@@ -1,0 +1,5 @@
+spring:
+  application:
+    name: ieuri
+server:
+  port: 8888
