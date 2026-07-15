@@ -108,3 +108,19 @@ Schema is owned by **Flyway migrations**, never by Hibernate. The domain-model �
 - **Reference across aggregates by id, not object**, even inside a domain.
 - **Conventions:** snake_case tables/columns; explicit PK; `created_at`/`updated_at` where the aggregate needs auditing; NOT NULL and constraints that encode real invariants.
 - **DB access from tooling is read-only.** The postgres MCP is for inspecting the current schema and verifying after apply — never for running DDL. Schema changes go through migration files, reviewed before apply.
+
+## Git strategy
+
+Branches: `master`, `dev`, `feature/*`, `hotfix/*`.
+
+- **master** — production. Always deployable; only ever receives merges from `dev` (or `hotfix/*`). Never commit directly.
+- **dev** — integration branch, kept in an always-mergeable-to-master state. Every feature starts from `dev` and merges back into `dev`.
+- **feature/** — all new work. Branch from `dev`, merge back into `dev`. This is where review happens (feature → dev).
+- **hotfix/** — urgent production fixes. Branch from `master`, merge into `master` (and back-merge into `dev` to keep it in sync).
+
+Merge & review rules:
+
+- `feature/* → dev`: **reviewed** (this is the review gate).
+- `dev → master`: **not reviewed** — dev is already validated and kept release-ready, so promoting it to production is a straight merge.
+- Never start a feature from `master`. Never start a hotfix from `dev`.
+- After a `hotfix/* → master`, back-merge into `dev` so dev doesn't fall behind production.
