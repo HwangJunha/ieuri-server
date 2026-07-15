@@ -1,0 +1,61 @@
+{
+  "// note": "Personal, gitignored overrides for THIS repo (.claude/settings.local.json). Team-shared rules go in .claude/settings.json. Precedence: deny > ask > allow, first match wins. A deny can't carry allow exceptions — narrow the deny instead.",
+
+  "permissions": {
+    "defaultMode": "acceptEdits",
+
+    "allow": [
+      "Read(./**)",
+      "Read(//**/*.kt)",
+      "Read(//**/*.kts)",
+      "Read(//**/*.graphqls)",
+      "Read(//**/*.yaml)",
+      "Read(//**/*.yml)",
+
+      "Bash(./gradlew build)",
+      "Bash(./gradlew test:*)",
+      "Bash(./gradlew bootRun)",
+      "Bash(./gradlew compileKotlin:*)",
+      "Bash(./gradlew compileTestKotlin:*)",
+      "Bash(./gradlew bootJar)",
+
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git branch:*)",
+      "Bash(git add:*)"
+    ],
+
+    "ask": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(//**/*.pem)",
+      "Read(//**/*.key)",
+      "Read(//**/application-*.yaml)",
+
+      "Bash(git push:*)",
+      "Bash(git commit:*)",
+      "Bash(gh pr:*)",
+      "Bash(docker:*)",
+      "Bash(kubectl:*)"
+    ],
+
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(rm -r:*)",
+      "Bash(rm -f:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git push --force:*)",
+      "Bash(git clean:*)",
+      "Bash(curl:*)",
+      "Bash(wget:*)",
+      "Read(./.ssh/**)",
+      "Read(//**/id_rsa)",
+      "Read(//**/id_ed25519)",
+      "Read(//**/*.p12)",
+      "Read(//**/*secret*)",
+      "Edit(./.env)",
+      "Edit(./.env.*)"
+    ]
+  }
+}

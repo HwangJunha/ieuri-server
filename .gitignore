@@ -228,3 +228,6 @@ Temporary Items
 *.icloud
 
 # End of https://www.toptal.com/developers/gitignore/api/macos,kotlin,java,intellij
+
+./claude/last-test-status
+.claude/settings.local.json
