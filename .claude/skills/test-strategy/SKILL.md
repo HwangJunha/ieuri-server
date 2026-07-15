@@ -7,7 +7,6 @@ metadata:
   version: "1.0"
 # --- Claude Code extensions (ignored by other agents) ---
 allowed-tools: Read, Glob, Grep, Write, Edit   # generates test files, so Write/Edit are allowed
-model: inherit
 argument-hint: "<slice path or class>"
 ---
 

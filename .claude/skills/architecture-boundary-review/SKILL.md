@@ -6,7 +6,6 @@ metadata:
   author: junha
   version: "1.0"
 allowed-tools: Read, Glob, Grep      # review-only: no Edit/Write/Bash so it cannot modify code
-model: inherit                       # boundary reasoning benefits from the main model; switch to opus for large diffs
 context: fork                        # runs in an isolated subagent — keeps verbose findings out of the main chat
 argument-hint: "<path or diff>"
 ---

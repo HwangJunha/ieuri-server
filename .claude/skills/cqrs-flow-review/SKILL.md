@@ -7,7 +7,6 @@ metadata:
   version: "1.0"
 # --- Claude Code extensions (ignored by other agents) ---
 allowed-tools: Read, Glob, Grep      # review-only
-model: inherit
 context: fork                        # isolated subagent; narrow focused pass, keep chat clean
 argument-hint: "<slice path>"
 ---

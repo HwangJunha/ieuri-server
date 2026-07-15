@@ -7,7 +7,6 @@ metadata:
   version: "1.0"
 # --- Claude Code extensions (ignored by other agents) ---
 allowed-tools: Read, Glob, Grep      # review-only
-model: inherit                       # routine enough for haiku on small diffs; keep inherit for judgment calls
 context: fork                        # isolated subagent
 argument-hint: "<path or diff>"
 ---

@@ -7,7 +7,6 @@ metadata:
   version: "1.0"
 # --- Claude Code extensions (ignored by other agents) ---
 allowed-tools: Read, Glob, Grep, Write, Edit   # writes migration .sql files; DB access is read-only via the postgres MCP
-model: inherit
 argument-hint: "<domain> <requirement or spec path>"
 ---
 

@@ -7,7 +7,6 @@ metadata:
   version: "1.0"
 # --- Claude Code extensions (ignored by other agents) ---
 allowed-tools: Read, Glob, Grep, Write, Edit   # this skill WRITES files (it scaffolds a slice)
-model: inherit
 disable-model-invocation: true                 # writes many files → trigger deliberately via /domain-slice-generator, not auto
 argument-hint: "<domain> <command|query> <UseCaseName>"
 ---
