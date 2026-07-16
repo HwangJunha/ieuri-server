@@ -4,6 +4,8 @@ plugins {
     id("org.springframework.boot") version "4.0.7"
     id("io.spring.dependency-management") version "1.1.7"
     kotlin("plugin.jpa") version "2.3.0"
+    // 스키마 우선(schema-first): auth.graphqls로부터 GraphQL input/output/enum 타입을 생성한다.
+    id("com.netflix.dgs.codegen") version "8.6.0"
 }
 
 group = "org.around"
@@ -65,4 +67,13 @@ allOpen {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+}
+
+// auth.graphqls → Kotlin GraphQL 타입 생성(입력/출력/enum). 서버 전용이라 client 코드는 생성하지 않는다.
+// 생성 패키지는 Kotlin 하드 키워드('in')를 피하려고 keyword-free 경로를 사용한다.
+tasks.withType<com.netflix.graphql.dgs.codegen.gradle.GenerateJavaTask> {
+    schemaPaths = mutableListOf("${projectDir}/src/main/resources/schema")
+    packageName = "org.around.ieuri.auth.infrastructure.graphql.generated"
+    generateClient = false
+    language = "kotlin"
 }

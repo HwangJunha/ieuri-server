@@ -12,11 +12,18 @@ import org.around.ieuri.auth.application.port.`in`.command.RegisterMemberUseCase
 import org.around.ieuri.auth.application.port.`in`.command.ResendVerificationUseCase
 import org.around.ieuri.auth.application.port.`in`.command.VerifyEmailUseCase
 import org.around.ieuri.auth.domain.vo.Provider
+import org.around.ieuri.auth.infrastructure.graphql.generated.types.RegisterMemberInput
+import org.around.ieuri.auth.infrastructure.graphql.generated.types.RegisterMemberPayload
+import org.around.ieuri.auth.infrastructure.graphql.generated.types.ResendVerificationInput
+import org.around.ieuri.auth.infrastructure.graphql.generated.types.ResendVerificationPayload
+import org.around.ieuri.auth.infrastructure.graphql.generated.types.VerifyEmailInput
+import org.around.ieuri.auth.infrastructure.graphql.generated.types.VerifyEmailPayload
 import java.util.UUID
 
 /**
  * 회원 관련 GraphQL 뮤테이션 리졸버(인바운드 어댑터). 얇게 유지하며 유스케이스에 위임한다.
- * GraphQL 입력 → 커맨드, 애플리케이션 결과 → 응답 페이로드 매핑을 이 계층이 소유한다.
+ * 입력/출력 타입은 auth.graphqls로부터 DGS codegen으로 생성된다(schema-first).
+ * 리졸버는 생성 타입 → 커맨드, 애플리케이션 결과 → 생성 응답 타입 매핑만 담당한다.
  */
 @DgsComponent
 class MemberMutationResolver(
@@ -28,9 +35,10 @@ class MemberMutationResolver(
     fun authHealth(): String = "ok"
 
     @DgsMutation
-    fun registerMember(@InputArgument input: RegisterMemberInputDto): RegisterMemberPayload {
+    fun registerMember(@InputArgument input: RegisterMemberInput): RegisterMemberPayload {
         val command = RegisterMemberCommand(
-            provider = Provider.valueOf(input.provider.uppercase()),
+            // 생성된 GraphQL Provider enum → 도메인 Provider (이름이 일치)
+            provider = Provider.valueOf(input.provider.name),
             idToken = input.idToken,
             submittedEmail = input.email,
             ageVerified = input.ageVerified,
@@ -44,7 +52,7 @@ class MemberMutationResolver(
     }
 
     @DgsMutation
-    fun verifyEmail(@InputArgument input: VerifyEmailInputDto): VerifyEmailPayload {
+    fun verifyEmail(@InputArgument input: VerifyEmailInput): VerifyEmailPayload {
         val result = verifyEmailUseCase.handle(
             VerifyEmailCommand(UUID.fromString(input.verificationId), input.code),
         )
@@ -52,7 +60,7 @@ class MemberMutationResolver(
     }
 
     @DgsMutation
-    fun resendVerification(@InputArgument input: ResendVerificationInputDto): ResendVerificationPayload {
+    fun resendVerification(@InputArgument input: ResendVerificationInput): ResendVerificationPayload {
         val result = resendVerificationUseCase.handle(
             ResendVerificationCommand(UUID.fromString(input.verificationId)),
         )
