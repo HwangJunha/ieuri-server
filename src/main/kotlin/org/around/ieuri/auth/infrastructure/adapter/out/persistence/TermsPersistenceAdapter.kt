@@ -1,4 +1,4 @@
-package org.around.ieuri.auth.infrastructure.adapter.out.persistence.adapter
+package org.around.ieuri.auth.infrastructure.adapter.out.persistence
 
 import org.around.ieuri.auth.application.port.out.persistence.TermsRepositoryPort
 import org.around.ieuri.auth.application.port.out.persistence.TermsView
