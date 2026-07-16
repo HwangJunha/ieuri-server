@@ -40,6 +40,8 @@ dependencies {
     runtimeOnly("org.postgresql:postgresql")
     testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")
     testImplementation("io.mockk:mockk:1.13.13")
+    // 패키지 의존성 방향(infrastructure → application → domain) 검증
+    testImplementation("com.tngtech.archunit:archunit-junit5:1.4.1")
     testImplementation("org.springframework.boot:spring-boot-starter-security-test")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("com.netflix.graphql.dgs:graphql-dgs-spring-graphql-starter-test")
