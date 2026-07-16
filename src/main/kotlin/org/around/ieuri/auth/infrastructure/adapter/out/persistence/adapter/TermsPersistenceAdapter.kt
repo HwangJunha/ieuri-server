@@ -1,7 +1,8 @@
-package org.around.ieuri.auth.infrastructure.adapter.out.persistence
+package org.around.ieuri.auth.infrastructure.adapter.out.persistence.adapter
 
 import org.around.ieuri.auth.application.port.out.persistence.TermsRepositoryPort
 import org.around.ieuri.auth.application.port.out.persistence.TermsView
+import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.TermsJpaRepository
 import org.springframework.stereotype.Component
 import java.time.Instant
 

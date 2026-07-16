@@ -1,6 +1,8 @@
-package org.around.ieuri.auth.infrastructure.adapter.out.persistence
+package org.around.ieuri.auth.infrastructure.adapter.out.persistence.adapter
 
 import org.around.ieuri.auth.application.port.out.persistence.AuditLogPort
+import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberAuditLogEntity
+import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.MemberAuditLogJpaRepository
 import org.springframework.stereotype.Component
 import tools.jackson.databind.ObjectMapper
 

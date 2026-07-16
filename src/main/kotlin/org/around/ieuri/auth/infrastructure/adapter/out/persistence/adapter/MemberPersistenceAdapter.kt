@@ -1,4 +1,4 @@
-package org.around.ieuri.auth.infrastructure.adapter.out.persistence
+package org.around.ieuri.auth.infrastructure.adapter.out.persistence.adapter
 
 import org.around.ieuri.auth.application.port.out.persistence.MemberRepositoryPort
 import org.around.ieuri.auth.application.port.out.security.EmailEncryptorPort
@@ -6,6 +6,12 @@ import org.around.ieuri.auth.domain.aggregate.Member
 import org.around.ieuri.auth.domain.vo.Email
 import org.around.ieuri.auth.domain.vo.Provider
 import org.around.ieuri.auth.domain.vo.ProviderUserId
+import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberEntity
+import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberProfileEntity
+import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberTermsAgreementEntity
+import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.MemberJpaRepository
+import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.MemberProfileJpaRepository
+import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.MemberTermsAgreementJpaRepository
 import org.springframework.stereotype.Component
 import java.time.Instant
 

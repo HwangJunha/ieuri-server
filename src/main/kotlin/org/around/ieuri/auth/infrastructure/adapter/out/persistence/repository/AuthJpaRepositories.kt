@@ -1,5 +1,12 @@
-package org.around.ieuri.auth.infrastructure.adapter.out.persistence
+package org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository
 
+import org.around.ieuri.auth.domain.vo.Provider
+import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.EmailVerificationEntity
+import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberAuditLogEntity
+import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberEntity
+import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberProfileEntity
+import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberTermsAgreementEntity
+import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.TermsEntity
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
@@ -8,7 +15,7 @@ import java.time.Instant
 import java.util.UUID
 
 interface MemberJpaRepository : JpaRepository<MemberEntity, Long> {
-    fun existsByProviderAndProviderUserId(provider: org.around.ieuri.auth.domain.vo.Provider, providerUserId: String): Boolean
+    fun existsByProviderAndProviderUserId(provider: Provider, providerUserId: String): Boolean
 }
 
 interface MemberProfileJpaRepository : JpaRepository<MemberProfileEntity, Long>

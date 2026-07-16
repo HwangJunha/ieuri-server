@@ -1,7 +1,9 @@
-package org.around.ieuri.auth.infrastructure.adapter.out.persistence
+package org.around.ieuri.auth.infrastructure.adapter.out.persistence.adapter
 
 import org.around.ieuri.auth.application.port.out.persistence.EmailVerificationRepositoryPort
 import org.around.ieuri.auth.domain.aggregate.EmailVerification
+import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.EmailVerificationEntity
+import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.EmailVerificationJpaRepository
 import org.springframework.stereotype.Component
 import java.time.Instant
 import java.util.UUID
