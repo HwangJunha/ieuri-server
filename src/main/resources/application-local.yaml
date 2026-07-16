@@ -1,0 +1,9 @@
+# 로컬(local) 프로파일 전용 값. 여기 값들은 개발 전용이며 운영 값과 반드시 다르다.
+# 주의: DB 비밀번호는 여기 두지 않는다(셸 환경변수 IEURI_DB_PASSWORD로 주입).
+ieuri:
+  encryption:
+    # 개발 전용 AES-256 키(base64 32바이트) — 운영에서는 절대 사용 금지, 환경변수로 교체.
+    key: aWV1cmlfbG9jYWxfZGV2X2FlczI1Nl9rZXlfMzJieXQ=
+    pepper: aWV1cmktbG9jYWwtZGV2LXBlcHBlcg==
+  mail:
+    from: no-reply-dev@ieuri.local
