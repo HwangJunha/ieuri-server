@@ -1,0 +1,62 @@
+type Query {
+    "GraphQL 스키마 헬스 체크(루트 Query 필요)."
+    authHealth: String!
+}
+
+type Mutation {
+    "SNS 회원가입. 가입은 이메일 검증 완료를 기다리지 않고 성공 처리된다."
+    registerMember(input: RegisterMemberInput!): RegisterMemberPayload!
+    "이메일 검증 코드 확인."
+    verifyEmail(input: VerifyEmailInput!): VerifyEmailPayload!
+    "이메일 검증 코드 재발송."
+    resendVerification(input: ResendVerificationInput!): ResendVerificationPayload!
+}
+
+enum Provider {
+    APPLE
+    GOOGLE
+    KAKAO
+}
+
+input RegisterMemberInput {
+    provider: Provider!
+    "SNS id_token(또는 dev 토큰)."
+    idToken: String!
+    "폼 제출 이메일(필수). provider 값이 기본 채워지되 수정 가능."
+    email: String!
+    "만 14세 이상 확인."
+    ageVerified: Boolean!
+    agreements: [AgreementInput!]!
+}
+
+input AgreementInput {
+    termsCode: String!
+    agreed: Boolean!
+}
+
+input VerifyEmailInput {
+    "가입 응답으로 받은 검증 핸들(email_verification.public_id)."
+    verificationId: ID!
+    code: String!
+}
+
+input ResendVerificationInput {
+    verificationId: ID!
+}
+
+type RegisterMemberPayload {
+    emailVerified: Boolean!
+    "미검증인 경우에만 채워지는 검증 핸들."
+    verificationId: ID
+}
+
+type VerifyEmailPayload {
+    verified: Boolean!
+    "실패 사유(EXPIRED/CONSUMED/MAX_ATTEMPTS_EXCEEDED/CODE_MISMATCH). 성공 시 null."
+    failureReason: String
+}
+
+type ResendVerificationPayload {
+    verificationId: ID!
+    expiresAt: String!
+}
