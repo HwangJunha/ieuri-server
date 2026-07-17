@@ -51,3 +51,6 @@ ieuri:
     secret: ${IEURI_JWT_SECRET}
     access-ttl: 5m
     refresh-ttl: 30d
+  admin:
+    # 정지/복구 임시 가드 키(본격 RBAC 전까지). prod: 환경변수 fail-fast. local: 오버라이드.
+    api-key: ${IEURI_ADMIN_API_KEY}

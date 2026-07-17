@@ -10,3 +10,6 @@ ieuri:
   jwt:
     # 개발 전용 HS256 서명 키(base64 32바이트) — 운영에서는 절대 사용 금지, 환경변수로 교체.
     secret: aWV1cmlfbG9jYWxfZGV2X2p3dF9oczI1Nl9zZWNyZXQ=
+  admin:
+    # 개발 전용 관리자 키 — 운영에서는 환경변수로 교체.
+    api-key: dev-admin-key
