@@ -1,5 +1,6 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.persistence
 
+import org.around.ieuri.auth.application.port.out.persistence.MemberAuthentication
 import org.around.ieuri.auth.application.port.out.persistence.MemberRepositoryPort
 import org.around.ieuri.auth.application.port.out.security.EmailEncryptorPort
 import org.around.ieuri.auth.domain.aggregate.Member
@@ -75,5 +76,10 @@ class MemberPersistenceAdapter(
     override fun findEmailByMemberId(memberId: Long): Email? {
         val entity = memberRepository.findById(memberId).orElse(null) ?: return null
         return Email(encryptor.decrypt(entity.emailEncrypted))
+    }
+
+    override fun findAuthentication(provider: Provider, providerUserId: ProviderUserId): MemberAuthentication? {
+        val entity = memberRepository.findByProviderAndProviderUserId(provider, providerUserId.value) ?: return null
+        return MemberAuthentication(memberId = requireNotNull(entity.id), status = entity.status)
     }
 }

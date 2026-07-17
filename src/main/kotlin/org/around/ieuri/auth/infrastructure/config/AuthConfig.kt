@@ -12,7 +12,7 @@ import java.time.Duration
  * 변환해 핸들러에 주입하고, 테스트 가능성을 위해 Clock을 빈으로 제공한다.
  */
 @Configuration
-@EnableConfigurationProperties(EncryptionProperties::class, VerificationProperties::class)
+@EnableConfigurationProperties(EncryptionProperties::class, VerificationProperties::class, JwtProperties::class)
 class AuthConfig {
 
     @Bean
