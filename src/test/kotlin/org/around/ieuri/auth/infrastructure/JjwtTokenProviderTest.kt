@@ -32,9 +32,21 @@ class JjwtTokenProviderTest {
     }
 
     @Test
+    fun `access 토큰 발급 후 파싱하면 memberId가 일치한다`() {
+        val issued = provider.issueAccessToken(100L)
+        assertEquals(100L, provider.parseAccessToken(issued.token).memberId)
+    }
+
+    @Test
     fun `access 토큰을 refresh 자리에 넣으면 타입 불일치로 거부된다`() {
         val access = provider.issueAccessToken(100L)
         assertFailsWith<InvalidTokenException> { provider.parseRefreshToken(access.token) }
+    }
+
+    @Test
+    fun `refresh 토큰을 access 자리에 넣으면 타입 불일치로 거부된다`() {
+        val refresh = provider.issueRefreshToken(100L)
+        assertFailsWith<InvalidTokenException> { provider.parseAccessToken(refresh.token) }
     }
 
     @Test

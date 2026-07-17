@@ -16,6 +16,12 @@ type Mutation {
     refreshToken(input: RefreshTokenInput!): AuthTokenPayload!
     "로그아웃. 제출한 refreshToken을 폐기한다."
     logout(input: LogoutInput!): LogoutPayload!
+    "회원 탈퇴(본인). accessToken 인증 필요. 회원과 소유 데이터가 삭제된다."
+    withdrawMember: WithdrawMemberPayload!
+    "회원 정지(관리자). X-Admin-Api-Key 헤더 필요."
+    suspendMember(input: SuspendMemberInput!): AdminActionPayload!
+    "회원 정지 해제(관리자). X-Admin-Api-Key 헤더 필요."
+    reactivateMember(input: ReactivateMemberInput!): AdminActionPayload!
 }
 
 enum Provider {
@@ -92,5 +98,24 @@ type AuthTokenPayload {
 }
 
 type LogoutPayload {
+    success: Boolean!
+}
+
+input SuspendMemberInput {
+    memberId: ID!
+    reason: String!
+    "정지 만료 시각(ISO-8601). 없으면 무기한."
+    suspendedUntil: String
+}
+
+input ReactivateMemberInput {
+    memberId: ID!
+}
+
+type WithdrawMemberPayload {
+    success: Boolean!
+}
+
+type AdminActionPayload {
     success: Boolean!
 }

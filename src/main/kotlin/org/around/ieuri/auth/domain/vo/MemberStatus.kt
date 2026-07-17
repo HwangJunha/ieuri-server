@@ -1,11 +1,10 @@
 package org.around.ieuri.auth.domain.vo
 
 /**
- * 회원 상태. 이번 스텝에서는 ACTIVE만 사용하고,
- * 탈퇴/정지(다음 스텝)를 위한 상태값을 미리 확보해 둔다.
+ * 회원 상태. 탈퇴는 행 삭제(hard delete)로 처리하므로 상태값으로 남기지 않는다.
+ * 따라서 상태는 ACTIVE / SUSPENDED 둘뿐이다.
  */
 enum class MemberStatus {
     ACTIVE,
     SUSPENDED,
-    WITHDRAWN,
 }

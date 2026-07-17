@@ -27,12 +27,23 @@ interface MemberRepositoryPort {
 
     /** 로그인용 인증 정보 조회. (provider, provider_user_id)로 회원의 id·상태를 반환. 없으면 null. */
     fun findAuthentication(provider: Provider, providerUserId: ProviderUserId): MemberAuthentication?
+
+    /** 상태 변경(정지/복구)용 도메인 회원 로드. 동의 이력은 재적재하지 않는다. */
+    fun load(memberId: Long): Member?
+
+    /** 도메인의 상태·정지 메타를 managed 엔티티에 반영(dirty-check). */
+    fun updateStatus(member: Member)
+
+    /** 탈퇴: 회원과 소유 데이터(프로필·동의이력·이메일검증) 행을 삭제한다(감사 로그는 보존). */
+    fun deleteMember(memberId: Long)
 }
 
 /** 로그인 인증에 필요한 최소 회원 정보. */
 data class MemberAuthentication(
     val memberId: Long,
     val status: MemberStatus,
+    val suspendedUntil: Instant?,
+    val suspensionReason: String?,
 )
 
 /** 활성 약관 조회 포트. 코드별 최신 유효 버전을 반환한다. */

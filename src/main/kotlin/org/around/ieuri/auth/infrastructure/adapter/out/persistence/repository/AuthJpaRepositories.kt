@@ -20,9 +20,14 @@ interface MemberJpaRepository : JpaRepository<MemberEntity, Long> {
     fun findByProviderAndProviderUserId(provider: Provider, providerUserId: String): MemberEntity?
 }
 
-interface MemberProfileJpaRepository : JpaRepository<MemberProfileEntity, Long>
+interface MemberProfileJpaRepository : JpaRepository<MemberProfileEntity, Long> {
+    fun findByMemberId(memberId: Long): MemberProfileEntity?
+    fun deleteByMemberId(memberId: Long)
+}
 
-interface MemberTermsAgreementJpaRepository : JpaRepository<MemberTermsAgreementEntity, Long>
+interface MemberTermsAgreementJpaRepository : JpaRepository<MemberTermsAgreementEntity, Long> {
+    fun deleteByMemberId(memberId: Long)
+}
 
 interface TermsJpaRepository : JpaRepository<TermsEntity, Long> {
     fun findByEffectiveAtLessThanEqual(now: Instant): List<TermsEntity>
@@ -43,6 +48,8 @@ interface EmailVerificationJpaRepository : JpaRepository<EmailVerificationEntity
 
     @Query("SELECT MAX(e.createdAt) FROM EmailVerificationEntity e WHERE e.memberId = :memberId")
     fun findLatestCreatedAtByMemberId(@Param("memberId") memberId: Long): Instant?
+
+    fun deleteByMemberId(memberId: Long)
 }
 
 interface MemberAuditLogJpaRepository : JpaRepository<MemberAuditLogEntity, Long>

@@ -13,7 +13,15 @@ interface TokenProviderPort {
 
     /** refresh 토큰을 파싱·검증하고 클레임을 반환. 유효하지 않으면 예외. */
     fun parseRefreshToken(token: String): RefreshTokenClaims
+
+    /** access 토큰을 파싱·검증하고 인증 주체(memberId)를 반환. 유효하지 않으면 예외. */
+    fun parseAccessToken(token: String): AccessTokenClaims
 }
+
+/** 검증된 access 토큰의 클레임. */
+data class AccessTokenClaims(
+    val memberId: Long,
+)
 
 /** 발급된 accessToken(값 + 만료시각). */
 data class IssuedToken(

@@ -5,11 +5,13 @@ import org.around.ieuri.auth.application.port.out.persistence.MemberRepositoryPo
 import org.around.ieuri.auth.application.port.out.security.EmailEncryptorPort
 import org.around.ieuri.auth.domain.aggregate.Member
 import org.around.ieuri.auth.domain.vo.Email
+import org.around.ieuri.auth.domain.vo.Nickname
 import org.around.ieuri.auth.domain.vo.Provider
 import org.around.ieuri.auth.domain.vo.ProviderUserId
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberProfileEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberTermsAgreementEntity
+import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.EmailVerificationJpaRepository
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.MemberJpaRepository
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.MemberProfileJpaRepository
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.MemberTermsAgreementJpaRepository
@@ -25,6 +27,7 @@ class MemberPersistenceAdapter(
     private val memberRepository: MemberJpaRepository,
     private val profileRepository: MemberProfileJpaRepository,
     private val agreementRepository: MemberTermsAgreementJpaRepository,
+    private val emailVerificationRepository: EmailVerificationJpaRepository,
     private val encryptor: EmailEncryptorPort,
 ) : MemberRepositoryPort {
 
@@ -80,6 +83,49 @@ class MemberPersistenceAdapter(
 
     override fun findAuthentication(provider: Provider, providerUserId: ProviderUserId): MemberAuthentication? {
         val entity = memberRepository.findByProviderAndProviderUserId(provider, providerUserId.value) ?: return null
-        return MemberAuthentication(memberId = requireNotNull(entity.id), status = entity.status)
+        return MemberAuthentication(
+            memberId = requireNotNull(entity.id),
+            status = entity.status,
+            suspendedUntil = entity.suspendedUntil,
+            suspensionReason = entity.suspensionReason,
+        )
+    }
+
+    override fun load(memberId: Long): Member? {
+        val entity = memberRepository.findById(memberId).orElse(null) ?: return null
+        val profile = profileRepository.findByMemberId(memberId)
+        return Member.reconstitute(
+            id = requireNotNull(entity.id),
+            provider = entity.provider,
+            providerUserId = ProviderUserId(entity.providerUserId),
+            email = Email(encryptor.decrypt(entity.emailEncrypted)),
+            emailVerified = entity.emailVerified,
+            status = entity.status,
+            ageVerified = entity.ageVerified,
+            suspendedAt = entity.suspendedAt,
+            suspendedUntil = entity.suspendedUntil,
+            suspensionReason = entity.suspensionReason,
+            nickname = Nickname(profile?.nickname ?: "여행자"),
+            profileImageUrl = profile?.profileImageUrl,
+            createdAt = requireNotNull(entity.createdAt),
+        )
+    }
+
+    override fun updateStatus(member: Member) {
+        val id = member.id ?: return
+        val entity = memberRepository.findById(id).orElse(null) ?: return
+        entity.status = member.status
+        entity.suspendedAt = member.suspendedAt
+        entity.suspendedUntil = member.suspendedUntil
+        entity.suspensionReason = member.suspensionReason
+        // dirty-check로 UPDATE.
+    }
+
+    override fun deleteMember(memberId: Long) {
+        // FK 자식부터 삭제 후 회원 삭제(감사 로그는 FK가 없어 보존됨).
+        emailVerificationRepository.deleteByMemberId(memberId)
+        agreementRepository.deleteByMemberId(memberId)
+        profileRepository.deleteByMemberId(memberId)
+        memberRepository.deleteById(memberId)
     }
 }

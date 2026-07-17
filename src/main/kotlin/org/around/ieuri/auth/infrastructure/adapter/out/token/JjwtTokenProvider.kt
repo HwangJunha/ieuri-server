@@ -4,6 +4,7 @@ import io.jsonwebtoken.JwtException
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.security.Keys
 import org.around.ieuri.auth.application.exception.InvalidTokenException
+import org.around.ieuri.auth.application.port.out.token.AccessTokenClaims
 import org.around.ieuri.auth.application.port.out.token.IssuedRefreshToken
 import org.around.ieuri.auth.application.port.out.token.IssuedToken
 import org.around.ieuri.auth.application.port.out.token.RefreshTokenClaims
@@ -63,6 +64,22 @@ class JjwtTokenProvider(
     }
 
     override fun parseRefreshToken(token: String): RefreshTokenClaims {
+        val claims = parseAndVerify(token, TYPE_REFRESH)
+        val memberId = claims.subject?.toLongOrNull()
+            ?: throw InvalidTokenException("토큰에 회원 식별자가 없습니다.")
+        val jti = claims.id ?: throw InvalidTokenException("토큰에 jti가 없습니다.")
+        return RefreshTokenClaims(memberId = memberId, jti = jti, expiresAt = claims.expiration.toInstant())
+    }
+
+    override fun parseAccessToken(token: String): AccessTokenClaims {
+        val claims = parseAndVerify(token, TYPE_ACCESS)
+        val memberId = claims.subject?.toLongOrNull()
+            ?: throw InvalidTokenException("토큰에 회원 식별자가 없습니다.")
+        return AccessTokenClaims(memberId = memberId)
+    }
+
+    /** 서명·발급자·만료를 검증하고 typ 클레임을 확인한 뒤 Claims를 반환. 실패 시 InvalidTokenException. */
+    private fun parseAndVerify(token: String, expectedType: String): io.jsonwebtoken.Claims {
         val claims = try {
             Jwts.parser()
                 .verifyWith(key)
@@ -75,15 +92,10 @@ class JjwtTokenProvider(
         } catch (ex: IllegalArgumentException) {
             throw InvalidTokenException("유효하지 않은 토큰입니다.")
         }
-
-        if (claims.get(TYPE_CLAIM, String::class.java) != TYPE_REFRESH) {
-            throw InvalidTokenException("refresh 토큰이 아닙니다.")
+        if (claims.get(TYPE_CLAIM, String::class.java) != expectedType) {
+            throw InvalidTokenException("토큰 유형이 올바르지 않습니다.")
         }
-        val memberId = claims.subject?.toLongOrNull()
-            ?: throw InvalidTokenException("토큰에 회원 식별자가 없습니다.")
-        val jti = claims.id ?: throw InvalidTokenException("토큰에 jti가 없습니다.")
-
-        return RefreshTokenClaims(memberId = memberId, jti = jti, expiresAt = claims.expiration.toInstant())
+        return claims
     }
 
     private companion object {

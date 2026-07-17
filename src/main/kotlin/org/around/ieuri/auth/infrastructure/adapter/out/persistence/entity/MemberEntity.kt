@@ -45,6 +45,15 @@ class MemberEntity(
     @Column(name = "age_verified", nullable = false)
     var ageVerified: Boolean,
 
+    @Column(name = "suspended_at")
+    var suspendedAt: Instant? = null,
+
+    @Column(name = "suspended_until")
+    var suspendedUntil: Instant? = null,
+
+    @Column(name = "suspension_reason", length = 500)
+    var suspensionReason: String? = null,
+
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant? = null,
 
