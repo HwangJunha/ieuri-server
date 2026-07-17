@@ -10,6 +10,12 @@ type Mutation {
     verifyEmail(input: VerifyEmailInput!): VerifyEmailPayload!
     "이메일 검증 코드 재발송."
     resendVerification(input: ResendVerificationInput!): ResendVerificationPayload!
+    "SNS 로그인. 기존 회원만 인증하며 accessToken/refreshToken을 발급한다."
+    login(input: LoginInput!): AuthTokenPayload!
+    "refreshToken으로 accessToken 재발급(refresh 회전)."
+    refreshToken(input: RefreshTokenInput!): AuthTokenPayload!
+    "로그아웃. 제출한 refreshToken을 폐기한다."
+    logout(input: LogoutInput!): LogoutPayload!
 }
 
 enum Provider {
@@ -59,4 +65,32 @@ type VerifyEmailPayload {
 type ResendVerificationPayload {
     verificationId: ID!
     expiresAt: String!
+}
+
+input LoginInput {
+    provider: Provider!
+    "SNS id_token(또는 dev 토큰)."
+    idToken: String!
+}
+
+input RefreshTokenInput {
+    refreshToken: String!
+}
+
+input LogoutInput {
+    refreshToken: String!
+}
+
+type AuthTokenPayload {
+    accessToken: String!
+    refreshToken: String!
+    tokenType: String!
+    "accessToken 남은 유효기간(초)."
+    accessTokenExpiresIn: Int!
+    "refreshToken 남은 유효기간(초)."
+    refreshTokenExpiresIn: Int!
+}
+
+type LogoutPayload {
+    success: Boolean!
 }

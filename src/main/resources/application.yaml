@@ -45,3 +45,9 @@ ieuri:
     # local: application-local.yaml이 개발 전용 값으로 오버라이드한다.
     key: ${IEURI_ENCRYPTION_KEY}
     pepper: ${IEURI_ENCRYPTION_PEPPER}
+  jwt:
+    issuer: ieuri
+    # prod: 환경변수 주입(기본값 없음 → fail-fast). local: application-local.yaml이 오버라이드.
+    secret: ${IEURI_JWT_SECRET}
+    access-ttl: 5m
+    refresh-ttl: 30d

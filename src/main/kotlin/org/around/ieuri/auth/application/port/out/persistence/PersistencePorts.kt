@@ -3,6 +3,7 @@ package org.around.ieuri.auth.application.port.out.persistence
 import org.around.ieuri.auth.domain.aggregate.EmailVerification
 import org.around.ieuri.auth.domain.aggregate.Member
 import org.around.ieuri.auth.domain.vo.Email
+import org.around.ieuri.auth.domain.vo.MemberStatus
 import org.around.ieuri.auth.domain.vo.Provider
 import org.around.ieuri.auth.domain.vo.ProviderUserId
 import java.time.Instant
@@ -23,7 +24,16 @@ interface MemberRepositoryPort {
 
     /** 검증메일 재발송 등을 위해 저장된 이메일을 복호화해 반환한다. */
     fun findEmailByMemberId(memberId: Long): Email?
+
+    /** 로그인용 인증 정보 조회. (provider, provider_user_id)로 회원의 id·상태를 반환. 없으면 null. */
+    fun findAuthentication(provider: Provider, providerUserId: ProviderUserId): MemberAuthentication?
 }
+
+/** 로그인 인증에 필요한 최소 회원 정보. */
+data class MemberAuthentication(
+    val memberId: Long,
+    val status: MemberStatus,
+)
 
 /** 활성 약관 조회 포트. 코드별 최신 유효 버전을 반환한다. */
 interface TermsRepositoryPort {

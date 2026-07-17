@@ -16,6 +16,8 @@ import java.util.UUID
 
 interface MemberJpaRepository : JpaRepository<MemberEntity, Long> {
     fun existsByProviderAndProviderUserId(provider: Provider, providerUserId: String): Boolean
+
+    fun findByProviderAndProviderUserId(provider: Provider, providerUserId: String): MemberEntity?
 }
 
 interface MemberProfileJpaRepository : JpaRepository<MemberProfileEntity, Long>
