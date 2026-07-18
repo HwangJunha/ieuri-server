@@ -32,7 +32,7 @@ class JjwtTokenProvider(
     private val accessTtl = properties.accessTtl
     private val refreshTtl = properties.refreshTtl
 
-    override fun issueAccessToken(memberId: Long): IssuedToken {
+    override fun issueAccessToken(memberId: Long, permissions: Set<String>, roles: Set<String>): IssuedToken {
         val now = clock.instant()
         val expiresAt = now.plus(accessTtl)
         val token = Jwts.builder()
@@ -40,6 +40,9 @@ class JjwtTokenProvider(
             .subject(memberId.toString())
             .id(UUID.randomUUID().toString())
             .claim(TYPE_CLAIM, TYPE_ACCESS)
+            // 유효 권한/역할을 flatten해 담는다. 인가는 요청당 DB 조회 없이 perms로 판정한다.
+            .claim(PERMS_CLAIM, permissions.toList())
+            .claim(ROLES_CLAIM, roles.toList())
             .issuedAt(Date.from(now))
             .expiration(Date.from(expiresAt))
             .signWith(key, Jwts.SIG.HS256)
@@ -75,8 +78,16 @@ class JjwtTokenProvider(
         val claims = parseAndVerify(token, TYPE_ACCESS)
         val memberId = claims.subject?.toLongOrNull()
             ?: throw InvalidTokenException("토큰에 회원 식별자가 없습니다.")
-        return AccessTokenClaims(memberId = memberId)
+        return AccessTokenClaims(
+            memberId = memberId,
+            permissions = claims.stringSet(PERMS_CLAIM),
+            roles = claims.stringSet(ROLES_CLAIM),
+        )
     }
+
+    /** 문자열 리스트 클레임을 Set<String>으로 안전하게 읽는다(누락/타입 불일치 시 빈 집합). */
+    private fun io.jsonwebtoken.Claims.stringSet(name: String): Set<String> =
+        (this[name] as? Collection<*>)?.mapNotNull { it as? String }?.toSet() ?: emptySet()
 
     /** 서명·발급자·만료를 검증하고 typ 클레임을 확인한 뒤 Claims를 반환. 실패 시 InvalidTokenException. */
     private fun parseAndVerify(token: String, expectedType: String): io.jsonwebtoken.Claims {
@@ -102,5 +113,7 @@ class JjwtTokenProvider(
         const val TYPE_CLAIM = "typ"
         const val TYPE_ACCESS = "access"
         const val TYPE_REFRESH = "refresh"
+        const val PERMS_CLAIM = "perms"
+        const val ROLES_CLAIM = "roles"
     }
 }

@@ -1,6 +1,12 @@
 type Query {
     "GraphQL 스키마 헬스 체크(루트 Query 필요)."
     authHealth: String!
+    "본인 정보. accessToken 인증만 필요(권한 불요). 역할/유효권한을 담아 클라이언트 메뉴 렌더에 사용한다."
+    me: Me!
+    "관리자 회원 단건 조회. member:read 권한 필요."
+    member(id: ID!): MemberDetail!
+    "관리자 회원 목록(페이지네이션). member:read 권한 필요. 목록은 이메일을 포함하지 않는다(최소수집)."
+    members(status: MemberStatus, roleCode: String, page: Int = 0, size: Int = 20): MemberPage!
 }
 
 type Mutation {
@@ -18,10 +24,20 @@ type Mutation {
     logout(input: LogoutInput!): LogoutPayload!
     "회원 탈퇴(본인). accessToken 인증 필요. 회원과 소유 데이터가 삭제된다."
     withdrawMember: WithdrawMemberPayload!
-    "회원 정지(관리자). X-Admin-Api-Key 헤더 필요."
+    "회원 정지(관리자). member:suspend 권한 필요."
     suspendMember(input: SuspendMemberInput!): AdminActionPayload!
-    "회원 정지 해제(관리자). X-Admin-Api-Key 헤더 필요."
+    "회원 정지 해제(관리자). member:reactivate 권한 필요."
     reactivateMember(input: ReactivateMemberInput!): AdminActionPayload!
+    "역할 부여(관리자). role:assign 권한 필요."
+    assignRole(input: AssignRoleInput!): RoleChangePayload!
+    "역할 회수(관리자). role:revoke 권한 필요. 본인의 마지막 관리 역할 회수는 거부된다."
+    revokeRole(input: RevokeRoleInput!): RoleChangePayload!
+}
+
+"회원 상태. 탈퇴는 행 삭제(hard delete)이므로 상태값에 없다."
+enum MemberStatus {
+    ACTIVE
+    SUSPENDED
 }
 
 enum Provider {
@@ -118,4 +134,67 @@ type WithdrawMemberPayload {
 
 type AdminActionPayload {
     success: Boolean!
+}
+
+input AssignRoleInput {
+    memberId: ID!
+    roleCode: String!
+}
+
+input RevokeRoleInput {
+    memberId: ID!
+    roleCode: String!
+}
+
+"역할 부여/회수 결과. changed=false면 멱등(이미 부여됨/원래 없음)."
+type RoleChangePayload {
+    success: Boolean!
+    changed: Boolean!
+}
+
+"본인 정보(me). 이메일은 본인이므로 평문 노출. roles/permissions로 클라이언트 메뉴를 렌더한다."
+type Me {
+    id: ID!
+    email: String!
+    nickname: String!
+    profileImageUrl: String
+    status: MemberStatus!
+    emailVerified: Boolean!
+    roles: [String!]!
+    permissions: [String!]!
+    "가입일(ISO-8601)."
+    createdAt: String!
+}
+
+"관리자 회원 단건 상세. member:read 권한 필요."
+type MemberDetail {
+    id: ID!
+    email: String!
+    nickname: String!
+    profileImageUrl: String
+    status: MemberStatus!
+    emailVerified: Boolean!
+    "정지 정보(정지 상태에서만 채워짐, ISO-8601)."
+    suspendedAt: String
+    suspendedUntil: String
+    suspensionReason: String
+    roles: [String!]!
+    createdAt: String!
+}
+
+"관리자 회원 목록 항목. 최소수집: 이메일 미포함."
+type MemberSummary {
+    id: ID!
+    nickname: String!
+    status: MemberStatus!
+    roles: [String!]!
+    createdAt: String!
+}
+
+type MemberPage {
+    items: [MemberSummary!]!
+    page: Int!
+    size: Int!
+    totalElements: Int!
+    totalPages: Int!
 }

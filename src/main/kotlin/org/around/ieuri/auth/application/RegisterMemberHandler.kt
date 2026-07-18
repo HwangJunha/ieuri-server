@@ -11,10 +11,12 @@ import org.around.ieuri.auth.application.port.out.event.DomainEventPublisherPort
 import org.around.ieuri.auth.application.port.out.persistence.AuditLogPort
 import org.around.ieuri.auth.application.port.out.persistence.EmailVerificationRepositoryPort
 import org.around.ieuri.auth.application.port.out.persistence.MemberRepositoryPort
+import org.around.ieuri.auth.application.port.out.persistence.RoleRepositoryPort
 import org.around.ieuri.auth.application.port.out.persistence.TermsRepositoryPort
 import org.around.ieuri.auth.application.port.out.security.VerificationCodeGeneratorPort
 import org.around.ieuri.auth.domain.aggregate.EmailVerification
 import org.around.ieuri.auth.domain.aggregate.Member
+import org.around.ieuri.auth.domain.aggregate.Role
 import org.around.ieuri.auth.domain.event.MemberRegistered
 import org.around.ieuri.auth.domain.vo.Agreement
 import org.around.ieuri.auth.domain.vo.Email
@@ -35,6 +37,7 @@ import java.util.UUID
 class RegisterMemberHandler(
     private val snsVerifier: SnsIdentityVerifierPort,
     private val memberRepository: MemberRepositoryPort,
+    private val roleRepository: RoleRepositoryPort,
     private val termsRepository: TermsRepositoryPort,
     private val verificationRepository: EmailVerificationRepositoryPort,
     private val codeGenerator: VerificationCodeGeneratorPort,
@@ -88,6 +91,9 @@ class RegisterMemberHandler(
         )
 
         val memberId = memberRepository.save(member)
+
+        // 기본 역할(USER) 부여. 관리 역할은 부트스트랩/역할 부여로만 얻는다.
+        roleRepository.assignRoleToMember(memberId, Role.USER)
 
         var verificationPublicId: UUID? = null
         if (!member.emailVerified) {

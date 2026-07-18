@@ -14,6 +14,7 @@ import org.around.ieuri.auth.application.port.out.event.DomainEventPublisherPort
 import org.around.ieuri.auth.application.port.out.persistence.AuditLogPort
 import org.around.ieuri.auth.application.port.out.persistence.EmailVerificationRepositoryPort
 import org.around.ieuri.auth.application.port.out.persistence.MemberRepositoryPort
+import org.around.ieuri.auth.application.port.out.persistence.RoleRepositoryPort
 import org.around.ieuri.auth.application.port.out.persistence.TermsRepositoryPort
 import org.around.ieuri.auth.application.port.out.persistence.TermsView
 import org.around.ieuri.auth.application.port.out.security.VerificationCodeGeneratorPort
@@ -35,6 +36,7 @@ class RegisterMemberHandlerTest {
 
     private val snsVerifier = mockk<SnsIdentityVerifierPort>()
     private val memberRepository = mockk<MemberRepositoryPort>()
+    private val roleRepository = mockk<RoleRepositoryPort>(relaxed = true)
     private val termsRepository = mockk<TermsRepositoryPort>()
     private val verificationRepository = mockk<EmailVerificationRepositoryPort>(relaxed = true)
     private val codeGenerator = mockk<VerificationCodeGeneratorPort>()
@@ -44,7 +46,7 @@ class RegisterMemberHandlerTest {
     private val clock = Clock.fixed(Instant.parse("2026-07-16T00:00:00Z"), ZoneOffset.UTC)
 
     private val handler = RegisterMemberHandler(
-        snsVerifier, memberRepository, termsRepository, verificationRepository,
+        snsVerifier, memberRepository, roleRepository, termsRepository, verificationRepository,
         codeGenerator, auditLog, eventPublisher, policy, clock,
     )
 
@@ -81,6 +83,7 @@ class RegisterMemberHandlerTest {
         assertTrue(result.emailVerified)
         assertNull(result.verificationPublicId)
         verify(exactly = 1) { memberRepository.save(any()) }
+        verify { roleRepository.assignRoleToMember(100L, "USER") }
         verify(exactly = 0) { verificationRepository.save(any()) }
         verify(exactly = 0) { codeGenerator.generate() }
         verify { auditLog.record(100L, "MEMBER_REGISTERED", any()) }

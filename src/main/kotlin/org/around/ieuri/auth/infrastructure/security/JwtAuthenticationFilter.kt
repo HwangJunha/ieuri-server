@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletResponse
 import org.around.ieuri.auth.application.exception.InvalidTokenException
 import org.around.ieuri.auth.application.port.out.token.TokenProviderPort
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
@@ -26,7 +27,9 @@ class JwtAuthenticationFilter(
             val token = header.substring(BEARER_PREFIX.length)
             try {
                 val claims = tokenProvider.parseAccessToken(token)
-                val authentication = UsernamePasswordAuthenticationToken(claims.memberId, null, emptyList())
+                // 권한(perms)을 authority로 세팅 → Authorizer가 권한 코드로 인가를 판정한다.
+                val authorities = claims.permissions.map { SimpleGrantedAuthority(it) }
+                val authentication = UsernamePasswordAuthenticationToken(claims.memberId, null, authorities)
                 SecurityContextHolder.getContext().authentication = authentication
             } catch (ex: InvalidTokenException) {
                 // 무효 토큰은 인증 없이 통과. SecurityContext는 설정하지 않는다.

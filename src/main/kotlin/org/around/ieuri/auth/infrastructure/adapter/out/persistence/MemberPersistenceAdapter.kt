@@ -14,6 +14,7 @@ import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.Membe
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.EmailVerificationJpaRepository
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.MemberJpaRepository
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.MemberProfileJpaRepository
+import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.MemberRoleJpaRepository
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.MemberTermsAgreementJpaRepository
 import org.springframework.stereotype.Component
 import java.time.Instant
@@ -28,11 +29,14 @@ class MemberPersistenceAdapter(
     private val profileRepository: MemberProfileJpaRepository,
     private val agreementRepository: MemberTermsAgreementJpaRepository,
     private val emailVerificationRepository: EmailVerificationJpaRepository,
+    private val memberRoleRepository: MemberRoleJpaRepository,
     private val encryptor: EmailEncryptorPort,
 ) : MemberRepositoryPort {
 
     override fun existsByProviderAndProviderUserId(provider: Provider, providerUserId: ProviderUserId): Boolean =
         memberRepository.existsByProviderAndProviderUserId(provider, providerUserId.value)
+
+    override fun existsById(memberId: Long): Boolean = memberRepository.existsById(memberId)
 
     override fun save(member: Member): Long {
         val saved = memberRepository.save(
@@ -126,6 +130,7 @@ class MemberPersistenceAdapter(
         emailVerificationRepository.deleteByMemberId(memberId)
         agreementRepository.deleteByMemberId(memberId)
         profileRepository.deleteByMemberId(memberId)
+        memberRoleRepository.deleteByMemberId(memberId)
         memberRepository.deleteById(memberId)
     }
 }
