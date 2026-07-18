@@ -7,7 +7,11 @@ import java.time.Instant
  * refresh 검증 실패(서명/만료/타입 불일치)는 InvalidTokenException을 던진다.
  */
 interface TokenProviderPort {
-    fun issueAccessToken(memberId: Long): IssuedToken
+    /**
+     * accessToken 발급. 발급 시점의 유효 권한(permissions)과 역할(roles)을 클레임에 flatten해 담는다.
+     * 인가는 요청당 DB 조회 없이 이 토큰의 permissions로 판정한다(역할 변경은 최대 access TTL 후 반영).
+     */
+    fun issueAccessToken(memberId: Long, permissions: Set<String>, roles: Set<String>): IssuedToken
 
     fun issueRefreshToken(memberId: Long): IssuedRefreshToken
 
@@ -18,9 +22,11 @@ interface TokenProviderPort {
     fun parseAccessToken(token: String): AccessTokenClaims
 }
 
-/** 검증된 access 토큰의 클레임. */
+/** 검증된 access 토큰의 클레임. permissions로 인가를 판정하고, roles는 표시/감사용이다. */
 data class AccessTokenClaims(
     val memberId: Long,
+    val permissions: Set<String>,
+    val roles: Set<String>,
 )
 
 /** 발급된 accessToken(값 + 만료시각). */

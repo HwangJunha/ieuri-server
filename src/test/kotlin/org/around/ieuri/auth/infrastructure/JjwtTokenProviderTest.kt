@@ -32,14 +32,28 @@ class JjwtTokenProviderTest {
     }
 
     @Test
-    fun `access 토큰 발급 후 파싱하면 memberId가 일치한다`() {
-        val issued = provider.issueAccessToken(100L)
-        assertEquals(100L, provider.parseAccessToken(issued.token).memberId)
+    fun `access 토큰 발급 후 파싱하면 memberId와 권한·역할이 일치한다`() {
+        val issued = provider.issueAccessToken(100L, setOf("member:read", "member:suspend"), setOf("ADMIN"))
+        val claims = provider.parseAccessToken(issued.token)
+
+        assertEquals(100L, claims.memberId)
+        assertEquals(setOf("member:read", "member:suspend"), claims.permissions)
+        assertEquals(setOf("ADMIN"), claims.roles)
+    }
+
+    @Test
+    fun `권한이 없는 access 토큰은 빈 권한 집합으로 파싱된다`() {
+        val issued = provider.issueAccessToken(100L, emptySet(), setOf("USER"))
+        val claims = provider.parseAccessToken(issued.token)
+
+        assertEquals(100L, claims.memberId)
+        assertTrue(claims.permissions.isEmpty())
+        assertEquals(setOf("USER"), claims.roles)
     }
 
     @Test
     fun `access 토큰을 refresh 자리에 넣으면 타입 불일치로 거부된다`() {
-        val access = provider.issueAccessToken(100L)
+        val access = provider.issueAccessToken(100L, setOf("member:read"), setOf("ADMIN"))
         assertFailsWith<InvalidTokenException> { provider.parseRefreshToken(access.token) }
     }
 

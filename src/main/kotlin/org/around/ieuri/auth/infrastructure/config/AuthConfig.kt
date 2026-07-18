@@ -16,7 +16,7 @@ import java.time.Duration
     EncryptionProperties::class,
     VerificationProperties::class,
     JwtProperties::class,
-    AdminProperties::class,
+    RbacProperties::class,
 )
 class AuthConfig {
 

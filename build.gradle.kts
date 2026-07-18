@@ -4,6 +4,8 @@ plugins {
     id("org.springframework.boot") version "4.0.7"
     id("io.spring.dependency-management") version "1.1.7"
     kotlin("plugin.jpa") version "2.3.0"
+    // QueryDSL Q클래스 생성을 위한 애노테이션 프로세싱(kapt).
+    kotlin("kapt") version "2.3.0"
     // 스키마 우선(schema-first): auth.graphqls로부터 GraphQL input/output/enum 타입을 생성한다.
     id("com.netflix.dgs.codegen") version "8.6.0"
 }
@@ -27,11 +29,19 @@ extra["netflixDgsVersion"] = "11.1.0"
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-security")
+    // @RequiresPermission 선언적 인가(애스펙트)용 AspectJ 위버. spring-aop는 전이 의존이나,
+    // 위버는 명시해 두어 프록시 파싱(@Aspect) 요건을 드러낸다. 프록시 활성화는 @EnableAspectJAutoProxy(AopConfig).
+    implementation("org.aspectj:aspectjweaver")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-mail")
     implementation("com.netflix.graphql.dgs:graphql-dgs-spring-graphql-starter")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("tools.jackson.module:jackson-module-kotlin")
+    // 읽기(CQRS) 프로젝션: QueryDSL. Spring Boot 4(Hibernate 7)와 호환되는 OpenFeign 포크(jakarta) 사용.
+    implementation("io.github.openfeign.querydsl:querydsl-jpa:6.11")
+    kapt("io.github.openfeign.querydsl:querydsl-apt:6.11:jakarta")
+    kapt("jakarta.persistence:jakarta.persistence-api")
+    kapt("jakarta.annotation:jakarta.annotation-api")
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
     // Spring Boot 4는 자동구성을 모듈로 분리했다. Flyway 자동구성(FlywayAutoConfiguration)은

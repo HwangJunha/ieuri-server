@@ -20,3 +20,9 @@ class InvalidTokenException(message: String) : RuntimeException(message)
 
 /** 이미 회전·폐기된 refresh가 다시 제출됐을 때(탈취 의심) → 회원 전체 폐기. */
 class TokenReuseDetectedException(message: String) : RuntimeException(message)
+
+/** 존재하지 않는 역할 코드로 부여/회수를 시도할 때. */
+class RoleNotFoundException(message: String) : RuntimeException(message)
+
+/** 본인의 마지막 관리 역할을 스스로 회수하려 할 때(자기 강등 방지). */
+class SelfDemotionException(message: String) : RuntimeException(message)

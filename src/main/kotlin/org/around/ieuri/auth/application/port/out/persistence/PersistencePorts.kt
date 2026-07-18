@@ -16,6 +16,9 @@ import java.util.UUID
 interface MemberRepositoryPort {
     fun existsByProviderAndProviderUserId(provider: Provider, providerUserId: ProviderUserId): Boolean
 
+    /** 회원 존재 여부(역할 부여/회수 대상 검증용). */
+    fun existsById(memberId: Long): Boolean
+
     /** 회원 애그리거트(프로필 + 동의 이력)를 신규 저장하고 생성된 id를 반환한다. */
     fun save(member: Member): Long
 
