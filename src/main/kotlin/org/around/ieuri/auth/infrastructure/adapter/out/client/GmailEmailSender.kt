@@ -34,4 +34,18 @@ class GmailEmailSender(
             log.warn("검증 코드 메일 발송 실패 (to={}): {}", toEmail, ex.message)
         }
     }
+
+    override fun sendPasswordResetCode(toEmail: String, code: String) {
+        try {
+            val message = SimpleMailMessage().apply {
+                if (fromAddress.isNotBlank()) setFrom(fromAddress)
+                setTo(toEmail)
+                subject = "[이으리] 비밀번호 재설정 코드"
+                text = "비밀번호 재설정 코드는 [$code] 입니다. 요청하지 않으셨다면 이 메일을 무시하세요."
+            }
+            mailSender.send(message)
+        } catch (ex: Exception) {
+            log.warn("비밀번호 재설정 코드 메일 발송 실패 (to={}): {}", toEmail, ex.message)
+        }
+    }
 }

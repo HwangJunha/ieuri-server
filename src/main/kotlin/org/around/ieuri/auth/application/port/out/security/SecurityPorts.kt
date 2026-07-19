@@ -17,3 +17,12 @@ interface VerificationCodeGeneratorPort {
     fun generate(): String
     fun hash(code: String): String
 }
+
+/**
+ * 비밀번호 단방향 해시 포트. 자체(EMAIL) 회원가입/로그인에서 비밀번호를 안전하게 저장·검증한다.
+ * 구현은 안전한 단방향 해시(BCrypt) + 서버 pepper를 사용한다(도메인/애플리케이션은 방식을 알지 못한다).
+ */
+interface PasswordEncoderPort {
+    fun encode(rawPassword: String): String
+    fun matches(rawPassword: String, encodedPassword: String): Boolean
+}

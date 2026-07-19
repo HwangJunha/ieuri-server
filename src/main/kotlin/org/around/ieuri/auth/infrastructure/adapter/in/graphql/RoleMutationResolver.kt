@@ -24,7 +24,9 @@ class RoleMutationResolver(
 ) {
     @DgsMutation
     @RequiresPermission(Permission.ROLE_ASSIGN)
-    fun assignRole(@InputArgument input: AssignRoleInput): RoleChangePayload {
+    fun assignRole(@InputArgument input: AssignRoleInput): RoleChangePayload = withUserErrors(
+        onError = { RoleChangePayload(success = false, userErrors = it, changed = null) },
+    ) {
         val actorId = currentMemberProvider.requireMemberId()
         val result = roleUseCase.assign(
             AssignRoleCommand(
@@ -33,12 +35,14 @@ class RoleMutationResolver(
                 roleCode = input.roleCode,
             ),
         )
-        return RoleChangePayload(success = result.success, changed = result.changed)
+        RoleChangePayload(success = result.success, userErrors = emptyList(), changed = result.changed)
     }
 
     @DgsMutation
     @RequiresPermission(Permission.ROLE_REVOKE)
-    fun revokeRole(@InputArgument input: RevokeRoleInput): RoleChangePayload {
+    fun revokeRole(@InputArgument input: RevokeRoleInput): RoleChangePayload = withUserErrors(
+        onError = { RoleChangePayload(success = false, userErrors = it, changed = null) },
+    ) {
         val actorId = currentMemberProvider.requireMemberId()
         val result = roleUseCase.revoke(
             RevokeRoleCommand(
@@ -47,6 +51,6 @@ class RoleMutationResolver(
                 roleCode = input.roleCode,
             ),
         )
-        return RoleChangePayload(success = result.success, changed = result.changed)
+        RoleChangePayload(success = result.success, userErrors = emptyList(), changed = result.changed)
     }
 }

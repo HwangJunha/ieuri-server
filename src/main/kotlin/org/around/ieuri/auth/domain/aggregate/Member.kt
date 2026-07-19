@@ -5,6 +5,7 @@ import org.around.ieuri.auth.domain.vo.Agreement
 import org.around.ieuri.auth.domain.vo.Email
 import org.around.ieuri.auth.domain.vo.MemberStatus
 import org.around.ieuri.auth.domain.vo.Nickname
+import org.around.ieuri.auth.domain.vo.PasswordHash
 import org.around.ieuri.auth.domain.vo.Provider
 import org.around.ieuri.auth.domain.vo.ProviderUserId
 import java.time.Instant
@@ -28,6 +29,8 @@ class Member private constructor(
     suspensionReasonInitial: String?,
     val profile: Profile,
     val agreements: List<Agreement>,
+    /** 자체(EMAIL) 가입 회원의 비밀번호 해시. SNS 회원은 null. */
+    val passwordHash: PasswordHash?,
     val createdAt: Instant,
 ) {
     var emailVerified: Boolean = emailVerifiedInitial
@@ -106,6 +109,45 @@ class Member private constructor(
                 suspensionReasonInitial = null,
                 profile = Profile(nickname = nickname, profileImageUrl = profileImageUrl),
                 agreements = agreements,
+                passwordHash = null,
+                createdAt = now,
+            )
+        }
+
+        /**
+         * 자체(EMAIL) 회원가입. provider=EMAIL, provider_user_id=정규화된 이메일, 비밀번호 해시를 보관한다.
+         * 이메일 인증 전이므로 emailVerified=false로 시작하고, 인증 코드 검증 시 활성화된다.
+         * 필수 약관 동의·만 14세 불변식은 SNS 가입과 동일하게 강제한다.
+         */
+        fun registerByEmail(
+            email: Email,
+            passwordHash: PasswordHash,
+            nickname: Nickname,
+            ageVerified: Boolean,
+            agreements: List<Agreement>,
+            requiredTermsCodes: Set<String>,
+            now: Instant,
+        ): Member {
+            require(ageVerified) { "만 14세 미만은 가입할 수 없습니다." }
+
+            val agreedCodes = agreements.filter { it.agreed }.map { it.termsCode }.toSet()
+            val missing = requiredTermsCodes - agreedCodes
+            require(missing.isEmpty()) { "필수 약관에 동의해야 가입할 수 있습니다. 미동의: $missing" }
+
+            return Member(
+                id = null,
+                provider = Provider.EMAIL,
+                providerUserId = ProviderUserId(email.value),
+                email = email,
+                emailVerifiedInitial = false,
+                statusInitial = MemberStatus.ACTIVE,
+                ageVerified = ageVerified,
+                suspendedAtInitial = null,
+                suspendedUntilInitial = null,
+                suspensionReasonInitial = null,
+                profile = Profile(nickname = nickname, profileImageUrl = null),
+                agreements = agreements,
+                passwordHash = passwordHash,
                 createdAt = now,
             )
         }
@@ -141,6 +183,7 @@ class Member private constructor(
             suspensionReasonInitial = suspensionReason,
             profile = Profile(nickname = nickname, profileImageUrl = profileImageUrl),
             agreements = emptyList(),
+            passwordHash = null,
             createdAt = createdAt,
         )
     }
