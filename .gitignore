@@ -231,3 +231,10 @@ Temporary Items
 
 ./claude/last-test-status
 .claude/settings.local.json
+
+# 헥사고날 구조의 소스 패키지 'out'(adapter/out/...)은 IntelliJ 빌드 출력 'out/'과 이름이 겹친다.
+# 위 IntelliJ 규칙(out/)이 소스까지 무시하므로, 소스 트리의 out 패키지는 다시 추적한다(마지막 매치 우선).
+!**/src/main/**/out/
+!**/src/test/**/out/
+# 로컬 환경변수(direnv). DB 비밀번호 등 비밀값 포함 — 커밋 금지.
+.envrc

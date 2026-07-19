@@ -2,7 +2,7 @@
 name: architecture-reviewer
 description: Use this agent to review ieuri code for architectural violations — DDD/hexagonal boundaries, dependency direction, domain purity, JPA/DGS leakage, CQRS correctness, and cross-domain isolation. Delegate after a slice is built or before merging. Read-only; it reports findings and never modifies code.
 tools: Read, Grep, Glob
-model: opus4.7
+model: opus
 skills:
   - architecture-boundary-review
   - cqrs-flow-review

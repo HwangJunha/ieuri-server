@@ -2,7 +2,7 @@
 name: schema-designer
 description: Use this agent to design database tables and produce Flyway migration SQL for the ieuri project from a requirement or spec. Delegate when the user asks to design a schema, add/change tables, or turn a problem/*.md or GitHub issue into a migration. Inspects the DB read-only and writes migration files only — it never runs DDL against the database.
 tools: Read, Grep, Glob, Write, Edit
-model: opus4.7
+model: opus
 skills:
   - schema-design
 ---

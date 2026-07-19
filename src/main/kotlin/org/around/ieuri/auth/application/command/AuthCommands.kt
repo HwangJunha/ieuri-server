@@ -1,0 +1,97 @@
+package org.around.ieuri.auth.application.command
+
+import org.around.ieuri.auth.domain.vo.Provider
+import java.util.UUID
+
+/**
+ * 회원가입 커맨드(쓰기 입력). GraphQL input에서 변환된다.
+ * 형식/shape 검증만 여기서 수행하고, 업무 불변식은 도메인(Member.register)에서 강제한다.
+ */
+data class RegisterMemberCommand(
+    val provider: Provider,
+    val idToken: String,
+    /** 폼 제출 이메일(필수). provider 값이 기본 채워지되 사용자가 수정 가능. */
+    val submittedEmail: String,
+    /** 만 14세 이상 확인 체크값. */
+    val ageVerified: Boolean,
+    val agreements: List<AgreementInput>,
+) {
+    init {
+        require(idToken.isNotBlank()) { "idToken은 필수입니다." }
+        require(submittedEmail.isNotBlank()) { "이메일은 필수 입력값입니다." }
+    }
+}
+
+/**
+ * 자체(EMAIL) 회원가입 커맨드. 이메일+비밀번호로 가입하고 이메일 인증으로 활성화한다.
+ * 비밀번호 정책(개인정보보호법 안전성 확보조치 기준: 3종 조합 8자 이상)은 여기서 형식 검증한다.
+ */
+data class RegisterEmailMemberCommand(
+    val email: String,
+    val password: String,
+    val ageVerified: Boolean,
+    val agreements: List<AgreementInput>,
+) {
+    init {
+        require(email.isNotBlank()) { "이메일은 필수 입력값입니다." }
+        validatePasswordPolicy(password)
+    }
+}
+
+/** 약관별 동의/비동의 입력. 비동의도 이력으로 남긴다. */
+data class AgreementInput(
+    val termsCode: String,
+    val agreed: Boolean,
+) {
+    init {
+        require(termsCode.isNotBlank()) { "termsCode는 비어 있을 수 없습니다." }
+    }
+}
+
+/**
+ * 비밀번호 정책 검증(형식). 영문·숫자·특수문자 3종을 모두 포함하고 8자 이상이어야 한다.
+ * (개인정보보호법 「개인정보의 안전성 확보조치 기준」: 3종 조합 시 8자 이상 충족.)
+ */
+fun validatePasswordPolicy(password: String) {
+    require(password.length in 8..100) { "비밀번호는 8자 이상 100자 이하여야 합니다." }
+    require(password.any { it.isLetter() }) { "비밀번호에 영문자를 포함해야 합니다." }
+    require(password.any { it.isDigit() }) { "비밀번호에 숫자를 포함해야 합니다." }
+    require(password.any { !it.isLetterOrDigit() && !it.isWhitespace() }) { "비밀번호에 특수문자를 포함해야 합니다." }
+}
+
+/** 비밀번호 재설정 요청 커맨드(이메일로 코드 발송). 계정 유무는 응답으로 드러내지 않는다. */
+data class RequestPasswordResetCommand(
+    val email: String,
+) {
+    init {
+        require(email.isNotBlank()) { "이메일은 필수입니다." }
+    }
+}
+
+/** 비밀번호 재설정 실행 커맨드. 이메일+코드로 검증하고 새 비밀번호로 교체한다. */
+data class ResetPasswordCommand(
+    val email: String,
+    val code: String,
+    val newPassword: String,
+) {
+    init {
+        require(email.isNotBlank()) { "이메일은 필수입니다." }
+        require(code.matches(Regex("^\\d{6}$"))) { "코드는 6자리 숫자여야 합니다." }
+        validatePasswordPolicy(newPassword)
+    }
+}
+
+/** 이메일 검증 커맨드. 가입 응답으로 받은 검증 핸들(publicId) + 6자리 코드. */
+data class VerifyEmailCommand(
+    val verificationPublicId: UUID,
+    val code: String,
+) {
+    init {
+        require(code.matches(Regex("^\\d{6}$"))) { "코드는 6자리 숫자여야 합니다." }
+    }
+}
+
+/** 검증 코드 재발송 커맨드. */
+data class ResendVerificationCommand(
+    val verificationPublicId: UUID,
+)

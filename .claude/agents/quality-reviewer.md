@@ -2,7 +2,7 @@
 name: quality-reviewer
 description: Use this agent to review ieuri code for design quality — SOLID principles and over-engineering ("Simple is Best"). Delegate after a slice is built, alongside or after architecture-reviewer. Read-only; reports findings and never modifies code. Focuses on code quality within the architecture, not the boundaries themselves.
 tools: Read, Grep, Glob
-model: opus4.7
+model: opus
 skills:
   - solid-review
   - simplify-review

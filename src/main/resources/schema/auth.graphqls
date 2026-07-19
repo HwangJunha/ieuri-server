@@ -1,0 +1,315 @@
+type Query {
+    "GraphQL 스키마 헬스 체크(루트 Query 필요)."
+    authHealth: String!
+    "본인 정보. accessToken 인증만 필요(권한 불요). 역할/유효권한을 담아 클라이언트 메뉴 렌더에 사용한다."
+    me: Me!
+    "관리자 회원 단건 조회. member:read 권한 필요."
+    member(id: ID!): MemberDetail!
+    "관리자 회원 목록(커서 페이지네이션). member:read 권한 필요. 목록은 이메일을 포함하지 않는다(최소수집)."
+    members(status: MemberStatus, roleCode: String, first: Int = 20, after: String): MemberConnection!
+    "부여 가능한 역할 목록. role:assign 권한 필요. 프런트가 역할 드롭다운을 하드코딩 없이 렌더한다."
+    assignableRoles: [RoleInfo!]!
+}
+
+type Mutation {
+    "SNS 회원가입. 가입은 이메일 검증 완료를 기다리지 않고 성공 처리된다."
+    registerSnsMember(input: RegisterSnsMemberInput!): RegisterSnsMemberPayload!
+    "자체(이메일) 회원가입. 이메일+비밀번호로 가입하고 이메일 인증으로 활성화한다."
+    registerEmailMember(input: RegisterEmailMemberInput!): RegisterEmailMemberPayload!
+    "이메일 검증 코드 확인."
+    verifyEmail(input: VerifyEmailInput!): VerifyEmailPayload!
+    "이메일 검증 코드 재발송."
+    resendVerification(input: ResendVerificationInput!): ResendVerificationPayload!
+    "SNS 로그인. 기존 회원만 인증하며 accessToken/refreshToken을 발급한다."
+    loginSns(input: LoginSnsInput!): AuthTokenPayload!
+    "자체(이메일) 로그인. 비밀번호 검증 + 이메일 인증 완료를 요구하며 토큰을 발급한다."
+    loginEmail(input: LoginEmailInput!): AuthTokenPayload!
+    "비밀번호 재설정 요청. 이메일로 재설정 코드를 발송한다(계정 유무는 응답으로 드러내지 않음)."
+    requestPasswordReset(input: RequestPasswordResetInput!): RequestPasswordResetPayload!
+    "비밀번호 재설정 실행. 이메일+코드 검증 성공 시 새 비밀번호로 교체하고 기존 세션을 폐기한다."
+    resetPassword(input: ResetPasswordInput!): ResetPasswordPayload!
+    "refreshToken으로 accessToken 재발급(refresh 회전)."
+    refreshToken(input: RefreshTokenInput!): AuthTokenPayload!
+    "로그아웃. 제출한 refreshToken을 폐기한다."
+    logout(input: LogoutInput!): LogoutPayload!
+    "회원 탈퇴(본인). accessToken 인증 필요. 회원과 소유 데이터가 삭제된다."
+    withdrawMember: WithdrawMemberPayload!
+    "회원 정지(관리자). member:suspend 권한 필요."
+    suspendMember(input: SuspendMemberInput!): AdminActionPayload!
+    "회원 정지 해제(관리자). member:reactivate 권한 필요."
+    reactivateMember(input: ReactivateMemberInput!): AdminActionPayload!
+    "역할 부여(관리자). role:assign 권한 필요."
+    assignRole(input: AssignRoleInput!): RoleChangePayload!
+    "역할 회수(관리자). role:revoke 권한 필요. 본인의 마지막 관리 역할 회수는 거부된다."
+    revokeRole(input: RevokeRoleInput!): RoleChangePayload!
+}
+
+"모든 mutation 응답이 구현하는 공통 규약. success와 도메인 검증 실패(userErrors)를 담는다."
+interface BaseResponse {
+    "유스케이스가 성공했는지. 실패 시 userErrors가 채워진다."
+    success: Boolean!
+    "예상 가능한 도메인/입력 검증 실패 목록. 시스템/인증 오류는 최상위 errors로 전달된다."
+    userErrors: [UserError!]!
+}
+
+"사용자에게 보여줄 수 있는 도메인/입력 검증 오류."
+type UserError {
+    "머신 판독용 코드(예: MEMBER_ALREADY_REGISTERED, INVALID_INPUT)."
+    code: String!
+    "사용자 노출 메시지."
+    message: String!
+    "관련 입력 필드 경로(있을 때). 예: input.email"
+    field: String
+}
+
+"회원 상태. 탈퇴는 행 삭제(hard delete)이므로 상태값에 없다."
+enum MemberStatus {
+    ACTIVE
+    SUSPENDED
+}
+
+enum Provider {
+    APPLE
+    GOOGLE
+    KAKAO
+}
+
+"약관 코드. 시드(R__seed_terms)와 일치한다. 프런트가 동의 항목을 하드코딩 없이 렌더한다."
+enum TermsCode {
+    SERVICE
+    PRIVACY
+    LOCATION
+    MARKETING
+}
+
+"부여 가능한 역할 정보(assignableRoles). 코드는 assignRole/revokeRole의 roleCode로 사용한다."
+type RoleInfo {
+    code: String!
+    name: String!
+    description: String
+}
+
+input RegisterSnsMemberInput {
+    provider: Provider!
+    "SNS id_token(또는 dev 토큰)."
+    idToken: String!
+    "폼 제출 이메일(필수). provider 값이 기본 채워지되 수정 가능."
+    email: String!
+    "만 14세 이상 확인."
+    ageVerified: Boolean!
+    agreements: [AgreementInput!]!
+}
+
+input AgreementInput {
+    termsCode: TermsCode!
+    agreed: Boolean!
+}
+
+input RegisterEmailMemberInput {
+    email: String!
+    "비밀번호. 영문·숫자·특수문자 3종 모두 포함, 8자 이상."
+    password: String!
+    "만 14세 이상 확인."
+    ageVerified: Boolean!
+    agreements: [AgreementInput!]!
+}
+
+input LoginEmailInput {
+    email: String!
+    password: String!
+}
+
+input RequestPasswordResetInput {
+    email: String!
+}
+
+input ResetPasswordInput {
+    email: String!
+    "이메일로 받은 6자리 재설정 코드."
+    code: String!
+    "새 비밀번호. 영문·숫자·특수문자 3종 모두 포함, 8자 이상."
+    newPassword: String!
+}
+
+input VerifyEmailInput {
+    "가입 응답으로 받은 검증 핸들(email_verification.public_id)."
+    verificationId: ID!
+    code: String!
+}
+
+input ResendVerificationInput {
+    verificationId: ID!
+}
+
+type RegisterSnsMemberPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+    "성공 시 채워짐. 이메일 검증 완료 여부."
+    emailVerified: Boolean
+    "미검증인 경우에만 채워지는 검증 핸들."
+    verificationId: ID
+}
+
+type RegisterEmailMemberPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+    "이메일 인증 코드 검증에 사용할 핸들(가입 성공 시 채워짐)."
+    verificationId: ID
+}
+
+type RequestPasswordResetPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+}
+
+type ResetPasswordPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+    "실패 사유(EXPIRED/CONSUMED/MAX_ATTEMPTS_EXCEEDED/CODE_MISMATCH/INVALID_OR_EXPIRED). 성공 시 null."
+    failureReason: String
+}
+
+type VerifyEmailPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+    "코드 검증 결과(성공 시 채워짐)."
+    verified: Boolean
+    "실패 사유(EXPIRED/CONSUMED/MAX_ATTEMPTS_EXCEEDED/CODE_MISMATCH). 성공 시 null."
+    failureReason: String
+}
+
+type ResendVerificationPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+    verificationId: ID
+    expiresAt: String
+}
+
+input LoginSnsInput {
+    provider: Provider!
+    "SNS id_token(또는 dev 토큰)."
+    idToken: String!
+}
+
+input RefreshTokenInput {
+    refreshToken: String!
+}
+
+input LogoutInput {
+    refreshToken: String!
+}
+
+type AuthTokenPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+    accessToken: String
+    refreshToken: String
+    tokenType: String
+    "accessToken 남은 유효기간(초)."
+    accessTokenExpiresIn: Int
+    "refreshToken 남은 유효기간(초)."
+    refreshTokenExpiresIn: Int
+}
+
+type LogoutPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+}
+
+input SuspendMemberInput {
+    memberId: ID!
+    reason: String!
+    "정지 만료 시각(ISO-8601). 없으면 무기한."
+    suspendedUntil: String
+}
+
+input ReactivateMemberInput {
+    memberId: ID!
+}
+
+type WithdrawMemberPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+}
+
+type AdminActionPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+}
+
+input AssignRoleInput {
+    memberId: ID!
+    roleCode: String!
+}
+
+input RevokeRoleInput {
+    memberId: ID!
+    roleCode: String!
+}
+
+"역할 부여/회수 결과. changed=false면 멱등(이미 부여됨/원래 없음)."
+type RoleChangePayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+    changed: Boolean
+}
+
+"본인 정보(me). 이메일은 본인이므로 평문 노출. roles/permissions로 클라이언트 메뉴를 렌더한다."
+type Me {
+    id: ID!
+    email: String!
+    nickname: String!
+    profileImageUrl: String
+    status: MemberStatus!
+    emailVerified: Boolean!
+    roles: [String!]!
+    permissions: [String!]!
+    "가입일(ISO-8601)."
+    createdAt: String!
+}
+
+"관리자 회원 단건 상세. member:read 권한 필요."
+type MemberDetail {
+    id: ID!
+    email: String!
+    nickname: String!
+    profileImageUrl: String
+    status: MemberStatus!
+    emailVerified: Boolean!
+    "정지 정보(정지 상태에서만 채워짐, ISO-8601)."
+    suspendedAt: String
+    suspendedUntil: String
+    suspensionReason: String
+    roles: [String!]!
+    createdAt: String!
+}
+
+"관리자 회원 목록 항목. 최소수집: 이메일 미포함."
+type MemberSummary {
+    id: ID!
+    nickname: String!
+    status: MemberStatus!
+    roles: [String!]!
+    createdAt: String!
+}
+
+"커서 페이지네이션 공통 페이지 정보(Relay Connection)."
+type PageInfo {
+    hasNextPage: Boolean!
+    hasPreviousPage: Boolean!
+    startCursor: String
+    endCursor: String
+}
+
+"회원 목록 커서 연결(Relay Connection)."
+type MemberConnection {
+    edges: [MemberEdge!]!
+    pageInfo: PageInfo!
+    "전체 개수(선택)."
+    totalCount: Int
+}
+
+type MemberEdge {
+    cursor: String!
+    node: MemberSummary!
+}

@@ -1,12 +1,55 @@
 spring:
   application:
     name: ieuri
+  profiles:
+    default: local
+  datasource:
+    url: ${IEURI_DB_URL:jdbc:postgresql://localhost:5432/ieuri}
+    username: ${IEURI_DB_USERNAME:ieuri}
+    # 비밀값: 커밋 금지. prod는 환경변수 주입, local은 셸 환경변수(IEURI_DB_PASSWORD)로 제공.
+    password: ${IEURI_DB_PASSWORD}
+    hikari:
+      keepalive-time: 120000
   jpa:
     hibernate:
+      # 스키마 소유권은 Flyway. Hibernate는 엔티티↔스키마 검증만 한다.
       ddl-auto: validate
+    open-in-view: false
   flyway:
     enabled: true
     locations: classpath:db/migration
-    baseline-on-migrate: false
+    # 공유 DB의 public 스키마에 무관한 기존 객체가 있을 수 있어, v0로 baseline 후 V1부터 전부 적용한다
+    # (기존 DB에 Flyway를 도입하는 표준 방식). baseline-version=0이라 V1 마이그레이션이 스킵되지 않는다.
+    baseline-on-migrate: true
+    baseline-version: 0
+  mail:
+    # 개발/임시: Gmail SMTP. 자격증명이 없어도 컨텍스트는 로드된다(발송 시에만 필요).
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_APP_PASSWORD:}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+
 server:
   port: 8888
+
+ieuri:
+  mail:
+    from: ${MAIL_FROM:}
+  verification:
+    ttl-minutes: 10
+    max-attempts: 5
+    resend-cooldown-seconds: 60
+  encryption:
+    # prod: 환경변수로만 주입(기본값 없음 → 없으면 부팅 실패, fail-fast).
+    # local: application-local.yaml이 개발 전용 값으로 오버라이드한다.
+    key: ${IEURI_ENCRYPTION_KEY}
+    pepper: ${IEURI_ENCRYPTION_PEPPER}
+  jwt:
+    issuer: ieuri
+    # prod: 환경변수 주입(기본값 없음 → fail-fast). local: application-local.yaml이 오버라이드.
+    secret: ${IEURI_JWT_SECRET}
+    access-ttl: 5m
+    refresh-ttl: 30d

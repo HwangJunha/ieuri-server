@@ -2,7 +2,7 @@
 name: slice-builder
 description: Use this agent to implement a new use case (command or query) in the ieuri codebase — a full vertical slice plus its tests. Delegate when the user asks to add a create/update/delete/get/list feature to a domain, scaffold a use case, or wire a feature end to end. Not for reviews or cross-cutting infra.
 tools: Read, Grep, Glob, Write, Edit, Bash
-model: opus4.7
+model: opus
 skills:
   - domain-slice-generator
   - test-strategy
