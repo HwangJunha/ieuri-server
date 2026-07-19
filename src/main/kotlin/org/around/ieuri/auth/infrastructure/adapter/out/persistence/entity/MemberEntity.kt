@@ -38,6 +38,9 @@ class MemberEntity(
     @Column(name = "email_verified", nullable = false)
     var emailVerified: Boolean,
 
+    @Column(name = "password_hash", length = 255)
+    var passwordHash: String? = null,
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     var status: MemberStatus,

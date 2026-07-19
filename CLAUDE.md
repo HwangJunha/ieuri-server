@@ -58,8 +58,9 @@ org/around/ieuri/
           persistence/               # write ports: load/save aggregate
           query/                     # read ports: return read-model DTOs
           client/                    # external system ports
-      command/                       # Command input objects + command handlers (impl of port/in/command)
-      query/                         # read-model DTOs + query handlers (impl of port/in/query)
+      command/                       # Command input objects (write inputs only)
+      query/                         # read-model DTOs + query inputs (read models only)
+      service/                       # use-case implementations (XxxService, impl of port/in command & query)
     infrastructure/
       adapter/
         in/
@@ -80,13 +81,14 @@ There is no per-domain `utils` package. Domain-specific helpers become domain se
 - **Command (write):** GraphQL input → `Command` object (application) → `domain` aggregate (invariants enforced here) → JPA `@Entity` via the persistence adapter's mapper. The domain model is the source of truth; JPA entities are a persistence detail and never leak into `application`/`domain`.
     - **On update:** inside the transaction, load the *managed* JPA entity, apply the domain's changes onto that managed entity, and let Hibernate dirty-checking emit the `UPDATE`. Do **not** build a fresh detached entity and `save()` it — that defeats dirty-checking.
     - **On create:** map the domain aggregate to a new entity and persist it.
-- **Query (read):** GraphQL args → query handler → outbound `query` port → **QueryDSL projects directly into a read-model DTO**, bypassing the domain aggregate entirely. The **resolver** maps that read DTO into the GraphQL response type — `application` must not import DGS/response types.
+- **Query (read):** GraphQL args → query service (`application/service/`) → outbound `query` port → **QueryDSL projects directly into a read-model DTO**, bypassing the domain aggregate entirely. The **resolver** maps that read DTO into the GraphQL response type — `application` must not import DGS/response types.
 - Write ports and read ports stay physically separate; never route reads through aggregates or the CQRS benefit is lost. The read `port/out/query` may return read DTOs directly — do not force domain-port symmetry on the read side.
 - Start with a **per-query QueryDSL projection**. Introduce a DGS `DataLoader` only where nested associations actually cause N+1 — do not add DataLoaders preemptively.
 
 ### Naming
 
 - Write input is a `Command`, not a "DTO". Reserve "DTO" for the read side (QueryDSL projection results and read models). This keeps command input, domain model, JPA entity, read DTO, and GraphQL response from collapsing into one overloaded word.
+- **Use-case implementations are `XxxService`, not `XxxHandler`, and live in `application/service/`.** Group related use cases into one cohesive service with **meaningful method names** (e.g. `MemberRegistrationService.registerBySns/verifyEmail`, `AuthTokenService.loginBySns/refresh/logout`) instead of a generic `handle()` per single-method class. The matching inbound port groups the same use cases (`MemberRegistrationUseCase`, `AuthTokenUseCase`, …).
 
 ### Validation
 

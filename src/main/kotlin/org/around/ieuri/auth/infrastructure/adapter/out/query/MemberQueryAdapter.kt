@@ -1,6 +1,7 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.query
 
 import com.querydsl.core.BooleanBuilder
+import com.querydsl.core.types.dsl.BooleanExpression
 import com.querydsl.jpa.JPAExpressions
 import com.querydsl.jpa.impl.JPAQueryFactory
 import org.around.ieuri.auth.application.port.out.query.MemberQueryPort
@@ -9,7 +10,9 @@ import org.around.ieuri.auth.application.query.MembersQuery
 import org.around.ieuri.auth.application.query.MeView
 import org.around.ieuri.auth.application.query.MemberDetailView
 import org.around.ieuri.auth.application.query.MemberSummaryView
-import org.around.ieuri.auth.application.query.MembersPage
+import org.around.ieuri.common.pagination.CursorEdge
+import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.common.pagination.CursorPageInfo
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.QMemberEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.QMemberProfileEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.QMemberRoleEntity
@@ -49,14 +52,14 @@ class MemberQueryAdapter(
 
         return MeView(
             memberId = memberId,
-            email = encryptor.decrypt(row.get(member.emailEncrypted)!!),
+            email = encryptor.decrypt(requireNotNull(row.get(member.emailEncrypted))),
             nickname = row.get(profile.nickname) ?: DEFAULT_NICKNAME,
             profileImageUrl = row.get(profile.profileImageUrl),
-            status = row.get(member.status)!!,
-            emailVerified = row.get(member.emailVerified)!!,
+            status = requireNotNull(row.get(member.status)),
+            emailVerified = requireNotNull(row.get(member.emailVerified)),
             roles = roleCodesOf(memberId),
             permissions = permissionCodesOf(memberId),
-            createdAt = row.get(member.createdAt)!!,
+            createdAt = requireNotNull(row.get(member.createdAt)),
         )
     }
 
@@ -74,69 +77,87 @@ class MemberQueryAdapter(
 
         return MemberDetailView(
             memberId = memberId,
-            email = encryptor.decrypt(row.get(member.emailEncrypted)!!),
+            email = encryptor.decrypt(requireNotNull(row.get(member.emailEncrypted))),
             nickname = row.get(profile.nickname) ?: DEFAULT_NICKNAME,
             profileImageUrl = row.get(profile.profileImageUrl),
-            status = row.get(member.status)!!,
-            emailVerified = row.get(member.emailVerified)!!,
+            status = requireNotNull(row.get(member.status)),
+            emailVerified = requireNotNull(row.get(member.emailVerified)),
             suspendedAt = row.get(member.suspendedAt),
             suspendedUntil = row.get(member.suspendedUntil),
             suspensionReason = row.get(member.suspensionReason),
             roles = roleCodesOf(memberId),
-            createdAt = row.get(member.createdAt)!!,
+            createdAt = requireNotNull(row.get(member.createdAt)),
         )
     }
 
-    override fun findMembers(query: MembersQuery): MembersPage {
-        val size = query.size.coerceIn(1, MAX_PAGE_SIZE)
-        val page = query.page.coerceAtLeast(0)
-
-        val where = BooleanBuilder()
-        query.status?.let { where.and(member.status.eq(it)) }
-        query.roleCode?.let { code ->
-            // 역할 코드 필터: 해당 코드의 역할을 가진 회원만(중복 행 방지를 위해 exists 서브쿼리 사용).
-            where.and(
-                JPAExpressions.selectOne()
-                    .from(memberRole)
-                    .where(
-                        memberRole.memberId.eq(member.id).and(
-                            memberRole.roleId.`in`(
-                                JPAExpressions.select(role.id).from(role).where(role.code.eq(code)),
-                            ),
-                        ),
-                    )
-                    .exists(),
-            )
+    override fun findMembers(query: MembersQuery): CursorPage<MemberSummaryView> {
+        val first = query.first.coerceIn(1, MAX_PAGE_SIZE)
+        // 커서 = 회원 id(문자열). id는 이미 공개 값이라 별도 인코딩 없이 그대로 쓴다.
+        val afterId = query.after?.let {
+            it.toLongOrNull() ?: throw IllegalArgumentException("유효하지 않은 커서입니다.")
         }
 
-        val total = queryFactory.select(member.count()).from(member).where(where).fetchOne() ?: 0L
+        // status/roleCode 필터(전체 개수·페이지 공통).
+        val baseWhere = BooleanBuilder()
+        query.status?.let { baseWhere.and(member.status.eq(it)) }
+        query.roleCode?.let { baseWhere.and(hasRole(it)) }
+
+        // keyset: id 내림차순 정렬에서 다음 페이지는 id < afterId. first+1로 hasNextPage 판정.
+        val pageWhere = BooleanBuilder().and(baseWhere)
+        afterId?.let { pageWhere.and(member.id.lt(it)) }
 
         val rows = queryFactory
             .select(member.id, profile.nickname, member.status, member.createdAt)
             .from(member)
             .leftJoin(profile).on(profile.memberId.eq(member.id))
-            .where(where)
+            .where(pageWhere)
             .orderBy(member.id.desc())
-            .offset(page.toLong() * size)
-            .limit(size.toLong())
+            .limit((first + 1).toLong())
             .fetch()
 
-        val ids = rows.mapNotNull { it.get(member.id) }
+        val hasNextPage = rows.size > first
+        val pageRows = if (hasNextPage) rows.take(first) else rows
+
+        val ids = pageRows.mapNotNull { it.get(member.id) }
         val rolesByMember = roleCodesOf(ids)
 
-        val items = rows.map { r ->
-            val id = r.get(member.id)!!
-            MemberSummaryView(
-                memberId = id,
-                nickname = r.get(profile.nickname) ?: DEFAULT_NICKNAME,
-                status = r.get(member.status)!!,
-                roles = rolesByMember[id].orEmpty(),
-                createdAt = r.get(member.createdAt)!!,
+        val edges = pageRows.map { r ->
+            val id = requireNotNull(r.get(member.id))
+            CursorEdge(
+                cursor = id.toString(),
+                node = MemberSummaryView(
+                    memberId = id,
+                    nickname = r.get(profile.nickname) ?: DEFAULT_NICKNAME,
+                    status = requireNotNull(r.get(member.status)),
+                    roles = rolesByMember[id].orEmpty(),
+                    createdAt = requireNotNull(r.get(member.createdAt)),
+                ),
             )
         }
 
-        return MembersPage(items = items, page = page, size = size, totalElements = total)
+        val total = queryFactory.select(member.count()).from(member).where(baseWhere).fetchOne() ?: 0L
+
+        val pageInfo = CursorPageInfo(
+            hasNextPage = hasNextPage,
+            hasPreviousPage = afterId != null,
+            startCursor = edges.firstOrNull()?.cursor,
+            endCursor = edges.lastOrNull()?.cursor,
+        )
+        return CursorPage(edges = edges, pageInfo = pageInfo, totalCount = total)
     }
+
+    /** 역할 코드 필터: 해당 코드의 역할을 가진 회원만(중복 행 방지를 위해 exists 서브쿼리 사용). */
+    private fun hasRole(code: String): BooleanExpression =
+        JPAExpressions.selectOne()
+            .from(memberRole)
+            .where(
+                memberRole.memberId.eq(member.id).and(
+                    memberRole.roleId.`in`(
+                        JPAExpressions.select(role.id).from(role).where(role.code.eq(code)),
+                    ),
+                ),
+            )
+            .exists()
 
     /** 회원의 역할 코드 목록. */
     private fun roleCodesOf(memberId: Long): List<String> =
@@ -158,7 +179,7 @@ class MemberQueryAdapter(
             .where(memberRole.memberId.`in`(memberIds))
             .orderBy(role.code.asc())
             .fetch()
-            .groupBy({ it.get(memberRole.memberId)!! }, { it.get(role.code)!! })
+            .groupBy({ requireNotNull(it.get(memberRole.memberId)) }, { requireNotNull(it.get(role.code)) })
     }
 
     /** 회원의 유효 권한 코드(역할들의 권한 합집합). */

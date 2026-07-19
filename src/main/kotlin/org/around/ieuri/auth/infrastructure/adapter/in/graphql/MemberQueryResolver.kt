@@ -7,17 +7,19 @@ import org.around.ieuri.auth.application.port.`in`.query.MemberQueryUseCase
 import org.around.ieuri.auth.application.query.MembersQuery
 import org.around.ieuri.auth.application.query.MeView
 import org.around.ieuri.auth.application.query.MemberDetailView
-import org.around.ieuri.auth.application.query.MembersPage
 import org.around.ieuri.auth.application.query.MemberSummaryView
 import org.around.ieuri.auth.domain.vo.MemberStatus
 import org.around.ieuri.auth.domain.vo.Permission
 import org.around.ieuri.auth.infrastructure.security.CurrentMemberProvider
 import org.around.ieuri.auth.infrastructure.security.RequiresPermission
+import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.auth.infrastructure.graphql.generated.types.Me as GqlMe
+import org.around.ieuri.auth.infrastructure.graphql.generated.types.MemberConnection as GqlMemberConnection
 import org.around.ieuri.auth.infrastructure.graphql.generated.types.MemberDetail as GqlMemberDetail
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.MemberPage as GqlMemberPage
+import org.around.ieuri.auth.infrastructure.graphql.generated.types.MemberEdge as GqlMemberEdge
 import org.around.ieuri.auth.infrastructure.graphql.generated.types.MemberStatus as GqlMemberStatus
 import org.around.ieuri.auth.infrastructure.graphql.generated.types.MemberSummary as GqlMemberSummary
+import org.around.ieuri.auth.infrastructure.graphql.generated.types.PageInfo as GqlPageInfo
 
 /**
  * 회원 조회 GraphQL 쿼리 리졸버(인바운드 어댑터, CQRS 읽기 측).
@@ -44,15 +46,15 @@ class MemberQueryResolver(
     fun members(
         @InputArgument status: GqlMemberStatus?,
         @InputArgument roleCode: String?,
-        @InputArgument page: Int?,
-        @InputArgument size: Int?,
-    ): GqlMemberPage {
+        @InputArgument first: Int?,
+        @InputArgument after: String?,
+    ): GqlMemberConnection {
         val result = memberQueryUseCase.members(
             MembersQuery(
                 status = status?.let { MemberStatus.valueOf(it.name) },
                 roleCode = roleCode,
-                page = page ?: 0,
-                size = size ?: DEFAULT_PAGE_SIZE,
+                first = first ?: DEFAULT_PAGE_SIZE,
+                after = after,
             ),
         )
         return result.toGql()
@@ -84,12 +86,15 @@ class MemberQueryResolver(
         createdAt = createdAt.toString(),
     )
 
-    private fun MembersPage.toGql(): GqlMemberPage = GqlMemberPage(
-        items = items.map { it.toGql() },
-        page = page,
-        size = size,
-        totalElements = totalElements.toInt(),
-        totalPages = totalPages,
+    private fun CursorPage<MemberSummaryView>.toGql(): GqlMemberConnection = GqlMemberConnection(
+        edges = edges.map { GqlMemberEdge(cursor = it.cursor, node = it.node.toGql()) },
+        pageInfo = GqlPageInfo(
+            hasNextPage = pageInfo.hasNextPage,
+            hasPreviousPage = pageInfo.hasPreviousPage,
+            startCursor = pageInfo.startCursor,
+            endCursor = pageInfo.endCursor,
+        ),
+        totalCount = totalCount?.toInt(),
     )
 
     private fun MemberSummaryView.toGql(): GqlMemberSummary = GqlMemberSummary(

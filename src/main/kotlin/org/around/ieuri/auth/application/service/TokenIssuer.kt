@@ -1,4 +1,4 @@
-package org.around.ieuri.auth.application
+package org.around.ieuri.auth.application.service
 
 import org.around.ieuri.auth.application.port.`in`.command.TokenPairResult
 import org.around.ieuri.auth.application.port.out.persistence.RoleRepositoryPort

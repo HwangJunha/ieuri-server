@@ -6,9 +6,7 @@ import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.auth.application.command.ReactivateMemberCommand
 import org.around.ieuri.auth.application.command.SuspendMemberCommand
 import org.around.ieuri.auth.application.command.WithdrawMemberCommand
-import org.around.ieuri.auth.application.port.`in`.command.ReactivateMemberUseCase
-import org.around.ieuri.auth.application.port.`in`.command.SuspendMemberUseCase
-import org.around.ieuri.auth.application.port.`in`.command.WithdrawMemberUseCase
+import org.around.ieuri.auth.application.port.`in`.command.MemberLifecycleUseCase
 import org.around.ieuri.auth.infrastructure.graphql.generated.types.AdminActionPayload
 import org.around.ieuri.auth.infrastructure.graphql.generated.types.ReactivateMemberInput
 import org.around.ieuri.auth.infrastructure.graphql.generated.types.SuspendMemberInput
@@ -23,36 +21,40 @@ import java.time.Instant
  * 탈퇴는 accessToken 인증 주체(본인)로 처리하고, 정지/복구는 권한(member:suspend/member:reactivate)으로 보호한다.
  */
 @DgsComponent
-class AuthLifecycleMutationResolver(
-    private val withdrawMemberUseCase: WithdrawMemberUseCase,
-    private val suspendMemberUseCase: SuspendMemberUseCase,
-    private val reactivateMemberUseCase: ReactivateMemberUseCase,
+class MemberLifecycleMutationResolver(
+    private val memberLifecycleUseCase: MemberLifecycleUseCase,
     private val currentMemberProvider: CurrentMemberProvider,
 ) {
     @DgsMutation
-    fun withdrawMember(): WithdrawMemberPayload {
+    fun withdrawMember(): WithdrawMemberPayload = withUserErrors(
+        onError = { WithdrawMemberPayload(success = false, userErrors = it) },
+    ) {
         val memberId = currentMemberProvider.requireMemberId()
-        val result = withdrawMemberUseCase.handle(WithdrawMemberCommand(memberId))
-        return WithdrawMemberPayload(success = result.success)
+        val result = memberLifecycleUseCase.withdraw(WithdrawMemberCommand(memberId))
+        WithdrawMemberPayload(success = result.success, userErrors = emptyList())
     }
 
     @DgsMutation
     @RequiresPermission(Permission.MEMBER_SUSPEND)
-    fun suspendMember(@InputArgument input: SuspendMemberInput): AdminActionPayload {
-        val result = suspendMemberUseCase.handle(
+    fun suspendMember(@InputArgument input: SuspendMemberInput): AdminActionPayload = withUserErrors(
+        onError = { AdminActionPayload(success = false, userErrors = it) },
+    ) {
+        val result = memberLifecycleUseCase.suspend(
             SuspendMemberCommand(
                 memberId = input.memberId.toLong(),
                 reason = input.reason,
                 suspendedUntil = input.suspendedUntil?.let { Instant.parse(it) },
             ),
         )
-        return AdminActionPayload(success = result.success)
+        AdminActionPayload(success = result.success, userErrors = emptyList())
     }
 
     @DgsMutation
     @RequiresPermission(Permission.MEMBER_REACTIVATE)
-    fun reactivateMember(@InputArgument input: ReactivateMemberInput): AdminActionPayload {
-        val result = reactivateMemberUseCase.handle(ReactivateMemberCommand(input.memberId.toLong()))
-        return AdminActionPayload(success = result.success)
+    fun reactivateMember(@InputArgument input: ReactivateMemberInput): AdminActionPayload = withUserErrors(
+        onError = { AdminActionPayload(success = false, userErrors = it) },
+    ) {
+        val result = memberLifecycleUseCase.reactivate(ReactivateMemberCommand(input.memberId.toLong()))
+        AdminActionPayload(success = result.success, userErrors = emptyList())
     }
 }

@@ -45,21 +45,13 @@ data class MemberSummaryView(
     val createdAt: Instant,
 )
 
-/** 회원 목록 페이지. */
-data class MembersPage(
-    val items: List<MemberSummaryView>,
-    val page: Int,
-    val size: Int,
-    val totalElements: Long,
-) {
-    val totalPages: Int
-        get() = if (size <= 0) 0 else ((totalElements + size - 1) / size).toInt()
-}
-
-/** 회원 목록 조회 조건. status/roleCode는 선택 필터. */
+/**
+ * 회원 목록 조회 조건(커서 기본). status/roleCode는 선택 필터.
+ * first는 가져올 개수, after는 커서(없으면 처음부터). 목록은 커서 페이지네이션으로 통일한다.
+ */
 data class MembersQuery(
     val status: MemberStatus?,
     val roleCode: String?,
-    val page: Int,
-    val size: Int,
+    val first: Int,
+    val after: String?,
 )

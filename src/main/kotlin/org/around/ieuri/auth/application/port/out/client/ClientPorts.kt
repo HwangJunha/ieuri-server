@@ -25,4 +25,6 @@ data class SnsIdentity(
 /** 이메일 발송 포트. 현재 Gmail SMTP 구현, 추후 Resend로 교체. */
 interface EmailSenderPort {
     fun sendVerificationCode(toEmail: String, code: String)
+
+    fun sendPasswordResetCode(toEmail: String, code: String)
 }

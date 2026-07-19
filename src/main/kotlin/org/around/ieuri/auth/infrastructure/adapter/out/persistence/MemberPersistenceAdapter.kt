@@ -1,5 +1,6 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.persistence
 
+import org.around.ieuri.auth.application.port.out.persistence.EmailAuthentication
 import org.around.ieuri.auth.application.port.out.persistence.MemberAuthentication
 import org.around.ieuri.auth.application.port.out.persistence.MemberRepositoryPort
 import org.around.ieuri.auth.application.port.out.security.EmailEncryptorPort
@@ -45,6 +46,7 @@ class MemberPersistenceAdapter(
                 providerUserId = member.providerUserId.value,
                 emailEncrypted = encryptor.encrypt(member.email.value),
                 emailVerified = member.emailVerified,
+                passwordHash = member.passwordHash?.value,
                 status = member.status,
                 ageVerified = member.ageVerified,
             ),
@@ -80,6 +82,12 @@ class MemberPersistenceAdapter(
         // 트랜잭션 커밋 시 dirty-check로 UPDATE 발행(@PreUpdate가 updated_at 갱신).
     }
 
+    override fun updatePassword(memberId: Long, newPasswordHash: String) {
+        val entity = memberRepository.findById(memberId).orElse(null) ?: return
+        entity.passwordHash = newPasswordHash
+        // 트랜잭션 커밋 시 dirty-check로 UPDATE.
+    }
+
     override fun findEmailByMemberId(memberId: Long): Email? {
         val entity = memberRepository.findById(memberId).orElse(null) ?: return null
         return Email(encryptor.decrypt(entity.emailEncrypted))
@@ -92,6 +100,18 @@ class MemberPersistenceAdapter(
             status = entity.status,
             suspendedUntil = entity.suspendedUntil,
             suspensionReason = entity.suspensionReason,
+        )
+    }
+
+    override fun findEmailAuthentication(email: String): EmailAuthentication? {
+        val entity = memberRepository.findByProviderAndProviderUserId(Provider.EMAIL, email) ?: return null
+        return EmailAuthentication(
+            memberId = requireNotNull(entity.id),
+            status = entity.status,
+            suspendedUntil = entity.suspendedUntil,
+            suspensionReason = entity.suspensionReason,
+            passwordHash = entity.passwordHash,
+            emailVerified = entity.emailVerified,
         )
     }
 

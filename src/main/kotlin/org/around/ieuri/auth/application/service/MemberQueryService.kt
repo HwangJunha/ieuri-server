@@ -1,8 +1,13 @@
-package org.around.ieuri.auth.application.query
+package org.around.ieuri.auth.application.service
 
 import org.around.ieuri.auth.application.exception.MemberNotFoundException
 import org.around.ieuri.auth.application.port.`in`.query.MemberQueryUseCase
 import org.around.ieuri.auth.application.port.out.query.MemberQueryPort
+import org.around.ieuri.auth.application.query.MemberDetailView
+import org.around.ieuri.auth.application.query.MemberSummaryView
+import org.around.ieuri.auth.application.query.MembersQuery
+import org.around.ieuri.auth.application.query.MeView
+import org.around.ieuri.common.pagination.CursorPage
 import org.springframework.stereotype.Service
 
 /**
@@ -10,7 +15,7 @@ import org.springframework.stereotype.Service
  * 인가는 인바운드 리졸버에서 판정하고, 여기선 조회에 집중한다. 목록은 이메일 미포함(최소수집).
  */
 @Service
-class MemberQueryHandler(
+class MemberQueryService(
     private val memberQueryPort: MemberQueryPort,
 ) : MemberQueryUseCase {
 
@@ -22,5 +27,5 @@ class MemberQueryHandler(
         memberQueryPort.findMemberDetail(memberId)
             ?: throw MemberNotFoundException("회원을 찾을 수 없습니다.")
 
-    override fun members(query: MembersQuery): MembersPage = memberQueryPort.findMembers(query)
+    override fun members(query: MembersQuery): CursorPage<MemberSummaryView> = memberQueryPort.findMembers(query)
 }

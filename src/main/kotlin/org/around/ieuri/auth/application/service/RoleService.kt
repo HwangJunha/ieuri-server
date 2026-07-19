@@ -1,4 +1,4 @@
-package org.around.ieuri.auth.application
+package org.around.ieuri.auth.application.service
 
 import org.around.ieuri.auth.application.command.AssignRoleCommand
 import org.around.ieuri.auth.application.command.RevokeRoleCommand
@@ -20,7 +20,7 @@ import org.springframework.transaction.annotation.Transactional
  * 자기 강등 방지: 본인이 자신의 마지막 "관리 역할"(role:assign/role:revoke를 주는 역할)을 회수하는 것은 거부한다.
  */
 @Service
-class RoleHandler(
+class RoleService(
     private val memberRepository: MemberRepositoryPort,
     private val roleRepository: RoleRepositoryPort,
     private val auditLog: AuditLogPort,

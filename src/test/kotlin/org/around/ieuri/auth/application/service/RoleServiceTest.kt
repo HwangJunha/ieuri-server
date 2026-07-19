@@ -1,4 +1,4 @@
-package org.around.ieuri.auth.application
+package org.around.ieuri.auth.application.service
 
 import io.mockk.every
 import io.mockk.mockk
@@ -18,14 +18,14 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** RoleHandler — 부여/회수 오케스트레이션과 자기 강등 방지. */
-class RoleHandlerTest {
+/** RoleService — 부여/회수 오케스트레이션과 자기 강등 방지. */
+class RoleServiceTest {
 
     private val memberRepository = mockk<MemberRepositoryPort>()
     private val roleRepository = mockk<RoleRepositoryPort>(relaxed = true)
     private val auditLog = mockk<AuditLogPort>(relaxed = true)
 
-    private val roleHandler = RoleHandler(memberRepository, roleRepository, auditLog)
+    private val roleService = RoleService(memberRepository, roleRepository, auditLog)
 
     private val adminRole = Role("ADMIN", "관리자", setOf(Permission(Permission.ROLE_ASSIGN), Permission(Permission.ROLE_REVOKE)))
     private val userRole = Role("USER", "일반", emptySet())
@@ -38,7 +38,7 @@ class RoleHandlerTest {
         every { roleRepository.findByCode("ADMIN") } returns adminRole
         every { roleRepository.assignRoleToMember(7L, "ADMIN") } returns true
 
-        val result = roleHandler.assign(AssignRoleCommand(actorMemberId = 1L, targetMemberId = 7L, roleCode = "ADMIN"))
+        val result = roleService.assign(AssignRoleCommand(actorMemberId = 1L, targetMemberId = 7L, roleCode = "ADMIN"))
 
         assertTrue(result.changed)
         verify { auditLog.record(7L, "MEMBER_ROLE_ASSIGNED", any()) }
@@ -50,7 +50,7 @@ class RoleHandlerTest {
         every { roleRepository.findByCode("ADMIN") } returns adminRole
         every { roleRepository.assignRoleToMember(7L, "ADMIN") } returns false
 
-        val result = roleHandler.assign(AssignRoleCommand(1L, 7L, "ADMIN"))
+        val result = roleService.assign(AssignRoleCommand(1L, 7L, "ADMIN"))
 
         assertFalse(result.changed)
         verify(exactly = 0) { auditLog.record(any(), "MEMBER_ROLE_ASSIGNED", any()) }
@@ -59,14 +59,14 @@ class RoleHandlerTest {
     @Test
     fun `없는 회원에게 부여하면 예외`() {
         every { memberRepository.existsById(7L) } returns false
-        assertFailsWith<MemberNotFoundException> { roleHandler.assign(AssignRoleCommand(1L, 7L, "ADMIN")) }
+        assertFailsWith<MemberNotFoundException> { roleService.assign(AssignRoleCommand(1L, 7L, "ADMIN")) }
     }
 
     @Test
     fun `없는 역할을 부여하면 예외`() {
         every { memberRepository.existsById(7L) } returns true
         every { roleRepository.findByCode("GHOST") } returns null
-        assertFailsWith<RoleNotFoundException> { roleHandler.assign(AssignRoleCommand(1L, 7L, "GHOST")) }
+        assertFailsWith<RoleNotFoundException> { roleService.assign(AssignRoleCommand(1L, 7L, "GHOST")) }
     }
 
     // --- revoke ---
@@ -77,7 +77,7 @@ class RoleHandlerTest {
         every { roleRepository.findByCode("ADMIN") } returns adminRole
         every { roleRepository.revokeRoleFromMember(7L, "ADMIN") } returns true
 
-        val result = roleHandler.revoke(RevokeRoleCommand(actorMemberId = 1L, targetMemberId = 7L, roleCode = "ADMIN"))
+        val result = roleService.revoke(RevokeRoleCommand(actorMemberId = 1L, targetMemberId = 7L, roleCode = "ADMIN"))
 
         assertTrue(result.changed)
         verify { auditLog.record(7L, "MEMBER_ROLE_REVOKED", any()) }
@@ -91,7 +91,7 @@ class RoleHandlerTest {
         every { roleRepository.findRolesOfMember(1L) } returns listOf(adminRole, userRole)
 
         assertFailsWith<SelfDemotionException> {
-            roleHandler.revoke(RevokeRoleCommand(actorMemberId = 1L, targetMemberId = 1L, roleCode = "ADMIN"))
+            roleService.revoke(RevokeRoleCommand(actorMemberId = 1L, targetMemberId = 1L, roleCode = "ADMIN"))
         }
         verify(exactly = 0) { roleRepository.revokeRoleFromMember(any(), any()) }
     }
@@ -104,7 +104,7 @@ class RoleHandlerTest {
         every { roleRepository.findRolesOfMember(1L) } returns listOf(adminRole, superAdmin)
         every { roleRepository.revokeRoleFromMember(1L, "ADMIN") } returns true
 
-        val result = roleHandler.revoke(RevokeRoleCommand(1L, 1L, "ADMIN"))
+        val result = roleService.revoke(RevokeRoleCommand(1L, 1L, "ADMIN"))
 
         assertTrue(result.changed)
     }
@@ -115,7 +115,7 @@ class RoleHandlerTest {
         every { roleRepository.findByCode("USER") } returns userRole
         every { roleRepository.revokeRoleFromMember(1L, "USER") } returns true
 
-        val result = roleHandler.revoke(RevokeRoleCommand(1L, 1L, "USER"))
+        val result = roleService.revoke(RevokeRoleCommand(1L, 1L, "USER"))
 
         assertTrue(result.changed)
         verify(exactly = 0) { roleRepository.findRolesOfMember(any()) }
