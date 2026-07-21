@@ -28,6 +28,8 @@ extra["netflixDgsVersion"] = "11.1.0"
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    // refresh 토큰 저장소를 Valkey(Redis 프로토콜 호환)로 이관. Lettuce 클라이언트 기본.
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.boot:spring-boot-starter-security")
     // @RequiresPermission 선언적 인가(애스펙트)용 AspectJ 위버. spring-aop는 전이 의존이나,
     // 위버는 명시해 두어 프록시 파싱(@Aspect) 요건을 드러낸다. 프록시 활성화는 @EnableAspectJAutoProxy(AopConfig).
