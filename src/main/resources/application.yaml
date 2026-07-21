@@ -22,6 +22,16 @@ spring:
     # (기존 DB에 Flyway를 도입하는 표준 방식). baseline-version=0이라 V1 마이그레이션이 스킵되지 않는다.
     baseline-on-migrate: true
     baseline-version: 0
+  data:
+    redis:
+      # refresh 토큰 저장소(Valkey, Redis 프로토콜 호환). 값은 전부 환경변수 외부화.
+      host: ${IEURI_VALKEY_HOST:localhost}
+      port: ${IEURI_VALKEY_PORT:6379}
+      # 비밀값: 커밋 금지. prod는 환경변수 주입, local은 인증 없는 개발 인스턴스(빈 값).
+      password: ${IEURI_VALKEY_PASSWORD:}
+      # command timeout: 장애 시 요청 스레드가 무한정 매달리지 않도록 반드시 둔다.
+      timeout: 2s
+      client-name: ieuri
   mail:
     # 개발/임시: Gmail SMTP. 자격증명이 없어도 컨텍스트는 로드된다(발송 시에만 필요).
     host: ${MAIL_HOST:smtp.gmail.com}
