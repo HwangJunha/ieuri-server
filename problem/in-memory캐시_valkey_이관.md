@@ -13,6 +13,7 @@
 
 ## 포함 기능 (In Scope)
 
+
 1. `save()` 기능을 기존 in-memory cache와 같은 로직이 흘러가야 된다.
 2. `existsActive` 기능을 기존 in-memory cache와 같은 로직이 흘러가야 된다.
 3. `revoke` 기능을 기존 in-memory cache와 같은 로직이 흘러가야 된다.
@@ -101,3 +102,4 @@
 - 만료된 refresh 재제출이 재사용 감지로 전체 세션을 폐기하는 현재 동작(정책상 의도됨, 변경 안 함).
 - top-level 에러에 안정적 error code/extensions를 부여하는 전역 `DataFetcherExceptionResolver`
   (현재는 기존 인증 에러와 동일하게 최상위 error로 전파하는 것에 맞춤).
+
