@@ -6,20 +6,19 @@ import org.around.ieuri.auth.application.port.out.client.SnsIdentity
 import org.around.ieuri.auth.application.port.out.client.SnsIdentityVerifierPort
 import org.around.ieuri.auth.domain.vo.Provider
 import org.around.ieuri.auth.infrastructure.config.SnsProperties
-import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Component
 
 /**
- * 실검증(prod 등 `!local`) SNS 신원 검증기. provider별 JWKS 검증기([JwksIdTokenVerifier])로
- * id_token의 서명·iss·aud·exp를 검증하고, 검증된 클레임을 [SnsIdentity]로 매핑한다.
- * 서명 미검증 stub([DevSnsIdentityVerifier])과 프로파일로 상호 배타.
+ * SNS 신원 검증기. provider별 JWKS 검증기([JwksIdTokenVerifier])로 id_token의
+ * 서명·iss·aud·exp를 검증하고, 검증된 클레임을 [SnsIdentity]로 매핑한다.
+ * 모든 환경에서 실검증한다(별도 dev stub 없음 — 로컬에서 SNS를 테스트하려면 실제 provider
+ * 로그인으로 발급받은 id_token이 필요하다).
  *
  * - Google: aud=웹 클라이언트 ID, iss=accounts.google.com(두 형태)
  * - Apple:  aud=Bundle ID(kr.ieuri.ktripspot), iss=appleid.apple.com. 이름/이메일은 최초 1회만.
  * - Kakao:  OIDC id_token, aud=REST API 키(앱 ID), iss=kauth.kakao.com
  */
 @Component
-@Profile("!local")
 class CompositeSnsIdentityVerifier(
     properties: SnsProperties,
 ) : SnsIdentityVerifierPort {

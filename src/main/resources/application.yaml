@@ -63,9 +63,8 @@ ieuri:
     secret: ${IEURI_JWT_SECRET}
     access-ttl: 5m
     refresh-ttl: 30d
-  # SNS id_token 검증(prod 프로파일에서 실검증기가 사용). aud로 검증할 클라이언트 ID/앱 키는
-  # 공개 식별자라 env 오버라이드 가능한 기본값으로 둔다. jwks-uri/issuer는 provider 고정값.
-  # local 프로파일은 DevSnsIdentityVerifier(서명 미검증 stub)를 쓰므로 이 값이 필요 없다.
+  # SNS id_token 검증. aud로 검증할 클라이언트 ID/앱 키는 공개 식별자라 env 오버라이드
+  # 가능한 기본값으로 둔다. jwks-uri/issuer는 provider 고정값. 모든 환경에서 실검증한다.
   sns:
     google:
       client-id: ${GOOGLE_OAUTH_CLIENT_ID:504325192446-69cc1ljfcrl5364632mrssn1dmeh43h8.apps.googleusercontent.com}
