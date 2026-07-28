@@ -26,19 +26,19 @@ class CompositeSnsIdentityVerifier(
     private val google = JwksIdTokenVerifier(
         jwksUri = properties.google.jwksUri,
         issuers = properties.google.issuers.toSet(),
-        audience = properties.google.clientId,
+        audiences = properties.google.clientIds.toSet(),
     )
 
     private val apple = JwksIdTokenVerifier(
         jwksUri = properties.apple.jwksUri,
         issuers = setOf(properties.apple.issuer),
-        audience = properties.apple.audience,
+        audiences = properties.apple.audiences.toSet(),
     )
 
     private val kakao = JwksIdTokenVerifier(
         jwksUri = properties.kakao.jwksUri,
         issuers = setOf(properties.kakao.issuer),
-        audience = properties.kakao.appKey,
+        audiences = properties.kakao.appKeys.toSet(),
     )
 
     override fun verify(provider: Provider, idToken: String): SnsIdentity {

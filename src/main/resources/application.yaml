@@ -67,16 +67,23 @@ ieuri:
   # 가능한 기본값으로 둔다. jwks-uri/issuer는 provider 고정값. 모든 환경에서 실검증한다.
   sns:
     google:
-      client-id: ${GOOGLE_OAUTH_CLIENT_ID:504325192446-69cc1ljfcrl5364632mrssn1dmeh43h8.apps.googleusercontent.com}
+      # id_token의 aud는 플랫폼별로 다르다: iOS→iOS 클라이언트 ID, Android/Web→웹 클라이언트 ID.
+      # 셋 다 허용한다(하나라도 일치하면 통과).
+      client-ids:
+        - ${GOOGLE_WEB_CLIENT_ID:504325192446-69cc1ljfcrl5364632mrssn1dmeh43h8.apps.googleusercontent.com}
+        - ${GOOGLE_IOS_CLIENT_ID:504325192446-vvqljuqs07v73fq5093ekl1ijt6q1cm7.apps.googleusercontent.com}
+        - ${GOOGLE_ANDROID_CLIENT_ID:504325192446-69cc1ljfcrl5364632mrssn1dmeh43h8.apps.googleusercontent.com}
       jwks-uri: https://www.googleapis.com/oauth2/v3/certs
       issuers:
         - https://accounts.google.com
         - accounts.google.com
     apple:
-      audience: ${APPLE_AUDIENCE:kr.ieuri.ktripspot}
+      audiences:
+        - ${APPLE_AUDIENCE:kr.ieuri.ktripspot}
       jwks-uri: https://appleid.apple.com/auth/keys
       issuer: https://appleid.apple.com
     kakao:
-      app-key: ${KAKAO_REST_API_KEY:0a242875d051e4dced8e2a4155da5dab}
+      app-keys:
+        - ${KAKAO_REST_API_KEY:0a242875d051e4dced8e2a4155da5dab}
       jwks-uri: https://kauth.kakao.com/.well-known/jwks.json
       issuer: https://kauth.kakao.com

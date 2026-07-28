@@ -36,8 +36,8 @@ class JwksIdTokenVerifierTest {
 
     private fun verifier(
         issuers: Set<String> = setOf(issuer),
-        aud: String = audience,
-    ) = JwksIdTokenVerifier(jwkSource, issuers, aud)
+        auds: Set<String> = setOf(audience),
+    ) = JwksIdTokenVerifier(jwkSource, issuers, auds)
 
     private fun signedToken(
         iss: String = issuer,
@@ -76,6 +76,17 @@ class JwksIdTokenVerifierTest {
         assertFailsWith<SnsVerificationFailedException> {
             verifier().verify(signedToken(aud = "someone-else"))
         }
+    }
+
+    @Test
+    fun `accepts any audience in the allowed set (iOS vs web client id)`() {
+        // Google's id_token aud differs by platform: iOS client id from an iOS
+        // app, web client id from Android/web. Both must pass.
+        val iosId = "ios-client-id"
+        val webId = "web-client-id"
+        val v = verifier(auds = setOf(webId, iosId))
+        assertEquals("user-123", v.verify(signedToken(aud = iosId)).subject)
+        assertEquals("user-123", v.verify(signedToken(aud = webId)).subject)
     }
 
     @Test
