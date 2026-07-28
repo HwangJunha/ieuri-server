@@ -63,3 +63,30 @@ ieuri:
     secret: ${IEURI_JWT_SECRET}
     access-ttl: 5m
     refresh-ttl: 30d
+  # SNS id_token 검증. aud로 검증할 클라이언트 ID/앱 키는 공개 식별자라 env 오버라이드
+  # 가능한 기본값으로 둔다. jwks-uri/issuer는 provider 고정값. 모든 환경에서 실검증한다.
+  sns:
+    google:
+      # id_token의 aud는 플랫폼별로 다르다: iOS→iOS 클라이언트 ID, Android/Web→웹 클라이언트 ID.
+      # 셋 다 허용한다(하나라도 일치하면 통과).
+      client-ids:
+        - ${GOOGLE_WEB_CLIENT_ID:504325192446-69cc1ljfcrl5364632mrssn1dmeh43h8.apps.googleusercontent.com}
+        - ${GOOGLE_IOS_CLIENT_ID:504325192446-vvqljuqs07v73fq5093ekl1ijt6q1cm7.apps.googleusercontent.com}
+        - ${GOOGLE_ANDROID_CLIENT_ID:504325192446-69cc1ljfcrl5364632mrssn1dmeh43h8.apps.googleusercontent.com}
+      jwks-uri: https://www.googleapis.com/oauth2/v3/certs
+      issuers:
+        - https://accounts.google.com
+        - accounts.google.com
+    apple:
+      audiences:
+        - ${APPLE_AUDIENCE:kr.ieuri.ktripspot}
+      jwks-uri: https://appleid.apple.com/auth/keys
+      issuer: https://appleid.apple.com
+    kakao:
+      # 카카오 OIDC id_token의 aud는 "로그인에 사용한 앱 키"다. 앱은 네이티브 앱 키로
+      # 로그인하므로 aud도 네이티브 앱 키다(REST API 키가 아님). 실제로 올 수 있는 값만
+      # 허용한다(허용 aud는 최소로 — 오지 않을 REST 키를 넣으면 검증만 느슨해진다).
+      app-keys:
+        - ${KAKAO_NATIVE_APP_KEY:f3d974f8c5a77ab1fb0673c353f9cb62}
+      jwks-uri: https://kauth.kakao.com/.well-known/jwks.json
+      issuer: https://kauth.kakao.com
