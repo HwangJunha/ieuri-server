@@ -50,9 +50,13 @@ dependencies {
     // flyway-core가 아니라 이 모듈에 있으므로 명시적으로 추가해야 마이그레이션이 부팅 시 실행된다.
     implementation("org.springframework.boot:spring-boot-flyway")
     // JWT (JVM 표준 라이브러리 jjwt). api만 컴파일 의존, 구현/직렬화는 런타임.
+    // 자체 발급 HS256 토큰 전용.
     implementation("io.jsonwebtoken:jjwt-api:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
+    // 외부 SNS id_token(RS256/ES256) 서명 검증 + JWKS 원격 조회/캐시. jjwt는 JWKS 조회를
+    // 지원하지 않아 별도 라이브러리를 쓴다. Google/Apple/Kakao 공개키로 서명·iss·aud·exp 검증.
+    implementation("com.nimbusds:nimbus-jose-jwt:9.40")
     runtimeOnly("org.postgresql:postgresql")
     testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")
     testImplementation("io.mockk:mockk:1.13.13")

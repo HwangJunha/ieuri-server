@@ -29,6 +29,13 @@ class MemberNotFoundException(message: String) :
 class InactiveMemberException(message: String) :
     UserFacingException("ACCOUNT_INACTIVE", message)
 
+/**
+ * SNS id_token 검증 실패(서명 불일치/발급자·audience 불일치/만료/형식 오류).
+ * 어떤 사유인지 과도하게 노출하지 않도록 단일 code로 일반화한다.
+ */
+class SnsVerificationFailedException(message: String) :
+    UserFacingException("SNS_VERIFICATION_FAILED", message)
+
 /** 존재하지 않는 역할 코드로 부여/회수를 시도할 때. */
 class RoleNotFoundException(message: String) :
     UserFacingException("ROLE_NOT_FOUND", message)
