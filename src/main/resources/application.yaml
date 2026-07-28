@@ -83,7 +83,10 @@ ieuri:
       jwks-uri: https://appleid.apple.com/auth/keys
       issuer: https://appleid.apple.com
     kakao:
+      # 카카오 OIDC id_token의 aud는 "로그인에 사용한 앱 키"다 — 앱은 네이티브 앱 키로
+      # 로그인하므로 aud도 네이티브 앱 키다(REST API 키가 아님). 둘 다 허용해 안전하게 둔다.
       app-keys:
+        - ${KAKAO_NATIVE_APP_KEY:f3d974f8c5a77ab1fb0673c353f9cb62}
         - ${KAKAO_REST_API_KEY:0a242875d051e4dced8e2a4155da5dab}
       jwks-uri: https://kauth.kakao.com/.well-known/jwks.json
       issuer: https://kauth.kakao.com
