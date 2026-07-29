@@ -126,3 +126,60 @@ Merge & review rules:
 - `dev → master`: **not reviewed** — dev is already validated and kept release-ready, so promoting it to production is a straight merge.
 - Never start a feature from `master`. Never start a hotfix from `dev`.
 - After a `hotfix/* → master`, back-merge into `dev` so dev doesn't fall behind production.
+
+## Spec-driven workflow
+
+Requirements do not originate in this repository. They come from the planner harness
+(`ieuri-planner`) and live in the Obsidian vault under `Specs/SPEC-XXXX/`.
+
+Two documents, two jobs:
+
+- **`Specs/SPEC-XXXX/spec.md`** (vault) — requirements, acceptance criteria, applied policies.
+  The authority on *what must be true*.
+- **`problem/SPEC-XXXX-server.md`** (this repo) — the server-side design: domain, aggregate
+  boundary, command/query split, persistence implications. The entry point for implementation,
+  versioned alongside the code.
+
+**Read both before implementing.** The design document is where you start; the acceptance
+criteria in the linked spec are what the tests must satisfy. A slice that satisfies the design
+but not the acceptance criteria is not done.
+
+`problem/SPEC-*.md` files are produced by the planner. Do not edit them — a hook blocks it.
+Other files under `problem/` are yours.
+
+### Issues and branches
+
+Each spec opens one issue per target repo, created by the planner. The issue carries the
+background, a link to the spec, the acceptance conditions for this repo, and the branch name.
+
+Branches are `feature/SPEC-XXXX-<short-kebab-name>`, cut from `dev` as before. The spec id is a
+permanent identifier shared by the spec, the issue, the log, and the published post, so carrying
+it in the branch makes the whole chain greppable. A step or plan number still does not belong
+there — it stops meaning anything the moment the plan changes.
+
+### When the spec is wrong
+
+**Do not fix it in code.** If you hit a case the spec does not cover, a technical impossibility,
+or a needed contract change:
+
+1. Stop.
+2. Comment on the issue: `[AMEND] SPEC-XXXX: <what you hit and why the spec cannot stand>`
+3. Wait. The planner harness folds it back with `/amend`, and the spec is updated with a change
+   history entry.
+
+Implementing something different and mentioning it later is what makes a spec worthless within
+three features. The temptation is strongest when the deviation is small.
+
+### Contract
+
+`Specs/SPEC-XXXX/contract.graphql` is a **proposal** from the planner, not a decision. This
+repository owns the final schema.
+
+Where the proposal is wrong, change it here and say so in the issue — that is a normal outcome,
+not an amendment. Where you accept it, the `.graphqls` under `src/main/resources/schema/` must
+end up matching it; a `contract-drift` hook compares them and blocks on divergence.
+
+### Status
+
+The recorder harness moves the spec to `implemented` when it records completion. Do not edit spec
+status yourself.

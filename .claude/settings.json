@@ -1,12 +1,13 @@
 {
   "// note": "Merge this into .claude/settings.json at the repo root. Make every script executable: chmod +x .claude/hooks/*.sh",
-
+  "env": { "IEURI_VAULT": "/Users/junha/Documents/Obsidian Vault" },
   "hooks": {
     "PreToolUse": [
       {
         "matcher": "Write|Edit|MultiEdit",
         "hooks": [
-          { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-sensitive-paths.sh" }
+          { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-sensitive-paths.sh" },
+          { "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-spec-docs.sh\"" }
         ]
       }
     ],
