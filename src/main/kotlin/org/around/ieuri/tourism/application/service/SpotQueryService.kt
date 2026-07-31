@@ -8,12 +8,14 @@ import org.around.ieuri.tourism.application.exception.InvalidCoordinatesExceptio
 import org.around.ieuri.tourism.application.exception.RadiusTooLargeException
 import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
 import org.around.ieuri.tourism.application.port.`in`.query.SpotQueryUseCase
+import org.around.ieuri.tourism.application.port.out.client.NearbySpotData
 import org.around.ieuri.tourism.application.port.out.client.NearbySpotQuery
 import org.around.ieuri.tourism.application.port.out.client.TourInfoPort
 import org.around.ieuri.tourism.application.query.SpotView
 import org.around.ieuri.tourism.application.query.SpotsQuery
 import org.around.ieuri.tourism.domain.aggregate.Spot
 import org.around.ieuri.tourism.domain.vo.Coordinates
+import org.around.ieuri.tourism.domain.vo.Distance
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.springframework.stereotype.Service
@@ -60,7 +62,8 @@ class SpotQueryService(
                 ),
             )
             if (upstreamTotalCount == null) upstreamTotalCount = result.totalCount
-            result.spots.forEach { merged.putIfAbsent(it.id, it) }
+            // DTO→Domain: 여기서 거리(도메인 로직)를 채워 Spot으로 조립한다.
+            result.spots.forEach { data -> merged.putIfAbsent(data.id, data.toSpot(center)) }
             upstreamHasMore = result.hasMoreUpstreamPages
             pageNo++
 
@@ -113,6 +116,19 @@ class SpotQueryService(
             throw CategoryNotAvailableForLocaleException("$category 는 현재 언어에서 제공되지 않습니다.")
         }
     }
+
+    /** 포트 중립 DTO → 도메인 Spot. 거리(도메인 로직)를 사용자 좌표 기준으로 채운다(DTO→Domain). */
+    private fun NearbySpotData.toSpot(center: Coordinates): Spot = Spot(
+        id = id,
+        title = title,
+        address = address,
+        thumbnailImageUrl = thumbnailImageUrl,
+        coordinates = coordinates,
+        distance = Distance.between(center, coordinates),
+        category = category,
+        copyright = copyright,
+        attributionText = copyright.attributionText,
+    )
 
     private fun Spot.toView(): SpotView = SpotView(
         id = id,
