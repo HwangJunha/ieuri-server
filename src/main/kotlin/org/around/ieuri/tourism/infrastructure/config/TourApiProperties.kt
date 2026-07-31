@@ -17,9 +17,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties
  * @param mobileOs       MobileOS 파라미터.
  * @param mobileApp      MobileApp 파라미터.
  * @param maxRadiusMeters 서버 UX/성능 반경 상한(초과 시 RADIUS_TOO_LARGE).
- * @param maxPageSize    first 상한(POL-018 잠정 100).
- * @param upstreamPageSize numOfRows(실측 100).
- * @param maxUpstreamPagesPerCursor 커서 한 번 채우기 위한 upstream 페이지 상한(과호출 방지).
+ * @param maxPageSize    size 상한(POL-018 잠정 100). 초과 요청은 클램프.
  * @param connectTimeoutMillis / readTimeoutMillis  HTTP 타임아웃.
  */
 @ConfigurationProperties(prefix = "ieuri.tourapi")
@@ -33,10 +31,8 @@ data class TourApiProperties(
     val mobileApp: String = "ieuri",
     val maxRadiusMeters: Int = 100_000,
     val maxPageSize: Int = 100,
-    val upstreamPageSize: Int = 100,
-    val maxUpstreamPagesPerCursor: Int = 3,
-    val connectTimeoutMillis: Long = 3_000,
-    val readTimeoutMillis: Long = 5_000,
+    val connectTimeoutMillis: Long = 15_000,
+    val readTimeoutMillis: Long = 30_000,
 ) {
     companion object {
         const val CODESET_KO = "KO"

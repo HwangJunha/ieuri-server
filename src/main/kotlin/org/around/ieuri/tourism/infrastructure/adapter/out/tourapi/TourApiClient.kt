@@ -64,6 +64,7 @@ class TourApiClient(
             throw e
         } catch (e: Exception) {
             // 좌표를 로그에 남기지 않는다(POL-013/AC-23).
+            log.warn("Error while calling tour api", e)
             log.warn("TourAPI 호출 실패: {}", e.javaClass.simpleName)
             throw UpstreamUnavailableException("TourAPI 호출에 실패했습니다.", e)
         }

@@ -5,6 +5,7 @@ import org.around.ieuri.tourism.domain.vo.SpotCategory
 
 /**
  * spots 쿼리 입력. 언어는 인자가 아니라 Accept-Language에서 온다(요청 스코프 컨텍스트로 주입).
+ * TourAPI가 pageNo 오프셋만 지원하므로 오프셋 페이지네이션([page] 1-base, [size]).
  * 좌표·반경 형식 검증은 Coordinates VO/서비스에서, 카테고리 가용성은 서비스에서 판정한다.
  */
 data class SpotsQuery(
@@ -12,8 +13,18 @@ data class SpotsQuery(
     val longitude: Double,
     val radiusMeters: Int,
     val category: SpotCategory?,
-    val first: Int,
-    val after: String?,
+    val page: Int,
+    val size: Int,
+)
+
+/**
+ * spots 응답. [items]는 거리 오름차순 정렬된 한 페이지, [hasNext]로 소진 판정, [totalCount]는 필터-이전 참고값.
+ */
+data class SpotPageView(
+    val items: List<SpotView>,
+    val page: Int,
+    val hasNext: Boolean,
+    val totalCount: Int?,
 )
 
 /**

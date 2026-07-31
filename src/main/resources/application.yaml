@@ -68,7 +68,7 @@ ieuri:
   # TourAPI(한국관광공사) 접근. serviceKey는 4개 언어 공용 단일 키(실측 B-4) — 언어는 base-url 선택에만 영향.
   # serviceKey는 환경변수로만 주입한다(응답·로그·GraphQL 어디에도 노출 금지, fail-fast 없이 빈 값이면 조회 시 실패).
   tourapi:
-    service-key: ${IEURI_TOUR_API_KEY:}
+    service-key: ${IEURI_TOUR_API_KEY_ENCODING:}
     base-urls:
       KO: https://apis.data.go.kr/B551011/KorService2
       EN: https://apis.data.go.kr/B551011/EngService2
@@ -101,8 +101,6 @@ ieuri:
     mobile-app: ieuri
     max-radius-meters: 100000
     max-page-size: 100
-    upstream-page-size: 100
-    max-upstream-pages-per-cursor: 3
     connect-timeout-millis: 3000
     read-timeout-millis: 5000
   sns:

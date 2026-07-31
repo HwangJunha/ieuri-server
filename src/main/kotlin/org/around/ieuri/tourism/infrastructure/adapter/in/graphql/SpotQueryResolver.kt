@@ -3,18 +3,16 @@ package org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql
 import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
-import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.tourism.application.port.`in`.query.SpotQueryUseCase
+import org.around.ieuri.tourism.application.query.SpotPageView
 import org.around.ieuri.tourism.application.query.SpotView
 import org.around.ieuri.tourism.application.query.SpotsQuery
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.tourism.infrastructure.locale.LocaleContext
 import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
-import org.around.ieuri.common.graphql.generated.types.PageInfo as GqlPageInfo
 import org.around.ieuri.common.graphql.generated.types.Spot as GqlSpot
 import org.around.ieuri.common.graphql.generated.types.SpotCategory as GqlSpotCategory
-import org.around.ieuri.common.graphql.generated.types.SpotConnection as GqlSpotConnection
-import org.around.ieuri.common.graphql.generated.types.SpotEdge as GqlSpotEdge
+import org.around.ieuri.common.graphql.generated.types.SpotPage as GqlSpotPage
 
 /**
  * 관광지 조회 GraphQL 쿼리 리졸버(인바운드 어댑터, CQRS 읽기). 언어는 요청 스코프 LocaleContext에서 읽어
@@ -32,17 +30,17 @@ class SpotQueryResolver(
         @InputArgument longitude: Double,
         @InputArgument radiusMeters: Int?,
         @InputArgument category: GqlSpotCategory?,
-        @InputArgument first: Int?,
-        @InputArgument after: String?,
-    ): GqlSpotConnection {
+        @InputArgument page: Int?,
+        @InputArgument size: Int?,
+    ): GqlSpotPage {
         val result = spotQueryUseCase.spots(
             SpotsQuery(
                 latitude = latitude,
                 longitude = longitude,
                 radiusMeters = radiusMeters ?: DEFAULT_RADIUS_METERS,
                 category = category?.let { SpotCategory.valueOf(it.name) },
-                first = first ?: DEFAULT_PAGE_SIZE,
-                after = after,
+                page = page ?: DEFAULT_PAGE,
+                size = size ?: DEFAULT_SIZE,
             ),
             locale = localeContext.locale,
         )
@@ -54,15 +52,11 @@ class SpotQueryResolver(
         spotQueryUseCase.availableCategories(localeContext.locale)
             .map { GqlSpotCategory.valueOf(it.name) }
 
-    private fun CursorPage<SpotView>.toGql(): GqlSpotConnection = GqlSpotConnection(
-        edges = edges.map { GqlSpotEdge(cursor = it.cursor, node = it.node.toGql()) },
-        pageInfo = GqlPageInfo(
-            hasNextPage = pageInfo.hasNextPage,
-            hasPreviousPage = pageInfo.hasPreviousPage,
-            startCursor = pageInfo.startCursor,
-            endCursor = pageInfo.endCursor,
-        ),
-        totalCount = totalCount?.toInt(),
+    private fun SpotPageView.toGql(): GqlSpotPage = GqlSpotPage(
+        items = items.map { it.toGql() },
+        page = page,
+        hasNext = hasNext,
+        totalCount = totalCount,
     )
 
     private fun SpotView.toGql(): GqlSpot = GqlSpot(
@@ -80,6 +74,7 @@ class SpotQueryResolver(
 
     private companion object {
         const val DEFAULT_RADIUS_METERS = 20_000
-        const val DEFAULT_PAGE_SIZE = 20
+        const val DEFAULT_PAGE = 1
+        const val DEFAULT_SIZE = 100
     }
 }

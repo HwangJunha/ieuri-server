@@ -1,8 +1,5 @@
 package org.around.ieuri.tourism.application.service
 
-import org.around.ieuri.common.pagination.CursorEdge
-import org.around.ieuri.common.pagination.CursorPage
-import org.around.ieuri.common.pagination.CursorPageInfo
 import org.around.ieuri.tourism.application.exception.CategoryNotAvailableForLocaleException
 import org.around.ieuri.tourism.application.exception.InvalidCoordinatesException
 import org.around.ieuri.tourism.application.exception.RadiusTooLargeException
@@ -11,6 +8,7 @@ import org.around.ieuri.tourism.application.port.`in`.query.SpotQueryUseCase
 import org.around.ieuri.tourism.application.port.out.client.NearbySpotData
 import org.around.ieuri.tourism.application.port.out.client.NearbySpotQuery
 import org.around.ieuri.tourism.application.port.out.client.TourInfoPort
+import org.around.ieuri.tourism.application.query.SpotPageView
 import org.around.ieuri.tourism.application.query.SpotView
 import org.around.ieuri.tourism.application.query.SpotsQuery
 import org.around.ieuri.tourism.domain.aggregate.Spot
@@ -21,13 +19,13 @@ import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.springframework.stereotype.Service
 
 /**
- * 관광지 조회 유스케이스 구현(CQRS 읽기). 파이프라인 책임 분배(spec §3):
- *  - 좌표/반경/카테고리 검증      : 여기(application)
- *  - TourAPI 호출·필터·정규화·거리 : TourInfoPort 뒤 어댑터
- *  - 정렬((거리, id))·커서 페이지  : 여기(application) — 정렬은 계약(POL-019)
+ * 관광지 조회 유스케이스 구현(CQRS 읽기). 파이프라인:
+ *  - 좌표/반경/카테고리 검증 : 여기(application)
+ *  - TourAPI 호출·필터·정규화 : TourInfoPort 뒤 어댑터
+ *  - 거리 계산·정렬(거리 ASC) : 여기(application) — 정렬은 계약(POL-019)
  *
- * 커서는 (거리, contentId) 복합키. upstream(arrange=Q)이 거리순이 아니므로, after 요청 시 그 키보다 큰
- * 항목이 나오도록 upstream을 필요한 만큼(정책 상한 내) 조회·병합해 정렬한 뒤 keyset으로 자른다.
+ * TourAPI가 pageNo 오프셋만 지원하고 라이브 데이터라, 커서 대신 **오프셋 한 페이지**를 그대로 서빙한다.
+ * 클라이언트가 한 페이지를 스택에 쌓고 소진 시 page+1을 조회한다(서버가 페이지 병합·재조립을 하지 않는다).
  */
 @Service
 class SpotQueryService(
@@ -35,63 +33,37 @@ class SpotQueryService(
     private val policy: SpotQueryPolicy,
 ) : SpotQueryUseCase {
 
-    override fun spots(query: SpotsQuery, locale: DomainLocale): CursorPage<SpotView> {
+    override fun spots(query: SpotsQuery, locale: DomainLocale): SpotPageView {
         val center = validatedCenter(query.latitude, query.longitude)
         validateRadius(query.radiusMeters)
         query.category?.let { validateCategory(it, locale) }
 
-        val first = query.first.coerceIn(1, policy.maxPageSize)
-        val afterKey = query.after?.let { SpotCursorCodec.decode(it) }
+        val page = query.page.coerceAtLeast(1)
+        val size = query.size.coerceIn(1, policy.maxPageSize)
 
-        // upstream 페이지를 상한까지 병합. 라이브 upstream이라 절대적 누락 방지는 불가하나,
-        // 동일 요청 세션 내 커서 진행에서 (거리, id) 키 초과 항목만 이어지므로 중복은 없다(AC-1).
-        val merged = LinkedHashMap<String, Spot>() // contentId 기준 dedup(같은 항목 페이지 재출현 방지)
-        var pageNo = 1
-        var upstreamHasMore = true
-        var upstreamTotalCount: Int? = null
-
-        while (pageNo <= policy.maxUpstreamPagesPerCursor && upstreamHasMore) {
-            val result = tourInfoPort.findNearby(
-                NearbySpotQuery(
-                    locale = locale,
-                    center = center,
-                    radiusMeters = query.radiusMeters,
-                    category = query.category,
-                    pageNo = pageNo,
-                    numOfRows = policy.upstreamPageSize,
-                ),
-            )
-            if (upstreamTotalCount == null) upstreamTotalCount = result.totalCount
-            // DTO→Domain: 여기서 거리(도메인 로직)를 채워 Spot으로 조립한다.
-            result.spots.forEach { data -> merged.putIfAbsent(data.id, data.toSpot(center)) }
-            upstreamHasMore = result.hasMoreUpstreamPages
-            pageNo++
-
-            // 커서 초과분을 한 페이지+1개 이상 확보하면 조기 종료(과호출 방지). afterKey 유무 모두 대칭 적용.
-            val enough = merged.values.count { afterKey == null || it.sortKey > afterKey } >= first + 1
-            if (enough) break
-        }
-
-        // 정렬 (거리 ASC, id ASC) — 복합 정렬키.
-        val sorted = merged.values.sortedBy { it.sortKey }
-
-        // keyset: afterKey보다 큰 항목만.
-        val afterApplied = if (afterKey == null) sorted else sorted.filter { it.sortKey > afterKey }
-
-        val hasNextPage = afterApplied.size > first
-        val pageItems = if (hasNextPage) afterApplied.take(first) else afterApplied
-
-        val edges = pageItems.map { spot ->
-            CursorEdge(cursor = SpotCursorCodec.encode(spot.sortKey), node = spot.toView())
-        }
-
-        val pageInfo = CursorPageInfo(
-            hasNextPage = hasNextPage,
-            hasPreviousPage = afterKey != null,
-            startCursor = edges.firstOrNull()?.cursor,
-            endCursor = edges.lastOrNull()?.cursor,
+        val result = tourInfoPort.findNearby(
+            NearbySpotQuery(
+                locale = locale,
+                center = center,
+                radiusMeters = query.radiusMeters,
+                category = query.category,
+                pageNo = page,
+                numOfRows = size,
+            ),
         )
-        return CursorPage(edges = edges, pageInfo = pageInfo, totalCount = upstreamTotalCount?.toLong())
+
+        // DTO→Domain(거리 채움) 후 거리 오름차순 정렬(동률이면 id). 정렬은 계약(POL-019).
+        val items = result.spots
+            .map { it.toSpot(center) }
+            .sortedWith(compareBy({ it.distance.meters }, { it.id }))
+            .map { it.toView() }
+
+        return SpotPageView(
+            items = items,
+            page = page,
+            hasNext = result.hasMoreUpstreamPages,
+            totalCount = result.totalCount,
+        )
     }
 
     override fun availableCategories(locale: DomainLocale): List<SpotCategory> =

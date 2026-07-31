@@ -22,8 +22,6 @@ class TourismConfig {
         SpotQueryPolicy(
             maxRadiusMeters = properties.maxRadiusMeters,
             maxPageSize = properties.maxPageSize,
-            upstreamPageSize = properties.upstreamPageSize,
-            maxUpstreamPagesPerCursor = properties.maxUpstreamPagesPerCursor,
         )
 
     /**

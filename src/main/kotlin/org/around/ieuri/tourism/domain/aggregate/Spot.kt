@@ -10,7 +10,7 @@ import org.around.ieuri.tourism.domain.vo.SpotCategory
  * 도메인은 TourAPI 필드명(contentid/firstimage/mapx…)·코드 체계를 알지 않는다 — 어댑터가 이 모델로 번역한다.
  * DB에 적재하지 않는 읽기 전용 값(관광 데이터는 저장하지 않음). JPA 엔티티가 아니다.
  *
- * [distance]는 어댑터/포트가 사용자 좌표 기준으로 채운다(도메인 [Distance.between] 사용). 서버 재정렬·커서의 키다.
+ * [distance]는 application이 사용자 좌표 기준으로 채운다(도메인 [Distance.between] 사용). 서버 정렬 기준.
  */
 data class Spot(
     /** TourAPI contentId. 같은 장소라도 언어별로 다르다 — 요청 언어 내에서만 안정적. */
@@ -34,16 +34,5 @@ data class Spot(
         require(title.isNotBlank()) { "spot title은 필수입니다." }
         require(thumbnailImageUrl.startsWith("https://")) { "thumbnailImageUrl은 https여야 합니다." }
         require(attributionText.isNotBlank()) { "attributionText는 비어 있을 수 없습니다." }
-    }
-
-    /**
-     * (거리, id) 복합 커서 정렬키(POL-019). 서버 재정렬과 커서 안정성의 단일 기준.
-     * 거리 오름차순, 동률이면 id 오름차순.
-     */
-    val sortKey: SortKey get() = SortKey(distance.meters, id)
-
-    data class SortKey(val distanceMeters: Double, val id: String) : Comparable<SortKey> {
-        override fun compareTo(other: SortKey): Int =
-            compareValuesBy(this, other, { it.distanceMeters }, { it.id })
     }
 }
