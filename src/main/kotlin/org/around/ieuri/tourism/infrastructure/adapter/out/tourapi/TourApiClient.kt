@@ -14,7 +14,6 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
 import org.springframework.web.util.UriComponentsBuilder
-import tools.jackson.databind.ObjectMapper
 import java.net.URI
 
 /**
@@ -27,25 +26,18 @@ import java.net.URI
 @Component
 class TourApiClient(
     private val properties: TourApiProperties,
-    private val objectMapper: ObjectMapper,
     // 타임아웃 적용된 RestClient를 TourismConfig에서 빈으로 등록해 주입한다(설정 중앙화·테스트 용이).
+    // RestClient의 Jackson 메시지 컨버터가 응답을 TourApiResponse로 바로 역직렬화한다(String 미경유).
     private val tourApiRestClient: RestClient,
 ) : TourInfoPort {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
     override fun findNearby(query: NearbySpotQuery): NearbySpotResult =
-        parseAndMap(call(query), query.locale)
+        mapResponse(call(query), query.locale)
 
-    /** 응답 본문(String) → 중립 결과. HTTP와 분리해 역직렬화·resultCode 판정·매핑을 단위 테스트 가능하게 한다. */
-    fun parseAndMap(body: String, locale: DomainLocale): NearbySpotResult {
-        val response = try {
-            objectMapper.readValue(body, TourApiResponse::class.java)
-        } catch (e: Exception) {
-            log.warn("TourAPI 응답 파싱 실패: {}", e.javaClass.simpleName)
-            throw UpstreamUnavailableException("TourAPI 응답을 해석할 수 없습니다.", e)
-        }
-
+    /** TourAPI 응답 DTO → 중립 결과. resultCode 판정·필터·매핑. HTTP·역직렬화와 분리해 단위 테스트 가능. */
+    fun mapResponse(response: TourApiResponse, locale: DomainLocale): NearbySpotResult {
         val header = response.response.header
         if (header.resultCode != OK_CODE) {
             log.warn("TourAPI resultCode={} msg={}", header.resultCode, header.resultMsg)
@@ -60,13 +52,13 @@ class TourApiClient(
         return NearbySpotResult(spots = spots, totalCount = apiBody.totalCount, hasMoreUpstreamPages = hasMore)
     }
 
-    /** HTTP 호출. 네트워크/타임아웃/비2xx는 UpstreamUnavailableException으로 변환(누출 금지). */
-    private fun call(query: NearbySpotQuery): String =
+    /** HTTP 호출 + Jackson 역직렬화(RestClient 컨버터). 네트워크/타임아웃/비2xx/파싱실패는 UpstreamUnavailable로 변환. */
+    private fun call(query: NearbySpotQuery): TourApiResponse =
         try {
             tourApiRestClient.get()
                 .uri(buildUri(query))
                 .retrieve()
-                .body(String::class.java)
+                .body(TourApiResponse::class.java)
                 ?: throw UpstreamUnavailableException("TourAPI 응답 본문이 비어 있습니다.")
         } catch (e: UpstreamUnavailableException) {
             throw e
