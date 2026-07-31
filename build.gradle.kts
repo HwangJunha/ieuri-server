@@ -36,6 +36,10 @@ dependencies {
     implementation("org.aspectj:aspectjweaver")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-mail")
+    // Spring Boot 4는 자동구성을 모듈로 분리했다. RestClient.Builder 자동구성(RestClientAutoConfiguration)은
+    // 이 모듈에 있으므로, TourAPI 호출용 RestClient 빈을 자동구성 빌더로 만들려면 명시적으로 추가해야 한다.
+    // (Flyway 자동구성을 spring-boot-flyway로 별도 추가하는 것과 동일한 패턴.)
+    implementation("org.springframework.boot:spring-boot-restclient")
     implementation("com.netflix.graphql.dgs:graphql-dgs-spring-graphql-starter")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("tools.jackson.module:jackson-module-kotlin")
