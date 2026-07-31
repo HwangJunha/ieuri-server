@@ -36,6 +36,10 @@ dependencies {
     implementation("org.aspectj:aspectjweaver")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-mail")
+    // Spring Boot 4는 자동구성을 모듈로 분리했다. RestClient.Builder 자동구성(RestClientAutoConfiguration)은
+    // 이 모듈에 있으므로, TourAPI 호출용 RestClient 빈을 자동구성 빌더로 만들려면 명시적으로 추가해야 한다.
+    // (Flyway 자동구성을 spring-boot-flyway로 별도 추가하는 것과 동일한 패턴.)
+    implementation("org.springframework.boot:spring-boot-restclient")
     implementation("com.netflix.graphql.dgs:graphql-dgs-spring-graphql-starter")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("tools.jackson.module:jackson-module-kotlin")
@@ -91,11 +95,11 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
-// auth.graphqls → Kotlin GraphQL 타입 생성(입력/출력/enum). 서버 전용이라 client 코드는 생성하지 않는다.
-// 생성 패키지는 Kotlin 하드 키워드('in')를 피하려고 keyword-free 경로를 사용한다.
+// schema/*.graphqls → Kotlin GraphQL 타입 생성(입력/출력/enum). 서버 전용이라 client 코드는 생성하지 않는다.
+// 생성 타입은 특정 도메인 소유가 아니라 스키마 전체의 공유 커널이므로 common 하위에 둔다(도메인 간 격리 규칙 준수).
 tasks.withType<com.netflix.graphql.dgs.codegen.gradle.GenerateJavaTask> {
     schemaPaths = mutableListOf("${projectDir}/src/main/resources/schema")
-    packageName = "org.around.ieuri.auth.infrastructure.graphql.generated"
+    packageName = "org.around.ieuri.common.graphql.generated"
     generateClient = false
     language = "kotlin"
 }

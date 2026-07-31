@@ -10,16 +10,16 @@ import org.around.ieuri.auth.application.query.MemberDetailView
 import org.around.ieuri.auth.application.query.MemberSummaryView
 import org.around.ieuri.auth.domain.vo.MemberStatus
 import org.around.ieuri.auth.domain.vo.Permission
-import org.around.ieuri.auth.infrastructure.security.CurrentMemberProvider
+import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.auth.infrastructure.security.RequiresPermission
 import org.around.ieuri.common.pagination.CursorPage
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.Me as GqlMe
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.MemberConnection as GqlMemberConnection
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.MemberDetail as GqlMemberDetail
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.MemberEdge as GqlMemberEdge
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.MemberStatus as GqlMemberStatus
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.MemberSummary as GqlMemberSummary
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.PageInfo as GqlPageInfo
+import org.around.ieuri.common.graphql.generated.types.Me as GqlMe
+import org.around.ieuri.common.graphql.generated.types.MemberConnection as GqlMemberConnection
+import org.around.ieuri.common.graphql.generated.types.MemberDetail as GqlMemberDetail
+import org.around.ieuri.common.graphql.generated.types.MemberEdge as GqlMemberEdge
+import org.around.ieuri.common.graphql.generated.types.MemberStatus as GqlMemberStatus
+import org.around.ieuri.common.graphql.generated.types.MemberSummary as GqlMemberSummary
+import org.around.ieuri.common.graphql.generated.types.PageInfo as GqlPageInfo
 
 /**
  * 회원 조회 GraphQL 쿼리 리졸버(인바운드 어댑터, CQRS 읽기 측).

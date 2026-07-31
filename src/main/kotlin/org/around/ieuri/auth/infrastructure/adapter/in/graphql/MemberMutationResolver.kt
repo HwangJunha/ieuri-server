@@ -13,18 +13,18 @@ import org.around.ieuri.auth.application.command.ResetPasswordCommand
 import org.around.ieuri.auth.application.command.VerifyEmailCommand
 import org.around.ieuri.auth.application.port.`in`.command.MemberRegistrationUseCase
 import org.around.ieuri.auth.domain.vo.Provider
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.RegisterEmailMemberInput
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.RegisterEmailMemberPayload
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.RegisterSnsMemberInput
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.RegisterSnsMemberPayload
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.RequestPasswordResetInput
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.RequestPasswordResetPayload
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.ResendVerificationInput
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.ResendVerificationPayload
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.ResetPasswordInput
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.ResetPasswordPayload
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.VerifyEmailInput
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.VerifyEmailPayload
+import org.around.ieuri.common.graphql.generated.types.RegisterEmailMemberInput
+import org.around.ieuri.common.graphql.generated.types.RegisterEmailMemberPayload
+import org.around.ieuri.common.graphql.generated.types.RegisterSnsMemberInput
+import org.around.ieuri.common.graphql.generated.types.RegisterSnsMemberPayload
+import org.around.ieuri.common.graphql.generated.types.RequestPasswordResetInput
+import org.around.ieuri.common.graphql.generated.types.RequestPasswordResetPayload
+import org.around.ieuri.common.graphql.generated.types.ResendVerificationInput
+import org.around.ieuri.common.graphql.generated.types.ResendVerificationPayload
+import org.around.ieuri.common.graphql.generated.types.ResetPasswordInput
+import org.around.ieuri.common.graphql.generated.types.ResetPasswordPayload
+import org.around.ieuri.common.graphql.generated.types.VerifyEmailInput
+import org.around.ieuri.common.graphql.generated.types.VerifyEmailPayload
 import java.util.UUID
 
 /**

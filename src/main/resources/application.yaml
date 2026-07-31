@@ -65,6 +65,44 @@ ieuri:
     refresh-ttl: 30d
   # SNS id_token 검증. aud로 검증할 클라이언트 ID/앱 키는 공개 식별자라 env 오버라이드
   # 가능한 기본값으로 둔다. jwks-uri/issuer는 provider 고정값. 모든 환경에서 실검증한다.
+  # TourAPI(한국관광공사) 접근. serviceKey는 4개 언어 공용 단일 키(실측 B-4) — 언어는 base-url 선택에만 영향.
+  # serviceKey는 환경변수로만 주입한다(응답·로그·GraphQL 어디에도 노출 금지, fail-fast 없이 빈 값이면 조회 시 실패).
+  tourapi:
+    service-key: ${IEURI_TOUR_API_KEY_ENCODING:}
+    base-urls:
+      KO: https://apis.data.go.kr/B551011/KorService2
+      EN: https://apis.data.go.kr/B551011/EngService2
+      JA: https://apis.data.go.kr/B551011/JpnService2
+      ZH: https://apis.data.go.kr/B551011/ChtService2
+    # 도메인 카테고리 → 언어별 TourAPI contentTypeId. 값 보정이 코드 수정 없이 가능하도록 설정으로 둔다.
+    category-codes:
+      KO:
+        TOURIST_SPOT: 12
+        CULTURAL_FACILITY: 14
+        FESTIVAL_EVENT: 15
+        TRAVEL_COURSE: 25
+        LEISURE_SPORTS: 28
+        LODGING: 32
+        SHOPPING: 38
+        RESTAURANT: 39
+      FOREIGN:
+        TOURIST_SPOT: 76
+        CULTURAL_FACILITY: 78
+        FESTIVAL_EVENT: 85
+        LEISURE_SPORTS: 75
+        LODGING: 80
+        SHOPPING: 79
+        RESTAURANT: 82
+        TRANSPORT: 77
+    # 비관광 제외 lclsSystm2 코드(다국어 공통). [TBD] 실데이터 표본으로 확정 — 초기 빈 목록.
+    exclude-lclssystm2: []
+    arrange: Q
+    mobile-os: ETC
+    mobile-app: ieuri
+    max-radius-meters: 100000
+    max-page-size: 100
+    connect-timeout-millis: 3000
+    read-timeout-millis: 5000
   sns:
     google:
       # id_token의 aud는 플랫폼별로 다르다: iOS→iOS 클라이언트 ID, Android/Web→웹 클라이언트 ID.

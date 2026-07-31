@@ -1,0 +1,21 @@
+package org.around.ieuri.tourism.application.port.`in`.query
+
+import org.around.ieuri.tourism.application.query.SpotPageView
+import org.around.ieuri.tourism.application.query.SpotsQuery
+import org.around.ieuri.tourism.domain.vo.DomainLocale
+import org.around.ieuri.tourism.domain.vo.SpotCategory
+
+/**
+ * 관광지 조회 인바운드 포트(CQRS 읽기). 언어는 요청 스코프에서 결정돼 명시 파라미터로 전달된다
+ * (리졸버가 LocaleContext에서 읽어 넘긴다 — application은 서블릿/헤더를 모른다).
+ */
+interface SpotQueryUseCase {
+    /**
+     * 위치 기반 관광지 오프셋 페이지. 거리 오름차순 정렬, 비관광 필터·거리계산 포함.
+     * [memberId]가 있으면(로그인) 이미 반응(좋아요/패스)한 관광지를 제외한다 — 중복 노출 방지. 비로그인은 제외 없음.
+     */
+    fun spots(query: SpotsQuery, locale: DomainLocale, memberId: Long?): SpotPageView
+
+    /** 현재 언어에서 유효한 카테고리 목록(AC-8). */
+    fun availableCategories(locale: DomainLocale): List<SpotCategory>
+}
