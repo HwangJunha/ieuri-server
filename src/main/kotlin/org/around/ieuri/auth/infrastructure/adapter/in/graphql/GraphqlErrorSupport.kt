@@ -1,7 +1,7 @@
 package org.around.ieuri.auth.infrastructure.adapter.`in`.graphql
 
 import org.around.ieuri.auth.application.exception.UserFacingException
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.UserError
+import org.around.ieuri.common.graphql.generated.types.UserError
 
 /**
  * mutation 리졸버의 공통 오류 규약(BaseResponse). 예상 가능한 도메인/입력 실패는 payload의 userErrors로

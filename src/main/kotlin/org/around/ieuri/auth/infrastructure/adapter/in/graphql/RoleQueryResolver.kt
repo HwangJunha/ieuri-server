@@ -5,7 +5,7 @@ import com.netflix.graphql.dgs.DgsQuery
 import org.around.ieuri.auth.application.port.`in`.query.RoleQueryUseCase
 import org.around.ieuri.auth.domain.vo.Permission
 import org.around.ieuri.auth.infrastructure.security.RequiresPermission
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.RoleInfo as GqlRoleInfo
+import org.around.ieuri.common.graphql.generated.types.RoleInfo as GqlRoleInfo
 
 /**
  * 역할 조회 GraphQL 쿼리 리졸버(CQRS 읽기 측). assignableRoles는 role:assign 권한을 요구한다.

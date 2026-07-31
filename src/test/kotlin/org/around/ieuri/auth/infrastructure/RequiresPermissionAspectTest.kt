@@ -5,7 +5,7 @@ import io.mockk.mockk
 import io.mockk.verify
 import org.around.ieuri.auth.domain.vo.Permission
 import org.around.ieuri.auth.infrastructure.security.Authorizer
-import org.around.ieuri.auth.infrastructure.security.ForbiddenException
+import org.around.ieuri.common.security.ForbiddenException
 import org.around.ieuri.auth.infrastructure.security.RequiresPermission
 import org.around.ieuri.auth.infrastructure.security.RequiresPermissionAspect
 import org.springframework.aop.aspectj.annotation.AspectJProxyFactory

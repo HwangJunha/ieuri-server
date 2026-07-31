@@ -1,10 +1,11 @@
-package org.around.ieuri.auth.infrastructure.security
+package org.around.ieuri.common.security
 
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Component
 
 /**
- * 현재 인증된 회원(memberId)을 SecurityContext에서 조회한다. JWT 필터가 설정한 값을 읽는다.
+ * 현재 인증된 회원(memberId)을 SecurityContext에서 조회한다(공유 커널). JWT 필터가 설정한 principal(Long)을 읽는다.
+ * 여러 도메인의 리졸버가 재사용하므로 특정 도메인이 아닌 common에 둔다.
  */
 @Component
 class CurrentMemberProvider {

@@ -1,5 +1,7 @@
 package org.around.ieuri.auth.infrastructure.security
 
+import org.around.ieuri.common.security.ForbiddenException
+import org.around.ieuri.common.security.UnauthorizedException
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Component
 

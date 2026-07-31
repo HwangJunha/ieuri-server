@@ -91,11 +91,11 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
-// auth.graphqls → Kotlin GraphQL 타입 생성(입력/출력/enum). 서버 전용이라 client 코드는 생성하지 않는다.
-// 생성 패키지는 Kotlin 하드 키워드('in')를 피하려고 keyword-free 경로를 사용한다.
+// schema/*.graphqls → Kotlin GraphQL 타입 생성(입력/출력/enum). 서버 전용이라 client 코드는 생성하지 않는다.
+// 생성 타입은 특정 도메인 소유가 아니라 스키마 전체의 공유 커널이므로 common 하위에 둔다(도메인 간 격리 규칙 준수).
 tasks.withType<com.netflix.graphql.dgs.codegen.gradle.GenerateJavaTask> {
     schemaPaths = mutableListOf("${projectDir}/src/main/resources/schema")
-    packageName = "org.around.ieuri.auth.infrastructure.graphql.generated"
+    packageName = "org.around.ieuri.common.graphql.generated"
     generateClient = false
     language = "kotlin"
 }
