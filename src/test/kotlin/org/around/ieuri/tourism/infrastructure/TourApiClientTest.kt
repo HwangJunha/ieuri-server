@@ -8,6 +8,7 @@ import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.TourApiClient
 import org.around.ieuri.tourism.infrastructure.config.TourApiProperties
+import org.springframework.web.client.RestClient
 import tools.jackson.databind.json.JsonMapper
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -29,7 +30,8 @@ class TourApiClientTest {
         ),
         excludeLclssystm2 = listOf("EX999"),
     )
-    private val client = TourApiClient(properties, JsonMapper.builder().build())
+    // parseResponse만 검증하므로 HTTP는 실행되지 않는다 — RestClient는 기본 인스턴스면 충분.
+    private val client = TourApiClient(properties, JsonMapper.builder().build(), RestClient.create())
 
     private val query = NearbySpotQuery(
         locale = DomainLocale.KO,

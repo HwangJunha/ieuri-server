@@ -12,13 +12,11 @@ import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.tourism.infrastructure.config.TourApiProperties
 import org.slf4j.LoggerFactory
-import org.springframework.http.client.SimpleClientHttpRequestFactory
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
 import java.net.URI
-import java.time.Duration
 
 /**
  * TourAPI locationBasedList2 어댑터. TourInfoPort의 유일한 구현체로, TourAPI 세부(필드명·코드·함정)를 여기 가둔다.
@@ -38,19 +36,11 @@ import java.time.Duration
 class TourApiClient(
     private val properties: TourApiProperties,
     private val objectMapper: ObjectMapper,
+    // 타임아웃 적용된 RestClient를 TourismConfig에서 빈으로 등록해 주입한다(설정 중앙화·테스트 용이).
+    private val tourApiRestClient: RestClient,
 ) : TourInfoPort {
 
     private val log = LoggerFactory.getLogger(javaClass)
-
-    // 타임아웃을 반드시 건다: upstream 스톨이 요청 스레드를 무한정 매달지 않고 UPSTREAM_UNAVAILABLE로 전환되도록.
-    private val restClient: RestClient = RestClient.builder()
-        .requestFactory(
-            SimpleClientHttpRequestFactory().apply {
-                setConnectTimeout(Duration.ofMillis(properties.connectTimeoutMillis))
-                setReadTimeout(Duration.ofMillis(properties.readTimeoutMillis))
-            },
-        )
-        .build()
 
     override fun findNearby(query: NearbySpotQuery): NearbySpotResult =
         parseResponse(call(query), query)
@@ -81,7 +71,7 @@ class TourApiClient(
     private fun call(query: NearbySpotQuery): String {
         val uri = buildUri(query)
         return try {
-            restClient.get()
+            tourApiRestClient.get()
                 .uri(uri)
                 .retrieve()
                 .body(String::class.java)
