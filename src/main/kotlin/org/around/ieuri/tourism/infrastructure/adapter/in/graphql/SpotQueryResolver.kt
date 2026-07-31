@@ -9,6 +9,7 @@ import org.around.ieuri.tourism.application.query.SpotView
 import org.around.ieuri.tourism.application.query.SpotsQuery
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.tourism.infrastructure.locale.LocaleContext
+import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
 import org.around.ieuri.common.graphql.generated.types.Spot as GqlSpot
 import org.around.ieuri.common.graphql.generated.types.SpotCategory as GqlSpotCategory
@@ -23,6 +24,7 @@ import org.around.ieuri.common.graphql.generated.types.SpotPage as GqlSpotPage
 class SpotQueryResolver(
     private val spotQueryUseCase: SpotQueryUseCase,
     private val localeContext: LocaleContext,
+    private val currentMemberProvider: CurrentMemberProvider,
 ) {
     @DgsQuery
     fun spots(
@@ -43,6 +45,8 @@ class SpotQueryResolver(
                 size = size ?: DEFAULT_SIZE,
             ),
             locale = localeContext.locale,
+            // 비로그인 허용 쿼리 — memberId가 있으면 이미 반응한 항목을 제외한다(requireMemberId 아님).
+            memberId = currentMemberProvider.currentMemberId(),
         )
         return result.toGql()
     }

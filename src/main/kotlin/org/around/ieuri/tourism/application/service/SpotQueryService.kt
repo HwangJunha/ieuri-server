@@ -8,6 +8,7 @@ import org.around.ieuri.tourism.application.port.`in`.query.SpotQueryUseCase
 import org.around.ieuri.tourism.application.port.out.client.NearbySpotData
 import org.around.ieuri.tourism.application.port.out.client.NearbySpotQuery
 import org.around.ieuri.tourism.application.port.out.client.TourInfoPort
+import org.around.ieuri.tourism.application.port.out.query.SpotReactionQueryPort
 import org.around.ieuri.tourism.application.query.SpotPageView
 import org.around.ieuri.tourism.application.query.SpotView
 import org.around.ieuri.tourism.application.query.SpotsQuery
@@ -30,10 +31,11 @@ import org.springframework.stereotype.Service
 @Service
 class SpotQueryService(
     private val tourInfoPort: TourInfoPort,
+    private val spotReactionQueryPort: SpotReactionQueryPort,
     private val policy: SpotQueryPolicy,
 ) : SpotQueryUseCase {
 
-    override fun spots(query: SpotsQuery, locale: DomainLocale): SpotPageView {
+    override fun spots(query: SpotsQuery, locale: DomainLocale, memberId: Long?): SpotPageView {
         val center = validatedCenter(query.latitude, query.longitude)
         validateRadius(query.radiusMeters)
         query.category?.let { validateCategory(it, locale) }
@@ -52,8 +54,14 @@ class SpotQueryService(
             ),
         )
 
+        // 로그인 회원이 이미 반응(좋아요/패스)한 관광지 제외 — 중복 노출 방지. 비로그인은 제외 없음.
+        val reacted = memberId?.let {
+            spotReactionQueryPort.findReactedContentIds(it, result.spots.map { s -> s.id }, locale)
+        }.orEmpty()
+
         // DTO→Domain(거리 채움) 후 거리 오름차순 정렬(동률이면 id). 정렬은 계약(POL-019).
         val items = result.spots
+            .filter { it.id !in reacted }
             .map { it.toSpot(center) }
             .sortedWith(compareBy({ it.distance.meters }, { it.id }))
             .map { it.toView() }
