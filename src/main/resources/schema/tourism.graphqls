@@ -6,7 +6,7 @@
 # ============================================================
 
 extend type Query {
-    "contentId(=Spot.id) 단건 상세 조회. TourAPI detailCommon2·detailImage2를 실시간 호출(캐시 미스 시)한다."
+    "contentId(=Spot.id) 단건 상세 조회. TourAPI 상세 오퍼레이션들을 실시간 호출(캐시 미스 시)한다."
     # 언어는 Accept-Language 헤더로 전달(SPEC-0002 규약) — locale 인자 없음. 유효한 id는 항상 SpotDetail을
     # 반환하고, 해소 실패는 최상위 GraphQL 오류(SPOT_NOT_FOUND)이므로 non-null.
     spotDetail(id: ID!): SpotDetail!
@@ -135,7 +135,13 @@ type SpotImage {
     attributionText: String!
 }
 
-"관광지 상세. contentId 단건. 소개글·갤러리·연락처·저작권 전문·좋아요 개수를 담는다."
+"""
+관광지 상세. contentId 단건.
+
+**필드별 지연 조회**: 루트(spotDetail)는 detailCommon2 1콜만 소비하고, gallery·intro·infoItems는
+**요청한 경우에만** 각자 TourAPI를 호출한다. likeCount도 요청 시에만 집계한다. 즉 `{ id title overview }`만
+물으면 upstream 콜은 1회다.
+"""
 type SpotDetail {
     "Spot.id와 동일 식별자 공간(TourAPI contentId, 언어별로 갈림)."
     id: ID!
@@ -155,8 +161,52 @@ type SpotDetail {
     copyright: CopyrightType!
     "항목 저작권 표준 문구(전문). copyright에서 도출."
     attributionText: String!
-    "TourAPI 반환 순서, 최대 10장. 없으면 빈 배열(null 아님). 원소는 non-null(url 없는 이미지는 제외)."
+    "TourAPI 반환 순서, 최대 10장. 없으면 빈 배열(null 아님). 원소는 non-null(url 없는 이미지는 제외). 요청 시 detailImage2 1콜."
     gallery: [SpotImage!]!
-    "현재 요청 언어의 이 contentId LIKE 수. non-null, 없으면 0. 실시간 집계(캐시 비대상)."
+    "현재 요청 언어의 이 contentId LIKE 수. non-null, 없으면 0. 요청 시 실시간 집계(캐시 비대상)."
     likeCount: Int!
+
+    """
+    운영 정보(이용시간·휴무일·주차 등). 요청 시 detailIntro2 1콜.
+    TourAPI가 contentTypeId를 필수로 요구하므로 이 필드를 고르면 category도 함께 줘야 한다 —
+    spots가 내려준 Spot.category를 그대로 전달한다.
+    표시할 값이 하나도 없으면(또는 해당 언어에 카테고리 코드가 없으면) null.
+    """
+    intro(category: SpotCategory!): SpotIntro
+
+    """
+    이용안내 반복 항목(항목명/내용). 요청 시 detailInfo2 1콜. category가 필요한 이유는 intro와 동일.
+    없으면 빈 배열(null 아님).
+    """
+    infoItems(category: SpotCategory!): [SpotInfoItem!]!
+}
+
+"""
+관광지 운영 정보. TourAPI detailIntro2는 카테고리마다 응답 필드가 완전히 다르므로(관광지 usetime,
+음식점 opentimefood …) 서버가 **의미가 같은 필드를 공통 이름으로 정규화**해 내려준다.
+카테고리에 해당 개념이 없으면 그 필드는 null이다(예: 여행코스엔 주차·휴무 개념이 없음).
+"""
+type SpotIntro {
+    "영업/이용 시간. 카테고리별 usetime·opentimefood·usetimeculture 등을 통합."
+    businessHours: String
+    "휴무일. restdate·restdatefood·restdateculture 등을 통합."
+    closedDays: String
+    "주차 안내. parking·parkingfood·parkinglodging 등을 통합."
+    parking: String
+    "문의·안내 연락처. infocenter·infocenterfood 등을 통합. SpotDetail.tel(대표번호)과 다를 수 있음."
+    inquiryPhone: String
+    "이용요금·입장료. usefee·usefeeleports 등을 통합. 음식점은 대표메뉴 가격이 아니라 null."
+    fee: String
+    "반려동물 동반 가능 여부 안내(원문 문구). chkpet 계열 통합."
+    petAllowed: String
+    "신용카드 가능 여부 안내(원문 문구). chkcreditcard 계열 통합."
+    creditCardAccepted: String
+}
+
+"이용안내 1건(detailInfo2). 카테고리별 반복 항목을 항목명/내용 쌍으로 정규화한다."
+type SpotInfoItem {
+    "항목명(예: 이용시간, 입장료). TourAPI infoname."
+    name: String!
+    "항목 내용. TourAPI infotext(HTML 태그가 섞여 올 수 있어 클라이언트가 정제한다)."
+    text: String!
 }

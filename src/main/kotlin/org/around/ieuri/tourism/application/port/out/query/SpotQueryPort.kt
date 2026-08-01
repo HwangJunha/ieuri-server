@@ -3,10 +3,10 @@ package org.around.ieuri.tourism.application.port.out.query
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 
 /**
- * 반응 기록 읽기 아웃바운드 포트(CQRS 읽기). 애그리거트를 우회해 필요한 값만 프로젝션한다.
- * 이미 반응한 관광지를 spots 응답에서 제외(중복 노출 방지)하는 데 쓴다.
+ * 관광지 관련 읽기 아웃바운드 포트(CQRS 읽기). 애그리거트를 우회해 필요한 값만 프로젝션한다.
+ * spot 조회에 필요한 DB 읽기를 한 포트로 모은다(현재는 반응 기록 기반 집계·필터).
  */
-interface SpotReactionQueryPort {
+interface SpotQueryPort {
     /**
      * 주어진 contentId들 중 이 회원이 (현재 언어에서) 이미 반응한 것의 집합.
      * 조회 범위를 후보 contentId로 좁혀(IN) 회원의 전체 반응을 끌어오지 않는다.

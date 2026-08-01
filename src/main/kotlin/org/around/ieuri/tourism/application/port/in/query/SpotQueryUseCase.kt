@@ -1,6 +1,9 @@
 package org.around.ieuri.tourism.application.port.`in`.query
 
 import org.around.ieuri.tourism.application.query.SpotDetailView
+import org.around.ieuri.tourism.application.query.SpotImageView
+import org.around.ieuri.tourism.application.query.SpotInfoItemView
+import org.around.ieuri.tourism.application.query.SpotIntroView
 import org.around.ieuri.tourism.application.query.SpotPageView
 import org.around.ieuri.tourism.application.query.SpotsQuery
 import org.around.ieuri.tourism.domain.vo.DomainLocale
@@ -21,9 +24,23 @@ interface SpotQueryUseCase {
     fun availableCategories(locale: DomainLocale): List<SpotCategory>
 
     /**
-     * contentId 단건 상세(SPEC-0003). 캐시(파생 필드)를 앞세우고 likeCount는 실시간 집계로 얹는다.
+     * contentId 단건 상세 **본문**(SPEC-0003). 캐시를 앞세우며 upstream은 detailCommon2 1콜.
+     * 갤러리·운영정보·이용안내·좋아요 수는 GraphQL 필드가 요청될 때 아래 메서드로 따로 조회한다(지연 조회).
+     *
      * 해소 실패는 SpotDetailNotFoundException, 한도 초과는 UpstreamRateLimitedException, 그 외 장애는
      * UpstreamUnavailableException(모두 SpotQueryException → 최상위 errors[]).
      */
     fun spotDetail(contentId: String, locale: DomainLocale): SpotDetailView
+
+    /** 갤러리(요청 시에만). 캐시 → 미스면 detailImage2 1콜. */
+    fun spotGallery(contentId: String, locale: DomainLocale): List<SpotImageView>
+
+    /** 운영 정보(요청 시에만). 캐시 → 미스면 detailIntro2 1콜. 표시할 값이 없으면 null. */
+    fun spotIntro(contentId: String, category: SpotCategory, locale: DomainLocale): SpotIntroView?
+
+    /** 이용안내 항목(요청 시에만). 캐시 → 미스면 detailInfo2 1콜. */
+    fun spotInfoItems(contentId: String, category: SpotCategory, locale: DomainLocale): List<SpotInfoItemView>
+
+    /** 좋아요 수(요청 시에만). 캐시 비대상, 매번 실시간 집계(AC-14). */
+    fun spotLikeCount(contentId: String, locale: DomainLocale): Long
 }

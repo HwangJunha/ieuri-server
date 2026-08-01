@@ -13,7 +13,6 @@ import kotlin.test.assertTrue
 class SpotDetailTest {
 
     private fun detail(
-        gallery: List<SpotImage> = emptyList(),
         copyright: CopyrightType = CopyrightType.TYPE1,
         likeCount: Long = 0,
     ) = SpotDetail(
@@ -26,12 +25,8 @@ class SpotDetailTest {
         homepage = null,
         tel = null,
         copyright = copyright,
-        gallery = gallery,
         likeCount = likeCount,
     )
-
-    private fun image(url: String = "https://img/g.jpg") =
-        SpotImage(imageUrl = url, thumbnailUrl = null, caption = null, copyright = CopyrightType.TYPE1)
 
     @Test
     fun `attributionText는 copyright에서 도출된다`() {
@@ -52,19 +47,6 @@ class SpotDetailTest {
         assertFailsWith<IllegalArgumentException> {
             detail().copy(thumbnailImageUrl = "http://img/100.jpg")
         }
-    }
-
-    @Test
-    fun `갤러리가 10장을 초과하면 거부한다`() {
-        assertFailsWith<IllegalArgumentException> {
-            detail(gallery = (1..11).map { image("https://img/$it.jpg") })
-        }
-    }
-
-    @Test
-    fun `갤러리 10장은 허용된다`() {
-        val d = detail(gallery = (1..10).map { image("https://img/$it.jpg") })
-        assertEquals(10, d.gallery.size)
     }
 
     @Test

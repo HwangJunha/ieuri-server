@@ -1,28 +1,24 @@
 package org.around.ieuri.tourism.infrastructure
 
-import org.around.ieuri.tourism.application.exception.SpotDetailNotFoundException
-import org.around.ieuri.tourism.application.exception.UpstreamRateLimitedException
-import org.around.ieuri.tourism.application.exception.UpstreamUnavailableException
 import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.TourApiClient
 import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.TourApiDetailCommonResponse
 import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.TourApiDetailImageResponse
-import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.TourApiResponse
+import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.TourApiDetailInfoResponse
+import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.TourApiDetailIntroResponse
 import org.around.ieuri.tourism.infrastructure.config.TourApiProperties
 import org.springframework.web.client.RestClient
 import tools.jackson.module.kotlin.jacksonObjectMapper
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
  * TourApiClient 상세 매핑(SPEC-0003) — 2콜 병합·https 정규화(AC-7)·10장 캡(AC-8)·빈 갤러리(AC-9)·
- * 빈문자열 null화(AC-3)·미존재 NotFound(AC-15)·한도초과 RateLimited(AC-16)·오류 Unavailable(AC-17),
- * 그리고 items 단건 객체화/빈문자열 함정 역직렬화(AC-10). HTTP는 배제하고 순수 매핑만 검증한다.
+ * 이미지별 저작권 매핑, items 단건 객체화/빈문자열 함정 역직렬화(AC-10). HTTP는 배제하고 순수 매핑만 검증한다.
  */
 class TourApiDetailMappingTest {
 
@@ -56,108 +52,148 @@ class TourApiDetailMappingTest {
     private fun imageItem(url: String? = "http://tong.visitkorea.or.kr/g.jpg", cpyrht: String? = "Type3") =
         TourApiDetailImageResponse.Item(originimgurl = url, smallimageurl = "http://tong/small.jpg", imgname = "설명", cpyrhtDivCd = cpyrht)
 
-    // ── mapDetail 조립 ──────────────────────────────────────────────
+
+    // ── mapDetail: 본문(detailCommon2) ──────────────────────────────
 
     @Test
-    fun `AC-1 - common+image를 병합해 SpotDetail을 조립한다`() {
-        val detail = client.mapDetail(commonItem(), listOf(imageItem(), imageItem()), DomainLocale.KO)
+    fun `AC-1 - detailCommon2 item을 SpotDetail 본문으로 매핑한다`() {
+        val detail = client.mapDetail(commonItem(), DomainLocale.KO)
         assertEquals("100", detail.id)
         assertEquals("경복궁", detail.title)
         assertEquals("조선의 법궁", detail.overview)
         assertEquals("http://royal.go.kr", detail.homepage)
+        assertEquals("서울 종로구", detail.address)
         assertEquals(SpotCategory.TOURIST_SPOT, detail.category)
-        assertEquals(2, detail.gallery.size)
         assertEquals(CopyrightType.TYPE1, detail.copyright)
         assertEquals(0, detail.likeCount) // 어댑터는 likeCount를 채우지 않는다(§4 경계)
     }
 
     @Test
-    fun `AC-7 - 이미지 URL이 https로 정규화된다`() {
-        val detail = client.mapDetail(commonItem(), listOf(imageItem(url = "http://tong/a.jpg")), DomainLocale.KO)
+    fun `AC-7 - 썸네일 URL이 https로 정규화된다`() {
+        val detail = client.mapDetail(commonItem(firstimage = "http://tong/a.jpg"), DomainLocale.KO)
         assertTrue(detail.thumbnailImageUrl.startsWith("https://"))
-        assertTrue(detail.gallery.single().imageUrl.startsWith("https://"))
-        assertTrue(detail.gallery.single().thumbnailUrl!!.startsWith("https://"))
+    }
+
+    // ── mapGallery(detailImage2) ────────────────────────────────────
+
+    @Test
+    fun `AC-7 - 갤러리 이미지 URL이 https로 정규화된다`() {
+        val gallery = client.mapGallery(listOf(imageItem(url = "http://tong/a.jpg")))
+        assertTrue(gallery.single().imageUrl.startsWith("https://"))
+        assertTrue(gallery.single().thumbnailUrl!!.startsWith("https://"))
     }
 
     @Test
     fun `AC-8 - 갤러리는 반환 순서 앞 10장만 담는다`() {
-        val images = (1..15).map { imageItem(url = "http://tong/$it.jpg") }
-        val detail = client.mapDetail(commonItem(), images, DomainLocale.KO)
-        assertEquals(10, detail.gallery.size)
-        assertEquals("https://tong/1.jpg", detail.gallery.first().imageUrl)
-        assertEquals("https://tong/10.jpg", detail.gallery.last().imageUrl)
+        val gallery = client.mapGallery((1..15).map { imageItem(url = "http://tong/$it.jpg") })
+        assertEquals(10, gallery.size)
+        assertEquals("https://tong/1.jpg", gallery.first().imageUrl)
+        assertEquals("https://tong/10.jpg", gallery.last().imageUrl)
     }
 
     @Test
-    fun `AC-9 - 이미지가 없으면 빈 갤러리(오류 아님), firstimage를 썸네일로 쓴다`() {
-        val detail = client.mapDetail(commonItem(), emptyList(), DomainLocale.KO)
-        assertTrue(detail.gallery.isEmpty())
-        assertEquals("https://tong.visitkorea.or.kr/100.jpg", detail.thumbnailImageUrl)
-    }
-
-    @Test
-    fun `AC-3 - overview 빈 문자열은 null로 정규화된다`() {
-        val detail = client.mapDetail(commonItem(overview = "", homepage = "", tel = ""), emptyList(), DomainLocale.KO)
-        assertNull(detail.overview)
-        assertNull(detail.homepage)
-        assertNull(detail.tel)
-    }
-
-    @Test
-    fun `firstimage 없으면 갤러리 첫 장을 썸네일로 승격한다`() {
-        val detail = client.mapDetail(commonItem(firstimage = null), listOf(imageItem(url = "http://tong/g1.jpg")), DomainLocale.KO)
-        assertEquals("https://tong/g1.jpg", detail.thumbnailImageUrl)
-    }
-
-    @Test
-    fun `firstimage도 갤러리도 없으면 NotFound(썸네일 non-null 계약)`() {
-        assertFailsWith<SpotDetailNotFoundException> {
-            client.mapDetail(commonItem(firstimage = null), emptyList(), DomainLocale.KO)
-        }
-    }
-
-    @Test
-    fun `원본 url 없는 갤러리 항목은 제외된다`() {
-        val detail = client.mapDetail(commonItem(), listOf(imageItem(url = ""), imageItem(url = null), imageItem(url = "http://tong/ok.jpg")), DomainLocale.KO)
-        assertEquals(1, detail.gallery.size)
+    fun `AC-9 - 이미지가 없으면 빈 갤러리(오류 아님)`() {
+        assertTrue(client.mapGallery(emptyList()).isEmpty())
     }
 
     @Test
     fun `이미지별 저작권이 개별 매핑된다`() {
-        val detail = client.mapDetail(commonItem(cpyrht = "Type1"), listOf(imageItem(cpyrht = "Type3")), DomainLocale.KO)
-        assertEquals(CopyrightType.TYPE1, detail.copyright)
-        assertEquals(CopyrightType.TYPE3, detail.gallery.single().copyright)
+        assertEquals(CopyrightType.TYPE3, client.mapGallery(listOf(imageItem(cpyrht = "Type3"))).single().copyright)
     }
 
-    // ── resultCode 판정 ─────────────────────────────────────────────
+    // ── mapIntro: 카테고리별 필드 → 공통 필드 정규화 ──────────────────
 
-    private fun commonResponse(items: List<TourApiDetailCommonResponse.Item>, resultCode: String = "0000") =
-        TourApiDetailCommonResponse(
-            TourApiDetailCommonResponse.Response(
-                header = TourApiResponse.Header(resultCode = resultCode, resultMsg = "OK"),
-                body = TourApiDetailCommonResponse.Body(items),
+    @Test
+    fun `관광지 intro 필드를 공통 이름으로 정규화한다`() {
+        val intro = client.mapIntro(
+            TourApiDetailIntroResponse.Item(
+                usetime = "09:00~18:00", restdate = "화요일", parking = "가능(무료)",
+                infocenter = "02-1234", chkpet = "불가", chkcreditcard = "가능",
             ),
         )
 
-    @Test
-    fun `AC-15 - common이 비면 NotFound`() {
-        assertFailsWith<SpotDetailNotFoundException> {
-            client.mapDetailCommon(commonResponse(emptyList()))
-        }
+        assertEquals("09:00~18:00", intro?.businessHours)
+        assertEquals("화요일", intro?.closedDays)
+        assertEquals("가능(무료)", intro?.parking)
+        assertEquals("02-1234", intro?.inquiryPhone)
+        assertEquals("불가", intro?.petAllowed)
+        assertEquals("가능", intro?.creditCardAccepted)
     }
 
     @Test
-    fun `AC-16 - 한도 초과 코드는 RateLimited`() {
-        assertFailsWith<UpstreamRateLimitedException> {
-            client.mapDetailCommon(commonResponse(emptyList(), resultCode = "22"))
-        }
+    fun `음식점 intro 필드도 같은 공통 이름으로 정규화된다`() {
+        // 음식점은 opentimefood/restdatefood/parkingfood… 로 필드명이 완전히 다르다.
+        val intro = client.mapIntro(
+            TourApiDetailIntroResponse.Item(
+                opentimefood = "11:00~22:00", restdatefood = "연중무휴",
+                parkingfood = "주차장 있음", infocenterfood = "02-5678", chkcreditcardfood = "가능",
+            ),
+        )
+
+        assertEquals("11:00~22:00", intro?.businessHours)
+        assertEquals("연중무휴", intro?.closedDays)
+        assertEquals("주차장 있음", intro?.parking)
+        assertEquals("02-5678", intro?.inquiryPhone)
     }
 
     @Test
-    fun `AC-17 - 그 외 비정상 resultCode는 Unavailable`() {
-        assertFailsWith<UpstreamUnavailableException> {
-            client.mapDetailCommon(commonResponse(emptyList(), resultCode = "99"))
-        }
+    fun `intro에 값이 하나도 없으면 null이다(빈 껍데기 방지)`() {
+        assertNull(client.mapIntro(TourApiDetailIntroResponse.Item(usetime = "", parking = null)))
+    }
+
+    @Test
+    fun `intro 응답 item이 없으면 null이다`() {
+        assertNull(client.mapIntro(null))
+    }
+
+    // ── mapInfoItems(detailInfo2) ───────────────────────────────────
+
+    @Test
+    fun `이용안내 항목을 name·text 쌍으로 매핑한다`() {
+        val items = client.mapInfoItems(
+            listOf(
+                TourApiDetailInfoResponse.Item(infoname = "입장료", infotext = "성인 3,000원"),
+                TourApiDetailInfoResponse.Item(infoname = "이용시간", infotext = "09:00~18:00"),
+            ),
+        )
+
+        assertEquals(listOf("입장료", "이용시간"), items.map { it.name })
+        assertEquals("성인 3,000원", items.first().text)
+    }
+
+    @Test
+    fun `항목명이나 내용이 비면 그 항목은 제외된다`() {
+        val items = client.mapInfoItems(
+            listOf(
+                TourApiDetailInfoResponse.Item(infoname = "정상", infotext = "값"),
+                TourApiDetailInfoResponse.Item(infoname = "", infotext = "값"),
+                TourApiDetailInfoResponse.Item(infoname = "이름만", infotext = null),
+            ),
+        )
+        assertEquals(1, items.size)
+    }
+
+    @Test
+    fun `이용안내가 없으면 빈 목록이다(오류 아님)`() {
+        assertTrue(client.mapInfoItems(emptyList()).isEmpty())
+    }
+
+    @Test
+    fun `intro items가 빈 문자열로 와도 빈 목록으로 역직렬화된다`() {
+        val json = """
+            {"response":{"header":{"resultCode":"0000","resultMsg":"OK"},"body":{"items":""}}}
+        """.trimIndent()
+        assertTrue(mapper.readValue(json, TourApiDetailIntroResponse::class.java).response.body.items.isEmpty())
+    }
+
+    @Test
+    fun `info 단건 객체도 1개 배열로 정규화된다`() {
+        val json = """
+            {"response":{"header":{"resultCode":"0000","resultMsg":"OK"},
+             "body":{"items":{"item":{"infoname":"입장료","infotext":"무료"}}}}}
+        """.trimIndent()
+        val parsed = mapper.readValue(json, TourApiDetailInfoResponse::class.java)
+        assertEquals("입장료", parsed.response.body.items.single().infoname)
     }
 
     // ── items 함정 역직렬화(AC-10) ──────────────────────────────────
