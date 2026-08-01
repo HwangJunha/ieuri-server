@@ -63,6 +63,8 @@ For query `Xxx`:
 5. `d/infrastructure/adapter/out/query/` — **QueryDSL** projection into the read DTO. Per-query projection; no DataLoader unless a nested field demonstrably causes N+1.
 6. `d/infrastructure/adapter/in/graphql/` — DGS `@DgsQuery` resolver. Maps args → query, calls use case, maps read DTO → GraphQL response type. **Application must not import DGS/response types — mapping happens here.**
 
+**If the response composes parts with separable cost** (another upstream call, another table, an aggregate count), do not assemble them in the root. Give each part its own use-case method (step 2) and a `@DgsData(parentType, field)` resolver so it runs **only when the client selects that field**; put an argument on the field that needs it rather than the root. The root then returns the read DTO (not the codegen type — its non-null fields are required constructor args, so lazy fields can't be left empty) and field resolvers read it via `dfe.getSource<ReadDto>()`. A single-source query needs none of this — keep it one method and one resolver. See CLAUDE.md "Don't write REST in GraphQL clothing".
+
 ## Output format
 
 1. Confirm domain + slice type + use case in one line.
