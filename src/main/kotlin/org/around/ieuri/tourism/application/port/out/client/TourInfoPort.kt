@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.application.port.out.client
 
+import org.around.ieuri.tourism.domain.aggregate.SpotDetail
 import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
@@ -19,7 +20,23 @@ interface TourInfoPort {
      * upstream 장애는 UpstreamUnavailableException으로 변환해 던진다.
      */
     fun findNearby(query: NearbySpotQuery): NearbySpotResult
+
+    /**
+     * contentId 단건 상세를 도메인 [SpotDetail]로 반환한다(SPEC-0003). 어댑터가 detailCommon2·detailImage2 2콜을
+     * 병합하고 이미지 https 정규화·10장 컷·빈문자열 null화·저작권 조립까지 끝낸 상태로 넘긴다. [SpotDetail.likeCount]는
+     * 여기서 채우지 않는다(캐시 경계 분리 — application이 실시간 집계로 얹음).
+     *
+     * upstream이 해소하지 못하면 SpotNotFoundQueryException, 한도 초과는 UpstreamRateLimitedException,
+     * 그 외 장애·오류 XML은 UpstreamUnavailableException으로 변환해 던진다.
+     */
+    fun findDetail(query: SpotDetailQuery): SpotDetail
 }
+
+/** 상세 조회 입력. 언어는 요청 스코프에서 결정돼 명시 전달된다(어댑터가 언어별 base-url을 고른다). */
+data class SpotDetailQuery(
+    val contentId: String,
+    val locale: DomainLocale,
+)
 
 /**
  * 주변 조회 입력. [category]가 null이면 카테고리 미지정(전체). [pageNo]/[numOfRows]는 upstream 페이지네이션(1-base).

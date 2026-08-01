@@ -11,13 +11,16 @@ import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
 import org.around.ieuri.tourism.application.port.out.client.NearbySpotData
 import org.around.ieuri.tourism.application.port.out.client.NearbySpotQuery
 import org.around.ieuri.tourism.application.port.out.client.NearbySpotResult
+import org.around.ieuri.tourism.application.port.out.client.SpotDetailQuery
 import org.around.ieuri.tourism.application.port.out.client.TourInfoPort
 import org.around.ieuri.tourism.application.port.out.query.SpotReactionQueryPort
 import org.around.ieuri.tourism.application.query.SpotsQuery
+import org.around.ieuri.tourism.domain.aggregate.SpotDetail
 import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
+import org.around.ieuri.tourism.domain.vo.SpotImage
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -177,5 +180,66 @@ class SpotQueryServiceTest {
     fun `availableCategories는 언어별 유효 집합을 반환한다`() {
         assertTrue(SpotCategory.TRAVEL_COURSE in service.availableCategories(DomainLocale.KO))
         assertTrue(SpotCategory.TRANSPORT in service.availableCategories(DomainLocale.EN))
+    }
+
+    // ── spotDetail(SPEC-0003) ───────────────────────────────────────
+
+    private fun detail(likeCount: Long = 0) = SpotDetail(
+        id = "100",
+        title = "경복궁",
+        category = SpotCategory.TOURIST_SPOT,
+        thumbnailImageUrl = "https://img/100.jpg",
+        overview = "조선의 법궁",
+        address = "서울 종로구",
+        homepage = null,
+        tel = null,
+        copyright = CopyrightType.TYPE1,
+        gallery = listOf(
+            SpotImage("https://img/g1.jpg", null, "야경", CopyrightType.TYPE3),
+        ),
+        likeCount = likeCount,
+    )
+
+    @Test
+    fun `spotDetail은 파생 필드와 실시간 likeCount를 합쳐 반환한다(AC-1)`() {
+        every { tourInfoPort.findDetail(any()) } returns detail(likeCount = 0)
+        every { reactionQueryPort.countLikes("100", DomainLocale.KO) } returns 3L
+
+        val view = service.spotDetail("100", DomainLocale.KO)
+
+        assertEquals("100", view.id)
+        assertEquals("조선의 법궁", view.overview)
+        assertEquals(CopyrightType.TYPE1.attributionText, view.attributionText)
+        assertEquals(3, view.likeCount) // 실시간 집계값이 얹힌다
+        assertEquals(1, view.gallery.size)
+        assertEquals(CopyrightType.TYPE3.attributionText, view.gallery.single().attributionText)
+    }
+
+    @Test
+    fun `likeCount는 캐시된 파생값이 아니라 매 조회 집계값을 쓴다(AC-14)`() {
+        // 어댑터(캐시 포함)가 준 SpotDetail의 likeCount는 무시되고 countLikes가 진실이다.
+        every { tourInfoPort.findDetail(any()) } returns detail(likeCount = 999)
+        every { reactionQueryPort.countLikes("100", DomainLocale.KO) } returns 4L
+
+        assertEquals(4, service.spotDetail("100", DomainLocale.KO).likeCount)
+    }
+
+    @Test
+    fun `반응이 없으면 likeCount는 0(AC-12)`() {
+        every { tourInfoPort.findDetail(any()) } returns detail()
+        every { reactionQueryPort.countLikes(any(), any()) } returns 0L
+        assertEquals(0, service.spotDetail("100", DomainLocale.KO).likeCount)
+    }
+
+    @Test
+    fun `contentId와 locale을 그대로 포트에 전달한다`() {
+        val captured = slot<SpotDetailQuery>()
+        every { tourInfoPort.findDetail(capture(captured)) } returns detail()
+        every { reactionQueryPort.countLikes(any(), any()) } returns 0L
+
+        service.spotDetail("777", DomainLocale.JA)
+
+        assertEquals("777", captured.captured.contentId)
+        assertEquals(DomainLocale.JA, captured.captured.locale)
     }
 }

@@ -7,13 +7,18 @@ import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
 import org.around.ieuri.tourism.application.port.`in`.query.SpotQueryUseCase
 import org.around.ieuri.tourism.application.port.out.client.NearbySpotData
 import org.around.ieuri.tourism.application.port.out.client.NearbySpotQuery
+import org.around.ieuri.tourism.application.port.out.client.SpotDetailQuery
 import org.around.ieuri.tourism.application.port.out.client.TourInfoPort
 import org.around.ieuri.tourism.application.port.out.query.SpotReactionQueryPort
+import org.around.ieuri.tourism.application.query.SpotDetailView
+import org.around.ieuri.tourism.application.query.SpotImageView
 import org.around.ieuri.tourism.application.query.SpotPageView
 import org.around.ieuri.tourism.application.query.SpotView
 import org.around.ieuri.tourism.application.query.SpotsQuery
 import org.around.ieuri.tourism.domain.aggregate.Spot
+import org.around.ieuri.tourism.domain.aggregate.SpotDetail
 import org.around.ieuri.tourism.domain.vo.Coordinates
+import org.around.ieuri.tourism.domain.vo.SpotImage
 import org.around.ieuri.tourism.domain.vo.Distance
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
@@ -77,6 +82,16 @@ class SpotQueryService(
     override fun availableCategories(locale: DomainLocale): List<SpotCategory> =
         SpotCategory.availableIn(locale)
 
+    /**
+     * 상세 조회. tourInfoPort는 캐시 데코레이터가 앞선 상태라(§4) 캐시 히트면 upstream 무소모. TourAPI 파생 필드는
+     * 캐시 값이나, likeCount는 캐시와 무관하게 매번 실시간 집계해 얹는다(§5·AC-14).
+     */
+    override fun spotDetail(contentId: String, locale: DomainLocale): SpotDetailView {
+        val detail = tourInfoPort.findDetail(SpotDetailQuery(contentId = contentId, locale = locale))
+        val likeCount = spotReactionQueryPort.countLikes(contentId, locale)
+        return detail.withLikeCount(likeCount).toView()
+    }
+
     private fun validatedCenter(latitude: Double, longitude: Double): Coordinates =
         try {
             Coordinates(latitude, longitude)
@@ -108,6 +123,29 @@ class SpotQueryService(
         category = category,
         copyright = copyright,
         attributionText = copyright.attributionText,
+    )
+
+    private fun SpotDetail.toView(): SpotDetailView = SpotDetailView(
+        id = id,
+        title = title,
+        category = category,
+        thumbnailImageUrl = thumbnailImageUrl,
+        overview = overview,
+        address = address,
+        homepage = homepage,
+        tel = tel,
+        copyright = copyright,
+        attributionText = attributionText,
+        gallery = gallery.map { it.toView() },
+        likeCount = likeCount,
+    )
+
+    private fun SpotImage.toView(): SpotImageView = SpotImageView(
+        imageUrl = imageUrl,
+        thumbnailUrl = thumbnailUrl,
+        caption = caption,
+        copyright = copyright,
+        attributionText = attributionText,
     )
 
     private fun Spot.toView(): SpotView = SpotView(

@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.application.port.`in`.query
 
+import org.around.ieuri.tourism.application.query.SpotDetailView
 import org.around.ieuri.tourism.application.query.SpotPageView
 import org.around.ieuri.tourism.application.query.SpotsQuery
 import org.around.ieuri.tourism.domain.vo.DomainLocale
@@ -18,4 +19,11 @@ interface SpotQueryUseCase {
 
     /** 현재 언어에서 유효한 카테고리 목록(AC-8). */
     fun availableCategories(locale: DomainLocale): List<SpotCategory>
+
+    /**
+     * contentId 단건 상세(SPEC-0003). 캐시(파생 필드)를 앞세우고 likeCount는 실시간 집계로 얹는다.
+     * 해소 실패는 SpotDetailNotFoundException, 한도 초과는 UpstreamRateLimitedException, 그 외 장애는
+     * UpstreamUnavailableException(모두 SpotQueryException → 최상위 errors[]).
+     */
+    fun spotDetail(contentId: String, locale: DomainLocale): SpotDetailView
 }

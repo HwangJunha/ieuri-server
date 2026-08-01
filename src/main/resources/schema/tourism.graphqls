@@ -6,6 +6,11 @@
 # ============================================================
 
 extend type Query {
+    "contentId(=Spot.id) 단건 상세 조회. TourAPI detailCommon2·detailImage2를 실시간 호출(캐시 미스 시)한다."
+    # 언어는 Accept-Language 헤더로 전달(SPEC-0002 규약) — locale 인자 없음. 유효한 id는 항상 SpotDetail을
+    # 반환하고, 해소 실패는 최상위 GraphQL 오류(SPOT_NOT_FOUND)이므로 non-null.
+    spotDetail(id: ID!): SpotDetail!
+
     "위치 기반 관광지 목록. TourAPI locationBasedList2를 실시간 호출하며 DB에 저장하지 않는다."
     # TourAPI는 pageNo 오프셋 페이지네이션만 지원한다. 라이브 데이터라 커서 안정성을 보장할 수 없어
     # 오프셋(page/size)으로 서빙한다. 클라이언트는 한 페이지(기본 100건)를 받아 스택에 쌓고, 소진 시 page+1을 조회한다.
@@ -110,4 +115,48 @@ input ReactToSpotInput {
 type ReactToSpotPayload implements BaseResponse {
     success: Boolean!
     userErrors: [UserError!]!
+}
+
+# ── 관광지 상세(SPEC-0003) ────────────────────────────────────────
+# Spot의 확장이 아니라 별도 read shape다. Spot은 스와이프 리스트에서 대량 반환되므로 상세 전용 필드를 얹지 않는다.
+# 어떤 인터페이스도 구현하지 않는다(쿼리 결과이지 뮤테이션 페이로드가 아님). 상세 반응은 기존 reactToSpot 재사용.
+
+"갤러리 이미지 1장. TourAPI detailImage2가 이미지별 cpyrhtDivCd를 주므로 저작권/문구는 이미지별이며 부모 Spot에서 상속하지 않는다."
+type SpotImage {
+    "원본 이미지 URL. https 정규화. 항상 존재(url 없는 항목은 목록에 안 들어감)."
+    imageUrl: String!
+    "축소본 URL. nullable(TourAPI smallimageurl이 항목별로 보장되지 않음)."
+    thumbnailUrl: String
+    "이미지 설명(TourAPI imgname). nullable(자주 없음)."
+    caption: String
+    "이미지별 저작권 유형(Spot.copyright와 같은 enum)."
+    copyright: CopyrightType!
+    "이미지별 저작권 표준 문구. copyright 유형에서 항상 도출."
+    attributionText: String!
+}
+
+"관광지 상세. contentId 단건. 소개글·갤러리·연락처·저작권 전문·좋아요 개수를 담는다."
+type SpotDetail {
+    "Spot.id와 동일 식별자 공간(TourAPI contentId, 언어별로 갈림)."
+    id: ID!
+    title: String!
+    category: SpotCategory!
+    "갤러리 폴백/헤더 이미지(https 정규화)."
+    thumbnailImageUrl: String!
+    "detailCommon2 장문 소개. nullable(항목마다 없을 수 있음, 빈 문자열은 null 정규화)."
+    overview: String
+    "주소. nullable."
+    address: String
+    "detailCommon2 homepage. nullable(자주 없음)."
+    homepage: String
+    "detailCommon2 tel. nullable(자주 없음)."
+    tel: String
+    "항목 저작권 유형."
+    copyright: CopyrightType!
+    "항목 저작권 표준 문구(전문). copyright에서 도출."
+    attributionText: String!
+    "TourAPI 반환 순서, 최대 10장. 없으면 빈 배열(null 아님). 원소는 non-null(url 없는 이미지는 제외)."
+    gallery: [SpotImage!]!
+    "현재 요청 언어의 이 contentId LIKE 수. non-null, 없으면 0. 실시간 집계(캐시 비대상)."
+    likeCount: Int!
 }

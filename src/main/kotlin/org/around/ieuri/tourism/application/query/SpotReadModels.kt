@@ -42,3 +42,31 @@ data class SpotView(
     val mapX: Double,
     val mapY: Double,
 )
+
+/**
+ * spotDetail 응답의 read DTO(SPEC-0003). 리졸버가 GraphQL SpotDetail 타입으로 매핑한다(application은 DGS 무의존).
+ * [likeCount]는 캐시 비대상 실시간 집계값(§5).
+ */
+data class SpotDetailView(
+    val id: String,
+    val title: String,
+    val category: SpotCategory,
+    val thumbnailImageUrl: String,
+    val overview: String?,
+    val address: String?,
+    val homepage: String?,
+    val tel: String?,
+    val copyright: CopyrightType,
+    val attributionText: String,
+    val gallery: List<SpotImageView>,
+    val likeCount: Long,
+)
+
+/** 갤러리 이미지 1장의 read DTO. [attributionText]는 copyright에서 도출된 값. */
+data class SpotImageView(
+    val imageUrl: String,
+    val thumbnailUrl: String?,
+    val caption: String?,
+    val copyright: CopyrightType,
+    val attributionText: String,
+)

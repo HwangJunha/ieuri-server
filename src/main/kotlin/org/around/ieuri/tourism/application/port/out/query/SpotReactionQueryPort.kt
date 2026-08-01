@@ -12,4 +12,11 @@ interface SpotReactionQueryPort {
      * 조회 범위를 후보 contentId로 좁혀(IN) 회원의 전체 반응을 끌어오지 않는다.
      */
     fun findReactedContentIds(memberId: Long, contentIds: Collection<String>, language: DomainLocale): Set<String>
+
+    /**
+     * 이 contentId·언어에 대한 LIKE 반응 수(SPEC-0003 §5). DISLIKE는 세지 않고, 언어를 넘어 합산하지 않는다
+     * (키가 (content_id, language)라 언어별 분리 — SPEC-0002의 알려진 한계 상속). 반응이 없으면 0.
+     * 상세 조회 시 캐시와 무관하게 매번 실시간 집계한다(likeCount는 캐시 비대상).
+     */
+    fun countLikes(contentId: String, language: DomainLocale): Long
 }

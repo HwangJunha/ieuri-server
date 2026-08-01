@@ -3,6 +3,7 @@ package org.around.ieuri.tourism.infrastructure.adapter.out.query
 import com.querydsl.jpa.impl.JPAQueryFactory
 import org.around.ieuri.tourism.application.port.out.query.SpotReactionQueryPort
 import org.around.ieuri.tourism.domain.vo.DomainLocale
+import org.around.ieuri.tourism.domain.vo.ReactionType
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotReactionEntity
 import org.springframework.stereotype.Component
 
@@ -33,4 +34,15 @@ class SpotReactionQueryAdapter(
             .fetch()
             .toSet()
     }
+
+    override fun countLikes(contentId: String, language: DomainLocale): Long =
+        queryFactory
+            .select(reaction.count())
+            .from(reaction)
+            .where(
+                reaction.contentId.eq(contentId),
+                reaction.language.eq(language),
+                reaction.reaction.eq(ReactionType.LIKE),
+            )
+            .fetchOne() ?: 0L
 }

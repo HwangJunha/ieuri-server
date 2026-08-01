@@ -4,6 +4,8 @@ import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.tourism.application.port.`in`.query.SpotQueryUseCase
+import org.around.ieuri.tourism.application.query.SpotDetailView
+import org.around.ieuri.tourism.application.query.SpotImageView
 import org.around.ieuri.tourism.application.query.SpotPageView
 import org.around.ieuri.tourism.application.query.SpotView
 import org.around.ieuri.tourism.application.query.SpotsQuery
@@ -13,6 +15,8 @@ import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
 import org.around.ieuri.common.graphql.generated.types.Spot as GqlSpot
 import org.around.ieuri.common.graphql.generated.types.SpotCategory as GqlSpotCategory
+import org.around.ieuri.common.graphql.generated.types.SpotDetail as GqlSpotDetail
+import org.around.ieuri.common.graphql.generated.types.SpotImage as GqlSpotImage
 import org.around.ieuri.common.graphql.generated.types.SpotPage as GqlSpotPage
 
 /**
@@ -56,6 +60,10 @@ class SpotQueryResolver(
         spotQueryUseCase.availableCategories(localeContext.locale)
             .map { GqlSpotCategory.valueOf(it.name) }
 
+    @DgsQuery
+    fun spotDetail(@InputArgument id: String): GqlSpotDetail =
+        spotQueryUseCase.spotDetail(contentId = id, locale = localeContext.locale).toGql()
+
     private fun SpotPageView.toGql(): GqlSpotPage = GqlSpotPage(
         items = items.map { it.toGql() },
         page = page,
@@ -74,6 +82,30 @@ class SpotQueryResolver(
         attributionText = attributionText,
         mapX = mapX,
         mapY = mapY,
+    )
+
+    private fun SpotDetailView.toGql(): GqlSpotDetail = GqlSpotDetail(
+        id = id,
+        title = title,
+        category = GqlSpotCategory.valueOf(category.name),
+        thumbnailImageUrl = thumbnailImageUrl,
+        overview = overview,
+        address = address,
+        homepage = homepage,
+        tel = tel,
+        copyright = GqlCopyrightType.valueOf(copyright.name),
+        attributionText = attributionText,
+        gallery = gallery.map { it.toGql() },
+        // GraphQL likeCount는 Int!. 반응 수가 Int 범위를 넘을 일은 없다.
+        likeCount = likeCount.toInt(),
+    )
+
+    private fun SpotImageView.toGql(): GqlSpotImage = GqlSpotImage(
+        imageUrl = imageUrl,
+        thumbnailUrl = thumbnailUrl,
+        caption = caption,
+        copyright = GqlCopyrightType.valueOf(copyright.name),
+        attributionText = attributionText,
     )
 
     private companion object {
