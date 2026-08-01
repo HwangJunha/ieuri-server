@@ -1,148 +1,198 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.tourapi
 
-import org.around.ieuri.tourism.application.exception.UpstreamUnavailableException
 import org.around.ieuri.tourism.application.port.out.client.NearbySpotData
 import org.around.ieuri.tourism.application.port.out.client.NearbySpotQuery
 import org.around.ieuri.tourism.application.port.out.client.NearbySpotResult
+import org.around.ieuri.tourism.application.port.out.client.SpotDetailQuery
 import org.around.ieuri.tourism.application.port.out.client.TourInfoPort
+import org.around.ieuri.tourism.domain.aggregate.SpotDetail
 import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
+import org.around.ieuri.tourism.domain.vo.SpotImage
+import org.around.ieuri.tourism.domain.vo.SpotInfoItem
+import org.around.ieuri.tourism.domain.vo.SpotIntro
 import org.around.ieuri.tourism.infrastructure.config.TourApiProperties
-import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
+import org.springframework.web.client.requiredBody
 import org.springframework.web.util.UriComponentsBuilder
 import java.net.URI
 
 /**
- * TourAPI locationBasedList2 어댑터. TourInfoPort의 유일한 구현체로, TourAPI 세부(필드명·코드 체계)를 여기 가둔다.
- * 도메인·application·GraphQL은 TourAPI를 모른다. **DB 적재로 전환 = 이 클래스만 교체.**
+ * TourAPI 어댑터. TourInfoPort의 유일한 구현체로, TourAPI 세부(필드명·코드 체계)를 여기 가둔다.
  *
- * 책임: 호출 → DTO 역직렬화 → resultCode 판정 → item을 중립 DTO(NearbySpotData)로 매핑(비관광 필터·이미지
- * https 정규화·코드→도메인 enum 매핑 포함). 거리 계산·정렬·도메인 조립은 application이 한다.
+ * 책임은 딱 둘이다: **요청 URI 빌드**와 **응답 → 도메인/중립 DTO 매핑**. 그 외(재시도·캐시·거리계산·정렬)는
+ * 여기서 하지 않는다. 캐시는 SpotDetailCache, 거리·정렬은 application이 담당한다.
  */
 @Component
 class TourApiClient(
     private val properties: TourApiProperties,
-    // 타임아웃 적용된 RestClient를 TourismConfig에서 빈으로 등록해 주입한다(설정 중앙화·테스트 용이).
-    // RestClient의 Jackson 메시지 컨버터가 응답을 TourApiResponse로 바로 역직렬화한다(String 미경유).
     private val tourApiRestClient: RestClient,
 ) : TourInfoPort {
 
-    private val log = LoggerFactory.getLogger(javaClass)
-
-    override fun findNearby(query: NearbySpotQuery): NearbySpotResult =
-        mapResponse(call(query), query.locale)
-
-    /** TourAPI 응답 DTO → 중립 결과. resultCode 판정·필터·매핑. HTTP·역직렬화와 분리해 단위 테스트 가능. */
-    fun mapResponse(response: TourApiResponse, locale: DomainLocale): NearbySpotResult {
-        val header = response.response.header
-        if (header.resultCode != OK_CODE) {
-            log.warn("TourAPI resultCode={} msg={}", header.resultCode, header.resultMsg)
-            throw UpstreamUnavailableException("TourAPI 오류(resultCode=${header.resultCode}).")
-        }
-
-        val apiBody = response.response.body
-        val spots = apiBody.items.item.mapNotNull { it.toNearbySpotData(locale) }
-        // 다음 upstream 페이지 존재: pageNo*numOfRows < totalCount.
-        val hasMore = apiBody.pageNo.toLong() * apiBody.numOfRows.toLong() < apiBody.totalCount.toLong()
-
-        return NearbySpotResult(spots = spots, totalCount = apiBody.totalCount, hasMoreUpstreamPages = hasMore)
-    }
-
-    /** HTTP 호출 + Jackson 역직렬화(RestClient 컨버터). 네트워크/타임아웃/비2xx/파싱실패는 UpstreamUnavailable로 변환. */
-    private fun call(query: NearbySpotQuery): TourApiResponse =
-        try {
-            tourApiRestClient.get()
-                .uri(buildUri(query))
-                .retrieve()
-                .body(TourApiResponse::class.java)
-                ?: throw UpstreamUnavailableException("TourAPI 응답 본문이 비어 있습니다.")
-        } catch (e: UpstreamUnavailableException) {
-            throw e
-        } catch (e: Exception) {
-            // 좌표를 로그에 남기지 않는다(POL-013/AC-23).
-            log.warn("Error while calling tour api", e)
-            log.warn("TourAPI 호출 실패: {}", e.javaClass.simpleName)
-            throw UpstreamUnavailableException("TourAPI 호출에 실패했습니다.", e)
-        }
-
-    /**
-     * 요청 URI. serviceKey는 이미 인코딩된 상태일 수 있어 재인코딩을 막아야 한다(함정 1) → build(true)로 이미
-     * 인코딩된 것으로 간주하고, 나머지 파라미터는 특수문자가 없는 숫자·enum·고정문자열이라 안전하다.
-     */
-    private fun buildUri(query: NearbySpotQuery): URI =
-        UriComponentsBuilder.fromUriString(baseUrlFor(query.locale))
-            .path("/$OPERATION_LOCATION_BASED")
-            .queryParam("serviceKey", properties.serviceKey)
-            .queryParam("MobileOS", properties.mobileOs)
-            .queryParam("MobileApp", properties.mobileApp)
-            .queryParam("_type", "json")
+    override fun findNearby(query: NearbySpotQuery): NearbySpotResult {
+        val uri = UriComponentsBuilder.fromUriString(baseUrl(query.locale))
+            .path("/locationBasedList2")
+            .common()
             .queryParam("mapX", query.center.longitude)
             .queryParam("mapY", query.center.latitude)
             .queryParam("radius", query.radiusMeters)
             .queryParam("numOfRows", query.numOfRows)
             .queryParam("pageNo", query.pageNo)
             .queryParam("arrange", properties.arrange)
-            .apply { contentTypeIdFor(query.category, query.locale)?.let { queryParam("contentTypeId", it) } }
-            .build(true) // 이미 인코딩된 것으로 간주 → serviceKey 재인코딩 방지
+            .apply { categoryCode(query.category, query.locale)?.let { queryParam("contentTypeId", it) } }
+            .build(true)
             .toUri()
 
-    private fun baseUrlFor(locale: DomainLocale): String =
-        properties.baseUrls[locale.name]
-            ?: throw UpstreamUnavailableException("지원하지 않는 언어 설정입니다: ${locale.name}")
-
-    /** 도메인 카테고리 → 언어별 TourAPI contentTypeId. category 없으면 null(전체). 코드 체계를 어댑터에 가둔다. */
-    private fun contentTypeIdFor(category: SpotCategory?, locale: DomainLocale): Int? {
-        if (category == null) return null
-        return properties.categoryCodes[codesetFor(locale)]?.get(category)
+        val response: TourApiResponse = tourApiRestClient.get().uri(uri).retrieve().requiredBody()
+        return mapResponse(response, query.locale)
     }
 
-    /** 응답 contenttypeid → 도메인 카테고리 역매핑(설정 역방향). 실패 시 TOURIST_SPOT. */
-    private fun categoryFor(contentTypeId: String?, locale: DomainLocale): SpotCategory {
-        val id = contentTypeId?.toIntOrNull() ?: return SpotCategory.TOURIST_SPOT
-        return properties.categoryCodes[codesetFor(locale)]
-            ?.entries?.firstOrNull { it.value == id }?.key
-            ?: SpotCategory.TOURIST_SPOT
+    /** 상세 본문(detailCommon2 1콜). 갤러리·운영정보·이용안내는 각 필드가 요청될 때 따로 가져온다. */
+    override fun findDetail(query: SpotDetailQuery): SpotDetail {
+        val response: TourApiDetailCommonResponse =
+            tourApiRestClient.get().uri(detailUri(query, "detailCommon2")).retrieve().requiredBody()
+        return mapDetail(response.response.body.items.first(), query.locale)
     }
 
-    private fun codesetFor(locale: DomainLocale): String =
-        if (locale.isKorean) TourApiProperties.CODESET_KO else TourApiProperties.CODESET_FOREIGN
+    /** 갤러리(detailImage2 1콜). */
+    override fun findGallery(query: SpotDetailQuery): List<SpotImage> {
+        val response: TourApiDetailImageResponse =
+            tourApiRestClient.get().uri(detailUri(query, "detailImage2")).retrieve().requiredBody()
+        return mapGallery(response.response.body.items)
+    }
 
-    /** TourAPI item → 중립 DTO. 비관광·이미지 없음 항목은 null(드랍). */
-    private fun TourApiResponse.Item.toNearbySpotData(locale: DomainLocale): NearbySpotData? {
-        // 비관광 필터(lclsSystm2 제외 코드).
-        if (lclsSystm2 != null && lclsSystm2 in properties.excludeLclssystm2) return null
-        // arrange=Q 전제상 이미지·좌표·필수 필드는 보장되나, 빈 이미지만 방어적으로 드랍.
-        val image = firstimage?.takeIf { it.isNotBlank() }?.let(::toHttps) ?: return null
-        val id = contentid ?: return null
-        val name = title ?: return null
-        val x = mapx ?: return null
-        val y = mapy ?: return null
+    /** 운영 정보(detailIntro2 1콜). 언어별 카테고리 코드가 없으면 호출 자체를 생략한다. */
+    override fun findIntro(query: SpotDetailQuery, category: SpotCategory): SpotIntro? {
+        val contentTypeId = categoryCode(category, query.locale) ?: return null
+        val response: TourApiDetailIntroResponse =
+            tourApiRestClient.get().uri(detailUri(query, "detailIntro2", contentTypeId)).retrieve().requiredBody()
+        return mapIntro(response.response.body.items.firstOrNull())
+    }
 
-        return NearbySpotData(
-            id = id,
-            title = name,
-            address = mergeAddress(addr1, addr2),
-            thumbnailImageUrl = image,
-            coordinates = Coordinates(latitude = y, longitude = x),
-            category = categoryFor(contenttypeid, locale),
-            copyright = CopyrightType.fromCode(cpyrhtDivCd),
+    /** 이용안내 항목(detailInfo2 1콜). 언어별 카테고리 코드가 없으면 호출 자체를 생략한다. */
+    override fun findInfoItems(query: SpotDetailQuery, category: SpotCategory): List<SpotInfoItem> {
+        val contentTypeId = categoryCode(category, query.locale) ?: return emptyList()
+        val response: TourApiDetailInfoResponse =
+            tourApiRestClient.get().uri(detailUri(query, "detailInfo2", contentTypeId)).retrieve().requiredBody()
+        return mapInfoItems(response.response.body.items)
+    }
+
+    /** TourAPI 응답 DTO → 중립 결과. HTTP·역직렬화와 분리해 단위 테스트 가능. */
+    fun mapResponse(response: TourApiResponse, locale: DomainLocale): NearbySpotResult {
+        val body = response.response.body
+        return NearbySpotResult(
+            spots = body.items.item.mapNotNull { it.toNearbySpotData(locale) },
+            totalCount = body.totalCount,
+            hasMoreUpstreamPages = body.pageNo.toLong() * body.numOfRows.toLong() < body.totalCount.toLong(),
         )
     }
 
-    private fun toHttps(url: String): String =
-        if (url.startsWith("http://")) "https://" + url.removePrefix("http://") else url
+    /** detailCommon2 item → 도메인 SpotDetail(본문). */
+    fun mapDetail(common: TourApiDetailCommonResponse.Item, locale: DomainLocale): SpotDetail = SpotDetail(
+        id = common.contentid.orEmpty(),
+        title = common.title.orEmpty(),
+        category = category(common.contenttypeid, locale),
+        thumbnailImageUrl = common.firstimage.toHttps(),
+        overview = common.overview,
+        address = listOfNotNull(common.addr1, common.addr2).joinToString(" ").ifBlank { null },
+        homepage = common.homepage,
+        tel = common.tel,
+        copyright = CopyrightType.fromCode(common.cpyrhtDivCd),
+    )
 
-    private fun mergeAddress(addr1: String?, addr2: String?): String? =
-        listOfNotNull(addr1?.takeIf { it.isNotBlank() }, addr2?.takeIf { it.isNotBlank() })
-            .joinToString(" ")
-            .ifBlank { null }
+    /** detailImage2 item → 갤러리. TourAPI 반환 순서 유지, 앞 10장까지(AC-8). */
+    fun mapGallery(images: List<TourApiDetailImageResponse.Item>): List<SpotImage> =
+        images.take(SpotDetail.MAX_GALLERY_SIZE).map {
+            SpotImage(
+                imageUrl = it.originimgurl.toHttps(),
+                thumbnailUrl = it.smallimageurl?.toHttps(),
+                caption = it.imgname,
+                copyright = CopyrightType.fromCode(it.cpyrhtDivCd),
+            )
+        }
 
-    private companion object {
-        const val OK_CODE = "0000"
-        const val OPERATION_LOCATION_BASED = "locationBasedList2"
+    /** detailIntro2 item → 운영 정보. 표시할 값이 하나도 없으면 null(빈 껍데기 방지). */
+    fun mapIntro(intro: TourApiDetailIntroResponse.Item?): SpotIntro? =
+        intro?.toSpotIntro()?.takeUnless { it.isEmpty() }
+
+    /** detailInfo2 item → 이용안내 항목. 항목명·내용 중 하나라도 비면 제외. */
+    fun mapInfoItems(info: List<TourApiDetailInfoResponse.Item>): List<SpotInfoItem> =
+        info.mapNotNull { it.toSpotInfoItem() }
+
+    /**
+     * 카테고리별로 흩어진 intro 필드를 공통 도메인 필드로 정규화한다. 응답은 자기 카테고리 필드만 채워 주므로
+     * 후보를 순서대로 훑어 처음 값이 있는 것을 쓴다(카테고리 분기 없이 동작).
+     */
+    private fun TourApiDetailIntroResponse.Item.toSpotIntro(): SpotIntro = SpotIntro(
+        businessHours = firstNotBlank(usetime, usetimeculture, usetimefestival, usetimeleports, opentime, opentimefood),
+        closedDays = firstNotBlank(restdate, restdateculture, restdateleports, restdateshopping, restdatefood),
+        parking = firstNotBlank(parking, parkingculture, parkingleports, parkinglodging, parkingshopping, parkingfood),
+        inquiryPhone = firstNotBlank(
+            infocenter, infocenterculture, infocenterleports, infocenterlodging,
+            infocentershopping, infocenterfood, infocentertourcourse,
+        ),
+        fee = firstNotBlank(usefee, usefeeleports),
+        petAllowed = firstNotBlank(chkpet, chkpetculture, chkpetleports, chkpetshopping),
+        creditCardAccepted = firstNotBlank(
+            chkcreditcard, chkcreditcardculture, chkcreditcardleports, chkcreditcardshopping, chkcreditcardfood,
+        ),
+    )
+
+    /** 항목명·내용이 모두 있어야 의미가 있다. 하나라도 비면 드랍(여행코스·숙박의 다른 형태도 여기서 걸러짐). */
+    private fun TourApiDetailInfoResponse.Item.toSpotInfoItem(): SpotInfoItem? {
+        val name = infoname?.takeIf { it.isNotBlank() } ?: return null
+        val text = infotext?.takeIf { it.isNotBlank() } ?: return null
+        return SpotInfoItem(name = name, text = text)
     }
+
+    private fun firstNotBlank(vararg candidates: String?): String? =
+        candidates.firstOrNull { !it.isNullOrBlank() }
+
+    /** 도메인(SpotDetail·SpotImage·Spot)이 https URL을 요구하므로 매핑 단계에서 정규화한다. */
+    private fun String?.toHttps(): String =
+        this.orEmpty().replaceFirst("http://", "https://")
+
+    /** [contentTypeId]는 detailIntro2·detailInfo2에서 필수다(없으면 upstream이 필수 파라미터 누락으로 거절). */
+    private fun detailUri(query: SpotDetailQuery, operation: String, contentTypeId: Int? = null): URI =
+        UriComponentsBuilder.fromUriString(baseUrl(query.locale))
+            .path("/$operation")
+            .common()
+            .queryParam("contentId", query.contentId)
+            .apply { contentTypeId?.let { queryParam("contentTypeId", it) } }
+            .build(true)
+            .toUri()
+
+    /** 모든 오퍼레이션 공통 파라미터. serviceKey는 이미 인코딩된 값이라 build(true)로 재인코딩을 막는다. */
+    private fun UriComponentsBuilder.common(): UriComponentsBuilder =
+        queryParam("serviceKey", properties.serviceKey)
+            .queryParam("MobileOS", properties.mobileOs)
+            .queryParam("MobileApp", properties.mobileApp)
+            .queryParam("_type", "json")
+
+    private fun baseUrl(locale: DomainLocale): String = properties.baseUrls.getValue(locale.name)
+
+    private fun codeset(locale: DomainLocale): String =
+        if (locale.isKorean) TourApiProperties.CODESET_KO else TourApiProperties.CODESET_FOREIGN
+
+    private fun categoryCode(category: SpotCategory?, locale: DomainLocale): Int? =
+        category?.let { properties.categoryCodes[codeset(locale)]?.get(it) }
+
+    private fun category(contentTypeId: String?, locale: DomainLocale): SpotCategory {
+        val id = contentTypeId?.toIntOrNull() ?: return SpotCategory.TOURIST_SPOT
+        return properties.categoryCodes[codeset(locale)]?.entries?.firstOrNull { it.value == id }?.key
+            ?: SpotCategory.TOURIST_SPOT
+    }
+
+    private fun TourApiResponse.Item.toNearbySpotData(locale: DomainLocale): NearbySpotData? = NearbySpotData(
+        id = contentid ?: return null,
+        title = title ?: return null,
+        address = listOfNotNull(addr1, addr2).joinToString(" ").ifBlank { null },
+        thumbnailImageUrl = (firstimage ?: return null).toHttps(),
+        coordinates = Coordinates(latitude = mapy ?: return null, longitude = mapx ?: return null),
+        category = category(contenttypeid, locale),
+        copyright = CopyrightType.fromCode(cpyrhtDivCd),
+    )
 }

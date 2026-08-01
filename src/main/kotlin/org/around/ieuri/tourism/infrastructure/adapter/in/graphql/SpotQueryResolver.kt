@@ -1,9 +1,14 @@
 package org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql
 
 import com.netflix.graphql.dgs.DgsComponent
+import com.netflix.graphql.dgs.DgsData
+import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.tourism.application.port.`in`.query.SpotQueryUseCase
+import org.around.ieuri.tourism.application.query.SpotDetailView
+import org.around.ieuri.tourism.application.query.SpotIntroView
+import org.around.ieuri.tourism.application.query.SpotImageView
 import org.around.ieuri.tourism.application.query.SpotPageView
 import org.around.ieuri.tourism.application.query.SpotView
 import org.around.ieuri.tourism.application.query.SpotsQuery
@@ -13,6 +18,10 @@ import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
 import org.around.ieuri.common.graphql.generated.types.Spot as GqlSpot
 import org.around.ieuri.common.graphql.generated.types.SpotCategory as GqlSpotCategory
+import org.around.ieuri.common.graphql.generated.types.SpotDetail as GqlSpotDetail
+import org.around.ieuri.common.graphql.generated.types.SpotImage as GqlSpotImage
+import org.around.ieuri.common.graphql.generated.types.SpotInfoItem as GqlSpotInfoItem
+import org.around.ieuri.common.graphql.generated.types.SpotIntro as GqlSpotIntro
 import org.around.ieuri.common.graphql.generated.types.SpotPage as GqlSpotPage
 
 /**
@@ -56,6 +65,49 @@ class SpotQueryResolver(
         spotQueryUseCase.availableCategories(localeContext.locale)
             .map { GqlSpotCategory.valueOf(it.name) }
 
+    /**
+     * 상세 본문(detailCommon2 1콜). gallery·intro·infoItems·likeCount는 **요청된 경우에만** 아래 @DgsData
+     * 필드 리졸버가 각자 조회한다 — `{ id title overview }`만 물으면 upstream 콜은 1회다.
+     *
+     * 생성 타입(GqlSpotDetail)이 아니라 read DTO를 반환한다: 생성 타입은 non-null 필드를 생성자 필수 인자로
+     * 요구해서 지연 필드를 비워 둘 수 없다. 지연 필드의 소스로는 read DTO가 맞다(각 필드 리졸버가 여기서 id를 읽는다).
+     */
+    @DgsQuery
+    fun spotDetail(@InputArgument id: String): SpotDetailView =
+        spotQueryUseCase.spotDetail(contentId = id, locale = localeContext.locale)
+
+    @DgsData(parentType = "SpotDetail", field = "gallery")
+    fun gallery(dfe: DgsDataFetchingEnvironment): List<GqlSpotImage> =
+        spotQueryUseCase.spotGallery(dfe.getSource<SpotDetailView>()!!.id, localeContext.locale)
+            .map { it.toGql() }
+
+    @DgsData(parentType = "SpotDetail", field = "intro")
+    fun intro(
+        dfe: DgsDataFetchingEnvironment,
+        @InputArgument category: GqlSpotCategory,
+    ): GqlSpotIntro? =
+        spotQueryUseCase.spotIntro(
+            contentId = dfe.getSource<SpotDetailView>()!!.id,
+            category = SpotCategory.valueOf(category.name),
+            locale = localeContext.locale,
+        )?.toGql()
+
+    @DgsData(parentType = "SpotDetail", field = "infoItems")
+    fun infoItems(
+        dfe: DgsDataFetchingEnvironment,
+        @InputArgument category: GqlSpotCategory,
+    ): List<GqlSpotInfoItem> =
+        spotQueryUseCase.spotInfoItems(
+            contentId = dfe.getSource<SpotDetailView>()!!.id,
+            category = SpotCategory.valueOf(category.name),
+            locale = localeContext.locale,
+        ).map { GqlSpotInfoItem(name = it.name, text = it.text) }
+
+    @DgsData(parentType = "SpotDetail", field = "likeCount")
+    fun likeCount(dfe: DgsDataFetchingEnvironment): Int =
+        // GraphQL likeCount는 Int!. 반응 수가 Int 범위를 넘을 일은 없다.
+        spotQueryUseCase.spotLikeCount(dfe.getSource<SpotDetailView>()!!.id, localeContext.locale).toInt()
+
     private fun SpotPageView.toGql(): GqlSpotPage = GqlSpotPage(
         items = items.map { it.toGql() },
         page = page,
@@ -74,6 +126,24 @@ class SpotQueryResolver(
         attributionText = attributionText,
         mapX = mapX,
         mapY = mapY,
+    )
+
+    private fun SpotIntroView.toGql(): GqlSpotIntro = GqlSpotIntro(
+        businessHours = businessHours,
+        closedDays = closedDays,
+        parking = parking,
+        inquiryPhone = inquiryPhone,
+        fee = fee,
+        petAllowed = petAllowed,
+        creditCardAccepted = creditCardAccepted,
+    )
+
+    private fun SpotImageView.toGql(): GqlSpotImage = GqlSpotImage(
+        imageUrl = imageUrl,
+        thumbnailUrl = thumbnailUrl,
+        caption = caption,
+        copyright = GqlCopyrightType.valueOf(copyright.name),
+        attributionText = attributionText,
     )
 
     private companion object {

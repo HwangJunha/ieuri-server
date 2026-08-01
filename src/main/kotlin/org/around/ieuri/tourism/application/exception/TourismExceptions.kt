@@ -34,7 +34,7 @@ abstract class SpotQueryException(
     cause: Throwable? = null,
 ) : RuntimeException(message, cause) {
     /** GraphQL ErrorType로 매핑되는 분류(어댑터가 graphql.errors.ErrorType로 변환). */
-    enum class Classification { BAD_REQUEST, FAILED_PRECONDITION, UNAVAILABLE }
+    enum class Classification { BAD_REQUEST, FAILED_PRECONDITION, UNAVAILABLE, NOT_FOUND, RESOURCE_EXHAUSTED }
 }
 
 /** 위경도 범위 초과/형식 오류. */
@@ -52,3 +52,14 @@ class CategoryNotAvailableForLocaleException(message: String) :
 /** TourAPI 장애·타임아웃·오류(XML 오류 포함). DB 폴백 없음. */
 class UpstreamUnavailableException(message: String, cause: Throwable? = null) :
     SpotQueryException("UPSTREAM_UNAVAILABLE", Classification.UNAVAILABLE, message, cause)
+
+/**
+ * spotDetail 쿼리에서 contentId가 현재 언어 서비스에서 콘텐츠로 해소되지 않음(없거나 무효, 언어 교차 id 포함, AC-15/AC-6).
+ * 쿼리 경로이므로 최상위 errors[]로 표면화된다(reactToSpot의 SpotNotFoundException(userError)과 별개).
+ */
+class SpotDetailNotFoundException(message: String = "해당 관광지를 찾을 수 없습니다.") :
+    SpotQueryException("SPOT_NOT_FOUND", Classification.NOT_FOUND, message)
+
+/** TourAPI 일일 호출 한도 초과(캐시 미스 시, AC-16). UPSTREAM_UNAVAILABLE과 구분해 클라가 다르게 안내한다. */
+class UpstreamRateLimitedException(message: String = "잠시 후 다시 시도해 주세요.", cause: Throwable? = null) :
+    SpotQueryException("UPSTREAM_RATE_LIMITED", Classification.RESOURCE_EXHAUSTED, message, cause)

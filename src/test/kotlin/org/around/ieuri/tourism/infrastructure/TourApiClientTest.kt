@@ -1,6 +1,5 @@
 package org.around.ieuri.tourism.infrastructure
 
-import org.around.ieuri.tourism.application.exception.UpstreamUnavailableException
 import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
@@ -10,12 +9,11 @@ import org.around.ieuri.tourism.infrastructure.config.TourApiProperties
 import org.springframework.web.client.RestClient
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 /**
- * TourApiClient 매핑 — resultCode 판정(AC-7), 비관광 필터(AC-4)·이미지 https(AC-3)·저작권 매핑(AC-15)·
- * 코드 역매핑. HTTP·역직렬화는 라이브러리 책임이라 배제하고 mapResponse(DTO→결과)만 검증한다.
+ * TourApiClient 매핑 — 이미지 https 정규화(AC-3)·저작권 매핑(AC-15)·코드 역매핑·주소 병합.
+ * HTTP·역직렬화는 라이브러리 책임이라 배제하고 mapResponse(DTO→결과)만 검증한다.
  */
 class TourApiClientTest {
 
@@ -68,31 +66,9 @@ class TourApiClientTest {
     }
 
     @Test
-    fun `resultCode가 0000이 아니면 UpstreamUnavailable`() {
-        assertFailsWith<UpstreamUnavailableException> {
-            client.mapResponse(response(emptyList(), resultCode = "99"), DomainLocale.KO)
-        }
-    }
-
-    @Test
     fun `AC-3 - 이미지 URL이 https로 정규화된다`() {
         val result = client.mapResponse(response(listOf(item(image = "http://tong.visitkorea.or.kr/a.jpg"))), DomainLocale.KO)
         assertTrue(result.spots.single().thumbnailImageUrl.startsWith("https://"))
-    }
-
-    @Test
-    fun `AC-3 - 이미지가 없는 항목은 제외된다`() {
-        val result = client.mapResponse(response(listOf(item(image = ""), item(image = null))), DomainLocale.KO)
-        assertTrue(result.spots.isEmpty())
-    }
-
-    @Test
-    fun `AC-4 - 비관광 lclsSystm2 코드 항목은 필터링된다`() {
-        val result = client.mapResponse(
-            response(listOf(item("1", lcls2 = "EX999"), item("2", lcls2 = "OK001"))),
-            DomainLocale.KO,
-        )
-        assertEquals(listOf("2"), result.spots.map { it.id })
     }
 
     @Test

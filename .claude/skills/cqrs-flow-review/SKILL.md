@@ -26,6 +26,7 @@ GraphQL input → `Command` object → command handler → **domain aggregate (i
 
 **Query (read):**
 GraphQL args → query handler → `port/out/query` → **QueryDSL projection → read-model DTO (aggregate bypassed)** → resolver maps read DTO → GraphQL response.
+- **One use-case method per independently-resolvable field.** If a response composes parts with separate cost (extra upstream call, extra table, aggregate count), the inbound port exposes a method per part and `@DgsData` field resolvers call each only when the client selects it — not one fat method that assembles everything eagerly. Resolution granularity itself is `graphql-resolver-review`'s job; here just flag a query service that clearly forces over-fetching.
 
 ## Flag these
 

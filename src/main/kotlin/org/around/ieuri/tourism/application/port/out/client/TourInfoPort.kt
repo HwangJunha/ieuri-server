@@ -1,9 +1,13 @@
 package org.around.ieuri.tourism.application.port.out.client
 
+import org.around.ieuri.tourism.domain.aggregate.SpotDetail
 import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
+import org.around.ieuri.tourism.domain.vo.SpotImage
+import org.around.ieuri.tourism.domain.vo.SpotInfoItem
+import org.around.ieuri.tourism.domain.vo.SpotIntro
 
 /**
  * 관광 정보 조회 아웃바운드 포트. 어댑터가 TourAPI 세부(필드명·코드 체계)를 모두 해소한 **중립 데이터**
@@ -19,7 +23,38 @@ interface TourInfoPort {
      * upstream 장애는 UpstreamUnavailableException으로 변환해 던진다.
      */
     fun findNearby(query: NearbySpotQuery): NearbySpotResult
+
+    /**
+     * 상세 본문(detailCommon2 1콜). GraphQL 루트 spotDetail이 부른다. 갤러리·운영정보·이용안내는 포함하지 않는다 —
+     * 각 필드가 요청될 때만 아래 메서드로 따로 가져온다(필드별 지연 조회).
+     * [SpotDetail.likeCount]도 여기서 채우지 않는다(application이 실시간 집계로 얹음).
+     *
+     * upstream이 해소하지 못하면 SpotDetailNotFoundException, 한도 초과는 UpstreamRateLimitedException,
+     * 그 외 장애·오류 XML은 UpstreamUnavailableException으로 변환해 던진다.
+     */
+    fun findDetail(query: SpotDetailQuery): SpotDetail
+
+    /** 갤러리(detailImage2 1콜). gallery 필드가 요청될 때만 호출된다. 없으면 빈 목록. */
+    fun findGallery(query: SpotDetailQuery): List<SpotImage>
+
+    /**
+     * 운영 정보(detailIntro2 1콜). intro 필드가 요청될 때만 호출된다.
+     * 표시할 값이 하나도 없거나 [category]에 해당하는 언어별 코드가 없으면 null.
+     */
+    fun findIntro(query: SpotDetailQuery, category: SpotCategory): SpotIntro?
+
+    /**
+     * 이용안내 항목(detailInfo2 1콜). infoItems 필드가 요청될 때만 호출된다.
+     * [category]에 해당하는 언어별 코드가 없으면 빈 목록.
+     */
+    fun findInfoItems(query: SpotDetailQuery, category: SpotCategory): List<SpotInfoItem>
 }
+
+/** 상세 조회 입력. 언어는 요청 스코프에서 결정돼 명시 전달된다(어댑터가 언어별 base-url을 고른다). */
+data class SpotDetailQuery(
+    val contentId: String,
+    val locale: DomainLocale,
+)
 
 /**
  * 주변 조회 입력. [category]가 null이면 카테고리 미지정(전체). [pageNo]/[numOfRows]는 upstream 페이지네이션(1-base).

@@ -31,6 +31,8 @@ Read the repository `CLAUDE.md` first for the layer definitions.
 - **`infrastructure/adapter/out/query` (QueryDSL)** → persistence-slice test with Testcontainers; assert the projection returns the correct read DTO and does not over/under-fetch.
 
 - **`infrastructure/adapter/in/graphql` (DGS resolvers)** → DGS query/mutation tests (`DgsQueryExecutor` / a `@SpringBootTest` with the DGS test starter). Assert schema wiring, input → command mapping, and read DTO → response mapping. Business rules are already covered at the domain layer — don't re-assert them here.
+    - **Field-level laziness must be pinned here, and only here.** When a type has `@DgsData` lazy fields, "unselected fields don't fetch" is a *runtime* property — compilation and unit tests cannot prove it. Execute real queries and assert **call counts** on the use-case mock: `verify(exactly = 0) { useCase.xxx(any()) }` for fields the query omits, `exactly = 1` for the ones it selects. Also cover a field argument (`intro(category:)` reaching the port unchanged) and a nullable lazy field resolving to null without errors.
+    - Mocks wired as Spring beans are **singletons shared across test methods**, so call counts accumulate and a later test sees an earlier one's calls. `clearMocks(...)` in `@BeforeTest` — otherwise count assertions are silently wrong.
 
 ## Generating tests for a slice
 

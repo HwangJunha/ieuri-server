@@ -26,6 +26,7 @@ The repository `CLAUDE.md` is authoritative — read it before writing anything.
 - Dependencies point inward: `infrastructure → application → domain`.
 - Command path goes through the domain aggregate; query path bypasses it via QueryDSL projection.
 - No cross-domain internal imports — go through the other domain's `port/in` or a domain event.
+- **Resolve per field, not per endpoint.** If a query composes parts with separable cost (another upstream call, another table, an aggregate count), each part gets its own use-case method and a `@DgsData` field resolver so it runs only when selected — never one fat root that assembles everything. Arguments go on the field that needs them, not the root. Pin the laziness with a DGS query-execution test asserting call counts (`test-strategy`). Single-source queries need no field resolvers — don't split them. See CLAUDE.md "Don't write REST in GraphQL clothing"; `graphql-resolver-review` audits this.
 
 ## Output
 
