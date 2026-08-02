@@ -1,0 +1,55 @@
+# 관광지 동기화 배치 전용 설정(SPEC-0004). **batch 프로파일에서만 로드된다.**
+#
+# 배치는 API 서버와 **다른 프로세스로 뜬다** — 로컬은 수동 실행, k3s는 CronJob이다.
+# 그래서 설정도 여기 모아 두고, 배치가 아닌 프로세스는 이 파일을 아예 읽지 않는다.
+# API 파드에 스케줄러가 딸려 올라가 배치가 두 번 도는 사고를 구조적으로 막는 것이 목적이다.
+#
+# 실행:
+#   로컬  ./gradlew bootRun --args='--spring.profiles.active=local,batch'
+#   k3s   CronJob에서 --spring.profiles.active=prod,batch
+#
+# 공통 설정(datasource·flyway·tourapi 자격증명 등)은 application.yaml에서 그대로 상속받는다.
+# 여기에는 **배치일 때만 달라지는 값**만 둔다.
+
+spring:
+  batch:
+    jdbc:
+      # 메타 테이블 스키마는 Flyway가 소유한다(V14). Batch가 자체 초기화하면 그 DDL이
+      # flyway_schema_history에 남지 않아 스키마 형상 관리가 이원화된다.
+      initialize-schema: never
+    job:
+      # 부팅 시 잡을 자동 실행하지 않는다. 실행 시점은 스케줄러(또는 CronJob)가 정한다 —
+      # 재배포마다 전량 동기화가 도는 것을 막는다.
+      enabled: false
+
+  # 배치는 HTTP 표면을 갖지 않는다(POL-021: 배치는 내부 잡). CronJob으로 뜨는 파드가
+  # 포트를 잡으면 API 파드와 충돌하고, 열어 둘 이유도 없다.
+  main:
+    web-application-type: none
+
+ieuri:
+  tourapi:
+    sync:
+      # 이 프로파일로 떴다는 것 자체가 배치를 돌리겠다는 뜻이므로 기본 활성이다.
+      # (application.yaml의 기본값은 false — API 서버에서 스케줄러가 살아나지 않게 한다.)
+      enabled: ${IEURI_TOUR_SYNC_ENABLED:true}
+
+      # 스케줄러로 돌릴지, 외부 트리거(CronJob)로 돌릴지.
+      # k3s CronJob을 쓰면 스케줄 소유자가 k8s이므로 앱 내부 스케줄러는 꺼야 한다 —
+      # 둘 다 켜면 하루에 두 번 돈다.
+      #   scheduler-enabled=false → 부팅 즉시 1회 실행하고 종료(CronJob 모드)
+      #   scheduler-enabled=true  → 앱이 떠 있으면서 cron 시각에 실행(로컬 관찰용)
+      scheduler-enabled: ${IEURI_TOUR_SYNC_SCHEDULER:false}
+
+      # areaBasedSyncList2의 numOfRows. 조회 경로의 max-page-size(100)와 별개다
+      # (수집 효율 vs 응답 크기). 1000은 아직 실측되지 않았다 — upstream이 거부하면
+      # 이 값을 낮춘다(설계 문서 §4.2). 실측: 1000건 upsert에 약 0.2초.
+      page-size: ${IEURI_TOUR_SYNC_PAGE_SIZE:1000}
+
+      cron: "0 0 4 * * *"
+      zone: Asia/Seoul
+
+logging:
+  level:
+    org.springframework.batch: INFO
+    org.around.ieuri.tourism.infrastructure.batch: INFO
