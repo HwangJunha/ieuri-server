@@ -48,6 +48,9 @@ dependencies {
     kapt("io.github.openfeign.querydsl:querydsl-apt:6.11:jakarta")
     kapt("jakarta.persistence:jakarta.persistence-api")
     kapt("jakarta.annotation:jakarta.annotation-api")
+    // 관광지 목록 일 1회 동기화 잡(SPEC-0004). 메타 테이블(BATCH_*)은 Flyway 마이그레이션으로 소유하고
+    // spring.batch.jdbc.initialize-schema=never로 둔다 — 스키마 형상 관리를 Flyway로 일원화하기 위함.
+    implementation("org.springframework.boot:spring-boot-starter-batch")
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
     // Spring Boot 4는 자동구성을 모듈로 분리했다. Flyway 자동구성(FlywayAutoConfiguration)은
