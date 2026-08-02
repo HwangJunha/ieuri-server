@@ -8,6 +8,8 @@ import org.around.ieuri.tourism.application.port.`in`.query.SpotQueryUseCase
 import org.around.ieuri.tourism.application.port.out.cache.SpotCachePort
 import org.around.ieuri.tourism.application.port.out.client.SpotDetailQuery
 import org.around.ieuri.tourism.application.port.out.client.TourInfoPort
+import org.around.ieuri.tourism.application.port.out.persistence.SpotDetailStorePort
+import org.around.ieuri.tourism.application.port.out.queue.SpotDetailWriteQueuePort
 import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch
 import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
 import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
@@ -32,8 +34,9 @@ import org.springframework.stereotype.Service
  * **목록(spots)과 상세(spotDetail)의 데이터 출처가 다르다**(SPEC-0004):
  *  - 목록 : 적재된 spot 테이블만 본다. TourAPI를 호출하지 않는다(R-8). 반경 필터·거리 계산·정렬은
  *           DB가 인덱스로 수행한다(R-9). 좌표/반경/카테고리 검증만 여기서 한다.
- *  - 상세 : 여전히 Valkey → TourAPI다. 상세는 단건 조회만 지원되고 호출 쿼터로 전량 동기화가
- *           불가능해 적재 대상이 아니다. 필드별 지연 조회 구조도 그대로다(SPEC-0003 R7).
+ *  - 상세 : **Valkey → DB → TourAPI 3단 폴백**(R-13). 상세는 단건 조회만 지원되고 호출 쿼터로
+ *           전량 동기화가 불가능해, 조회된 것만 write-behind로 누적한다. 앞 단계에서 값을 찾으면
+ *           뒤 단계를 호출하지 않으며, 필드별 지연 조회 구조는 그대로다(SPEC-0003 R7).
  *
  * 페이지네이션은 오프셋(page/size)을 유지한다. 안정적 백킹 스토어가 생겨 커서가 기술적으로
  * 가능해졌지만(POL-017), 전환은 별도 스펙으로 다룬다(SPEC-0004 범위 제외).
@@ -43,6 +46,8 @@ class SpotQueryService(
     private val tourInfoPort: TourInfoPort,
     private val spotQueryPort: SpotQueryPort,
     private val spotCachePort: SpotCachePort,
+    private val spotDetailStorePort: SpotDetailStorePort,
+    private val writeQueuePort: SpotDetailWriteQueuePort,
     private val policy: SpotQueryPolicy,
 ) : SpotQueryUseCase {
 
@@ -97,19 +102,35 @@ class SpotQueryService(
      * 무소모 — AC-19). 오류는 예외로 전파되므로 캐시에 남지 않는다.
      * 갤러리·운영정보·이용안내·좋아요 수는 각 필드가 요청될 때 아래 메서드로 따로 조회한다.
      */
-    override fun spotDetail(contentId: String, locale: DomainLocale): SpotDetailView =
-        (
-            spotCachePort.getDetail(contentId, locale)
-                ?: tourInfoPort.findDetail(query(contentId, locale))
-                    .also { spotCachePort.putDetail(contentId, locale, it) }
-            ).toView()
+    override fun spotDetail(contentId: String, locale: DomainLocale): SpotDetailView {
+        spotCachePort.getDetail(contentId, locale)?.let { return it.toView() }
 
-    override fun spotGallery(contentId: String, locale: DomainLocale): List<SpotImageView> =
-        (
-            spotCachePort.getGallery(contentId, locale)
-                ?: tourInfoPort.findGallery(query(contentId, locale))
-                    .also { spotCachePort.putGallery(contentId, locale, it) }
-            ).map { it.toView() }
+        // DB 히트: Valkey를 충전하고 upstream은 건드리지 않는다(AC-35).
+        spotDetailStorePort.findDetail(contentId, locale)?.let { stored ->
+            spotCachePort.putDetail(contentId, locale, stored)
+            return stored.toView()
+        }
+
+        // 양쪽 미스: upstream 조회 후 캐시 충전 + 적재 큐 투입(AC-36·AC-39).
+        val fetched = tourInfoPort.findDetail(query(contentId, locale))
+        spotCachePort.putDetail(contentId, locale, fetched)
+        writeQueuePort.enqueueDetail(contentId, locale, fetched)
+        return fetched.toView()
+    }
+
+    override fun spotGallery(contentId: String, locale: DomainLocale): List<SpotImageView> {
+        spotCachePort.getGallery(contentId, locale)?.let { return it.map { image -> image.toView() } }
+
+        spotDetailStorePort.findGallery(contentId, locale)?.let { stored ->
+            spotCachePort.putGallery(contentId, locale, stored)
+            return stored.map { it.toView() }
+        }
+
+        val fetched = tourInfoPort.findGallery(query(contentId, locale))
+        spotCachePort.putGallery(contentId, locale, fetched)
+        writeQueuePort.enqueueGallery(contentId, locale, fetched)
+        return fetched.map { it.toView() }
+    }
 
     override fun spotIntro(contentId: String, category: SpotCategory, locale: DomainLocale): SpotIntroView? {
         // 히트 판정은 래퍼(non-null)로 한다 — 값 자체는 정상적으로 null일 수 있어, value로 판정하면
@@ -117,8 +138,16 @@ class SpotQueryService(
         val cached = spotCachePort.getIntro(contentId, locale, category)
         if (cached != null) return cached.value?.toView()
 
+        // DB도 같은 이유로 래퍼를 쓴다 — "적재됐으나 값 없음"을 미스로 오판하면 upstream을 계속 친다.
+        val stored = spotDetailStorePort.findIntro(contentId, locale, category)
+        if (stored != null) {
+            spotCachePort.putIntro(contentId, locale, category, stored.value)
+            return stored.value?.toView()
+        }
+
         val intro = tourInfoPort.findIntro(query(contentId, locale), category)
         spotCachePort.putIntro(contentId, locale, category, intro)
+        writeQueuePort.enqueueIntro(contentId, locale, category, intro)
         return intro?.toView()
     }
 
@@ -126,14 +155,26 @@ class SpotQueryService(
         contentId: String,
         category: SpotCategory,
         locale: DomainLocale,
-    ): List<SpotInfoItemView> =
-        (
-            spotCachePort.getInfoItems(contentId, locale, category)
-                ?: tourInfoPort.findInfoItems(query(contentId, locale), category)
-                    .also { spotCachePort.putInfoItems(contentId, locale, category, it) }
-            ).map { SpotInfoItemView(name = it.name, text = it.text) }
+    ): List<SpotInfoItemView> {
+        spotCachePort.getInfoItems(contentId, locale, category)
+            ?.let { return it.map { item -> SpotInfoItemView(item.name, item.text) } }
 
-    /** 좋아요 수는 캐시하지 않고 매번 집계한다(§5·AC-14). */
+        spotDetailStorePort.findInfoItems(contentId, locale, category)?.let { stored ->
+            spotCachePort.putInfoItems(contentId, locale, category, stored)
+            return stored.map { SpotInfoItemView(it.name, it.text) }
+        }
+
+        val fetched = tourInfoPort.findInfoItems(query(contentId, locale), category)
+        spotCachePort.putInfoItems(contentId, locale, category, fetched)
+        writeQueuePort.enqueueInfoItems(contentId, locale, category, fetched)
+        return fetched.map { SpotInfoItemView(it.name, it.text) }
+    }
+
+    /**
+     * 좋아요 수는 캐시하지 않고 매번 집계한다(AC-14).
+     * **3단 폴백 경로에 넣지 않는다**(AC-38) — spot_reaction 기반이라 TourInfoPort와 완전히 다른
+     * 포트이며, write-behind는 upstream 파생 데이터만 다룬다.
+     */
     override fun spotLikeCount(contentId: String, locale: DomainLocale): Long =
         spotQueryPort.countLikes(contentId, locale)
 
