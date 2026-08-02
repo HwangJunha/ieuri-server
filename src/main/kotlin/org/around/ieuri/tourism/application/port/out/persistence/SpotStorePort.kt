@@ -25,7 +25,23 @@ interface SpotStorePort {
     fun upsertAll(spots: List<SyncSpotCommand>, syncedAt: Instant): Int
 
     /**
-     * [language]에 적재된 전체 행 수. 정리 단계의 급감 감지 게이트(설계 문서 §2.6)와 실행 이력에 쓴다.
+     * [language]에 적재된 전체 행 수. 정리 단계의 급감 감지 게이트와 실행 이력에 쓴다.
      */
     fun countByLanguage(language: DomainLocale): Long
+
+    /**
+     * [language]에서 [survivingContentIds]에 **없는** 행을 삭제한다(R-5). 이번 실행이 수집한
+     * contentId 집합이 곧 "업스트림에 현존하는 것"이므로, 그 여집합이 사라진 항목이다.
+     *
+     * **시각(`last_synced_at`) 기준이 아니라 집합 기준이다.** 시각 기준은 "이번 실행이 건드렸나"를
+     * 보는데, 부분 실패나 페이지 경계 누락과 구분되지 않는다. 집합 기준은 "무엇을 봤나"를 직접
+     * 다루므로 게이트(전량 성공·0건·급감)를 명확한 조건으로 걸 수 있다.
+     *
+     * 데이터가 언어당 최대 6만 건 규모라 집합을 메모리에 들고 한 번에 비교하는 것이 현실적이다
+     * (실측: KO 56,897건 ≈ 6MB). 언어별로 독립 수행하므로 한 언어가 끝나면 집합을 버린다.
+     *
+     * **호출자가 게이트를 통과시킨 뒤에만 부른다** — 이 메서드는 안전 판정을 하지 않는다.
+     * @return 삭제된 행 수.
+     */
+    fun deleteMissing(language: DomainLocale, survivingContentIds: Set<String>): Int
 }

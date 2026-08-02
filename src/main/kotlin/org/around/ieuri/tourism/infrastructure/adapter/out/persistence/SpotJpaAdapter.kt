@@ -3,6 +3,7 @@ package org.around.ieuri.tourism.infrastructure.adapter.out.persistence
 import org.around.ieuri.tourism.application.command.SyncSpotCommand
 import org.around.ieuri.tourism.application.port.out.persistence.SpotStorePort
 import org.around.ieuri.tourism.domain.vo.DomainLocale
+import org.springframework.jdbc.core.BatchPreparedStatementSetter
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.ParameterizedPreparedStatementSetter
 import org.springframework.stereotype.Component
@@ -49,6 +50,40 @@ class SpotJpaAdapter(
         // batchUpdate(sql, batchArgs, batchSize, pss)는 청크별 결과를 배열의 배열로 돌려준다.
         return jdbcTemplate.batchUpdate(UPSERT_SQL, spots, spots.size, setter)
             .sumOf { chunk -> chunk.count { it != 0 } }
+    }
+
+    /**
+     * 생존 집합을 **임시 테이블에 넣고 anti-join**으로 지운다. `NOT IN (...)`에 6만 개 파라미터를
+     * 넣으면 파서·플래너가 감당하지 못하고 드라이버 한도(65535)도 넘는다.
+     *
+     * 임시 테이블은 `ON COMMIT DROP`이라 트랜잭션이 끝나면 사라진다 — 동시 실행이나 실패 시
+     * 찌꺼기가 남지 않는다. 배치는 언어별 순차 실행이라 경합도 없다.
+     */
+    @Transactional
+    override fun deleteMissing(language: DomainLocale, survivingContentIds: Set<String>): Int {
+        // 빈 집합으로 호출되면 전량 삭제가 된다. 게이트가 막아야 하지만, 여기서도 한 번 더 막는다 —
+        // 이 한 줄이 없으면 게이트 버그가 곧 데이터 전량 손실이다(AC-14).
+        require(survivingContentIds.isNotEmpty()) { "생존 집합이 비어 있으면 정리하지 않는다." }
+
+        jdbcTemplate.execute(
+            "CREATE TEMP TABLE surviving_spot (content_id VARCHAR(32) PRIMARY KEY) ON COMMIT DROP",
+        )
+        val ids = survivingContentIds.toList()
+        jdbcTemplate.batchUpdate(
+            "INSERT INTO surviving_spot (content_id) VALUES (?) ON CONFLICT DO NOTHING",
+            object : BatchPreparedStatementSetter {
+                override fun getBatchSize() = ids.size
+                override fun setValues(ps: PreparedStatement, i: Int) = ps.setString(1, ids[i])
+            },
+        )
+        return jdbcTemplate.update(
+            """
+            DELETE FROM spot s
+            WHERE s.language = ?
+              AND NOT EXISTS (SELECT 1 FROM surviving_spot t WHERE t.content_id = s.content_id)
+            """.trimIndent(),
+            language.name,
+        )
     }
 
     @Transactional(readOnly = true)
