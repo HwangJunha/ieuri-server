@@ -25,6 +25,7 @@ import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
+import kotlin.test.assertTrue
 
 /**
  * 동기화 Tasklet의 페이지 진행·재개 동작(SPEC-0004 R-3·R-4).
@@ -62,11 +63,12 @@ class SpotSyncTaskletTest {
         return tasklet.execute(contribution, chunkContext)
     }
 
-    private fun tasklet(pageSize: Int = 1_000) = SpotSyncTasklet(
+    private fun tasklet(pageSize: Int = 1_000, cleanupMinRatio: Double = 0.5) = SpotSyncTasklet(
         language = DomainLocale.KO,
         syncPort = syncPort,
         storePort = storePort,
         pageSize = pageSize,
+        cleanupMinRatio = cleanupMinRatio,
     )
 
     @Test
@@ -164,5 +166,86 @@ class SpotSyncTaskletTest {
         val thrown = runCatching { run(tasklet(), execution) }.exceptionOrNull()
 
         assertNotEquals(null, thrown)
+    }
+
+    // ---------- 사라진 항목 정리 (R-5) ----------
+
+    @Test
+    fun `수집 집합에 없는 행을 삭제한다`() {
+        every { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) } returns
+            page(listOf(record("a"), record("b")), totalCount = 2)
+        every { storePort.upsertAll(any(), any()) } returns 2
+        every { storePort.countByLanguage(DomainLocale.KO) } returns 3L
+        every { storePort.deleteMissing(any(), any()) } returns 1
+
+        run(tasklet(), stepExecution())
+
+        // 수집한 것(a, b)만 살리고 나머지는 지운다 — 시각이 아니라 집합 기준이다.
+        verify(exactly = 1) { storePort.deleteMissing(DomainLocale.KO, setOf("a", "b")) }
+    }
+
+    @Test
+    fun `수집이 0건이면 정리를 건너뛴다(AC-14)`() {
+        // 업스트림 일시 오류로 빈 목록을 받았을 때 전량 삭제되면 안 된다.
+        every { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) } returns page(emptyList(), totalCount = 0)
+        every { storePort.upsertAll(any(), any()) } returns 0
+        every { storePort.countByLanguage(DomainLocale.KO) } returns 5_000L
+
+        val execution = stepExecution()
+        run(tasklet(), execution)
+
+        verify(exactly = 0) { storePort.deleteMissing(any(), any()) }
+        assertEquals("collected 0 items", execution.executionContext.getString(SpotSyncTasklet.KEY_CLEANUP_SKIPPED))
+    }
+
+    @Test
+    fun `수집 건수가 기존 대비 급감하면 정리를 건너뛴다`() {
+        // 정렬 이동으로 몇 건 누락되는 것은 정상이지만, 절반 아래로 빠지면 업스트림 이상이다.
+        every { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) } returns
+            page(listOf(record("a")), totalCount = 1)
+        every { storePort.upsertAll(any(), any()) } returns 1
+        every { storePort.countByLanguage(DomainLocale.KO) } returns 1_000L
+
+        val execution = stepExecution()
+        run(tasklet(), execution)
+
+        verify(exactly = 0) { storePort.deleteMissing(any(), any()) }
+        assertTrue(
+            execution.executionContext.getString(SpotSyncTasklet.KEY_CLEANUP_SKIPPED).contains("50%"),
+        )
+    }
+
+    @Test
+    fun `재개 실행이면 집합이 불완전하므로 정리를 건너뛴다`() {
+        // 3페이지부터 재개하면 1·2페이지 항목이 집합에 없어, 그대로 지우면 대량 오삭제가 된다.
+        every { syncPort.fetchPage(DomainLocale.KO, 3, 1_000) } returns
+            page(listOf(record("c")), totalCount = 3_000)
+        every { storePort.upsertAll(any(), any()) } returns 1
+        every { storePort.countByLanguage(DomainLocale.KO) } returns 3_000L
+
+        val execution = stepExecution()
+        execution.executionContext.putInt(SpotSyncTasklet.KEY_NEXT_PAGE, 3)
+        // totalCount를 넘겨 마지막 페이지로 만든다.
+        every { syncPort.fetchPage(DomainLocale.KO, 3, 1_000) } returns
+            page(listOf(record("c")), totalCount = 3)
+        run(tasklet(), execution)
+
+        verify(exactly = 0) { storePort.deleteMissing(any(), any()) }
+        assertTrue(
+            execution.executionContext.getString(SpotSyncTasklet.KEY_CLEANUP_SKIPPED).contains("resumed"),
+        )
+    }
+
+    @Test
+    fun `정리는 마지막 페이지에서 한 번만 수행된다`() {
+        every { syncPort.fetchPage(DomainLocale.KO, any(), 1_000) } returns
+            page(listOf(record("a")), totalCount = 3_000)
+        every { storePort.upsertAll(any(), any()) } returns 1
+        every { storePort.countByLanguage(any()) } returns 1L
+        every { storePort.deleteMissing(any(), any()) } returns 0
+
+        val execution = stepExecution()
+        run(tasklet(), execution) // 아직 페이지가 남음
+        verify(exactly = 0) { storePort.deleteMissing(any(), any()) }
     }
 }

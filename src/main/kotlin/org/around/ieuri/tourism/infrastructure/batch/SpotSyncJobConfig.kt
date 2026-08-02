@@ -27,10 +27,9 @@ import org.springframework.transaction.PlatformTransactionManager
  * **순차 실행**은 serviceKey가 4개 언어 공용 단일 키이기 때문이다(SPEC-0002 §0 B-4 실측) — 병렬화하면
  * 호출 한도를 4배 속도로 소모한다.
  *
- * 정리 단계(cleanupStep)는 아직 없다. 사라진 항목 처리 방식이 `[TBD-1]`, 허용 창이 `[TBD-1a]`로 미결이며,
- * 둘은 AC-13과 직접 충돌하는 관계라 임의로 정할 수 없다(스펙 런타임 계약 위험 10번). 결정 전에 정리를
- * 넣으면 멀쩡한 관광지를 지우는 쪽이든 AC-13을 어기는 쪽이든 한쪽을 몰래 택하는 셈이 된다.
- * `last_synced_at`은 이미 적재되고 있으므로 결정 후 Step 추가만으로 붙는다.
+ * **사라진 항목 정리는 별도 Step이 아니라 각 언어 Step의 마지막에 수행한다**(R-5). 언어별로 수집한
+ * contentId 집합이 그 시점에 메모리에 있으므로, 그것을 그대로 쓰는 편이 자연스럽다. 별도 Step으로
+ * 빼면 집합을 어딘가에 넘겨야 하는데 6만 건을 ExecutionContext에 직렬화하는 것은 비싸다.
  */
 @Configuration
 @Profile(BATCH_PROFILE)
@@ -64,6 +63,7 @@ class SpotSyncJobConfig(
                     syncPort = syncPort,
                     storePort = storePort,
                     pageSize = properties.pageSize,
+                    cleanupMinRatio = properties.cleanupMinRatio,
                 ),
                 transactionManager,
             )

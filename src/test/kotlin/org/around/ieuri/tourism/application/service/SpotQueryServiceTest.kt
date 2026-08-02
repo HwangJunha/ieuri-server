@@ -13,6 +13,11 @@ import org.around.ieuri.tourism.application.port.out.cache.CachedIntro
 import org.around.ieuri.tourism.application.port.out.cache.SpotCachePort
 import org.around.ieuri.tourism.application.port.out.client.SpotDetailQuery
 import org.around.ieuri.tourism.application.port.out.client.TourInfoPort
+import org.around.ieuri.tourism.application.port.out.persistence.SpotDetailStorePort
+import org.around.ieuri.tourism.application.port.out.persistence.StoredIntro
+import org.around.ieuri.tourism.application.event.SpotDetailFetched
+import org.around.ieuri.tourism.application.event.SpotGalleryFetched
+import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
 import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch
 import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
 import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
@@ -38,11 +43,15 @@ class SpotQueryServiceTest {
     private val tourInfoPort = mockk<TourInfoPort>()
     private val spotQueryPort = mockk<SpotQueryPort>()
     private val spotCachePort = mockk<SpotCachePort>()
+    private val spotDetailStorePort = mockk<SpotDetailStorePort>()
+    private val eventPublisher = mockk<TourismEventPublisherPort>(relaxed = true)
     private val policy = SpotQueryPolicy(
         maxRadiusMeters = 100_000,
         maxPageSize = 100,
     )
-    private val service = SpotQueryService(tourInfoPort, spotQueryPort, spotCachePort, policy)
+    private val service = SpotQueryService(
+        tourInfoPort, spotQueryPort, spotCachePort, spotDetailStorePort, eventPublisher, policy,
+    )
 
     // 기본: 아무것도 반응하지 않음(빈 집합). 개별 테스트에서 override.
     init {
@@ -58,6 +67,11 @@ class SpotQueryServiceTest {
         every { spotCachePort.putIntro(any(), any(), any(), any()) } returns Unit
         every { spotCachePort.getInfoItems(any(), any(), any()) } returns null
         every { spotCachePort.putInfoItems(any(), any(), any(), any()) } returns Unit
+        // 기본: DB도 미스. 3단 폴백의 단계별 검증은 개별 테스트에서 override.
+        every { spotDetailStorePort.findDetail(any(), any()) } returns null
+        every { spotDetailStorePort.findGallery(any(), any()) } returns null
+        every { spotDetailStorePort.findIntro(any(), any(), any()) } returns null
+        every { spotDetailStorePort.findInfoItems(any(), any(), any()) } returns null
     }
 
     /**
@@ -74,6 +88,13 @@ class SpotQueryServiceTest {
         category = SpotCategory.TOURIST_SPOT,
         copyright = CopyrightType.UNSPECIFIED,
         distanceMeters = distanceMeters,
+    )
+
+    private fun image() = SpotImage(
+        imageUrl = "https://img/g1.jpg",
+        thumbnailUrl = null,
+        caption = null,
+        copyright = CopyrightType.UNSPECIFIED,
     )
 
     private fun query(page: Int = 1, size: Int = 100, category: SpotCategory? = null, radius: Int = 20000) =
@@ -220,6 +241,93 @@ class SpotQueryServiceTest {
         assertEquals(listOf("a", "b"), result.items.map { it.id })
         assertTrue(captured.captured.excludedContentIds.isEmpty())
         verify(exactly = 0) { spotQueryPort.findReactedContentIds(any(), any()) }
+    }
+
+    // ---------- 3단 폴백: Valkey → DB → TourAPI (SPEC-0004 R-13) ----------
+
+    @Test
+    fun `Valkey 히트면 DB와 TourAPI를 모두 호출하지 않는다(AC-34)`() {
+        every { spotCachePort.getDetail("100", DomainLocale.KO) } returns detail()
+
+        service.spotDetail("100", DomainLocale.KO)
+
+        verify(exactly = 0) { spotDetailStorePort.findDetail(any(), any()) }
+        verify(exactly = 0) { tourInfoPort.findDetail(any()) }
+    }
+
+    @Test
+    fun `Valkey 미스에 DB 히트면 TourAPI를 치지 않고 Valkey를 충전한다(AC-35)`() {
+        every { spotDetailStorePort.findDetail("100", DomainLocale.KO) } returns detail()
+
+        val result = service.spotDetail("100", DomainLocale.KO)
+
+        assertEquals("경복궁", result.title)
+        verify(exactly = 0) { tourInfoPort.findDetail(any()) }
+        verify(exactly = 1) { spotCachePort.putDetail("100", DomainLocale.KO, any()) }
+    }
+
+    @Test
+    fun `양쪽 미스면 TourAPI를 호출하고 적재 큐에 넣는다(AC-36·AC-39)`() {
+        every { tourInfoPort.findDetail(any()) } returns detail()
+
+        service.spotDetail("100", DomainLocale.KO)
+
+        verify(exactly = 1) { tourInfoPort.findDetail(any()) }
+        // 응답은 적재 완료를 기다리지 않는다 — 이벤트만 발행하고, 리스너가 @Async로 처리한다.
+        verify(exactly = 1) { eventPublisher.publish(ofType(SpotDetailFetched::class)) }
+    }
+
+    @Test
+    fun `DB 히트 시에는 이벤트를 발행하지 않는다`() {
+        // 이미 적재된 것을 또 발행하면 큐가 불필요하게 찬다.
+        every { spotDetailStorePort.findDetail("100", DomainLocale.KO) } returns detail()
+
+        service.spotDetail("100", DomainLocale.KO)
+
+        verify(exactly = 0) { eventPublisher.publish(any()) }
+    }
+
+    @Test
+    fun `갤러리도 같은 3단 구조를 갖는다`() {
+        every { spotDetailStorePort.findGallery("100", DomainLocale.KO) } returns listOf(image())
+
+        val result = service.spotGallery("100", DomainLocale.KO)
+
+        assertEquals(1, result.size)
+        verify(exactly = 0) { tourInfoPort.findGallery(any()) }
+    }
+
+    @Test
+    fun `intro는 DB에 적재된 값이 null이어도 미스로 취급하지 않는다`() {
+        // "적재됐으나 값 없음"을 미스로 오판하면 매 조회마다 upstream을 두드린다.
+        every { spotDetailStorePort.findIntro("100", DomainLocale.KO, SpotCategory.TOURIST_SPOT) } returns
+            StoredIntro(null)
+
+        val result = service.spotIntro("100", SpotCategory.TOURIST_SPOT, DomainLocale.KO)
+
+        assertNull(result)
+        verify(exactly = 0) { tourInfoPort.findIntro(any(), any()) }
+    }
+
+    @Test
+    fun `infoItems도 같은 3단 구조를 갖는다`() {
+        every { spotDetailStorePort.findInfoItems("100", DomainLocale.KO, SpotCategory.TOURIST_SPOT) } returns
+            listOf(SpotInfoItem("주차", "가능"))
+
+        val result = service.spotInfoItems("100", SpotCategory.TOURIST_SPOT, DomainLocale.KO)
+
+        assertEquals(1, result.size)
+        verify(exactly = 0) { tourInfoPort.findInfoItems(any(), any()) }
+    }
+
+    @Test
+    fun `likeCount는 3단 폴백 경로에 들어가지 않는다(AC-38)`() {
+        every { spotQueryPort.countLikes("100", DomainLocale.KO) } returns 7L
+
+        assertEquals(7L, service.spotLikeCount("100", DomainLocale.KO))
+
+        verify(exactly = 0) { spotDetailStorePort.findDetail(any(), any()) }
+        verify(exactly = 0) { eventPublisher.publish(any()) }
     }
 
     @Test
