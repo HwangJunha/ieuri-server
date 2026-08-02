@@ -56,7 +56,7 @@ single-query read into field resolvers is over-engineering (see `simplify-review
    read it via `dfe.getSource<ReadDto>()`.
 
 6. **Laziness asserted only by compilation** — no test proves the calls don't happen.
-   *Fix:* DGS query-execution test verifying call counts (`verify(exactly = 0)`) for unselected
+   *Fix:* service-level test with mocked ports verifying call counts (`verify(exactly = 0)`) for unselected
    fields. See `test-strategy`.
 
 7. **DataLoader confusion** — a DataLoader added to "make it lazy," or lazy resolvers added to
