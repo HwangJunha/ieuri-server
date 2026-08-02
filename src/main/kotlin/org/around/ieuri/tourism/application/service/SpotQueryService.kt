@@ -9,7 +9,11 @@ import org.around.ieuri.tourism.application.port.out.cache.SpotCachePort
 import org.around.ieuri.tourism.application.port.out.client.SpotDetailQuery
 import org.around.ieuri.tourism.application.port.out.client.TourInfoPort
 import org.around.ieuri.tourism.application.port.out.persistence.SpotDetailStorePort
-import org.around.ieuri.tourism.application.port.out.queue.SpotDetailWriteQueuePort
+import org.around.ieuri.tourism.application.event.SpotDetailFetched
+import org.around.ieuri.tourism.application.event.SpotGalleryFetched
+import org.around.ieuri.tourism.application.event.SpotInfoItemsFetched
+import org.around.ieuri.tourism.application.event.SpotIntroFetched
+import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
 import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch
 import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
 import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
@@ -47,7 +51,7 @@ class SpotQueryService(
     private val spotQueryPort: SpotQueryPort,
     private val spotCachePort: SpotCachePort,
     private val spotDetailStorePort: SpotDetailStorePort,
-    private val writeQueuePort: SpotDetailWriteQueuePort,
+    private val eventPublisher: TourismEventPublisherPort,
     private val policy: SpotQueryPolicy,
 ) : SpotQueryUseCase {
 
@@ -111,10 +115,10 @@ class SpotQueryService(
             return stored.toView()
         }
 
-        // 양쪽 미스: upstream 조회 후 캐시 충전 + 적재 큐 투입(AC-36·AC-39).
+        // 양쪽 미스: upstream 조회 후 캐시 충전 + 적재 이벤트 발행(AC-36·AC-39).
         val fetched = tourInfoPort.findDetail(query(contentId, locale))
         spotCachePort.putDetail(contentId, locale, fetched)
-        writeQueuePort.enqueueDetail(contentId, locale, fetched)
+        eventPublisher.publish(SpotDetailFetched(contentId, locale, fetched))
         return fetched.toView()
     }
 
@@ -128,7 +132,7 @@ class SpotQueryService(
 
         val fetched = tourInfoPort.findGallery(query(contentId, locale))
         spotCachePort.putGallery(contentId, locale, fetched)
-        writeQueuePort.enqueueGallery(contentId, locale, fetched)
+        eventPublisher.publish(SpotGalleryFetched(contentId, locale, fetched))
         return fetched.map { it.toView() }
     }
 
@@ -147,7 +151,7 @@ class SpotQueryService(
 
         val intro = tourInfoPort.findIntro(query(contentId, locale), category)
         spotCachePort.putIntro(contentId, locale, category, intro)
-        writeQueuePort.enqueueIntro(contentId, locale, category, intro)
+        eventPublisher.publish(SpotIntroFetched(contentId, locale, category, intro))
         return intro?.toView()
     }
 
@@ -166,7 +170,7 @@ class SpotQueryService(
 
         val fetched = tourInfoPort.findInfoItems(query(contentId, locale), category)
         spotCachePort.putInfoItems(contentId, locale, category, fetched)
-        writeQueuePort.enqueueInfoItems(contentId, locale, category, fetched)
+        eventPublisher.publish(SpotInfoItemsFetched(contentId, locale, category, fetched))
         return fetched.map { SpotInfoItemView(it.name, it.text) }
     }
 

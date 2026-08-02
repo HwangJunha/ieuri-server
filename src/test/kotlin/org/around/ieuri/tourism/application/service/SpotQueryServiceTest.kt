@@ -15,7 +15,9 @@ import org.around.ieuri.tourism.application.port.out.client.SpotDetailQuery
 import org.around.ieuri.tourism.application.port.out.client.TourInfoPort
 import org.around.ieuri.tourism.application.port.out.persistence.SpotDetailStorePort
 import org.around.ieuri.tourism.application.port.out.persistence.StoredIntro
-import org.around.ieuri.tourism.application.port.out.queue.SpotDetailWriteQueuePort
+import org.around.ieuri.tourism.application.event.SpotDetailFetched
+import org.around.ieuri.tourism.application.event.SpotGalleryFetched
+import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
 import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch
 import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
 import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
@@ -42,13 +44,13 @@ class SpotQueryServiceTest {
     private val spotQueryPort = mockk<SpotQueryPort>()
     private val spotCachePort = mockk<SpotCachePort>()
     private val spotDetailStorePort = mockk<SpotDetailStorePort>()
-    private val writeQueuePort = mockk<SpotDetailWriteQueuePort>(relaxed = true)
+    private val eventPublisher = mockk<TourismEventPublisherPort>(relaxed = true)
     private val policy = SpotQueryPolicy(
         maxRadiusMeters = 100_000,
         maxPageSize = 100,
     )
     private val service = SpotQueryService(
-        tourInfoPort, spotQueryPort, spotCachePort, spotDetailStorePort, writeQueuePort, policy,
+        tourInfoPort, spotQueryPort, spotCachePort, spotDetailStorePort, eventPublisher, policy,
     )
 
     // 기본: 아무것도 반응하지 않음(빈 집합). 개별 테스트에서 override.
@@ -271,18 +273,18 @@ class SpotQueryServiceTest {
         service.spotDetail("100", DomainLocale.KO)
 
         verify(exactly = 1) { tourInfoPort.findDetail(any()) }
-        // 응답은 적재 완료를 기다리지 않는다 — 큐에 넣기만 한다.
-        verify(exactly = 1) { writeQueuePort.enqueueDetail("100", DomainLocale.KO, any()) }
+        // 응답은 적재 완료를 기다리지 않는다 — 이벤트만 발행하고, 리스너가 @Async로 처리한다.
+        verify(exactly = 1) { eventPublisher.publish(ofType(SpotDetailFetched::class)) }
     }
 
     @Test
-    fun `DB 히트 시에는 큐에 다시 넣지 않는다`() {
-        // 이미 적재된 것을 또 넣으면 큐가 불필요하게 찬다.
+    fun `DB 히트 시에는 이벤트를 발행하지 않는다`() {
+        // 이미 적재된 것을 또 발행하면 큐가 불필요하게 찬다.
         every { spotDetailStorePort.findDetail("100", DomainLocale.KO) } returns detail()
 
         service.spotDetail("100", DomainLocale.KO)
 
-        verify(exactly = 0) { writeQueuePort.enqueueDetail(any(), any(), any()) }
+        verify(exactly = 0) { eventPublisher.publish(any()) }
     }
 
     @Test
@@ -325,7 +327,7 @@ class SpotQueryServiceTest {
         assertEquals(7L, service.spotLikeCount("100", DomainLocale.KO))
 
         verify(exactly = 0) { spotDetailStorePort.findDetail(any(), any()) }
-        verify(exactly = 0) { writeQueuePort.enqueueDetail(any(), any(), any()) }
+        verify(exactly = 0) { eventPublisher.publish(any()) }
     }
 
     @Test
