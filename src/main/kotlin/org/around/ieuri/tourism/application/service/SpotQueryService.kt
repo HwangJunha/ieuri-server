@@ -5,12 +5,12 @@ import org.around.ieuri.tourism.application.exception.InvalidCoordinatesExceptio
 import org.around.ieuri.tourism.application.exception.RadiusTooLargeException
 import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
 import org.around.ieuri.tourism.application.port.`in`.query.SpotQueryUseCase
-import org.around.ieuri.tourism.application.port.out.client.NearbySpotData
-import org.around.ieuri.tourism.application.port.out.client.NearbySpotQuery
 import org.around.ieuri.tourism.application.port.out.cache.SpotCachePort
 import org.around.ieuri.tourism.application.port.out.client.SpotDetailQuery
 import org.around.ieuri.tourism.application.port.out.client.TourInfoPort
+import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch
 import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
+import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
 import org.around.ieuri.tourism.application.query.SpotDetailView
 import org.around.ieuri.tourism.application.query.SpotImageView
 import org.around.ieuri.tourism.application.query.SpotInfoItemView
@@ -18,24 +18,25 @@ import org.around.ieuri.tourism.application.query.SpotIntroView
 import org.around.ieuri.tourism.application.query.SpotPageView
 import org.around.ieuri.tourism.application.query.SpotView
 import org.around.ieuri.tourism.application.query.SpotsQuery
-import org.around.ieuri.tourism.domain.aggregate.Spot
 import org.around.ieuri.tourism.domain.aggregate.SpotDetail
 import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.domain.vo.SpotImage
 import org.around.ieuri.tourism.domain.vo.SpotIntro
-import org.around.ieuri.tourism.domain.vo.Distance
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.springframework.stereotype.Service
 
 /**
- * 관광지 조회 유스케이스 구현(CQRS 읽기). 파이프라인:
- *  - 좌표/반경/카테고리 검증 : 여기(application)
- *  - TourAPI 호출·필터·정규화 : TourInfoPort 뒤 어댑터
- *  - 거리 계산·정렬(거리 ASC) : 여기(application) — 정렬은 계약(POL-019)
+ * 관광지 조회 유스케이스 구현(CQRS 읽기).
  *
- * TourAPI가 pageNo 오프셋만 지원하고 라이브 데이터라, 커서 대신 **오프셋 한 페이지**를 그대로 서빙한다.
- * 클라이언트가 한 페이지를 스택에 쌓고 소진 시 page+1을 조회한다(서버가 페이지 병합·재조립을 하지 않는다).
+ * **목록(spots)과 상세(spotDetail)의 데이터 출처가 다르다**(SPEC-0004):
+ *  - 목록 : 적재된 spot 테이블만 본다. TourAPI를 호출하지 않는다(R-8). 반경 필터·거리 계산·정렬은
+ *           DB가 인덱스로 수행한다(R-9). 좌표/반경/카테고리 검증만 여기서 한다.
+ *  - 상세 : 여전히 Valkey → TourAPI다. 상세는 단건 조회만 지원되고 호출 쿼터로 전량 동기화가
+ *           불가능해 적재 대상이 아니다. 필드별 지연 조회 구조도 그대로다(SPEC-0003 R7).
+ *
+ * 페이지네이션은 오프셋(page/size)을 유지한다. 안정적 백킹 스토어가 생겨 커서가 기술적으로
+ * 가능해졌지만(POL-017), 전환은 별도 스펙으로 다룬다(SPEC-0004 범위 제외).
  */
 @Service
 class SpotQueryService(
@@ -45,6 +46,14 @@ class SpotQueryService(
     private val policy: SpotQueryPolicy,
 ) : SpotQueryUseCase {
 
+    /**
+     * 주변 관광지 한 페이지(SPEC-0004 R-8). **TourAPI를 호출하지 않는다** — 배치가 적재한 spot
+     * 테이블만 본다(AC-20·AC-21). 반경 필터·거리 계산·정렬을 DB가 인덱스로 수행한다(AC-24).
+     *
+     * SPEC-0002와 달라진 점은 거리·정렬의 주체다. 당시에는 upstream이 반경 안의 결과만 줘서
+     * application이 Haversine으로 채우고 정렬했지만, 전량 적재 후에는 "반경 안"을 DB가 풀어야 한다.
+     * 계약(거리 오름차순 + id 타이브레이크, POL-019)은 그대로이며 ORDER BY로 옮겨갔다.
+     */
     override fun spots(query: SpotsQuery, locale: DomainLocale, memberId: Long?): SpotPageView {
         val center = validatedCenter(query.latitude, query.longitude)
         validateRadius(query.radiusMeters)
@@ -53,34 +62,30 @@ class SpotQueryService(
         val page = query.page.coerceAtLeast(1)
         val size = query.size.coerceIn(1, policy.maxPageSize)
 
-        val result = tourInfoPort.findNearby(
-            NearbySpotQuery(
-                locale = locale,
-                center = center,
-                radiusMeters = query.radiusMeters,
-                category = query.category,
-                pageNo = page,
-                numOfRows = size,
-            ),
+        // 로그인 회원이 이미 반응(좋아요/패스)한 관광지 제외 — 중복 노출 방지. 비로그인은 제외 없음.
+        // **DB 쿼리 단계에서 제외한다** — 조회 후 걸러내면 페이지가 요청한 size보다 작아진다.
+        val excluded = memberId?.let { spotQueryPort.findReactedContentIds(it, locale) }.orEmpty()
+
+        val search = NearbySpotSearch(
+            language = locale,
+            center = center,
+            radiusMeters = query.radiusMeters,
+            category = query.category,
+            excludedContentIds = excluded,
+            limit = size,
+            offset = (page - 1) * size,
         )
 
-        // 로그인 회원이 이미 반응(좋아요/패스)한 관광지 제외 — 중복 노출 방지. 비로그인은 제외 없음.
-        val reacted = memberId?.let {
-            spotQueryPort.findReactedContentIds(it, result.spots.map { s -> s.id }, locale)
-        }.orEmpty()
-
-        // DTO→Domain(거리 채움) 후 거리 오름차순 정렬(동률이면 id). 정렬은 계약(POL-019).
-        val items = result.spots
-            .filter { it.id !in reacted }
-            .map { it.toSpot(center) }
-            .sortedWith(compareBy({ it.distance.meters }, { it.id }))
-            .map { it.toView() }
+        val results = spotQueryPort.searchNearby(search)
+        val totalCount = spotQueryPort.countNearby(search)
 
         return SpotPageView(
-            items = items,
+            items = results.map { it.toView() },
             page = page,
-            hasNext = result.hasMoreUpstreamPages,
-            totalCount = result.totalCount,
+            // 같은 조건의 전체 건수 기준이라 totalCount와 일관된다 — 둘이 갈리면
+            // hasNext=false인데 totalCount는 더 있다고 말하는 상태가 생긴다(런타임 계약 위험 3번).
+            hasNext = page.toLong() * size < totalCount.toLong(),
+            totalCount = totalCount,
         )
     }
 
@@ -155,19 +160,6 @@ class SpotQueryService(
         }
     }
 
-    /** 포트 중립 DTO → 도메인 Spot. 거리(도메인 로직)를 사용자 좌표 기준으로 채운다(DTO→Domain). */
-    private fun NearbySpotData.toSpot(center: Coordinates): Spot = Spot(
-        id = id,
-        title = title,
-        address = address,
-        thumbnailImageUrl = thumbnailImageUrl,
-        coordinates = coordinates,
-        distance = Distance.between(center, coordinates),
-        category = category,
-        copyright = copyright,
-        attributionText = copyright.attributionText,
-    )
-
     private fun SpotDetail.toView(): SpotDetailView = SpotDetailView(
         id = id,
         title = title,
@@ -199,16 +191,21 @@ class SpotQueryService(
         attributionText = attributionText,
     )
 
-    private fun Spot.toView(): SpotView = SpotView(
-        id = id,
+    /**
+     * 읽기 DTO → 응답 뷰. [attributionText]는 copyright에서 파생되므로 여기서 도출한다 —
+     * 적재하지 않는 이유이기도 하다(컬럼으로 두면 둘이 어긋날 수 있다).
+     * 거리는 DB가 계산한 값을 그대로 쓴다.
+     */
+    private fun SpotSearchResult.toView(): SpotView = SpotView(
+        id = contentId,
         title = title,
         address = address,
         thumbnailImageUrl = thumbnailImageUrl,
-        distanceMeters = distance.meters,
+        distanceMeters = distanceMeters,
         category = category,
         copyright = copyright,
-        attributionText = attributionText,
-        mapX = coordinates.longitude,
-        mapY = coordinates.latitude,
+        attributionText = copyright.attributionText,
+        mapX = mapX,
+        mapY = mapY,
     )
 }

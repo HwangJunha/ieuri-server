@@ -1,17 +1,36 @@
 package org.around.ieuri.tourism.application.port.out.query
 
+import org.around.ieuri.tourism.domain.vo.Coordinates
+import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
+import org.around.ieuri.tourism.domain.vo.SpotCategory
 
 /**
  * 관광지 관련 읽기 아웃바운드 포트(CQRS 읽기). 애그리거트를 우회해 필요한 값만 프로젝션한다.
- * spot 조회에 필요한 DB 읽기를 한 포트로 모은다(현재는 반응 기록 기반 집계·필터).
+ * spot 조회에 필요한 DB 읽기를 한 포트로 모은다(반경 조회, 반응 기록 기반 집계·필터).
  */
 interface SpotQueryPort {
     /**
-     * 주어진 contentId들 중 이 회원이 (현재 언어에서) 이미 반응한 것의 집합.
-     * 조회 범위를 후보 contentId로 좁혀(IN) 회원의 전체 반응을 끌어오지 않는다.
+     * 반경 안의 관광지를 **거리 오름차순**으로 한 페이지 조회한다(SPEC-0004 R-8·R-9).
+     * TourAPI를 호출하지 않는다 — 적재된 spot 테이블만 본다(AC-20·AC-21).
+     *
+     * 거리 계산·정렬을 DB가 수행하는 것이 SPEC-0002와 달라진 점이다. 당시에는 upstream이 반경 안의
+     * 결과만 줘서 application이 Haversine으로 거리를 채우고 정렬했지만, 전량 적재 후에는 "반경 안"을
+     * DB가 인덱스로 풀어야 한다(AC-24). [SpotSearchResult.distanceMeters]는 그 계산 결과다.
      */
-    fun findReactedContentIds(memberId: Long, contentIds: Collection<String>, language: DomainLocale): Set<String>
+    fun searchNearby(query: NearbySpotSearch): List<SpotSearchResult>
+
+    /** [query] 조건에 맞는 전체 건수(페이지 무관). SpotPage.totalCount 산출용. */
+    fun countNearby(query: NearbySpotSearch): Int
+
+    /**
+     * 이 회원이 (현재 언어에서) 이미 반응한 contentId 전체.
+     *
+     * SPEC-0002에서는 upstream이 준 후보로 범위를 좁혔지만(IN), 이제는 제외를 **DB 조회 단계에**
+     * 넘겨야 해서(그래야 페이지가 size보다 작아지지 않는다) 후보를 미리 알 수 없다.
+     * 반응 기록은 회원당 많아야 수천 건 규모라 전량 조회가 현실적이다.
+     */
+    fun findReactedContentIds(memberId: Long, language: DomainLocale): Set<String>
 
     /**
      * 이 contentId·언어에 대한 LIKE 반응 수(SPEC-0003 §5). DISLIKE는 세지 않고, 언어를 넘어 합산하지 않는다
@@ -20,3 +39,35 @@ interface SpotQueryPort {
      */
     fun countLikes(contentId: String, language: DomainLocale): Long
 }
+
+/**
+ * 반경 조회 입력. [excludedContentIds]는 로그인 회원이 이미 반응한 항목으로, **DB 쿼리 단계에서**
+ * 제외한다 — 조회 후 애플리케이션에서 걸러내면 페이지가 요청한 size보다 작아지기 때문이다
+ * (SPEC-0002의 실시간 조회에서는 upstream 페이지를 그대로 서빙해 이 문제가 없었다).
+ */
+data class NearbySpotSearch(
+    val language: DomainLocale,
+    val center: Coordinates,
+    val radiusMeters: Int,
+    val category: SpotCategory?,
+    val excludedContentIds: Set<String>,
+    val limit: Int,
+    val offset: Int,
+)
+
+/**
+ * 반경 조회 결과 1건(read DTO). 리졸버가 GraphQL Spot 타입으로 매핑한다(application은 DGS 무의존).
+ * [distanceMeters]는 DB가 ST_Distance로 계산한 요청 좌표로부터의 구면 거리(미터)다.
+ * attributionText는 copyright에서 파생되므로 담지 않는다 — 서비스가 도출한다.
+ */
+data class SpotSearchResult(
+    val contentId: String,
+    val title: String,
+    val address: String?,
+    val thumbnailImageUrl: String,
+    val mapX: Double,
+    val mapY: Double,
+    val category: SpotCategory,
+    val copyright: CopyrightType,
+    val distanceMeters: Double,
+)

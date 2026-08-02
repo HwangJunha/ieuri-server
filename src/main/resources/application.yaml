@@ -15,6 +15,13 @@ spring:
       # 스키마 소유권은 Flyway. Hibernate는 엔티티↔스키마 검증만 한다.
       ddl-auto: validate
     open-in-view: false
+  batch:
+    jdbc:
+      # 메타 테이블 스키마는 Flyway가 소유한다(V14). API 서버로 떠도 Batch 자동구성이
+      # 로드되므로 여기서도 꺼 둔다 — 배치 상세 설정은 application-batch.yaml.
+      initialize-schema: never
+    job:
+      enabled: false
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -97,6 +104,8 @@ ieuri:
     # 비관광 제외 lclsSystm2 코드(다국어 공통). [TBD] 실데이터 표본으로 확정 — 초기 빈 목록.
     exclude-lclssystm2: []
     arrange: Q
+    # 관광지 동기화 배치 설정은 application-batch.yaml에 있다. 잡·런처·스케줄러 빈이
+    # 전부 @Profile("batch")라, batch 프로파일 없이 뜬 API 서버에는 아예 존재하지 않는다.
     mobile-os: ETC
     mobile-app: ieuri
     max-radius-meters: 100000

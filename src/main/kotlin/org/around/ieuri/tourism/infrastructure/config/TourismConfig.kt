@@ -1,6 +1,7 @@
 package org.around.ieuri.tourism.infrastructure.config
 
 import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
+import org.around.ieuri.tourism.infrastructure.batch.SpotSyncProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -14,7 +15,7 @@ import java.time.Duration
  * @EnableConfigurationProperties 한다(프로젝트 관례).
  */
 @Configuration
-@EnableConfigurationProperties(TourApiProperties::class)
+@EnableConfigurationProperties(TourApiProperties::class, SpotSyncProperties::class)
 class TourismConfig {
 
     @Bean

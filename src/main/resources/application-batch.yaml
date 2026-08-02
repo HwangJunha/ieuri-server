@@ -1,0 +1,53 @@
+# 관광지 동기화 배치 전용 설정(SPEC-0004). **batch 프로파일에서만 로드된다.**
+#
+# 배치는 API 서버와 **다른 프로세스로 뜬다** — 로컬은 수동 실행, k3s는 CronJob이다.
+# 그래서 설정도 여기 모아 두고, 배치가 아닌 프로세스는 이 파일을 아예 읽지 않는다.
+# API 파드에 스케줄러가 딸려 올라가 배치가 두 번 도는 사고를 구조적으로 막는 것이 목적이다.
+#
+# **실행 시점은 앱이 정하지 않는다.** 부팅하면 즉시 1회 실행하고 프로세스가 종료된다.
+# 언제 띄울지는 k8s CronJob(또는 kubectl create job)이 소유한다 — 앱에 스케줄러를 두면
+# 트리거가 둘이 되어 하루 두 번 도는 사고가 난다.
+#
+# 실행:
+#   로컬  ./gradlew bootRun --args='--spring.profiles.active=local,batch'
+#   k3s   CronJob에서 --spring.profiles.active=prod,batch
+#   수동  kubectl create job --from=cronjob/<name> <run-name> -n <ns>
+#
+# 공통 설정(datasource·flyway·tourapi 자격증명 등)은 application.yaml에서 그대로 상속받는다.
+# 여기에는 **배치일 때만 달라지는 값**만 둔다.
+
+spring:
+  batch:
+    jdbc:
+      # 메타 테이블 스키마는 Flyway가 소유한다(V14). Batch가 자체 초기화하면 그 DDL이
+      # flyway_schema_history에 남지 않아 스키마 형상 관리가 이원화된다.
+      initialize-schema: never
+    job:
+      # 부팅 시 잡을 자동 실행하지 않는다. 실행 시점은 스케줄러(또는 CronJob)가 정한다 —
+      # 재배포마다 전량 동기화가 도는 것을 막는다.
+      enabled: false
+
+  # 배치는 HTTP 표면을 갖지 않는다(POL-021: 배치는 내부 잡). CronJob으로 뜨는 파드가
+  # 포트를 잡으면 API 파드와 충돌하고, 열어 둘 이유도 없다.
+  main:
+    web-application-type: none
+
+ieuri:
+  tourapi:
+    sync:
+      # 실행할 잡. 외부에서 바꿀 수 있게 둔다 — 잡이 늘어나도 런처 코드는 그대로다.
+      job: ${IEURI_TOUR_SYNC_JOB:spotSyncJob}
+
+      # areaBasedSyncList2의 numOfRows. 조회 경로의 max-page-size(100)와 별개다
+      # (수집 효율 vs 응답 크기). 1000은 아직 실측되지 않았다 — upstream이 거부하면
+      # 이 값을 낮춘다(설계 문서 §4.2). 실측: 1000건 upsert에 약 0.2초.
+      page-size: ${IEURI_TOUR_SYNC_PAGE_SIZE:1000}
+
+      # runDate 잡 파라미터의 시간대. "하루"의 경계를 정하므로 중복 실행 방지(AC-6)의 기준이다.
+      # 실행 스케줄 자체는 k8s CronJob이 소유한다 — 앱에는 스케줄러가 없다.
+      zone: Asia/Seoul
+
+logging:
+  level:
+    org.springframework.batch: INFO
+    org.around.ieuri.tourism.infrastructure.batch: INFO
