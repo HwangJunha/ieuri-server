@@ -150,7 +150,7 @@ Schema is owned by **Flyway migrations**, never by Hibernate. The domain-model �
 
 **Work in a git worktree by default.** Several slices run concurrently, so each unit of work gets its own worktree instead of sharing the checkout — otherwise parallel sessions collide on the working tree, the Gradle build directory, and `.claude/last-test-status`. `worktree.bgIsolation` is set to `worktree` in `.claude/settings.local.json`; when a task starts in an existing session, call `EnterWorktree` rather than branching in place. One worktree per branch, named after it.
 
-> A fresh worktree branches from `origin/<default-branch>` by default, **not** from your current HEAD. Since features cut from `dev`, verify the base before starting and rebase if it is wrong — otherwise the slice is built on stale code.
+> `worktree.baseRef` is `origin/dev`, so a fresh worktree branches from `dev` — matching the rule that features cut from `dev`. It does **not** branch from your current HEAD, so uncommitted work in the shared checkout does not carry over.
 
 Branches: `master`, `dev`, `feature/*`, `hotfix/*`.
 

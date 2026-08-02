@@ -107,7 +107,8 @@
     "defaultMode": "acceptEdits"
   },
   "worktree": {
-    "bgIsolation": "worktree"
+    "bgIsolation": "worktree",
+    "baseRef": "origin/dev"
   },
   "// note": "Personal, gitignored overrides for THIS repo (.claude/settings.local.json). Team-shared rules go in .claude/settings.json. Precedence: deny > ask > allow, first match wins. A deny can't carry allow exceptions — narrow the deny instead."
 }
