@@ -9,14 +9,15 @@ package org.around.ieuri.tourism.application.exception
  *                               [errorClassification]에 담긴 DGS ErrorType으로 분류(POL-016 초안).
  *
  * 쿼리엔 payload 컨벤션이 없어 두 경로가 다르다(spec §4.8).
+ *
+ * 단, **인증 실패는 이 분기와 무관하게 항상 최상위 errors[]로 표면화한다**(SPEC-0005 R15).
+ * userErrors[]는 세션 상태를 나타내는 값을 담지 않는다 — 클라이언트의 자동 토큰 갱신은 최상위 errors[]를
+ * 보는 링크 계층에서 일어나므로, 인증 실패를 payload에 담으면 갱신이 트리거되지 않는다.
+ * 따라서 리졸버는 common/security의 UnauthorizedException(= 이 taxonomy 밖)을 그대로 전파시킨다.
  */
 
-/** reactToSpot의 사용자 노출 실패. code는 머신 판독용 안정 식별자. */
+/** reactToSpot의 사용자 노출 실패. code는 머신 판독용 안정 식별자. 인증 실패는 여기에 속하지 않는다(위 참조). */
 abstract class ReactionUserException(val code: String, message: String) : RuntimeException(message)
-
-/** 비로그인 상태의 좋아요/싫어요 시도(AC-14). */
-class UnauthenticatedReactionException(message: String = "로그인이 필요합니다.") :
-    ReactionUserException("UNAUTHENTICATED", message)
 
 /** 현재 요청 언어에서 resolve되지 않는 spotId(오래된 카드 등, AC-14b). */
 class SpotNotFoundException(message: String = "해당 관광지를 찾을 수 없습니다.") :

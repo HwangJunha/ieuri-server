@@ -4,7 +4,6 @@ import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsMutation
 import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.tourism.application.command.ReactToSpotCommand
-import org.around.ieuri.tourism.application.exception.UnauthenticatedReactionException
 import org.around.ieuri.tourism.application.port.`in`.command.ReactToSpotUseCase
 import org.around.ieuri.tourism.domain.vo.ReactionType
 import org.around.ieuri.tourism.infrastructure.locale.LocaleContext
@@ -15,8 +14,10 @@ import org.around.ieuri.common.graphql.generated.types.UserError
 
 /**
  * 좋아요/싫어요 기록 GraphQL 뮤테이션 리졸버(인바운드 어댑터, 쓰기). 언어는 LocaleContext(Accept-Language)에서,
- * memberId는 SecurityContext에서 온다. 비로그인은 UNAUTHENTICATED userError로 응답한다(AC-14, 최상위 error 아님).
- * 예상 실패는 withReactionUserErrors로 payload의 userErrors로 변환한다(BaseResponse 규약).
+ * memberId는 SecurityContext에서 온다. 비로그인은 requireMemberId()가 던지는 UnauthorizedException이
+ * 최상위 errors[]로 전파된다(SPEC-0005 R15) — 클라이언트의 자동 토큰 갱신이 최상위 errors[]에서만
+ * 트리거되므로 인증 실패는 payload에 담지 않는다.
+ * 그 외 예상 실패(SPOT_NOT_FOUND/INVALID_INPUT)는 withReactionUserErrors로 userErrors로 변환한다(BaseResponse 규약).
  */
 @DgsComponent
 class ReactToSpotResolver(
@@ -28,9 +29,9 @@ class ReactToSpotResolver(
     fun reactToSpot(@InputArgument input: ReactToSpotInput): ReactToSpotPayload = withReactionUserErrors(
         onError = { failure(it) },
     ) {
-        // 비로그인 → userErrors(UNAUTHENTICATED). requireMemberId()는 최상위 error를 던지므로 쓰지 않는다.
-        val memberId = currentMemberProvider.currentMemberId()
-            ?: throw UnauthenticatedReactionException()
+        // 비로그인 → UnauthorizedException. ReactionUserException이 아니므로 withReactionUserErrors가
+        // 붙잡지 않고 최상위 errors[]로 전파된다(auth 도메인 리졸버와 동일한 경로).
+        val memberId = currentMemberProvider.requireMemberId()
 
         reactToSpotUseCase.react(
             command = ReactToSpotCommand(
