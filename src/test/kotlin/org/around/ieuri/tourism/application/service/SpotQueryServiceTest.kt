@@ -9,14 +9,13 @@ import org.around.ieuri.tourism.application.exception.InvalidCoordinatesExceptio
 import org.around.ieuri.tourism.application.exception.RadiusTooLargeException
 import org.around.ieuri.tourism.application.exception.SpotDetailNotFoundException
 import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
-import org.around.ieuri.tourism.application.port.out.client.NearbySpotData
-import org.around.ieuri.tourism.application.port.out.client.NearbySpotQuery
-import org.around.ieuri.tourism.application.port.out.client.NearbySpotResult
 import org.around.ieuri.tourism.application.port.out.cache.CachedIntro
 import org.around.ieuri.tourism.application.port.out.cache.SpotCachePort
 import org.around.ieuri.tourism.application.port.out.client.SpotDetailQuery
 import org.around.ieuri.tourism.application.port.out.client.TourInfoPort
+import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch
 import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
+import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
 import org.around.ieuri.tourism.application.query.SpotsQuery
 import org.around.ieuri.tourism.domain.aggregate.SpotDetail
 import org.around.ieuri.tourism.domain.vo.Coordinates
@@ -47,7 +46,9 @@ class SpotQueryServiceTest {
 
     // 기본: 아무것도 반응하지 않음(빈 집합). 개별 테스트에서 override.
     init {
-        every { spotQueryPort.findReactedContentIds(any(), any(), any()) } returns emptySet()
+        every { spotQueryPort.findReactedContentIds(any(), any()) } returns emptySet()
+        every { spotQueryPort.searchNearby(any()) } returns emptyList()
+        every { spotQueryPort.countNearby(any()) } returns 0
         // 기본: 캐시 미스 + 저장 성공. 캐시 히트 검증은 개별 테스트에서 override.
         every { spotCachePort.getDetail(any(), any()) } returns null
         every { spotCachePort.putDetail(any(), any(), any()) } returns Unit
@@ -60,17 +61,19 @@ class SpotQueryServiceTest {
     }
 
     /**
-     * 중립 DTO 픽스처. [rank]가 커질수록 center에서 경도 offset이 커져 거리도 단조 증가한다
-     * (서비스가 Haversine으로 거리를 계산하므로, 순서 검증엔 좌표로 거리 순서를 만든다).
+     * 읽기 DTO 픽스처. 거리는 **DB가 계산해 돌려준 값**이므로 여기서 직접 지정한다
+     * (SPEC-0004 이후 application은 거리를 계산하지 않는다).
      */
-    private fun data(id: String, rank: Int): NearbySpotData = NearbySpotData(
-        id = id,
+    private fun result(id: String, distanceMeters: Double): SpotSearchResult = SpotSearchResult(
+        contentId = id,
         title = "spot-$id",
         address = "서울 어딘가",
         thumbnailImageUrl = "https://img/$id.jpg",
-        coordinates = Coordinates(latitude = 37.5665, longitude = 126.9780 + rank * 0.01),
+        mapX = 126.9780,
+        mapY = 37.5665,
         category = SpotCategory.TOURIST_SPOT,
         copyright = CopyrightType.UNSPECIFIED,
+        distanceMeters = distanceMeters,
     )
 
     private fun query(page: Int = 1, size: Int = 100, category: SpotCategory? = null, radius: Int = 20000) =
@@ -80,57 +83,82 @@ class SpotQueryServiceTest {
         )
 
     @Test
-    fun `결과는 거리 오름차순으로 정렬된다(AC-1)`() {
-        // upstream이 거리순이 아닌 순서로 준다(rank가 클수록 멀다: a<b<c).
-        every { tourInfoPort.findNearby(any()) } returns NearbySpotResult(
-            spots = listOf(data("c", 3), data("a", 1), data("b", 2)),
-            totalCount = 3,
-            hasMoreUpstreamPages = false,
-        )
+    fun `DB가 돌려준 순서를 그대로 유지한다(AC-25)`() {
+        // 정렬은 이제 DB(ORDER BY ST_Distance, id)가 담당한다. 서비스가 재정렬하면
+        // DB의 타이브레이크가 무의미해지므로, 받은 순서를 보존하는 것이 올바른 동작이다.
+        every { spotQueryPort.searchNearby(any()) } returns
+            listOf(result("a", 100.0), result("b", 200.0), result("c", 300.0))
+        every { spotQueryPort.countNearby(any()) } returns 3
+
         val result = service.spots(query(), DomainLocale.KO, memberId = null)
+
         assertEquals(listOf("a", "b", "c"), result.items.map { it.id })
     }
 
     @Test
-    fun `page와 size를 upstream pageNo·numOfRows로 전달한다`() {
-        val captured = slot<NearbySpotQuery>()
-        every { tourInfoPort.findNearby(capture(captured)) } returns NearbySpotResult(emptyList(), 0, false)
+    fun `page와 size를 limit·offset으로 변환한다`() {
+        val captured = slot<NearbySpotSearch>()
+        every { spotQueryPort.searchNearby(capture(captured)) } returns emptyList()
+
         service.spots(query(page = 3, size = 50), DomainLocale.KO, memberId = null)
-        assertEquals(3, captured.captured.pageNo)
-        assertEquals(50, captured.captured.numOfRows)
+
+        assertEquals(50, captured.captured.limit)
+        assertEquals(100, captured.captured.offset) // (3-1) * 50
     }
 
     @Test
-    fun `hasNext는 upstream 다음 페이지 존재 여부를 그대로 반영한다`() {
-        every { tourInfoPort.findNearby(any()) } returns NearbySpotResult(
-            spots = listOf(data("a", 1)),
-            totalCount = 200,
-            hasMoreUpstreamPages = true,
-        )
-        val result = service.spots(query(page = 1), DomainLocale.KO, memberId = null)
+    fun `hasNext는 totalCount와 같은 조건에서 산출된다`() {
+        // 둘이 다른 기준을 쓰면 hasNext=false인데 totalCount는 더 있다고 말하는 상태가 생긴다
+        // (런타임 계약 위험 3번).
+        every { spotQueryPort.searchNearby(any()) } returns listOf(result("a", 100.0))
+        every { spotQueryPort.countNearby(any()) } returns 200
+
+        val result = service.spots(query(page = 1, size = 100), DomainLocale.KO, memberId = null)
+
         assertTrue(result.hasNext)
         assertEquals(1, result.page)
-        assertEquals(200, result.totalCount) // 참고용 상한(필터 이전)
+        assertEquals(200, result.totalCount)
     }
 
     @Test
-    fun `distanceMeters가 서버 Haversine 계산으로 채워진다(AC-2)`() {
-        // center(126.9780)에서 경도 +0.01 떨어진 지점 → 위도 37.5665에서 약 880m.
-        every { tourInfoPort.findNearby(any()) } returns NearbySpotResult(
-            spots = listOf(data("a", 1)),
-            totalCount = 1,
-            hasMoreUpstreamPages = false,
-        )
+    fun `마지막 페이지면 hasNext가 false다(AC-29)`() {
+        every { spotQueryPort.searchNearby(any()) } returns listOf(result("a", 100.0))
+        every { spotQueryPort.countNearby(any()) } returns 100
+
+        val result = service.spots(query(page = 1, size = 100), DomainLocale.KO, memberId = null)
+
+        assertFalse(result.hasNext)
+    }
+
+    @Test
+    fun `distanceMeters는 DB 계산 값을 그대로 노출한다(AC-26)`() {
+        every { spotQueryPort.searchNearby(any()) } returns listOf(result("a", 877.5))
+        every { spotQueryPort.countNearby(any()) } returns 1
+
         val d = service.spots(query(), DomainLocale.KO, memberId = null).items.single().distanceMeters
-        assertTrue(d in 700.0..1_100.0, "expected ~880m, got ${d}m")
+
+        assertEquals(877.5, d)
     }
 
     @Test
-    fun `size가 상한(100)을 넘으면 클램프된다`() {
-        val captured = slot<NearbySpotQuery>()
-        every { tourInfoPort.findNearby(capture(captured)) } returns NearbySpotResult(emptyList(), 0, false)
+    fun `size가 상한(100)을 넘으면 클램프된다(AC-30)`() {
+        val captured = slot<NearbySpotSearch>()
+        every { spotQueryPort.searchNearby(capture(captured)) } returns emptyList()
+
         service.spots(query(size = 500), DomainLocale.KO, memberId = null)
-        assertEquals(100, captured.captured.numOfRows)
+
+        assertEquals(100, captured.captured.limit)
+    }
+
+    @Test
+    fun `spots 조회는 TourAPI를 호출하지 않는다(AC-21)`() {
+        // 이 스펙의 핵심 주장 — 목록 조회 경로에서 upstream 의존이 완전히 사라진다.
+        every { spotQueryPort.searchNearby(any()) } returns listOf(result("a", 100.0))
+        every { spotQueryPort.countNearby(any()) } returns 1
+
+        service.spots(query(), DomainLocale.KO, memberId = null)
+
+        verify(exactly = 0) { tourInfoPort.findNearby(any()) }
     }
 
     @Test
@@ -154,42 +182,44 @@ class SpotQueryServiceTest {
     @Test
     fun `현재 언어에 없는 카테고리는 CATEGORY_NOT_AVAILABLE_FOR_LOCALE`() {
         assertFailsWith<CategoryNotAvailableForLocaleException> {
-            service.spots(query(category = SpotCategory.TRAVEL_COURSE), DomainLocale.EN, memberId = null) // 여행코스는 외국어 없음
+            service.spots(query(category = SpotCategory.TRAVEL_COURSE), DomainLocale.EN, memberId = null)
         }
     }
 
     @Test
-    fun `카테고리 미지정이면 upstream에 contentTypeId 없이 전달된다`() {
-        val captured = slot<NearbySpotQuery>()
-        every { tourInfoPort.findNearby(capture(captured)) } returns NearbySpotResult(emptyList(), 0, false)
-        service.spots(query(category = null), DomainLocale.KO, memberId = null)
-        assertEquals(null, captured.captured.category)
+    fun `카테고리 필터가 조회 조건으로 전달된다(AC-33)`() {
+        val captured = slot<NearbySpotSearch>()
+        every { spotQueryPort.searchNearby(capture(captured)) } returns emptyList()
+
+        service.spots(query(category = SpotCategory.LODGING), DomainLocale.KO, memberId = null)
+
+        assertEquals(SpotCategory.LODGING, captured.captured.category)
     }
 
     @Test
-    fun `로그인 회원이 이미 반응한 관광지는 제외된다`() {
-        every { tourInfoPort.findNearby(any()) } returns NearbySpotResult(
-            spots = listOf(data("a", 1), data("b", 2), data("c", 3)),
-            totalCount = 3,
-            hasMoreUpstreamPages = false,
-        )
-        // b는 이미 반응함 → 제외.
-        every { spotQueryPort.findReactedContentIds(7L, any(), DomainLocale.KO) } returns setOf("b")
+    fun `로그인 회원이 이미 반응한 관광지는 DB 조회 단계에서 제외된다`() {
+        // 조회 후 걸러내면 페이지가 요청한 size보다 작아지므로 쿼리 조건으로 넘긴다.
+        val captured = slot<NearbySpotSearch>()
+        every { spotQueryPort.findReactedContentIds(7L, DomainLocale.KO) } returns setOf("b")
+        every { spotQueryPort.searchNearby(capture(captured)) } returns emptyList()
 
-        val result = service.spots(query(), DomainLocale.KO, memberId = 7L)
-        assertEquals(listOf("a", "c"), result.items.map { it.id })
+        service.spots(query(), DomainLocale.KO, memberId = 7L)
+
+        assertEquals(setOf("b"), captured.captured.excludedContentIds)
     }
 
     @Test
     fun `비로그인은 반응 조회 없이 전부 반환한다`() {
-        every { tourInfoPort.findNearby(any()) } returns NearbySpotResult(
-            spots = listOf(data("a", 1), data("b", 2)),
-            totalCount = 2,
-            hasMoreUpstreamPages = false,
-        )
+        val captured = slot<NearbySpotSearch>()
+        every { spotQueryPort.searchNearby(capture(captured)) } returns
+            listOf(result("a", 100.0), result("b", 200.0))
+        every { spotQueryPort.countNearby(any()) } returns 2
+
         val result = service.spots(query(), DomainLocale.KO, memberId = null)
+
         assertEquals(listOf("a", "b"), result.items.map { it.id })
-        verify(exactly = 0) { spotQueryPort.findReactedContentIds(any(), any(), any()) }
+        assertTrue(captured.captured.excludedContentIds.isEmpty())
+        verify(exactly = 0) { spotQueryPort.findReactedContentIds(any(), any()) }
     }
 
     @Test
