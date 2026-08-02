@@ -16,17 +16,12 @@ const val BATCH_PROFILE = "batch"
  *   (적재 성능은 실측했다 — 1000건 upsert에 약 0.2초, 4만 건 전량에 약 10초.)
  * @param job 실행할 잡 이름. **외부에서 지정한다**(`--ieuri.tourapi.sync.job=...`).
  *   잡이 늘어나도 런처 코드는 그대로 두고 CronJob 매니페스트가 "무엇을 돌릴지"를 소유한다.
- * @param schedulerEnabled 실행 트리거를 **누가 소유하는가**.
- *   - `false`(기본): 외부 트리거(k3s CronJob). 부팅 즉시 1회 실행하고 프로세스가 종료된다.
- *   - `true`: 앱 내부 `@Scheduled`. 프로세스가 떠 있으면서 [cron] 시각에 실행한다(로컬 관찰용).
- *   둘 다 켜면 하루에 두 번 도므로 배타적으로 쓴다.
- * @param cron 내부 스케줄러 사용 시 실행 주기. 기본은 매일 04:00(KST) — 트래픽이 가장 적은 시간대.
+ * @param zone `runDate` 잡 파라미터를 만들 때 쓰는 시간대. 이 값이 "하루"의 경계를 정하므로
+ *   중복 실행 방지(AC-6)의 기준이기도 하다. 실행 스케줄 자체는 k8s CronJob이 소유한다.
  */
 @ConfigurationProperties(prefix = "ieuri.tourapi.sync")
 data class SpotSyncProperties(
     val pageSize: Int = 1_000,
     val job: String = "spotSyncJob",
-    val schedulerEnabled: Boolean = false,
-    val cron: String = "0 0 4 * * *",
     val zone: String = "Asia/Seoul",
 )

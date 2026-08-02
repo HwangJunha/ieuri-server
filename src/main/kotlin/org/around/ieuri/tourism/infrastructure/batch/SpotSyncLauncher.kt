@@ -21,7 +21,7 @@ import kotlin.system.exitProcess
  * 동기화 잡 실행의 단일 진입점(SPEC-0004 AC-4·AC-6). **batch 프로파일에서만 생성된다** —
  * API 서버 프로세스에는 이 빈도, [SpotSyncJobConfig]의 잡도 존재하지 않는다.
  *
- * **실행할 잡을 외부에서 지정한다**: `--ieuri.tourapi.sync.job=spotSyncJob`(기본값).
+ * **실행 시점도, 실행할 잡도 외부가 정한다**: `--ieuri.tourapi.sync.job=spotSyncJob`(기본값).
  * 잡이 늘어나도 이 클래스는 그대로 두고 인자만 바꾸면 되며, CronJob 매니페스트가
  * "무엇을 돌릴지"를 소유한다.
  *
@@ -54,16 +54,14 @@ class SpotSyncLauncher(
     private var exitCode = 0
 
     /**
-     * 외부 트리거(k3s CronJob) 모드: 부팅 즉시 1회 실행하고 프로세스를 종료한다.
-     * 스케줄러 모드([SpotSyncScheduler])면 아무것도 하지 않고 cron 시각을 기다린다 —
-     * 둘 다 실행되면 하루에 두 번 돈다.
+     * 부팅 즉시 1회 실행하고 프로세스를 종료한다. **실행 시점은 외부(k8s CronJob)가 소유한다** —
+     * 앱 내부에 스케줄러를 두지 않으므로 트리거가 하나뿐이고, 하루 두 번 도는 실수가 원천 차단된다.
      *
      * CronJob은 "파드가 뜨고 → 잡이 끝나면 종료되는" 모델이라 명시적으로 종료해야 한다.
      * [SpringApplication.exit]가 컨텍스트를 닫아 커넥션 풀·스레드를 정리한 뒤 종료 코드를
      * 계산하며, 그 값이 [getExitCode]에서 온다.
      */
     override fun run(args: ApplicationArguments) {
-        if (properties.schedulerEnabled) return
         exitCode = if (launch()) 0 else 1
         exitProcess(SpringApplication.exit(context))
     }

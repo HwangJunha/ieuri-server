@@ -3,7 +3,6 @@ package org.around.ieuri.tourism.infrastructure.config
 import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
 import org.around.ieuri.tourism.infrastructure.batch.SpotSyncProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
-import org.springframework.scheduling.annotation.EnableScheduling
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.client.SimpleClientHttpRequestFactory
@@ -17,7 +16,6 @@ import java.time.Duration
  */
 @Configuration
 @EnableConfigurationProperties(TourApiProperties::class, SpotSyncProperties::class)
-@EnableScheduling
 class TourismConfig {
 
     @Bean
