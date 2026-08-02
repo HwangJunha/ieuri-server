@@ -16,7 +16,7 @@ The repository `CLAUDE.md` is authoritative — read it before writing anything.
 
 1. Confirm the target: domain, slice type (command/query), use-case name, aggregate + relevant fields. Ask once only if genuinely missing.
 2. Generate the vertical slice per `domain-slice-generator` (every layer, correct package placement).
-3. Generate the matching tests per `test-strategy` (correct shape per layer — pure JUnit5 for domain, mocked ports for handlers, Testcontainers slices for adapters, DGS tests for resolvers).
+3. Generate the matching tests per `test-strategy` — **unit tests for domain and business logic only** (pure JUnit5 for domain, mocked ports for services). **No infrastructure tests**: no Spring context, no Testcontainers, no DGS query-execution tests. Architecture is covered by the existing ArchUnit suite.
 4. Run `./gradlew test` (or `compileTestKotlin` for a fast check) and report the result.
 
 ## Hard rules (do not violate — a PreToolUse hook will block you anyway)
@@ -26,7 +26,7 @@ The repository `CLAUDE.md` is authoritative — read it before writing anything.
 - Dependencies point inward: `infrastructure → application → domain`.
 - Command path goes through the domain aggregate; query path bypasses it via QueryDSL projection.
 - No cross-domain internal imports — go through the other domain's `port/in` or a domain event.
-- **Resolve per field, not per endpoint.** If a query composes parts with separable cost (another upstream call, another table, an aggregate count), each part gets its own use-case method and a `@DgsData` field resolver so it runs only when selected — never one fat root that assembles everything. Arguments go on the field that needs them, not the root. Pin the laziness with a DGS query-execution test asserting call counts (`test-strategy`). Single-source queries need no field resolvers — don't split them. See CLAUDE.md "Don't write REST in GraphQL clothing"; `graphql-resolver-review` audits this.
+- **Resolve per field, not per endpoint.** If a query composes parts with separable cost (another upstream call, another table, an aggregate count), each part gets its own use-case method and a `@DgsData` field resolver so it runs only when selected — never one fat root that assembles everything. Arguments go on the field that needs them, not the root. Pin the laziness at the **service level** with mocked ports (`verify(exactly = 0)` for unselected fields) — not through a DGS context (`test-strategy`). Single-source queries need no field resolvers — don't split them. See CLAUDE.md "Don't write REST in GraphQL clothing"; `graphql-resolver-review` audits this.
 
 ## Output
 
