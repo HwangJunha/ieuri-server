@@ -4,13 +4,13 @@ import org.around.ieuri.tourism.application.port.out.client.SpotSyncPort
 import org.around.ieuri.tourism.application.port.out.persistence.SpotStorePort
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.springframework.batch.core.job.Job
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.batch.core.job.builder.JobBuilder
 import org.springframework.batch.core.repository.JobRepository
 import org.springframework.batch.core.step.Step
 import org.springframework.batch.core.step.builder.StepBuilder
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.Profile
 import org.springframework.transaction.PlatformTransactionManager
 
 /**
@@ -33,7 +33,7 @@ import org.springframework.transaction.PlatformTransactionManager
  * `last_synced_at`은 이미 적재되고 있으므로 결정 후 Step 추가만으로 붙는다.
  */
 @Configuration
-@ConditionalOnProperty(prefix = "ieuri.tourapi.sync", name = ["enabled"], havingValue = "true")
+@Profile(BATCH_PROFILE)
 class SpotSyncJobConfig(
     private val jobRepository: JobRepository,
     private val transactionManager: PlatformTransactionManager,

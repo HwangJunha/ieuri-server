@@ -1,6 +1,7 @@
 package org.around.ieuri.tourism.infrastructure.batch
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
+import org.springframework.context.annotation.Profile
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Component
  * 여기서는 "언제"만 정한다.
  */
 @Component
+@Profile(BATCH_PROFILE)
 @ConditionalOnProperty(
     prefix = "ieuri.tourapi.sync",
     name = ["scheduler-enabled"],

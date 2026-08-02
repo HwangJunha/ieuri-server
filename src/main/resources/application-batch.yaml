@@ -30,9 +30,8 @@ spring:
 ieuri:
   tourapi:
     sync:
-      # 이 프로파일로 떴다는 것 자체가 배치를 돌리겠다는 뜻이므로 기본 활성이다.
-      # (application.yaml의 기본값은 false — API 서버에서 스케줄러가 살아나지 않게 한다.)
-      enabled: ${IEURI_TOUR_SYNC_ENABLED:true}
+      # 실행할 잡. 외부에서 바꿀 수 있게 둔다 — 잡이 늘어나도 런처 코드는 그대로다.
+      job: ${IEURI_TOUR_SYNC_JOB:spotSyncJob}
 
       # 스케줄러로 돌릴지, 외부 트리거(CronJob)로 돌릴지.
       # k3s CronJob을 쓰면 스케줄 소유자가 k8s이므로 앱 내부 스케줄러는 꺼야 한다 —
