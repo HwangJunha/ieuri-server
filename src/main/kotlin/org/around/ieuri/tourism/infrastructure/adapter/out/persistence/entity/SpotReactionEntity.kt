@@ -29,6 +29,17 @@ class SpotReactionEntity(
     @Column(name = "member_id", nullable = false)
     var memberId: Long,
 
+    /**
+     * 부모 `spot` 행의 surrogate PK(V19). **참조 무결성과 CASCADE 전용이며 도메인은 이 값을 모른다** —
+     * `SpotReaction`에 대응 필드가 없고, 조회·업서트 판정은 여전히 자연키로 한다.
+     *
+     * 연관(`@ManyToOne`)이 아니라 **plain 컬럼으로 둔다.** 이 값을 읽는 코드가 없어 연관을 걸면
+     * 지연 로딩 프록시와 N+1 위험만 늘고 얻는 것이 없다. 애그리거트 간 참조는 id로 한다는
+     * 프로젝트 규약과도 맞는다.
+     */
+    @Column(name = "spot_id", nullable = false)
+    var spotId: Long,
+
     @Column(name = "content_id", nullable = false, length = 32)
     var contentId: String,
 

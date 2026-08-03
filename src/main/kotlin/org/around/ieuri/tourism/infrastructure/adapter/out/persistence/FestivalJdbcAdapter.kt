@@ -120,20 +120,17 @@ class FestivalJdbcAdapter(
          * `updated_at`은 [SpotJpaAdapter]와 같은 이유로 **실제로 값이 바뀐 경우에만** 올린다.
          * `last_synced_at`은 반대로 항상 갱신한다.
          *
-         * **`ON CONFLICT (content_id, language) WHERE ...`가 아니라 부모 존재 조건을 `SELECT`로
-         * 건다.** `INSERT ... SELECT ... WHERE EXISTS`는 부모 `spot` 행이 없으면 0행을 삽입하므로,
-         * FK 위반 예외 대신 조용한 건너뜀이 된다(R-2·AC-5). 한 건의 부모 없는 축제가 페이지 전체를
-         * 롤백시킬 이유가 없다.
+         * **`VALUES`가 아니라 `SELECT ... FROM spot`으로 삽입한다.** 두 가지를 한 번에 해결한다:
+         * 부모의 surrogate id를 가져오고(V19), 부모가 없으면 0행이 삽입되어 FK 위반 예외 대신
+         * 조용한 건너뜀이 된다(R-2·AC-5). 한 건의 부모 없는 축제가 페이지 전체를 롤백시킬 이유가 없다.
          */
         val UPSERT_SQL = """
             INSERT INTO spot_festival (
-                content_id, language, event_start_date, event_end_date,
+                spot_id, content_id, language, event_start_date, event_end_date,
                 progress_type, festival_type, last_synced_at
             )
-            SELECT ?, ?, ?, ?, ?, ?, ?
-            WHERE EXISTS (
-                SELECT 1 FROM spot s WHERE s.content_id = ? AND s.language = ?
-            )
+            SELECT s.id, ?, ?, ?, ?, ?, ?, ?
+            FROM spot s WHERE s.content_id = ? AND s.language = ?
             ON CONFLICT (content_id, language) DO UPDATE SET
                 event_start_date = EXCLUDED.event_start_date,
                 event_end_date   = EXCLUDED.event_end_date,

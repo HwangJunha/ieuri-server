@@ -1,9 +1,11 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.persistence
 
+import org.around.ieuri.tourism.application.exception.SpotNotFoundException
 import org.around.ieuri.tourism.application.port.out.persistence.SpotReactionPort
 import org.around.ieuri.tourism.domain.aggregate.SpotReaction
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.SpotReactionEntity
+import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.repository.SpotJpaRepository
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.repository.SpotReactionJpaRepository
 import org.springframework.stereotype.Component
 
@@ -17,6 +19,7 @@ import org.springframework.stereotype.Component
 @Component
 class SpotReactionPersistenceAdapter(
     private val repository: SpotReactionJpaRepository,
+    private val spotRepository: SpotJpaRepository,
 ) : SpotReactionPort {
 
     override fun find(memberId: Long, contentId: String, language: DomainLocale): SpotReaction? =
@@ -28,10 +31,16 @@ class SpotReactionPersistenceAdapter(
         )
         if (existing != null) {
             // 관리 엔티티에 도메인 변경을 얹는다(dirty-checking → UPDATE). 자연키는 불변이라 reaction만 갱신.
+            // spot_id도 자연키에 종속이라 불변이므로 건드리지 않는다 — 재조회 비용이 여기서는 들지 않는다.
             existing.reaction = reaction.reaction
-        } else {
-            repository.save(reaction.toNewEntity())
+            return
         }
+        // 신규 생성 시에만 부모 id가 필요하다(V19). 존재하지 않는 관광지에는 반응할 수 없으므로
+        // 부모 부재는 정상 흐름이 아니다 — 조용히 무시하면 사용자에게는 성공으로 보이면서 저장이
+        // 안 되므로, 도메인 예외로 올려 서비스가 SPOT_NOT_FOUND로 표면화하게 한다.
+        val spotId = spotRepository.findIdByContentIdAndLanguage(reaction.contentId, reaction.language)
+            ?: throw SpotNotFoundException()
+        repository.save(reaction.toNewEntity(spotId))
     }
 
     private fun SpotReactionEntity.toDomain(): SpotReaction =
@@ -42,9 +51,11 @@ class SpotReactionPersistenceAdapter(
             reaction = reaction,
         )
 
-    private fun SpotReaction.toNewEntity(): SpotReactionEntity =
+    private fun SpotReaction.toNewEntity(spotId: Long): SpotReactionEntity =
         SpotReactionEntity(
             memberId = memberId,
+            // 도메인에는 없는 값이다 — 부모 참조는 persistence 관심사이므로 매퍼 안에 가둔다(V19).
+            spotId = spotId,
             contentId = contentId,
             language = language,
             reaction = reaction,

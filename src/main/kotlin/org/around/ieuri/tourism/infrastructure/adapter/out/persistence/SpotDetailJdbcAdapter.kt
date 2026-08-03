@@ -24,6 +24,11 @@ import java.sql.PreparedStatement
  *
  * **각 save는 단일 트랜잭션이다**(AC-44). 종료 시점에 절반만 쓰인 상태가 남지 않아야 하며,
  * 갤러리처럼 "삭제 후 삽입"하는 경우 특히 중요하다 — 삭제만 되고 삽입이 안 되면 데이터가 사라진다.
+ *
+ * **삽입은 `VALUES`가 아니라 `SELECT ... FROM spot`이다**(V19). 자식이 부모의 surrogate id를
+ * 참조하게 되면서, 적재 시점에 그 id를 가져와야 하기 때문이다. 부수 효과로 **부모 `spot` 행이 없으면
+ * 0행이 삽입되어 조용히 건너뛴다** — FK 위반으로 조회 요청 전체를 실패시키지 않는다. 상세는 조회된
+ * 것만 누적되는 캐시이므로, 부모가 아직 적재되지 않은 항목은 다음 조회 때 다시 시도되면 그만이다.
  */
 @Component
 class SpotDetailJdbcAdapter(
@@ -60,9 +65,10 @@ class SpotDetailJdbcAdapter(
     override fun saveDetail(contentId: String, locale: DomainLocale, detail: SpotDetail) {
         jdbcTemplate.update(
             """
-            INSERT INTO spot_detail (content_id, language, title, category, thumbnail_image_url,
+            INSERT INTO spot_detail (spot_id, content_id, language, title, category, thumbnail_image_url,
                                      overview, address, homepage, tel, copyright, fetched_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now())
+            SELECT s.id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now()
+            FROM spot s WHERE s.content_id = ? AND s.language = ?
             ON CONFLICT (content_id, language) DO UPDATE SET
                 title = EXCLUDED.title, category = EXCLUDED.category,
                 thumbnail_image_url = EXCLUDED.thumbnail_image_url, overview = EXCLUDED.overview,
@@ -71,6 +77,7 @@ class SpotDetailJdbcAdapter(
             """.trimIndent(),
             contentId, locale.name, detail.title, detail.category.name, detail.thumbnailImageUrl,
             detail.overview, detail.address, detail.homepage, detail.tel, detail.copyright.name,
+            contentId, locale.name,
         )
     }
 
@@ -111,9 +118,10 @@ class SpotDetailJdbcAdapter(
         if (gallery.isEmpty()) return
         jdbcTemplate.batchUpdate(
             """
-            INSERT INTO spot_detail_image (content_id, language, display_order, image_url,
+            INSERT INTO spot_detail_image (spot_id, content_id, language, display_order, image_url,
                                            thumbnail_url, caption, copyright, fetched_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, now())
+            SELECT s.id, ?, ?, ?, ?, ?, ?, ?, now()
+            FROM spot s WHERE s.content_id = ? AND s.language = ?
             ON CONFLICT (content_id, language, display_order) DO UPDATE SET
                 image_url = EXCLUDED.image_url, thumbnail_url = EXCLUDED.thumbnail_url,
                 caption = EXCLUDED.caption, copyright = EXCLUDED.copyright, fetched_at = now()
@@ -129,6 +137,9 @@ class SpotDetailJdbcAdapter(
                     ps.setString(5, image.thumbnailUrl)
                     ps.setString(6, image.caption)
                     ps.setString(7, image.copyright.name)
+                    // 부모 조회용(V19).
+                    ps.setString(8, contentId)
+                    ps.setString(9, locale.name)
                 }
             },
         )
@@ -164,9 +175,10 @@ class SpotDetailJdbcAdapter(
     override fun saveIntro(contentId: String, locale: DomainLocale, category: SpotCategory, intro: SpotIntro?) {
         jdbcTemplate.update(
             """
-            INSERT INTO spot_detail_intro (content_id, language, category, business_hours, closed_days,
+            INSERT INTO spot_detail_intro (spot_id, content_id, language, category, business_hours, closed_days,
                                            parking, inquiry_phone, fee, pet_allowed, credit_card_accepted, fetched_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now())
+            SELECT s.id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now()
+            FROM spot s WHERE s.content_id = ? AND s.language = ?
             ON CONFLICT (content_id, language, category) DO UPDATE SET
                 business_hours = EXCLUDED.business_hours, closed_days = EXCLUDED.closed_days,
                 parking = EXCLUDED.parking, inquiry_phone = EXCLUDED.inquiry_phone,
@@ -176,6 +188,7 @@ class SpotDetailJdbcAdapter(
             """.trimIndent(),
             contentId, locale.name, category.name, intro?.businessHours, intro?.closedDays,
             intro?.parking, intro?.inquiryPhone, intro?.fee, intro?.petAllowed, intro?.creditCardAccepted,
+            contentId, locale.name,
         )
     }
 
@@ -212,8 +225,9 @@ class SpotDetailJdbcAdapter(
         if (items.isEmpty()) return
         jdbcTemplate.batchUpdate(
             """
-            INSERT INTO spot_detail_info (content_id, language, category, display_order, name, text, fetched_at)
-            VALUES (?, ?, ?, ?, ?, ?, now())
+            INSERT INTO spot_detail_info (spot_id, content_id, language, category, display_order, name, text, fetched_at)
+            SELECT s.id, ?, ?, ?, ?, ?, ?, now()
+            FROM spot s WHERE s.content_id = ? AND s.language = ?
             ON CONFLICT (content_id, language, category, display_order) DO UPDATE SET
                 name = EXCLUDED.name, text = EXCLUDED.text, fetched_at = now()
             """.trimIndent(),
@@ -227,6 +241,9 @@ class SpotDetailJdbcAdapter(
                     ps.setInt(4, i)
                     ps.setString(5, item.name)
                     ps.setString(6, item.text)
+                    // 부모 조회용(V19).
+                    ps.setString(7, contentId)
+                    ps.setString(8, locale.name)
                 }
             },
         )
