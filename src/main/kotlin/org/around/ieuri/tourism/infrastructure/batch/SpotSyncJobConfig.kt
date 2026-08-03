@@ -60,12 +60,33 @@ class SpotSyncJobConfig(
 
     @Bean
     fun spotSyncJob(): Job {
-        // KO 먼저 — 데이터가 가장 많고 실측 대상이라 문제가 있으면 여기서 먼저 드러난다.
-        val order = listOf(DomainLocale.KO, DomainLocale.EN, DomainLocale.JA, DomainLocale.ZH)
         // 관광지 4개 언어를 모두 마친 뒤 축제 4개 언어가 온다 — 부모 행이 먼저 있어야 한다(R-2).
-        val steps = order.map(::syncStep) + order.map(::festivalStep)
+        val steps = LANGUAGE_ORDER.map(::syncStep) + LANGUAGE_ORDER.map { festivalStep(it, JOB_NAME) }
         return steps.drop(1)
             .fold(JobBuilder(JOB_NAME, jobRepository).start(steps.first())) { acc, step -> acc.next(step) }
+            .build()
+    }
+
+    /**
+     * **축제 Step만 도는 잡.** `--ieuri.tourapi.sync.job=festivalSyncJob`으로 선택한다.
+     *
+     * 관광지 수집은 4개 언어 전량(약 12만 건)을 훑어 TourAPI 호출을 크게 소모하는데, 축제 정보만
+     * 갱신하면 되는 상황에서 그것까지 다시 돌 이유가 없다. 호출 한도가 빠듯할 때 축제만 선별
+     * 실행하기 위한 경로다.
+     *
+     * **[spotSyncJob]을 대체하지 않는다.** 이 잡은 R-9(종료 축제 재삽입 방지)를 성립시키지 못한다 —
+     * 관광지 수집 Step이 없으므로 제외 집합이 쓰일 자리가 없고, 다음 [spotSyncJob] 실행이
+     * `areaBasedSyncList2`로 종료 축제를 다시 적재할 수 있다. **정기 실행은 여전히 [spotSyncJob]이
+     * 담당하며, 이 잡은 수동 보정용이다.**
+     *
+     * Step 이름에 잡 이름을 접두로 붙여 [spotSyncJob]의 Step과 구분한다. 같은 이름을 쓰면 두 잡이
+     * 같은 `BATCH_STEP_EXECUTION` 이력을 공유해 재개 판정이 서로 간섭한다.
+     */
+    @Bean
+    fun festivalSyncJob(): Job {
+        val steps = LANGUAGE_ORDER.map { festivalStep(it, FESTIVAL_JOB_NAME) }
+        return steps.drop(1)
+            .fold(JobBuilder(FESTIVAL_JOB_NAME, jobRepository).start(steps.first())) { acc, step -> acc.next(step) }
             .build()
     }
 
@@ -97,8 +118,8 @@ class SpotSyncJobConfig(
      * **한 언어의 실패가 다른 언어를 되돌리지 않는다**(R-6·AC-21). Step이 분리되어 있어 앞 언어의
      * 커밋은 그대로 남는다.
      */
-    private fun festivalStep(language: DomainLocale): Step =
-        StepBuilder("festivalSyncStep-${language.name}", jobRepository)
+    private fun festivalStep(language: DomainLocale, jobName: String): Step =
+        StepBuilder("$jobName-festivalStep-${language.name}", jobRepository)
             .tasklet(
                 FestivalSyncTasklet(
                     language = language,
@@ -112,5 +133,11 @@ class SpotSyncJobConfig(
 
     companion object {
         const val JOB_NAME = "spotSyncJob"
+
+        /** 축제 Step만 도는 잡. 정기 실행이 아니라 수동 보정용이다 — [festivalSyncJob] 참조. */
+        const val FESTIVAL_JOB_NAME = "festivalSyncJob"
+
+        /** KO 먼저 — 데이터가 가장 많고 실측 대상이라 문제가 있으면 여기서 먼저 드러난다. */
+        private val LANGUAGE_ORDER = listOf(DomainLocale.KO, DomainLocale.EN, DomainLocale.JA, DomainLocale.ZH)
     }
 }

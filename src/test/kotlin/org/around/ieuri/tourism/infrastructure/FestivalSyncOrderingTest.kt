@@ -40,11 +40,16 @@ class FestivalSyncOrderingTest {
     private val stepNames: List<String>
         get() = (config.spotSyncJob() as SimpleJob).stepNames.toList()
 
+    private val festivalJobStepNames: List<String>
+        get() = (config.festivalSyncJob() as SimpleJob).stepNames.toList()
+
+    private fun isFestivalStep(name: String) = name.contains("-festivalStep-")
+
     @Test
     fun `모든 관광지 Step이 끝난 뒤에 축제 Step이 온다`() {
         // AC-5. 부모 spot 행이 먼저 적재되어야 축제 자식 행이 붙을 수 있다.
         val lastSpot = stepNames.indexOfLast { it.startsWith("syncLanguageStep-") }
-        val firstFestival = stepNames.indexOfFirst { it.startsWith("festivalSyncStep-") }
+        val firstFestival = stepNames.indexOfFirst(::isFestivalStep)
 
         assertTrue(firstFestival > lastSpot, "축제 Step이 관광지 Step보다 먼저 온다: $stepNames")
     }
@@ -52,16 +57,46 @@ class FestivalSyncOrderingTest {
     @Test
     fun `4개 언어 각각에 대해 축제 Step이 하나씩 있다`() {
         // AC-20·R-6. 언어별로 독립 Step이라 한 언어의 실패가 다른 언어를 되돌리지 않는다.
-        val festivalSteps = stepNames.filter { it.startsWith("festivalSyncStep-") }
+        val festivalSteps = stepNames.filter(::isFestivalStep)
 
-        assertEquals(DomainLocale.entries.map { "festivalSyncStep-${it.name}" }.toSet(), festivalSteps.toSet())
+        assertEquals(
+            DomainLocale.entries.map { "${SpotSyncJobConfig.JOB_NAME}-festivalStep-${it.name}" }.toSet(),
+            festivalSteps.toSet(),
+        )
         assertEquals(4, festivalSteps.size)
     }
 
+    // ---------- 축제 선별 실행 잡 ----------
+
     @Test
-    fun `축제 전용 잡을 따로 만들지 않는다`() {
-        // 스펙 §선행 조사·§비범위. 별도 잡이면 두 잡의 정리가 서로의 행을 지우고, 관광지 수집이
-        // 종료 축제를 되살린다 — R-9가 성립하려면 한 잡 안에서 순서가 보장되어야 한다.
+    fun `축제 전용 잡은 축제 Step만 갖는다`() {
+        // 관광지 수집은 4개 언어 전량(약 12만 건)을 훑어 TourAPI 호출을 크게 소모한다.
+        // 축제만 갱신하면 되는 상황에서 그것까지 다시 돌 이유가 없다.
+        assertEquals(SpotSyncJobConfig.FESTIVAL_JOB_NAME, config.festivalSyncJob().name)
+        assertEquals(4, festivalJobStepNames.size)
+        assertTrue(
+            festivalJobStepNames.all(::isFestivalStep),
+            "축제 전용 잡에 관광지 Step이 섞였다: $festivalJobStepNames",
+        )
+    }
+
+    @Test
+    fun `두 잡의 Step 이름이 겹치지 않는다`() {
+        // 같은 이름을 쓰면 두 잡이 같은 BATCH_STEP_EXECUTION 이력을 공유해 재개 판정이 서로
+        // 간섭한다 — 한 잡이 완료 표시한 Step을 다른 잡이 건너뛴다.
+        assertTrue(
+            stepNames.intersect(festivalJobStepNames.toSet()).isEmpty(),
+            "Step 이름 충돌: ${stepNames.intersect(festivalJobStepNames.toSet())}",
+        )
+    }
+
+    @Test
+    fun `정기 실행 잡은 관광지와 축제를 한 잡에서 순서대로 돈다`() {
+        // 스펙 §선행 조사·§비범위. 정기 실행을 두 잡으로 나누면 각자의 정리가 서로의 행을 지우고,
+        // 관광지 수집이 종료 축제를 되살린다 — R-9가 성립하려면 한 잡 안에서 순서가 보장되어야 한다.
+        //
+        // festivalSyncJob은 이 결정을 뒤집지 않는다. **정기 실행이 아니라 수동 보정용**이며,
+        // 그 잡만 돌면 R-9가 성립하지 않는다는 점을 festivalSyncJob의 KDoc이 명시한다.
         assertEquals(SpotSyncJobConfig.JOB_NAME, config.spotSyncJob().name)
         assertEquals(8, stepNames.size)
     }
