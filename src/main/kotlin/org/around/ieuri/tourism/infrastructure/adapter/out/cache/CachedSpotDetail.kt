@@ -19,7 +19,6 @@ import org.around.ieuri.tourism.domain.vo.SpotIntro
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class CachedSpotDetail(
-    val id: String = "",
     val title: String = "",
     val category: SpotCategory = SpotCategory.TOURIST_SPOT,
     val thumbnailImageUrl: String = "",

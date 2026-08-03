@@ -1,7 +1,6 @@
 package org.around.ieuri.tourism.application.port.out.persistence
 
 import org.around.ieuri.tourism.domain.aggregate.SpotDetail
-import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.tourism.domain.vo.SpotImage
 import org.around.ieuri.tourism.domain.vo.SpotInfoItem

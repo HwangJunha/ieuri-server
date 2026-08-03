@@ -1,10 +1,9 @@
 package org.around.ieuri.tourism.application.port.out.persistence
 
 import org.around.ieuri.tourism.domain.aggregate.SpotReaction
-import org.around.ieuri.tourism.domain.vo.DomainLocale
 
 /**
- * 좋아요/싫어요 저장 아웃바운드 포트. 식별 단위는 (memberId, contentId, language).
+ * 좋아요/싫어요 저장 아웃바운드 포트. 식별 단위는 (memberId, spotId).
  * 재평가는 같은 키에 대한 upsert(덮어쓰기)이며 이력을 남기지 않는다(AC-13).
  */
 interface SpotReactionPort {

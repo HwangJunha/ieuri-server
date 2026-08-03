@@ -16,6 +16,7 @@ import org.around.ieuri.tourism.application.event.SpotInfoItemsFetched
 import org.around.ieuri.tourism.application.event.SpotIntroFetched
 import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
 import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch
+import org.around.ieuri.tourism.application.port.out.query.SpotIdentity
 import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
 import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
 import org.around.ieuri.tourism.application.query.SpotDetailView
@@ -108,6 +109,7 @@ class SpotQueryService(
      * 갤러리·운영정보·이용안내·좋아요 수는 각 필드가 요청될 때 아래 메서드로 따로 조회한다.
      */
     override fun spotDetail(spotId: Long, locale: DomainLocale): SpotDetailView {
+        val identity = resolve(spotId, locale)
         spotCachePort.getDetail(spotId)?.let { return it.toView(spotId) }
 
         // DB 히트: Valkey를 충전하고 upstream은 건드리지 않는다(AC-35).
@@ -117,13 +119,14 @@ class SpotQueryService(
         }
 
         // 양쪽 미스: upstream 조회 후 캐시 충전 + 적재 이벤트 발행(AC-36·AC-39).
-        val fetched = tourInfoPort.findDetail(query(spotId, locale))
+        val fetched = tourInfoPort.findDetail(identity.toQuery(locale))
         spotCachePort.putDetail(spotId, fetched)
         eventPublisher.publish(SpotDetailFetched(spotId, fetched))
         return fetched.toView(spotId)
     }
 
     override fun spotGallery(spotId: Long, locale: DomainLocale): List<SpotImageView> {
+        val identity = resolve(spotId, locale)
         spotCachePort.getGallery(spotId)?.let { return it.map { image -> image.toView() } }
 
         spotDetailStorePort.findGallery(spotId)?.let { stored ->
@@ -131,13 +134,14 @@ class SpotQueryService(
             return stored.map { it.toView() }
         }
 
-        val fetched = tourInfoPort.findGallery(query(spotId, locale))
+        val fetched = tourInfoPort.findGallery(identity.toQuery(locale))
         spotCachePort.putGallery(spotId, fetched)
         eventPublisher.publish(SpotGalleryFetched(spotId, fetched))
         return fetched.map { it.toView() }
     }
 
     override fun spotIntro(spotId: Long, category: SpotCategory, locale: DomainLocale): SpotIntroView? {
+        val identity = resolve(spotId, locale)
         // 히트 판정은 래퍼(non-null)로 한다 — 값 자체는 정상적으로 null일 수 있어, value로 판정하면
         // "값 없음"이 매번 캐시 미스로 취급돼 upstream을 계속 두드리게 된다.
         val cached = spotCachePort.getIntro(spotId, category)
@@ -150,7 +154,7 @@ class SpotQueryService(
             return stored.value?.toView()
         }
 
-        val intro = tourInfoPort.findIntro(query(spotId, locale), category)
+        val intro = tourInfoPort.findIntro(identity.toQuery(locale), category)
         spotCachePort.putIntro(spotId, category, intro)
         eventPublisher.publish(SpotIntroFetched(spotId, category, intro))
         return intro?.toView()
@@ -161,6 +165,7 @@ class SpotQueryService(
         category: SpotCategory,
         locale: DomainLocale,
     ): List<SpotInfoItemView> {
+        val identity = resolve(spotId, locale)
         spotCachePort.getInfoItems(spotId, category)
             ?.let { return it.map { item -> SpotInfoItemView(item.name, item.text) } }
 
@@ -169,7 +174,7 @@ class SpotQueryService(
             return stored.map { SpotInfoItemView(it.name, it.text) }
         }
 
-        val fetched = tourInfoPort.findInfoItems(query(spotId, locale), category)
+        val fetched = tourInfoPort.findInfoItems(identity.toQuery(locale), category)
         spotCachePort.putInfoItems(spotId, category, fetched)
         eventPublisher.publish(SpotInfoItemsFetched(spotId, category, fetched))
         return fetched.map { SpotInfoItemView(it.name, it.text) }
@@ -183,21 +188,25 @@ class SpotQueryService(
     override fun spotLikeCount(spotId: Long): Long = spotQueryPort.countLikes(spotId)
 
     /**
-     * upstream 조회 좌표를 만든다. **`spot.id` → `contentId` 해석과 언어 검증이 여기서 일어난다.**
+     * `spot.id`를 해석하고 **요청 언어와 일치하는지 검증한다.**
      *
-     * 이 변환이 필요한 이유는 외부 식별자와 upstream 식별자가 분리됐기 때문이다 — TourAPI는 우리 PK를
-     * 모른다. 캐시·DB가 모두 미스일 때만 호출되므로 추가 조회는 그 경로에만 든다.
+     * **캐시·DB를 보기 전에 호출해야 한다.** 검증을 upstream 폴백 직전에 두면 캐시 히트·DB 히트에서
+     * 그대로 통과해, 정작 흔한 경로에서 교차 언어 콘텐츠가 나간다. `spot_detail`과 캐시 키 모두
+     * 언어를 들지 않으므로(V20) 그 단계에서는 언어를 스스로 판별할 수 없다.
      *
-     * **요청 언어와 다른 언어의 id는 존재하지 않는 것으로 취급한다.** 클라이언트가 언어를 바꾸면
-     * 목록을 다시 받아야 하며, 이전 언어의 id로 상세를 요청하는 것은 버그다. 조용히 다른 언어
-     * 콘텐츠를 돌려주면 그 버그가 드러나지 않는다.
+     * 요청 언어와 다른 언어의 id는 **존재하지 않는 것으로 취급한다.** 클라이언트가 언어를 바꾸면
+     * 목록을 다시 받아야 하며, 이전 언어의 id로 상세를 요청하는 것은 버그다 — 조용히 다른 언어를
+     * 돌려주면 그 버그가 드러나지 않는다.
      */
-    private fun query(spotId: Long, locale: DomainLocale): SpotDetailQuery {
-        val identity = spotQueryPort.findIdentity(spotId)
-            ?: throw SpotDetailNotFoundException()
+    private fun resolve(spotId: Long, locale: DomainLocale): SpotIdentity {
+        val identity = spotQueryPort.findIdentity(spotId) ?: throw SpotDetailNotFoundException()
         if (identity.language != locale) throw SpotDetailNotFoundException()
-        return SpotDetailQuery(contentId = identity.contentId, locale = locale)
+        return identity
     }
+
+    /** upstream 조회 좌표. TourAPI는 우리 PK를 모르므로 해석된 contentId로 묻는다. */
+    private fun SpotIdentity.toQuery(locale: DomainLocale) =
+        SpotDetailQuery(contentId = contentId, locale = locale)
 
     private fun validatedCenter(latitude: Double, longitude: Double): Coordinates =
         try {

@@ -345,7 +345,6 @@ class SpotQueryServiceTest {
     // ── spotDetail(SPEC-0003) ───────────────────────────────────────
 
     private fun detail(likeCount: Long = 0) = SpotDetail(
-        id = 100L,
         title = "경복궁",
         category = SpotCategory.TOURIST_SPOT,
         thumbnailImageUrl = "https://img/100.jpg",
@@ -441,6 +440,35 @@ class SpotQueryServiceTest {
 
         assertFailsWith<SpotDetailNotFoundException> { service.spotDetail(777L, DomainLocale.KO) }
         verify(exactly = 0) { tourInfoPort.findDetail(any()) }
+    }
+
+    @Test
+    fun `캐시가 히트해도 언어가 다르면 거부한다`() {
+        // **회귀 방지.** 언어 검증을 upstream 폴백 직전에 두면 캐시 히트에서 그대로 통과해,
+        // 정작 가장 흔한 경로에서 교차 언어 콘텐츠가 나간다. spot_detail과 캐시 키 모두 언어를
+        // 들지 않으므로(V20) 그 단계에서는 스스로 판별할 수 없다.
+        every { spotQueryPort.findIdentity(777L) } returns
+            SpotIdentity(contentId = "ta-999", language = DomainLocale.EN)
+        every { spotCachePort.getDetail(777L) } returns detail()
+
+        assertFailsWith<SpotDetailNotFoundException> { service.spotDetail(777L, DomainLocale.KO) }
+    }
+
+    @Test
+    fun `지연 필드도 언어가 다르면 거부한다`() {
+        // 갤러리·운영정보·이용안내가 각각 독립 진입점이라 전부 검증해야 한다 —
+        // 하나라도 빠지면 그 필드만 교차 언어로 새어 나간다.
+        every { spotQueryPort.findIdentity(777L) } returns
+            SpotIdentity(contentId = "ta-999", language = DomainLocale.EN)
+        every { spotCachePort.getGallery(777L) } returns emptyList()
+
+        assertFailsWith<SpotDetailNotFoundException> { service.spotGallery(777L, DomainLocale.KO) }
+        assertFailsWith<SpotDetailNotFoundException> {
+            service.spotIntro(777L, SpotCategory.TOURIST_SPOT, DomainLocale.KO)
+        }
+        assertFailsWith<SpotDetailNotFoundException> {
+            service.spotInfoItems(777L, SpotCategory.TOURIST_SPOT, DomainLocale.KO)
+        }
     }
 
     @Test

@@ -24,7 +24,7 @@ interface SpotQueryPort {
     fun countNearby(query: NearbySpotSearch): Int
 
     /**
-     * 이 회원이 (현재 언어에서) 이미 반응한 contentId 전체.
+     * 이 회원이 (현재 언어에서) 이미 반응한 `spot.id` 전체.
      *
      * SPEC-0002에서는 upstream이 준 후보로 범위를 좁혔지만(IN), 이제는 제외를 **DB 조회 단계에**
      * 넘겨야 해서(그래야 페이지가 size보다 작아지지 않는다) 후보를 미리 알 수 없다.
@@ -33,8 +33,8 @@ interface SpotQueryPort {
     fun findReactedSpotIds(memberId: Long, language: DomainLocale): Set<Long>
 
     /**
-     * 이 contentId·언어에 대한 LIKE 반응 수(SPEC-0003 §5). DISLIKE는 세지 않고, 언어를 넘어 합산하지 않는다
-     * (키가 (content_id, language)라 언어별 분리 — SPEC-0002의 알려진 한계 상속). 반응이 없으면 0.
+     * 이 `spot.id`에 대한 LIKE 반응 수(SPEC-0003 §5). DISLIKE는 세지 않는다. **언어 조건이 없다** —
+     * spotId가 이미 언어별이므로 언어를 다시 거르면 중복이다(V20). 반응이 없으면 0.
      * 상세 조회 시 캐시와 무관하게 매번 실시간 집계한다(likeCount는 캐시 비대상).
      */
     fun countLikes(spotId: Long): Long

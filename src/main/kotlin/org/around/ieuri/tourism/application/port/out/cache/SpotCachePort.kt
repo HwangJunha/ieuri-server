@@ -1,7 +1,6 @@
 package org.around.ieuri.tourism.application.port.out.cache
 
 import org.around.ieuri.tourism.domain.aggregate.SpotDetail
-import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.tourism.domain.vo.SpotImage
 import org.around.ieuri.tourism.domain.vo.SpotInfoItem
@@ -14,8 +13,7 @@ import org.around.ieuri.tourism.domain.vo.SpotIntro
  *
  * 캐시 대상은 **TourAPI 파생 필드**뿐이며, likeCount는 담지 않는다(매 조회 실시간 집계 — AC-14).
  * 캐시는 최적화지 정합성 소스가 아니다. 구현체는 저장소 장애를 삼키고(get→null, put→무시) upstream 폴백을
- * 허용해야 한다. 키는 (오퍼레이션, contentId, language[, category]) — contentId가 언어별로 갈리므로 언어를
- * 포함한다(AC-19). intro·info는 카테고리가 응답을 가르므로 키에 함께 넣는다.
+ * 허용해야 한다. 키는 (오퍼레이션[, category], spotId) 조합이다 — spotId가 이미 언어별이라 언어를 따로 넣지 않는다. * 포함한다(AC-19). intro·info는 카테고리가 응답을 가르므로 키에 함께 넣는다.
  */
 interface SpotCachePort {
     /** 상세 본문. 미스·장애면 null. */

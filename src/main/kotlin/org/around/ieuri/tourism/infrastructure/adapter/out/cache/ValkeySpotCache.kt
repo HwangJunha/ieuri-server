@@ -18,7 +18,7 @@ import java.time.Duration
 /**
  * Valkey 기반 관광지 캐시(SPEC-0003 §4). auth의 refresh 토큰 저장소와 동일 인스턴스를 쓴다(신규 인프라 아님).
  *
- *  - **오퍼레이션별 키**: `ieuri:tourism:spot:{op}:{language}[:{category}]:{contentId}`.
+ *  - **오퍼레이션별 키**: `ieuri:tourism:spot:{op}:{language}[:{category}]:{spotId}`.
  *    필드별 지연 조회와 짝을 맞춰 부분 히트가 가능하다. TTL 24h(AC-20).
  *  - **likeCount는 담지 않는다** — 캐시되는 SpotDetail 본문에 애초에 반응 수가 없다(AC-14).
  *  - **에러는 캐시하지 않는다**: 조회 실패는 예외로 전파되므로 put이 호출되지 않는다.
@@ -91,7 +91,7 @@ class ValkeySpotCache(
      * 캐시 키. **언어 세그먼트가 없다** — [spotId]가 이미 언어별로 갈리므로(같은 장소의 다른 언어는
      * 다른 `spot.id`) 언어를 다시 넣으면 중복이다.
      *
-     * 프리픽스에 `v2`가 붙는다. 식별자가 TourAPI contentId에서 `spot.id`로 바뀌면서 **같은 키 모양에
+     * 프리픽스에 `v2`가 붙는다. 식별자가 TourAPI spotId에서 `spot.id`로 바뀌면서 **같은 키 모양에
      * 다른 의미가 담기게 되므로**, 옛 항목이 새 키로 잘못 읽히지 않도록 네임스페이스를 분리한다.
      * 남은 v1 항목은 TTL(24h)로 자연 소멸한다.
      */
