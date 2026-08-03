@@ -17,10 +17,16 @@
 # 여기에는 **배치일 때만 달라지는 값**만 둔다.
 
 spring:
-  # spring.batch.* 설정은 여기 두지 않는다 — Boot 4에서 spring.batch.jdbc.*와
-  # spring.batch.job.enabled가 사라졌고, 남은 키는 spring.batch.job.name 하나뿐이다.
-  # 메타데이터 저장소는 BatchInfrastructureConfig가 @EnableJdbcJobRepository로 명시한다.
-  # 메타 테이블 스키마는 여전히 Flyway 소유다(V14) — Batch가 자체 초기화하지 않는다.
+  batch:
+    job:
+      # 부팅 시 자동 실행하지 않는다. 실행할 잡은 SpotSyncLauncher가 ieuri.tourapi.sync.job으로
+      # 선택한다 — 잡이 spotSyncJob·festivalSyncJob 둘이므로, 이걸 켜 두면 Boot가 어느 것을
+      # 돌릴지 몰라 기동이 실패한다("Job name must be specified in case of multiple jobs").
+      # application.yaml에서 이미 끄지만, 배치 프로세스에서 특히 중요하므로 여기서도 명시한다.
+      enabled: false
+
+  # spring.batch.jdbc.*는 두지 않는다 — Boot 4에 없는 키다. 메타데이터 저장소는
+  # BatchInfrastructureConfig의 @EnableJdbcJobRepository가 정하고, 스키마는 Flyway 소유다(V14).
 
   # 배치는 HTTP 표면을 갖지 않는다(POL-021: 배치는 내부 잡). CronJob으로 뜨는 파드가
   # 포트를 잡으면 API 파드와 충돌하고, 열어 둘 이유도 없다.

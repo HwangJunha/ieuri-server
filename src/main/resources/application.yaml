@@ -19,15 +19,23 @@ spring:
       # 스키마 소유권은 Flyway. Hibernate는 엔티티↔스키마 검증만 한다.
       ddl-auto: validate
     open-in-view: false
-  # spring.batch.jdbc.*·spring.batch.job.enabled를 두지 않는다 — **Boot 4에 존재하지 않는 키다.**
-  # Boot 4의 BatchProperties에는 spring.batch.job.name 하나만 남아 있어, 나머지는 오타처럼 조용히
-  # 무시된다. 실제로 initialize-schema: never가 무시되는 줄 모른 채 "메타 스키마는 Flyway가
-  # 소유한다"고 믿고 있었다.
-  #
-  # 두 설정이 담당하던 일은 이제 코드가 명시한다:
-  #   - 메타데이터 저장소   → BatchInfrastructureConfig의 @EnableJdbcJobRepository
-  #   - 부팅 시 자동 실행 안 함 → 잡 빈이 batch 프로파일에서만 생성되고, 실행은 SpotSyncLauncher가
-  #                              명시적으로 트리거한다(k8s CronJob이 시점을 소유)
+  batch:
+    job:
+      # **부팅 시 잡을 자동 실행하지 않는다.** 실행 시점과 대상은 SpotSyncLauncher가 소유한다
+      # (k8s CronJob이 트리거). 이걸 끄지 않으면 Boot의 BatchJobLauncherAutoConfiguration이
+      # 등록된 잡을 부팅 즉시 돌리고, **잡이 둘 이상이면** 어느 것을 돌릴지 몰라
+      # "Job name must be specified in case of multiple jobs"로 기동 자체가 실패한다.
+      #
+      # 이 키는 Boot 4에도 살아 있다 — BatchProperties에는 name 필드밖에 없지만,
+      # BatchJobLauncherAutoConfiguration이
+      # @ConditionalOnBooleanProperty(name="spring.batch.job.enabled", matchIfMissing=true)로
+      # 직접 읽는다. 기본값이 true이므로 명시적으로 꺼야 한다.
+      enabled: false
+
+  # spring.batch.jdbc.*는 두지 않는다 — **Boot 4에 존재하지 않는 키다.** initialize-schema: never가
+  # 조용히 무시되는 줄 모른 채 "메타 스키마는 Flyway가 소유한다"고 믿고 있었고, 실제 저장소는
+  # 인메모리였다. 메타데이터 저장소는 이제 BatchInfrastructureConfig가
+  # @EnableJdbcJobRepository로 명시한다. 스키마는 여전히 Flyway 소유다(V14).
   flyway:
     enabled: true
     locations: classpath:db/migration
