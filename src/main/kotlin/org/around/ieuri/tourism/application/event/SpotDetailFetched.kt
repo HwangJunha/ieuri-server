@@ -19,6 +19,22 @@ data class SpotDetailFetched(
     val detail: SpotDetail,
 )
 
+/**
+ * upstream에 상세 본문이 **없음을 확인했을 때** 발행되는 이벤트(SPEC-0008 R-3).
+ *
+ * [SpotDetailFetched]와 별도 이벤트인 이유는 적재 방식이 다르기 때문이다 — 부재는 본문 컬럼을
+ * null로 두고 `body_absent`를 세우며, NOT NULL 컬럼은 [fallback](= `spot` 행의 값)으로 채운다.
+ * 한 이벤트에 플래그로 담으면 리스너가 매번 분기해야 하고, "부재를 적재한다"는 사실이 타입에서
+ * 사라진다.
+ *
+ * **실패 시에는 발행하지 않는다**(AC-16·AC-4). 장애는 부재의 재확인이 아니므로 신선도 창을
+ * 연장해서는 안 된다 — 예외가 그대로 전파되어 이 지점에 도달하지 않는다.
+ */
+data class SpotDetailAbsent(
+    val spotId: Long,
+    val fallback: SpotDetail,
+)
+
 data class SpotGalleryFetched(
     val spotId: Long,
     val gallery: List<SpotImage>,

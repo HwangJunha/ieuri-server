@@ -9,19 +9,29 @@ import org.around.ieuri.tourism.application.exception.InvalidCoordinatesExceptio
 import org.around.ieuri.tourism.application.exception.RadiusTooLargeException
 import org.around.ieuri.tourism.application.exception.SpotDetailNotFoundException
 import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
+import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.common.pagination.CursorPageInfo
+import org.around.ieuri.tourism.application.port.out.cache.CachedDetail
 import org.around.ieuri.tourism.application.port.out.cache.CachedIntro
 import org.around.ieuri.tourism.application.port.out.cache.SpotCachePort
 import org.around.ieuri.tourism.application.port.out.client.SpotDetailQuery
 import org.around.ieuri.tourism.application.port.out.client.TourInfoPort
 import org.around.ieuri.tourism.application.port.out.persistence.SpotDetailStorePort
+import org.around.ieuri.tourism.application.port.out.persistence.StoredDetail
 import org.around.ieuri.tourism.application.port.out.persistence.StoredIntro
+import org.around.ieuri.tourism.application.event.SpotDetailAbsent
 import org.around.ieuri.tourism.application.event.SpotDetailFetched
 import org.around.ieuri.tourism.application.event.SpotGalleryFetched
+import org.around.ieuri.tourism.application.exception.UpstreamUnavailableException
 import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
+import org.around.ieuri.tourism.application.port.out.query.LikedSpotsSearch
 import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch
+import org.around.ieuri.tourism.application.port.out.query.SpotBasics
 import org.around.ieuri.tourism.application.port.out.query.SpotIdentity
 import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
 import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
+import org.around.ieuri.tourism.application.query.LikedSpotView
+import org.around.ieuri.tourism.application.query.LikedSpotsQuery
 import org.around.ieuri.tourism.application.query.SpotsQuery
 import org.around.ieuri.tourism.domain.aggregate.SpotDetail
 import org.around.ieuri.tourism.domain.vo.Coordinates
@@ -31,6 +41,8 @@ import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.tourism.domain.vo.SpotImage
 import org.around.ieuri.tourism.domain.vo.SpotInfoItem
 import org.around.ieuri.tourism.domain.vo.SpotIntro
+import java.time.Duration
+import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -49,6 +61,8 @@ class SpotQueryServiceTest {
     private val policy = SpotQueryPolicy(
         maxRadiusMeters = 100_000,
         maxPageSize = 100,
+        maxLikedPageSize = 100,
+        detailAbsenceTtl = Duration.ofDays(7),
     )
     private val service = SpotQueryService(
         tourInfoPort, spotQueryPort, spotCachePort, spotDetailStorePort, eventPublisher, policy,
@@ -67,6 +81,9 @@ class SpotQueryServiceTest {
         // 기본: 캐시 미스 + 저장 성공. 캐시 히트 검증은 개별 테스트에서 override.
         every { spotCachePort.getDetail(any()) } returns null
         every { spotCachePort.putDetail(any(), any()) } returns Unit
+        every { spotCachePort.putDetailAbsence(any(), any()) } returns Unit
+        // 부재 응답 구성용 spot 값(R-2). 부재를 다루지 않는 테스트에도 있어야 무해하다.
+        every { spotQueryPort.findSpotBasics(any()) } answers { basics() }
         every { spotCachePort.getGallery(any()) } returns null
         every { spotCachePort.putGallery(any(), any()) } returns Unit
         every { spotCachePort.getIntro(any(), any()) } returns null
@@ -94,6 +111,35 @@ class SpotQueryServiceTest {
         category = SpotCategory.TOURIST_SPOT,
         copyright = CopyrightType.UNSPECIFIED,
         distanceMeters = distanceMeters,
+    )
+
+    /** `spot` 행이 보유한 값 — 본문 부재 시 응답을 구성하는 재료(R-2). */
+    private fun basics(address: String? = "서울 종로구") = SpotBasics(
+        title = "경복궁",
+        address = address,
+        thumbnailImageUrl = "https://img/100.jpg",
+        category = SpotCategory.TOURIST_SPOT,
+        copyright = CopyrightType.TYPE1,
+    )
+
+    /** 적재된 본문(존재). */
+    private fun stored(detail: SpotDetail = detail()) =
+        StoredDetail(detail = detail, bodyAbsent = false, fetchedAt = Instant.now())
+
+    /** 적재된 부재 행. [age]로 신선도 경과를 만든다. */
+    private fun storedAbsence(age: Duration = Duration.ZERO) = StoredDetail(
+        detail = SpotDetail(
+            title = "경복궁",
+            category = SpotCategory.TOURIST_SPOT,
+            thumbnailImageUrl = "https://img/100.jpg",
+            overview = null,
+            address = "서울 종로구",
+            homepage = null,
+            tel = null,
+            copyright = CopyrightType.TYPE1,
+        ),
+        bodyAbsent = true,
+        fetchedAt = Instant.now().minus(age),
     )
 
     private fun image() = SpotImage(
@@ -253,7 +299,7 @@ class SpotQueryServiceTest {
 
     @Test
     fun `Valkey 히트면 DB와 TourAPI를 모두 호출하지 않는다(AC-34)`() {
-        every { spotCachePort.getDetail(100L) } returns detail()
+        every { spotCachePort.getDetail(100L) } returns CachedDetail(detail(), bodyAbsent = false)
 
         service.spotDetail(100L, DomainLocale.KO)
 
@@ -263,7 +309,7 @@ class SpotQueryServiceTest {
 
     @Test
     fun `Valkey 미스에 DB 히트면 TourAPI를 치지 않고 Valkey를 충전한다(AC-35)`() {
-        every { spotDetailStorePort.findDetail(100L) } returns detail()
+        every { spotDetailStorePort.findDetail(100L) } returns stored()
 
         val result = service.spotDetail(100L, DomainLocale.KO)
 
@@ -286,7 +332,7 @@ class SpotQueryServiceTest {
     @Test
     fun `DB 히트 시에는 이벤트를 발행하지 않는다`() {
         // 이미 적재된 것을 또 발행하면 큐가 불필요하게 찬다.
-        every { spotDetailStorePort.findDetail(100L) } returns detail()
+        every { spotDetailStorePort.findDetail(100L) } returns stored()
 
         service.spotDetail(100L, DomainLocale.KO)
 
@@ -387,7 +433,7 @@ class SpotQueryServiceTest {
 
     @Test
     fun `AC-19 - 본문 캐시 히트면 upstream을 호출하지 않는다`() {
-        every { spotCachePort.getDetail(100L) } returns detail()
+        every { spotCachePort.getDetail(100L) } returns CachedDetail(detail(), bodyAbsent = false)
 
         service.spotDetail(100L, DomainLocale.KO)
 
@@ -449,7 +495,7 @@ class SpotQueryServiceTest {
         // 들지 않으므로(V20) 그 단계에서는 스스로 판별할 수 없다.
         every { spotQueryPort.findIdentity(777L) } returns
             SpotIdentity(contentId = "ta-999", language = DomainLocale.EN)
-        every { spotCachePort.getDetail(777L) } returns detail()
+        every { spotCachePort.getDetail(777L) } returns CachedDetail(detail(), bodyAbsent = false)
 
         assertFailsWith<SpotDetailNotFoundException> { service.spotDetail(777L, DomainLocale.KO) }
     }
@@ -566,5 +612,332 @@ class SpotQueryServiceTest {
     fun `AC-12 - 반응이 없으면 좋아요 수는 0`() {
         every { spotQueryPort.countLikes(any()) } returns 0L
         assertEquals(0L, service.spotLikeCount(100L))
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // SPEC-0008 : 상세 본문 부재 (R-1 ~ R-4)
+    //
+    // 이 절의 핵심 주장은 하나다 — **부재와 실패는 다른 것이다.** 부재는 다시 물어도 결과가 같은
+    // 사실이라 적재하고 성공으로 응답하고, 실패는 다음엔 될 수 있으므로 적재하지 않고 표면화한다.
+    // ══════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `AC-1 - 본문이 부재해도 예외 없이 SpotDetail을 반환한다`() {
+        every { tourInfoPort.findDetail(any()) } returns null
+
+        val view = service.spotDetail(100L, DomainLocale.KO)
+
+        assertEquals(100L, view.id)
+        assertEquals("경복궁", view.title)
+    }
+
+    @Test
+    fun `AC-2 - 본문 부재는 SPOT_NOT_FOUND가 아니다`() {
+        // 부재는 오류가 아니라 성공 경로다. 이 둘을 섞으면 클라이언트가 "spot이 없음"과
+        // "상세만 없음"을 구분할 수 없고, 후자는 축약 화면으로 정상 렌더되어야 한다.
+        every { tourInfoPort.findDetail(any()) } returns null
+
+        service.spotDetail(100L, DomainLocale.KO) // 예외가 나면 실패
+    }
+
+    @Test
+    fun `AC-3 - spot 자체가 없으면 SPOT_NOT_FOUND다`() {
+        // 본문 부재와 id 미해석은 서로 다른 경로다.
+        every { spotQueryPort.findIdentity(404L) } returns null
+
+        assertFailsWith<SpotDetailNotFoundException> { service.spotDetail(404L, DomainLocale.KO) }
+    }
+
+    @Test
+    fun `AC-4 - 포트가 예외를 던지면 부재로 적재하지 않고 실패로 표면화한다`() {
+        // **이 스펙에서 가장 중요한 경계다.** 일시적 장애를 부재로 적재하면 신선도 기준이 지날
+        // 때까지 데이터가 복구되지 않는다.
+        every { tourInfoPort.findDetail(any()) } throws UpstreamUnavailableException("upstream down")
+
+        assertFailsWith<UpstreamUnavailableException> { service.spotDetail(100L, DomainLocale.KO) }
+
+        verify(exactly = 0) { eventPublisher.publish(ofType(SpotDetailAbsent::class)) }
+        verify(exactly = 0) { spotCachePort.putDetailAbsence(any(), any()) }
+    }
+
+    @Test
+    fun `AC-5·AC-6 - 부재 시 응답은 spot 행의 값으로 구성된다`() {
+        every { tourInfoPort.findDetail(any()) } returns null
+
+        val view = service.spotDetail(100L, DomainLocale.KO)
+
+        assertEquals("경복궁", view.title)
+        assertEquals(SpotCategory.TOURIST_SPOT, view.category)
+        assertEquals("https://img/100.jpg", view.thumbnailImageUrl)
+        assertEquals(CopyrightType.TYPE1, view.copyright)
+        // attributionText는 copyright에서 도출되므로 부재 시에도 값이 있다.
+        assertEquals(CopyrightType.TYPE1.attributionText, view.attributionText)
+    }
+
+    @Test
+    fun `AC-7 - 부재 시 overview·homepage·tel은 null이다`() {
+        every { tourInfoPort.findDetail(any()) } returns null
+
+        val view = service.spotDetail(100L, DomainLocale.KO)
+
+        assertNull(view.overview)
+        assertNull(view.homepage)
+        assertNull(view.tel)
+    }
+
+    @Test
+    fun `AC-8 - spot의 address가 null이어도 부재 조회는 성공한다`() {
+        every { spotQueryPort.findSpotBasics(any()) } returns basics(address = null)
+        every { tourInfoPort.findDetail(any()) } returns null
+
+        val view = service.spotDetail(100L, DomainLocale.KO)
+
+        assertNull(view.address)
+        assertEquals("경복궁", view.title)
+    }
+
+    @Test
+    fun `AC-9 - 부재가 적재된 spot은 upstream을 다시 호출하지 않는다`() {
+        // 부재 적재의 존재 이유 그 자체 — 없는 데이터를 매 조회마다 다시 묻지 않는다.
+        every { spotDetailStorePort.findDetail(100L) } returns storedAbsence()
+
+        val view = service.spotDetail(100L, DomainLocale.KO)
+
+        assertNull(view.overview)
+        verify(exactly = 0) { tourInfoPort.findDetail(any()) }
+    }
+
+    @Test
+    fun `AC-10 - 한 번도 조회되지 않은 spot은 upstream을 호출한다`() {
+        // 행 없음(미조회)과 행 있음+부재는 다른 상태다.
+        every { spotDetailStorePort.findDetail(100L) } returns null
+        every { tourInfoPort.findDetail(any()) } returns detail()
+
+        service.spotDetail(100L, DomainLocale.KO)
+
+        verify(exactly = 1) { tourInfoPort.findDetail(any()) }
+    }
+
+    @Test
+    fun `AC-11 - 부재와 미조회는 서로 다른 상태로 구분된다`() {
+        // 미조회 → upstream을 친다.
+        every { spotDetailStorePort.findDetail(1L) } returns null
+        every { tourInfoPort.findDetail(any()) } returns detail()
+        service.spotDetail(1L, DomainLocale.KO)
+        verify(exactly = 1) { tourInfoPort.findDetail(any()) }
+
+        // 부재 적재됨 → 치지 않는다. 둘을 같은 null로 표현했다면 이 구분이 불가능하다.
+        every { spotDetailStorePort.findDetail(2L) } returns storedAbsence()
+        service.spotDetail(2L, DomainLocale.KO)
+        verify(exactly = 1) { tourInfoPort.findDetail(any()) } // 늘지 않았다
+    }
+
+    @Test
+    fun `AC-12 - 신선도 기준 이전이면 여전히 부재로 응답한다`() {
+        every { spotDetailStorePort.findDetail(100L) } returns storedAbsence(age = Duration.ofDays(3))
+
+        val view = service.spotDetail(100L, DomainLocale.KO)
+
+        assertNull(view.overview)
+        verify(exactly = 0) { tourInfoPort.findDetail(any()) }
+    }
+
+    @Test
+    fun `AC-13 - 부재의 신선도가 지나면 upstream에 다시 묻는다`() {
+        every { spotDetailStorePort.findDetail(100L) } returns storedAbsence(age = Duration.ofDays(8))
+        every { tourInfoPort.findDetail(any()) } returns null
+
+        service.spotDetail(100L, DomainLocale.KO)
+
+        verify(exactly = 1) { tourInfoPort.findDetail(any()) }
+    }
+
+    @Test
+    fun `AC-14 - 재조회 결과 본문이 생기면 본문 있는 상태로 전환된다`() {
+        every { spotDetailStorePort.findDetail(100L) } returns storedAbsence(age = Duration.ofDays(8))
+        every { tourInfoPort.findDetail(any()) } returns detail()
+
+        val view = service.spotDetail(100L, DomainLocale.KO)
+
+        assertEquals("조선의 법궁", view.overview)
+        // 부재가 아니라 본문 적재 이벤트가 나가야 body_absent가 false로 되돌아간다.
+        verify(exactly = 1) { eventPublisher.publish(ofType(SpotDetailFetched::class)) }
+        verify(exactly = 0) { eventPublisher.publish(ofType(SpotDetailAbsent::class)) }
+    }
+
+    @Test
+    fun `AC-15 - 재조회가 여전히 부재면 적재 시각이 갱신된다`() {
+        // 갱신하지 않으면 신선도 경과가 누적된 채로 남아 매 조회마다 upstream을 치는 상태로
+        // 퇴화한다 — 부재 적재가 무의미해지는 지점이다.
+        every { spotDetailStorePort.findDetail(100L) } returns storedAbsence(age = Duration.ofDays(8))
+        every { tourInfoPort.findDetail(any()) } returns null
+
+        service.spotDetail(100L, DomainLocale.KO)
+
+        // 부재 이벤트 재발행 = 어댑터의 upsert가 fetched_at을 now()로 갱신 → 창이 새로 시작된다.
+        verify(exactly = 1) { eventPublisher.publish(ofType(SpotDetailAbsent::class)) }
+    }
+
+    @Test
+    fun `AC-16 - 재조회가 실패로 끝나면 적재 시각을 갱신하지 않는다`() {
+        // 실패는 부재의 재확인이 아니므로 신선도 창을 연장해서는 안 된다.
+        every { spotDetailStorePort.findDetail(100L) } returns storedAbsence(age = Duration.ofDays(8))
+        every { tourInfoPort.findDetail(any()) } throws UpstreamUnavailableException("boom")
+
+        assertFailsWith<UpstreamUnavailableException> { service.spotDetail(100L, DomainLocale.KO) }
+
+        verify(exactly = 0) { eventPublisher.publish(any()) }
+    }
+
+    @Test
+    fun `부재를 확인하면 적재 이벤트를 발행한다(R-3)`() {
+        every { tourInfoPort.findDetail(any()) } returns null
+
+        service.spotDetail(100L, DomainLocale.KO)
+
+        verify(exactly = 1) { eventPublisher.publish(ofType(SpotDetailAbsent::class)) }
+        // 본문 적재로 잘못 나가면 body_absent가 서지 않아 다음 조회가 다시 upstream을 친다.
+        verify(exactly = 0) { eventPublisher.publish(ofType(SpotDetailFetched::class)) }
+    }
+
+    @Test
+    fun `캐시에 부재가 담겨 있으면 DB·upstream을 모두 건너뛴다`() {
+        // 부재를 캐시 미스로 오판하면 본문 없는 spot이 TTL 내내 매 조회마다 DB·upstream을 탄다.
+        every { spotCachePort.getDetail(100L) } returns
+            CachedDetail(storedAbsence().detail, bodyAbsent = true)
+
+        val view = service.spotDetail(100L, DomainLocale.KO)
+
+        assertNull(view.overview)
+        assertEquals("경복궁", view.title)
+        verify(exactly = 0) { spotDetailStorePort.findDetail(any()) }
+        verify(exactly = 0) { tourInfoPort.findDetail(any()) }
+    }
+
+    @Test
+    fun `DB의 부재 행을 읽으면 캐시도 부재로 충전한다`() {
+        // 부재를 일반 본문으로 캐시하면 캐시 히트 시 bodyAbsent가 false로 되살아난다.
+        every { spotDetailStorePort.findDetail(100L) } returns storedAbsence()
+
+        service.spotDetail(100L, DomainLocale.KO)
+
+        verify(exactly = 1) { spotCachePort.putDetailAbsence(100L, any()) }
+        verify(exactly = 0) { spotCachePort.putDetail(any(), any()) }
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // SPEC-0008 : 좋아요 목록 (R-15 ~ R-17)
+    // ══════════════════════════════════════════════════════════════════
+
+    private fun likedSpot(id: Long, likedAt: Instant = Instant.parse("2026-08-01T00:00:00Z")) =
+        LikedSpotView(
+            id = id,
+            title = "spot-$id",
+            thumbnailImageUrl = "https://img/$id.jpg",
+            address = null,
+            category = SpotCategory.TOURIST_SPOT,
+            copyright = CopyrightType.TYPE1,
+            attributionText = CopyrightType.TYPE1.attributionText,
+            likedAt = likedAt,
+        )
+
+    private fun likedPage(vararg nodes: LikedSpotView) = CursorPage(
+        edges = nodes.map { org.around.ieuri.common.pagination.CursorEdge("c-${it.id}", it) },
+        pageInfo = CursorPageInfo(
+            hasNextPage = false,
+            hasPreviousPage = false,
+            startCursor = nodes.firstOrNull()?.let { "c-${it.id}" },
+            endCursor = nodes.lastOrNull()?.let { "c-${it.id}" },
+        ),
+        // 목록 조회는 총계를 세지 않는다 — totalCount 필드가 요청될 때만 별도로 센다.
+        totalCount = null,
+    )
+
+    @Test
+    fun `AC-48·AC-49 - 인증 회원과 요청 언어가 조회 조건으로 전달된다`() {
+        // 본인 것만·요청 언어만이라는 두 제약이 쿼리 단계에서 걸려야 한다. 조회 후 걸러내면
+        // 페이지가 요청한 크기보다 작아진다.
+        val captured = slot<LikedSpotsSearch>()
+        every { spotQueryPort.findLikedSpots(capture(captured)) } returns likedPage()
+
+        service.likedSpots(LikedSpotsQuery(first = 20, after = null), DomainLocale.EN, memberId = 7L)
+
+        assertEquals(7L, captured.captured.memberId)
+        assertEquals(DomainLocale.EN, captured.captured.language)
+    }
+
+    @Test
+    fun `AC-45 - 포트가 돌려준 목록을 그대로 반환한다`() {
+        // LIKE 필터·정렬은 포트(쿼리)의 책임이다 — 서비스가 재정렬하면 DB의 타이브레이크가
+        // 무의미해진다(spots와 같은 규율).
+        every { spotQueryPort.findLikedSpots(any()) } returns likedPage(likedSpot(1L), likedSpot(2L))
+
+        val page = service.likedSpots(LikedSpotsQuery(20, null), DomainLocale.KO, memberId = 7L)
+
+        assertEquals(listOf(1L, 2L), page.edges.map { it.node.id })
+    }
+
+    @Test
+    fun `AC-52 - first가 상한을 초과하면 클램프된다`() {
+        val captured = slot<LikedSpotsSearch>()
+        every { spotQueryPort.findLikedSpots(capture(captured)) } returns likedPage()
+
+        service.likedSpots(LikedSpotsQuery(first = 500, after = null), DomainLocale.KO, memberId = 7L)
+
+        assertEquals(100, captured.captured.first)
+    }
+
+    @Test
+    fun `first가 0 이하이면 최소 1로 보정된다`() {
+        val captured = slot<LikedSpotsSearch>()
+        every { spotQueryPort.findLikedSpots(capture(captured)) } returns likedPage()
+
+        service.likedSpots(LikedSpotsQuery(first = 0, after = null), DomainLocale.KO, memberId = 7L)
+
+        assertEquals(1, captured.captured.first)
+    }
+
+    @Test
+    fun `AC-51 - after 커서가 조회 조건으로 전달된다`() {
+        val captured = slot<LikedSpotsSearch>()
+        every { spotQueryPort.findLikedSpots(capture(captured)) } returns likedPage()
+
+        service.likedSpots(LikedSpotsQuery(20, after = "cursor-abc"), DomainLocale.KO, memberId = 7L)
+
+        assertEquals("cursor-abc", captured.captured.after)
+    }
+
+    @Test
+    fun `목록 조회는 총계를 세지 않는다(지연 필드)`() {
+        // totalCount는 별도 COUNT(*)라 비용이 따로 든다. 루트에서 무조건 세면 아무도 안 물어본
+        // 값에 스캔을 하나 더 쓴다 — spotDetail의 likeCount와 같은 규율이다.
+        every { spotQueryPort.findLikedSpots(any()) } returns likedPage(likedSpot(1L))
+
+        service.likedSpots(LikedSpotsQuery(20, null), DomainLocale.KO, memberId = 7L)
+
+        verify(exactly = 0) { spotQueryPort.countLikedSpots(any(), any()) }
+    }
+
+    @Test
+    fun `총계는 요청될 때만 같은 조건으로 센다`() {
+        every { spotQueryPort.countLikedSpots(7L, DomainLocale.EN) } returns 42L
+
+        assertEquals(42L, service.likedSpotsTotalCount(DomainLocale.EN, memberId = 7L))
+
+        // 총계만 물었으면 목록 조회는 일어나지 않는다.
+        verify(exactly = 0) { spotQueryPort.findLikedSpots(any()) }
+    }
+
+    @Test
+    fun `좋아요 목록은 상세 조회 경로를 건드리지 않는다`() {
+        // 목록은 spot 행만 본다 — 상세가 부재한 spot도 정상적으로 나타나야 하므로
+        // spot_detail·캐시·upstream 어느 것도 타지 않는다(AC-55의 전제).
+        every { spotQueryPort.findLikedSpots(any()) } returns likedPage(likedSpot(1L))
+
+        service.likedSpots(LikedSpotsQuery(20, null), DomainLocale.KO, memberId = 7L)
+
+        verify(exactly = 0) { spotDetailStorePort.findDetail(any()) }
+        verify(exactly = 0) { tourInfoPort.findDetail(any()) }
+        verify(exactly = 0) { spotCachePort.getDetail(any()) }
     }
 }

@@ -29,6 +29,18 @@ extend type Query {
 
     "현재 언어(Accept-Language)에서 유효한 관광지 카테고리 목록. 여행코스(KO 전용)·교통(외국어 전용) 비대칭을 흡수한다."
     availableSpotCategories: [SpotCategory!]!
+
+    """
+    인증된 회원이 좋아요한 장소 목록(SPEC-0008 R-15~R-17). likedAt 내림차순, 동률은 spot.id로 타이브레이크.
+
+    **요청 언어로 한정된다.** 같은 장소라도 언어마다 spot.id가 다르고, 요청 언어와 다른 언어의
+    식별자로 상세를 요청하면 거부된다(SPEC-0007 R-14) — 목록이 언어를 섞으면 카드는 보이는데
+    탭하면 실패하는 형태가 된다.
+
+    미인증 요청은 최상위 errors[]의 UNAUTHENTICATED로 거부한다. 빈 목록으로 대체하지 않는다 —
+    빈 목록은 "좋아요가 없음"이라는 다른 의미다.
+    """
+    likedSpots(first: Int = 20, after: String): LikedSpotConnection!
 }
 
 extend type Mutation {
@@ -161,8 +173,17 @@ type SpotDetail {
     copyright: CopyrightType!
     "항목 저작권 표준 문구(전문). copyright에서 도출."
     attributionText: String!
-    "TourAPI 반환 순서, 최대 10장. 없으면 빈 배열(null 아님). 원소는 non-null(url 없는 이미지는 제외). 요청 시 detailImage2 1콜."
-    gallery: [SpotImage!]!
+    """
+    TourAPI 반환 순서, 최대 10장. 원소는 non-null(url 없는 이미지는 제외). 요청 시 detailImage2 1콜.
+
+    **nullable이다(SPEC-0008 R-5).** detailImage2 조회 실패를 이 필드에 가둔다 — 실패 시 이 필드만
+    null이 되고 본문은 정상 반환되며, 실패는 최상위 errors[]에 path로 표면화된다.
+    이미지가 없는 경우(실패가 아님)는 빈 배열이다.
+
+    null(조회 실패)과 빈 배열(이미지 없음)을 구분하는 필드·enum·payload를 두지 않는다 —
+    클라이언트가 두 경우를 동일하게(썸네일 1장 폴백) 처리한다.
+    """
+    gallery: [SpotImage!]
     "이 spot.id의 LIKE 수. non-null, 없으면 0. 요청 시 실시간 집계(캐시 비대상)."
     likeCount: Int!
 
@@ -176,9 +197,11 @@ type SpotDetail {
 
     """
     이용안내 반복 항목(항목명/내용). 요청 시 detailInfo2 1콜. category가 필요한 이유는 intro와 동일.
-    없으면 빈 배열(null 아님).
+
+    **nullable이다(SPEC-0008 R-6).** gallery와 동일하게 detailInfo2 실패를 이 필드에 가둔다.
+    항목이 없는 경우(실패가 아님)는 빈 배열이다.
     """
-    infoItems(category: SpotCategory!): [SpotInfoItem!]!
+    infoItems(category: SpotCategory!): [SpotInfoItem!]
 }
 
 """
@@ -209,4 +232,50 @@ type SpotInfoItem {
     name: String!
     "항목 내용. TourAPI infotext(HTML 태그가 섞여 올 수 있어 클라이언트가 정제한다)."
     text: String!
+}
+
+# ── 좋아요 목록(SPEC-0008 R-15~R-18) ──────────────────────────────
+# 필드가 전부 spot 행에 있어 spot_detail을 조인하지 않는다 — 상세가 부재한 spot도 목록에는 정상 노출된다.
+
+"""
+좋아요 목록 항목.
+
+**Spot을 재사용하지 않는다.** Spot.distanceMeters: Float! 는 기준 좌표가 있어야 성립하는데 이 목록엔
+기준 좌표가 없다. 좌표 인자를 추가하는 것은 요구사항에 없는 것을 발명하는 일이고, Spot.distanceMeters를
+nullable로 바꾸면 이 한 곳 때문에 spots의 모든 소비자가 분기를 떠안는다. 타입 분리가 양쪽을 피한다.
+
+지도 표시 요구사항이 없어 mapX·mapY는 두지 않는다.
+"""
+type LikedSpot {
+    "spot.id. 상세 진입 시 그대로 spotDetail(id:)에 넘긴다."
+    id: ID!
+    title: String!
+    thumbnailImageUrl: String!
+    address: String
+    category: SpotCategory!
+    copyright: CopyrightType!
+    "공공누리 출처표시 문구. copyright에서 도출."
+    attributionText: String!
+}
+
+"좋아요 목록 커서 연결. MemberConnection/MemberEdge/PageInfo 선례를 그대로 따른다(PageInfo는 auth.graphqls 재사용)."
+type LikedSpotConnection {
+    edges: [LikedSpotEdge!]!
+    pageInfo: PageInfo!
+    "전체 좋아요 수(선택). MemberConnection.totalCount·SpotPage.totalCount와 같이 nullable."
+    totalCount: Int
+}
+
+type LikedSpotEdge {
+    cursor: String!
+    node: LikedSpot!
+
+    """
+    좋아요 등록 시각(ISO-8601). 정렬 기준이자 표시용.
+
+    **노드가 아니라 엣지에 둔다** — "언제 좋아요했는가"는 회원과 spot의 *관계*의 속성이지 spot
+    자체의 속성이 아니다. 같은 spot이라도 회원마다 값이 다르다.
+    String!은 기존 관행(Me.createdAt)을 따른 것이다 — 별도 DateTime 스칼라가 두 스키마 어디에도 없다.
+    """
+    likedAt: String!
 }

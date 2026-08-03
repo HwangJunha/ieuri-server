@@ -7,6 +7,9 @@ import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.tourism.application.port.`in`.query.SpotQueryUseCase
 import org.around.ieuri.tourism.application.exception.SpotDetailNotFoundException
+import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.tourism.application.query.LikedSpotView
+import org.around.ieuri.tourism.application.query.LikedSpotsQuery
 import org.around.ieuri.tourism.application.query.SpotDetailView
 import org.around.ieuri.tourism.application.query.SpotIntroView
 import org.around.ieuri.tourism.application.query.SpotImageView
@@ -17,6 +20,10 @@ import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.tourism.infrastructure.locale.LocaleContext
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
+import org.around.ieuri.common.graphql.generated.types.LikedSpot as GqlLikedSpot
+import org.around.ieuri.common.graphql.generated.types.LikedSpotConnection as GqlLikedSpotConnection
+import org.around.ieuri.common.graphql.generated.types.LikedSpotEdge as GqlLikedSpotEdge
+import org.around.ieuri.common.graphql.generated.types.PageInfo as GqlPageInfo
 import org.around.ieuri.common.graphql.generated.types.Spot as GqlSpot
 import org.around.ieuri.common.graphql.generated.types.SpotCategory as GqlSpotCategory
 import org.around.ieuri.common.graphql.generated.types.SpotDetail as GqlSpotDetail
@@ -77,6 +84,15 @@ class SpotQueryResolver(
     fun spotDetail(@InputArgument id: Long): SpotDetailView =
         spotQueryUseCase.spotDetail(spotId = id, locale = localeContext.locale)
 
+    /**
+     * 갤러리(SPEC-0008 R-5). **nullable이다** — 이 필드의 조회가 실패하면 DGS가 실패를 이 필드에
+     * 가두고 null로 채운 뒤 최상위 `errors[]`에 path와 함께 싣는다. 본문은 이미 부모 리졸버가
+     * 반환했으므로 그대로 살아남는다(AC-17).
+     *
+     * 여기서 예외를 삼켜 null을 돌려주지 않는다 — 그러면 `errors[]` 항목이 사라져 클라이언트가
+     * "실패"와 "이미지 없음"을 구분할 근거를 잃는다. 실패는 그대로 던지고, 이미지가 없는 정상
+     * 경우만 빈 배열이 된다(AC-19).
+     */
     @DgsData(parentType = "SpotDetail", field = "gallery")
     fun gallery(dfe: DgsDataFetchingEnvironment): List<GqlSpotImage> =
         spotQueryUseCase.spotGallery(dfe.spotId(), localeContext.locale)
@@ -108,6 +124,79 @@ class SpotQueryResolver(
     fun likeCount(dfe: DgsDataFetchingEnvironment): Int =
         // GraphQL likeCount는 Int!. 반응 수가 Int 범위를 넘을 일은 없다.
         spotQueryUseCase.spotLikeCount(dfe.spotId()).toInt()
+
+    /**
+     * 좋아요 목록(SPEC-0008 R-15~R-17).
+     *
+     * **인증 필수다**(AC-53). `requireMemberId()`가 던지는 예외는 최상위 `errors[]`의
+     * UNAUTHENTICATED로 나간다 — 빈 목록으로 대체하지 않는다(AC-54). 빈 목록은 "좋아요가 없음"이라는
+     * 다른 의미이고, 둘을 섞으면 클라이언트가 로그인 유도 시점을 판단할 수 없다.
+     *
+     * `spots`가 `currentMemberId()`(비로그인 허용)를 쓰는 것과 대비된다 — 그쪽은 비로그인도 유효한
+     * 조회지만 "내 좋아요"는 주체가 없으면 성립하지 않는다.
+     */
+    @DgsQuery
+    fun likedSpots(
+        @InputArgument first: Int?,
+        @InputArgument after: String?,
+    ): CursorPage<LikedSpotView> {
+        val memberId = currentMemberProvider.requireMemberId()
+        return spotQueryUseCase.likedSpots(
+            LikedSpotsQuery(first = first ?: DEFAULT_LIKED_PAGE_SIZE, after = after),
+            locale = localeContext.locale,
+            memberId = memberId,
+        )
+    }
+
+    /**
+     * `edges`·`pageInfo`는 루트가 이미 조회한 페이지에서 나온다 — 추가 I/O가 없으므로 여기서 매핑한다.
+     * 생성 타입이 아니라 read 페이지를 루트가 반환하는 것은 `spotDetail`과 같은 이유다(지연 필드를
+     * 비워 둘 수 없는 생성자 제약).
+     */
+    @DgsData(parentType = "LikedSpotConnection", field = "edges")
+    fun likedSpotEdges(dfe: DgsDataFetchingEnvironment): List<GqlLikedSpotEdge> =
+        dfe.likedPage().edges.map {
+            GqlLikedSpotEdge(
+                cursor = it.cursor,
+                node = it.node.toGql(),
+                // likedAt은 노드가 아니라 엣지의 값이다 — 회원과 spot의 *관계* 속성이라
+                // 같은 spot이라도 회원마다 다르다.
+                likedAt = it.node.likedAt.toString(),
+            )
+        }
+
+    @DgsData(parentType = "LikedSpotConnection", field = "pageInfo")
+    fun likedSpotPageInfo(dfe: DgsDataFetchingEnvironment): GqlPageInfo =
+        dfe.likedPage().pageInfo.let {
+            GqlPageInfo(
+                hasNextPage = it.hasNextPage,
+                hasPreviousPage = it.hasPreviousPage,
+                startCursor = it.startCursor,
+                endCursor = it.endCursor,
+            )
+        }
+
+    /**
+     * 총 개수는 **요청됐을 때만** 센다. 별도 COUNT(*)라 비용이 따로 들고, 커서 페이징에 필수도
+     * 아니다(소진 판정은 `hasNextPage`). 루트에서 무조건 세면 아무도 안 물어본 값에 스캔을 하나
+     * 더 쓰게 된다 — `spotDetail`의 `likeCount`와 같은 규율이다.
+     */
+    @DgsData(parentType = "LikedSpotConnection", field = "totalCount")
+    fun likedSpotsTotalCount(): Int =
+        spotQueryUseCase.likedSpotsTotalCount(
+            locale = localeContext.locale,
+            memberId = currentMemberProvider.requireMemberId(),
+        ).toInt()
+
+    private fun LikedSpotView.toGql(): GqlLikedSpot = GqlLikedSpot(
+        id = id,
+        title = title,
+        thumbnailImageUrl = thumbnailImageUrl,
+        address = address,
+        category = GqlSpotCategory.valueOf(category.name),
+        copyright = GqlCopyrightType.valueOf(copyright.name),
+        attributionText = attributionText,
+    )
 
     private fun SpotPageView.toGql(): GqlSpotPage = GqlSpotPage(
         items = items.map { it.toGql() },
@@ -151,6 +240,9 @@ class SpotQueryResolver(
         const val DEFAULT_RADIUS_METERS = 20_000
         const val DEFAULT_PAGE = 1
         const val DEFAULT_SIZE = 100
+
+        /** 좋아요 목록 기본 페이지 크기. `members`의 선례를 따랐다(SPEC-0008 [TBD-2]). */
+        const val DEFAULT_LIKED_PAGE_SIZE = 20
     }
 
     /**
@@ -163,4 +255,10 @@ class SpotQueryResolver(
     private fun DgsDataFetchingEnvironment.spotId(): Long =
         getSource<SpotDetailView>()?.id
             ?: error("SpotDetail 필드 리졸버는 부모가 반환한 SpotDetailView를 소스로 받아야 한다.")
+
+    /** 부모 `likedSpots`가 돌려준 읽기 페이지. [spotId]와 같은 이유로 `!!` 대신 명시적으로 실패시킨다. */
+    @Suppress("UNCHECKED_CAST")
+    private fun DgsDataFetchingEnvironment.likedPage(): CursorPage<LikedSpotView> =
+        getSource<CursorPage<LikedSpotView>>()
+            ?: error("LikedSpotConnection 필드 리졸버는 부모가 반환한 CursorPage를 소스로 받아야 한다.")
 }

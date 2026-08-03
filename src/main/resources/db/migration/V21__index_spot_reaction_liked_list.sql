@@ -1,0 +1,23 @@
+-- tourism 도메인: 좋아요 목록 조회 정렬 인덱스(SPEC-0008 R-15·R-16).
+--
+-- likedSpots는 "내가 LIKE한 spot을 최신순으로 한 페이지" 조회다.
+--   WHERE member_id = ? AND reaction = 'LIKE'  ORDER BY updated_at DESC, spot_id DESC
+--
+-- 기존 인덱스로는 정렬을 커버하지 못한다:
+--   - uq_spot_reaction (member_id, spot_id)     : member_id 선행이라 필터는 타지만 정렬 키가 없어
+--                                                 매 페이지마다 회원의 전체 반응을 정렬해야 한다.
+--   - idx_spot_reaction_member (member_id)      : 위와 같은 이유.
+--   - idx_spot_reaction_spot_reaction (spot_id, reaction) : spot_id 선행이라 회원 조회를 못 탄다.
+--
+-- **정렬 키를 인덱스에 담아 keyset 페이징이 인덱스만으로 전진하게 한다.** reaction을 키에 포함해
+-- DISLIKE 행을 인덱스 단계에서 걷어낸다 — 목록은 LIKE만 반환하므로(AC-45) 필터가 선행일수록 좋다.
+--
+-- **정렬 키가 updated_at인 이유.** 재평가(DISLIKE→LIKE)는 기존 행을 in-place 갱신하므로
+-- created_at은 "최초로 반응한 시각"에 머문다. 사용자가 체감하는 "좋아요한 시점"은 현재의 LIKE가
+-- 설정된 시각이며 그것이 updated_at이다. created_at으로 정렬하면 방금 좋아요로 바꾼 항목이
+-- 목록 아래에 묻힌다.
+--
+-- 동률 타이브레이크(spot_id DESC)까지 인덱스에 담는다 — 같은 밀리초에 기록된 두 행의 순서가
+-- 페이지마다 달라지면 커서 페이징이 항목을 건너뛰거나 중복시킨다(POL-019).
+CREATE INDEX idx_spot_reaction_liked_list
+    ON spot_reaction (member_id, reaction, updated_at DESC, spot_id DESC);
