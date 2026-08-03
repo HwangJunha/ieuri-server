@@ -47,9 +47,17 @@ ieuri:
       # 업스트림 이상으로 대량 오삭제되는 것을 막는다.
       cleanup-min-ratio: ${IEURI_TOUR_SYNC_CLEANUP_MIN_RATIO:0.5}
 
-      # runDate 잡 파라미터의 시간대. "하루"의 경계를 정하므로 중복 실행 방지(AC-6)의 기준이다.
+      # runDate 잡 파라미터의 시간대. "하루"의 경계를 정하므로 중복 실행 방지(AC-6)의 기준이며,
+      # 축제 Step의 종료 판정 기준일도 같은 값에서 나온다(SPEC-0007).
       # 실행 스케줄 자체는 k8s CronJob이 소유한다 — 앱에는 스케줄러가 없다.
       zone: Asia/Seoul
+
+    # 축제 정보 수집(SPEC-0007). 같은 spotSyncJob 안에서 관광지 Step 뒤에 돈다 — 별도 잡·CronJob이
+    # 아니므로 스케줄 설정이 없다.
+    festival-sync:
+      # searchFestival2의 numOfRows. **이 오퍼레이션은 이 레포에서 호출된 적이 없어 상한이
+      # 실측되지 않았다([TBD-3]).** 관광지와 같은 1000으로 시작하고, 업스트림이 거부하면 이 값만 낮춘다.
+      page-size: ${IEURI_TOUR_FESTIVAL_PAGE_SIZE:1000}
 
 logging:
   level:

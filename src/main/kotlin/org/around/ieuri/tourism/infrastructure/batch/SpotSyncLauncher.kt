@@ -83,7 +83,9 @@ class SpotSyncLauncher(
         val runDate = LocalDate.now(ZoneId.of(properties.zone))
         val parameters = JobParametersBuilder()
             // 식별 파라미터. 같은 날짜 = 같은 JobInstance = 중복 실행 불가(AC-6).
-            .addString("runDate", runDate.toString())
+            // **축제 Step이 이 값을 실행일로 읽는다**(SPEC-0007 AC-8) — Step 안에서 now()를 부르지
+            // 않으므로 수집 조건·종료 판정·재삽입 제외가 모두 같은 날짜를 쓴다.
+            .addString(RUN_DATE_PARAMETER, runDate.toString())
             .toJobParameters()
 
         return try {

@@ -10,6 +10,7 @@ import org.springframework.batch.core.step.StepContribution
 import org.springframework.batch.core.step.tasklet.Tasklet
 import org.springframework.batch.infrastructure.repeat.RepeatStatus
 import java.time.Instant
+import java.time.LocalDate
 
 /**
  * 한 언어의 관광지 목록을 전량 수집·적재하는 Step 본체(SPEC-0004 R-2·R-3·R-4).
@@ -25,6 +26,14 @@ import java.time.Instant
  *
  * 언어 간 병렬 실행은 하지 않는다 — serviceKey가 4개 언어 공용 단일 키라(SPEC-0002 §0 B-4 실측)
  * 병렬화가 호출 한도를 4배 속도로 소모한다.
+ *
+ * @param endedFestivalIds 종료된 축제의 contentId를 돌려주는 조회(SPEC-0007 R-9).
+ *   `areaBasedSyncList2`에는 `contentTypeId` 요청 파라미터가 없어 **축제도 이 경로로 수집된다.**
+ *   제외하지 않으면 축제 정리가 지운 행사를 이 Step이 그대로 되살린다(AC-31·AC-32).
+ *
+ *   **집합이 아니라 함수를 받는 이유는 Step 빈이 부팅 시점에 만들어지기 때문이다.** 그때 조회한
+ *   집합은 실행 시점에는 낡았다. 대신 Step이 시작할 때 한 번 호출해 스냅샷을 잡는다 — 축제는 절대
+ *   건수가 적어 페이지마다 다시 조회할 이유가 없다.
  */
 class SpotSyncTasklet(
     private val language: DomainLocale,
@@ -32,6 +41,7 @@ class SpotSyncTasklet(
     private val storePort: SpotStorePort,
     private val pageSize: Int,
     private val cleanupMinRatio: Double,
+    private val endedFestivalIds: (LocalDate) -> Set<String> = { emptySet() },
 ) : Tasklet {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -46,6 +56,12 @@ class SpotSyncTasklet(
      */
     private val collectedIds = HashSet<String>()
 
+    /**
+     * 종료 축제 제외 집합의 스냅샷(R-9). Step이 시작할 때 한 번만 잡는다 — 페이지마다 다시 조회하면
+     * 페이지당 질의가 하나씩 늘고, 하루 1회 배치에서 그만큼의 신선도가 필요하지도 않다.
+     */
+    private var endedFestivalSnapshot: Set<String>? = null
+
     override fun execute(contribution: StepContribution, chunkContext: ChunkContext): RepeatStatus {
         val executionContext = chunkContext.stepContext.stepExecution.executionContext
         val pageNo = executionContext.getInt(KEY_NEXT_PAGE, 1)
@@ -59,7 +75,24 @@ class SpotSyncTasklet(
         val syncedAt = executionContext.getString(KEY_SYNCED_AT, Instant.now().toString()).let(Instant::parse)
 
         val page = syncPort.fetchPage(language, pageNo, pageSize)
-        val written = storePort.upsertAll(page.records, syncedAt)
+
+        // 종료된 축제를 적재 대상에서 뺀다(SPEC-0007 R-9). **어댑터가 아니라 여기서 거른다** —
+        // 어댑터에서 걸러 버리면 제외분이 page.records에 아예 없어 아래 collectedIds에도 들어가지
+        // 못하고, 그것이 AC-34 문제를 그대로 일으킨다.
+        //
+        // 판정은 contentId **집합 멤버십**뿐이다. 카테고리나 날짜를 여기서 다시 해석하지 않으므로
+        // 축제가 아닌 항목은 영향을 받지 않는다(AC-33) — 축제가 아닌 contentId는 애초에 이 집합에
+        // 들어올 수 없다.
+        val excluded = endedFestivalSnapshot
+            ?: endedFestivalIds(chunkContext.runDate()).also { endedFestivalSnapshot = it }
+        val toStore = if (excluded.isEmpty()) page.records else page.records.filterNot { it.contentId in excluded }
+        val written = storePort.upsertAll(toStore, syncedAt)
+
+        // **제외분까지 collectedIds에 넣는다**(AC-34). 이 집합은 정리에서 두 곳에 쓰인다 —
+        // deleteMissing의 생존 집합이자 급감 게이트의 분자다. 제외분이 빠지면 (1) 수집량이 실제보다
+        // 작아져 관광지 정리가 부당하게 스킵될 수 있고, (2) deleteMissing이 제외분을 "사라진 항목"으로
+        // 보고 삭제 대상에 넣어 삭제 건수가 이중으로 잡힌다. 축제 Step이 이미 지운 행이라 최종 상태는
+        // 같지만 관측값이 틀어진다.
         page.records.forEach { collectedIds += it.contentId }
 
         val totalWritten = executionContext.getInt(KEY_WRITTEN, 0) + written
