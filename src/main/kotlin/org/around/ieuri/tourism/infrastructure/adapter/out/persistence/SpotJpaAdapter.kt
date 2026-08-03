@@ -9,7 +9,6 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import java.sql.PreparedStatement
 import java.sql.Timestamp
-import java.sql.Types
 import java.time.Instant
 
 /**
@@ -42,7 +41,7 @@ class SpotJpaAdapter(
             ps.setDouble(6, spot.coordinates.longitude)
             ps.setDouble(7, spot.coordinates.latitude)
             ps.setString(8, spot.category.name)
-            spot.contentTypeId?.let { ps.setInt(9, it) } ?: ps.setNull(9, Types.INTEGER)
+            ps.setInt(9, spot.contentTypeId)
             ps.setString(10, spot.copyright.name)
             ps.setTimestamp(11, syncedTimestamp)
         }

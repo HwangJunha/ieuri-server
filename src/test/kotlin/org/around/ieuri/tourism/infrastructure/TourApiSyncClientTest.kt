@@ -133,6 +133,27 @@ class TourApiSyncClientTest {
     }
 
     @Test
+    fun `contentTypeId가 없으면 적재하지 않는다`() {
+        // 전량 적재 실측(2026-08-03, 121,913건)에서 값이 빠진 항목은 한 건도 없었다. 없으면 카테고리
+        // 폴백을 사후 질의할 수단이 사라지므로(V13이 이 컬럼을 둔 이유) 적재 대상에서 제외한다.
+        // DB의 NOT NULL(V18)이 이 규율을 쓰기 시점에 한 번 더 막는다.
+        val page = client.mapPage(response(listOf(item(contentTypeId = null))), DomainLocale.KO)
+
+        assertTrue(page.records.isEmpty())
+        assertEquals(1, page.droppedCount)
+    }
+
+    @Test
+    fun `contentTypeId가 숫자가 아니면 적재하지 않는다`() {
+        // 폴백 대상(해석 불가 코드)과 드랍 대상(코드 자체가 없음)은 다르다 — 9999는 숫자라 원본을
+        // 남기고 폴백하지만, 숫자가 아니면 남길 원본이 없다.
+        val page = client.mapPage(response(listOf(item(contentTypeId = "알수없음"))), DomainLocale.KO)
+
+        assertTrue(page.records.isEmpty())
+        assertEquals(1, page.droppedCount)
+    }
+
+    @Test
     fun `제외 대상 lclsSystm2 항목은 적재하지 않는다`() {
         val page = client.mapPage(response(listOf(item(lcls2 = "EX999"))), DomainLocale.KO)
 

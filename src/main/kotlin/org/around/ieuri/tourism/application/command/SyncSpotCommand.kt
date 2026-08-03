@@ -16,6 +16,10 @@ import org.around.ieuri.tourism.domain.vo.SpotCategory
  *
  * [contentTypeId]는 해석 이전의 TourAPI 원본 코드로 **적재 전용**이며, 카테고리 폴백 감지·교정에만 쓴다
  * (응답·로그 노출 금지 — SPEC-0002 R8).
+ *
+ * **[contentTypeId]는 필수다.** 전량 적재 실측(2026-08-03, 121,913건)에서 값이 빠진 항목이 한 건도
+ * 없었고, 없으면 이 컬럼을 둔 목적(폴백 사후 질의·재해석 교정)이 성립하지 않는다. 값을 주지 않는
+ * 항목은 적재 대상에서 제외한다 — 어댑터가 드랍하고, DB의 NOT NULL(V19)이 한 번 더 막는다.
  */
 data class SyncSpotCommand(
     val contentId: String,
@@ -25,7 +29,7 @@ data class SyncSpotCommand(
     val thumbnailImageUrl: String,
     val coordinates: Coordinates,
     val category: SpotCategory,
-    val contentTypeId: Int?,
+    val contentTypeId: Int,
     val copyright: CopyrightType,
 ) {
     init {

@@ -50,3 +50,25 @@ ALTER TABLE spot_festival
 
 -- R-8의 종료 축제 조회가 매일 언어별로 수행된다. language 선행 — 정리는 항상 한 언어로 한정된다(AC-22).
 CREATE INDEX idx_spot_festival_end_date ON spot_festival (language, event_end_date);
+
+-- ---------------------------------------------------------------------------
+-- spot.content_type_id를 NOT NULL로 강제한다.
+--
+-- **적재 실측이 근거다(2026-08-03).** 전량 적재 후 질의 결과 121,913건(KO 56,897 · EN 21,751 ·
+-- JA 21,601 · ZH 21,664) 전부 content_type_id가 채워져 있었고, 언어마다 8종의 값이 나타났다.
+-- NULL이 한 건도 없으므로 **백필이 필요 없다.**
+--
+-- V13은 이 컬럼을 nullable로 두었다. 당시 근거는 "해석 실패 시 폴백"이었으나, 폴백되는 것은
+-- 도메인 category이지 원본 코드가 아니다 — 원본이 없으면 폴백 여부를 사후 질의할 수단 자체가
+-- 사라지므로(V13이 이 컬럼을 둔 이유) nullable은 목적과 어긋난다.
+--
+-- **TourAPI가 값을 주지 않는 항목은 이제 적재하지 않는다.** 어댑터(TourApiSyncClient)가 드랍하며,
+-- 이 제약은 그 규율이 우회되지 않도록 쓰기 시점에 한 번 더 막는다 — spot의 다른 NOT NULL 컬럼
+-- (thumbnail_image_url 등)이 이미 같은 역할을 한다.
+--
+-- 이 컬럼을 유니크 키에 포함하는 건은 **이 마이그레이션의 범위가 아니다.** SPEC-0004 스펙 문서에
+-- 그 요구가 없어 이슈 #35에 [AMEND]로 올렸으며, 키 전략 전환과 함께 별도로 다룬다. 다만 NOT NULL이
+-- 그 논의의 선결 조건이었다 — Postgres 유니크 제약은 NULL을 서로 다른 값으로 취급하므로, nullable인
+-- 채로 키에 넣으면 같은 (content_id, language) 행이 중복 삽입된다.
+ALTER TABLE spot
+    ALTER COLUMN content_type_id SET NOT NULL;
