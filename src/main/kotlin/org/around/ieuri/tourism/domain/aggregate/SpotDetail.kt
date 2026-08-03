@@ -13,10 +13,13 @@ import org.around.ieuri.tourism.domain.vo.SpotCategory
  * [likeCount]도 어댑터가 채우지 않는다. application이 [withLikeCount]로 실시간 집계값을 얹는다(§5).
  * 기본값 0은 "아직 집계 전" 상태다.
  *
+ * **식별자를 담지 않는다**(V20). 이 모델을 만드는 셋(TourAPI 매핑·DB 조회·캐시) 중 어느 것도
+ * `spot.id`를 모르며, 응답 식별자는 요청이 이미 알고 있다. 읽기 DTO(`SpotDetailView`)가 그것을
+ * 소유하는 편이 CQRS상 맞고, 아무도 채우지 않는 필드를 두면 불변식이 무의미해진다.
+ *
  * 순수 Kotlin — 프레임워크/JPA/DGS 의존 없음.
  */
 data class SpotDetail(
-    val id: String,
     val title: String,
     val category: SpotCategory,
     val thumbnailImageUrl: String,
@@ -28,7 +31,6 @@ data class SpotDetail(
     val likeCount: Long = 0,
 ) {
     init {
-        require(id.isNotBlank()) { "contentId는 비어 있을 수 없습니다." }
         require(title.isNotBlank()) { "title은 비어 있을 수 없습니다." }
         require(thumbnailImageUrl.startsWith("https://")) { "썸네일 URL은 https로 정규화되어야 합니다." }
         require(likeCount >= 0) { "좋아요 수는 음수일 수 없습니다." }

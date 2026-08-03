@@ -6,7 +6,7 @@
 # ============================================================
 
 extend type Query {
-    "contentId(=Spot.id) 단건 상세 조회. TourAPI 상세 오퍼레이션들을 실시간 호출(캐시 미스 시)한다."
+    "spot.id 단건 상세 조회. TourAPI 상세 오퍼레이션들을 실시간 호출(캐시 미스 시)한다."
     # 언어는 Accept-Language 헤더로 전달(SPEC-0002 규약) — locale 인자 없음. 유효한 id는 항상 SpotDetail을
     # 반환하고, 해소 실패는 최상위 GraphQL 오류(SPOT_NOT_FOUND)이므로 non-null.
     spotDetail(id: ID!): SpotDetail!
@@ -32,7 +32,7 @@ extend type Query {
 }
 
 extend type Mutation {
-    "관광지 좋아요/싫어요 기록. 동일 장소라도 언어별 contentId가 다르므로 서버가 (contentId, 요청언어)로 저장한다. 재평가는 덮어쓴다(취소는 범위 밖)."
+    "관광지 좋아요/싫어요 기록. spot.id 하나로 저장한다 — id가 이미 언어별이라 언어를 따로 받지 않는다. 재평가는 덮어쓴다(취소는 범위 밖)."
     reactToSpot(input: ReactToSpotInput!): ReactToSpotPayload!
 }
 
@@ -76,7 +76,7 @@ enum SpotReaction {
 
 "locationBasedList2가 요청 언어로 반환한 물리적 장소 1건. 상세/overview/다중이미지는 이번 스펙 범위 밖."
 type Spot {
-    "TourAPI contentId. 주의: 같은 장소라도 언어별로 다르다 — 요청 언어 내에서만 안정적."
+    "서버가 부여한 안정적 식별자(spot.id). 언어별로 다른 행이므로 언어를 바꾸면 목록을 다시 받아야 한다."
     id: ID!
     title: String!
     "주소. addr1/addr2 병합(카드엔 상세 구분 불필요). 값이 없을 수 있음."
@@ -107,7 +107,7 @@ type SpotPage {
 
 "language는 인자로 받지 않는다 — 서버가 요청 언어(Accept-Language)와 결합해 저장."
 input ReactToSpotInput {
-    "반응이 기록되는 언어별 contentId."
+    "반응 대상 관광지의 spot.id(Spot.id와 같은 값)."
     spotId: ID!
     reaction: SpotReaction!
 }
@@ -136,14 +136,14 @@ type SpotImage {
 }
 
 """
-관광지 상세. contentId 단건.
+관광지 상세. spot.id 단건.
 
 **필드별 지연 조회**: 루트(spotDetail)는 detailCommon2 1콜만 소비하고, gallery·intro·infoItems는
 **요청한 경우에만** 각자 TourAPI를 호출한다. likeCount도 요청 시에만 집계한다. 즉 `{ id title overview }`만
 물으면 upstream 콜은 1회다.
 """
 type SpotDetail {
-    "Spot.id와 동일 식별자 공간(TourAPI contentId, 언어별로 갈림)."
+    "Spot.id와 동일 식별자 공간(서버가 부여한 spot.id)."
     id: ID!
     title: String!
     category: SpotCategory!
@@ -163,7 +163,7 @@ type SpotDetail {
     attributionText: String!
     "TourAPI 반환 순서, 최대 10장. 없으면 빈 배열(null 아님). 원소는 non-null(url 없는 이미지는 제외). 요청 시 detailImage2 1콜."
     gallery: [SpotImage!]!
-    "현재 요청 언어의 이 contentId LIKE 수. non-null, 없으면 0. 요청 시 실시간 집계(캐시 비대상)."
+    "이 spot.id의 LIKE 수. non-null, 없으면 0. 요청 시 실시간 집계(캐시 비대상)."
     likeCount: Int!
 
     """

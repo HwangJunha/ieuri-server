@@ -58,7 +58,8 @@ class TourApiDetailMappingTest {
     @Test
     fun `AC-1 - detailCommon2 item을 SpotDetail 본문으로 매핑한다`() {
         val detail = client.mapDetail(commonItem(), DomainLocale.KO)
-        assertEquals("100", detail.id)
+        // 식별자는 이 모델에 없다(V20) — TourAPI는 자기 contentId만 알 뿐 우리 spot.id를
+        // 모르므로, 응답 식별자는 읽기 DTO가 요청받은 값으로 채운다.
         assertEquals("경복궁", detail.title)
         assertEquals("조선의 법궁", detail.overview)
         assertEquals("http://royal.go.kr", detail.homepage)

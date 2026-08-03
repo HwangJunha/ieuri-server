@@ -2,6 +2,7 @@ package org.around.ieuri.tourism.infrastructure.adapter.out.query
 
 import com.querydsl.jpa.impl.JPAQueryFactory
 import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch
+import org.around.ieuri.tourism.application.port.out.query.SpotIdentity
 import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
 import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
 import org.around.ieuri.tourism.domain.vo.CopyrightType
@@ -34,7 +35,7 @@ class SpotQueryAdapter(
         // 한 곳만 바뀌어도 조용히 어긋난다. CTE는 그 결합을 끊는다.
         val sql = """
             WITH c AS (SELECT $CENTER AS center)
-            SELECT content_id, title, address, thumbnail_image_url, map_x, map_y,
+            SELECT id, title, address, thumbnail_image_url, map_x, map_y,
                    category, copyright,
                    ST_Distance(location, c.center) AS distance_meters
             FROM spot, c
@@ -50,7 +51,7 @@ class SpotQueryAdapter(
             sql,
             { rs, _ ->
                 SpotSearchResult(
-                    contentId = rs.getString("content_id"),
+                    spotId = rs.getLong("id"),
                     title = rs.getString("title"),
                     address = rs.getString("address"),
                     thumbnailImageUrl = rs.getString("thumbnail_image_url"),
@@ -95,10 +96,10 @@ class SpotQueryAdapter(
             conditions += "category = ?"
             params += it.name
         }
-        if (query.excludedContentIds.isNotEmpty()) {
+        if (query.excludedSpotIds.isNotEmpty()) {
             // 이미 반응한 항목은 DB 단계에서 제외한다 — 조회 후 걸러내면 페이지가 size보다 작아진다.
-            conditions += "content_id NOT IN (${query.excludedContentIds.joinToString(",") { "?" }})"
-            params.addAll(query.excludedContentIds)
+            conditions += "id NOT IN (${query.excludedSpotIds.joinToString(",") { "?" }})"
+            params.addAll(query.excludedSpotIds)
         }
         return conditions.joinToString(" AND ") to params
     }
@@ -108,25 +109,51 @@ class SpotQueryAdapter(
         const val CENTER = "ST_MakePoint(?, ?)::geography"
     }
 
-    override fun findReactedContentIds(memberId: Long, language: DomainLocale): Set<String> =
-        queryFactory
-            .select(reaction.contentId)
-            .from(reaction)
-            .where(
-                reaction.memberId.eq(memberId),
-                reaction.language.eq(language),
-            )
-            .fetch()
-            .toSet()
+    /**
+     * **`spot`을 조인해 언어를 판별한다**(V20). `spot_reaction`에서 `language` 컬럼이 사라졌기
+     * 때문이다 — 언어는 이제 `spot` 행이 소유하며, 반응은 `spot_id`로만 그것을 가리킨다.
+     *
+     * QueryDSL이 아니라 JDBC를 쓰는 이유는 `spot`에 Q-클래스 조인 정의가 없어서다. 조인 하나를
+     * 위해 엔티티 연관을 새로 얹는 것보다 이 편이 가볍다.
+     */
+    override fun findReactedSpotIds(memberId: Long, language: DomainLocale): Set<Long> =
+        jdbcTemplate.queryForList(
+            """
+            SELECT r.spot_id FROM spot_reaction r
+            JOIN spot s ON s.id = r.spot_id
+            WHERE r.member_id = ? AND s.language = ?
+            """.trimIndent(),
+            Long::class.java,
+            memberId, language.name,
+        ).filterNotNull().toSet()
 
-    override fun countLikes(contentId: String, language: DomainLocale): Long =
+    /**
+     * LIKE 반응 수(SPEC-0003 §5). **언어 조건이 사라졌다** — `spotId`가 이미 언어별이므로
+     * 언어를 다시 거르면 중복이다(V20).
+     */
+    override fun countLikes(spotId: Long): Long =
         queryFactory
             .select(reaction.count())
             .from(reaction)
             .where(
-                reaction.contentId.eq(contentId),
-                reaction.language.eq(language),
+                reaction.spotId.eq(spotId),
                 reaction.reaction.eq(ReactionType.LIKE),
             )
             .fetchOne() ?: 0L
+
+    /**
+     * `spot.id` → upstream 식별 정보(V20). 상세 조회가 캐시·DB를 모두 놓쳤을 때만 호출된다 —
+     * TourAPI는 우리 PK를 모르므로 `contentId`로 물어야 한다.
+     */
+    override fun findIdentity(spotId: Long): SpotIdentity? =
+        jdbcTemplate.query(
+            "SELECT content_id, language FROM spot WHERE id = ?",
+            { rs, _ ->
+                SpotIdentity(
+                    contentId = rs.getString("content_id"),
+                    language = DomainLocale.valueOf(rs.getString("language")),
+                )
+            },
+            spotId,
+        ).firstOrNull()
 }

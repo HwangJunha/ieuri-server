@@ -1,7 +1,6 @@
 package org.around.ieuri.tourism.application.port.out.persistence
 
 import org.around.ieuri.tourism.domain.aggregate.SpotDetail
-import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.tourism.domain.vo.SpotImage
 import org.around.ieuri.tourism.domain.vo.SpotInfoItem
@@ -27,8 +26,8 @@ import org.around.ieuri.tourism.domain.vo.SpotIntro
  */
 interface SpotDetailStorePort {
     /** 상세 본문. 미적재면 null. */
-    fun findDetail(contentId: String, locale: DomainLocale): SpotDetail?
-    fun saveDetail(contentId: String, locale: DomainLocale, detail: SpotDetail)
+    fun findDetail(spotId: Long): SpotDetail?
+    fun saveDetail(spotId: Long, detail: SpotDetail)
 
     /**
      * 갤러리. 미적재면 null.
@@ -36,19 +35,19 @@ interface SpotDetailStorePort {
      * upstream에 한 번 더 묻는다. 빈 갤러리는 드물고 비용도 1콜이라, 빈 목록 전용 마커 행을 두는
      * 것보다 단순하다. intro는 값 없음이 흔해 래퍼로 구분한다(아래).
      */
-    fun findGallery(contentId: String, locale: DomainLocale): List<SpotImage>?
-    fun saveGallery(contentId: String, locale: DomainLocale, gallery: List<SpotImage>)
+    fun findGallery(spotId: Long): List<SpotImage>?
+    fun saveGallery(spotId: Long, gallery: List<SpotImage>)
 
     /**
      * 운영 정보. 미적재면 null, **적재됐으나 값이 없으면 `StoredIntro(null)`**.
      * intro는 정상적으로 null일 수 있어 래퍼 없이는 두 상태를 구분할 수 없다.
      */
-    fun findIntro(contentId: String, locale: DomainLocale, category: SpotCategory): StoredIntro?
-    fun saveIntro(contentId: String, locale: DomainLocale, category: SpotCategory, intro: SpotIntro?)
+    fun findIntro(spotId: Long, category: SpotCategory): StoredIntro?
+    fun saveIntro(spotId: Long, category: SpotCategory, intro: SpotIntro?)
 
     /** 이용안내. 미적재면 null. 빈 목록은 갤러리와 같은 이유로 미적재와 구분하지 않는다. */
-    fun findInfoItems(contentId: String, locale: DomainLocale, category: SpotCategory): List<SpotInfoItem>?
-    fun saveInfoItems(contentId: String, locale: DomainLocale, category: SpotCategory, items: List<SpotInfoItem>)
+    fun findInfoItems(spotId: Long, category: SpotCategory): List<SpotInfoItem>?
+    fun saveInfoItems(spotId: Long, category: SpotCategory, items: List<SpotInfoItem>)
 }
 
 /** 적재 여부와 "값이 null임"을 구분하기 위한 래퍼(intro 전용). */

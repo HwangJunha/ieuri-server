@@ -31,7 +31,7 @@ data class SpotPageView(
  * spots 응답의 read DTO(카드 1장). 리졸버가 GraphQL Spot 타입으로 매핑한다(application은 DGS 무의존).
  */
 data class SpotView(
-    val id: String,
+    val id: Long,
     val title: String,
     val address: String?,
     val thumbnailImageUrl: String,
@@ -49,7 +49,7 @@ data class SpotView(
  * 여기 담지 않는다(필드별 지연 조회).
  */
 data class SpotDetailView(
-    val id: String,
+    val id: Long,
     val title: String,
     val category: SpotCategory,
     val thumbnailImageUrl: String,

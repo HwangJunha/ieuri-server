@@ -19,7 +19,6 @@ import org.around.ieuri.tourism.domain.vo.SpotIntro
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class CachedSpotDetail(
-    val id: String = "",
     val title: String = "",
     val category: SpotCategory = SpotCategory.TOURIST_SPOT,
     val thumbnailImageUrl: String = "",
@@ -30,7 +29,6 @@ data class CachedSpotDetail(
     val copyright: CopyrightType = CopyrightType.UNSPECIFIED,
 ) {
     fun toDomain(): SpotDetail = SpotDetail(
-        id = id,
         title = title,
         category = category,
         thumbnailImageUrl = thumbnailImageUrl,
@@ -44,7 +42,6 @@ data class CachedSpotDetail(
 
     companion object {
         fun from(detail: SpotDetail): CachedSpotDetail = CachedSpotDetail(
-            id = detail.id,
             title = detail.title,
             category = detail.category,
             thumbnailImageUrl = detail.thumbnailImageUrl,

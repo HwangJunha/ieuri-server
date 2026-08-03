@@ -38,8 +38,8 @@ class MemberQueryResolver(
 
     @DgsQuery
     @RequiresPermission(Permission.MEMBER_READ)
-    fun member(@InputArgument id: String): GqlMemberDetail =
-        memberQueryUseCase.member(id.toLong()).toGql()
+    fun member(@InputArgument id: Long): GqlMemberDetail =
+        memberQueryUseCase.member(id).toGql()
 
     @DgsQuery
     @RequiresPermission(Permission.MEMBER_READ)
@@ -61,7 +61,7 @@ class MemberQueryResolver(
     }
 
     private fun MeView.toGql(): GqlMe = GqlMe(
-        id = memberId.toString(),
+        id = memberId,
         email = email,
         nickname = nickname,
         profileImageUrl = profileImageUrl,
@@ -73,7 +73,7 @@ class MemberQueryResolver(
     )
 
     private fun MemberDetailView.toGql(): GqlMemberDetail = GqlMemberDetail(
-        id = memberId.toString(),
+        id = memberId,
         email = email,
         nickname = nickname,
         profileImageUrl = profileImageUrl,
@@ -98,7 +98,7 @@ class MemberQueryResolver(
     )
 
     private fun MemberSummaryView.toGql(): GqlMemberSummary = GqlMemberSummary(
-        id = memberId.toString(),
+        id = memberId,
         nickname = nickname,
         status = GqlMemberStatus.valueOf(status.name),
         roles = roles,

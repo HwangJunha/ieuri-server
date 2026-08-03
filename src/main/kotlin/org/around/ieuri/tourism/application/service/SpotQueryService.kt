@@ -1,6 +1,7 @@
 package org.around.ieuri.tourism.application.service
 
 import org.around.ieuri.tourism.application.exception.CategoryNotAvailableForLocaleException
+import org.around.ieuri.tourism.application.exception.SpotDetailNotFoundException
 import org.around.ieuri.tourism.application.exception.InvalidCoordinatesException
 import org.around.ieuri.tourism.application.exception.RadiusTooLargeException
 import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
@@ -15,6 +16,7 @@ import org.around.ieuri.tourism.application.event.SpotInfoItemsFetched
 import org.around.ieuri.tourism.application.event.SpotIntroFetched
 import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
 import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch
+import org.around.ieuri.tourism.application.port.out.query.SpotIdentity
 import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
 import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
 import org.around.ieuri.tourism.application.query.SpotDetailView
@@ -73,14 +75,14 @@ class SpotQueryService(
 
         // 로그인 회원이 이미 반응(좋아요/패스)한 관광지 제외 — 중복 노출 방지. 비로그인은 제외 없음.
         // **DB 쿼리 단계에서 제외한다** — 조회 후 걸러내면 페이지가 요청한 size보다 작아진다.
-        val excluded = memberId?.let { spotQueryPort.findReactedContentIds(it, locale) }.orEmpty()
+        val excluded = memberId?.let { spotQueryPort.findReactedSpotIds(it, locale) }.orEmpty()
 
         val search = NearbySpotSearch(
             language = locale,
             center = center,
             radiusMeters = query.radiusMeters,
             category = query.category,
-            excludedContentIds = excluded,
+            excludedSpotIds = excluded,
             limit = size,
             offset = (page - 1) * size,
         )
@@ -106,71 +108,75 @@ class SpotQueryService(
      * 무소모 — AC-19). 오류는 예외로 전파되므로 캐시에 남지 않는다.
      * 갤러리·운영정보·이용안내·좋아요 수는 각 필드가 요청될 때 아래 메서드로 따로 조회한다.
      */
-    override fun spotDetail(contentId: String, locale: DomainLocale): SpotDetailView {
-        spotCachePort.getDetail(contentId, locale)?.let { return it.toView() }
+    override fun spotDetail(spotId: Long, locale: DomainLocale): SpotDetailView {
+        val identity = resolve(spotId, locale)
+        spotCachePort.getDetail(spotId)?.let { return it.toView(spotId) }
 
         // DB 히트: Valkey를 충전하고 upstream은 건드리지 않는다(AC-35).
-        spotDetailStorePort.findDetail(contentId, locale)?.let { stored ->
-            spotCachePort.putDetail(contentId, locale, stored)
-            return stored.toView()
+        spotDetailStorePort.findDetail(spotId)?.let { stored ->
+            spotCachePort.putDetail(spotId, stored)
+            return stored.toView(spotId)
         }
 
         // 양쪽 미스: upstream 조회 후 캐시 충전 + 적재 이벤트 발행(AC-36·AC-39).
-        val fetched = tourInfoPort.findDetail(query(contentId, locale))
-        spotCachePort.putDetail(contentId, locale, fetched)
-        eventPublisher.publish(SpotDetailFetched(contentId, locale, fetched))
-        return fetched.toView()
+        val fetched = tourInfoPort.findDetail(identity.toQuery(locale))
+        spotCachePort.putDetail(spotId, fetched)
+        eventPublisher.publish(SpotDetailFetched(spotId, fetched))
+        return fetched.toView(spotId)
     }
 
-    override fun spotGallery(contentId: String, locale: DomainLocale): List<SpotImageView> {
-        spotCachePort.getGallery(contentId, locale)?.let { return it.map { image -> image.toView() } }
+    override fun spotGallery(spotId: Long, locale: DomainLocale): List<SpotImageView> {
+        val identity = resolve(spotId, locale)
+        spotCachePort.getGallery(spotId)?.let { return it.map { image -> image.toView() } }
 
-        spotDetailStorePort.findGallery(contentId, locale)?.let { stored ->
-            spotCachePort.putGallery(contentId, locale, stored)
+        spotDetailStorePort.findGallery(spotId)?.let { stored ->
+            spotCachePort.putGallery(spotId, stored)
             return stored.map { it.toView() }
         }
 
-        val fetched = tourInfoPort.findGallery(query(contentId, locale))
-        spotCachePort.putGallery(contentId, locale, fetched)
-        eventPublisher.publish(SpotGalleryFetched(contentId, locale, fetched))
+        val fetched = tourInfoPort.findGallery(identity.toQuery(locale))
+        spotCachePort.putGallery(spotId, fetched)
+        eventPublisher.publish(SpotGalleryFetched(spotId, fetched))
         return fetched.map { it.toView() }
     }
 
-    override fun spotIntro(contentId: String, category: SpotCategory, locale: DomainLocale): SpotIntroView? {
+    override fun spotIntro(spotId: Long, category: SpotCategory, locale: DomainLocale): SpotIntroView? {
+        val identity = resolve(spotId, locale)
         // 히트 판정은 래퍼(non-null)로 한다 — 값 자체는 정상적으로 null일 수 있어, value로 판정하면
         // "값 없음"이 매번 캐시 미스로 취급돼 upstream을 계속 두드리게 된다.
-        val cached = spotCachePort.getIntro(contentId, locale, category)
+        val cached = spotCachePort.getIntro(spotId, category)
         if (cached != null) return cached.value?.toView()
 
         // DB도 같은 이유로 래퍼를 쓴다 — "적재됐으나 값 없음"을 미스로 오판하면 upstream을 계속 친다.
-        val stored = spotDetailStorePort.findIntro(contentId, locale, category)
+        val stored = spotDetailStorePort.findIntro(spotId, category)
         if (stored != null) {
-            spotCachePort.putIntro(contentId, locale, category, stored.value)
+            spotCachePort.putIntro(spotId, category, stored.value)
             return stored.value?.toView()
         }
 
-        val intro = tourInfoPort.findIntro(query(contentId, locale), category)
-        spotCachePort.putIntro(contentId, locale, category, intro)
-        eventPublisher.publish(SpotIntroFetched(contentId, locale, category, intro))
+        val intro = tourInfoPort.findIntro(identity.toQuery(locale), category)
+        spotCachePort.putIntro(spotId, category, intro)
+        eventPublisher.publish(SpotIntroFetched(spotId, category, intro))
         return intro?.toView()
     }
 
     override fun spotInfoItems(
-        contentId: String,
+        spotId: Long,
         category: SpotCategory,
         locale: DomainLocale,
     ): List<SpotInfoItemView> {
-        spotCachePort.getInfoItems(contentId, locale, category)
+        val identity = resolve(spotId, locale)
+        spotCachePort.getInfoItems(spotId, category)
             ?.let { return it.map { item -> SpotInfoItemView(item.name, item.text) } }
 
-        spotDetailStorePort.findInfoItems(contentId, locale, category)?.let { stored ->
-            spotCachePort.putInfoItems(contentId, locale, category, stored)
+        spotDetailStorePort.findInfoItems(spotId, category)?.let { stored ->
+            spotCachePort.putInfoItems(spotId, category, stored)
             return stored.map { SpotInfoItemView(it.name, it.text) }
         }
 
-        val fetched = tourInfoPort.findInfoItems(query(contentId, locale), category)
-        spotCachePort.putInfoItems(contentId, locale, category, fetched)
-        eventPublisher.publish(SpotInfoItemsFetched(contentId, locale, category, fetched))
+        val fetched = tourInfoPort.findInfoItems(identity.toQuery(locale), category)
+        spotCachePort.putInfoItems(spotId, category, fetched)
+        eventPublisher.publish(SpotInfoItemsFetched(spotId, category, fetched))
         return fetched.map { SpotInfoItemView(it.name, it.text) }
     }
 
@@ -179,10 +185,27 @@ class SpotQueryService(
      * **3단 폴백 경로에 넣지 않는다**(AC-38) — spot_reaction 기반이라 TourInfoPort와 완전히 다른
      * 포트이며, write-behind는 upstream 파생 데이터만 다룬다.
      */
-    override fun spotLikeCount(contentId: String, locale: DomainLocale): Long =
-        spotQueryPort.countLikes(contentId, locale)
+    override fun spotLikeCount(spotId: Long): Long = spotQueryPort.countLikes(spotId)
 
-    private fun query(contentId: String, locale: DomainLocale) =
+    /**
+     * `spot.id`를 해석하고 **요청 언어와 일치하는지 검증한다.**
+     *
+     * **캐시·DB를 보기 전에 호출해야 한다.** 검증을 upstream 폴백 직전에 두면 캐시 히트·DB 히트에서
+     * 그대로 통과해, 정작 흔한 경로에서 교차 언어 콘텐츠가 나간다. `spot_detail`과 캐시 키 모두
+     * 언어를 들지 않으므로(V20) 그 단계에서는 언어를 스스로 판별할 수 없다.
+     *
+     * 요청 언어와 다른 언어의 id는 **존재하지 않는 것으로 취급한다.** 클라이언트가 언어를 바꾸면
+     * 목록을 다시 받아야 하며, 이전 언어의 id로 상세를 요청하는 것은 버그다 — 조용히 다른 언어를
+     * 돌려주면 그 버그가 드러나지 않는다.
+     */
+    private fun resolve(spotId: Long, locale: DomainLocale): SpotIdentity {
+        val identity = spotQueryPort.findIdentity(spotId) ?: throw SpotDetailNotFoundException()
+        if (identity.language != locale) throw SpotDetailNotFoundException()
+        return identity
+    }
+
+    /** upstream 조회 좌표. TourAPI는 우리 PK를 모르므로 해석된 contentId로 묻는다. */
+    private fun SpotIdentity.toQuery(locale: DomainLocale) =
         SpotDetailQuery(contentId = contentId, locale = locale)
 
     private fun validatedCenter(latitude: Double, longitude: Double): Coordinates =
@@ -205,8 +228,9 @@ class SpotQueryService(
         }
     }
 
-    private fun SpotDetail.toView(): SpotDetailView = SpotDetailView(
-        id = id,
+    /** 어댑터가 만든 본문에 요청받은 `spot.id`를 얹는다 — 캐시·DB·upstream 어느 경로도 우리 PK를 모른다. */
+    private fun SpotDetail.toView(spotId: Long): SpotDetailView = SpotDetailView(
+        id = spotId,
         title = title,
         category = category,
         thumbnailImageUrl = thumbnailImageUrl,
@@ -242,7 +266,7 @@ class SpotQueryService(
      * 거리는 DB가 계산한 값을 그대로 쓴다.
      */
     private fun SpotSearchResult.toView(): SpotView = SpotView(
-        id = contentId,
+        id = spotId,
         title = title,
         address = address,
         thumbnailImageUrl = thumbnailImageUrl,

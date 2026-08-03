@@ -16,7 +16,6 @@ class SpotDetailTest {
         copyright: CopyrightType = CopyrightType.TYPE1,
         likeCount: Long = 0,
     ) = SpotDetail(
-        id = "100",
         title = "경복궁",
         category = SpotCategory.TOURIST_SPOT,
         thumbnailImageUrl = "https://img/100.jpg",
@@ -38,7 +37,6 @@ class SpotDetailTest {
         val base = detail(likeCount = 0)
         val withLikes = base.withLikeCount(7)
         assertEquals(7, withLikes.likeCount)
-        assertEquals(base.id, withLikes.id)
         assertEquals(0, base.likeCount) // 원본 불변
     }
 
@@ -55,8 +53,8 @@ class SpotDetailTest {
     }
 
     @Test
-    fun `id·title이 비면 거부한다`() {
-        assertFailsWith<IllegalArgumentException> { detail().copy(id = "") }
+    fun `title이 비면 거부한다`() {
+        // id 불변식은 사라졌다(V20) — 이 모델은 식별자를 담지 않고 읽기 DTO가 소유한다.
         assertFailsWith<IllegalArgumentException> { detail().copy(title = " ") }
     }
 

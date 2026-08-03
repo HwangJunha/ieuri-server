@@ -33,26 +33,26 @@ class SpotDetailWriteBehindListener(
 
     @Async(TourismAsyncConfig.WRITE_BEHIND_EXECUTOR)
     @EventListener
-    fun on(event: SpotDetailFetched) = runSafely("detail:${event.contentId}") {
-        store.saveDetail(event.contentId, event.locale, event.detail)
+    fun on(event: SpotDetailFetched) = runSafely("detail:${event.spotId}") {
+        store.saveDetail(event.spotId, event.detail)
     }
 
     @Async(TourismAsyncConfig.WRITE_BEHIND_EXECUTOR)
     @EventListener
-    fun on(event: SpotGalleryFetched) = runSafely("gallery:${event.contentId}") {
-        store.saveGallery(event.contentId, event.locale, event.gallery)
+    fun on(event: SpotGalleryFetched) = runSafely("gallery:${event.spotId}") {
+        store.saveGallery(event.spotId, event.gallery)
     }
 
     @Async(TourismAsyncConfig.WRITE_BEHIND_EXECUTOR)
     @EventListener
-    fun on(event: SpotIntroFetched) = runSafely("intro:${event.contentId}") {
-        store.saveIntro(event.contentId, event.locale, event.category, event.intro)
+    fun on(event: SpotIntroFetched) = runSafely("intro:${event.spotId}") {
+        store.saveIntro(event.spotId, event.category, event.intro)
     }
 
     @Async(TourismAsyncConfig.WRITE_BEHIND_EXECUTOR)
     @EventListener
-    fun on(event: SpotInfoItemsFetched) = runSafely("info:${event.contentId}") {
-        store.saveInfoItems(event.contentId, event.locale, event.category, event.items)
+    fun on(event: SpotInfoItemsFetched) = runSafely("info:${event.spotId}") {
+        store.saveInfoItems(event.spotId, event.category, event.items)
     }
 
     private fun runSafely(label: String, task: () -> Unit) {

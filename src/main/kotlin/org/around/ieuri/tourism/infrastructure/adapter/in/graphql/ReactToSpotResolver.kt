@@ -6,7 +6,6 @@ import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.tourism.application.command.ReactToSpotCommand
 import org.around.ieuri.tourism.application.port.`in`.command.ReactToSpotUseCase
 import org.around.ieuri.tourism.domain.vo.ReactionType
-import org.around.ieuri.tourism.infrastructure.locale.LocaleContext
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.common.graphql.generated.types.ReactToSpotInput
 import org.around.ieuri.common.graphql.generated.types.ReactToSpotPayload
@@ -23,7 +22,6 @@ import org.around.ieuri.common.graphql.generated.types.UserError
 class ReactToSpotResolver(
     private val reactToSpotUseCase: ReactToSpotUseCase,
     private val currentMemberProvider: CurrentMemberProvider,
-    private val localeContext: LocaleContext,
 ) {
     @DgsMutation
     fun reactToSpot(@InputArgument input: ReactToSpotInput): ReactToSpotPayload = withReactionUserErrors(
@@ -40,7 +38,6 @@ class ReactToSpotResolver(
                 reaction = ReactionType.valueOf(input.reaction.name),
             ),
             memberId = memberId,
-            locale = localeContext.locale,
         )
         ReactToSpotPayload(success = true, userErrors = emptyList())
     }
