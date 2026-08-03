@@ -133,12 +133,12 @@ input ResetPasswordInput {
 
 input VerifyEmailInput {
     "가입 응답으로 받은 검증 핸들(email_verification.public_id)."
-    verificationId: ID!
+    verificationId: String!
     code: String!
 }
 
 input ResendVerificationInput {
-    verificationId: ID!
+    verificationId: String!
 }
 
 type RegisterSnsMemberPayload implements BaseResponse {
@@ -147,14 +147,14 @@ type RegisterSnsMemberPayload implements BaseResponse {
     "성공 시 채워짐. 이메일 검증 완료 여부."
     emailVerified: Boolean
     "미검증인 경우에만 채워지는 검증 핸들."
-    verificationId: ID
+    verificationId: String
 }
 
 type RegisterEmailMemberPayload implements BaseResponse {
     success: Boolean!
     userErrors: [UserError!]!
     "이메일 인증 코드 검증에 사용할 핸들(가입 성공 시 채워짐)."
-    verificationId: ID
+    verificationId: String
 }
 
 type RequestPasswordResetPayload implements BaseResponse {
@@ -181,7 +181,7 @@ type VerifyEmailPayload implements BaseResponse {
 type ResendVerificationPayload implements BaseResponse {
     success: Boolean!
     userErrors: [UserError!]!
-    verificationId: ID
+    verificationId: String
     expiresAt: String
 }
 

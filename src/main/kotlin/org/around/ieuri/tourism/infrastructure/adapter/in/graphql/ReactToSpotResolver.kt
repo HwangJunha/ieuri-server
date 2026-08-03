@@ -4,7 +4,6 @@ import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsMutation
 import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.tourism.application.command.ReactToSpotCommand
-import org.around.ieuri.tourism.application.exception.SpotNotFoundException
 import org.around.ieuri.tourism.application.port.`in`.command.ReactToSpotUseCase
 import org.around.ieuri.tourism.domain.vo.ReactionType
 import org.around.ieuri.common.security.CurrentMemberProvider
@@ -34,10 +33,7 @@ class ReactToSpotResolver(
 
         reactToSpotUseCase.react(
             command = ReactToSpotCommand(
-                // 숫자가 아니면 없는 관광지로 취급한다 — SpotNotFoundException은
-                // ReactionUserException이라 withReactionUserErrors가 붙잡아 userErrors[]로 낸다
-                // (인증 실패만 최상위 errors[], SPEC-0005 R15).
-                spotId = input.spotId.toLongOrNull() ?: throw SpotNotFoundException(),
+                spotId = input.spotId,
                 // GraphQL enum → 도메인 enum. 이름 체계가 어긋나면 valueOf가 즉시 실패한다.
                 reaction = ReactionType.valueOf(input.reaction.name),
             ),

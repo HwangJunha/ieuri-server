@@ -105,4 +105,11 @@ tasks.withType<com.netflix.graphql.dgs.codegen.gradle.GenerateJavaTask> {
     packageName = "org.around.ieuri.common.graphql.generated"
     generateClient = false
     language = "kotlin"
+    // GraphQL ID 스칼라를 Long으로 생성한다. codegen 기본값은 String이라 리졸버마다 toString/toLong
+    // 변환과 파싱 실패 분기가 생기는데, 이 스키마의 ID는 **전부 서버가 부여한 BIGINT PK**다
+    // (spot.id, member.id, terms.id …). 문자열로 받아 곧바로 되돌리는 왕복이 순수한 잡음이었다.
+    //
+    // 매핑을 두면 생성 타입까지 Long이 되어 **경계에서 한 번만 검증된다** — 형식이 틀린 id는
+    // 리졸버에 도달하기 전에 GraphQL이 자체 오류로 거부한다.
+    typeMapping = mutableMapOf("ID" to "kotlin.Long")
 }

@@ -74,12 +74,12 @@ class SpotQueryResolver(
      * 요구해서 지연 필드를 비워 둘 수 없다. 지연 필드의 소스로는 read DTO가 맞다(각 필드 리졸버가 여기서 id를 읽는다).
      */
     @DgsQuery
-    fun spotDetail(@InputArgument id: String): SpotDetailView =
-        spotQueryUseCase.spotDetail(spotId = id.toSpotId(), locale = localeContext.locale)
+    fun spotDetail(@InputArgument id: Long): SpotDetailView =
+        spotQueryUseCase.spotDetail(spotId = id, locale = localeContext.locale)
 
     @DgsData(parentType = "SpotDetail", field = "gallery")
     fun gallery(dfe: DgsDataFetchingEnvironment): List<GqlSpotImage> =
-        spotQueryUseCase.spotGallery(dfe.getSource<SpotDetailView>()!!.id, localeContext.locale)
+        spotQueryUseCase.spotGallery(dfe.spotId(), localeContext.locale)
             .map { it.toGql() }
 
     @DgsData(parentType = "SpotDetail", field = "intro")
@@ -88,7 +88,7 @@ class SpotQueryResolver(
         @InputArgument category: GqlSpotCategory,
     ): GqlSpotIntro? =
         spotQueryUseCase.spotIntro(
-            spotId = dfe.getSource<SpotDetailView>()!!.id,
+            spotId = dfe.spotId(),
             category = SpotCategory.valueOf(category.name),
             locale = localeContext.locale,
         )?.toGql()
@@ -99,7 +99,7 @@ class SpotQueryResolver(
         @InputArgument category: GqlSpotCategory,
     ): List<GqlSpotInfoItem> =
         spotQueryUseCase.spotInfoItems(
-            spotId = dfe.getSource<SpotDetailView>()!!.id,
+            spotId = dfe.spotId(),
             category = SpotCategory.valueOf(category.name),
             locale = localeContext.locale,
         ).map { GqlSpotInfoItem(name = it.name, text = it.text) }
@@ -107,7 +107,7 @@ class SpotQueryResolver(
     @DgsData(parentType = "SpotDetail", field = "likeCount")
     fun likeCount(dfe: DgsDataFetchingEnvironment): Int =
         // GraphQL likeCount는 Int!. 반응 수가 Int 범위를 넘을 일은 없다.
-        spotQueryUseCase.spotLikeCount(dfe.getSource<SpotDetailView>()!!.id).toInt()
+        spotQueryUseCase.spotLikeCount(dfe.spotId()).toInt()
 
     private fun SpotPageView.toGql(): GqlSpotPage = GqlSpotPage(
         items = items.map { it.toGql() },
@@ -117,7 +117,7 @@ class SpotQueryResolver(
     )
 
     private fun SpotView.toGql(): GqlSpot = GqlSpot(
-        id = id.toString(),
+        id = id,
         title = title,
         address = address,
         thumbnailImageUrl = thumbnailImageUrl,
@@ -154,11 +154,13 @@ class SpotQueryResolver(
     }
 
     /**
-     * GraphQL `ID!`(문자열) → `spot.id`. **숫자가 아니면 존재하지 않는 것으로 취급한다** —
-     * 식별자가 TourAPI contentId에서 우리 PK로 바뀌면서(V20), 옛 contentId를 그대로 보내는
-     * 클라이언트가 있을 수 있다. 파싱 실패를 별도 오류로 만들면 "없는 id"와 "형식이 틀린 id"를
-     * 클라이언트가 구분해 처리해야 하는데, 둘 다 대응은 같다(목록을 다시 받는다).
+     * 부모 `spotDetail`이 돌려준 read DTO에서 `spot.id`를 꺼낸다.
+     *
+     * `!!` 대신 명시적으로 실패시킨다 — 부모 리졸버가 반환한 값이라 실제로 null이 될 수 없지만,
+     * 그 보장은 DGS의 실행 순서에 달려 있어 타입이 증명하지 못한다. 단언 연산자는 그 사실을
+     * 숨기는 반면 이 쪽은 왜 안전한지를 남긴다.
      */
-    private fun String.toSpotId(): Long =
-        toLongOrNull() ?: throw SpotDetailNotFoundException()
+    private fun DgsDataFetchingEnvironment.spotId(): Long =
+        getSource<SpotDetailView>()?.id
+            ?: error("SpotDetail 필드 리졸버는 부모가 반환한 SpotDetailView를 소스로 받아야 한다.")
 }
