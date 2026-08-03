@@ -8,5 +8,5 @@ import org.around.ieuri.tourism.domain.vo.DomainLocale
  * [memberId]는 인증된 회원(리졸버가 SecurityContext에서 확립). 비로그인은 리졸버 또는 여기서 거부한다.
  */
 interface ReactToSpotUseCase {
-    fun react(command: ReactToSpotCommand, memberId: Long, locale: DomainLocale)
+    fun react(command: ReactToSpotCommand, memberId: Long)
 }

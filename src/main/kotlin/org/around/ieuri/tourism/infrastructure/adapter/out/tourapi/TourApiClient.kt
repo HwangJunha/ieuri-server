@@ -92,7 +92,6 @@ class TourApiClient(
 
     /** detailCommon2 item → 도메인 SpotDetail(본문). */
     fun mapDetail(common: TourApiDetailCommonResponse.Item, locale: DomainLocale): SpotDetail = SpotDetail(
-        id = common.contentid.orEmpty(),
         title = common.title.orEmpty(),
         category = category(common.contenttypeid, locale),
         thumbnailImageUrl = common.firstimage.toHttps(),

@@ -6,6 +6,7 @@ import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.tourism.application.port.`in`.query.SpotQueryUseCase
+import org.around.ieuri.tourism.application.exception.SpotDetailNotFoundException
 import org.around.ieuri.tourism.application.query.SpotDetailView
 import org.around.ieuri.tourism.application.query.SpotIntroView
 import org.around.ieuri.tourism.application.query.SpotImageView
@@ -74,7 +75,7 @@ class SpotQueryResolver(
      */
     @DgsQuery
     fun spotDetail(@InputArgument id: String): SpotDetailView =
-        spotQueryUseCase.spotDetail(contentId = id, locale = localeContext.locale)
+        spotQueryUseCase.spotDetail(spotId = id.toSpotId(), locale = localeContext.locale)
 
     @DgsData(parentType = "SpotDetail", field = "gallery")
     fun gallery(dfe: DgsDataFetchingEnvironment): List<GqlSpotImage> =
@@ -87,7 +88,7 @@ class SpotQueryResolver(
         @InputArgument category: GqlSpotCategory,
     ): GqlSpotIntro? =
         spotQueryUseCase.spotIntro(
-            contentId = dfe.getSource<SpotDetailView>()!!.id,
+            spotId = dfe.getSource<SpotDetailView>()!!.id,
             category = SpotCategory.valueOf(category.name),
             locale = localeContext.locale,
         )?.toGql()
@@ -98,7 +99,7 @@ class SpotQueryResolver(
         @InputArgument category: GqlSpotCategory,
     ): List<GqlSpotInfoItem> =
         spotQueryUseCase.spotInfoItems(
-            contentId = dfe.getSource<SpotDetailView>()!!.id,
+            spotId = dfe.getSource<SpotDetailView>()!!.id,
             category = SpotCategory.valueOf(category.name),
             locale = localeContext.locale,
         ).map { GqlSpotInfoItem(name = it.name, text = it.text) }
@@ -106,7 +107,7 @@ class SpotQueryResolver(
     @DgsData(parentType = "SpotDetail", field = "likeCount")
     fun likeCount(dfe: DgsDataFetchingEnvironment): Int =
         // GraphQL likeCount는 Int!. 반응 수가 Int 범위를 넘을 일은 없다.
-        spotQueryUseCase.spotLikeCount(dfe.getSource<SpotDetailView>()!!.id, localeContext.locale).toInt()
+        spotQueryUseCase.spotLikeCount(dfe.getSource<SpotDetailView>()!!.id).toInt()
 
     private fun SpotPageView.toGql(): GqlSpotPage = GqlSpotPage(
         items = items.map { it.toGql() },
@@ -116,7 +117,7 @@ class SpotQueryResolver(
     )
 
     private fun SpotView.toGql(): GqlSpot = GqlSpot(
-        id = id,
+        id = id.toString(),
         title = title,
         address = address,
         thumbnailImageUrl = thumbnailImageUrl,
@@ -151,4 +152,13 @@ class SpotQueryResolver(
         const val DEFAULT_PAGE = 1
         const val DEFAULT_SIZE = 100
     }
+
+    /**
+     * GraphQL `ID!`(문자열) → `spot.id`. **숫자가 아니면 존재하지 않는 것으로 취급한다** —
+     * 식별자가 TourAPI contentId에서 우리 PK로 바뀌면서(V20), 옛 contentId를 그대로 보내는
+     * 클라이언트가 있을 수 있다. 파싱 실패를 별도 오류로 만들면 "없는 id"와 "형식이 틀린 id"를
+     * 클라이언트가 구분해 처리해야 하는데, 둘 다 대응은 같다(목록을 다시 받는다).
+     */
+    private fun String.toSpotId(): Long =
+        toLongOrNull() ?: throw SpotDetailNotFoundException()
 }

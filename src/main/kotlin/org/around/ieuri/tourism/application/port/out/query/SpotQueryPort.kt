@@ -30,14 +30,26 @@ interface SpotQueryPort {
      * 넘겨야 해서(그래야 페이지가 size보다 작아지지 않는다) 후보를 미리 알 수 없다.
      * 반응 기록은 회원당 많아야 수천 건 규모라 전량 조회가 현실적이다.
      */
-    fun findReactedContentIds(memberId: Long, language: DomainLocale): Set<String>
+    fun findReactedSpotIds(memberId: Long, language: DomainLocale): Set<Long>
 
     /**
      * 이 contentId·언어에 대한 LIKE 반응 수(SPEC-0003 §5). DISLIKE는 세지 않고, 언어를 넘어 합산하지 않는다
      * (키가 (content_id, language)라 언어별 분리 — SPEC-0002의 알려진 한계 상속). 반응이 없으면 0.
      * 상세 조회 시 캐시와 무관하게 매번 실시간 집계한다(likeCount는 캐시 비대상).
      */
-    fun countLikes(contentId: String, language: DomainLocale): Long
+    fun countLikes(spotId: Long): Long
+
+    /**
+     * `spot.id`에 대응하는 upstream 좌표. **상세 조회가 캐시·DB를 모두 놓쳤을 때만 필요하다** —
+     * TourAPI는 우리 PK를 모르므로 `contentId`로 물어야 하기 때문이다.
+     *
+     * 반환된 [SpotIdentity.language]는 **언어 교차 id를 거부하는 근거**이기도 하다. 요청 언어와
+     * 다르면 존재하지 않는 것으로 취급한다 — 조용히 다른 언어 콘텐츠를 돌려주면 클라이언트의
+     * 언어 전환 버그가 드러나지 않는다.
+     *
+     * 없으면 null(= 존재하지 않는 spot).
+     */
+    fun findIdentity(spotId: Long): SpotIdentity?
 }
 
 /**
@@ -50,7 +62,7 @@ data class NearbySpotSearch(
     val center: Coordinates,
     val radiusMeters: Int,
     val category: SpotCategory?,
-    val excludedContentIds: Set<String>,
+    val excludedSpotIds: Set<Long>,
     val limit: Int,
     val offset: Int,
 )
@@ -61,7 +73,7 @@ data class NearbySpotSearch(
  * attributionText는 copyright에서 파생되므로 담지 않는다 — 서비스가 도출한다.
  */
 data class SpotSearchResult(
-    val contentId: String,
+    val spotId: Long,
     val title: String,
     val address: String?,
     val thumbnailImageUrl: String,
@@ -70,4 +82,15 @@ data class SpotSearchResult(
     val category: SpotCategory,
     val copyright: CopyrightType,
     val distanceMeters: Double,
+)
+
+/**
+ * `spot.id`가 가리키는 행의 upstream 식별 정보. **상세 조회의 TourAPI 폴백과 언어 검증에만 쓴다.**
+ *
+ * 이 타입이 존재하는 이유는 외부 식별자(`spot.id`)와 upstream 식별자(`contentId`)가 분리됐기
+ * 때문이다. 분리 이전에는 둘이 같아서 변환이 필요 없었다.
+ */
+data class SpotIdentity(
+    val contentId: String,
+    val language: DomainLocale,
 )

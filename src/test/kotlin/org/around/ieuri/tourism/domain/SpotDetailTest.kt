@@ -16,7 +16,7 @@ class SpotDetailTest {
         copyright: CopyrightType = CopyrightType.TYPE1,
         likeCount: Long = 0,
     ) = SpotDetail(
-        id = "100",
+        id = 100L,
         title = "경복궁",
         category = SpotCategory.TOURIST_SPOT,
         thumbnailImageUrl = "https://img/100.jpg",
@@ -55,8 +55,10 @@ class SpotDetailTest {
     }
 
     @Test
-    fun `id·title이 비면 거부한다`() {
-        assertFailsWith<IllegalArgumentException> { detail().copy(id = "") }
+    fun `id가 음수이거나 title이 비면 거부한다`() {
+        // id는 Long이 되어(V20) "비어 있음"이라는 상태가 사라졌다 — 음수만 막으면 된다.
+        // 0은 "아직 식별자가 얹히지 않은" 정상 상태이므로 거부하지 않는다.
+        assertFailsWith<IllegalArgumentException> { detail().copy(id = -1L) }
         assertFailsWith<IllegalArgumentException> { detail().copy(title = " ") }
     }
 

@@ -7,10 +7,10 @@ import org.around.ieuri.tourism.domain.vo.ReactionType
  * 형식 검증(빈 값)만 여기서, 인증·resolve 판정은 서비스에서 한다.
  */
 data class ReactToSpotCommand(
-    val spotId: String,
+    val spotId: Long,
     val reaction: ReactionType,
 ) {
     init {
-        require(spotId.isNotBlank()) { "spotId는 필수입니다." }
+        require(spotId > 0) { "spotId는 양수여야 합니다." }
     }
 }

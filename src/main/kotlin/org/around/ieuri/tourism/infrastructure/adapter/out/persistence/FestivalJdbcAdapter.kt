@@ -31,16 +31,15 @@ class FestivalJdbcAdapter(
         if (festivals.isEmpty()) return 0
         val syncedTimestamp = Timestamp.from(syncedAt)
         val setter = ParameterizedPreparedStatementSetter<SyncFestivalCommand> { ps: PreparedStatement, festival ->
-            ps.setString(1, festival.contentId)
-            ps.setString(2, festival.language.name)
-            ps.setDate(3, Date.valueOf(festival.period.start))
-            ps.setDate(4, Date.valueOf(festival.period.end))
-            ps.setString(5, festival.progressType)
-            ps.setString(6, festival.festivalType)
-            ps.setTimestamp(7, syncedTimestamp)
-            // 부모 존재 확인(EXISTS) 절이 같은 키를 한 번 더 요구한다 — 아래 UPSERT_SQL 주석 참조.
-            ps.setString(8, festival.contentId)
-            ps.setString(9, festival.language.name)
+            ps.setDate(1, Date.valueOf(festival.period.start))
+            ps.setDate(2, Date.valueOf(festival.period.end))
+            ps.setString(3, festival.progressType)
+            ps.setString(4, festival.festivalType)
+            ps.setTimestamp(5, syncedTimestamp)
+            // 부모 조회(SELECT ... FROM spot)가 자연키를 요구한다 — 적재 입력은 여전히 TourAPI
+            // contentId 기반이므로 여기서 spot.id로 해석한다.
+            ps.setString(6, festival.contentId)
+            ps.setString(7, festival.language.name)
         }
         return jdbcTemplate.batchUpdate(UPSERT_SQL, festivals, festivals.size, setter)
             .sumOf { chunk -> chunk.count { it != 0 } }
@@ -71,7 +70,11 @@ class FestivalJdbcAdapter(
         require(survivingContentIds.isNotEmpty()) { "생존 집합이 비어 있으면 정리하지 않는다." }
 
         val doomed = jdbcTemplate.queryForList(
-            "SELECT content_id FROM spot_festival WHERE language = ?",
+            """
+            SELECT s.content_id FROM spot_festival f
+            JOIN spot s ON s.id = f.spot_id
+            WHERE s.language = ?
+            """.trimIndent(),
             String::class.java,
             language.name,
         ).filterNotNull().filterNot { it in survivingContentIds }
@@ -101,8 +104,9 @@ class FestivalJdbcAdapter(
     override fun findEndedContentIds(language: DomainLocale, asOf: LocalDate): Set<String> =
         jdbcTemplate.queryForList(
             """
-            SELECT content_id FROM spot_festival
-            WHERE language = ? AND event_end_date < ?
+            SELECT s.content_id FROM spot_festival f
+            JOIN spot s ON s.id = f.spot_id
+            WHERE s.language = ? AND f.event_end_date < ?
             """.trimIndent(),
             String::class.java,
             language.name,
@@ -126,12 +130,12 @@ class FestivalJdbcAdapter(
          */
         val UPSERT_SQL = """
             INSERT INTO spot_festival (
-                spot_id, content_id, language, event_start_date, event_end_date,
+                spot_id, event_start_date, event_end_date,
                 progress_type, festival_type, last_synced_at
             )
-            SELECT s.id, ?, ?, ?, ?, ?, ?, ?
+            SELECT s.id, ?, ?, ?, ?, ?
             FROM spot s WHERE s.content_id = ? AND s.language = ?
-            ON CONFLICT (content_id, language) DO UPDATE SET
+            ON CONFLICT (spot_id) DO UPDATE SET
                 event_start_date = EXCLUDED.event_start_date,
                 event_end_date   = EXCLUDED.event_end_date,
                 progress_type    = EXCLUDED.progress_type,

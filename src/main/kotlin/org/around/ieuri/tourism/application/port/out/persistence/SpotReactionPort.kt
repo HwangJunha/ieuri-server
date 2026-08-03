@@ -9,7 +9,7 @@ import org.around.ieuri.tourism.domain.vo.DomainLocale
  */
 interface SpotReactionPort {
     /** 기존 기록을 로드(재평가 시 관리 엔티티에 도메인 변경을 얹기 위함). 없으면 null. */
-    fun find(memberId: Long, contentId: String, language: DomainLocale): SpotReaction?
+    fun find(memberId: Long, spotId: Long): SpotReaction?
 
     /** 신규 생성 또는 재평가 저장(upsert). */
     fun save(reaction: SpotReaction)

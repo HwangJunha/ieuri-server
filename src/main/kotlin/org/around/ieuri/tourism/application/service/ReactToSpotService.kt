@@ -4,7 +4,6 @@ import org.around.ieuri.tourism.application.command.ReactToSpotCommand
 import org.around.ieuri.tourism.application.port.`in`.command.ReactToSpotUseCase
 import org.around.ieuri.tourism.application.port.out.persistence.SpotReactionPort
 import org.around.ieuri.tourism.domain.aggregate.SpotReaction
-import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -23,8 +22,8 @@ class ReactToSpotService(
 ) : ReactToSpotUseCase {
 
     @Transactional
-    override fun react(command: ReactToSpotCommand, memberId: Long, locale: DomainLocale) {
-        val existing = spotReactionPort.find(memberId, command.spotId, locale)
+    override fun react(command: ReactToSpotCommand, memberId: Long) {
+        val existing = spotReactionPort.find(memberId, command.spotId)
         if (existing != null) {
             existing.reevaluate(command.reaction)
             spotReactionPort.save(existing)
@@ -32,8 +31,7 @@ class ReactToSpotService(
         }
         val reaction = SpotReaction.record(
             memberId = memberId,
-            contentId = command.spotId,
-            language = locale,
+            spotId = command.spotId,
             reaction = command.reaction,
         )
         spotReactionPort.save(reaction)

@@ -10,7 +10,6 @@ import jakarta.persistence.Id
 import jakarta.persistence.PrePersist
 import jakarta.persistence.PreUpdate
 import jakarta.persistence.Table
-import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.ReactionType
 import java.time.Instant
 
@@ -30,22 +29,14 @@ class SpotReactionEntity(
     var memberId: Long,
 
     /**
-     * 부모 `spot` 행의 surrogate PK(V19). **참조 무결성과 CASCADE 전용이며 도메인은 이 값을 모른다** —
-     * `SpotReaction`에 대응 필드가 없고, 조회·업서트 판정은 여전히 자연키로 한다.
+     * 부모 `spot` 행의 surrogate PK. **이제 이것이 유일한 관광지 식별자다**(V20) — 자연키
+     * (content_id·language)가 자식에서 제거되어 upsert 단위도 `(member_id, spot_id)`가 됐다.
      *
-     * 연관(`@ManyToOne`)이 아니라 **plain 컬럼으로 둔다.** 이 값을 읽는 코드가 없어 연관을 걸면
-     * 지연 로딩 프록시와 N+1 위험만 늘고 얻는 것이 없다. 애그리거트 간 참조는 id로 한다는
-     * 프로젝트 규약과도 맞는다.
+     * 연관(`@ManyToOne`)이 아니라 plain 컬럼으로 둔다. `spot`을 객체로 로드할 일이 없어 연관을 걸면
+     * 지연 로딩 프록시와 N+1 위험만 늘고, 애그리거트 간 참조는 id로 한다는 규약과도 맞는다.
      */
     @Column(name = "spot_id", nullable = false)
     var spotId: Long,
-
-    @Column(name = "content_id", nullable = false, length = 32)
-    var contentId: String,
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "language", nullable = false, length = 2)
-    var language: DomainLocale,
 
     @Enumerated(EnumType.STRING)
     @Column(name = "reaction", nullable = false, length = 10)
