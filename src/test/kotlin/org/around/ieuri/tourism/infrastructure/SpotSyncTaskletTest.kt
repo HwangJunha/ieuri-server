@@ -12,16 +12,18 @@ import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
+import org.around.ieuri.tourism.infrastructure.batch.RUN_DATE_PARAMETER
 import org.around.ieuri.tourism.infrastructure.batch.SpotSyncTasklet
 import org.springframework.batch.core.job.JobExecution
 import org.springframework.batch.core.job.JobInstance
-import org.springframework.batch.core.job.parameters.JobParameters
+import org.springframework.batch.core.job.parameters.JobParametersBuilder
 import org.springframework.batch.core.scope.context.ChunkContext
 import org.springframework.batch.core.scope.context.StepContext
 import org.springframework.batch.core.step.StepContribution
 import org.springframework.batch.core.step.StepExecution
 import org.springframework.batch.infrastructure.repeat.RepeatStatus
 import java.time.Instant
+import java.time.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -53,9 +55,16 @@ class SpotSyncTaskletTest {
     private fun page(records: List<SyncSpotCommand>, totalCount: Int) =
         SpotSyncPage(records = records, totalCount = totalCount, droppedCount = 0, categoryFallbackCount = 0)
 
-    /** 실제 StepExecution — ExecutionContext가 진짜로 유지되어야 재개 동작을 검증할 수 있다. */
-    private fun stepExecution(): StepExecution =
-        StepExecution("syncLanguageStep-KO", JobExecution(1L, JobInstance(1L, "spotSyncJob"), JobParameters()))
+    /**
+     * 실제 StepExecution — ExecutionContext가 진짜로 유지되어야 재개 동작을 검증할 수 있다.
+     * `runDate` 잡 파라미터는 SPEC-0007의 종료 축제 제외 집합 조회 기준일이다.
+     */
+    private fun stepExecution(): StepExecution {
+        val parameters = JobParametersBuilder()
+            .addString(RUN_DATE_PARAMETER, RUN_DATE.toString())
+            .toJobParameters()
+        return StepExecution("syncLanguageStep-KO", JobExecution(1L, JobInstance(1L, "spotSyncJob"), parameters))
+    }
 
     private fun run(tasklet: SpotSyncTasklet, stepExecution: StepExecution): RepeatStatus? {
         val contribution = StepContribution(stepExecution)
@@ -63,12 +72,17 @@ class SpotSyncTaskletTest {
         return tasklet.execute(contribution, chunkContext)
     }
 
-    private fun tasklet(pageSize: Int = 1_000, cleanupMinRatio: Double = 0.5) = SpotSyncTasklet(
+    private fun tasklet(
+        pageSize: Int = 1_000,
+        cleanupMinRatio: Double = 0.5,
+        endedFestivalIds: Set<String> = emptySet(),
+    ) = SpotSyncTasklet(
         language = DomainLocale.KO,
         syncPort = syncPort,
         storePort = storePort,
         pageSize = pageSize,
         cleanupMinRatio = cleanupMinRatio,
+        endedFestivalIds = { endedFestivalIds },
     )
 
     @Test
@@ -247,5 +261,84 @@ class SpotSyncTaskletTest {
         val execution = stepExecution()
         run(tasklet(), execution) // 아직 페이지가 남음
         verify(exactly = 0) { storePort.deleteMissing(any(), any()) }
+    }
+
+    // ---------- 종료 축제 재삽입 방지 (SPEC-0007 R-9) ----------
+
+    @Test
+    fun `종료된 축제는 적재 대상에서 제외한다`() {
+        // AC-31·AC-32. areaBasedSyncList2에는 contentTypeId 파라미터가 없어 축제도 이 경로로 온다.
+        // 제외하지 않으면 같은 잡의 축제 정리가 지운 행사를 이 Step이 되살린다.
+        every { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) } returns
+            page(listOf(record("ended"), record("alive")), totalCount = 2)
+        every { storePort.upsertAll(any(), any()) } returns 1
+        every { storePort.countByLanguage(DomainLocale.KO) } returns 2L
+        every { storePort.deleteMissing(any(), any()) } returns 0
+
+        run(tasklet(endedFestivalIds = setOf("ended")), stepExecution())
+
+        verify(exactly = 1) { storePort.upsertAll(match { it.map(SyncSpotCommand::contentId) == listOf("alive") }, any()) }
+    }
+
+    @Test
+    fun `축제가 아닌 항목은 종료 판정의 영향을 받지 않는다`() {
+        // AC-33. 판정은 contentId 집합 멤버십뿐이다 — 카테고리·날짜를 여기서 다시 해석하지 않으므로
+        // 축제가 아닌 contentId는 애초에 제외 집합에 들어올 수 없다.
+        every { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) } returns
+            page(listOf(record("spot-1"), record("spot-2")), totalCount = 2)
+        every { storePort.upsertAll(any(), any()) } returns 2
+        every { storePort.countByLanguage(DomainLocale.KO) } returns 2L
+        every { storePort.deleteMissing(any(), any()) } returns 0
+
+        run(tasklet(endedFestivalIds = setOf("ended-festival")), stepExecution())
+
+        verify(exactly = 1) { storePort.upsertAll(match { it.size == 2 }, any()) }
+    }
+
+    @Test
+    fun `제외된 항목도 수집 집합에는 포함되어 이중 삭제되지 않는다`() {
+        // AC-34. collectedIds는 deleteMissing의 생존 집합이자 급감 게이트의 분자다. 제외분이 빠지면
+        // (1) 수집량이 실제보다 작아져 정리가 부당하게 스킵될 수 있고, (2) 제외분이 "사라진 항목"으로
+        // 삭제 대상에 들어가 삭제 건수가 이중으로 잡힌다.
+        every { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) } returns
+            page(listOf(record("ended"), record("alive")), totalCount = 2)
+        every { storePort.upsertAll(any(), any()) } returns 1
+        every { storePort.countByLanguage(DomainLocale.KO) } returns 2L
+        every { storePort.deleteMissing(any(), any()) } returns 0
+
+        val execution = stepExecution()
+        run(tasklet(endedFestivalIds = setOf("ended")), execution)
+
+        verify(exactly = 1) { storePort.deleteMissing(DomainLocale.KO, setOf("ended", "alive")) }
+        assertEquals(2, execution.executionContext.getInt(SpotSyncTasklet.KEY_COLLECTED))
+    }
+
+    @Test
+    fun `제외 집합은 Step당 한 번만 조회한다`() {
+        // 페이지마다 다시 조회하면 페이지당 질의가 하나씩 늘고, 하루 1회 배치에서 그만큼의 신선도가
+        // 필요하지도 않다. 부팅 시점이 아니라 실행 시점에 잡는 것이 요점이다.
+        every { syncPort.fetchPage(DomainLocale.KO, any(), 1_000) } returns
+            page(listOf(record("a")), totalCount = 3_000)
+        every { storePort.upsertAll(any(), any()) } returns 1
+
+        var lookups = 0
+        val tasklet = SpotSyncTasklet(
+            language = DomainLocale.KO,
+            syncPort = syncPort,
+            storePort = storePort,
+            pageSize = 1_000,
+            cleanupMinRatio = 0.5,
+            endedFestivalIds = { lookups++; emptySet() },
+        )
+
+        val execution = stepExecution()
+        run(tasklet, execution)
+        run(tasklet, execution)
+
+        assertEquals(1, lookups)
+    }
+
+    private companion object {
+        val RUN_DATE: LocalDate = LocalDate.of(2026, 8, 3)
     }
 }

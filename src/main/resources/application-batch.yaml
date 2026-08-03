@@ -18,14 +18,14 @@
 
 spring:
   batch:
-    jdbc:
-      # 메타 테이블 스키마는 Flyway가 소유한다(V14). Batch가 자체 초기화하면 그 DDL이
-      # flyway_schema_history에 남지 않아 스키마 형상 관리가 이원화된다.
-      initialize-schema: never
     job:
-      # 부팅 시 잡을 자동 실행하지 않는다. 실행 시점은 스케줄러(또는 CronJob)가 정한다 —
-      # 재배포마다 전량 동기화가 도는 것을 막는다.
+      # 부팅 시 자동 실행하지 않는다. 실행할 잡은 SpotSyncLauncher가 ieuri.tourapi.sync.job으로
+      # 선택한다 — 트리거가 둘이 되어 하루 두 번 도는 사고를 막는다.
+      # application.yaml에서 이미 끄지만, 배치 프로세스에서 특히 중요하므로 여기서도 명시한다.
       enabled: false
+
+  # spring.batch.jdbc.*는 두지 않는다 — Boot 4에 없는 키다. 메타데이터 저장소는
+  # BatchInfrastructureConfig의 @EnableJdbcJobRepository가 정하고, 스키마는 Flyway 소유다(V14).
 
   # 배치는 HTTP 표면을 갖지 않는다(POL-021: 배치는 내부 잡). CronJob으로 뜨는 파드가
   # 포트를 잡으면 API 파드와 충돌하고, 열어 둘 이유도 없다.
@@ -47,9 +47,17 @@ ieuri:
       # 업스트림 이상으로 대량 오삭제되는 것을 막는다.
       cleanup-min-ratio: ${IEURI_TOUR_SYNC_CLEANUP_MIN_RATIO:0.5}
 
-      # runDate 잡 파라미터의 시간대. "하루"의 경계를 정하므로 중복 실행 방지(AC-6)의 기준이다.
+      # runDate 잡 파라미터의 시간대. "하루"의 경계를 정하므로 중복 실행 방지(AC-6)의 기준이며,
+      # 축제 Step의 종료 판정 기준일도 같은 값에서 나온다(SPEC-0007).
       # 실행 스케줄 자체는 k8s CronJob이 소유한다 — 앱에는 스케줄러가 없다.
       zone: Asia/Seoul
+
+    # 축제 정보 수집(SPEC-0007). 같은 spotSyncJob 안에서 관광지 Step 뒤에 돈다 — 별도 잡·CronJob이
+    # 아니므로 스케줄 설정이 없다.
+    festival-sync:
+      # searchFestival2의 numOfRows. **이 오퍼레이션은 이 레포에서 호출된 적이 없어 상한이
+      # 실측되지 않았다([TBD-3]).** 관광지와 같은 1000으로 시작하고, 업스트림이 거부하면 이 값만 낮춘다.
+      page-size: ${IEURI_TOUR_FESTIVAL_PAGE_SIZE:1000}
 
 logging:
   level:

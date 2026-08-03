@@ -82,7 +82,9 @@ class TourApiSyncClient(
             thumbnailImageUrl = (firstimage?.takeIf { it.isNotBlank() } ?: return null).toHttps(),
             coordinates = coordinatesOrNull(mapy ?: return null, mapx ?: return null) ?: return null,
             category = category,
-            contentTypeId = contenttypeid?.toIntOrNull(),
+            // 값이 없거나 숫자가 아니면 드랍한다. 실측(2026-08-03, 121,913건)에서 한 건도 없었고,
+            // 없으면 카테고리 폴백을 사후에 질의할 수단이 사라진다(V13이 이 컬럼을 둔 이유).
+            contentTypeId = contenttypeid?.toIntOrNull() ?: return null,
             copyright = CopyrightType.fromCode(cpyrhtDivCd),
         )
     }

@@ -3,14 +3,12 @@ package org.around.ieuri.tourism.infrastructure.adapter.out.persistence
 import org.around.ieuri.tourism.application.command.SyncSpotCommand
 import org.around.ieuri.tourism.application.port.out.persistence.SpotStorePort
 import org.around.ieuri.tourism.domain.vo.DomainLocale
-import org.springframework.jdbc.core.BatchPreparedStatementSetter
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.ParameterizedPreparedStatementSetter
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import java.sql.PreparedStatement
 import java.sql.Timestamp
-import java.sql.Types
 import java.time.Instant
 
 /**
@@ -43,7 +41,7 @@ class SpotJpaAdapter(
             ps.setDouble(6, spot.coordinates.longitude)
             ps.setDouble(7, spot.coordinates.latitude)
             ps.setString(8, spot.category.name)
-            spot.contentTypeId?.let { ps.setInt(9, it) } ?: ps.setNull(9, Types.INTEGER)
+            ps.setInt(9, spot.contentTypeId)
             ps.setString(10, spot.copyright.name)
             ps.setTimestamp(11, syncedTimestamp)
         }
@@ -53,11 +51,25 @@ class SpotJpaAdapter(
     }
 
     /**
-     * 생존 집합을 **임시 테이블에 넣고 anti-join**으로 지운다. `NOT IN (...)`에 6만 개 파라미터를
-     * 넣으면 파서·플래너가 감당하지 못하고 드라이버 한도(65535)도 넘는다.
+     * 사라진 항목 삭제(R-5). **임시 테이블을 쓰지 않는다.**
      *
-     * 임시 테이블은 `ON COMMIT DROP`이라 트랜잭션이 끝나면 사라진다 — 동시 실행이나 실패 시
-     * 찌꺼기가 남지 않는다. 배치는 언어별 순차 실행이라 경합도 없다.
+     * 이전 구현은 생존 집합을 `CREATE TEMP TABLE ... ON COMMIT DROP`에 넣고 anti-join으로 지웠다.
+     * 세션 로컬이라 인스턴스 간 충돌은 없지만, **같은 세션(=커넥션)이 이 메서드를 두 번 타면 테이블이
+     * 이미 존재해 실패한다** — 언어별로 4번 호출되는 구조에서 커넥션이 재사용되면 그대로 걸리고,
+     * 애플리케이션을 여러 개로 확장하면 경합 가능성이 더 커진다. DDL을 배치 경로에서 없애는 편이
+     * 단순하고 안전하다.
+     *
+     * **대신 삭제 대상을 먼저 확정한 뒤 청크로 나눠 지운다.** `NOT IN (6만 건)`을 그대로 보내면
+     * 드라이버 파라미터 한도(65535)를 넘고 플래너도 감당하지 못하므로, 순서를 뒤집는다:
+     *
+     *  1. 그 언어의 **현존 contentId 전체**를 읽는다(언어당 최대 6만 건 ≈ 6MB, 이미 같은 규모의
+     *     생존 집합을 메모리에 들고 있으므로 새로운 부담이 아니다).
+     *  2. 메모리에서 생존 집합을 빼 **삭제 대상만** 남긴다.
+     *  3. 그 대상을 [DELETE_CHUNK_SIZE]씩 나눠 `IN (...)`으로 지운다.
+     *
+     * **여집합을 SQL이 아니라 메모리에서 계산하는 것이 핵심이다.** `NOT IN`을 청크로 쪼개면 각 청크가
+     * "그 청크에 없는 전부"를 지워 첫 청크에서 데이터가 날아간다 — 여집합은 분할 가능한 연산이
+     * 아니다. 반대로 삭제 대상 목록은 그냥 목록이라 얼마든지 나눌 수 있다.
      */
     @Transactional
     override fun deleteMissing(language: DomainLocale, survivingContentIds: Set<String>): Int {
@@ -65,25 +77,34 @@ class SpotJpaAdapter(
         // 이 한 줄이 없으면 게이트 버그가 곧 데이터 전량 손실이다(AC-14).
         require(survivingContentIds.isNotEmpty()) { "생존 집합이 비어 있으면 정리하지 않는다." }
 
-        jdbcTemplate.execute(
-            "CREATE TEMP TABLE surviving_spot (content_id VARCHAR(32) PRIMARY KEY) ON COMMIT DROP",
-        )
-        val ids = survivingContentIds.toList()
-        jdbcTemplate.batchUpdate(
-            "INSERT INTO surviving_spot (content_id) VALUES (?) ON CONFLICT DO NOTHING",
-            object : BatchPreparedStatementSetter {
-                override fun getBatchSize() = ids.size
-                override fun setValues(ps: PreparedStatement, i: Int) = ps.setString(1, ids[i])
-            },
-        )
-        return jdbcTemplate.update(
-            """
-            DELETE FROM spot s
-            WHERE s.language = ?
-              AND NOT EXISTS (SELECT 1 FROM surviving_spot t WHERE t.content_id = s.content_id)
-            """.trimIndent(),
+        val doomed = jdbcTemplate.queryForList(
+            "SELECT content_id FROM spot WHERE language = ?",
+            String::class.java,
             language.name,
-        )
+        ).filterNotNull().filterNot { it in survivingContentIds }
+
+        return deleteByContentIdsInChunks("spot", language, doomed)
+    }
+
+    /**
+     * [contentIds]를 [DELETE_CHUNK_SIZE]씩 나눠 삭제하고 총 삭제 행 수를 돌려준다.
+     *
+     * 한 트랜잭션 안에서 여러 번 `DELETE`를 치므로 부분 삭제로 끝나지 않는다 — 중간에 실패하면
+     * 전체가 롤백된다. 청크는 **파라미터 한도를 넘지 않기 위한 분할이지 커밋 경계가 아니다.**
+     */
+    private fun deleteByContentIdsInChunks(
+        table: String,
+        language: DomainLocale,
+        contentIds: List<String>,
+    ): Int {
+        if (contentIds.isEmpty()) return 0
+        return contentIds.chunked(DELETE_CHUNK_SIZE).sumOf { chunk ->
+            val placeholders = chunk.joinToString(",") { "?" }
+            jdbcTemplate.update(
+                "DELETE FROM $table WHERE language = ? AND content_id IN ($placeholders)",
+                language.name, *chunk.toTypedArray(),
+            )
+        }
     }
 
     @Transactional(readOnly = true)
@@ -95,6 +116,12 @@ class SpotJpaAdapter(
         ) ?: 0L
 
     private companion object {
+        /**
+         * 삭제 `IN` 절 하나에 넣을 최대 id 수. JDBC 드라이버 파라미터 한도(65535)에 여유를 두고,
+         * 플래너가 부담 없이 다루는 크기로 잡는다. 커밋 경계가 아니라 **분할 단위일 뿐이다.**
+         */
+        const val DELETE_CHUNK_SIZE = 1_000
+
         /**
          * `updated_at`은 **실제로 값이 바뀐 경우에만** 올린다(CASE 절). 무조건 갱신하면 매일 전 행이
          * 변경된 것처럼 보여 "실제로 바뀐 것"을 구분할 수 없어진다. `last_synced_at`은 반대로 항상
