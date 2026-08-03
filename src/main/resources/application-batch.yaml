@@ -20,8 +20,7 @@ spring:
   batch:
     job:
       # 부팅 시 자동 실행하지 않는다. 실행할 잡은 SpotSyncLauncher가 ieuri.tourapi.sync.job으로
-      # 선택한다 — 잡이 spotSyncJob·festivalSyncJob 둘이므로, 이걸 켜 두면 Boot가 어느 것을
-      # 돌릴지 몰라 기동이 실패한다("Job name must be specified in case of multiple jobs").
+      # 선택한다 — 트리거가 둘이 되어 하루 두 번 도는 사고를 막는다.
       # application.yaml에서 이미 끄지만, 배치 프로세스에서 특히 중요하므로 여기서도 명시한다.
       enabled: false
 

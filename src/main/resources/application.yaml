@@ -23,8 +23,9 @@ spring:
     job:
       # **부팅 시 잡을 자동 실행하지 않는다.** 실행 시점과 대상은 SpotSyncLauncher가 소유한다
       # (k8s CronJob이 트리거). 이걸 끄지 않으면 Boot의 BatchJobLauncherAutoConfiguration이
-      # 등록된 잡을 부팅 즉시 돌리고, **잡이 둘 이상이면** 어느 것을 돌릴지 몰라
-      # "Job name must be specified in case of multiple jobs"로 기동 자체가 실패한다.
+      # 등록된 잡을 부팅 즉시 돌린다 — 재배포마다 전량 동기화가 도는 사고가 된다.
+      # (잡이 둘 이상이면 아예 "Job name must be specified in case of multiple jobs"로
+      #  기동이 실패한다.)
       #
       # 이 키는 Boot 4에도 살아 있다 — BatchProperties에는 name 필드밖에 없지만,
       # BatchJobLauncherAutoConfiguration이
