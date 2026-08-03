@@ -111,9 +111,17 @@ class SpotDetailJdbcAdapter(
         // 전량 교체. upstream이 이미지를 지우거나 순서를 바꿨을 때 낡은 행이 남지 않는다.
         // 삽입은 ON CONFLICT로 둔다 — 같은 항목을 두 워커가 동시에 교체할 때 유니크 제약 위반으로
         // 실패하는 대신 덮어쓰게 한다(AC-41). 실패해도 자기치유되지만 무의미한 예외 로그를 남긴다.
+        // **삭제도 부모 존재를 조건으로 건다**(V19). 아래 삽입이 `SELECT ... FROM spot`이라 부모가 없으면
+        // 0행이 되는데, 삭제만 무조건 실행하면 기존 갤러리가 지워지고 아무것도 채워지지 않는다.
+        // V19 이전에는 FK 위반이 같은 트랜잭션을 롤백시켜 이 상태가 생길 수 없었다 — 둘이 함께
+        // 건너뛰어야 그 성질이 유지된다.
         jdbcTemplate.update(
-            "DELETE FROM spot_detail_image WHERE content_id = ? AND language = ?",
-            contentId, locale.name,
+            """
+            DELETE FROM spot_detail_image
+            WHERE content_id = ? AND language = ?
+              AND EXISTS (SELECT 1 FROM spot s WHERE s.content_id = ? AND s.language = ?)
+            """.trimIndent(),
+            contentId, locale.name, contentId, locale.name,
         )
         if (gallery.isEmpty()) return
         jdbcTemplate.batchUpdate(
@@ -218,9 +226,14 @@ class SpotDetailJdbcAdapter(
         category: SpotCategory,
         items: List<SpotInfoItem>,
     ) {
+        // 갤러리와 같은 이유로 삭제도 부모 존재를 조건으로 건다(V19).
         jdbcTemplate.update(
-            "DELETE FROM spot_detail_info WHERE content_id = ? AND language = ? AND category = ?",
-            contentId, locale.name, category.name,
+            """
+            DELETE FROM spot_detail_info
+            WHERE content_id = ? AND language = ? AND category = ?
+              AND EXISTS (SELECT 1 FROM spot s WHERE s.content_id = ? AND s.language = ?)
+            """.trimIndent(),
+            contentId, locale.name, category.name, contentId, locale.name,
         )
         if (items.isEmpty()) return
         jdbcTemplate.batchUpdate(

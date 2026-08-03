@@ -15,8 +15,10 @@ import org.springframework.data.repository.query.Param
  */
 interface SpotJpaRepository : JpaRepository<SpotEntity, Long> {
     /**
-     * 자연키에 대응하는 `spot.id`. 행이 없으면 null이며, 호출자는 그것을 **부모 없음**으로 처리한다
-     * (예외로 올리지 않는다 — 한 건의 부모 부재가 배치 페이지 전체나 사용자 요청을 실패시킬 이유가 없다).
+     * 자연키에 대응하는 `spot.id`. 행이 없으면 null이며, 호출자는 그것을 **부모 없음**으로 처리해
+     * 적재를 건너뛴다. 예외로 올리지 않는다 — 부모 부재를 사용자 오류로 표면화할지는 유스케이스가
+     * 정할 문제이고(`ReactToSpotService`의 AC-14b 주석 참조), 어댑터가 앞당겨 결정하면 기존에
+     * 성공하던 요청의 관찰 가능한 계약이 조용히 바뀐다.
      *
      * 엔티티가 아니라 스칼라를 돌려준다. 영속성 컨텍스트에 불필요한 관리 객체를 남기지 않는다.
      */

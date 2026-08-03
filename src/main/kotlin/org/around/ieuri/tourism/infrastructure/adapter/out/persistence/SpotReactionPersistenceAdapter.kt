@@ -1,12 +1,12 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.persistence
 
-import org.around.ieuri.tourism.application.exception.SpotNotFoundException
 import org.around.ieuri.tourism.application.port.out.persistence.SpotReactionPort
 import org.around.ieuri.tourism.domain.aggregate.SpotReaction
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.SpotReactionEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.repository.SpotJpaRepository
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.repository.SpotReactionJpaRepository
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 
 /**
@@ -22,6 +22,8 @@ class SpotReactionPersistenceAdapter(
     private val spotRepository: SpotJpaRepository,
 ) : SpotReactionPort {
 
+    private val log = LoggerFactory.getLogger(javaClass)
+
     override fun find(memberId: Long, contentId: String, language: DomainLocale): SpotReaction? =
         repository.findByMemberIdAndContentIdAndLanguage(memberId, contentId, language)?.toDomain()
 
@@ -31,15 +33,24 @@ class SpotReactionPersistenceAdapter(
         )
         if (existing != null) {
             // 관리 엔티티에 도메인 변경을 얹는다(dirty-checking → UPDATE). 자연키는 불변이라 reaction만 갱신.
-            // spot_id도 자연키에 종속이라 불변이므로 건드리지 않는다 — 재조회 비용이 여기서는 들지 않는다.
+            //
+            // spot_id는 재설정하지 않는다. 부모가 정리로 사라졌다가 재적재되면 새 id를 받지만, 그
+            // 삭제가 CASCADE로 이 반응 행까지 지우므로 낡은 포인터가 남을 수 없다 — 자연키 종속이
+            // 아니라 CASCADE가 이것을 보장한다.
             existing.reaction = reaction.reaction
             return
         }
-        // 신규 생성 시에만 부모 id가 필요하다(V19). 존재하지 않는 관광지에는 반응할 수 없으므로
-        // 부모 부재는 정상 흐름이 아니다 — 조용히 무시하면 사용자에게는 성공으로 보이면서 저장이
-        // 안 되므로, 도메인 예외로 올려 서비스가 SPOT_NOT_FOUND로 표면화하게 한다.
+        // 신규 생성 시에만 부모 id가 필요하다(V19).
+        //
+        // **부모가 없으면 조용히 건너뛴다.** resolve 판정(AC-14b·SPOT_NOT_FOUND)은 이번 범위 밖이며,
+        // [ReactToSpotService]가 "향후 place-resolution 레이어가 생기면 그 지점에서 거부한다"고
+        // 명시한다. 어댑터가 앞당겨 예외를 던지면 기존에 성공하던 요청이 SPOT_NOT_FOUND가 되어
+        // 관찰 가능한 계약이 바뀐다 — 그 판단은 어댑터가 아니라 유스케이스의 몫이다.
         val spotId = spotRepository.findIdByContentIdAndLanguage(reaction.contentId, reaction.language)
-            ?: throw SpotNotFoundException()
+        if (spotId == null) {
+            log.warn("spot 행이 없어 반응을 저장하지 않는다: language={}", reaction.language)
+            return
+        }
         repository.save(reaction.toNewEntity(spotId))
     }
 
