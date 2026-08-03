@@ -3,7 +3,6 @@ package org.around.ieuri.tourism.infrastructure.adapter.out.persistence
 import org.around.ieuri.tourism.application.command.SyncFestivalCommand
 import org.around.ieuri.tourism.application.port.out.persistence.FestivalStorePort
 import org.around.ieuri.tourism.domain.vo.DomainLocale
-import org.springframework.jdbc.core.BatchPreparedStatementSetter
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.ParameterizedPreparedStatementSetter
 import org.springframework.stereotype.Component
@@ -53,23 +52,17 @@ class FestivalJdbcAdapter(
      */
     @Transactional
     override fun deleteEnded(language: DomainLocale, asOf: LocalDate): Int =
-        jdbcTemplate.update(
-            """
-            DELETE FROM spot s
-            USING spot_festival f
-            WHERE f.content_id = s.content_id
-              AND f.language = s.language
-              AND s.language = ?
-              AND f.event_end_date < ?
-            """.trimIndent(),
-            language.name,
-            Date.valueOf(asOf),
-        )
+        // [findEndedContentIds]와 같은 조건으로 대상을 뽑아 청크로 지운다. 조건이 두 곳에 있으므로
+        // 한쪽만 바꾸면 R-9의 제외 집합과 실제 삭제 대상이 어긋난다 — 같은 메서드를 재사용한다.
+        deleteSpotsInChunks(language, findEndedContentIds(language, asOf).toList())
 
     /**
-     * 이번 수집 결과에 없는 축제 삭제(AC-29). [SpotJpaAdapter.deleteMissing]과 같은 임시 테이블
-     * anti-join 방식이되, **`spot_festival`에 있는 행만** 대상으로 한다 — 관광지 전반을 건드리면
-     * 축제 정리가 관광지 정리를 덮어쓴다.
+     * 이번 수집 결과에 없는 축제 삭제(AC-29). **`spot_festival`에 있는 행만** 대상으로 한다 —
+     * 관광지 전반을 건드리면 축제 정리가 관광지 정리를 덮어쓴다.
+     *
+     * [SpotJpaAdapter.deleteMissing]과 같은 이유로 **임시 테이블을 쓰지 않는다.** 삭제 대상을 먼저
+     * 확정한 뒤 청크로 나눠 지운다 — 여집합은 분할 가능한 연산이 아니므로 `NOT IN`을 쪼갤 수 없고,
+     * 삭제 대상 목록은 그냥 목록이라 나눌 수 있다. 축제는 절대 건수가 적어 이 조회가 가볍다.
      */
     @Transactional
     override fun deleteMissing(language: DomainLocale, survivingContentIds: Set<String>): Int {
@@ -77,28 +70,31 @@ class FestivalJdbcAdapter(
         // 한 번 더 막는다 — 이 한 줄이 없으면 게이트 버그가 곧 데이터 손실이다(AC-35와 짝).
         require(survivingContentIds.isNotEmpty()) { "생존 집합이 비어 있으면 정리하지 않는다." }
 
-        jdbcTemplate.execute(
-            "CREATE TEMP TABLE surviving_festival (content_id VARCHAR(32) PRIMARY KEY) ON COMMIT DROP",
-        )
-        val ids = survivingContentIds.toList()
-        jdbcTemplate.batchUpdate(
-            "INSERT INTO surviving_festival (content_id) VALUES (?) ON CONFLICT DO NOTHING",
-            object : BatchPreparedStatementSetter {
-                override fun getBatchSize() = ids.size
-                override fun setValues(ps: PreparedStatement, i: Int) = ps.setString(1, ids[i])
-            },
-        )
-        return jdbcTemplate.update(
-            """
-            DELETE FROM spot s
-            USING spot_festival f
-            WHERE f.content_id = s.content_id
-              AND f.language = s.language
-              AND s.language = ?
-              AND NOT EXISTS (SELECT 1 FROM surviving_festival t WHERE t.content_id = f.content_id)
-            """.trimIndent(),
+        val doomed = jdbcTemplate.queryForList(
+            "SELECT content_id FROM spot_festival WHERE language = ?",
+            String::class.java,
             language.name,
-        )
+        ).filterNotNull().filterNot { it in survivingContentIds }
+
+        return deleteSpotsInChunks(language, doomed)
+    }
+
+    /**
+     * [contentIds]에 해당하는 **`spot` 행**을 [DELETE_CHUNK_SIZE]씩 나눠 지운다. `spot_festival`은
+     * FK CASCADE로 따라 사라진다(AC-30).
+     *
+     * 한 트랜잭션 안에서 여러 번 `DELETE`를 치므로 중간 실패 시 전체가 롤백된다 — 청크는 파라미터
+     * 한도를 넘지 않기 위한 분할이지 커밋 경계가 아니다.
+     */
+    private fun deleteSpotsInChunks(language: DomainLocale, contentIds: List<String>): Int {
+        if (contentIds.isEmpty()) return 0
+        return contentIds.chunked(DELETE_CHUNK_SIZE).sumOf { chunk ->
+            val placeholders = chunk.joinToString(",") { "?" }
+            jdbcTemplate.update(
+                "DELETE FROM spot WHERE language = ? AND content_id IN ($placeholders)",
+                language.name, *chunk.toTypedArray(),
+            )
+        }
     }
 
     @Transactional(readOnly = true)
@@ -114,6 +110,12 @@ class FestivalJdbcAdapter(
         ).filterNotNull().toSet()   // content_id는 NOT NULL이나 JDBC 시그니처가 nullable이다.
 
     private companion object {
+        /**
+         * 삭제 `IN` 절 하나에 넣을 최대 id 수. [SpotJpaAdapter]와 같은 값이다 — 드라이버 파라미터
+         * 한도(65535)에 여유를 두기 위한 분할 단위이지 커밋 경계가 아니다.
+         */
+        const val DELETE_CHUNK_SIZE = 1_000
+
         /**
          * `updated_at`은 [SpotJpaAdapter]와 같은 이유로 **실제로 값이 바뀐 경우에만** 올린다.
          * `last_synced_at`은 반대로 항상 갱신한다.
