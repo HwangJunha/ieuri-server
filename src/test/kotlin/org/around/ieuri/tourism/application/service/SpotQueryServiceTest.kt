@@ -8,6 +8,7 @@ import org.around.ieuri.tourism.application.exception.CategoryNotAvailableForLoc
 import org.around.ieuri.tourism.application.exception.InvalidCoordinatesException
 import org.around.ieuri.tourism.application.exception.RadiusTooLargeException
 import org.around.ieuri.tourism.application.exception.SpotDetailNotFoundException
+import org.around.ieuri.tourism.application.exception.UpstreamUnavailableException
 import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
 import org.around.ieuri.tourism.application.port.out.cache.CachedIntro
 import org.around.ieuri.tourism.application.port.out.cache.SpotCachePort
@@ -566,5 +567,88 @@ class SpotQueryServiceTest {
     fun `AC-12 - 반응이 없으면 좋아요 수는 0`() {
         every { spotQueryPort.countLikes(any()) } returns 0L
         assertEquals(0L, service.spotLikeCount(100L))
+    }
+
+    // ── SPEC-0006: 지연 필드 실패가 본문을 죽이지 않는다 ──────────────────
+    //
+    // 계약상의 격리(gallery·infoItems가 nullable)는 스키마가 담당하고, GraphQL 실행기가 실패한
+    // 필드만 null로 채운 뒤 path를 담은 errors[] 항목을 만든다. application이 보장해야 하는 것은
+    // 그 아래 두 가지다 — (1) 지연 필드의 실패가 본문 조회와 서로 독립적일 것, (2) 실패를 삼켜
+    // 빈 값으로 대체하지 않고 예외로 전파할 것. 삼키면 클라이언트가 실패를 알 수 없고 errors[]
+    // 항목도 생기지 않는다.
+    //
+    // errors[]의 path 형태 자체는 DGS 런타임이 정하는 부분이라 전송 계층을 세워야 관찰 가능하다.
+    // 이 플랫폼의 테스트 범위를 벗어나므로 여기서는 명세하지 않는다(설계문서 §7).
+
+    @Test
+    fun `SPEC-0006 AC-27 - 갤러리 조회가 실패해도 본문은 채워진 채 반환된다`() {
+        every { spotCachePort.getDetail(100L) } returns null
+        every { tourInfoPort.findDetail(any()) } returns detail()
+        every { tourInfoPort.findGallery(any()) } throws
+            UpstreamUnavailableException("detailImage2 장애")
+
+        // 본문은 갤러리 실패와 무관하게 성립한다 — 둘은 별개 진입점이다.
+        val body = service.spotDetail(100L, DomainLocale.KO)
+        assertEquals("경복궁", body.title)
+
+        // 갤러리는 실패를 삼키지 않고 그대로 던진다(빈 배열로 대체하지 않는다).
+        assertFailsWith<UpstreamUnavailableException> { service.spotGallery(100L, DomainLocale.KO) }
+    }
+
+    @Test
+    fun `SPEC-0006 AC-28 - 이용안내 조회가 실패해도 본문은 오류로 대체되지 않는다`() {
+        every { spotCachePort.getDetail(100L) } returns null
+        every { tourInfoPort.findDetail(any()) } returns detail()
+        every { tourInfoPort.findInfoItems(any(), any()) } throws
+            UpstreamUnavailableException("detailInfo2 장애")
+
+        val body = service.spotDetail(100L, DomainLocale.KO)
+        assertEquals("경복궁", body.title)
+
+        assertFailsWith<UpstreamUnavailableException> {
+            service.spotInfoItems(100L, SpotCategory.TOURIST_SPOT, DomainLocale.KO)
+        }
+    }
+
+    @Test
+    fun `SPEC-0006 AC-34 - 갤러리와 이용안내가 모두 실패해도 본문이 반환된다`() {
+        every { spotCachePort.getDetail(100L) } returns null
+        every { tourInfoPort.findDetail(any()) } returns detail()
+        every { tourInfoPort.findGallery(any()) } throws UpstreamUnavailableException("장애")
+        every { tourInfoPort.findInfoItems(any(), any()) } throws UpstreamUnavailableException("장애")
+
+        val body = service.spotDetail(100L, DomainLocale.KO)
+
+        assertEquals("경복궁", body.title)
+        assertEquals(100L, body.id)
+    }
+
+    @Test
+    fun `SPEC-0006 AC-30 - 본문 조회가 실패하면 전체가 실패한다`() {
+        // 본문 실패는 부분 실패로 격하되지 않는다 — 본문이 없으면 상세 화면이 성립하지 않으므로
+        // 루트를 nullable로 완화하지 않았다(설계문서 §3.2). 빈 본문으로 대체하지 않는다.
+        every { spotCachePort.getDetail(100L) } returns null
+        every { tourInfoPort.findDetail(any()) } throws
+            UpstreamUnavailableException("detailCommon2 장애")
+
+        assertFailsWith<UpstreamUnavailableException> { service.spotDetail(100L, DomainLocale.KO) }
+    }
+
+    @Test
+    fun `실패한 지연 조회 결과는 캐시에 적재되지 않는다`() {
+        // 실패가 TTL 동안 고정되면 부분 실패가 복구되지 않는다(설계문서 §5).
+        every { tourInfoPort.findGallery(any()) } throws UpstreamUnavailableException("장애")
+        every { tourInfoPort.findInfoItems(any(), any()) } throws UpstreamUnavailableException("장애")
+        every { tourInfoPort.findDetail(any()) } throws UpstreamUnavailableException("장애")
+
+        assertFailsWith<UpstreamUnavailableException> { service.spotGallery(100L, DomainLocale.KO) }
+        assertFailsWith<UpstreamUnavailableException> {
+            service.spotInfoItems(100L, SpotCategory.TOURIST_SPOT, DomainLocale.KO)
+        }
+        assertFailsWith<UpstreamUnavailableException> { service.spotDetail(100L, DomainLocale.KO) }
+
+        verify(exactly = 0) { spotCachePort.putGallery(any(), any()) }
+        verify(exactly = 0) { spotCachePort.putInfoItems(any(), any(), any()) }
+        verify(exactly = 0) { spotCachePort.putDetail(any(), any()) }
     }
 }

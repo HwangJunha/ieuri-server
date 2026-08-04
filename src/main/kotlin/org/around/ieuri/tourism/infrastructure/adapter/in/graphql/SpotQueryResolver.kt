@@ -77,8 +77,17 @@ class SpotQueryResolver(
     fun spotDetail(@InputArgument id: Long): SpotDetailView =
         spotQueryUseCase.spotDetail(spotId = id, locale = localeContext.locale)
 
+    /**
+     * 갤러리(nullable — SPEC-0006 R9). **예외를 잡지 않는다.** 조회가 실패하면 예외가 그대로 올라가고,
+     * 필드가 nullable이므로 GraphQL 실행기가 이 필드만 null로 채운 뒤 `path=["spotDetail","gallery"]`인
+     * errors[] 항목을 만든다 — 본문과 형제 필드는 살아남는다. 여기서 예외를 삼켜 빈 배열로 바꾸면
+     * 클라이언트가 실패를 알 수 없고 errors[] 항목도 생기지 않는다.
+     *
+     * 반환 타입이 nullable인 것은 스키마와의 형 일치를 위해서다. 이 함수 자체가 null을 돌려주는 경로는
+     * 없다 — null은 실행기가 실패 시에 만든다.
+     */
     @DgsData(parentType = "SpotDetail", field = "gallery")
-    fun gallery(dfe: DgsDataFetchingEnvironment): List<GqlSpotImage> =
+    fun gallery(dfe: DgsDataFetchingEnvironment): List<GqlSpotImage>? =
         spotQueryUseCase.spotGallery(dfe.spotId(), localeContext.locale)
             .map { it.toGql() }
 
@@ -93,11 +102,12 @@ class SpotQueryResolver(
             locale = localeContext.locale,
         )?.toGql()
 
+    /** 이용안내(nullable — SPEC-0006 R10). 실패 전파 규약은 [gallery]와 동일하다. */
     @DgsData(parentType = "SpotDetail", field = "infoItems")
     fun infoItems(
         dfe: DgsDataFetchingEnvironment,
         @InputArgument category: GqlSpotCategory,
-    ): List<GqlSpotInfoItem> =
+    ): List<GqlSpotInfoItem>? =
         spotQueryUseCase.spotInfoItems(
             spotId = dfe.spotId(),
             category = SpotCategory.valueOf(category.name),
