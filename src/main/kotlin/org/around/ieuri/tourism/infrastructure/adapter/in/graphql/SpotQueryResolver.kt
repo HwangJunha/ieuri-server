@@ -7,7 +7,6 @@ import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.tourism.application.port.`in`.query.SpotQueryUseCase
 import org.around.ieuri.tourism.application.exception.SpotDetailNotFoundException
-import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.tourism.application.query.LikedSpotView
 import org.around.ieuri.tourism.application.query.LikedSpotsQuery
 import org.around.ieuri.tourism.application.query.SpotDetailView
@@ -134,52 +133,58 @@ class SpotQueryResolver(
      *
      * `spots`가 `currentMemberId()`(비로그인 허용)를 쓰는 것과 대비된다 — 그쪽은 비로그인도 유효한
      * 조회지만 "내 좋아요"는 주체가 없으면 성립하지 않는다.
+     *
+     * **생성 타입을 반환해야 한다**(`members` 선례와 동일). Spring for GraphQL의
+     * `ConnectionFieldTypeVisitor`가 `edges`·`pageInfo`를 가진 필드를 Relay 커넥션으로 자동 인식해
+     * 반환값을 감싸려 하기 때문이다. 이때 통과 조건은 둘 중 하나다 —
+     * 등록된 `ConnectionAdapter`가 지원하는 타입이거나, **반환 객체의 클래스 이름이 `Connection`으로
+     * 끝나거나**(`ConnectionDataFetcher.adaptDataContainer`). 이 저장소엔 어댑터가 없으므로 후자에
+     * 기대며, `GqlLikedSpotConnection`은 이름이 맞아 그대로 통과한다.
+     *
+     * read DTO(`CursorPage`)를 그대로 돌려주면 두 조건에 모두 걸리지 않아
+     * `No ConnectionAdapter for: ...CursorPage`로 실패한다. `spotDetail`이 read DTO를 반환할 수 있는
+     * 것과 갈리는 지점이다 — 그쪽은 커넥션 형태가 아니라 이 방문자를 타지 않는다.
      */
     @DgsQuery
     fun likedSpots(
         @InputArgument first: Int?,
         @InputArgument after: String?,
-    ): CursorPage<LikedSpotView> {
+    ): GqlLikedSpotConnection {
         val memberId = currentMemberProvider.requireMemberId()
-        return spotQueryUseCase.likedSpots(
+        val page = spotQueryUseCase.likedSpots(
             LikedSpotsQuery(first = first ?: DEFAULT_LIKED_PAGE_SIZE, after = after),
             locale = localeContext.locale,
             memberId = memberId,
         )
+        return GqlLikedSpotConnection(
+            edges = page.edges.map {
+                GqlLikedSpotEdge(
+                    cursor = it.cursor,
+                    node = it.node.toGql(),
+                    // likedAt은 노드가 아니라 엣지의 값이다 — 회원과 spot의 *관계* 속성이라
+                    // 같은 spot이라도 회원마다 다르다.
+                    likedAt = it.node.likedAt.toString(),
+                )
+            },
+            pageInfo = GqlPageInfo(
+                hasNextPage = page.pageInfo.hasNextPage,
+                hasPreviousPage = page.pageInfo.hasPreviousPage,
+                startCursor = page.pageInfo.startCursor,
+                endCursor = page.pageInfo.endCursor,
+            ),
+            // **null로 두는 것이 지연 조회다.** totalCount는 별도 COUNT(*)라 비용이 따로 드는데,
+            // 스키마상 nullable이라 클라이언트가 고르지 않을 수 있다. 아래 필드 리졸버가 요청된
+            // 경우에만 실제로 센다 — 여기서 채우면 아무도 안 물어본 값에 스캔을 하나 더 쓴다.
+            totalCount = null,
+        )
     }
 
     /**
-     * `edges`·`pageInfo`는 루트가 이미 조회한 페이지에서 나온다 — 추가 I/O가 없으므로 여기서 매핑한다.
-     * 생성 타입이 아니라 read 페이지를 루트가 반환하는 것은 `spotDetail`과 같은 이유다(지연 필드를
-     * 비워 둘 수 없는 생성자 제약).
-     */
-    @DgsData(parentType = "LikedSpotConnection", field = "edges")
-    fun likedSpotEdges(dfe: DgsDataFetchingEnvironment): List<GqlLikedSpotEdge> =
-        dfe.likedPage().edges.map {
-            GqlLikedSpotEdge(
-                cursor = it.cursor,
-                node = it.node.toGql(),
-                // likedAt은 노드가 아니라 엣지의 값이다 — 회원과 spot의 *관계* 속성이라
-                // 같은 spot이라도 회원마다 다르다.
-                likedAt = it.node.likedAt.toString(),
-            )
-        }
-
-    @DgsData(parentType = "LikedSpotConnection", field = "pageInfo")
-    fun likedSpotPageInfo(dfe: DgsDataFetchingEnvironment): GqlPageInfo =
-        dfe.likedPage().pageInfo.let {
-            GqlPageInfo(
-                hasNextPage = it.hasNextPage,
-                hasPreviousPage = it.hasPreviousPage,
-                startCursor = it.startCursor,
-                endCursor = it.endCursor,
-            )
-        }
-
-    /**
      * 총 개수는 **요청됐을 때만** 센다. 별도 COUNT(*)라 비용이 따로 들고, 커서 페이징에 필수도
-     * 아니다(소진 판정은 `hasNextPage`). 루트에서 무조건 세면 아무도 안 물어본 값에 스캔을 하나
-     * 더 쓰게 된다 — `spotDetail`의 `likeCount`와 같은 규율이다.
+     * 아니다(소진 판정은 `hasNextPage`) — `spotDetail`의 `likeCount`와 같은 규율이다.
+     *
+     * 부모가 `totalCount = null`로 남겨 둔 자리를 채운다. 생성 타입이 이미 필드를 갖고 있어도
+     * DGS는 이 리졸버를 우선하므로, 선택되지 않으면 호출 자체가 일어나지 않는다.
      */
     @DgsData(parentType = "LikedSpotConnection", field = "totalCount")
     fun likedSpotsTotalCount(): Int =
@@ -255,10 +260,4 @@ class SpotQueryResolver(
     private fun DgsDataFetchingEnvironment.spotId(): Long =
         getSource<SpotDetailView>()?.id
             ?: error("SpotDetail 필드 리졸버는 부모가 반환한 SpotDetailView를 소스로 받아야 한다.")
-
-    /** 부모 `likedSpots`가 돌려준 읽기 페이지. [spotId]와 같은 이유로 `!!` 대신 명시적으로 실패시킨다. */
-    @Suppress("UNCHECKED_CAST")
-    private fun DgsDataFetchingEnvironment.likedPage(): CursorPage<LikedSpotView> =
-        getSource<CursorPage<LikedSpotView>>()
-            ?: error("LikedSpotConnection 필드 리졸버는 부모가 반환한 CursorPage를 소스로 받아야 한다.")
 }
