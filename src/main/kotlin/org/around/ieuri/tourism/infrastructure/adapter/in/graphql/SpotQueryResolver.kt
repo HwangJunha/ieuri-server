@@ -147,12 +147,17 @@ class SpotQueryResolver(
      */
     @DgsQuery
     fun likedSpots(
+        @InputArgument category: GqlSpotCategory?,
         @InputArgument first: Int?,
         @InputArgument after: String?,
     ): GqlLikedSpotConnection {
         val memberId = currentMemberProvider.requireMemberId()
         val page = spotQueryUseCase.likedSpots(
-            LikedSpotsQuery(first = first ?: DEFAULT_LIKED_PAGE_SIZE, after = after),
+            LikedSpotsQuery(
+                category = category?.let { SpotCategory.valueOf(it.name) },
+                first = first ?: DEFAULT_LIKED_PAGE_SIZE,
+                after = after,
+            ),
             locale = localeContext.locale,
             memberId = memberId,
         )
@@ -185,10 +190,19 @@ class SpotQueryResolver(
      *
      * 부모가 `totalCount = null`로 남겨 둔 자리를 채운다. 생성 타입이 이미 필드를 갖고 있어도
      * DGS는 이 리졸버를 우선하므로, 선택되지 않으면 호출 자체가 일어나지 않는다.
+     *
+     * **부모 필드의 `category` 인자를 그대로 읽어 같은 조건으로 센다.** 이 리졸버는 별도 진입점이라
+     * 인자를 다시 받지 않으면 필터를 잃고, 그러면 "전체 12건"이라면서 3건만 보이는 응답이 나간다.
      */
     @DgsData(parentType = "LikedSpotConnection", field = "totalCount")
-    fun likedSpotsTotalCount(): Int =
+    fun likedSpotsTotalCount(dfe: DgsDataFetchingEnvironment): Int =
         spotQueryUseCase.likedSpotsTotalCount(
+            LikedSpotsQuery(
+                category = dfe.parentCategoryArgument(),
+                // 총계는 페이지 경계와 무관하다 — 포트가 무시하므로 기본값을 넘긴다.
+                first = DEFAULT_LIKED_PAGE_SIZE,
+                after = null,
+            ),
             locale = localeContext.locale,
             memberId = currentMemberProvider.requireMemberId(),
         ).toInt()
@@ -260,4 +274,21 @@ class SpotQueryResolver(
     private fun DgsDataFetchingEnvironment.spotId(): Long =
         getSource<SpotDetailView>()?.id
             ?: error("SpotDetail 필드 리졸버는 부모가 반환한 SpotDetailView를 소스로 받아야 한다.")
+
+    /**
+     * 부모 `likedSpots` 필드에 넘어온 `category` 인자. 총계를 목록과 같은 조건으로 세기 위해 필요하다.
+     *
+     * **두 표현을 모두 받는다.** graphql-java는 스키마 전용 enum을 이름 문자열로 강제 변환하지만,
+     * 런타임 매핑이 붙으면 enum 인스턴스가 올 수도 있다. 한쪽만 가정하고 캐스팅하면 빗나갔을 때
+     * 조용히 null이 되어 **필터가 사라진 총계**가 나간다 — 예외조차 없이 숫자만 틀리는 형태라
+     * 발견이 늦다. 모르는 형태면 명시적으로 실패시킨다.
+     */
+    private fun DgsDataFetchingEnvironment.parentCategoryArgument(): SpotCategory? =
+        when (val raw = executionStepInfo.parent.arguments["category"]) {
+            null -> null
+            is SpotCategory -> raw
+            is GqlSpotCategory -> SpotCategory.valueOf(raw.name)
+            is String -> SpotCategory.valueOf(raw)
+            else -> error("category 인자의 형태를 해석할 수 없습니다: ${raw::class.qualifiedName}")
+        }
 }

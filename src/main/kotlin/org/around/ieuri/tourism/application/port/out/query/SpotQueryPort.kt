@@ -72,9 +72,12 @@ interface SpotQueryPort {
 
     /**
      * 좋아요 총 개수. **`totalCount` 필드가 선택됐을 때만 호출된다** — 별도 COUNT(*)라 비용이 따로
-     * 들고, 커서 페이징에 필수도 아니다(소진 판정은 hasNextPage). 목록과 같은 조건을 써야 한다.
+     * 들고, 커서 페이징에 필수도 아니다(소진 판정은 hasNextPage).
+     *
+     * **목록과 같은 조건을 받는다** — 카테고리 필터를 빠뜨리면 "전체 12건"이라면서 3건만 보이는
+     * 상태가 된다. 그래서 [LikedSpotsSearch]를 그대로 재사용한다(페이징 인자는 무시).
      */
-    fun countLikedSpots(memberId: Long, language: DomainLocale): Long
+    fun countLikedSpots(query: LikedSpotsSearch): Long
 }
 
 /**
@@ -96,6 +99,8 @@ data class SpotBasics(
 data class LikedSpotsSearch(
     val memberId: Long,
     val language: DomainLocale,
+    /** 카테고리 필터. null이면 전체. 값이 있으면 `spot.category`로 거른다. */
+    val category: SpotCategory?,
     val first: Int,
     val after: String?,
 )

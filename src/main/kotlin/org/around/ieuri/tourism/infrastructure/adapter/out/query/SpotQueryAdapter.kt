@@ -202,9 +202,11 @@ class SpotQueryAdapter(
      */
     override fun findLikedSpots(query: LikedSpotsSearch): CursorPage<LikedSpotView> {
         val cursor = query.after?.let { decodeCursor(it) }
+        val (baseWhere, baseParams) = likedWhereClause(query)
 
         // keyset 조건. 정렬이 (updated_at DESC, spot_id DESC)이므로 다음 페이지는 그 튜플보다 "작은" 행이다.
         // 튜플 비교로 쓰면 복합 인덱스를 그대로 탄다 — OR로 풀어쓰면 옵티마이저가 놓칠 수 있다.
+        // **총계에는 붙이지 않는다** — 커서는 페이지 경계일 뿐 집합의 조건이 아니다.
         val keysetCondition = cursor?.let { " AND (r.updated_at, r.spot_id) < (?, ?)" }.orEmpty()
         val keysetParams = cursor?.let { listOf(Timestamp.from(it.updatedAt), it.spotId) }.orEmpty()
 
@@ -214,7 +216,7 @@ class SpotQueryAdapter(
                    r.updated_at AS liked_at
             FROM spot_reaction r
             JOIN spot s ON s.id = r.spot_id
-            WHERE r.member_id = ? AND r.reaction = ? AND s.language = ?$keysetCondition
+            WHERE $baseWhere$keysetCondition
             ORDER BY r.updated_at DESC, r.spot_id DESC
             LIMIT ?
             """.trimIndent(),
@@ -232,10 +234,7 @@ class SpotQueryAdapter(
                     likedAt = rs.getTimestamp("liked_at").toInstant(),
                 )
             },
-            *(
-                listOf<Any>(query.memberId, ReactionType.LIKE.name, query.language.name) +
-                    keysetParams + (query.first + 1)
-                ).toTypedArray(),
+            *(baseParams + keysetParams + (query.first + 1)).toTypedArray(),
         )
 
         val hasNextPage = rows.size > query.first
@@ -260,19 +259,33 @@ class SpotQueryAdapter(
     /**
      * 좋아요 총 개수(`LikedSpotConnection.totalCount`가 **선택됐을 때만** 호출된다).
      *
-     * 목록 조회와 같은 조건을 쓴다 — 둘이 갈리면 "총 3건인데 4건이 보인다"는 상태가 생긴다.
-     * 커서 페이징 자체는 이 값이 필요 없다(소진 판정은 hasNextPage로 한다).
+     * 목록과 [likedWhereClause]를 공유한다 — 조건이 갈리면 "전체 12건"이라면서 3건만 보이는 상태가
+     * 생긴다. 커서(페이지 경계)만 빠지는데, 그것은 집합의 조건이 아니라 위치라서 총계와 무관하다.
      */
-    override fun countLikedSpots(memberId: Long, language: DomainLocale): Long =
-        jdbcTemplate.queryForObject(
-            """
-            SELECT COUNT(*) FROM spot_reaction r
-            JOIN spot s ON s.id = r.spot_id
-            WHERE r.member_id = ? AND r.reaction = ? AND s.language = ?
-            """.trimIndent(),
+    override fun countLikedSpots(query: LikedSpotsSearch): Long {
+        val (where, params) = likedWhereClause(query)
+        return jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM spot_reaction r JOIN spot s ON s.id = r.spot_id WHERE $where",
             Long::class.java,
-            memberId, ReactionType.LIKE.name, language.name,
+            *params.toTypedArray(),
         ) ?: 0L
+    }
+
+    /**
+     * 목록·총계 공통 조건. 한 곳에서 만들어 둘이 어긋나지 않게 한다(`spots`의 `whereClause`와 같은 이유).
+     *
+     * 언어 판정은 `spot` 조인으로 한다 — V20 이후 `spot_reaction`에 language가 없다.
+     * 카테고리도 `spot`이 소유하므로 같은 조인을 그대로 쓴다.
+     */
+    private fun likedWhereClause(query: LikedSpotsSearch): Pair<String, List<Any>> {
+        val conditions = mutableListOf("r.member_id = ?", "r.reaction = ?", "s.language = ?")
+        val params = mutableListOf<Any>(query.memberId, ReactionType.LIKE.name, query.language.name)
+        query.category?.let {
+            conditions += "s.category = ?"
+            params += it.name
+        }
+        return conditions.joinToString(" AND ") to params
+    }
 
     /**
      * 커서 = 정렬 키(updated_at, spot_id)를 Base64로 감싼 값.

@@ -70,6 +70,10 @@ interface SpotQueryUseCase {
      *
      * [memberId]는 인증 컨텍스트에서 온 값이며 본인 것만 조회한다(AC-48). 미인증 거부는 리졸버가
      * 판정한다 — 이 포트는 이미 인증된 회원을 전제한다.
+     *
+     * [LikedSpotsQuery.category]가 있으면 그 카테고리만 반환한다. `spots`와 동일하게 현재 언어에서
+     * 유효하지 않은 카테고리는 CATEGORY_NOT_AVAILABLE_FOR_LOCALE로 거부한다 — 두 목록이 같은
+     * 카테고리 축을 쓰므로 판정도 같아야 한다.
      */
     fun likedSpots(query: LikedSpotsQuery, locale: DomainLocale, memberId: Long): CursorPage<LikedSpotView>
 
@@ -77,6 +81,8 @@ interface SpotQueryUseCase {
      * 좋아요 총 개수(`totalCount` 필드 요청 시에만). 목록과 **별도 유스케이스 메서드**인 이유는
      * 비용이 따로 들기 때문이다 — 통짜로 묶으면 아무도 안 물어본 COUNT(*)를 매 페이지마다 낸다.
      * `spotDetail`의 지연 필드들과 같은 규율이다.
+     *
+     * **목록과 같은 [query]를 받는다** — 카테고리가 갈리면 총계와 목록이 서로 다른 집합을 말하게 된다.
      */
-    fun likedSpotsTotalCount(locale: DomainLocale, memberId: Long): Long
+    fun likedSpotsTotalCount(query: LikedSpotsQuery, locale: DomainLocale, memberId: Long): Long
 }

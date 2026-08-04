@@ -93,6 +93,8 @@ data class SpotImageView(
  * 회원은 인증 컨텍스트에서 온다 — 둘 다 클라이언트가 고를 수 있는 값이 아니다(AC-48·AC-49).
  */
 data class LikedSpotsQuery(
+    /** 언어 중립 카테고리 필터. null이면 전체(`spots`와 같은 규약). */
+    val category: SpotCategory?,
     val first: Int,
     val after: String?,
 )

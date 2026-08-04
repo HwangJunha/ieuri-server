@@ -860,7 +860,7 @@ class SpotQueryServiceTest {
         val captured = slot<LikedSpotsSearch>()
         every { spotQueryPort.findLikedSpots(capture(captured)) } returns likedPage()
 
-        service.likedSpots(LikedSpotsQuery(first = 20, after = null), DomainLocale.EN, memberId = 7L)
+        service.likedSpots(LikedSpotsQuery(category = null, first = 20, after = null), DomainLocale.EN, memberId = 7L)
 
         assertEquals(7L, captured.captured.memberId)
         assertEquals(DomainLocale.EN, captured.captured.language)
@@ -872,7 +872,7 @@ class SpotQueryServiceTest {
         // 무의미해진다(spots와 같은 규율).
         every { spotQueryPort.findLikedSpots(any()) } returns likedPage(likedSpot(1L), likedSpot(2L))
 
-        val page = service.likedSpots(LikedSpotsQuery(20, null), DomainLocale.KO, memberId = 7L)
+        val page = service.likedSpots(LikedSpotsQuery(null, 20, null), DomainLocale.KO, memberId = 7L)
 
         assertEquals(listOf(1L, 2L), page.edges.map { it.node.id })
     }
@@ -882,7 +882,7 @@ class SpotQueryServiceTest {
         val captured = slot<LikedSpotsSearch>()
         every { spotQueryPort.findLikedSpots(capture(captured)) } returns likedPage()
 
-        service.likedSpots(LikedSpotsQuery(first = 500, after = null), DomainLocale.KO, memberId = 7L)
+        service.likedSpots(LikedSpotsQuery(category = null, first = 500, after = null), DomainLocale.KO, memberId = 7L)
 
         assertEquals(100, captured.captured.first)
     }
@@ -892,7 +892,7 @@ class SpotQueryServiceTest {
         val captured = slot<LikedSpotsSearch>()
         every { spotQueryPort.findLikedSpots(capture(captured)) } returns likedPage()
 
-        service.likedSpots(LikedSpotsQuery(first = 0, after = null), DomainLocale.KO, memberId = 7L)
+        service.likedSpots(LikedSpotsQuery(category = null, first = 0, after = null), DomainLocale.KO, memberId = 7L)
 
         assertEquals(1, captured.captured.first)
     }
@@ -902,7 +902,7 @@ class SpotQueryServiceTest {
         val captured = slot<LikedSpotsSearch>()
         every { spotQueryPort.findLikedSpots(capture(captured)) } returns likedPage()
 
-        service.likedSpots(LikedSpotsQuery(20, after = "cursor-abc"), DomainLocale.KO, memberId = 7L)
+        service.likedSpots(LikedSpotsQuery(null, 20, after = "cursor-abc"), DomainLocale.KO, memberId = 7L)
 
         assertEquals("cursor-abc", captured.captured.after)
     }
@@ -913,19 +913,83 @@ class SpotQueryServiceTest {
         // 값에 스캔을 하나 더 쓴다 — spotDetail의 likeCount와 같은 규율이다.
         every { spotQueryPort.findLikedSpots(any()) } returns likedPage(likedSpot(1L))
 
-        service.likedSpots(LikedSpotsQuery(20, null), DomainLocale.KO, memberId = 7L)
+        service.likedSpots(LikedSpotsQuery(null, 20, null), DomainLocale.KO, memberId = 7L)
 
-        verify(exactly = 0) { spotQueryPort.countLikedSpots(any(), any()) }
+        verify(exactly = 0) { spotQueryPort.countLikedSpots(any()) }
     }
 
     @Test
     fun `총계는 요청될 때만 같은 조건으로 센다`() {
-        every { spotQueryPort.countLikedSpots(7L, DomainLocale.EN) } returns 42L
+        val captured = slot<LikedSpotsSearch>()
+        every { spotQueryPort.countLikedSpots(capture(captured)) } returns 42L
 
-        assertEquals(42L, service.likedSpotsTotalCount(DomainLocale.EN, memberId = 7L))
+        assertEquals(
+            42L,
+            service.likedSpotsTotalCount(
+                LikedSpotsQuery(category = null, first = 20, after = null),
+                DomainLocale.EN,
+                memberId = 7L,
+            ),
+        )
+        assertEquals(7L, captured.captured.memberId)
+        assertEquals(DomainLocale.EN, captured.captured.language)
 
         // 총계만 물었으면 목록 조회는 일어나지 않는다.
         verify(exactly = 0) { spotQueryPort.findLikedSpots(any()) }
+    }
+
+    @Test
+    fun `카테고리 필터가 조회 조건으로 전달된다`() {
+        val captured = slot<LikedSpotsSearch>()
+        every { spotQueryPort.findLikedSpots(capture(captured)) } returns likedPage()
+
+        service.likedSpots(
+            LikedSpotsQuery(category = SpotCategory.RESTAURANT, first = 20, after = null),
+            DomainLocale.KO,
+            memberId = 7L,
+        )
+
+        assertEquals(SpotCategory.RESTAURANT, captured.captured.category)
+    }
+
+    @Test
+    fun `카테고리 미지정이면 전체를 조회한다`() {
+        val captured = slot<LikedSpotsSearch>()
+        every { spotQueryPort.findLikedSpots(capture(captured)) } returns likedPage()
+
+        service.likedSpots(LikedSpotsQuery(null, 20, null), DomainLocale.KO, memberId = 7L)
+
+        assertNull(captured.captured.category)
+    }
+
+    @Test
+    fun `현재 언어에 없는 카테고리는 거부한다(spots와 동일)`() {
+        // 두 목록이 같은 카테고리 축을 쓰므로 판정도 같아야 한다 — 한쪽만 통과하면
+        // 클라이언트가 카테고리 칩을 어느 화면에서 보여줄지 판단할 근거가 갈린다.
+        assertFailsWith<CategoryNotAvailableForLocaleException> {
+            service.likedSpots(
+                LikedSpotsQuery(category = SpotCategory.TRAVEL_COURSE, first = 20, after = null),
+                DomainLocale.EN,
+                memberId = 7L,
+            )
+        }
+
+        verify(exactly = 0) { spotQueryPort.findLikedSpots(any()) }
+    }
+
+    @Test
+    fun `총계도 목록과 같은 카테고리 조건으로 센다`() {
+        // 조건이 갈리면 "전체 12건"이라면서 3건만 보이는 응답이 나간다.
+        val captured = slot<LikedSpotsSearch>()
+        every { spotQueryPort.countLikedSpots(capture(captured)) } returns 3L
+
+        service.likedSpotsTotalCount(
+            LikedSpotsQuery(category = SpotCategory.LODGING, first = 20, after = null),
+            DomainLocale.KO,
+            memberId = 7L,
+        )
+
+        assertEquals(SpotCategory.LODGING, captured.captured.category)
     }
 
     @Test
@@ -934,7 +998,7 @@ class SpotQueryServiceTest {
         // spot_detail·캐시·upstream 어느 것도 타지 않는다(AC-55의 전제).
         every { spotQueryPort.findLikedSpots(any()) } returns likedPage(likedSpot(1L))
 
-        service.likedSpots(LikedSpotsQuery(20, null), DomainLocale.KO, memberId = 7L)
+        service.likedSpots(LikedSpotsQuery(null, 20, null), DomainLocale.KO, memberId = 7L)
 
         verify(exactly = 0) { spotDetailStorePort.findDetail(any()) }
         verify(exactly = 0) { tourInfoPort.findDetail(any()) }

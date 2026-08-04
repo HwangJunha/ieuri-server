@@ -40,7 +40,12 @@ extend type Query {
     미인증 요청은 최상위 errors[]의 UNAUTHENTICATED로 거부한다. 빈 목록으로 대체하지 않는다 —
     빈 목록은 "좋아요가 없음"이라는 다른 의미다.
     """
-    likedSpots(first: Int = 20, after: String): LikedSpotConnection!
+    likedSpots(
+        "언어 중립 카테고리 필터. 미지정이면 전체. spots와 동일하게 현재 언어에서 유효한 값만 허용한다."
+        category: SpotCategory
+        first: Int = 20
+        after: String
+    ): LikedSpotConnection!
 }
 
 extend type Mutation {
