@@ -67,8 +67,11 @@ class JjwtTokenProviderTest {
     fun `변조되었거나 형식이 잘못된 토큰은 거부된다`() {
         assertFailsWith<InvalidTokenException> { provider.parseRefreshToken("not-a-jwt") }
 
+        // 서명 끝 한 글자를 **다른 글자로** 바꾼다. 고정 문자열을 이어붙이면 원래 값과 같아질 수 있어
+        // 토큰이 그대로 유효해진다(간헐적 실패의 원인).
         val issued = provider.issueRefreshToken(100L)
-        val tampered = issued.token.dropLast(2) + "xx"
+        val last = issued.token.last()
+        val tampered = issued.token.dropLast(1) + if (last == 'A') 'B' else 'A'
         assertFailsWith<InvalidTokenException> { provider.parseRefreshToken(tampered) }
     }
 }

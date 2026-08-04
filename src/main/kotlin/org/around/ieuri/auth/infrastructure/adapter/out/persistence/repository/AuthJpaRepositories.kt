@@ -9,9 +9,6 @@ import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.Membe
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.PasswordResetEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.TermsEntity
 import org.springframework.data.jpa.repository.JpaRepository
-import org.springframework.data.jpa.repository.Modifying
-import org.springframework.data.jpa.repository.Query
-import org.springframework.data.repository.query.Param
 import java.time.Instant
 import java.util.UUID
 
@@ -37,18 +34,8 @@ interface TermsJpaRepository : JpaRepository<TermsEntity, Long> {
 interface EmailVerificationJpaRepository : JpaRepository<EmailVerificationEntity, Long> {
     fun findByPublicId(publicId: UUID): EmailVerificationEntity?
 
-    @Modifying
-    @Query(
-        """
-        UPDATE EmailVerificationEntity e
-        SET e.consumed = true
-        WHERE e.memberId = :memberId AND e.consumed = false AND e.verifiedAt IS NULL
-        """,
-    )
-    fun consumeActiveByMemberId(@Param("memberId") memberId: Long): Int
-
-    @Query("SELECT MAX(e.createdAt) FROM EmailVerificationEntity e WHERE e.memberId = :memberId")
-    fun findLatestCreatedAtByMemberId(@Param("memberId") memberId: Long): Instant?
+    /** 가장 최근에 발급된 챌린지. 재발송 쿨다운 판정에 쓴다. */
+    fun findFirstByMemberIdOrderByCreatedAtDesc(memberId: Long): EmailVerificationEntity?
 
     fun deleteByMemberId(memberId: Long)
 }
@@ -57,10 +44,6 @@ interface PasswordResetJpaRepository : JpaRepository<PasswordResetEntity, Long> 
     fun findByPublicId(publicId: UUID): PasswordResetEntity?
 
     fun findFirstByMemberIdAndConsumedFalseOrderByCreatedAtDesc(memberId: Long): PasswordResetEntity?
-
-    @Modifying
-    @Query("UPDATE PasswordResetEntity p SET p.consumed = true WHERE p.memberId = :memberId AND p.consumed = false")
-    fun consumeActiveByMemberId(@Param("memberId") memberId: Long): Int
 }
 
 interface MemberAuditLogJpaRepository : JpaRepository<MemberAuditLogEntity, Long>

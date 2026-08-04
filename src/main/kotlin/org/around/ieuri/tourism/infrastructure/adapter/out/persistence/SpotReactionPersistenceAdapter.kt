@@ -2,12 +2,13 @@ package org.around.ieuri.tourism.infrastructure.adapter.out.persistence
 
 import org.around.ieuri.tourism.application.port.out.persistence.SpotReactionPort
 import org.around.ieuri.tourism.domain.aggregate.SpotReaction
-import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.SpotReactionEntity
+import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.mapper.toDomain
+import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.mapper.toNewEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.repository.SpotReactionJpaRepository
 import org.springframework.stereotype.Component
 
 /**
- * 좋아요/싫어요 저장 포트 구현. 도메인↔엔티티 매핑을 여기서 담당한다(별도 Mapper 클래스 없음, 프로젝트 관례).
+ * 좋아요/싫어요 저장 포트 구현. 도메인↔엔티티 변환은 `mapper` 패키지가 담당한다.
  *
  * PK는 surrogate id지만 upsert 단위는 자연키 `(member_id, spot_id)`(UNIQUE). 재평가(upsert)는
  * 그 키로 관리 엔티티를 로드해 reaction만 갱신하고 dirty-checking으로 UPDATE를 낸다(관례).
@@ -33,18 +34,4 @@ class SpotReactionPersistenceAdapter(
         }
         repository.save(reaction.toNewEntity())
     }
-
-    private fun SpotReactionEntity.toDomain(): SpotReaction =
-        SpotReaction.record(
-            memberId = memberId,
-            spotId = spotId,
-            reaction = reaction,
-        )
-
-    private fun SpotReaction.toNewEntity(): SpotReactionEntity =
-        SpotReactionEntity(
-            memberId = memberId,
-            spotId = spotId,
-            reaction = reaction,
-        )
 }

@@ -1,10 +1,9 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.tourapi
 
-import org.around.ieuri.tourism.application.command.SyncFestivalCommand
 import org.around.ieuri.tourism.application.port.out.client.FestivalSyncPage
 import org.around.ieuri.tourism.application.port.out.client.FestivalSyncPort
 import org.around.ieuri.tourism.domain.vo.DomainLocale
-import org.around.ieuri.tourism.domain.vo.FestivalPeriod
+import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.mapper.toSyncFestivalCommandOrNull
 import org.around.ieuri.tourism.infrastructure.config.TourApiProperties
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
@@ -68,7 +67,7 @@ class TourApiFestivalSyncClient(
         asOf: LocalDate,
     ): FestivalSyncPage {
         val body = response.response.body
-        val records = body.items.item.mapNotNull { it.toRecord(language, asOf) }
+        val records = body.items.item.mapNotNull { it.toSyncFestivalCommandOrNull(language, asOf) }
 
         return FestivalSyncPage(
             records = records,
@@ -77,41 +76,6 @@ class TourApiFestivalSyncClient(
             // 해소된다 — 드랍이 유의미한 규모면 R-4의 정책 자체를 재검토해야 한다.
             droppedCount = body.items.item.size - records.size,
         )
-    }
-
-    /**
-     * 한 항목의 매핑. **드랍은 예외가 아니라 null 반환이다** — 한 건의 이상 데이터가 페이지 전체를
-     * 실패시킬 이유가 없다([TourApiSyncClient]의 좌표 처리와 같은 판단).
-     */
-    private fun TourApiFestivalResponse.Item.toRecord(
-        language: DomainLocale,
-        asOf: LocalDate,
-    ): SyncFestivalCommand? {
-        val contentId = contentid?.takeIf { it.isNotBlank() } ?: return null       // AC-4
-        val start = parseDate(eventstartdate) ?: return null                       // AC-13
-        val end = parseDate(eventenddate) ?: return null                           // AC-14
-        // AC-15. 도메인이 던지는 예외를 항목 드랍으로 흡수한다.
-        val period = runCatching { FestivalPeriod(start = start, end = end) }.getOrNull() ?: return null
-        if (period.isEndedAsOf(asOf)) return null                                  // AC-9
-
-        return SyncFestivalCommand(
-            contentId = contentId,
-            language = language,
-            period = period,
-            // 해석하지 않는다(R-5·AC-17·AC-19). 공백만 null로 정규화한다(AC-18).
-            progressType = progresstype?.takeIf { it.isNotBlank() },
-            festivalType = festivaltype?.takeIf { it.isNotBlank() },
-        )
-    }
-
-    /**
-     * `YYYYMMDD` 파싱. **엄격하게 해석한다** — `2026-08-10` 같은 다른 형식이나 존재하지 않는 날짜는
-     * null이 되어 항목이 드랍된다(AC-14·R-4). 관대하게 보정하면 잘못 해석된 종료일로 정리 판정이
-     * 조용히 틀린다.
-     */
-    private fun parseDate(raw: String?): LocalDate? {
-        val trimmed = raw?.trim()?.takeIf { it.isNotEmpty() } ?: return null
-        return runCatching { LocalDate.parse(trimmed, YYYYMMDD) }.getOrNull()
     }
 
     private companion object {

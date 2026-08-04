@@ -13,61 +13,36 @@ import org.around.ieuri.tourism.domain.vo.SpotCategory
  */
 interface SpotQueryPort {
     /**
-     * 반경 안의 관광지를 **거리 오름차순**으로 한 페이지 조회한다(SPEC-0004 R-8·R-9).
-     * TourAPI를 호출하지 않는다 — 적재된 spot 테이블만 본다(AC-20·AC-21).
-     *
-     * 거리 계산·정렬을 DB가 수행하는 것이 SPEC-0002와 달라진 점이다. 당시에는 upstream이 반경 안의
-     * 결과만 줘서 application이 Haversine으로 거리를 채우고 정렬했지만, 전량 적재 후에는 "반경 안"을
-     * DB가 인덱스로 풀어야 한다(AC-24). [SpotSearchResult.distanceMeters]는 그 계산 결과다.
+     * 반경 안의 관광지를 **거리 오름차순**으로 한 페이지 조회한다. TourAPI를 호출하지 않고 적재된
+     * spot 테이블만 본다. [SpotSearchResult.distanceMeters]는 DB가 계산한 구면 거리다.
      */
     fun searchNearby(query: NearbySpotSearch): List<SpotSearchResult>
 
     /** [query] 조건에 맞는 전체 건수(페이지 무관). SpotPage.totalCount 산출용. */
     fun countNearby(query: NearbySpotSearch): Int
 
-    /**
-     * 이 회원이 (현재 언어에서) 이미 반응한 `spot.id` 전체.
-     *
-     * SPEC-0002에서는 upstream이 준 후보로 범위를 좁혔지만(IN), 이제는 제외를 **DB 조회 단계에**
-     * 넘겨야 해서(그래야 페이지가 size보다 작아지지 않는다) 후보를 미리 알 수 없다.
-     * 반응 기록은 회원당 많아야 수천 건 규모라 전량 조회가 현실적이다.
-     */
+    /** 이 회원이 현재 언어에서 이미 반응한 `spot.id` 전체. */
     fun findReactedSpotIds(memberId: Long, language: DomainLocale): Set<Long>
 
     /**
-     * 이 `spot.id`에 대한 LIKE 반응 수(SPEC-0003 §5). DISLIKE는 세지 않는다. **언어 조건이 없다** —
-     * spotId가 이미 언어별이므로 언어를 다시 거르면 중복이다(V20). 반응이 없으면 0.
-     * 상세 조회 시 캐시와 무관하게 매번 실시간 집계한다(likeCount는 캐시 비대상).
+     * 이 `spot.id`에 대한 LIKE 반응 수. DISLIKE는 세지 않으며, 반응이 없으면 0.
+     * **언어 조건이 없다** — spotId가 이미 언어별이라 언어를 다시 거르면 중복이다.
      */
     fun countLikes(spotId: Long): Long
 
     /**
-     * `spot.id`에 대응하는 upstream 좌표. **상세 조회가 캐시·DB를 모두 놓쳤을 때만 필요하다** —
-     * TourAPI는 우리 PK를 모르므로 `contentId`로 물어야 하기 때문이다.
-     *
-     * 반환된 [SpotIdentity.language]는 **언어 교차 id를 거부하는 근거**이기도 하다. 요청 언어와
-     * 다르면 존재하지 않는 것으로 취급한다 — 조용히 다른 언어 콘텐츠를 돌려주면 클라이언트의
-     * 언어 전환 버그가 드러나지 않는다.
-     *
-     * 없으면 null(= 존재하지 않는 spot).
+     * `spot.id`에 대응하는 upstream 식별 정보. 없으면 null(= 존재하지 않는 spot).
+     * 반환된 [SpotIdentity.language]는 언어 교차 id를 거부하는 근거이기도 하다.
      */
     fun findIdentity(spotId: Long): SpotIdentity?
 
     /**
-     * `spot` 행이 이미 보유한 상세 표시 값(SPEC-0008 R-2). **상세 본문이 부재할 때 응답을 구성하는
-     * 재료다** — title·category·thumbnailImageUrl·copyright가 여기서 오므로 본문이 없어도 non-null
-     * 필드를 모두 채울 수 있고(AC-5·AC-6), 부재 행의 NOT NULL 컬럼도 이 값으로 적재한다.
-     *
-     * 없으면 null(= 존재하지 않는 spot).
+     * `spot` 행이 이미 보유한 상세 표시 값. 상세 본문이 부재할 때 응답을 구성하고 부재 행의 NOT NULL
+     * 컬럼을 채우는 재료다. 없으면 null(= 존재하지 않는 spot).
      */
     fun findSpotBasics(spotId: Long): SpotBasics?
 
-    /**
-     * 회원이 좋아요(LIKE)한 spot 한 페이지(SPEC-0008 R-15·R-16). DISLIKE는 제외한다(AC-45).
-     *
-     * **요청 언어로 한정한다**(AC-49). `spot_reaction`은 V20 이후 language 컬럼이 없으므로 `spot`을
-     * 조인해 판별한다 — 종료 축제 조회가 같은 이유로 `spot`을 조인하는 것과 같은 패턴이다.
-     */
+    /** 회원이 좋아요(LIKE)한 spot 한 페이지. DISLIKE는 제외하고 요청 언어로 한정한다. */
     fun findLikedSpots(query: LikedSpotsSearch): CursorPage<LikedSpotView>
 }
 
@@ -84,7 +59,7 @@ data class SpotBasics(
 )
 
 /**
- * 좋아요 목록 조회 입력. [language]로 한정하고 [memberId] 본인 것만 조회한다(AC-48).
+ * 좋아요 목록 조회 입력. [language]로 한정하고 [memberId] 본인 것만 조회한다.
  * [after]는 불투명 커서이며 정렬 키(likedAt, spotId)에서 파생된다.
  */
 data class LikedSpotsSearch(
@@ -97,9 +72,8 @@ data class LikedSpotsSearch(
 )
 
 /**
- * 반경 조회 입력. [excludedContentIds]는 로그인 회원이 이미 반응한 항목으로, **DB 쿼리 단계에서**
- * 제외한다 — 조회 후 애플리케이션에서 걸러내면 페이지가 요청한 size보다 작아지기 때문이다
- * (SPEC-0002의 실시간 조회에서는 upstream 페이지를 그대로 서빙해 이 문제가 없었다).
+ * 반경 조회 입력. [excludedSpotIds]는 로그인 회원이 이미 반응한 항목으로, **DB 쿼리 단계에서**
+ * 제외해야 한다 — 조회 후 애플리케이션에서 걸러내면 페이지가 요청한 size보다 작아진다.
  */
 data class NearbySpotSearch(
     val language: DomainLocale,
@@ -128,12 +102,7 @@ data class SpotSearchResult(
     val distanceMeters: Double,
 )
 
-/**
- * `spot.id`가 가리키는 행의 upstream 식별 정보. **상세 조회의 TourAPI 폴백과 언어 검증에만 쓴다.**
- *
- * 이 타입이 존재하는 이유는 외부 식별자(`spot.id`)와 upstream 식별자(`contentId`)가 분리됐기
- * 때문이다. 분리 이전에는 둘이 같아서 변환이 필요 없었다.
- */
+/** `spot.id`가 가리키는 행의 upstream 식별 정보. 상세 조회의 TourAPI 폴백과 언어 검증에만 쓴다. */
 data class SpotIdentity(
     val contentId: String,
     val language: DomainLocale,

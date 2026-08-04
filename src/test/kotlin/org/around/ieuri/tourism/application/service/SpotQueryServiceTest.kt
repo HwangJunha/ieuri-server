@@ -23,7 +23,6 @@ import org.around.ieuri.tourism.application.port.out.persistence.StoredIntro
 import org.around.ieuri.tourism.application.event.SpotDetailAbsent
 import org.around.ieuri.tourism.application.event.SpotDetailFetched
 import org.around.ieuri.tourism.application.event.SpotGalleryFetched
-import org.around.ieuri.tourism.application.exception.UpstreamUnavailableException
 import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
 import org.around.ieuri.tourism.application.port.out.query.LikedSpotsSearch
 import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch

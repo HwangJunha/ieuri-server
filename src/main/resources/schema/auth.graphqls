@@ -7,7 +7,7 @@ type Query {
     member(id: ID!): MemberDetail!
     "관리자 회원 목록(커서 페이지네이션). member:read 권한 필요. 목록은 이메일을 포함하지 않는다(최소수집)."
     members(status: MemberStatus, roleCode: String, first: Int = 20, after: String): MemberConnection!
-    "부여 가능한 역할 목록. role:assign 권한 필요. 프런트가 역할 드롭다운을 하드코딩 없이 렌더한다."
+    "할당 가능한 역할 목록. role:assign 권한이 필요하다."
     assignableRoles: [RoleInfo!]!
 }
 
@@ -74,7 +74,7 @@ enum Provider {
     KAKAO
 }
 
-"약관 코드. 시드(R__seed_terms)와 일치한다. 프런트가 동의 항목을 하드코딩 없이 렌더한다."
+"약관 코드. 클라이언트가 동의 항목을 하드코딩 없이 렌더한다."
 enum TermsCode {
     SERVICE
     PRIVACY
@@ -82,7 +82,7 @@ enum TermsCode {
     MARKETING
 }
 
-"부여 가능한 역할 정보(assignableRoles). 코드는 assignRole/revokeRole의 roleCode로 사용한다."
+"할당 가능한 역할. code는 assignRole·revokeRole의 roleCode로 쓰는 값이다."
 type RoleInfo {
     code: String!
     name: String!

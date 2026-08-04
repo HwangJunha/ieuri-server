@@ -1,38 +1,27 @@
-# ============================================================
-# SPEC-0002 — 관광지 스와이프 추천 (tourism 도메인)
-# additive only. 기존 타입/필드/enum을 변경하지 않는다. BREAKING 없음.
-# 재사용(auth.graphqls): interface BaseResponse, type UserError, type PageInfo.
-# 루트 Query/Mutation은 auth.graphqls가 이미 선언하므로 여기선 extend 한다.
-# ============================================================
-
 extend type Query {
-    "spot.id 단건 상세 조회. TourAPI 상세 오퍼레이션들을 실시간 호출(캐시 미스 시)한다."
-    # 언어는 Accept-Language 헤더로 전달(SPEC-0002 규약) — locale 인자 없음. 유효한 id는 항상 SpotDetail을
-    # 반환하고, 해소 실패는 최상위 GraphQL 오류(SPOT_NOT_FOUND)이므로 non-null.
+    "spot.id 단건 상세 조회. 언어는 Accept-Language로 전달하며 locale 인자는 없다. 해소 불가한 id는 최상위 오류(SPOT_NOT_FOUND)다."
     spotDetail(id: ID!): SpotDetail!
 
-    "위치 기반 관광지 목록. TourAPI locationBasedList2를 실시간 호출하며 DB에 저장하지 않는다."
-    # TourAPI는 pageNo 오프셋 페이지네이션만 지원한다. 라이브 데이터라 커서 안정성을 보장할 수 없어
-    # 오프셋(page/size)으로 서빙한다. 클라이언트는 한 페이지(기본 100건)를 받아 스택에 쌓고, 소진 시 page+1을 조회한다.
+    "위치 기반 관광지 목록. 오프셋 페이지네이션(page/size)이며 커서가 아니다."
     spots(
         latitude: Float!
         longitude: Float!
-        "조회 반경(미터). 기본 20000, 서버 UX/성능 상한 100000(초과 시 RADIUS_TOO_LARGE)."
+        "검색 반경(미터). 기본 20000, 최대 100000 — 초과 시 RADIUS_TOO_LARGE."
         radiusMeters: Int = 20000
-        "언어 중립 카테고리. 현재 언어에서 유효한 값만 availableSpotCategories로 확인."
+        "언어 중립 카테고리 필터. availableSpotCategories에 있는 값만 유효하다."
         category: SpotCategory
-        "페이지 번호(1-base). 기본 1."
+        "페이지 번호, 1부터."
         page: Int = 1
-        "페이지 크기. 기본 100, 서버 상한 100(초과 시 클램프)."
+        "페이지 크기. 기본 100, 상한 100 — 초과 시 클램프된다."
         size: Int = 100
     ): SpotPage!
 
-    "현재 언어(Accept-Language)에서 유효한 관광지 카테고리 목록. 여행코스(KO 전용)·교통(외국어 전용) 비대칭을 흡수한다."
+    "현재 언어(Accept-Language)에서 유효한 카테고리 목록. 언어별로 다르다."
     availableSpotCategories: [SpotCategory!]!
 
-    "내가 좋아요한 장소 목록. 요청 언어로 한정되며 최신순. 인증 필수(미인증은 UNAUTHENTICATED)."
+    "내가 좋아요한 장소 목록. 요청 언어 한정, 최신순. 인증 필수(UNAUTHENTICATED)."
     likedSpots(
-        "카테고리 필터. 미지정이면 전체."
+        "카테고리 필터. 생략하면 전체."
         category: SpotCategory
         first: Int = 20
         after: String
@@ -40,11 +29,11 @@ extend type Query {
 }
 
 extend type Mutation {
-    "관광지 좋아요/싫어요 기록. spot.id 하나로 저장한다 — id가 이미 언어별이라 언어를 따로 받지 않는다. 재평가는 덮어쓴다(취소는 범위 밖)."
+    "관광지 좋아요/싫어요 기록. 다시 반응하면 덮어쓰며, 반응 취소 수단은 없다."
     reactToSpot(input: ReactToSpotInput!): ReactToSpotPayload!
 }
 
-"지원 언어. 문서·향후 explicit override용. spots/availableSpotCategories는 locale 인자를 받지 않으며 언어는 Accept-Language에서 온다(부재 시 EN 폴백)."
+"지원 언어. 활성 언어는 Accept-Language에서 오며(부재 시 EN) 인자로 받지 않는다."
 enum Locale {
     EN
     KO
@@ -52,28 +41,28 @@ enum Locale {
     ZH
 }
 
-"언어 중립 관광지 카테고리. 서버가 언어별 TourAPI content-type 코드로 매핑한다. 모든 언어에서 모든 값이 유효하지는 않다 — availableSpotCategories 참조."
+"언어 중립 관광지 카테고리. 모든 언어에서 모든 값이 유효하지는 않다 — availableSpotCategories 참조."
 enum SpotCategory {
     TOURIST_SPOT
     CULTURAL_FACILITY
     FESTIVAL_EVENT
-    "한국어(KO) 서비스에서만 제공됨."
+    "한국어(KO) 서비스 전용."
     TRAVEL_COURSE
     LEISURE_SPORTS
     LODGING
     SHOPPING
     RESTAURANT
-    "외국어(EN/JA/ZH) 서비스에서만 제공됨."
+    "외국어(EN/JA/ZH) 서비스 전용."
     TRANSPORT
 }
 
-"TourAPI cpyrhtDivCd 매핑. 클라이언트가 유형별로 렌더링을 분기하므로 서버가 감추거나 기본값으로 뭉개지 않는다."
+"저작권 유형. 클라이언트가 유형별로 출처 표기를 분기한다."
 enum CopyrightType {
-    "공공누리 제1유형 — 출처표시. 상업·변형 가능."
+    "공공누리 제1유형"
     TYPE1
-    "공공누리 제3유형 — 출처표시 + 변경금지."
+    "공공누리 제3유형"
     TYPE3
-    "TourAPI가 값을 제공하지 않음. 보수적으로 변경금지에 준해 취급."
+    "저작권 유형을 확인할 수 없음. 출처 표기는 TYPE3에 준해 처리한다."
     UNSPECIFIED
 }
 
@@ -82,40 +71,41 @@ enum SpotReaction {
     DISLIKE
 }
 
-"locationBasedList2가 요청 언어로 반환한 물리적 장소 1건. 상세/overview/다중이미지는 이번 스펙 범위 밖."
+"요청 언어로 반환된 물리적 장소 1건."
 type Spot {
-    "서버가 부여한 안정적 식별자(spot.id). 언어별로 다른 행이므로 언어를 바꾸면 목록을 다시 받아야 한다."
+    "안정적 식별자. 언어별로 다르므로 언어를 바꾸면 목록을 다시 받아야 한다."
     id: ID!
     title: String!
-    "주소. addr1/addr2 병합(카드엔 상세 구분 불필요). 값이 없을 수 있음."
+    "주소. 없을 수 있다."
     address: String
-    "https 정규화된 카드 이미지(firstimage). Non-null: 상위 조회가 이미지 보유 항목만 반환하도록 보장(운영 방침)."
+    "카드 이미지 URL(https). 이미지가 없는 항목은 결과에서 제외되므로 항상 존재한다."
     thumbnailImageUrl: String!
-    "Haversine 직선거리(미터). 서버가 요청 좌표 기준 계산."
+    "요청 좌표로부터의 직선거리(미터)."
     distanceMeters: Float!
     category: SpotCategory!
     copyright: CopyrightType!
-    "공공누리 출처표시 문구(사람이 읽는 텍스트). UNSPECIFIED여도 최소 출처를 담는다."
+    "출처 표기 문구. UNSPECIFIED여도 채워진다."
     attributionText: String!
-    "TourAPI mapx/mapy(경도/위도, 원 좌표계)."
+    "경도."
     mapX: Float!
+    "위도."
     mapY: Float!
 }
 
-"관광지 오프셋 페이지. items는 거리 오름차순(가까운 곳 우선, POL-019) 정렬. 소진 판정은 hasNext로."
+"관광지 오프셋 페이지. 거리 오름차순(가까운 곳 우선) 정렬이며 hasNext로 소진을 판정한다."
 type SpotPage {
     items: [Spot!]!
-    "현재 페이지 번호(1-base)."
+    "현재 페이지 번호, 1부터."
     page: Int!
-    "다음 페이지 존재 여부. false면 마지막 페이지 — 클라이언트는 빈 상태로 전환."
+    "다음 페이지 존재 여부. false면 마지막 페이지다."
     hasNext: Boolean!
-    "TourAPI totalCount(비관광·이미지 필터 이전 총계). 실제 전달 건수보다 큼 — 참고용."
+    "필터 이전 총계라 실제 전달 건수보다 클 수 있다. 참고용."
     totalCount: Int
 }
 
-"language는 인자로 받지 않는다 — 서버가 요청 언어(Accept-Language)와 결합해 저장."
+"language 인자를 받지 않는다 — 현재 요청 언어 기준으로 기록된다."
 input ReactToSpotInput {
-    "반응 대상 관광지의 spot.id(Spot.id와 같은 값)."
+    "대상 관광지의 id(Spot.id와 같은 값)."
     spotId: ID!
     reaction: SpotReaction!
 }
@@ -125,130 +115,107 @@ type ReactToSpotPayload implements BaseResponse {
     userErrors: [UserError!]!
 }
 
-# ── 관광지 상세(SPEC-0003) ────────────────────────────────────────
-# Spot의 확장이 아니라 별도 read shape다. Spot은 스와이프 리스트에서 대량 반환되므로 상세 전용 필드를 얹지 않는다.
-# 어떤 인터페이스도 구현하지 않는다(쿼리 결과이지 뮤테이션 페이로드가 아님). 상세 반응은 기존 reactToSpot 재사용.
-
-"갤러리 이미지 1장. TourAPI detailImage2가 이미지별 cpyrhtDivCd를 주므로 저작권/문구는 이미지별이며 부모 Spot에서 상속하지 않는다."
+"갤러리 이미지 1장. 저작권과 출처 표기는 이미지별이며 부모 Spot에서 상속하지 않는다."
 type SpotImage {
-    "원본 이미지 URL. https 정규화. 항상 존재(url 없는 항목은 목록에 안 들어감)."
+    "원본 이미지 URL(https). url이 없는 항목은 제외되므로 항상 존재한다."
     imageUrl: String!
-    "축소본 URL. nullable(TourAPI smallimageurl이 항목별로 보장되지 않음)."
+    "축소본 URL. 없을 수 있다."
     thumbnailUrl: String
-    "이미지 설명(TourAPI imgname). nullable(자주 없음)."
+    "이미지 설명. 없는 경우가 잦다."
     caption: String
-    "이미지별 저작권 유형(Spot.copyright와 같은 enum)."
+    "이미지별 저작권 유형."
     copyright: CopyrightType!
-    "이미지별 저작권 표준 문구. copyright 유형에서 항상 도출."
+    "저작권 유형에 대응하는 표준 출처 표기 문구."
     attributionText: String!
 }
 
-"""
-관광지 상세. spot.id 단건.
-
-**필드별 지연 조회**: 루트(spotDetail)는 detailCommon2 1콜만 소비하고, gallery·intro·infoItems는
-**요청한 경우에만** 각자 TourAPI를 호출한다. likeCount도 요청 시에만 집계한다. 즉 `{ id title overview }`만
-물으면 upstream 콜은 1회다.
-"""
+"관광지 상세. spot.id를 키로 한다."
 type SpotDetail {
-    "Spot.id와 동일 식별자 공간(서버가 부여한 spot.id)."
+    "Spot.id와 같은 값."
     id: ID!
     title: String!
     category: SpotCategory!
-    "갤러리 폴백/헤더 이미지(https 정규화)."
+    "대표 이미지 URL(https)."
     thumbnailImageUrl: String!
-    "detailCommon2 장문 소개. nullable(항목마다 없을 수 있음, 빈 문자열은 null 정규화)."
+    "장문 소개. 없을 수 있으며, 빈 문자열은 null로 정규화된다."
     overview: String
-    "주소. nullable."
+    "주소. 없을 수 있다."
     address: String
-    "detailCommon2 homepage. nullable(자주 없음)."
+    "홈페이지 URL. 없는 경우가 잦다."
     homepage: String
-    "detailCommon2 tel. nullable(자주 없음)."
+    "대표 전화번호. 없는 경우가 잦다."
     tel: String
-    "항목 저작권 유형."
+    "저작권 유형."
     copyright: CopyrightType!
-    "항목 저작권 표준 문구(전문). copyright에서 도출."
+    "저작권 유형에서 파생된 출처 표기 문구."
     attributionText: String!
+
     """
-    TourAPI 반환 순서, 최대 10장. 원소는 non-null(url 없는 이미지는 제외). 요청 시 detailImage2 1콜.
+    최대 10장, 서버가 준 순서. 원소는 non-null이다.
 
-
-    **nullable이다(SPEC-0008 R-5).** detailImage2 조회 실패를 이 필드에 가둔다 — 실패 시 이 필드만
-    null이 되고 본문은 정상 반환되며, 실패는 최상위 errors[]에 path로 표면화된다.
-    이미지가 없는 경우(실패가 아님)는 빈 배열이다.
-
-    null(조회 실패)과 빈 배열(이미지 없음)을 구분하는 필드·enum·payload를 두지 않는다 —
-    클라이언트가 두 경우를 동일하게(썸네일 1장 폴백) 처리한다.
-
+    null은 이 필드의 조회가 실패했다는 뜻이며, 본문은 정상 반환되고 실패는 최상위 errors[]에
+    path로 표면화된다. 빈 배열은 이미지가 실제로 없다는 뜻이다.
+    두 경우를 구분하는 별도 필드는 없으며, 클라이언트는 둘을 동일하게(썸네일 1장 폴백) 처리한다.
     """
     gallery: [SpotImage!]
-    "이 spot.id의 LIKE 수. non-null, 없으면 0. 요청 시 실시간 집계(캐시 비대상)."
+
+    "이 장소의 LIKE 수. non-null이며 없으면 0이다."
     likeCount: Int!
 
     """
-    운영 정보(이용시간·휴무일·주차 등). 요청 시 detailIntro2 1콜.
-    TourAPI가 contentTypeId를 필수로 요구하므로 이 필드를 고르면 category도 함께 줘야 한다 —
-    spots가 내려준 Spot.category를 그대로 전달한다.
-    표시할 값이 하나도 없으면(또는 해당 언어에 카테고리 코드가 없으면) null.
+    운영 정보(이용시간·휴무일·주차 등). 이 장소의 category 값을 그대로 넘긴다.
+    해당 카테고리·언어에 보여줄 값이 없으면 null이다.
     """
     intro(category: SpotCategory!): SpotIntro
 
     """
-    이용안내 반복 항목(항목명/내용). 요청 시 detailInfo2 1콜. category가 필요한 이유는 intro와 동일.
+    이용안내 반복 항목. category는 intro와 같은 의미다.
 
-    **nullable이다(SPEC-0008 R-6).** gallery와 동일하게 detailInfo2 실패를 이 필드에 가둔다.
-    항목이 없는 경우(실패가 아님)는 빈 배열이다.
-
+    null은 이 필드의 조회 실패(최상위 errors[]에 표면화), 빈 배열은 항목이 없다는 뜻이다.
     """
     infoItems(category: SpotCategory!): [SpotInfoItem!]
 }
 
-"""
-관광지 운영 정보. TourAPI detailIntro2는 카테고리마다 응답 필드가 완전히 다르므로(관광지 usetime,
-음식점 opentimefood …) 서버가 **의미가 같은 필드를 공통 이름으로 정규화**해 내려준다.
-카테고리에 해당 개념이 없으면 그 필드는 null이다(예: 여행코스엔 주차·휴무 개념이 없음).
-"""
+"운영 정보. 카테고리마다 다른 응답을 공통 필드명으로 정규화한다. 해당 개념이 없는 카테고리에서는 null이다."
 type SpotIntro {
-    "영업/이용 시간. 카테고리별 usetime·opentimefood·usetimeculture 등을 통합."
+    "영업·이용 시간."
     businessHours: String
-    "휴무일. restdate·restdatefood·restdateculture 등을 통합."
+    "휴무일."
     closedDays: String
-    "주차 안내. parking·parkingfood·parkinglodging 등을 통합."
+    "주차 정보."
     parking: String
-    "문의·안내 연락처. infocenter·infocenterfood 등을 통합. SpotDetail.tel(대표번호)과 다를 수 있음."
+    "문의·안내 연락처. SpotDetail.tel과 다를 수 있다."
     inquiryPhone: String
-    "이용요금·입장료. usefee·usefeeleports 등을 통합. 음식점은 대표메뉴 가격이 아니라 null."
+    "이용요금·입장료. 음식점은 null이며 메뉴 가격이 아니다."
     fee: String
-    "반려동물 동반 가능 여부 안내(원문 문구). chkpet 계열 통합."
+    "반려동물 동반 안내."
     petAllowed: String
-    "신용카드 가능 여부 안내(원문 문구). chkcreditcard 계열 통합."
+    "신용카드 가능 여부."
     creditCardAccepted: String
 }
 
-"이용안내 1건(detailInfo2). 카테고리별 반복 항목을 항목명/내용 쌍으로 정규화한다."
+"이용안내 항목 1건."
 type SpotInfoItem {
-    "항목명(예: 이용시간, 입장료). TourAPI infoname."
+    "항목명."
     name: String!
-    "항목 내용. TourAPI infotext(HTML 태그가 섞여 올 수 있어 클라이언트가 정제한다)."
+    "항목 내용. HTML 태그가 섞일 수 있어 클라이언트가 정제한다."
     text: String!
 }
 
-# ── 좋아요 목록(SPEC-0008) ────────────────────────────────────────
-
-"목록 카드와 상세 진입에 필요한 값만 담는다. 거리(distanceMeters)와 좌표(mapX·mapY)는 제공하지 않는다."
+"목록 카드와 상세 진입에 필요한 값만 담는다. 거리와 좌표는 제공하지 않는다."
 type LikedSpot {
-    "spot.id. 상세 진입 시 그대로 spotDetail(id:)에 넘긴다."
+    "spot.id — spotDetail(id:)에 그대로 넘긴다."
     id: ID!
     title: String!
     thumbnailImageUrl: String!
     address: String
     category: SpotCategory!
     copyright: CopyrightType!
-    "공공누리 출처표시 문구. copyright에서 도출."
+    "저작권 유형에서 파생된 출처 표기 문구."
     attributionText: String!
 }
 
-"좋아요 목록 커서 연결. 총 개수는 제공하지 않는다 — 소진 판정은 pageInfo.hasNextPage로 한다."
+"좋아요 목록 커서 연결. 총 개수는 제공하지 않으며 pageInfo.hasNextPage로 소진을 판정한다."
 type LikedSpotConnection {
     edges: [LikedSpotEdge!]!
     pageInfo: PageInfo!
@@ -257,6 +224,6 @@ type LikedSpotConnection {
 type LikedSpotEdge {
     cursor: String!
     node: LikedSpot!
-    "좋아요한 시각(ISO-8601). 정렬 기준이다."
+    "좋아요한 시각(ISO-8601). 이 값 기준 최신순 정렬이다."
     likedAt: String!
 }

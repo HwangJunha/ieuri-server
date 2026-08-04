@@ -9,26 +9,18 @@ import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * write-behind 리스너 전용 executor(SPEC-0004 R-15·[TBD-5]).
+ * write-behind 리스너 전용 executor. 유계 큐를 쓰고, 큐가 차면 작업을 **폐기**하며 폐기 건수를
+ * 카운터로 남긴다. write-behind는 캐시 충전이지 데이터 보존이 아니므로 버려도 정합성이 깨지지 않는다
+ * — 다음 조회 때 다시 발행된다.
  *
- * **전용 executor를 두는 이유**는 Spring의 기본 `applicationTaskExecutor`가 무제한 큐를 써서
- * 메모리가 조용히 늘기 때문이다. 여기서는 상한과 거부 정책을 명시한다:
- *
- *  - **유계 큐** — 상한을 넘으면 쌓지 않는다.
- *  - **폐기(Discard)** — 블로킹은 R-15(가용성 유지)와 충돌하고, `CallerRunsPolicy`는 요청
- *    스레드가 적재를 수행해 AC-39를 위반한다. 남는 것은 폐기이며, write-behind는 **캐시 충전이지
- *    데이터 보존이 아니므로** 버려도 정합성이 깨지지 않는다 — 다음 조회 때 다시 발행된다.
- *  - 폐기 건수를 카운터로 남긴다(AC-43).
- *
- * **종료 시**(R-16): 새 유입을 막고 진행 중인 작업을 **유한 시간** 안에서 마무리한다.
- * 각 적재는 어댑터에서 단일 트랜잭션이라 중간에 끊겨도 절반만 쓰인 상태가 남지 않는다(AC-44).
- * 무한 대기는 배포·재시작을 붙잡으므로 하지 않는다.
+ * 종료 시 진행 중인 작업을 유한 시간 안에서만 기다린다. 각 적재는 어댑터에서 단일 트랜잭션이라
+ * 중간에 끊겨도 절반만 쓰인 상태가 남지 않는다.
  */
 @Configuration
 @EnableAsync
 class TourismAsyncConfig {
 
-    /** 폐기 건수. 꾸준히 늘면 큐 상한이나 워커 수가 부족하다는 신호다(AC-43). */
+    /** 폐기 건수. 꾸준히 늘면 큐 상한이나 워커 수가 부족하다는 신호다. */
     private val discarded = AtomicLong()
 
     @Bean(WRITE_BEHIND_EXECUTOR)
@@ -54,7 +46,7 @@ class TourismAsyncConfig {
         initialize()
     }
 
-    /** 관측용. 폐기 총계를 외부에서 확인할 수 있게 노출한다(AC-43). */
+    /** 관측용. 폐기 총계를 외부에서 확인할 수 있게 노출한다. */
     fun discardedCount(): Long = discarded.get()
 
     companion object {

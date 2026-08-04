@@ -42,17 +42,12 @@ import org.springframework.stereotype.Service
 import java.time.Instant
 
 /**
- * 관광지 조회 유스케이스 구현(CQRS 읽기).
+ * 관광지 조회 유스케이스 구현(CQRS 읽기). 목록과 상세의 데이터 출처가 다르다:
+ *  - 목록 : 적재된 spot 테이블만 본다. 반경 필터·거리 계산·정렬은 DB가 인덱스로 수행한다.
+ *  - 상세 : Valkey → DB → TourAPI 3단 폴백. 앞 단계에서 값을 찾으면 뒤 단계를 호출하지 않으며,
+ *           필드별 지연 조회 구조를 유지한다.
  *
- * **목록(spots)과 상세(spotDetail)의 데이터 출처가 다르다**(SPEC-0004):
- *  - 목록 : 적재된 spot 테이블만 본다. TourAPI를 호출하지 않는다(R-8). 반경 필터·거리 계산·정렬은
- *           DB가 인덱스로 수행한다(R-9). 좌표/반경/카테고리 검증만 여기서 한다.
- *  - 상세 : **Valkey → DB → TourAPI 3단 폴백**(R-13). 상세는 단건 조회만 지원되고 호출 쿼터로
- *           전량 동기화가 불가능해, 조회된 것만 write-behind로 누적한다. 앞 단계에서 값을 찾으면
- *           뒤 단계를 호출하지 않으며, 필드별 지연 조회 구조는 그대로다(SPEC-0003 R7).
- *
- * 페이지네이션은 오프셋(page/size)을 유지한다. 안정적 백킹 스토어가 생겨 커서가 기술적으로
- * 가능해졌지만(POL-017), 전환은 별도 스펙으로 다룬다(SPEC-0004 범위 제외).
+ * 페이지네이션은 오프셋(page/size)이다.
  */
 @Service
 class SpotQueryService(
@@ -65,12 +60,8 @@ class SpotQueryService(
 ) : SpotQueryUseCase {
 
     /**
-     * 주변 관광지 한 페이지(SPEC-0004 R-8). **TourAPI를 호출하지 않는다** — 배치가 적재한 spot
-     * 테이블만 본다(AC-20·AC-21). 반경 필터·거리 계산·정렬을 DB가 인덱스로 수행한다(AC-24).
-     *
-     * SPEC-0002와 달라진 점은 거리·정렬의 주체다. 당시에는 upstream이 반경 안의 결과만 줘서
-     * application이 Haversine으로 채우고 정렬했지만, 전량 적재 후에는 "반경 안"을 DB가 풀어야 한다.
-     * 계약(거리 오름차순 + id 타이브레이크, POL-019)은 그대로이며 ORDER BY로 옮겨갔다.
+     * 주변 관광지 한 페이지. **TourAPI를 호출하지 않는다** — 배치가 적재한 spot 테이블만 본다.
+     * 반경 필터·거리 계산·정렬은 DB가 인덱스로 수행하며, 정렬은 거리 오름차순 + id 타이브레이크다.
      */
     override fun spots(query: SpotsQuery, locale: DomainLocale, memberId: Long?): SpotPageView {
         val center = validatedCenter(query.latitude, query.longitude)

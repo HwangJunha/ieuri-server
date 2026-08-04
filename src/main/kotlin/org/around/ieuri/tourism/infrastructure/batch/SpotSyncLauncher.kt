@@ -18,26 +18,14 @@ import java.time.ZoneId
 import kotlin.system.exitProcess
 
 /**
- * 동기화 잡 실행의 단일 진입점(SPEC-0004 AC-4·AC-6). **batch 프로파일에서만 생성된다** —
- * API 서버 프로세스에는 이 빈도, [SpotSyncJobConfig]의 잡도 존재하지 않는다.
+ * 동기화 잡 실행의 단일 진입점. batch 프로파일에서만 생성되며, 실행할 잡은 외부가 정한다
+ * (`--ieuri.tourapi.sync.job=spotSyncJob`).
  *
- * **실행 시점도, 실행할 잡도 외부가 정한다**: `--ieuri.tourapi.sync.job=spotSyncJob`(기본값).
- * 잡이 늘어나도 이 클래스는 그대로 두고 인자만 바꾸면 되며, CronJob 매니페스트가
- * "무엇을 돌릴지"를 소유한다.
+ * 중복 실행 방지는 Spring Batch의 `JobInstance` 유일성에 맡긴다 — 실행 일자를 식별 파라미터로 넣어
+ * "같은 날짜 = 같은 JobInstance"로 막는다. 이미 완료된 날짜면 [JobInstanceAlreadyCompleteException],
+ * 실행 중이면 [JobExecutionAlreadyRunningException]이 나며 둘 다 정상적인 중복 차단이다.
  *
- * **Boot의 `JobLauncherApplicationRunner`를 쓰지 않는 이유는 잡 파라미터 때문이다.**
- * 그쪽은 커맨드라인 non-option args로만 파라미터를 받는데, 이 잡은 **실행 일자**를 식별
- * 파라미터로 넣어야 한다(같은 날짜 = 같은 JobInstance = 중복 실행 불가, AC-6). 날짜를 CronJob
- * 매니페스트에 하드코딩할 수 없으므로 실행 시점에 서버가 만든다. 그 한 가지를 빼면 나머지는
- * Boot 방식과 같다 — [ApplicationRunner]·[ExitCodeGenerator]를 그대로 구현한다.
- *
- * **중복 실행 방지는 Spring Batch의 `JobInstance` 유일성에 맡긴다**(설계 문서 §4.6).
- * 이미 완료된 날짜면 [JobInstanceAlreadyCompleteException], 실행 중이면
- * [JobExecutionAlreadyRunningException]이 나며 **둘 다 오류가 아니라 정상적인 중복 차단**이다.
- *
- * > 단일 인스턴스 전제다. 다중으로 배포하면 두 인스턴스가 동시에 발화할 때 경합이 생길 수 있어
- * > Valkey 분산 락이 추가로 필요하다(설계 문서 §4.6). k3s CronJob은 `concurrencyPolicy: Forbid`로
- * > 파드 수준에서 한 번 더 막는다.
+ * > 단일 인스턴스 전제다. 다중 배포 시에는 분산 락이 추가로 필요하다.
  */
 @Component
 @Profile(BATCH_PROFILE)
@@ -54,12 +42,8 @@ class SpotSyncLauncher(
     private var exitCode = 0
 
     /**
-     * 부팅 즉시 1회 실행하고 프로세스를 종료한다. **실행 시점은 외부(k8s CronJob)가 소유한다** —
-     * 앱 내부에 스케줄러를 두지 않으므로 트리거가 하나뿐이고, 하루 두 번 도는 실수가 원천 차단된다.
-     *
-     * CronJob은 "파드가 뜨고 → 잡이 끝나면 종료되는" 모델이라 명시적으로 종료해야 한다.
-     * [SpringApplication.exit]가 컨텍스트를 닫아 커넥션 풀·스레드를 정리한 뒤 종료 코드를
-     * 계산하며, 그 값이 [getExitCode]에서 온다.
+     * 부팅 즉시 1회 실행하고 프로세스를 종료한다 — 실행 시점은 외부(k8s CronJob)가 소유한다.
+     * [SpringApplication.exit]가 컨텍스트를 닫아 커넥션 풀·스레드를 정리한 뒤 종료 코드를 계산한다.
      */
     override fun run(args: ApplicationArguments) {
         exitCode = if (launch()) 0 else 1
@@ -70,21 +54,20 @@ class SpotSyncLauncher(
     override fun getExitCode(): Int = exitCode
 
     /**
-     * @return 성공(또는 중복 스킵)이면 true, **잡이 실패로 끝났으면 false**.
+     * 설정된 잡을 실행일 파라미터와 함께 1회 실행한다.
      *
-     * 실패를 예외가 아니라 반환값으로 알리는 이유는, Spring Batch가 스텝 실패를 예외로
-     * 던지지 않고 `JobExecution.status=FAILED`로 표현하기 때문이다. 이걸 보지 않으면
-     * 실패한 실행을 성공으로 착각한다(부분 실패는 R-3상 정상이지만, 그것과
-     * "잡 전체가 실패로 끝남"은 다르다).
+     * @return 성공(또는 중복 스킵)이면 true, 잡이 실패로 끝났으면 false. Spring Batch는 스텝 실패를
+     *   예외로 던지지 않고 `JobExecution.status=FAILED`로 표현하므로, 이 상태를 보지 않으면 실패한
+     *   실행을 성공으로 착각한다.
      */
     fun launch(): Boolean {
         val job = jobs.firstOrNull { it.name == properties.job }
             ?: error("잡을 찾을 수 없습니다: ${properties.job} (등록된 잡: ${jobs.map { it.name }})")
         val runDate = LocalDate.now(ZoneId.of(properties.zone))
         val parameters = JobParametersBuilder()
-            // 식별 파라미터. 같은 날짜 = 같은 JobInstance = 중복 실행 불가(AC-6).
-            // **축제 Step이 이 값을 실행일로 읽는다**(SPEC-0007 AC-8) — Step 안에서 now()를 부르지
-            // 않으므로 수집 조건·종료 판정·재삽입 제외가 모두 같은 날짜를 쓴다.
+            // 식별 파라미터. 같은 날짜 = 같은 JobInstance = 중복 실행 불가.
+            // Step들이 이 값을 실행일로 읽으므로 Step 안에서 now()를 부르면 안 된다 — 자정을 걸쳐
+            // 도는 실행에서 단계마다 날짜가 달라진다.
             .addString(RUN_DATE_PARAMETER, runDate.toString())
             .toJobParameters()
 

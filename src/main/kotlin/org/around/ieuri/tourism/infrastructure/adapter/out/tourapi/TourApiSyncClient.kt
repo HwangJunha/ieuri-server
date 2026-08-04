@@ -2,11 +2,9 @@ package org.around.ieuri.tourism.infrastructure.adapter.out.tourapi
 
 import org.around.ieuri.tourism.application.port.out.client.SpotSyncPage
 import org.around.ieuri.tourism.application.port.out.client.SpotSyncPort
-import org.around.ieuri.tourism.application.command.SyncSpotCommand
-import org.around.ieuri.tourism.domain.vo.Coordinates
-import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
+import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.mapper.toSyncSpotCommandOrNull
 import org.around.ieuri.tourism.infrastructure.config.TourApiProperties
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
@@ -55,7 +53,9 @@ class TourApiSyncClient(
         val records = body.items.item.mapNotNull { item ->
             val resolved = resolveCategory(item.contenttypeid, language)
             if (resolved.isFallback) fallbacks++
-            item.toRecord(language, resolved.category)
+            // 비관광 항목 제외(lclsSystm2). 설정이 빈 목록이면 아무것도 걸러내지 않는다.
+            if (item.lclsSystm2 != null && item.lclsSystm2 in properties.excludeLclssystm2) return@mapNotNull null
+            item.toSyncSpotCommandOrNull(language, resolved.category)
         }
 
         return SpotSyncPage(
@@ -65,36 +65,6 @@ class TourApiSyncClient(
             categoryFallbackCount = fallbacks,
         )
     }
-
-    /**
-     * 비관광 항목 제외(lclsSystm2)는 설정이 빈 목록이면 아무것도 걸러내지 않는다. `exclude-lclssystm2`는
-     * SPEC-0002에서 `[TBD]`로 넘어온 상태이며 이 스펙이 해소하지 않는다 — 다만 전량 적재 후
-     * `content_type_id`·분포를 질의하면 표본이 나오므로 그때 확정할 수 있다(설계 문서 §4.3).
-     */
-    private fun TourApiResponse.Item.toRecord(language: DomainLocale, category: SpotCategory): SyncSpotCommand? {
-        if (lclsSystm2 != null && lclsSystm2 in properties.excludeLclssystm2) return null
-        return SyncSpotCommand(
-            contentId = contentid?.takeIf { it.isNotBlank() } ?: return null,
-            language = language,
-            title = title?.takeIf { it.isNotBlank() } ?: return null,
-            address = listOfNotNull(addr1, addr2).joinToString(" ").ifBlank { null },
-            // arrange=Q가 보장하더라도 재확인한다 — 이 필드는 SDL에서 non-null이다.
-            thumbnailImageUrl = (firstimage?.takeIf { it.isNotBlank() } ?: return null).toHttps(),
-            coordinates = coordinatesOrNull(mapy ?: return null, mapx ?: return null) ?: return null,
-            category = category,
-            // 값이 없거나 숫자가 아니면 드랍한다. 실측(2026-08-03, 121,913건)에서 한 건도 없었고,
-            // 없으면 카테고리 폴백을 사후에 질의할 수단이 사라진다(V13이 이 컬럼을 둔 이유).
-            contentTypeId = contenttypeid?.toIntOrNull() ?: return null,
-            copyright = CopyrightType.fromCode(cpyrhtDivCd),
-        )
-    }
-
-    /**
-     * 좌표 범위를 벗어난 항목은 적재하지 않는다. 도메인 [Coordinates]가 던지는 예외를 배치 전체를
-     * 중단시키는 대신 항목 드랍으로 흡수한다 — 한 건의 이상 좌표가 페이지 전체를 실패시킬 이유가 없다.
-     */
-    private fun coordinatesOrNull(latitude: Double, longitude: Double): Coordinates? =
-        runCatching { Coordinates(latitude = latitude, longitude = longitude) }.getOrNull()
 
     /**
      * contentTypeId → 도메인 카테고리. 해석 실패 시 TOURIST_SPOT으로 떨어지는 것은 [TourApiClient]와
@@ -110,6 +80,4 @@ class TourApiSyncClient(
     }
 
     private data class ResolvedCategory(val category: SpotCategory, val isFallback: Boolean)
-
-    private fun String.toHttps(): String = replaceFirst("http://", "https://")
 }

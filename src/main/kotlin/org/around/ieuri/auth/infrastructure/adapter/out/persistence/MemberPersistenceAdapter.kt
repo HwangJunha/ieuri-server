@@ -6,12 +6,11 @@ import org.around.ieuri.auth.application.port.out.persistence.MemberRepositoryPo
 import org.around.ieuri.auth.application.port.out.security.EmailEncryptorPort
 import org.around.ieuri.auth.domain.aggregate.Member
 import org.around.ieuri.auth.domain.vo.Email
-import org.around.ieuri.auth.domain.vo.Nickname
 import org.around.ieuri.auth.domain.vo.Provider
 import org.around.ieuri.auth.domain.vo.ProviderUserId
-import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberEntity
-import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberProfileEntity
-import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberTermsAgreementEntity
+import org.around.ieuri.auth.infrastructure.adapter.out.persistence.mapper.toDomain
+import org.around.ieuri.auth.infrastructure.adapter.out.persistence.mapper.toNewEntity
+import org.around.ieuri.auth.infrastructure.adapter.out.persistence.mapper.toNewProfileEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.EmailVerificationJpaRepository
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.MemberJpaRepository
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.MemberProfileJpaRepository
@@ -40,39 +39,11 @@ class MemberPersistenceAdapter(
     override fun existsById(memberId: Long): Boolean = memberRepository.existsById(memberId)
 
     override fun save(member: Member): Long {
-        val saved = memberRepository.save(
-            MemberEntity(
-                provider = member.provider,
-                providerUserId = member.providerUserId.value,
-                emailEncrypted = encryptor.encrypt(member.email.value),
-                emailVerified = member.emailVerified,
-                passwordHash = member.passwordHash?.value,
-                status = member.status,
-                ageVerified = member.ageVerified,
-            ),
-        )
+        val saved = memberRepository.save(member.toNewEntity(encryptor.encrypt(member.email.value)))
         val memberId = requireNotNull(saved.id) { "회원 저장 후 id가 없습니다." }
 
-        profileRepository.save(
-            MemberProfileEntity(
-                memberId = memberId,
-                nickname = member.profile.nickname.value,
-                profileImageUrl = member.profile.profileImageUrl,
-            ),
-        )
-
-        member.agreements.forEach { agreement ->
-            agreementRepository.save(
-                MemberTermsAgreementEntity(
-                    memberId = memberId,
-                    termsId = agreement.termsId,
-                    termsCode = agreement.termsCode,
-                    termsVersion = agreement.termsVersion,
-                    agreed = agreement.agreed,
-                    agreedAt = agreement.agreedAt,
-                ),
-            )
-        }
+        profileRepository.save(member.toNewProfileEntity(memberId))
+        member.agreements.forEach { agreementRepository.save(it.toNewEntity(memberId)) }
         return memberId
     }
 
@@ -118,21 +89,7 @@ class MemberPersistenceAdapter(
     override fun load(memberId: Long): Member? {
         val entity = memberRepository.findById(memberId).orElse(null) ?: return null
         val profile = profileRepository.findByMemberId(memberId)
-        return Member.reconstitute(
-            id = requireNotNull(entity.id),
-            provider = entity.provider,
-            providerUserId = ProviderUserId(entity.providerUserId),
-            email = Email(encryptor.decrypt(entity.emailEncrypted)),
-            emailVerified = entity.emailVerified,
-            status = entity.status,
-            ageVerified = entity.ageVerified,
-            suspendedAt = entity.suspendedAt,
-            suspendedUntil = entity.suspendedUntil,
-            suspensionReason = entity.suspensionReason,
-            nickname = Nickname(profile?.nickname ?: "여행자"),
-            profileImageUrl = profile?.profileImageUrl,
-            createdAt = requireNotNull(entity.createdAt),
-        )
+        return entity.toDomain(profile, encryptor.decrypt(entity.emailEncrypted))
     }
 
     override fun updateStatus(member: Member) {
