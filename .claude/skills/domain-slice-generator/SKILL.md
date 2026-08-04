@@ -44,7 +44,7 @@ For use case `Xxx` in domain `d`:
 3. `d/application/command/XxxHandler.kt` — application handler implementing the port; orchestrates load → domain mutation → save. Depends only on `domain` + `port/out`.
 4. `d/domain/aggregate/` — add/extend the aggregate root method that enforces the invariant. Pure Kotlin.
 5. `d/application/port/out/persistence/XxxRepositoryPort.kt` — `load`/`save` contract in domain terms (no JPA types).
-6. `d/infrastructure/adapter/out/persistence/` — JPA `@Entity`, Spring Data repository, and a **mapper** (domain ↔ entity). Implements the port.
+6. `d/infrastructure/adapter/out/persistence/` — the port implementation, plus `entity/` (JPA `@Entity`) and a Spring Data repository. **Conversion goes in `persistence/mapper/` as extension functions on the source type** (`fun XxxEntity.toDomain(): Xxx`, `fun Xxx.toNewEntity(): XxxEntity`) — never as private members of the adapter (POL-033). Values needing config or crypto (e.g. an encrypted email) are passed *into* the mapper as parameters so it stays a pure function. External-response conversion goes in a separate `client/mapper/`, not alongside entity mappers.
 7. `d/infrastructure/adapter/in/graphql/` — DGS `@DgsMutation` resolver that maps GraphQL input → `XxxCommand`, calls the use case, maps result → response type.
 
 ### Update vs create rule (dirty-checking)
@@ -60,7 +60,7 @@ For query `Xxx`:
 2. `d/application/port/in/query/XxxQueryUseCase.kt` — interface returning the read DTO.
 3. `d/application/query/XxxQueryHandler.kt` — implements the port; calls the outbound query port. **Does not touch the aggregate.**
 4. `d/application/port/out/query/XxxQueryPort.kt` — returns the read DTO directly.
-5. `d/infrastructure/adapter/out/query/` — **QueryDSL** projection into the read DTO. Per-query projection; no DataLoader unless a nested field demonstrably causes N+1.
+5. `d/infrastructure/adapter/out/query/` — **QueryDSL** projection into the read DTO. Per-query projection; no DataLoader unless a nested field demonstrably causes N+1. Never `JdbcTemplate`, never `@Query`: raw SQL is allowed only in an adapter dedicated to PostGIS or `ON CONFLICT` upsert, and the port-implementing adapter delegates to it so the port stays single. Note JPQL has no row-value constructor — keyset paging is `a < ? OR (a = ? AND b < ?)`, not `(a, b) < (?, ?)`.
 6. `d/infrastructure/adapter/in/graphql/` — DGS `@DgsQuery` resolver. Maps args → query, calls use case, maps read DTO → GraphQL response type. **Application must not import DGS/response types — mapping happens here.**
 
 **If the response composes parts with separable cost** (another upstream call, another table, an aggregate count), do not assemble them in the root. Give each part its own use-case method (step 2) and a `@DgsData(parentType, field)` resolver so it runs **only when the client selects that field**; put an argument on the field that needs it rather than the root. The root then returns the read DTO (not the codegen type — its non-null fields are required constructor args, so lazy fields can't be left empty) and field resolvers read it via `dfe.getSource<ReadDto>()`. A single-source query needs none of this — keep it one method and one resolver. See CLAUDE.md "Don't write REST in GraphQL clothing".

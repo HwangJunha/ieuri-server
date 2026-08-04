@@ -14,7 +14,7 @@ import org.around.ieuri.tourism.domain.vo.ReactionType
 import java.time.Instant
 
 /**
- * 좋아요/싫어요 JPA 엔티티. 도메인 모델(SpotReaction)과 분리되며 어댑터가 매핑한다.
+ * 좋아요/싫어요 JPA 엔티티. 도메인 모델(SpotReaction)과 분리되며 `mapper` 패키지가 변환한다.
  * PK는 surrogate id(JPA 친화적: 단일 @Id, 연관·merge 단순). 자연키 (member_id, spot_id)는
  * DB UNIQUE(uq_spot_reaction)로 강제되며 upsert(재평가 덮어쓰기) 단위다(AC-12/13). 관광 데이터는 저장하지 않는다.
  */

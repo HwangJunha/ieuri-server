@@ -63,6 +63,16 @@ single-query read into field resolvers is over-engineering (see `simplify-review
    "fix N+1." Different problems: laziness prevents over-fetching *per request*; DataLoaders batch
    *within* a request. A lazy list field returning N items whose children each query can need both.
 
+8. **Schema description written for the server (POL-033)** — a description carrying cache strategy,
+   upstream operation names or call counts, batch behavior, or a `SPEC-` id. Clients cannot act on any
+   of it. *Fix:* keep meaning, unit/format, null semantics, pagination default + cap **and what happens
+   past the cap** (POL-018), and sort guarantee (POL-019); drop the rest.
+
+9. **A behavioral fact deleted along with the rationale** — the inverse failure, and the more dangerous
+   one. When a description is shortened, check that facts stated *nowhere else in the schema* survive:
+   clamp-vs-error at a limit, null vs empty array, empty-string normalization, sort key, who sanitizes
+   HTML. Clients branch on these. *Fix:* restore the fact in one line.
+
 ## Do NOT flag
 
 - Cheap fields already present on the root projection (splitting them adds indirection for nothing).

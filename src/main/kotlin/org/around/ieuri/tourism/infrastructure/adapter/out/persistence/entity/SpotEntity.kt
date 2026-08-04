@@ -16,7 +16,7 @@ import org.around.ieuri.tourism.domain.vo.SpotCategory
 import java.time.Instant
 
 /**
- * 관광지 목록 JPA 엔티티. 도메인 모델 `Spot`과 별개 클래스이며 어댑터가 매핑한다 — 둘을 한 클래스로
+ * 관광지 목록 JPA 엔티티. 도메인 모델 `Spot`과 별개 클래스이며 `mapper` 패키지가 변환한다 — 둘을 한 클래스로
  * 합치지 말 것(프로젝트 전역 규칙).
  *
  * PK는 surrogate id, upsert 단위는 자연키 (content_id, language) UNIQUE(uq_spot).

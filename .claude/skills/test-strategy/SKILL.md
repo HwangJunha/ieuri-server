@@ -33,8 +33,14 @@ If an infrastructure concern feels like it needs pinning, that is a signal to us
 
 - **`application/` command & query handlers** → plain JUnit 5 with the **outbound ports mocked** (MockK). No Spring context. Verify orchestration: correct aggregate method called, correct port interaction, correct result. Do not hit a real DB here.
 
-- **`infrastructure/` (adapters: persistence, query, client, graphql, batch, event)** → **no tests.** Mapping code with no branching is verified by the compiler and by running the app; SQL is verified against a real database by hand. A test that boots a context to prove Spring wires beans tells us nothing about our logic.
-    - The one exception is **pure mapping functions with real branching**, which are plain unit tests with no Spring: e.g. `TourApiClient.mapResponse` (upstream DTO → domain, with drop/normalize rules). Call the function directly; do not stand up HTTP or a context.
+- **`infrastructure/` adapters (persistence, query, client, graphql, batch, event)** → **no tests.** SQL is verified against a real database by hand. A test that boots a context to prove Spring wires beans tells us nothing about our logic.
+
+- **`infrastructure/**/mapper/` → always tested**, and this is not an exception to the iron rule: mappers are pure functions with no framework dependency, so they are unit tests in the ordinary sense. The compiler does *not* catch a swapped mapping between two same-typed fields (`mapy → longitude`), which is exactly the bug these catch. Required shape (POL-033):
+    - **Assert field by field**, with a **distinct value per field** in the fixture. A single whole-object `assertEquals` does not satisfy this — when it fails it cannot tell you which field is wrong.
+    - Assert **inside value objects** too (`Email.value`, `Coordinates.latitude`/`.longitude`, `FestivalPeriod.start`/`.end`), not just that the VO is non-null.
+    - Include a case where **every nullable field is null** — it must not throw.
+    - No Spring, no DB, no HTTP. Call the extension function directly.
+    - Before writing one, check whether an existing test already covers that conversion through a caller (e.g. `TourApiDetailMappingTest`). Extend or supersede it — do not duplicate coverage.
 
 - **Architecture (`ArchUnit`)** → dependency direction (`infrastructure → application → domain`), domain purity (no JPA/Spring/DGS/QueryDSL under `domain/`), `@Entity` confined to persistence adapters, no DGS types in `application`, cross-domain isolation. These live in `LayeredArchitectureTest`.
 
@@ -54,7 +60,8 @@ Do not boot a DGS context to re-prove that GraphQL only calls selected resolvers
 Given a slice from `domain-slice-generator`, produce:
 1. Domain unit tests for every new invariant/branch (pure JUnit5).
 2. Service test with mocked ports — orchestration, fallback order, which I/O runs for which input.
-3. Nothing for the adapters. If a slice adds a mapping function with real branching, one plain unit test for it.
+3. A mapper test for every conversion the slice adds — field by field, distinct values, all-nulls case.
+4. Nothing for the adapters themselves.
 
 Cover edge cases and failure paths, not just the happy path. Prefer table/parameterized tests for VO validation.
 
@@ -67,6 +74,8 @@ Cover edge cases and failure paths, not just the happy path. Prefer table/parame
 - Resolver tests re-asserting domain invariants already covered downstream.
 - Missing failure-path coverage for aggregate invariants.
 - Assertions on JPA entities instead of the domain model in write tests.
+- **Mapper tests using one whole-object `assertEquals`** instead of field-by-field assertions, or a fixture where several fields share the same value (a swap between them then passes silently).
+- **Tests whose fixture makes them non-deterministic** — e.g. tampering with a token by appending a fixed string that the original may already end with. If a test can pass or fail on the same input, fix the fixture; don't delete the coverage.
 
 ## Output format
 
