@@ -7,6 +7,8 @@ import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.tourism.application.port.`in`.query.SpotQueryUseCase
 import org.around.ieuri.tourism.application.exception.SpotDetailNotFoundException
+import org.around.ieuri.tourism.application.query.LikedSpotView
+import org.around.ieuri.tourism.application.query.LikedSpotsQuery
 import org.around.ieuri.tourism.application.query.SpotDetailView
 import org.around.ieuri.tourism.application.query.SpotIntroView
 import org.around.ieuri.tourism.application.query.SpotImageView
@@ -17,6 +19,10 @@ import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.tourism.infrastructure.locale.LocaleContext
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
+import org.around.ieuri.common.graphql.generated.types.LikedSpot as GqlLikedSpot
+import org.around.ieuri.common.graphql.generated.types.LikedSpotConnection as GqlLikedSpotConnection
+import org.around.ieuri.common.graphql.generated.types.LikedSpotEdge as GqlLikedSpotEdge
+import org.around.ieuri.common.graphql.generated.types.PageInfo as GqlPageInfo
 import org.around.ieuri.common.graphql.generated.types.Spot as GqlSpot
 import org.around.ieuri.common.graphql.generated.types.SpotCategory as GqlSpotCategory
 import org.around.ieuri.common.graphql.generated.types.SpotDetail as GqlSpotDetail
@@ -78,13 +84,13 @@ class SpotQueryResolver(
         spotQueryUseCase.spotDetail(spotId = id, locale = localeContext.locale)
 
     /**
-     * 갤러리(nullable — SPEC-0006 R9). **예외를 잡지 않는다.** 조회가 실패하면 예외가 그대로 올라가고,
-     * 필드가 nullable이므로 GraphQL 실행기가 이 필드만 null로 채운 뒤 `path=["spotDetail","gallery"]`인
-     * errors[] 항목을 만든다 — 본문과 형제 필드는 살아남는다. 여기서 예외를 삼켜 빈 배열로 바꾸면
-     * 클라이언트가 실패를 알 수 없고 errors[] 항목도 생기지 않는다.
+     * 갤러리(SPEC-0008 R-5). **nullable이다** — 이 필드의 조회가 실패하면 DGS가 실패를 이 필드에
+     * 가두고 null로 채운 뒤 최상위 `errors[]`에 path와 함께 싣는다. 본문은 이미 부모 리졸버가
+     * 반환했으므로 그대로 살아남는다(AC-17).
      *
-     * 반환 타입이 nullable인 것은 스키마와의 형 일치를 위해서다. 이 함수 자체가 null을 돌려주는 경로는
-     * 없다 — null은 실행기가 실패 시에 만든다.
+     * 여기서 예외를 삼켜 null을 돌려주지 않는다 — 그러면 `errors[]` 항목이 사라져 클라이언트가
+     * "실패"와 "이미지 없음"을 구분할 근거를 잃는다. 실패는 그대로 던지고, 이미지가 없는 정상
+     * 경우만 빈 배열이 된다(AC-19).
      */
     @DgsData(parentType = "SpotDetail", field = "gallery")
     fun gallery(dfe: DgsDataFetchingEnvironment): List<GqlSpotImage>? =
@@ -118,6 +124,72 @@ class SpotQueryResolver(
     fun likeCount(dfe: DgsDataFetchingEnvironment): Int =
         // GraphQL likeCount는 Int!. 반응 수가 Int 범위를 넘을 일은 없다.
         spotQueryUseCase.spotLikeCount(dfe.spotId()).toInt()
+
+    /**
+     * 좋아요 목록(SPEC-0008 R-15~R-17).
+     *
+     * **인증 필수다**(AC-53). `requireMemberId()`가 던지는 예외는 최상위 `errors[]`의
+     * UNAUTHENTICATED로 나간다 — 빈 목록으로 대체하지 않는다(AC-54). 빈 목록은 "좋아요가 없음"이라는
+     * 다른 의미이고, 둘을 섞으면 클라이언트가 로그인 유도 시점을 판단할 수 없다.
+     *
+     * `spots`가 `currentMemberId()`(비로그인 허용)를 쓰는 것과 대비된다 — 그쪽은 비로그인도 유효한
+     * 조회지만 "내 좋아요"는 주체가 없으면 성립하지 않는다.
+     *
+     * **생성 타입을 반환해야 한다**(`members` 선례와 동일). Spring for GraphQL의
+     * `ConnectionFieldTypeVisitor`가 `edges`·`pageInfo`를 가진 필드를 Relay 커넥션으로 자동 인식해
+     * 반환값을 감싸려 하기 때문이다. 이때 통과 조건은 둘 중 하나다 —
+     * 등록된 `ConnectionAdapter`가 지원하는 타입이거나, **반환 객체의 클래스 이름이 `Connection`으로
+     * 끝나거나**(`ConnectionDataFetcher.adaptDataContainer`). 이 저장소엔 어댑터가 없으므로 후자에
+     * 기대며, `GqlLikedSpotConnection`은 이름이 맞아 그대로 통과한다.
+     *
+     * read DTO(`CursorPage`)를 그대로 돌려주면 두 조건에 모두 걸리지 않아
+     * `No ConnectionAdapter for: ...CursorPage`로 실패한다. `spotDetail`이 read DTO를 반환할 수 있는
+     * 것과 갈리는 지점이다 — 그쪽은 커넥션 형태가 아니라 이 방문자를 타지 않는다.
+     */
+    @DgsQuery
+    fun likedSpots(
+        @InputArgument category: GqlSpotCategory?,
+        @InputArgument first: Int?,
+        @InputArgument after: String?,
+    ): GqlLikedSpotConnection {
+        val memberId = currentMemberProvider.requireMemberId()
+        val page = spotQueryUseCase.likedSpots(
+            LikedSpotsQuery(
+                category = category?.let { SpotCategory.valueOf(it.name) },
+                first = first ?: DEFAULT_LIKED_PAGE_SIZE,
+                after = after,
+            ),
+            locale = localeContext.locale,
+            memberId = memberId,
+        )
+        return GqlLikedSpotConnection(
+            edges = page.edges.map {
+                GqlLikedSpotEdge(
+                    cursor = it.cursor,
+                    node = it.node.toGql(),
+                    // likedAt은 노드가 아니라 엣지의 값이다 — 회원과 spot의 *관계* 속성이라
+                    // 같은 spot이라도 회원마다 다르다.
+                    likedAt = it.node.likedAt.toString(),
+                )
+            },
+            pageInfo = GqlPageInfo(
+                hasNextPage = page.pageInfo.hasNextPage,
+                hasPreviousPage = page.pageInfo.hasPreviousPage,
+                startCursor = page.pageInfo.startCursor,
+                endCursor = page.pageInfo.endCursor,
+            ),
+        )
+    }
+
+    private fun LikedSpotView.toGql(): GqlLikedSpot = GqlLikedSpot(
+        id = id,
+        title = title,
+        thumbnailImageUrl = thumbnailImageUrl,
+        address = address,
+        category = GqlSpotCategory.valueOf(category.name),
+        copyright = GqlCopyrightType.valueOf(copyright.name),
+        attributionText = attributionText,
+    )
 
     private fun SpotPageView.toGql(): GqlSpotPage = GqlSpotPage(
         items = items.map { it.toGql() },
@@ -161,6 +233,9 @@ class SpotQueryResolver(
         const val DEFAULT_RADIUS_METERS = 20_000
         const val DEFAULT_PAGE = 1
         const val DEFAULT_SIZE = 100
+
+        /** 좋아요 목록 기본 페이지 크기. `members`의 선례를 따랐다(SPEC-0008 [TBD-2]). */
+        const val DEFAULT_LIKED_PAGE_SIZE = 20
     }
 
     /**

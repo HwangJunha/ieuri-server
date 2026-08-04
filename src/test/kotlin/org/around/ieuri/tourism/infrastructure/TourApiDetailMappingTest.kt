@@ -179,6 +179,25 @@ class TourApiDetailMappingTest {
         assertTrue(client.mapInfoItems(emptyList()).isEmpty())
     }
 
+    /**
+     * SPEC-0008 R-1의 입력 조건. upstream이 본문을 갖고 있지 않으면 `items`가 빈 문자열로 오고
+     * 빈 리스트가 된다 — `findDetail`은 이때 예외가 아니라 null을 돌려줘야 한다.
+     *
+     * 이전 구현은 `items.first()`를 호출해 NoSuchElementException을 던졌고, **부재가 장애로
+     * 둔갑했다.** 재시도가 무의미한 사실이 재시도 가능한 실패로 표면화되던 지점이다.
+     */
+    @Test
+    fun `본문이 없으면 common items가 빈 목록으로 역직렬화된다(SPEC-0008 R-1)`() {
+        val json = """
+            {"response":{"header":{"resultCode":"0000","resultMsg":"OK"},"body":{"items":""}}}
+        """.trimIndent()
+        val parsed = mapper.readValue(json, TourApiDetailCommonResponse::class.java)
+
+        assertTrue(parsed.response.body.items.isEmpty())
+        // 어댑터는 이 빈 목록을 firstOrNull()로 받아 null을 돌려준다(예외 아님).
+        assertNull(parsed.response.body.items.firstOrNull())
+    }
+
     @Test
     fun `intro items가 빈 문자열로 와도 빈 목록으로 역직렬화된다`() {
         val json = """

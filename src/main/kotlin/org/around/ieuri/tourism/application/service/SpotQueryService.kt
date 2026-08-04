@@ -10,15 +10,21 @@ import org.around.ieuri.tourism.application.port.out.cache.SpotCachePort
 import org.around.ieuri.tourism.application.port.out.client.SpotDetailQuery
 import org.around.ieuri.tourism.application.port.out.client.TourInfoPort
 import org.around.ieuri.tourism.application.port.out.persistence.SpotDetailStorePort
+import org.around.ieuri.tourism.application.port.out.persistence.StoredDetail
+import org.around.ieuri.tourism.application.event.SpotDetailAbsent
 import org.around.ieuri.tourism.application.event.SpotDetailFetched
 import org.around.ieuri.tourism.application.event.SpotGalleryFetched
 import org.around.ieuri.tourism.application.event.SpotInfoItemsFetched
 import org.around.ieuri.tourism.application.event.SpotIntroFetched
 import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
+import org.around.ieuri.tourism.application.port.out.query.LikedSpotsSearch
 import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch
 import org.around.ieuri.tourism.application.port.out.query.SpotIdentity
 import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
 import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
+import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.tourism.application.query.LikedSpotView
+import org.around.ieuri.tourism.application.query.LikedSpotsQuery
 import org.around.ieuri.tourism.application.query.SpotDetailView
 import org.around.ieuri.tourism.application.query.SpotImageView
 import org.around.ieuri.tourism.application.query.SpotInfoItemView
@@ -33,6 +39,7 @@ import org.around.ieuri.tourism.domain.vo.SpotIntro
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.springframework.stereotype.Service
+import java.time.Instant
 
 /**
  * 관광지 조회 유스케이스 구현(CQRS 읽기).
@@ -107,22 +114,84 @@ class SpotQueryService(
      * 상세 본문(§4). 캐시를 먼저 보고 미스일 때만 upstream(detailCommon2 1콜) 후 저장한다(히트면 upstream
      * 무소모 — AC-19). 오류는 예외로 전파되므로 캐시에 남지 않는다.
      * 갤러리·운영정보·이용안내·좋아요 수는 각 필드가 요청될 때 아래 메서드로 따로 조회한다.
+     *
+     * **부재와 실패를 절대 섞지 않는다**(SPEC-0008 R-1·AC-4). 업스트림에 본문이 *없는* 것은 다시
+     * 물어도 결과가 같은 사실이므로 적재해 두고 성공으로 응답한다. 업스트림 호출이 *깨진* 것은
+     * 다음엔 될 수 있으므로 적재하지 않고 예외를 그대로 올린다. 섞으면 일시적 장애가 부재로 적재되어
+     * 신선도 기준이 지날 때까지 데이터가 복구되지 않는다.
+     *
+     * 세 가지 상태를 구분한다(R-3):
+     *   - 미조회      : 캐시·DB 모두 미스        → upstream 호출 (AC-10)
+     *   - 조회함·부재 : bodyAbsent = true       → upstream 호출 안 함, 단 신선도가 지나면 재조회 (AC-9·AC-13)
+     *   - 조회함·존재 : bodyAbsent = false      → upstream 호출 안 함
      */
     override fun spotDetail(spotId: Long, locale: DomainLocale): SpotDetailView {
         val identity = resolve(spotId, locale)
-        spotCachePort.getDetail(spotId)?.let { return it.toView(spotId) }
+
+        // 캐시 히트: 부재도 캐시된 값이다 — 미스로 오판하면 부재 spot이 TTL 내내 DB·upstream을 탄다.
+        spotCachePort.getDetail(spotId)?.let { return it.detail.toView(spotId) }
 
         // DB 히트: Valkey를 충전하고 upstream은 건드리지 않는다(AC-35).
+        // 단 **부재 행은 신선도를 본다**(R-4) — 나중에 업스트림에 데이터가 생길 수 있다.
         spotDetailStorePort.findDetail(spotId)?.let { stored ->
-            spotCachePort.putDetail(spotId, stored)
-            return stored.toView(spotId)
+            if (!stored.isStaleAbsence()) {
+                if (stored.bodyAbsent) {
+                    spotCachePort.putDetailAbsence(spotId, stored.detail)
+                } else {
+                    spotCachePort.putDetail(spotId, stored.detail)
+                }
+                return stored.detail.toView(spotId)
+            }
+            // 부재이면서 신선도가 지났다 — 아래로 떨어져 upstream에 다시 물어본다(AC-13).
         }
 
-        // 양쪽 미스: upstream 조회 후 캐시 충전 + 적재 이벤트 발행(AC-36·AC-39).
+        // 양쪽 미스(또는 부재 재조회 시점): upstream 조회 후 캐시 충전 + 적재 이벤트 발행(AC-36·AC-39).
+        // 여기서 던져지는 예외는 **실패**이며 부재로 적재되지 않는다 — 이벤트 발행 전에 전파된다(AC-4·AC-16).
         val fetched = tourInfoPort.findDetail(identity.toQuery(locale))
+
+        if (fetched == null) {
+            // 부재 확정. `spot` 행의 값으로 응답을 구성하고(R-2) 부재 사실을 적재한다(R-3).
+            // 재조회 결과가 여전히 부재여도 적재 시각이 갱신되어 다음 신선도 창이 새로 시작된다(AC-15).
+            val fallback = fallbackDetail(spotId)
+            spotCachePort.putDetailAbsence(spotId, fallback)
+            eventPublisher.publish(SpotDetailAbsent(spotId, fallback))
+            return fallback.toView(spotId)
+        }
+
+        // 재조회 결과 본문이 생겼다면 부재 행이 본문 있는 상태로 전환된다(AC-14) — saveDetail의 upsert가
+        // body_absent를 false로 되돌린다.
         spotCachePort.putDetail(spotId, fetched)
         eventPublisher.publish(SpotDetailFetched(spotId, fetched))
         return fetched.toView(spotId)
+    }
+
+    /**
+     * 부재 행의 신선도 판정(R-4). **부재 행에만 적용된다** — 정상 행에는 만료가 없다(1차 신선도는
+     * Valkey TTL 24h이고 배치가 목록을 매일 최신화한다). 부재를 더 짧게 잡는 이유는 업스트림에
+     * 나중에 데이터가 생길 수 있기 때문이다.
+     */
+    private fun StoredDetail.isStaleAbsence(): Boolean =
+        bodyAbsent && fetchedAt.isBefore(Instant.now().minus(policy.detailAbsenceTtl))
+
+    /**
+     * 본문 부재 시 응답·적재의 재료(R-2). `spot` 행이 title·category·thumbnailImageUrl·copyright를
+     * 전부 non-null로 갖고 있어 본문이 없어도 유효한 상세를 구성할 수 있다(AC-5·AC-6).
+     * overview·homepage·tel은 null로 남는다(AC-7). address는 `spot`이 갖고 있으면 쓰고 없으면 null이다(AC-8).
+     *
+     * [resolve]가 이미 통과한 뒤이므로 행은 존재한다 — 그 사이 사라졌다면 부재가 아니라 미해석이다.
+     */
+    private fun fallbackDetail(spotId: Long): SpotDetail {
+        val basics = spotQueryPort.findSpotBasics(spotId) ?: throw SpotDetailNotFoundException()
+        return SpotDetail(
+            title = basics.title,
+            category = basics.category,
+            thumbnailImageUrl = basics.thumbnailImageUrl,
+            overview = null,
+            address = basics.address,
+            homepage = null,
+            tel = null,
+            copyright = basics.copyright,
+        )
     }
 
     override fun spotGallery(spotId: Long, locale: DomainLocale): List<SpotImageView> {
@@ -186,6 +255,31 @@ class SpotQueryService(
      * 포트이며, write-behind는 upstream 파생 데이터만 다룬다.
      */
     override fun spotLikeCount(spotId: Long): Long = spotQueryPort.countLikes(spotId)
+
+    /**
+     * 좋아요 목록(SPEC-0008 R-15~R-17). LIKE만·본인 것만·요청 언어만 — 세 조건 모두 조회 포트가
+     * 쿼리 단계에서 건다(AC-45·AC-48·AC-49). 여기서는 페이지 크기 상한만 적용한다(AC-52).
+     *
+     * **애그리거트를 우회한다** — 읽기 전용이고 `spot` 행의 값만 필요하므로 QueryDSL 프로젝션이
+     * read DTO를 직접 만든다. 상세(`spot_detail`)를 조인하지 않아 상세가 부재한 spot도 목록에 나온다.
+     */
+    override fun likedSpots(
+        query: LikedSpotsQuery,
+        locale: DomainLocale,
+        memberId: Long,
+    ): CursorPage<LikedSpotView> {
+        // 카테고리 가용성 판정은 spots와 같다 — 같은 축을 쓰므로 달라질 이유가 없다.
+        query.category?.let { validateCategory(it, locale) }
+        return spotQueryPort.findLikedSpots(
+            LikedSpotsSearch(
+                memberId = memberId,
+                language = locale,
+                category = query.category,
+                first = query.first.coerceIn(1, policy.maxLikedPageSize),
+                after = query.after,
+            ),
+        )
+    }
 
     /**
      * `spot.id`를 해석하고 **요청 언어와 일치하는지 검증한다.**

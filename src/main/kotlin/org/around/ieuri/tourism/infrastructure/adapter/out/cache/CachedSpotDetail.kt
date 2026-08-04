@@ -27,6 +27,14 @@ data class CachedSpotDetail(
     val homepage: String? = null,
     val tel: String? = null,
     val copyright: CopyrightType = CopyrightType.UNSPECIFIED,
+    /**
+     * 업스트림에 본문이 없음을 확인한 값인지(SPEC-0008 R-3). true면 위 값들은 `spot` 행에서
+     * 구성된 것이고 overview·homepage·tel은 null이다.
+     *
+     * **기본값 false가 하위 호환을 준다** — 이 필드가 없던 시절 캐시된 항목은 본문이 있는 값이므로
+     * false가 곧 맞는 해석이다. TTL 24h 안에 자연히 교체된다.
+     */
+    val bodyAbsent: Boolean = false,
 ) {
     fun toDomain(): SpotDetail = SpotDetail(
         title = title,
@@ -41,7 +49,7 @@ data class CachedSpotDetail(
     )
 
     companion object {
-        fun from(detail: SpotDetail): CachedSpotDetail = CachedSpotDetail(
+        fun from(detail: SpotDetail, bodyAbsent: Boolean = false): CachedSpotDetail = CachedSpotDetail(
             title = detail.title,
             category = detail.category,
             thumbnailImageUrl = detail.thumbnailImageUrl,
@@ -50,6 +58,7 @@ data class CachedSpotDetail(
             homepage = detail.homepage,
             tel = detail.tel,
             copyright = detail.copyright,
+            bodyAbsent = bodyAbsent,
         )
     }
 }

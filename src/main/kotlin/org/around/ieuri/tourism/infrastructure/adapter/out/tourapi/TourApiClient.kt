@@ -50,11 +50,21 @@ class TourApiClient(
         return mapResponse(response, query.locale)
     }
 
-    /** 상세 본문(detailCommon2 1콜). 갤러리·운영정보·이용안내는 각 필드가 요청될 때 따로 가져온다. */
-    override fun findDetail(query: SpotDetailQuery): SpotDetail {
+    /**
+     * 상세 본문(detailCommon2 1콜). 갤러리·운영정보·이용안내는 각 필드가 요청될 때 따로 가져온다.
+     *
+     * **본문이 없으면 null**(SPEC-0008 R-1). upstream이 결과 없음을 주면 items가 빈 리스트가 된다
+     * (`"items": ""` → [CommonItemsDeserializer]가 흡수). 이전에는 `first()`가
+     * NoSuchElementException을 던져 **부재가 장애로 둔갑했다** — 재시도가 무의미한 사실이 재시도
+     * 가능한 실패로 표면화되고, 매 조회마다 upstream을 다시 두드렸다.
+     *
+     * HTTP·역직렬화 실패는 여전히 예외로 나간다(그쪽은 진짜 실패다).
+     */
+    override fun findDetail(query: SpotDetailQuery): SpotDetail? {
         val response: TourApiDetailCommonResponse =
             tourApiRestClient.get().uri(detailUri(query, "detailCommon2")).retrieve().requiredBody()
-        return mapDetail(response.response.body.items.first(), query.locale)
+        val item = response.response.body.items.firstOrNull() ?: return null
+        return mapDetail(item, query.locale)
     }
 
     /** 갤러리(detailImage2 1콜). */

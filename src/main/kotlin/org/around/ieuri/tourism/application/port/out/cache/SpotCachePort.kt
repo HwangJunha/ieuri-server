@@ -16,9 +16,20 @@ import org.around.ieuri.tourism.domain.vo.SpotIntro
  * 허용해야 한다. 키는 (오퍼레이션[, category], spotId) 조합이다 — spotId가 이미 언어별이라 언어를 따로 넣지 않는다. * 포함한다(AC-19). intro·info는 카테고리가 응답을 가르므로 키에 함께 넣는다.
  */
 interface SpotCachePort {
-    /** 상세 본문. 미스·장애면 null. */
-    fun getDetail(spotId: Long): SpotDetail?
+    /**
+     * 상세 본문. 미스·장애면 null, **히트면 [CachedDetail]**(SPEC-0008 R-3).
+     *
+     * intro와 같은 래퍼 문제다 — "본문이 부재함"도 캐시해야 하는 값이며, 그것을 미스로 오판하면
+     * 부재 spot이 24h TTL 내내 매 조회마다 DB·upstream을 타게 된다.
+     * [CachedDetail.bodyAbsent]가 부재 여부를 들고 있다.
+     */
+    fun getDetail(spotId: Long): CachedDetail?
+
+    /** 본문 존재. */
     fun putDetail(spotId: Long, detail: SpotDetail)
+
+    /** 본문 부재. [fallback]은 `spot` 행에서 구성한 응답용 값이다(R-2). */
+    fun putDetailAbsence(spotId: Long, fallback: SpotDetail)
 
     /** 갤러리. 미스·장애면 null(빈 목록과 구분해야 하므로 nullable). */
     fun getGallery(spotId: Long): List<SpotImage>?
@@ -38,3 +49,13 @@ interface SpotCachePort {
 
 /** 캐시 히트 여부와 "값이 null임"을 구분하기 위한 래퍼(intro 전용). */
 data class CachedIntro(val value: SpotIntro?)
+
+/**
+ * 캐시된 상세 본문. [bodyAbsent]가 true면 "업스트림에 본문이 없음"을 캐시한 것이며 [detail]의 값은
+ * `spot` 행에서 구성된 것이다(R-2). 신선도 판정은 DB가 맡으므로 여기엔 fetchedAt이 없다 —
+ * 캐시의 신선도는 TTL(24h) 자체다.
+ */
+data class CachedDetail(
+    val detail: SpotDetail,
+    val bodyAbsent: Boolean,
+)

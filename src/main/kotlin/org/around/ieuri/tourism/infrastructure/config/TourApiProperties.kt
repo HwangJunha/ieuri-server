@@ -2,6 +2,7 @@ package org.around.ieuri.tourism.infrastructure.config
 
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.springframework.boot.context.properties.ConfigurationProperties
+import java.time.Duration
 
 /**
  * TourAPI 접근 설정. **serviceKey는 4개 언어 공용 단일 키**(실측 B-4) — 언어는 base-url 선택에만 영향.
@@ -17,7 +18,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties
  * @param mobileOs       MobileOS 파라미터.
  * @param mobileApp      MobileApp 파라미터.
  * @param maxRadiusMeters 서버 UX/성능 반경 상한(초과 시 RADIUS_TOO_LARGE).
- * @param maxPageSize    size 상한(POL-018 잠정 100). 초과 요청은 클램프.
+ * @param maxPageSize    `spots` size 상한(POL-018 잠정 100). 초과 요청은 클램프.
+ * @param maxLikedPageSize `likedSpots` first 상한. maxPageSize와 값은 같지만 다른 계약이라 분리한다.
+ * @param detailAbsenceTtl 상세 본문 부재 행의 신선도 기준(SPEC-0008 [TBD-1] = 7일). 정상 행에는
+ *   만료가 없고 부재 행에만 적용된다 — 업스트림에 나중에 데이터가 생길 수 있기 때문이다.
  * @param connectTimeoutMillis / readTimeoutMillis  HTTP 타임아웃.
  */
 @ConfigurationProperties(prefix = "ieuri.tourapi")
@@ -31,6 +35,8 @@ data class TourApiProperties(
     val mobileApp: String = "ieuri",
     val maxRadiusMeters: Int = 100_000,
     val maxPageSize: Int = 100,
+    val maxLikedPageSize: Int = 100,
+    val detailAbsenceTtl: Duration = Duration.ofDays(7),
     val connectTimeoutMillis: Long = 15_000,
     val readTimeoutMillis: Long = 30_000,
 ) {

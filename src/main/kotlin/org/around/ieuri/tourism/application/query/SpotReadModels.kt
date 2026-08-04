@@ -2,6 +2,7 @@ package org.around.ieuri.tourism.application.query
 
 import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.SpotCategory
+import java.time.Instant
 
 /**
  * spots 쿼리 입력. 언어는 인자가 아니라 Accept-Language에서 온다(요청 스코프 컨텍스트로 주입).
@@ -85,4 +86,34 @@ data class SpotImageView(
     val caption: String?,
     val copyright: CopyrightType,
     val attributionText: String,
+)
+
+/**
+ * 좋아요 목록 조회 입력(SPEC-0008 R-15). 언어는 인자가 아니라 Accept-Language에서 오고,
+ * 회원은 인증 컨텍스트에서 온다 — 둘 다 클라이언트가 고를 수 있는 값이 아니다(AC-48·AC-49).
+ */
+data class LikedSpotsQuery(
+    /** 언어 중립 카테고리 필터. null이면 전체(`spots`와 같은 규약). */
+    val category: SpotCategory?,
+    val first: Int,
+    val after: String?,
+)
+
+/**
+ * 좋아요 목록 항목 1건의 read DTO. 필드가 전부 `spot` 행에 있어 `spot_detail`을 조인하지 않는다 —
+ * 상세가 부재한 spot도 목록에는 정상적으로 나타난다.
+ *
+ * [likedAt]은 **노드가 아니라 엣지의 값이지만** 프로젝션 단계에서 함께 읽어야 하므로 여기 담고,
+ * 리졸버가 엣지로 옮긴다. "언제 좋아요했는가"는 회원과 spot의 관계 속성이라 GraphQL 노드에는
+ * 노출하지 않는다.
+ */
+data class LikedSpotView(
+    val id: Long,
+    val title: String,
+    val thumbnailImageUrl: String,
+    val address: String?,
+    val category: SpotCategory,
+    val copyright: CopyrightType,
+    val attributionText: String,
+    val likedAt: Instant,
 )

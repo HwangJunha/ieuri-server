@@ -1,10 +1,16 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.query
 
 import com.querydsl.jpa.impl.JPAQueryFactory
+import org.around.ieuri.common.pagination.CursorEdge
+import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.common.pagination.CursorPageInfo
+import org.around.ieuri.tourism.application.port.out.query.LikedSpotsSearch
 import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch
+import org.around.ieuri.tourism.application.port.out.query.SpotBasics
 import org.around.ieuri.tourism.application.port.out.query.SpotIdentity
 import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
 import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
+import org.around.ieuri.tourism.application.query.LikedSpotView
 import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.ReactionType
@@ -12,6 +18,10 @@ import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotReactionEntity
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Component
+import java.nio.charset.StandardCharsets
+import java.sql.Timestamp
+import java.time.Instant
+import java.util.Base64
 
 /**
  * 관광지 읽기 포트 구현(CQRS 읽기). 애그리거트를 우회해 필요한 값만 프로젝션한다.
@@ -156,4 +166,136 @@ class SpotQueryAdapter(
             },
             spotId,
         ).firstOrNull()
+
+    /**
+     * 상세 본문이 부재할 때 응답을 구성할 `spot` 행의 값(SPEC-0008 R-2). title·thumbnail_image_url·
+     * category·copyright가 DB에서 NOT NULL이라 본문이 없어도 non-null 계약을 지킬 수 있다(AC-5·AC-6).
+     */
+    override fun findSpotBasics(spotId: Long): SpotBasics? =
+        jdbcTemplate.query(
+            "SELECT title, address, thumbnail_image_url, category, copyright FROM spot WHERE id = ?",
+            { rs, _ ->
+                SpotBasics(
+                    title = rs.getString("title"),
+                    address = rs.getString("address"),
+                    thumbnailImageUrl = rs.getString("thumbnail_image_url"),
+                    category = SpotCategory.valueOf(rs.getString("category")),
+                    copyright = CopyrightType.valueOf(rs.getString("copyright")),
+                )
+            },
+            spotId,
+        ).firstOrNull()
+
+    /**
+     * 좋아요 목록 한 페이지(SPEC-0008 R-15·R-16).
+     *
+     * **`spot`을 조인하는 이유가 둘이다.** (1) 목록 카드에 쓸 값이 전부 `spot` 행에 있고,
+     * (2) V20 이후 `spot_reaction`에 language가 없어 언어 한정을 이 조인으로 판정한다(AC-49) —
+     * 종료 축제 조회가 같은 이유로 `spot`을 조인하는 것과 같은 패턴이다.
+     *
+     * `spot_detail`은 **조인하지 않는다** — 좋아요 목록은 상세와 무관하므로 상세가 부재한 spot도
+     * 정상적으로 나타나야 한다.
+     *
+     * keyset 페이징: (updated_at, spot_id) 내림차순이 정렬 키이자 커서다. `first + 1`을 읽어
+     * hasNextPage를 판정하는 것은 `members`의 방식과 같다. QueryDSL이 아니라 JDBC인 것도 이 어댑터의
+     * 기존 선택과 같다 — `spot`에 Q-클래스가 없다.
+     */
+    override fun findLikedSpots(query: LikedSpotsSearch): CursorPage<LikedSpotView> {
+        val cursor = query.after?.let { decodeCursor(it) }
+        val (baseWhere, baseParams) = likedWhereClause(query)
+
+        // keyset 조건. 정렬이 (updated_at DESC, spot_id DESC)이므로 다음 페이지는 그 튜플보다 "작은" 행이다.
+        // 튜플 비교로 쓰면 복합 인덱스를 그대로 탄다 — OR로 풀어쓰면 옵티마이저가 놓칠 수 있다.
+        // **총계에는 붙이지 않는다** — 커서는 페이지 경계일 뿐 집합의 조건이 아니다.
+        val keysetCondition = cursor?.let { " AND (r.updated_at, r.spot_id) < (?, ?)" }.orEmpty()
+        val keysetParams = cursor?.let { listOf(Timestamp.from(it.updatedAt), it.spotId) }.orEmpty()
+
+        val rows = jdbcTemplate.query(
+            """
+            SELECT s.id, s.title, s.thumbnail_image_url, s.address, s.category, s.copyright,
+                   r.updated_at AS liked_at
+            FROM spot_reaction r
+            JOIN spot s ON s.id = r.spot_id
+            WHERE $baseWhere$keysetCondition
+            ORDER BY r.updated_at DESC, r.spot_id DESC
+            LIMIT ?
+            """.trimIndent(),
+            { rs, _ ->
+                val copyright = CopyrightType.valueOf(rs.getString("copyright"))
+                LikedSpotView(
+                    id = rs.getLong("id"),
+                    title = rs.getString("title"),
+                    thumbnailImageUrl = rs.getString("thumbnail_image_url"),
+                    address = rs.getString("address"),
+                    category = SpotCategory.valueOf(rs.getString("category")),
+                    copyright = copyright,
+                    // copyright에서 도출되는 값이라 적재하지 않는다(둘이 어긋날 여지를 없앤다).
+                    attributionText = copyright.attributionText,
+                    likedAt = rs.getTimestamp("liked_at").toInstant(),
+                )
+            },
+            *(baseParams + keysetParams + (query.first + 1)).toTypedArray(),
+        )
+
+        val hasNextPage = rows.size > query.first
+        val pageRows = if (hasNextPage) rows.take(query.first) else rows
+        val edges = pageRows.map { CursorEdge(cursor = encodeCursor(it.likedAt, it.id), node = it) }
+
+        return CursorPage(
+            edges = edges,
+            pageInfo = CursorPageInfo(
+                hasNextPage = hasNextPage,
+                hasPreviousPage = cursor != null,
+                startCursor = edges.firstOrNull()?.cursor,
+                endCursor = edges.lastOrNull()?.cursor,
+            ),
+            // 좋아요 목록은 총 개수를 노출하지 않는다(LikedSpotConnection에 필드가 없다) —
+            // 소진 판정은 hasNextPage로 충분하고, COUNT(*)는 페이지마다 스캔을 하나 더 쓴다.
+            totalCount = null,
+        )
+    }
+
+    /**
+     * 언어 판정은 `spot` 조인으로 한다 — V20 이후 `spot_reaction`에 language가 없다.
+     * 카테고리도 `spot`이 소유하므로 같은 조인을 그대로 쓴다.
+     */
+    private fun likedWhereClause(query: LikedSpotsSearch): Pair<String, List<Any>> {
+        val conditions = mutableListOf("r.member_id = ?", "r.reaction = ?", "s.language = ?")
+        val params = mutableListOf<Any>(query.memberId, ReactionType.LIKE.name, query.language.name)
+        query.category?.let {
+            conditions += "s.category = ?"
+            params += it.name
+        }
+        return conditions.joinToString(" AND ") to params
+    }
+
+    /**
+     * 커서 = 정렬 키(updated_at, spot_id)를 Base64로 감싼 값.
+     *
+     * **불투명성은 값을 감추려는 것이 아니다**(POL-021) — 두 구성 요소 모두 응답에 이미 있다
+     * (`LikedSpotEdge.likedAt`, `LikedSpot.id`). 목적은 클라이언트가 커서를 **파싱·조립하지 못하게**
+     * 막는 것이다. 형식이 드러나면 클라이언트가 직접 커서를 만들기 시작하고, 그 순간 정렬 키를
+     * 바꾸는 것이 파괴적 변경이 된다. `members`가 회원 id를 그대로 커서로 쓴 것은 그것이 단일
+     * 공개 식별자였기 때문이고, 복합 키인 여기서는 같은 선택을 할 수 없다.
+     *
+     * 시각은 `Instant.toString()`(ISO-8601)으로 담아 나노초까지 보존한다 — TIMESTAMPTZ가
+     * 마이크로초 정밀도라 잘라내면 같은 마이크로초의 두 행에서 커서가 어긋나 항목을 건너뛴다.
+     */
+    private fun encodeCursor(likedAt: Instant, spotId: Long): String =
+        Base64.getUrlEncoder().withoutPadding()
+            .encodeToString("$likedAt|$spotId".toByteArray(StandardCharsets.UTF_8))
+
+    private fun decodeCursor(cursor: String): LikedCursor =
+        try {
+            val decoded = String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8)
+            val (instant, spotId) = decoded.split("|", limit = 2)
+            LikedCursor(updatedAt = Instant.parse(instant), spotId = spotId.toLong())
+        } catch (e: RuntimeException) {
+            // 조작·구버전 커서. 조용히 첫 페이지로 되돌리면 클라이언트가 무한 루프에 빠질 수 있어
+            // 명시적으로 거부한다(members의 커서 처리와 같은 태도).
+            throw IllegalArgumentException("유효하지 않은 커서입니다.", e)
+        }
+
+    /** 디코딩된 keyset 커서. */
+    private data class LikedCursor(val updatedAt: Instant, val spotId: Long)
 }

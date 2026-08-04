@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.cache
 
+import org.around.ieuri.tourism.application.port.out.cache.CachedDetail
 import org.around.ieuri.tourism.application.port.out.cache.CachedIntro
 import org.around.ieuri.tourism.application.port.out.cache.SpotCachePort
 import org.around.ieuri.tourism.domain.aggregate.SpotDetail
@@ -32,13 +33,22 @@ class ValkeySpotCache(
 
     private val log = LoggerFactory.getLogger(javaClass)
 
-    override fun getDetail(spotId: Long): SpotDetail? =
+    /**
+     * 본문 캐시. **부재도 캐시된 값이다**(SPEC-0008 R-3) — 래퍼가 부재 여부를 함께 돌려주므로
+     * 호출자가 "미스"와 "부재를 확인함"을 구분한다. 부재를 미스로 오판하면 본문 없는 spot이
+     * TTL 내내 매 조회마다 DB·upstream을 타게 된다.
+     */
+    override fun getDetail(spotId: Long): CachedDetail? =
         read(key("detail", spotId)) {
-            objectMapper.readValue(it, CachedSpotDetail::class.java).toDomain()
+            val cached = objectMapper.readValue(it, CachedSpotDetail::class.java)
+            CachedDetail(detail = cached.toDomain(), bodyAbsent = cached.bodyAbsent)
         }
 
     override fun putDetail(spotId: Long, detail: SpotDetail) =
         write(key("detail", spotId), CachedSpotDetail.from(detail))
+
+    override fun putDetailAbsence(spotId: Long, fallback: SpotDetail) =
+        write(key("detail", spotId), CachedSpotDetail.from(fallback, bodyAbsent = true))
 
     override fun getGallery(spotId: Long): List<SpotImage>? =
         read(key("gallery", spotId)) {

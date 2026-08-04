@@ -29,10 +29,15 @@ interface TourInfoPort {
      * 각 필드가 요청될 때만 아래 메서드로 따로 가져온다(필드별 지연 조회).
      * [SpotDetail.likeCount]도 여기서 채우지 않는다(application이 실시간 집계로 얹음).
      *
-     * upstream이 해소하지 못하면 SpotDetailNotFoundException, 한도 초과는 UpstreamRateLimitedException,
-     * 그 외 장애·오류 XML은 UpstreamUnavailableException으로 변환해 던진다.
+     * **본문이 없으면 null을 돌려준다(예외가 아니다, SPEC-0008 R-1).** upstream이 이 contentId에 대해
+     * 본문을 갖고 있지 않은 것은 장애가 아니라 사실이며, 다시 물어도 결과가 같다. 예외로 표현하면
+     * 호출자가 "재시도가 의미 있는 실패"와 구분할 수 없고, 부재가 조용히 오류 응답이 된다(AC-1·AC-2).
+     *
+     * 반대로 **장애는 계속 예외다** — 한도 초과는 UpstreamRateLimitedException, 그 외 장애·오류 XML은
+     * UpstreamUnavailableException. 이 구분이 AC-4의 시험 대상이다: 실패를 부재로 적재하면 일시적
+     * 장애가 신선도 기준이 지날 때까지 굳어 버린다.
      */
-    fun findDetail(query: SpotDetailQuery): SpotDetail
+    fun findDetail(query: SpotDetailQuery): SpotDetail?
 
     /** 갤러리(detailImage2 1콜). gallery 필드가 요청될 때만 호출된다. 없으면 빈 목록. */
     fun findGallery(query: SpotDetailQuery): List<SpotImage>

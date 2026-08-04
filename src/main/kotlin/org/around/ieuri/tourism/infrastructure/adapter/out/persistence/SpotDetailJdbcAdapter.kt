@@ -1,6 +1,7 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.persistence
 
 import org.around.ieuri.tourism.application.port.out.persistence.SpotDetailStorePort
+import org.around.ieuri.tourism.application.port.out.persistence.StoredDetail
 import org.around.ieuri.tourism.application.port.out.persistence.StoredIntro
 import org.around.ieuri.tourism.domain.aggregate.SpotDetail
 import org.around.ieuri.tourism.domain.vo.CopyrightType
@@ -35,24 +36,34 @@ class SpotDetailJdbcAdapter(
 
     // ---------- 본문 ----------
 
+    /**
+     * 적재된 본문. **[StoredDetail]로 감싸 부재와 미적재를 구분한다**(SPEC-0008 R-3) —
+     * 행이 없으면 미조회(null), 있으면 `body_absent`가 부재 여부를 가른다.
+     * `fetched_at`은 부재 행의 신선도 판정(R-4)에 쓰인다.
+     */
     @Transactional(readOnly = true)
-    override fun findDetail(spotId: Long): SpotDetail? =
+    override fun findDetail(spotId: Long): StoredDetail? =
         jdbcTemplate.query(
             """
-            SELECT title, category, thumbnail_image_url, overview, address, homepage, tel, copyright
+            SELECT title, category, thumbnail_image_url, overview, address, homepage, tel,
+                   copyright, body_absent, fetched_at
             FROM spot_detail WHERE spot_id = ?
             """.trimIndent(),
             { rs, _ ->
-                SpotDetail(
-                    title = rs.getString("title"),
-                    category = SpotCategory.valueOf(rs.getString("category")),
-                    thumbnailImageUrl = rs.getString("thumbnail_image_url"),
-                    overview = rs.getString("overview"),
-                    address = rs.getString("address"),
-                    homepage = rs.getString("homepage"),
-                    tel = rs.getString("tel"),
-                    copyright = CopyrightType.valueOf(rs.getString("copyright")),
-                    // likeCount는 적재 대상이 아니다(AC-38) — 서비스가 실시간 집계로 얹는다.
+                StoredDetail(
+                    detail = SpotDetail(
+                        title = rs.getString("title"),
+                        category = SpotCategory.valueOf(rs.getString("category")),
+                        thumbnailImageUrl = rs.getString("thumbnail_image_url"),
+                        overview = rs.getString("overview"),
+                        address = rs.getString("address"),
+                        homepage = rs.getString("homepage"),
+                        tel = rs.getString("tel"),
+                        copyright = CopyrightType.valueOf(rs.getString("copyright")),
+                        // likeCount는 적재 대상이 아니다(AC-38) — 서비스가 실시간 집계로 얹는다.
+                    ),
+                    bodyAbsent = rs.getBoolean("body_absent"),
+                    fetchedAt = rs.getTimestamp("fetched_at").toInstant(),
                 )
             },
             spotId,
@@ -60,19 +71,41 @@ class SpotDetailJdbcAdapter(
 
     @Transactional
     override fun saveDetail(spotId: Long, detail: SpotDetail) {
+        upsertDetail(spotId, detail, bodyAbsent = false)
+    }
+
+    /**
+     * 본문 부재 적재(R-3). NOT NULL 컬럼은 `spot` 행에서 온 [fallback] 값으로 채우고
+     * overview·homepage·tel은 null로 남긴다(R-2).
+     *
+     * 이미 부재 행이 있어도 upsert가 `fetched_at`을 갱신하므로 **다음 신선도 창이 새로 시작된다**
+     * (AC-15) — 부재가 반복돼도 매 조회마다 upstream을 치는 상태로 퇴화하지 않는다.
+     */
+    @Transactional
+    override fun saveDetailAbsence(spotId: Long, fallback: SpotDetail) {
+        upsertDetail(spotId, fallback, bodyAbsent = true)
+    }
+
+    /**
+     * 본문 upsert. [bodyAbsent]가 두 경로의 유일한 차이다 — 부재였던 항목에 나중에 본문이 생기면
+     * `saveDetail`이 이 플래그를 false로 되돌리며 상태가 전환된다(AC-14).
+     */
+    private fun upsertDetail(spotId: Long, detail: SpotDetail, bodyAbsent: Boolean) {
         jdbcTemplate.update(
             """
             INSERT INTO spot_detail (spot_id, title, category, thumbnail_image_url,
-                                     overview, address, homepage, tel, copyright, fetched_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, now())
+                                     overview, address, homepage, tel, copyright, body_absent, fetched_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now())
             ON CONFLICT (spot_id) DO UPDATE SET
                 title = EXCLUDED.title, category = EXCLUDED.category,
                 thumbnail_image_url = EXCLUDED.thumbnail_image_url, overview = EXCLUDED.overview,
                 address = EXCLUDED.address, homepage = EXCLUDED.homepage, tel = EXCLUDED.tel,
-                copyright = EXCLUDED.copyright, fetched_at = now(), updated_at = now()
+                copyright = EXCLUDED.copyright, body_absent = EXCLUDED.body_absent,
+                fetched_at = now(), updated_at = now()
             """.trimIndent(),
             spotId, detail.title, detail.category.name, detail.thumbnailImageUrl,
             detail.overview, detail.address, detail.homepage, detail.tel, detail.copyright.name,
+            bodyAbsent,
         )
     }
 

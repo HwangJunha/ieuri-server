@@ -28,6 +28,8 @@ class TourismConfig {
         SpotQueryPolicy(
             maxRadiusMeters = properties.maxRadiusMeters,
             maxPageSize = properties.maxPageSize,
+            maxLikedPageSize = properties.maxLikedPageSize,
+            detailAbsenceTtl = properties.detailAbsenceTtl,
         )
 
     /**

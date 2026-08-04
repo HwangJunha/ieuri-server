@@ -1,5 +1,7 @@
 package org.around.ieuri.tourism.application.port.out.query
 
+import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.tourism.application.query.LikedSpotView
 import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
@@ -50,7 +52,49 @@ interface SpotQueryPort {
      * 없으면 null(= 존재하지 않는 spot).
      */
     fun findIdentity(spotId: Long): SpotIdentity?
+
+    /**
+     * `spot` 행이 이미 보유한 상세 표시 값(SPEC-0008 R-2). **상세 본문이 부재할 때 응답을 구성하는
+     * 재료다** — title·category·thumbnailImageUrl·copyright가 여기서 오므로 본문이 없어도 non-null
+     * 필드를 모두 채울 수 있고(AC-5·AC-6), 부재 행의 NOT NULL 컬럼도 이 값으로 적재한다.
+     *
+     * 없으면 null(= 존재하지 않는 spot).
+     */
+    fun findSpotBasics(spotId: Long): SpotBasics?
+
+    /**
+     * 회원이 좋아요(LIKE)한 spot 한 페이지(SPEC-0008 R-15·R-16). DISLIKE는 제외한다(AC-45).
+     *
+     * **요청 언어로 한정한다**(AC-49). `spot_reaction`은 V20 이후 language 컬럼이 없으므로 `spot`을
+     * 조인해 판별한다 — 종료 축제 조회가 같은 이유로 `spot`을 조인하는 것과 같은 패턴이다.
+     */
+    fun findLikedSpots(query: LikedSpotsSearch): CursorPage<LikedSpotView>
 }
+
+/**
+ * `spot` 행이 보유한 상세 표시 값(read DTO). 본문 부재 시 응답·적재의 재료가 된다.
+ * attributionText는 copyright에서 도출되므로 담지 않는다.
+ */
+data class SpotBasics(
+    val title: String,
+    val address: String?,
+    val thumbnailImageUrl: String,
+    val category: SpotCategory,
+    val copyright: CopyrightType,
+)
+
+/**
+ * 좋아요 목록 조회 입력. [language]로 한정하고 [memberId] 본인 것만 조회한다(AC-48).
+ * [after]는 불투명 커서이며 정렬 키(likedAt, spotId)에서 파생된다.
+ */
+data class LikedSpotsSearch(
+    val memberId: Long,
+    val language: DomainLocale,
+    /** 카테고리 필터. null이면 전체. 값이 있으면 `spot.category`로 거른다. */
+    val category: SpotCategory?,
+    val first: Int,
+    val after: String?,
+)
 
 /**
  * 반경 조회 입력. [excludedContentIds]는 로그인 회원이 이미 반응한 항목으로, **DB 쿼리 단계에서**

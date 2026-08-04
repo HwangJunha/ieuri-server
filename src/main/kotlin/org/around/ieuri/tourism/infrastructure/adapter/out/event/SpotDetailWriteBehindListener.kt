@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.event
 
+import org.around.ieuri.tourism.application.event.SpotDetailAbsent
 import org.around.ieuri.tourism.application.event.SpotDetailFetched
 import org.around.ieuri.tourism.application.event.SpotGalleryFetched
 import org.around.ieuri.tourism.application.event.SpotInfoItemsFetched
@@ -35,6 +36,19 @@ class SpotDetailWriteBehindListener(
     @EventListener
     fun on(event: SpotDetailFetched) = runSafely("detail:${event.spotId}") {
         store.saveDetail(event.spotId, event.detail)
+    }
+
+    /**
+     * 본문 부재의 적재(SPEC-0008 R-3). 부재를 남기지 않으면 본문 없는 spot을 매 조회마다 upstream에
+     * 다시 묻게 된다 — 다시 물어도 없는 데이터인데도.
+     *
+     * **실패는 여기 오지 않는다**(AC-4·AC-16). 서비스가 예외를 그대로 올리므로 이 이벤트는
+     * "없음을 확인했다"는 사실일 때만 발행된다.
+     */
+    @Async(TourismAsyncConfig.WRITE_BEHIND_EXECUTOR)
+    @EventListener
+    fun on(event: SpotDetailAbsent) = runSafely("detail-absent:${event.spotId}") {
+        store.saveDetailAbsence(event.spotId, event.fallback)
     }
 
     @Async(TourismAsyncConfig.WRITE_BEHIND_EXECUTOR)
