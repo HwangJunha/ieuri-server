@@ -76,13 +76,4 @@ interface SpotQueryUseCase {
      * 카테고리 축을 쓰므로 판정도 같아야 한다.
      */
     fun likedSpots(query: LikedSpotsQuery, locale: DomainLocale, memberId: Long): CursorPage<LikedSpotView>
-
-    /**
-     * 좋아요 총 개수(`totalCount` 필드 요청 시에만). 목록과 **별도 유스케이스 메서드**인 이유는
-     * 비용이 따로 들기 때문이다 — 통짜로 묶으면 아무도 안 물어본 COUNT(*)를 매 페이지마다 낸다.
-     * `spotDetail`의 지연 필드들과 같은 규율이다.
-     *
-     * **목록과 같은 [query]를 받는다** — 카테고리가 갈리면 총계와 목록이 서로 다른 집합을 말하게 된다.
-     */
-    fun likedSpotsTotalCount(query: LikedSpotsQuery, locale: DomainLocale, memberId: Long): Long
 }

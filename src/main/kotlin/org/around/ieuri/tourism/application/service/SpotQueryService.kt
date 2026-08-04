@@ -267,29 +267,17 @@ class SpotQueryService(
         query: LikedSpotsQuery,
         locale: DomainLocale,
         memberId: Long,
-    ): CursorPage<LikedSpotView> = spotQueryPort.findLikedSpots(query.toSearch(locale, memberId))
-
-    /** 좋아요 총 개수(`totalCount` 요청 시에만). 목록과 분리한 이유는 [SpotQueryUseCase] 참조. */
-    override fun likedSpotsTotalCount(
-        query: LikedSpotsQuery,
-        locale: DomainLocale,
-        memberId: Long,
-    ): Long = spotQueryPort.countLikedSpots(query.toSearch(locale, memberId))
-
-    /**
-     * 목록과 총계가 **같은 조건**을 쓰도록 한 곳에서 만든다. 둘이 갈리면 "전체 12건"이라면서 3건만
-     * 보이는 상태가 생긴다 — `spots`의 `whereClause`가 같은 이유로 존재한다.
-     *
-     * 카테고리 가용성 검증도 여기서 한다. `spots`와 같은 축을 쓰므로 판정이 달라질 이유가 없다.
-     */
-    private fun LikedSpotsQuery.toSearch(locale: DomainLocale, memberId: Long): LikedSpotsSearch {
-        category?.let { validateCategory(it, locale) }
-        return LikedSpotsSearch(
-            memberId = memberId,
-            language = locale,
-            category = category,
-            first = first.coerceIn(1, policy.maxLikedPageSize),
-            after = after,
+    ): CursorPage<LikedSpotView> {
+        // 카테고리 가용성 판정은 spots와 같다 — 같은 축을 쓰므로 달라질 이유가 없다.
+        query.category?.let { validateCategory(it, locale) }
+        return spotQueryPort.findLikedSpots(
+            LikedSpotsSearch(
+                memberId = memberId,
+                language = locale,
+                category = query.category,
+                first = query.first.coerceIn(1, policy.maxLikedPageSize),
+                after = query.after,
+            ),
         )
     }
 

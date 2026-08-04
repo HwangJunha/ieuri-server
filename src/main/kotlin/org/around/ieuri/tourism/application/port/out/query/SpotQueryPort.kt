@@ -69,15 +69,6 @@ interface SpotQueryPort {
      * 조인해 판별한다 — 종료 축제 조회가 같은 이유로 `spot`을 조인하는 것과 같은 패턴이다.
      */
     fun findLikedSpots(query: LikedSpotsSearch): CursorPage<LikedSpotView>
-
-    /**
-     * 좋아요 총 개수. **`totalCount` 필드가 선택됐을 때만 호출된다** — 별도 COUNT(*)라 비용이 따로
-     * 들고, 커서 페이징에 필수도 아니다(소진 판정은 hasNextPage).
-     *
-     * **목록과 같은 조건을 받는다** — 카테고리 필터를 빠뜨리면 "전체 12건"이라면서 3건만 보이는
-     * 상태가 된다. 그래서 [LikedSpotsSearch]를 그대로 재사용한다(페이징 인자는 무시).
-     */
-    fun countLikedSpots(query: LikedSpotsSearch): Long
 }
 
 /**

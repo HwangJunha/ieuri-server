@@ -249,31 +249,13 @@ class SpotQueryAdapter(
                 startCursor = edges.firstOrNull()?.cursor,
                 endCursor = edges.lastOrNull()?.cursor,
             ),
-            // **여기서 세지 않는다.** totalCount는 별도 COUNT(*)라 비용이 따로 드는데, 스키마상
-            // nullable이라 클라이언트가 고르지 않을 수 있다. 매 페이지마다 무조건 세면 아무도 안
-            // 물어본 값에 스캔을 하나 더 쓰는 셈이다 — 필드가 선택될 때만 [countLikedSpots]가 센다.
+            // 좋아요 목록은 총 개수를 노출하지 않는다(LikedSpotConnection에 필드가 없다) —
+            // 소진 판정은 hasNextPage로 충분하고, COUNT(*)는 페이지마다 스캔을 하나 더 쓴다.
             totalCount = null,
         )
     }
 
     /**
-     * 좋아요 총 개수(`LikedSpotConnection.totalCount`가 **선택됐을 때만** 호출된다).
-     *
-     * 목록과 [likedWhereClause]를 공유한다 — 조건이 갈리면 "전체 12건"이라면서 3건만 보이는 상태가
-     * 생긴다. 커서(페이지 경계)만 빠지는데, 그것은 집합의 조건이 아니라 위치라서 총계와 무관하다.
-     */
-    override fun countLikedSpots(query: LikedSpotsSearch): Long {
-        val (where, params) = likedWhereClause(query)
-        return jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM spot_reaction r JOIN spot s ON s.id = r.spot_id WHERE $where",
-            Long::class.java,
-            *params.toTypedArray(),
-        ) ?: 0L
-    }
-
-    /**
-     * 목록·총계 공통 조건. 한 곳에서 만들어 둘이 어긋나지 않게 한다(`spots`의 `whereClause`와 같은 이유).
-     *
      * 언어 판정은 `spot` 조인으로 한다 — V20 이후 `spot_reaction`에 language가 없다.
      * 카테고리도 `spot`이 소유하므로 같은 조인을 그대로 쓴다.
      */

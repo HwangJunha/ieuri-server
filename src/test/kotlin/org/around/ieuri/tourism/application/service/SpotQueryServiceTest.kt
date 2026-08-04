@@ -849,7 +849,7 @@ class SpotQueryServiceTest {
             startCursor = nodes.firstOrNull()?.let { "c-${it.id}" },
             endCursor = nodes.lastOrNull()?.let { "c-${it.id}" },
         ),
-        // 목록 조회는 총계를 세지 않는다 — totalCount 필드가 요청될 때만 별도로 센다.
+        // 좋아요 목록은 총 개수를 노출하지 않는다.
         totalCount = null,
     )
 
@@ -908,37 +908,6 @@ class SpotQueryServiceTest {
     }
 
     @Test
-    fun `목록 조회는 총계를 세지 않는다(지연 필드)`() {
-        // totalCount는 별도 COUNT(*)라 비용이 따로 든다. 루트에서 무조건 세면 아무도 안 물어본
-        // 값에 스캔을 하나 더 쓴다 — spotDetail의 likeCount와 같은 규율이다.
-        every { spotQueryPort.findLikedSpots(any()) } returns likedPage(likedSpot(1L))
-
-        service.likedSpots(LikedSpotsQuery(null, 20, null), DomainLocale.KO, memberId = 7L)
-
-        verify(exactly = 0) { spotQueryPort.countLikedSpots(any()) }
-    }
-
-    @Test
-    fun `총계는 요청될 때만 같은 조건으로 센다`() {
-        val captured = slot<LikedSpotsSearch>()
-        every { spotQueryPort.countLikedSpots(capture(captured)) } returns 42L
-
-        assertEquals(
-            42L,
-            service.likedSpotsTotalCount(
-                LikedSpotsQuery(category = null, first = 20, after = null),
-                DomainLocale.EN,
-                memberId = 7L,
-            ),
-        )
-        assertEquals(7L, captured.captured.memberId)
-        assertEquals(DomainLocale.EN, captured.captured.language)
-
-        // 총계만 물었으면 목록 조회는 일어나지 않는다.
-        verify(exactly = 0) { spotQueryPort.findLikedSpots(any()) }
-    }
-
-    @Test
     fun `카테고리 필터가 조회 조건으로 전달된다`() {
         val captured = slot<LikedSpotsSearch>()
         every { spotQueryPort.findLikedSpots(capture(captured)) } returns likedPage()
@@ -975,21 +944,6 @@ class SpotQueryServiceTest {
         }
 
         verify(exactly = 0) { spotQueryPort.findLikedSpots(any()) }
-    }
-
-    @Test
-    fun `총계도 목록과 같은 카테고리 조건으로 센다`() {
-        // 조건이 갈리면 "전체 12건"이라면서 3건만 보이는 응답이 나간다.
-        val captured = slot<LikedSpotsSearch>()
-        every { spotQueryPort.countLikedSpots(capture(captured)) } returns 3L
-
-        service.likedSpotsTotalCount(
-            LikedSpotsQuery(category = SpotCategory.LODGING, first = 20, after = null),
-            DomainLocale.KO,
-            memberId = 7L,
-        )
-
-        assertEquals(SpotCategory.LODGING, captured.captured.category)
     }
 
     @Test
