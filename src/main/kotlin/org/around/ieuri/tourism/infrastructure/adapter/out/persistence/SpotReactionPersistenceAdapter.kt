@@ -2,7 +2,8 @@ package org.around.ieuri.tourism.infrastructure.adapter.out.persistence
 
 import org.around.ieuri.tourism.application.port.out.persistence.SpotReactionPort
 import org.around.ieuri.tourism.domain.aggregate.SpotReaction
-import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.SpotReactionEntity
+import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.mapper.toDomain
+import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.mapper.toNewEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.repository.SpotReactionJpaRepository
 import org.springframework.stereotype.Component
 
@@ -33,18 +34,4 @@ class SpotReactionPersistenceAdapter(
         }
         repository.save(reaction.toNewEntity())
     }
-
-    private fun SpotReactionEntity.toDomain(): SpotReaction =
-        SpotReaction.record(
-            memberId = memberId,
-            spotId = spotId,
-            reaction = reaction,
-        )
-
-    private fun SpotReaction.toNewEntity(): SpotReactionEntity =
-        SpotReactionEntity(
-            memberId = memberId,
-            spotId = spotId,
-            reaction = reaction,
-        )
 }

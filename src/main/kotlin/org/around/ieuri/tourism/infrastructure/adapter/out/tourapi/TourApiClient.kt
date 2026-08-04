@@ -1,18 +1,20 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.tourapi
 
-import org.around.ieuri.tourism.application.port.out.client.NearbySpotData
 import org.around.ieuri.tourism.application.port.out.client.NearbySpotQuery
 import org.around.ieuri.tourism.application.port.out.client.NearbySpotResult
 import org.around.ieuri.tourism.application.port.out.client.SpotDetailQuery
 import org.around.ieuri.tourism.application.port.out.client.TourInfoPort
 import org.around.ieuri.tourism.domain.aggregate.SpotDetail
-import org.around.ieuri.tourism.domain.vo.Coordinates
-import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.tourism.domain.vo.SpotImage
 import org.around.ieuri.tourism.domain.vo.SpotInfoItem
 import org.around.ieuri.tourism.domain.vo.SpotIntro
+import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.mapper.toGallery
+import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.mapper.toInfoItems
+import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.mapper.toNearbySpotDataOrNull
+import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.mapper.toSpotDetail
+import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.mapper.toSpotIntroOrNull
 import org.around.ieuri.tourism.infrastructure.config.TourApiProperties
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
@@ -94,75 +96,24 @@ class TourApiClient(
     fun mapResponse(response: TourApiResponse, locale: DomainLocale): NearbySpotResult {
         val body = response.response.body
         return NearbySpotResult(
-            spots = body.items.item.mapNotNull { it.toNearbySpotData(locale) },
+            spots = body.items.item.mapNotNull { it.toNearbySpotDataOrNull(category(it.contenttypeid, locale)) },
             totalCount = body.totalCount,
             hasMoreUpstreamPages = body.pageNo.toLong() * body.numOfRows.toLong() < body.totalCount.toLong(),
         )
     }
 
     /** detailCommon2 item → 도메인 SpotDetail(본문). */
-    fun mapDetail(common: TourApiDetailCommonResponse.Item, locale: DomainLocale): SpotDetail = SpotDetail(
-        title = common.title.orEmpty(),
-        category = category(common.contenttypeid, locale),
-        thumbnailImageUrl = common.firstimage.toHttps(),
-        overview = common.overview,
-        address = listOfNotNull(common.addr1, common.addr2).joinToString(" ").ifBlank { null },
-        homepage = common.homepage,
-        tel = common.tel,
-        copyright = CopyrightType.fromCode(common.cpyrhtDivCd),
-    )
+    fun mapDetail(common: TourApiDetailCommonResponse.Item, locale: DomainLocale): SpotDetail =
+        common.toSpotDetail(category(common.contenttypeid, locale))
 
     /** detailImage2 item → 갤러리. TourAPI 반환 순서 유지, 앞 10장까지(AC-8). */
-    fun mapGallery(images: List<TourApiDetailImageResponse.Item>): List<SpotImage> =
-        images.take(SpotDetail.MAX_GALLERY_SIZE).map {
-            SpotImage(
-                imageUrl = it.originimgurl.toHttps(),
-                thumbnailUrl = it.smallimageurl?.toHttps(),
-                caption = it.imgname,
-                copyright = CopyrightType.fromCode(it.cpyrhtDivCd),
-            )
-        }
+    fun mapGallery(images: List<TourApiDetailImageResponse.Item>): List<SpotImage> = images.toGallery()
 
     /** detailIntro2 item → 운영 정보. 표시할 값이 하나도 없으면 null(빈 껍데기 방지). */
-    fun mapIntro(intro: TourApiDetailIntroResponse.Item?): SpotIntro? =
-        intro?.toSpotIntro()?.takeUnless { it.isEmpty() }
+    fun mapIntro(intro: TourApiDetailIntroResponse.Item?): SpotIntro? = intro?.toSpotIntroOrNull()
 
     /** detailInfo2 item → 이용안내 항목. 항목명·내용 중 하나라도 비면 제외. */
-    fun mapInfoItems(info: List<TourApiDetailInfoResponse.Item>): List<SpotInfoItem> =
-        info.mapNotNull { it.toSpotInfoItem() }
-
-    /**
-     * 카테고리별로 흩어진 intro 필드를 공통 도메인 필드로 정규화한다. 응답은 자기 카테고리 필드만 채워 주므로
-     * 후보를 순서대로 훑어 처음 값이 있는 것을 쓴다(카테고리 분기 없이 동작).
-     */
-    private fun TourApiDetailIntroResponse.Item.toSpotIntro(): SpotIntro = SpotIntro(
-        businessHours = firstNotBlank(usetime, usetimeculture, usetimefestival, usetimeleports, opentime, opentimefood),
-        closedDays = firstNotBlank(restdate, restdateculture, restdateleports, restdateshopping, restdatefood),
-        parking = firstNotBlank(parking, parkingculture, parkingleports, parkinglodging, parkingshopping, parkingfood),
-        inquiryPhone = firstNotBlank(
-            infocenter, infocenterculture, infocenterleports, infocenterlodging,
-            infocentershopping, infocenterfood, infocentertourcourse,
-        ),
-        fee = firstNotBlank(usefee, usefeeleports),
-        petAllowed = firstNotBlank(chkpet, chkpetculture, chkpetleports, chkpetshopping),
-        creditCardAccepted = firstNotBlank(
-            chkcreditcard, chkcreditcardculture, chkcreditcardleports, chkcreditcardshopping, chkcreditcardfood,
-        ),
-    )
-
-    /** 항목명·내용이 모두 있어야 의미가 있다. 하나라도 비면 드랍(여행코스·숙박의 다른 형태도 여기서 걸러짐). */
-    private fun TourApiDetailInfoResponse.Item.toSpotInfoItem(): SpotInfoItem? {
-        val name = infoname?.takeIf { it.isNotBlank() } ?: return null
-        val text = infotext?.takeIf { it.isNotBlank() } ?: return null
-        return SpotInfoItem(name = name, text = text)
-    }
-
-    private fun firstNotBlank(vararg candidates: String?): String? =
-        candidates.firstOrNull { !it.isNullOrBlank() }
-
-    /** 도메인(SpotDetail·SpotImage·Spot)이 https URL을 요구하므로 매핑 단계에서 정규화한다. */
-    private fun String?.toHttps(): String =
-        this.orEmpty().replaceFirst("http://", "https://")
+    fun mapInfoItems(info: List<TourApiDetailInfoResponse.Item>): List<SpotInfoItem> = info.toInfoItems()
 
     /** [contentTypeId]는 detailIntro2·detailInfo2에서 필수다(없으면 upstream이 필수 파라미터 누락으로 거절). */
     private fun detailUri(query: SpotDetailQuery, operation: String, contentTypeId: Int? = null): URI =
@@ -195,13 +146,4 @@ class TourApiClient(
             ?: SpotCategory.TOURIST_SPOT
     }
 
-    private fun TourApiResponse.Item.toNearbySpotData(locale: DomainLocale): NearbySpotData? = NearbySpotData(
-        id = contentid ?: return null,
-        title = title ?: return null,
-        address = listOfNotNull(addr1, addr2).joinToString(" ").ifBlank { null },
-        thumbnailImageUrl = (firstimage ?: return null).toHttps(),
-        coordinates = Coordinates(latitude = mapy ?: return null, longitude = mapx ?: return null),
-        category = category(contenttypeid, locale),
-        copyright = CopyrightType.fromCode(cpyrhtDivCd),
-    )
 }
