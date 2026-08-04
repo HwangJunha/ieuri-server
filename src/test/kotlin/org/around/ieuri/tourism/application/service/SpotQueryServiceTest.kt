@@ -8,6 +8,7 @@ import org.around.ieuri.tourism.application.exception.CategoryNotAvailableForLoc
 import org.around.ieuri.tourism.application.exception.InvalidCoordinatesException
 import org.around.ieuri.tourism.application.exception.RadiusTooLargeException
 import org.around.ieuri.tourism.application.exception.SpotDetailNotFoundException
+import org.around.ieuri.tourism.application.exception.UpstreamUnavailableException
 import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.CursorPageInfo
@@ -613,6 +614,7 @@ class SpotQueryServiceTest {
         every { spotQueryPort.countLikes(any()) } returns 0L
         assertEquals(0L, service.spotLikeCount(100L))
     }
+
 
     // ══════════════════════════════════════════════════════════════════
     // SPEC-0008 : 상세 본문 부재 (R-1 ~ R-4)

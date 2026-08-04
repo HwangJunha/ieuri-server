@@ -93,7 +93,7 @@ class SpotQueryResolver(
      * 경우만 빈 배열이 된다(AC-19).
      */
     @DgsData(parentType = "SpotDetail", field = "gallery")
-    fun gallery(dfe: DgsDataFetchingEnvironment): List<GqlSpotImage> =
+    fun gallery(dfe: DgsDataFetchingEnvironment): List<GqlSpotImage>? =
         spotQueryUseCase.spotGallery(dfe.spotId(), localeContext.locale)
             .map { it.toGql() }
 
@@ -108,11 +108,12 @@ class SpotQueryResolver(
             locale = localeContext.locale,
         )?.toGql()
 
+    /** 이용안내(nullable — SPEC-0006 R10). 실패 전파 규약은 [gallery]와 동일하다. */
     @DgsData(parentType = "SpotDetail", field = "infoItems")
     fun infoItems(
         dfe: DgsDataFetchingEnvironment,
         @InputArgument category: GqlSpotCategory,
-    ): List<GqlSpotInfoItem> =
+    ): List<GqlSpotInfoItem>? =
         spotQueryUseCase.spotInfoItems(
             spotId = dfe.spotId(),
             category = SpotCategory.valueOf(category.name),
