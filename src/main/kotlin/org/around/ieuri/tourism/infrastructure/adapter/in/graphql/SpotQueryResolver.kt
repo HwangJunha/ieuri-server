@@ -126,25 +126,12 @@ class SpotQueryResolver(
         spotQueryUseCase.spotLikeCount(dfe.spotId()).toInt()
 
     /**
-     * 좋아요 목록(SPEC-0008 R-15~R-17).
+     * 인증된 회원이 좋아요한 spot 커넥션. 미인증이면 빈 목록이 아니라 UNAUTHENTICATED 오류다.
      *
-     * **인증 필수다**(AC-53). `requireMemberId()`가 던지는 예외는 최상위 `errors[]`의
-     * UNAUTHENTICATED로 나간다 — 빈 목록으로 대체하지 않는다(AC-54). 빈 목록은 "좋아요가 없음"이라는
-     * 다른 의미이고, 둘을 섞으면 클라이언트가 로그인 유도 시점을 판단할 수 없다.
-     *
-     * `spots`가 `currentMemberId()`(비로그인 허용)를 쓰는 것과 대비된다 — 그쪽은 비로그인도 유효한
-     * 조회지만 "내 좋아요"는 주체가 없으면 성립하지 않는다.
-     *
-     * **생성 타입을 반환해야 한다**(`members` 선례와 동일). Spring for GraphQL의
-     * `ConnectionFieldTypeVisitor`가 `edges`·`pageInfo`를 가진 필드를 Relay 커넥션으로 자동 인식해
-     * 반환값을 감싸려 하기 때문이다. 이때 통과 조건은 둘 중 하나다 —
-     * 등록된 `ConnectionAdapter`가 지원하는 타입이거나, **반환 객체의 클래스 이름이 `Connection`으로
-     * 끝나거나**(`ConnectionDataFetcher.adaptDataContainer`). 이 저장소엔 어댑터가 없으므로 후자에
-     * 기대며, `GqlLikedSpotConnection`은 이름이 맞아 그대로 통과한다.
-     *
-     * read DTO(`CursorPage`)를 그대로 돌려주면 두 조건에 모두 걸리지 않아
-     * `No ConnectionAdapter for: ...CursorPage`로 실패한다. `spotDetail`이 read DTO를 반환할 수 있는
-     * 것과 갈리는 지점이다 — 그쪽은 커넥션 형태가 아니라 이 방문자를 타지 않는다.
+     * **read DTO(`CursorPage`)를 그대로 반환하면 안 된다.** Spring for GraphQL의
+     * `ConnectionFieldTypeVisitor`가 `edges`·`pageInfo`를 가진 필드를 Relay 커넥션으로 인식해 감싸려
+     * 하는데, 이 저장소엔 `ConnectionAdapter`가 없어 **클래스 이름이 `Connection`으로 끝나는** 타입만
+     * 통과한다. `CursorPage`를 돌려주면 `No ConnectionAdapter for: ...CursorPage`로 실패한다.
      */
     @DgsQuery
     fun likedSpots(

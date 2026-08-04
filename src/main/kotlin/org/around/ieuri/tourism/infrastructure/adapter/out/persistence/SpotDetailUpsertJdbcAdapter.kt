@@ -8,14 +8,13 @@ import org.around.ieuri.tourism.domain.vo.SpotIntro
 import org.springframework.jdbc.core.BatchPreparedStatementSetter
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Component
-import org.springframework.transaction.annotation.Transactional
 import java.sql.PreparedStatement
 
 /**
  * 상세 적재 전용 어댑터. 쓰기가 전부 `INSERT ... ON CONFLICT`라 이 어댑터에만 생 SQL이 남는다.
  *
- * 각 save는 단일 트랜잭션이다 — 갤러리처럼 "삭제 후 삽입"하는 경우 삭제만 되고 삽입이 안 되면
- * 데이터가 사라진다.
+ * 트랜잭션은 호출자([SpotDetailStoreAdapter])가 연다 — "삭제 후 삽입"이 한 트랜잭션에 묶여야
+ * 삭제만 되고 삽입이 안 되는 상태가 생기지 않는다. 여기 다시 애노테이션을 붙이지 않는다.
  */
 @Component
 class SpotDetailUpsertJdbcAdapter(
@@ -28,7 +27,6 @@ class SpotDetailUpsertJdbcAdapter(
      *
      * 부재 행이 이미 있어도 `fetched_at`을 갱신하므로 다음 신선도 창이 새로 시작된다.
      */
-    @Transactional
     fun upsertDetail(spotId: Long, detail: SpotDetail, bodyAbsent: Boolean) {
         jdbcTemplate.update(
             """
@@ -54,7 +52,6 @@ class SpotDetailUpsertJdbcAdapter(
      * 삽입을 `ON CONFLICT`로 두는 이유는 같은 항목을 두 워커가 동시에 교체할 때 유니크 제약 위반으로
      * 실패하는 대신 덮어쓰게 하기 위해서다.
      */
-    @Transactional
     fun replaceGallery(spotId: Long, gallery: List<SpotImage>) {
         jdbcTemplate.update("DELETE FROM spot_detail_image WHERE spot_id = ?", spotId)
         if (gallery.isEmpty()) return
@@ -83,7 +80,6 @@ class SpotDetailUpsertJdbcAdapter(
     }
 
     /** 운영 정보 upsert. 값이 하나도 없는 경우도 행으로 남겨 미적재와 구분한다. */
-    @Transactional
     fun upsertIntro(spotId: Long, category: SpotCategory, intro: SpotIntro?) {
         jdbcTemplate.update(
             """
@@ -103,7 +99,6 @@ class SpotDetailUpsertJdbcAdapter(
     }
 
     /** 이용안내 항목 전량 교체. 갤러리와 같은 이유로 삭제 후 배치 삽입한다. */
-    @Transactional
     fun replaceInfoItems(spotId: Long, category: SpotCategory, items: List<SpotInfoItem>) {
         jdbcTemplate.update(
             "DELETE FROM spot_detail_info WHERE spot_id = ? AND category = ?",

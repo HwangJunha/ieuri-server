@@ -21,6 +21,7 @@ class SpotStoreAdapter(
 
     private val spot = QSpotEntity.spotEntity
 
+    /** 트랜잭션은 위임 대상이 연다 — 여기 애노테이션을 중복으로 붙이지 않는다. */
     override fun upsertAll(spots: List<SyncSpotCommand>, syncedAt: Instant): Int =
         upsertAdapter.upsertAll(spots, syncedAt)
 

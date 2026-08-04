@@ -35,9 +35,10 @@ class FestivalStoreAdapter(
      */
     @Transactional
     override fun deleteEnded(language: DomainLocale, asOf: LocalDate): Int =
-        // [findEndedContentIds]와 같은 조건으로 대상을 뽑아 청크로 지운다 — 조건이 갈리면
-        // 제외 집합과 실제 삭제 대상이 어긋난다.
-        deleteSpotsInChunks(language, findEndedContentIds(language, asOf).toList())
+        // [findEndedContentIds]와 **같은 헬퍼**로 대상을 뽑는다 — 조건이 갈리면 제외 집합과
+        // 실제 삭제 대상이 어긋난다. 애노테이션이 붙은 메서드를 자기호출하면 프록시를 우회하므로
+        // 조건을 공용 헬퍼로 두고 양쪽이 그것을 호출한다.
+        deleteSpotsInChunks(language, endedContentIds(language, asOf).toList())
 
     /**
      * 이번 수집 결과에 없는 축제 삭제. `spot_festival`에 있는 행만 대상으로 한다 —
@@ -61,6 +62,10 @@ class FestivalStoreAdapter(
 
     @Transactional(readOnly = true)
     override fun findEndedContentIds(language: DomainLocale, asOf: LocalDate): Set<String> =
+        endedContentIds(language, asOf)
+
+    /** [asOf] 기준 종료된 축제의 contentId. 조회와 삭제가 같은 조건을 쓰도록 한 곳에 둔다. */
+    private fun endedContentIds(language: DomainLocale, asOf: LocalDate): Set<String> =
         queryFactory
             .select(spot.contentId)
             .from(festival)

@@ -16,6 +16,7 @@ import org.around.ieuri.tourism.domain.vo.ReactionType
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotReactionEntity
 import org.springframework.stereotype.Component
+import org.springframework.transaction.annotation.Transactional
 
 /**
  * 관광지 읽기 포트 구현(CQRS 읽기). 애그리거트를 우회해 필요한 값만 프로젝션한다.
@@ -33,9 +34,11 @@ class SpotQueryAdapter(
     private val spot = QSpotEntity.spotEntity
     private val reaction = QSpotReactionEntity.spotReactionEntity
 
+    @Transactional(readOnly = true)
     override fun searchNearby(query: NearbySpotSearch): List<SpotSearchResult> =
         spatialQueryAdapter.searchNearby(query)
 
+    @Transactional(readOnly = true)
     override fun countNearby(query: NearbySpotSearch): Int =
         spatialQueryAdapter.countNearby(query)
 
