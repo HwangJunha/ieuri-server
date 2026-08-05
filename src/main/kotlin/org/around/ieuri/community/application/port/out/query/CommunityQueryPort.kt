@@ -33,6 +33,29 @@ interface CommunityQueryPort {
         viewer: ViewerContext,
     ): Map<Long, List<CommentView>>
 
+    /**
+     * 아래 넷은 전부 **글 여러 건을 한 번에** 읽는다 — 각각 DataLoader가 하나씩 물고 있어,
+     * 클라이언트가 그 필드를 고른 경우에만, 고른 글 전부를 한 번의 쿼리로 가져온다.
+     * 결과에 키가 없으면 그 글에는 값이 없다는 뜻이다.
+     */
+    fun findTagsOf(postIds: List<Long>): Map<Long, List<String>>
+
+    /** 첨부 순서대로. 사진이 없는 글은 결과에 키가 없다. */
+    fun findPhotoKeysOf(postIds: List<Long>): Map<Long, List<String>>
+
+    /** 카테고리는 모든 글에 있다 — 키가 없으면 연결이 깨진 것이다. */
+    fun findCategoriesOf(postIds: List<Long>): Map<Long, TargetCategory>
+
+    /** 장소는 선택이라 **없는 글이 정상이다.** 그 글은 결과에 키가 없다. */
+    fun findSpotIdsOf(postIds: List<Long>): Map<Long, Long>
+
+    /**
+     * [memberId]가 좋아요한 글의 id만. 나머지는 좋아요하지 않았다는 뜻이다.
+     * 차단은 이 판정에 영향을 주지 않아 ViewerContext를 받지 않는다 — 받으면 차단 관계를
+     * 읽는 쿼리가 공짜로 한 번 더 붙는다.
+     */
+    fun findLikedPostIds(memberId: Long, postIds: List<Long>): Set<Long>
+
     fun findBlockedUsers(search: BlockedUsersSearch): CursorPage<BlockedUserView>
 
     /**

@@ -100,6 +100,22 @@ class CommunityQueryService(
             viewer = viewerContext(memberId),
         )
 
+    // 지연 필드 다섯. 포트로 그대로 넘긴다 — 여기서 더할 규칙이 없다.
+    override fun postTags(postIds: List<Long>): Map<Long, List<String>> =
+        communityQueryPort.findTagsOf(postIds)
+
+    override fun postPhotoKeys(postIds: List<Long>): Map<Long, List<String>> =
+        communityQueryPort.findPhotoKeysOf(postIds)
+
+    override fun postCategories(postIds: List<Long>): Map<Long, TargetCategory> =
+        communityQueryPort.findCategoriesOf(postIds)
+
+    override fun postSpotIds(postIds: List<Long>): Map<Long, Long> =
+        communityQueryPort.findSpotIdsOf(postIds)
+
+    override fun likedPostIds(postIds: List<Long>, memberId: Long): Set<Long> =
+        communityQueryPort.findLikedPostIds(memberId, postIds)
+
     override fun blockedUsers(query: BlockedUsersQuery, memberId: Long): CursorPage<BlockedUserView> =
         communityQueryPort.findBlockedUsers(
             BlockedUsersSearch(

@@ -86,23 +86,10 @@ class PostEntity(
     )
     var tags: MutableList<PostTagEntity> = mutableListOf(),
 
-    /** 카테고리 연결. 글당 하나이며 글과 함께 적재된다. */
-    @OneToOne(
-        mappedBy = "post",
-        cascade = [CascadeType.ALL],
-        orphanRemoval = true,
-        fetch = FetchType.LAZY,
-    )
-    var chip: PostChipEntity? = null,
-
-    /** 장소 연결. **선택이다** — 없으면 카테고리에만 속하는 글이다. */
-    @OneToOne(
-        mappedBy = "post",
-        cascade = [CascadeType.ALL],
-        orphanRemoval = true,
-        fetch = FetchType.LAZY,
-    )
-    var spot: PostSpotEntity? = null,
+    // 카테고리·장소 연결(community_post_chip·community_post_spot)은 **연관으로 두지 않는다.**
+    // nullable @OneToOne(mappedBy)은 lazy가 될 수 없다 — 프록시를 줄지 null을 줄지 정하려고
+    // Hibernate가 행마다 SELECT를 날려, FetchType.LAZY를 붙여도 피드 한 페이지에 N+1이 생긴다.
+    // 적재는 PostChipRepository·PostSpotRepository가, 조회는 QueryDSL과 DataLoader가 맡는다.
 
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant? = null,
@@ -356,14 +343,10 @@ class PostTagEntity(
 @Entity
 @Table(name = "community_post_chip")
 class PostChipEntity(
+    /** 글의 id가 그대로 PK다. 연관 대신 plain 컬럼으로 둔 이유는 PostEntity의 주석 참고. */
     @Id
     @Column(name = "post_id")
-    var postId: Long? = null,
-
-    @MapsId
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "post_id")
-    var post: PostEntity,
+    var postId: Long,
 
     @Enumerated(EnumType.STRING)
     @Column(name = "category", nullable = false, length = 30)
@@ -384,12 +367,7 @@ class PostChipEntity(
 class PostSpotEntity(
     @Id
     @Column(name = "post_id")
-    var postId: Long? = null,
-
-    @MapsId
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "post_id")
-    var post: PostEntity,
+    var postId: Long,
 
     @Column(name = "spot_id", nullable = false)
     var spotId: Long,

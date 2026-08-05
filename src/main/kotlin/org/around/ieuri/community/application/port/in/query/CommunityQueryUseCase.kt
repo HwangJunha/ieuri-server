@@ -10,6 +10,7 @@ import org.around.ieuri.community.application.query.PostView
 import org.around.ieuri.community.application.query.PostsQuery
 import org.around.ieuri.community.domain.vo.AppKey
 import org.around.ieuri.community.domain.vo.ContentLanguage
+import org.around.ieuri.community.domain.vo.TargetCategory
 
 /**
  * 커뮤니티 조회 유스케이스(CQRS 읽기). 도메인적으로 모두 커뮤니티 콘텐츠 조회이므로 하나로 묶는다.
@@ -31,6 +32,24 @@ interface CommunityQueryUseCase {
      * 전체 목록과 페이지네이션은 [comments]가 담당한다.
      */
     fun commentPreviews(postIds: List<Long>, memberId: Long): Map<Long, List<CommentView>>
+
+    /**
+     * 아래 다섯은 글의 **지연 필드**다 — 각각 다른 테이블에 있어 클라이언트가 그 필드를
+     * 고른 경우에만 DataLoader가 한 번에 읽는다. `{ id title }`만 물으면 하나도 돌지 않는다.
+     *
+     * 결과에 키가 없으면 그 글에 값이 없다는 뜻이며, 채우는 것은 호출자의 몫이다.
+     */
+    fun postTags(postIds: List<Long>): Map<Long, List<String>>
+
+    fun postPhotoKeys(postIds: List<Long>): Map<Long, List<String>>
+
+    fun postCategories(postIds: List<Long>): Map<Long, TargetCategory>
+
+    /** 장소는 선택이라 **없는 글이 정상이다.** */
+    fun postSpotIds(postIds: List<Long>): Map<Long, Long>
+
+    /** 호출자가 좋아요한 글의 id만. */
+    fun likedPostIds(postIds: List<Long>, memberId: Long): Set<Long>
 
     fun blockedUsers(query: BlockedUsersQuery, memberId: Long): CursorPage<BlockedUserView>
 

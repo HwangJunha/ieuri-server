@@ -7,6 +7,7 @@ import org.around.ieuri.community.domain.aggregate.PostLike
 import org.around.ieuri.community.domain.aggregate.Report
 import org.around.ieuri.community.domain.vo.PhotoObjectKey
 import org.around.ieuri.community.domain.vo.PostTag
+import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.BlockEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.CommentEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostEntity
@@ -27,10 +28,14 @@ import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.
  * 파싱되지 않는 사진 키는 **조용히 버리지 않고 실패시킨다**. 적재 시점에 형식을 통과한
  * 값이므로 파싱 실패는 데이터 손상이며, 그냥 넘기면 글에서 사진 한 장이 이유 없이 사라진다.
  */
-fun PostEntity.toDomain(): Post = Post.restore(
+/**
+ * 카테고리·장소는 별도 테이블이라 **호출자가 읽어 넘긴다** — 엔티티에 연관으로 두면
+ * nullable @OneToOne이 lazy가 되지 않아 조회마다 N+1이 붙는다(PostEntity 주석 참고).
+ */
+fun PostEntity.toDomain(category: TargetCategory, spotId: Long?): Post = Post.restore(
     id = requireNotNull(id) { "적재된 글에는 id가 있어야 한다." },
-    category = requireNotNull(chip?.category) { "적재된 글에는 카테고리가 있어야 한다." },
-    spotId = spot?.spotId,
+    category = category,
+    spotId = spotId,
     authorId = authorId,
     tags = tags.map { PostTag.restore(it.name, it.normalized) },
     title = title,
@@ -71,11 +76,18 @@ fun Post.toNewEntity(): PostEntity {
     entity.tags = tags.map {
         PostTagEntity(post = entity, name = it.name, normalized = it.normalized)
     }.toMutableList()
-    // 연결은 글이 만들어진 뒤에 붙인다 — @MapsId가 부모의 id를 받아 쓰기 때문이다.
-    entity.chip = PostChipEntity(post = entity, category = category)
-    entity.spot = spotId?.let { PostSpotEntity(post = entity, spotId = it) }
+    // 카테고리·장소 연결은 여기서 만들지 않는다 — 글의 id가 있어야 만들 수 있어
+    // 어댑터가 글을 저장한 뒤 붙인다.
     return entity
 }
+
+/** 글의 id가 정해진 **뒤에** 만든다 — post_id가 PK다. */
+fun Post.toChipEntity(postId: Long): PostChipEntity =
+    PostChipEntity(postId = postId, category = category)
+
+/** 장소는 선택이라 없으면 null이며, 그때는 연결 행 자체를 만들지 않는다. */
+fun Post.toSpotEntity(postId: Long): PostSpotEntity? =
+    spotId?.let { PostSpotEntity(postId = postId, spotId = it) }
 
 fun CommentEntity.toDomain(): Comment = Comment.restore(
     id = requireNotNull(id) { "적재된 댓글에는 id가 있어야 한다." },

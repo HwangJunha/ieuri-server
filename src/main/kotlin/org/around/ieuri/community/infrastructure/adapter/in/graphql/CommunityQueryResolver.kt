@@ -5,6 +5,7 @@ import com.netflix.graphql.dgs.DgsData
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
+import org.dataloader.DataLoader
 import java.util.concurrent.CompletableFuture
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.community.application.port.`in`.query.CommunityQueryUseCase
@@ -148,24 +149,62 @@ class CommunityQueryResolver(
             )
         }
 
+    /** 사용자가 입력한 태그. 별도 테이블이라 요청된 경우에만 배치로 읽는다. */
+    @DgsData(parentType = "Post", field = "tags")
+    fun postTags(dfe: DgsDataFetchingEnvironment): CompletableFuture<List<String>> =
+        dfe.loader<List<String>>(PostTagsDataLoader.NAME).load(dfe.postSource().id)
+
+    /** 사진 키. 배열 순서가 표시 순서다. */
+    @DgsData(parentType = "Post", field = "photoKeys")
+    fun postPhotoKeys(dfe: DgsDataFetchingEnvironment): CompletableFuture<List<String>> =
+        dfe.loader<List<String>>(PostPhotoKeysDataLoader.NAME).load(dfe.postSource().id)
+
+    /** 글의 카테고리. 연결 테이블에 있어 요청된 경우에만 읽는다. */
+    @DgsData(parentType = "Post", field = "category")
+    fun postCategory(dfe: DgsDataFetchingEnvironment): CompletableFuture<GqlTargetCategory> {
+        val postId = dfe.postSource().id
+        return dfe.loader<TargetCategory>(PostCategoryDataLoader.NAME)
+            .load(postId)
+            .thenApply {
+                requireNotNull(it) { "글($postId)에 카테고리 연결이 없다." }.toGql()
+            }
+    }
+
+    /** 호출자가 좋아요했는지. */
+    @DgsData(parentType = "Post", field = "likedByViewer")
+    fun postLikedByViewer(dfe: DgsDataFetchingEnvironment): CompletableFuture<Boolean> =
+        dfe.loader<Boolean>(PostLikedDataLoader.NAME)
+            .load(dfe.postSource().id)
+            .thenApply { it ?: false }
+
     /**
-     * 장소 칩. **연결된 장소가 없으면 null이다** — 조회 자체를 하지 않는다.
-     * 있으면 tourism을 물어야 하므로 요청된 경우에만 배치로 읽는다.
+     * 장소 칩. **장소는 선택이라 없으면 null이다.** 연결을 먼저 배치로 확인하고, 있을 때만
+     * tourism을 배치로 묻는다 — 두 단계 모두 요청된 경우에만 돈다.
      */
     @DgsData(parentType = "Post", field = "spot")
-    fun postSpot(dfe: DgsDataFetchingEnvironment): CompletableFuture<GqlPostSpot?> {
-        val spotId = dfe.postSource().spot?.id
-            ?: return CompletableFuture.completedFuture(null)
-
-        val loader = dfe.getDataLoader<Long, PostSpotView>(PostSpotDataLoader.NAME)
-            ?: error("DataLoader '${PostSpotDataLoader.NAME}'가 등록되지 않았다.")
-        return loader.load(spotId).thenApply { it?.toGql() }
-    }
+    fun postSpot(dfe: DgsDataFetchingEnvironment): CompletableFuture<GqlPostSpot?> =
+        dfe.loader<Long>(PostSpotIdDataLoader.NAME)
+            .load(dfe.postSource().id)
+            .thenCompose { spotId ->
+                if (spotId == null) {
+                    CompletableFuture.completedFuture(null)
+                } else {
+                    dfe.loader<PostSpotView>(PostSpotDataLoader.NAME)
+                        .load(spotId)
+                        .thenApply { it?.toGql() }
+                }
+            }
 
     /** 작성자. auth를 물어야 하므로 요청된 경우에만 조회한다. */
     @DgsData(parentType = "Post", field = "author")
     fun postAuthor(dfe: DgsDataFetchingEnvironment): CompletableFuture<GqlPostAuthor> =
-        dfe.loadAuthor(dfe.postSource().author.id)
+        dfe.loadAuthor(dfe.postSource().authorId)
+
+    /** 이름이 어긋난 로더를 조용히 넘기면 필드가 빈 채로 뜬다 — 명시적으로 실패시킨다. */
+    private fun <V : Any> DgsDataFetchingEnvironment.loader(
+        name: String,
+    ): DataLoader<Long, V> =
+        getDataLoader<Long, V>(name) ?: error("DataLoader '$name'가 등록되지 않았다.")
 
     @DgsData(parentType = "Comment", field = "author")
     fun commentAuthor(dfe: DgsDataFetchingEnvironment): CompletableFuture<GqlPostAuthor> {
@@ -210,6 +249,8 @@ class CommunityQueryResolver(
      * 회원 정보가 없어도 글은 남는다(탈퇴해도 글·댓글은 보존한다). 작성자 표시가 비면
      * 클라이언트가 렌더에 실패하므로 대체 표기를 내려준다.
      */
+    private fun TargetCategory.toGql() = GqlTargetCategory.valueOf(name)
+
     private fun PostSpotView.toGql() = GqlPostSpot(
         id = id,
         title = title,

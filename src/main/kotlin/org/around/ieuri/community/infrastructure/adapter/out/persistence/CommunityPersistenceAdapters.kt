@@ -12,11 +12,15 @@ import org.around.ieuri.community.domain.aggregate.PostLike
 import org.around.ieuri.community.domain.aggregate.Report
 import org.around.ieuri.community.domain.vo.ReportTargetType
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toDomain
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toChipEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toNewEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toSpotEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.BlockJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.CommentJpaRepository
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.PostChipJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.PostJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.PostLikeJpaRepository
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.PostSpotJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.ReportJpaRepository
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Component
@@ -30,15 +34,24 @@ import org.springframework.stereotype.Component
 @Component
 class PostPersistenceAdapter(
     private val repository: PostJpaRepository,
+    private val chipRepository: PostChipJpaRepository,
+    private val spotRepository: PostSpotJpaRepository,
 ) : PostRepositoryPort {
 
-    override fun findById(postId: Long): Post? =
-        repository.findByIdAndDeletedAtIsNull(postId)?.toDomain()
+    override fun findById(postId: Long): Post? {
+        val entity = repository.findByIdAndDeletedAtIsNull(postId) ?: return null
+        return entity.toDomain(
+            category = requireNotNull(chipRepository.findById(postId).orElse(null)) {
+                "글($postId)에 카테고리 연결이 없다."
+            }.category,
+            spotId = spotRepository.findById(postId).orElse(null)?.spotId,
+        )
+    }
 
     override fun save(post: Post): Post {
-        val id = post.id ?: return repository.save(post.toNewEntity()).toDomain()
+        val id = post.id ?: return create(post)
 
-        // 기존 글 갱신. 사진은 여전히 불변이다 — 수정은 제목·본문만 바꾼다.
+        // 기존 글 갱신. 카테고리·장소는 수정 대상이 아니라 연결 행을 건드리지 않는다.
         val entity = repository.findById(id).orElseThrow {
             IllegalStateException("갱신하려는 글($id)이 존재하지 않는다.")
         }
@@ -49,7 +62,19 @@ class PostPersistenceAdapter(
         entity.commentCount = post.commentCount
         entity.hidden = post.hidden
         entity.deletedAt = post.deletedAt
-        return entity.toDomain()
+        return entity.toDomain(category = post.category, spotId = post.spotId)
+    }
+
+    /**
+     * 글을 먼저 저장해 id를 받은 뒤 연결 행을 붙인다 — 연결의 PK가 글의 id라 순서를
+     * 뒤집을 수 없다. 장소는 선택이라 없으면 행을 만들지 않는다.
+     */
+    private fun create(post: Post): Post {
+        val saved = repository.save(post.toNewEntity())
+        val postId = requireNotNull(saved.id) { "저장된 글에는 id가 있어야 한다." }
+        chipRepository.save(post.toChipEntity(postId))
+        post.toSpotEntity(postId)?.let { spotRepository.save(it) }
+        return saved.toDomain(category = post.category, spotId = post.spotId)
     }
 }
 

@@ -26,25 +26,21 @@ data class PostAuthorView(
 )
 
 /**
- * 피드·단건 조회의 글 한 건.
+ * 피드·단건 조회의 글 한 건. **community_post 한 행이 가진 것만 담는다.**
  *
- * [likedByViewer]·[ownedByViewer]는 호출자에 따라 달라지는 값이라 프로젝션 단계에서 채운다.
- * 미인증 호출자에게 [likedByViewer]는 null이 아니라 false다.
+ * 태그·사진·카테고리·장소·좋아요 여부는 각자 다른 테이블에 있어 **여기 없다** —
+ * 클라이언트가 그 필드를 고른 경우에만 DataLoader가 한 번에 읽는다. 미리 채우면
+ * `{ id title }`만 물어도 조회가 다섯 번 붙어, 지연 필드로 나눈 의미가 사라진다.
+ *
+ * [ownedByViewer]는 authorId 비교라 추가 조회가 없어 그대로 둔다.
  */
 data class PostView(
     val id: Long,
     val title: String,
     val body: String,
-    /** 사용자가 입력한 태그. 표시는 원문 그대로다. */
-    val tags: List<String>,
-    val category: TargetCategory,
-    /** 연결된 장소. 없으면 null이며, 카드는 장소 칩 없이 그려진다. */
-    val spot: PostSpotView?,
-    val author: PostAuthorView,
-    val photoKeys: List<String>,
+    val authorId: Long,
     val likeCount: Int,
     val commentCount: Int,
-    val likedByViewer: Boolean,
     val ownedByViewer: Boolean,
     val hidden: Boolean,
     /** 수정된 적이 있는지. 클라이언트가 "수정됨"을 표시한다. */

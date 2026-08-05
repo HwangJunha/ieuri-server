@@ -121,16 +121,7 @@ class CommunityQueryAdapter(
             .where(post.id.eq(postId), visibleToViewer(viewer))
             .fetchOne() ?: return null
 
-        // 단건이라도 지연 컬렉션을 읽지 않는다 — 피드와 같은 조회 경로를 쓴다.
-        val ids = listOf(postId)
-        return entity.toPostView(
-            viewer = viewer,
-            likedIds = likedPostIds(viewer, ids),
-            tags = tagNamesOf(ids)[postId].orEmpty(),
-            photoKeys = photoKeysOf(ids)[postId].orEmpty(),
-            category = requireNotNull(categoriesOf(ids)[postId]) { "글($postId)에 카테고리 연결이 없다." },
-            spotId = spotIdsOf(ids)[postId],
-        )
+        return entity.toPostView(viewer)
     }
 
     @Transactional(readOnly = true)
@@ -304,28 +295,15 @@ class CommunityQueryAdapter(
         val hasNextPage = rows.size > first
         val pageRows = if (hasNextPage) rows.take(first) else rows
 
-        // 아래 셋은 전부 **한 번씩** 조회한다. 행마다 물으면 페이지 하나에 쿼리가 60번 붙는다.
-        val postIds = pageRows.mapNotNull { it.id }
-        val likedIds = likedPostIds(viewer, postIds)
-        val tagsByPost = tagNamesOf(postIds)
-        val photosByPost = photoKeysOf(postIds)
-        val categoriesByPost = categoriesOf(postIds)
-        val spotIdsByPost = spotIdsOf(postIds)
-
+        // 태그·사진·카테고리·장소·좋아요는 **여기서 읽지 않는다.** 클라이언트가 그 필드를
+        // 골랐을 때만 DataLoader가 페이지 전체를 한 번에 읽는다.
         val edges = pageRows.map { entity ->
-            val postId = requireNotNull(entity.id)
             CursorEdge(
-                cursor = encodeCursor(requireNotNull(entity.createdAt), postId),
-                node = entity.toPostView(
-                    viewer = viewer,
-                    likedIds = likedIds,
-                    tags = tagsByPost[postId].orEmpty(),
-                    photoKeys = photosByPost[postId].orEmpty(),
-                    category = requireNotNull(categoriesByPost[postId]) {
-                        "글($postId)에 카테고리 연결이 없다."
-                    },
-                    spotId = spotIdsByPost[postId],
+                cursor = encodeCursor(
+                    requireNotNull(entity.createdAt),
+                    requireNotNull(entity.id),
                 ),
+                node = entity.toPostView(viewer),
             )
         }
         return cursorPageOf(edges, hasNextPage = hasNextPage, hasPreviousPage = cursor != null)
@@ -374,8 +352,8 @@ class CommunityQueryAdapter(
         createdAtPath.lt(cursor.createdAt)
             .or(createdAtPath.eq(cursor.createdAt).and(idPath.lt(cursor.id)))
 
-    /** 여러 글의 카테고리를 한 번에. 지연 연관을 읽으면 글마다 쿼리가 나간다. */
-    private fun categoriesOf(postIds: List<Long>): Map<Long, TargetCategory> {
+    @Transactional(readOnly = true)
+    override fun findCategoriesOf(postIds: List<Long>): Map<Long, TargetCategory> {
         if (postIds.isEmpty()) return emptyMap()
 
         return queryFactory
@@ -388,8 +366,8 @@ class CommunityQueryAdapter(
             }
     }
 
-    /** 여러 글의 연결 장소를 한 번에. 장소가 없는 글은 키가 없다. */
-    private fun spotIdsOf(postIds: List<Long>): Map<Long, Long> {
+    @Transactional(readOnly = true)
+    override fun findSpotIdsOf(postIds: List<Long>): Map<Long, Long> {
         if (postIds.isEmpty()) return emptyMap()
 
         return queryFactory
@@ -402,11 +380,9 @@ class CommunityQueryAdapter(
             }
     }
 
-    /**
-     * 여러 글의 태그를 한 번에. 지연 컬렉션(PostEntity.tags)을 그대로 읽으면 글마다 쿼리가 나간다.
-     * 입력 순서와 무관하게 글별로 묶어 돌려주며, 태그가 없는 글은 키가 없다.
-     */
-    private fun tagNamesOf(postIds: List<Long>): Map<Long, List<String>> {
+    /** 입력 순서와 무관하게 글별로 묶어 돌려준다. 태그가 없는 글은 키가 없다. */
+    @Transactional(readOnly = true)
+    override fun findTagsOf(postIds: List<Long>): Map<Long, List<String>> {
         if (postIds.isEmpty()) return emptyMap()
 
         val rows = queryFactory
@@ -424,8 +400,9 @@ class CommunityQueryAdapter(
         return grouped
     }
 
-    /** 여러 글의 사진 키를 한 번에. position 순서가 표시 순서다. */
-    private fun photoKeysOf(postIds: List<Long>): Map<Long, List<String>> {
+    /** position 순서가 표시 순서다. */
+    @Transactional(readOnly = true)
+    override fun findPhotoKeysOf(postIds: List<Long>): Map<Long, List<String>> {
         if (postIds.isEmpty()) return emptyMap()
 
         val rows = queryFactory
@@ -443,50 +420,29 @@ class CommunityQueryAdapter(
         return grouped
     }
 
-    /** 호출자가 좋아요한 글 id. 행마다 묻지 않고 한 번에 읽는다. */
-    private fun likedPostIds(viewer: ViewerContext, postIds: List<Long>): Set<Long> {
+    @Transactional(readOnly = true)
+    override fun findLikedPostIds(memberId: Long, postIds: List<Long>): Set<Long> {
         if (postIds.isEmpty()) return emptySet()
         return queryFactory
             .select(like.postId)
             .from(like)
-            .where(like.memberId.eq(viewer.memberId), like.postId.`in`(postIds))
+            .where(like.memberId.eq(memberId), like.postId.`in`(postIds))
             .fetch()
             .toSet()
     }
 
-    /**
-     * 사진 키는 글마다 별도 조회 대신 컬렉션을 그대로 읽는다. `@OrderBy`가 순서를 보장하며,
-     * 피드 한 페이지에서 N+1이 실측되면 그때 DataLoader를 검토한다.
-     */
-    private fun PostEntity.toPostView(
-        viewer: ViewerContext,
-        likedIds: Set<Long>,
-        tags: List<String>,
-        photoKeys: List<String>,
-        category: TargetCategory,
-        spotId: Long?,
-    ): PostView {
-        val postId = requireNotNull(id)
-        return PostView(
-            id = postId,
+    /** community_post 한 행이 가진 것만 옮긴다. 나머지 필드는 DataLoader가 채운다. */
+    private fun PostEntity.toPostView(viewer: ViewerContext): PostView =
+        PostView(
+            id = requireNotNull(id),
             title = title,
             body = body,
-            tags = tags,
-            category = category,
-            // 장소의 제목·썸네일은 tourism 소유라 리졸버가 필드 단위로 채운다.
-            // 여기서는 id만 실어 "연결이 있는지"를 알린다.
-            spot = spotId?.let {
-                PostSpotView(id = it, title = "", thumbnailImageUrl = "", category = null)
-            },
-            author = PostAuthorView(id = authorId, nickname = "", profileImageUrl = null),
-            photoKeys = photoKeys,
+            authorId = authorId,
             likeCount = likeCount,
             commentCount = commentCount,
-            likedByViewer = postId in likedIds,
             ownedByViewer = authorId == viewer.memberId,
             hidden = hidden,
             edited = edited,
             createdAt = requireNotNull(createdAt),
         )
-    }
 }

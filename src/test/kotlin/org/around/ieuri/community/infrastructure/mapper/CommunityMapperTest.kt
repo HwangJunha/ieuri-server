@@ -11,7 +11,6 @@ import org.around.ieuri.community.domain.vo.ReportReason
 import org.around.ieuri.community.domain.vo.ReportTargetType
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.BlockEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.CommentEntity
-import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostChipEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostLikeEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostPhotoEntity
@@ -51,9 +50,7 @@ class CommunityMapperTest {
         entity.photos = mutableListOf(
             PostPhotoEntity(post = entity, objectKey = "images/3/$uuid", position = 0),
         )
-        entity.chip = PostChipEntity(post = entity, category = TargetCategory.TOURIST_SPOT)
-
-        val domain = entity.toDomain()
+        val domain = entity.toDomain(category = TargetCategory.TOURIST_SPOT, spotId = null)
 
         assertEquals(1L, domain.id)
         
@@ -84,8 +81,8 @@ class CommunityMapperTest {
 
         assertEquals(
             listOf("images/3/$first", "images/3/$second"),
-            entity.also { it.chip = PostChipEntity(post = it, category = TargetCategory.TOURIST_SPOT) }
-                .toDomain().photoKeys.map { it.value },
+            entity.toDomain(category = TargetCategory.TOURIST_SPOT, spotId = null)
+                .photoKeys.map { it.value },
         )
     }
 
@@ -97,9 +94,7 @@ class CommunityMapperTest {
             deletedAt = null, createdAt = createdAt, updatedAt = createdAt,
         )
 
-        entity.chip = PostChipEntity(post = entity, category = TargetCategory.TOURIST_SPOT)
-
-        val domain = entity.toDomain()
+        val domain = entity.toDomain(category = TargetCategory.TOURIST_SPOT, spotId = null)
 
         assertNull(domain.deletedAt)
         assertTrue(domain.photoKeys.isEmpty())

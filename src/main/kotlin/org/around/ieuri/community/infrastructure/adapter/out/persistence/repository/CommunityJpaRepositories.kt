@@ -3,8 +3,10 @@ package org.around.ieuri.community.infrastructure.adapter.out.persistence.reposi
 import org.around.ieuri.community.domain.vo.ReportTargetType
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.BlockEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.CommentEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostChipEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostLikeEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostSpotEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.ReportEntity
 import org.springframework.data.jpa.repository.JpaRepository
 
@@ -16,6 +18,12 @@ import org.springframework.data.jpa.repository.JpaRepository
 interface PostJpaRepository : JpaRepository<PostEntity, Long> {
     fun findByIdAndDeletedAtIsNull(id: Long): PostEntity?
 }
+
+/** 글 ↔ 카테고리. PK가 post_id라 findById가 곧 글 단위 조회다. */
+interface PostChipJpaRepository : JpaRepository<PostChipEntity, Long>
+
+/** 글 ↔ 장소. 장소는 선택이라 행이 없을 수 있다. */
+interface PostSpotJpaRepository : JpaRepository<PostSpotEntity, Long>
 
 interface CommentJpaRepository : JpaRepository<CommentEntity, Long> {
     fun findByIdAndDeletedAtIsNull(id: Long): CommentEntity?
