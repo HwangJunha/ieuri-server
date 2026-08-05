@@ -17,8 +17,8 @@ extend type Query {
         radiusMeters: Int = 20000
         "상단 추천 칩. 대상의 카테고리로 거른다. 좌표를 줄 때만 쓰인다."
         category: TargetCategory
-        "주제 태그 하나로 필터링. 생략하면 전체."
-        topic: PostTopic
+        "태그로 필터링. 대소문자와 선행 #을 가리지 않는다. 생략하면 전체."
+        tag: String
         first: Int = 20
         after: String
     ): PostConnection!
@@ -74,15 +74,6 @@ extend type Mutation {
     reportContent(input: ReportContentInput!): ReportContentPayload!
 }
 
-"글의 주제 태그. 고정 세트이며 글당 정확히 하나다. 표시 문자열은 클라이언트가 매핑한다."
-enum PostTopic {
-    QUESTION
-    TIP
-    REVIEW
-    COMPANION
-    PHOTO
-}
-
 "글이 붙을 수 있는 대상의 종류. 값이 늘어도 기존 값의 의미는 바뀌지 않는다."
 enum PostTargetType {
     SPOT
@@ -118,7 +109,8 @@ type Post {
     title: String!
     "1~500자."
     body: String!
-    topic: PostTopic!
+    "사용자가 입력한 태그. 최대 5개이며 입력한 원문 그대로 내려간다(대소문자 보존)."
+    tags: [String!]!
     "글이 붙은 대상. 카드의 칩이 이 값으로 그려진다."
     target: PostTarget!
     author: PostAuthor!
@@ -208,7 +200,8 @@ type CommunityChip {
 input CreatePostInput {
     targetType: PostTargetType!
     targetId: ID!
-    topic: PostTopic!
+    "사용자가 입력한 태그. 최대 5개. 공백 없이 30자 이내이며 선행 #은 제거된다. 빈 목록도 유효하다."
+    tags: [String!]!
     "1~50자. 앞뒤 공백은 제거된 뒤 판정한다."
     title: String!
     "1~500자. 앞뒤 공백은 제거된 뒤 판정한다."

@@ -9,7 +9,7 @@ import org.around.ieuri.community.domain.vo.AppKey
 import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.around.ieuri.community.domain.vo.PostTarget
 import org.around.ieuri.community.domain.vo.PostTargetType
-import org.around.ieuri.community.domain.vo.PostTopic
+import org.around.ieuri.community.domain.vo.PostTag
 
 /**
  * 커뮤니티 읽기 아웃바운드 포트(CQRS 읽기). 애그리게이트를 우회해 필요한 값만 프로젝션한다.
@@ -63,7 +63,8 @@ data class ViewerContext(
  */
 data class PostsSearch(
     val targets: List<PostTarget>?,
-    val topic: PostTopic?,
+    /** 정규화된 태그. null이면 태그로 좁히지 않는다. */
+    val normalizedTag: String?,
     val first: Int,
     val after: String?,
     val viewer: ViewerContext,

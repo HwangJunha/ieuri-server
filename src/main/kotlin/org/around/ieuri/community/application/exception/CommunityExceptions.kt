@@ -25,6 +25,12 @@ class PostBodyLengthInvalidException(message: String = "본문은 500자를 넘�
 class SpotNotFoundException(message: String = "해당 장소를 찾을 수 없습니다.") :
     CommunityUserException("SPOT_NOT_FOUND", message)
 
+class InvalidTagException(message: String = "태그는 공백 없이 30자 이내여야 합니다.") :
+    CommunityUserException("INVALID_TAG", message)
+
+class TooManyTagsException(message: String = "태그는 최대 5개입니다.") :
+    CommunityUserException("TOO_MANY_TAGS", message)
+
 class TooManyPhotosException(message: String = "사진은 최대 5장입니다.") :
     CommunityUserException("TOO_MANY_PHOTOS", message)
 

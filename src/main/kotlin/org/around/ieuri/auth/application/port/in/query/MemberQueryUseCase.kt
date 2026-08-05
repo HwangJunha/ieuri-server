@@ -29,4 +29,7 @@ interface MemberQueryUseCase {
      * 부재는 예외가 아니라 null이다.
      */
     fun memberPublicProfile(memberId: Long): MemberPublicProfileView?
+
+    /** 여러 회원의 표시용 정보를 **한 번에**. 목록을 그리는 호출자용이다. */
+    fun memberPublicProfiles(memberIds: List<Long>): Map<Long, MemberPublicProfileView>
 }

@@ -20,7 +20,6 @@ import org.around.ieuri.community.domain.aggregate.Post
 import org.around.ieuri.community.domain.aggregate.Report
 import org.around.ieuri.community.domain.vo.PostTarget
 import org.around.ieuri.community.domain.vo.PostTargetType
-import org.around.ieuri.community.domain.vo.PostTopic
 import org.around.ieuri.community.domain.vo.ReportReason
 import org.around.ieuri.community.domain.vo.ReportTargetType
 import java.time.Instant
@@ -50,7 +49,7 @@ class ReportCommandServiceTest {
         id = id,
         target = PostTarget(PostTargetType.SPOT, 1L),
         authorId = 42L,
-        topic = PostTopic.QUESTION,
+        tags = emptyList(),
         title = "제목",
         body = "본문",
         photoKeys = emptyList(),

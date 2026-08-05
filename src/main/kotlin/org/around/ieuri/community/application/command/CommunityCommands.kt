@@ -1,7 +1,7 @@
 package org.around.ieuri.community.application.command
 
 import org.around.ieuri.community.domain.vo.PostTarget
-import org.around.ieuri.community.domain.vo.PostTopic
+import org.around.ieuri.community.domain.vo.PostTag
 import org.around.ieuri.community.domain.vo.ReportReason
 import org.around.ieuri.community.domain.vo.ReportTargetType
 
@@ -13,7 +13,8 @@ import org.around.ieuri.community.domain.vo.ReportTargetType
 data class CreatePostCommand(
     /** 글이 붙는 대상. 종류와 id가 함께여야 대상 하나를 가리킨다. */
     val target: PostTarget,
-    val topic: PostTopic,
+    /** 사용자가 입력한 태그. 최대 5개이며 중복은 하나로 합쳐진다. */
+    val tags: List<String>,
     val title: String,
     val body: String,
     /** 확인 단계를 통과한 오브젝트 키. 배열 순서가 표시 순서다. */

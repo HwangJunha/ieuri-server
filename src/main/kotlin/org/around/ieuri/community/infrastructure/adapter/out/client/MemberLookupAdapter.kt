@@ -3,6 +3,7 @@ package org.around.ieuri.community.infrastructure.adapter.out.client
 import org.around.ieuri.auth.application.port.`in`.query.MemberQueryUseCase
 import org.around.ieuri.community.application.port.out.client.MemberLookupPort
 import org.around.ieuri.community.application.query.PostAuthorView
+import org.around.ieuri.community.infrastructure.adapter.out.client.mapper.toPostAuthorView
 import org.springframework.stereotype.Component
 
 /**
@@ -17,11 +18,10 @@ class MemberLookupAdapter(
 ) : MemberLookupPort {
 
     override fun findAuthor(memberId: Long): PostAuthorView? =
-        memberQueryUseCase.memberPublicProfile(memberId)?.let {
-            PostAuthorView(
-                id = it.memberId,
-                nickname = it.nickname,
-                profileImageUrl = it.profileImageUrl,
-            )
-        }
+        memberQueryUseCase.memberPublicProfile(memberId)?.toPostAuthorView()
+
+    /** 한 번의 조회로 여러 작성자를 가져온다 — 카드마다 묻지 않는다. */
+    override fun findAuthors(memberIds: List<Long>): Map<Long, PostAuthorView> =
+        memberQueryUseCase.memberPublicProfiles(memberIds.distinct())
+            .mapValues { (_, profile) -> profile.toPostAuthorView() }
 }

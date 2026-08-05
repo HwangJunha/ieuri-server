@@ -4,6 +4,7 @@ import com.querydsl.core.types.dsl.BooleanExpression
 import com.querydsl.core.types.dsl.BooleanPath
 import com.querydsl.core.types.dsl.DateTimePath
 import com.querydsl.core.types.dsl.NumberPath
+import com.querydsl.jpa.JPAExpressions
 import com.querydsl.jpa.impl.JPAQueryFactory
 import org.around.ieuri.common.pagination.CursorEdge
 import org.around.ieuri.common.pagination.CursorPage
@@ -31,6 +32,7 @@ import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostLikeEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostPhotoEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostTagEntity
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
@@ -57,6 +59,7 @@ class CommunityQueryAdapter(
     private val photo = QPostPhotoEntity.postPhotoEntity
     private val like = QPostLikeEntity.postLikeEntity
     private val chip = QCommunityChipEntity.communityChipEntity
+    private val tag = QPostTagEntity.postTagEntity
     private val block = QBlockEntity.blockEntity
 
     /**
@@ -76,8 +79,13 @@ class CommunityQueryAdapter(
         if (targets != null) {
             conditions += targetCondition(targets)
         }
-        if (search.topic != null) {
-            conditions += post.topic.eq(search.topic)
+        if (search.normalizedTag != null) {
+            // 태그가 붙은 글만. 서브쿼리로 걸어 조인이 행을 늘리지 않게 한다.
+            conditions += post.id.`in`(
+                JPAExpressions.select(tag.post.id)
+                    .from(tag)
+                    .where(tag.normalized.eq(search.normalizedTag)),
+            )
         }
 
         return findPosts(
@@ -349,7 +357,7 @@ class CommunityQueryAdapter(
             id = postId,
             title = title,
             body = body,
-            topic = topic,
+            tags = tags.map { it.name },
             // 대상의 제목·썸네일은 상대 도메인 소유라 리졸버가 필드 단위로 채운다.
             // 제목·썸네일·카테고리는 상대 도메인 소유라 리졸버가 필드 단위로 채운다.
             target = PostTargetView(

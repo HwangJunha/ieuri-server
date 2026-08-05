@@ -33,4 +33,7 @@ class MemberQueryService(
     /** 부재는 예외가 아니라 null이다 — 호출자가 존재 확인 용도로도 쓴다. */
     override fun memberPublicProfile(memberId: Long): MemberPublicProfileView? =
         memberQueryPort.findPublicProfile(memberId)
+
+    override fun memberPublicProfiles(memberIds: List<Long>): Map<Long, MemberPublicProfileView> =
+        memberQueryPort.findPublicProfilesIn(memberIds)
 }

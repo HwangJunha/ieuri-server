@@ -17,7 +17,6 @@ import org.around.ieuri.community.domain.aggregate.Comment
 import org.around.ieuri.community.domain.aggregate.Post
 import org.around.ieuri.community.domain.vo.PostTarget
 import org.around.ieuri.community.domain.vo.PostTargetType
-import org.around.ieuri.community.domain.vo.PostTopic
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -43,7 +42,7 @@ class CommentCommandServiceTest {
     private val service = CommentCommandService(commentRepository, postRepository, clock)
 
     private fun post(commentCount: Int) = Post.restore(
-        id = postId, target = PostTarget(PostTargetType.SPOT, 1L), authorId = 99L, topic = PostTopic.QUESTION,
+        id = postId, target = PostTarget(PostTargetType.SPOT, 1L), authorId = 99L, tags = emptyList(),
         title = "제목", body = "본문", photoKeys = emptyList(), likeCount = 0, commentCount = commentCount,
         hidden = false, deletedAt = null, createdAt = now,
     )

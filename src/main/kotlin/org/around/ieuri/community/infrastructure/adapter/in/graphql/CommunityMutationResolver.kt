@@ -46,7 +46,6 @@ import org.around.ieuri.community.application.port.`in`.command.PostLikeCommandU
 import org.around.ieuri.community.application.port.`in`.command.ReportCommandUseCase
 import org.around.ieuri.community.domain.vo.PostTarget
 import org.around.ieuri.community.domain.vo.PostTargetType
-import org.around.ieuri.community.domain.vo.PostTopic
 import org.around.ieuri.community.domain.vo.ReportReason
 import org.around.ieuri.community.domain.vo.ReportTargetType
 import org.springframework.stereotype.Component
@@ -80,7 +79,7 @@ class CommunityMutationResolver(
                     type = PostTargetType.valueOf(input.targetType.name),
                     id = input.targetId,
                 ),
-                topic = PostTopic.valueOf(input.topic.name),
+                tags = input.tags,
                 title = input.title,
                 body = input.body,
                 photoKeys = input.photoKeys,

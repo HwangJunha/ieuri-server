@@ -36,15 +36,13 @@ class SpotLookupAdapter(
         limit = limit,
     )
 
-    /** 존재하지 않는 spot은 결과에서 빠진다 — 호출자는 그것을 필터에서 제외한다. */
-    override fun findSummaries(spotIds: List<Long>): Map<Long, PostTargetView> {
-        val summaries = mutableMapOf<Long, PostTargetView>()
-        for (spotId in spotIds.distinct()) {
-            val summary = findSummary(spotId)
-            if (summary != null) {
-                summaries[spotId] = summary
-            }
-        }
-        return summaries
-    }
+    /**
+     * 여러 spot을 **한 번의 조회로** 가져온다. 존재하지 않는 spot은 결과에서 빠진다.
+     *
+     * 행마다 findSummary를 부르지 않는다 — 지역 피드는 대상이 수천 건일 수 있어
+     * 그렇게 하면 쿼리가 그 수만큼 나간다.
+     */
+    override fun findSummaries(spotIds: List<Long>): Map<Long, PostTargetView> =
+        spotQueryUseCase.spotSummaries(spotIds.distinct())
+            .mapValues { (_, summary) -> summary.toPostTargetView() }
 }

@@ -110,6 +110,29 @@ class MemberQueryAdapter(
                 )
             }
 
+    /**
+     * 여러 회원을 한 번에. 목록을 그리는 호출자가 행마다 묻지 않게 한다 —
+     * 피드 카드 20장이면 조회가 20번이 된다.
+     */
+    override fun findPublicProfilesIn(memberIds: List<Long>): Map<Long, MemberPublicProfileView> {
+        if (memberIds.isEmpty()) return emptyMap()
+
+        return queryFactory
+            .select(member.id, profile.nickname, profile.profileImageUrl)
+            .from(member)
+            .leftJoin(profile).on(profile.memberId.eq(member.id))
+            .where(member.id.`in`(memberIds))
+            .fetch()
+            .associate { row ->
+                val id = requireNotNull(row.get(member.id))
+                id to MemberPublicProfileView(
+                    memberId = id,
+                    nickname = row.get(profile.nickname) ?: DEFAULT_NICKNAME,
+                    profileImageUrl = row.get(profile.profileImageUrl),
+                )
+            }
+    }
+
     override fun findMembers(query: MembersQuery): CursorPage<MemberSummaryView> {
         val first = query.first.coerceIn(1, MAX_PAGE_SIZE)
         // 커서 = 회원 id(문자열). id는 이미 공개 값이라 별도 인코딩 없이 그대로 쓴다.

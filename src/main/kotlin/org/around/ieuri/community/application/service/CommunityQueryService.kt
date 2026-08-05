@@ -19,6 +19,7 @@ import org.around.ieuri.community.application.query.PostView
 import org.around.ieuri.community.application.query.PostsQuery
 import org.around.ieuri.community.domain.vo.AppKey
 import org.around.ieuri.community.domain.vo.ContentLanguage
+import org.around.ieuri.community.domain.vo.PostTag
 import org.around.ieuri.community.domain.vo.PostTarget
 import org.around.ieuri.community.domain.vo.PostTargetType
 import org.around.ieuri.community.domain.vo.TargetCategory
@@ -50,7 +51,8 @@ class CommunityQueryService(
         communityQueryPort.findPosts(
             PostsSearch(
                 targets = resolveTargets(query),
-                topic = query.topic,
+                // 태그는 정규화해 넘긴다 — 대소문자·선행 #을 가리지 않게 하려는 것이다.
+                normalizedTag = query.tag?.let { PostTag.parseOrNull(it)?.normalized },
                 first = clampPageSize(query.first),
                 after = query.after,
                 viewer = viewerContext(memberId),

@@ -6,12 +6,14 @@ import org.around.ieuri.community.domain.aggregate.Post
 import org.around.ieuri.community.domain.aggregate.PostLike
 import org.around.ieuri.community.domain.aggregate.Report
 import org.around.ieuri.community.domain.vo.PhotoObjectKey
+import org.around.ieuri.community.domain.vo.PostTag
 import org.around.ieuri.community.domain.vo.PostTarget
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.BlockEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.CommentEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostLikeEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostPhotoEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostTagEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.ReportEntity
 
 /**
@@ -28,7 +30,7 @@ fun PostEntity.toDomain(): Post = Post.restore(
     id = requireNotNull(id) { "적재된 글에는 id가 있어야 한다." },
     target = PostTarget(type = targetType, id = targetId),
     authorId = authorId,
-    topic = topic,
+    tags = tags.map { PostTag.restore(it.name, it.normalized) },
     title = title,
     body = body,
     photoKeys = photos.sortedBy { it.position }.map {
@@ -55,7 +57,6 @@ fun Post.toNewEntity(): PostEntity {
         targetType = target.type,
         targetId = target.id,
         authorId = authorId,
-        topic = topic,
         title = title,
         body = body,
         likeCount = likeCount,
@@ -66,6 +67,9 @@ fun Post.toNewEntity(): PostEntity {
     )
     entity.photos = photoKeys.mapIndexed { index, key ->
         PostPhotoEntity(post = entity, objectKey = key.value, position = index.toShort())
+    }.toMutableList()
+    entity.tags = tags.map {
+        PostTagEntity(post = entity, name = it.name, normalized = it.normalized)
     }.toMutableList()
     return entity
 }

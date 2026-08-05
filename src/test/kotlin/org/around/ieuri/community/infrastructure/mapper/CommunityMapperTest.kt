@@ -8,7 +8,6 @@ import org.around.ieuri.community.domain.aggregate.Report
 import org.around.ieuri.community.domain.vo.PhotoObjectKey
 import org.around.ieuri.community.domain.vo.PostTarget
 import org.around.ieuri.community.domain.vo.PostTargetType
-import org.around.ieuri.community.domain.vo.PostTopic
 import org.around.ieuri.community.domain.vo.ReportReason
 import org.around.ieuri.community.domain.vo.ReportTargetType
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.BlockEntity
@@ -41,7 +40,6 @@ class CommunityMapperTest {
             targetType = PostTargetType.SPOT,
             targetId = 2L,
             authorId = 3L,
-            topic = PostTopic.REVIEW,
             title = "제목",
             body = "본문",
             likeCount = 4,
@@ -61,7 +59,6 @@ class CommunityMapperTest {
         assertEquals(1L, domain.id)
         assertEquals(PostTarget(PostTargetType.SPOT, 2L), domain.target)
         assertEquals(3L, domain.authorId)
-        assertEquals(PostTopic.REVIEW, domain.topic)
         assertEquals("본문", domain.body)
         assertEquals(4, domain.likeCount)
         assertEquals(5, domain.commentCount)
@@ -75,7 +72,7 @@ class CommunityMapperTest {
     fun `글 사진은 position 순서대로 옮겨진다`() {
         val entity = PostEntity(
             id = 1L, targetType = PostTargetType.SPOT, targetId = 2L, authorId = 3L,
-            topic = PostTopic.PHOTO, title = "제목", body = "본문",
+            title = "제목", body = "본문",
             createdAt = createdAt, updatedAt = createdAt,
         )
         val first = UUID.randomUUID()
@@ -96,7 +93,7 @@ class CommunityMapperTest {
     fun `nullable 필드가 모두 null인 글도 옮겨진다`() {
         val entity = PostEntity(
             id = 1L, targetType = PostTargetType.SPOT, targetId = 2L, authorId = 3L,
-            topic = PostTopic.TIP, title = "제목", body = "본문",
+            title = "제목", body = "본문",
             deletedAt = null, createdAt = createdAt, updatedAt = createdAt,
         )
 
@@ -111,7 +108,7 @@ class CommunityMapperTest {
         val keyA = PhotoObjectKey.issue(3L, UUID.randomUUID()).toConfirmed()
         val keyB = PhotoObjectKey.issue(3L, UUID.randomUUID()).toConfirmed()
         val domain = Post.create(
-            target = PostTarget(PostTargetType.SPOT, 2L), authorId = 3L, topic = PostTopic.COMPANION,
+            target = PostTarget(PostTargetType.SPOT, 2L), authorId = 3L, tags = emptyList(),
             title = "제목", body = "본문", photoKeys = listOf(keyA, keyB),
         )
 
@@ -121,7 +118,6 @@ class CommunityMapperTest {
         assertEquals(PostTargetType.SPOT, entity.targetType)
         assertEquals(2L, entity.targetId)
         assertEquals(3L, entity.authorId)
-        assertEquals(PostTopic.COMPANION, entity.topic)
         assertEquals("본문", entity.body)
         assertEquals(0, entity.likeCount)
         assertEquals(0, entity.commentCount)

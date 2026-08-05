@@ -18,7 +18,6 @@ import jakarta.persistence.Table
 import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.around.ieuri.community.domain.vo.PostTargetType
 import org.around.ieuri.community.domain.vo.TargetCategory
-import org.around.ieuri.community.domain.vo.PostTopic
 import org.around.ieuri.community.domain.vo.ReportReason
 import org.around.ieuri.community.domain.vo.ReportTargetType
 import java.time.Instant
@@ -47,10 +46,6 @@ class PostEntity(
 
     @Column(name = "author_id", nullable = false)
     var authorId: Long,
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "topic", nullable = false, length = 20)
-    var topic: PostTopic,
 
     /** 길이 판정은 도메인이 소유한다 — 컬럼은 넉넉히 잡는다(이모지의 코드포인트 수 문제). */
     @Column(name = "title", nullable = false, length = 100)
@@ -88,6 +83,15 @@ class PostEntity(
     )
     @OrderBy("position ASC")
     var photos: MutableList<PostPhotoEntity> = mutableListOf(),
+
+    /** 사용자가 입력한 태그. 글과 함께 적재·삭제된다. */
+    @OneToMany(
+        mappedBy = "post",
+        cascade = [CascadeType.ALL],
+        orphanRemoval = true,
+        fetch = FetchType.LAZY,
+    )
+    var tags: MutableList<PostTagEntity> = mutableListOf(),
 
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant? = null,
@@ -300,5 +304,34 @@ class CommunityChipEntity(
     @PreUpdate
     fun onUpdate() {
         updatedAt = Instant.now()
+    }
+}
+
+/**
+ * 글 태그. 표시는 [name](유저 입력 원문), 매칭은 [normalized](소문자)로 한다.
+ */
+@Entity
+@Table(name = "community_post_tag")
+class PostTagEntity(
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    var id: Long? = null,
+
+    @jakarta.persistence.ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "post_id", nullable = false)
+    var post: PostEntity,
+
+    @Column(name = "name", nullable = false, length = 30)
+    var name: String,
+
+    @Column(name = "normalized", nullable = false, length = 30)
+    var normalized: String,
+
+    @Column(name = "created_at", nullable = false)
+    var createdAt: Instant? = null,
+) {
+    @PrePersist
+    fun onCreate() {
+        if (createdAt == null) createdAt = Instant.now()
     }
 }

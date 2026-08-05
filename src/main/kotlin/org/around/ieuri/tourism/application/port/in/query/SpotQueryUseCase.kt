@@ -59,6 +59,9 @@ interface SpotQueryUseCase {
      */
     fun spotSummary(spotId: Long): SpotSummaryView?
 
+    /** 여러 spot 요약을 **한 번에**. 목록을 그리는 호출자가 행마다 묻지 않게 한다. */
+    fun spotSummaries(spotIds: List<Long>): Map<Long, SpotSummaryView>
+
     /**
      * 좌표 반경 안에 있는 spot의 id. 다른 도메인이 "이 반경의 spot들"을 조건으로 쓸 때의 진입점이며,
      * `spot` 테이블을 아는 코드가 tourism 안에 머물게 한다.

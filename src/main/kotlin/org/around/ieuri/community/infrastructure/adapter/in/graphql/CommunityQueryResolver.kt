@@ -9,17 +9,16 @@ import java.util.concurrent.CompletableFuture
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.community.application.port.`in`.query.CommunityQueryUseCase
 import org.around.ieuri.community.application.port.out.client.MemberLookupPort
-import org.around.ieuri.community.application.port.out.client.SpotLookupPort
 import org.around.ieuri.community.application.query.BlockedUsersQuery
 import org.around.ieuri.common.pagination.CursorPageInfo
 import org.around.ieuri.community.application.query.CommentView
 import org.around.ieuri.community.application.query.PostAuthorView
+import org.around.ieuri.community.application.query.PostTargetView
 import org.around.ieuri.community.application.query.PostCommentsQuery
 import org.around.ieuri.community.application.query.PostView
 import org.around.ieuri.community.application.query.PostsQuery
 import org.around.ieuri.community.domain.vo.PostTarget
 import org.around.ieuri.community.domain.vo.PostTargetType
-import org.around.ieuri.community.domain.vo.PostTopic
 import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.infrastructure.app.AppKeyContext
 import org.around.ieuri.community.infrastructure.locale.CommunityLocaleContext
@@ -31,7 +30,6 @@ import org.around.ieuri.common.graphql.generated.types.PageInfo as GqlPageInfo
 import org.around.ieuri.common.graphql.generated.types.PostAuthor as GqlPostAuthor
 import org.around.ieuri.common.graphql.generated.types.PostTarget as GqlPostTarget
 import org.around.ieuri.common.graphql.generated.types.PostTargetType as GqlPostTargetType
-import org.around.ieuri.common.graphql.generated.types.PostTopic as GqlPostTopic
 import org.around.ieuri.common.graphql.generated.types.TargetCategory as GqlTargetCategory
 
 /**
@@ -49,7 +47,6 @@ import org.around.ieuri.common.graphql.generated.types.TargetCategory as GqlTarg
 @Component
 class CommunityQueryResolver(
     private val communityQueryUseCase: CommunityQueryUseCase,
-    private val spotLookupPort: SpotLookupPort,
     private val memberLookupPort: MemberLookupPort,
     private val currentMemberProvider: CurrentMemberProvider,
     private val appKeyContext: AppKeyContext,
@@ -67,7 +64,7 @@ class CommunityQueryResolver(
         @InputArgument longitude: Double?,
         @InputArgument radiusMeters: Int?,
         @InputArgument category: GqlTargetCategory?,
-        @InputArgument topic: GqlPostTopic?,
+        @InputArgument tag: String?,
         @InputArgument first: Int?,
         @InputArgument after: String?,
     ): PostConnection {
@@ -86,7 +83,7 @@ class CommunityQueryResolver(
                 longitude = longitude,
                 radiusMeters = radiusMeters ?: DEFAULT_RADIUS_METERS,
                 category = category?.let { TargetCategory.valueOf(it.name) },
-                topic = topic?.let { PostTopic.valueOf(it.name) },
+                tag = tag,
                 first = first ?: DEFAULT_PAGE_SIZE,
                 after = after,
             ),
@@ -134,13 +131,14 @@ class CommunityQueryResolver(
             BlockedUsersQuery(first = first ?: DEFAULT_PAGE_SIZE, after = after),
             memberId = memberId,
         )
+        // 목록 자체가 회원 정보를 보여주기 위한 것이라 지연시키지 않는다. 대신 **한 번에** 읽는다.
+        val authors = memberLookupPort.findAuthors(page.edges.map { it.node.member.id })
         return GqlBlockedUserConnection(
             edges = page.edges.map {
+                val memberId = it.node.member.id
                 GqlBlockedUserEdge(
                     cursor = it.cursor,
-                    // 차단 목록의 노드는 회원 표시 정보라 여기서 채운다 — 목록 자체가
-                    // 그 정보를 보여주기 위한 것이므로 지연시킬 이유가 없다.
-                    node = memberLookupPort.findAuthor(it.node.member.id).toGqlOrPlaceholder(it.node.member.id),
+                    node = authors[memberId].toGqlOrPlaceholder(memberId),
                     blockedAt = it.node.blockedAt.toString(),
                 )
             },
@@ -163,30 +161,32 @@ class CommunityQueryResolver(
 
     /** 대상 칩. 상대 도메인을 물어야 하므로 **요청된 경우에만** 조회한다. */
     @DgsData(parentType = "Post", field = "target")
-    fun postTarget(dfe: DgsDataFetchingEnvironment): GqlPostTarget? {
-        val source = dfe.postSource()
-        val summary = spotLookupPort.findSummary(source.target.id) ?: return null
-        return GqlPostTarget(
-            type = GqlPostTargetType.valueOf(summary.type.name),
-            id = summary.id,
-            title = summary.title,
-            thumbnailImageUrl = summary.thumbnailImageUrl,
-            category = summary.category?.let { GqlTargetCategory.valueOf(it.name) },
-        )
+    fun postTarget(dfe: DgsDataFetchingEnvironment): CompletableFuture<GqlPostTarget?> {
+        val loader = dfe.getDataLoader<Long, PostTargetView>(PostTargetDataLoader.NAME)
+            ?: error("DataLoader '${PostTargetDataLoader.NAME}'가 등록되지 않았다.")
+        return loader.load(dfe.postSource().target.id).thenApply { it?.toGql() }
     }
 
     /** 작성자. auth를 물어야 하므로 요청된 경우에만 조회한다. */
     @DgsData(parentType = "Post", field = "author")
-    fun postAuthor(dfe: DgsDataFetchingEnvironment): GqlPostAuthor {
-        val source = dfe.postSource()
-        return memberLookupPort.findAuthor(source.author.id).toGqlOrPlaceholder(source.author.id)
-    }
+    fun postAuthor(dfe: DgsDataFetchingEnvironment): CompletableFuture<GqlPostAuthor> =
+        dfe.loadAuthor(dfe.postSource().author.id)
 
     @DgsData(parentType = "Comment", field = "author")
-    fun commentAuthor(dfe: DgsDataFetchingEnvironment): GqlPostAuthor {
+    fun commentAuthor(dfe: DgsDataFetchingEnvironment): CompletableFuture<GqlPostAuthor> {
         val source = dfe.getSource<CommentView>()
             ?: error("Comment 필드 리졸버는 부모가 반환한 CommentView를 소스로 받아야 한다.")
-        return memberLookupPort.findAuthor(source.author.id).toGqlOrPlaceholder(source.author.id)
+        return dfe.loadAuthor(source.author.id)
+    }
+
+    /**
+     * 작성자를 배치로 읽는다. 글과 댓글이 같은 로더를 쓰므로 같은 사람이면 조회가 합쳐진다.
+     * 회원 정보가 없어도 글은 남으므로(탈퇴해도 글은 보존한다) 대체 표기로 채운다.
+     */
+    private fun DgsDataFetchingEnvironment.loadAuthor(memberId: Long): CompletableFuture<GqlPostAuthor> {
+        val loader = getDataLoader<Long, PostAuthorView>(PostAuthorDataLoader.NAME)
+            ?: error("DataLoader '${PostAuthorDataLoader.NAME}'가 등록되지 않았다.")
+        return loader.load(memberId).thenApply { it.toGqlOrPlaceholder(memberId) }
     }
 
     /**
@@ -215,6 +215,14 @@ class CommunityQueryResolver(
      * 회원 정보가 없어도 글은 남는다(탈퇴해도 글·댓글은 보존한다). 작성자 표시가 비면
      * 클라이언트가 렌더에 실패하므로 대체 표기를 내려준다.
      */
+    private fun PostTargetView.toGql() = GqlPostTarget(
+        type = GqlPostTargetType.valueOf(type.name),
+        id = id,
+        title = title,
+        thumbnailImageUrl = thumbnailImageUrl,
+        category = category?.let { GqlTargetCategory.valueOf(it.name) },
+    )
+
     private fun PostAuthorView?.toGqlOrPlaceholder(
         memberId: Long,
     ): GqlPostAuthor = GqlPostAuthor(

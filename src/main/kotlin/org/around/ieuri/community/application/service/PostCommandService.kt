@@ -7,6 +7,7 @@ import org.around.ieuri.community.application.exception.HiddenPostNotEditableExc
 import org.around.ieuri.community.application.exception.NotPostOwnerException
 import org.around.ieuri.community.application.exception.PhotoNotUploadedException
 import org.around.ieuri.community.application.exception.PostBodyLengthInvalidException
+import org.around.ieuri.community.application.exception.InvalidTagException
 import org.around.ieuri.community.application.exception.PostBodyRequiredException
 import org.around.ieuri.community.application.exception.PostNotFoundException
 import org.around.ieuri.community.application.exception.PostTitleLengthInvalidException
@@ -20,6 +21,7 @@ import org.around.ieuri.community.application.port.out.client.SpotLookupPort
 import org.around.ieuri.community.application.port.out.persistence.PostRepositoryPort
 import org.around.ieuri.community.domain.aggregate.Post
 import org.around.ieuri.community.domain.vo.PhotoObjectKey
+import org.around.ieuri.community.domain.vo.PostTag
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -57,6 +59,12 @@ class PostCommandService(
         // 반환값은 쓰지 않는다 — 부재가 곧 대상 유효성 판정이다.
         if (spotLookupPort.findSummary(command.target.id) == null) throw SpotNotFoundException()
 
+        // 형식이 어긋난 태그는 조용히 버리지 않고 거부한다 — 유저가 입력한 것이 사라지면
+        // 왜 안 붙었는지 알 수 없다.
+        val tags = command.tags.map { raw ->
+            PostTag.parseOrNull(raw) ?: throw InvalidTagException()
+        }
+
         val photoKeys = command.photoKeys.map { raw ->
             val key = PhotoObjectKey.parse(raw) ?: throw PhotoNotUploadedException()
             // 소유권과 확인 여부는 저장소를 묻지 않고 판정한다.
@@ -71,7 +79,7 @@ class PostCommandService(
         val post = Post.create(
             target = command.target,
             authorId = memberId,
-            topic = command.topic,
+            tags = tags,
             title = title,
             body = body,
             photoKeys = photoKeys,

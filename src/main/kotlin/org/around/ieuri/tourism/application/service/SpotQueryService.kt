@@ -252,6 +252,16 @@ class SpotQueryService(
      * `spot` 한 행만 읽는다 — 캐시도 upstream도 타지 않는다. 부재는 예외가 아니라 null이며,
      * 호출자가 그것을 "유효하지 않은 spotId"로 해석한다.
      */
+    override fun spotSummaries(spotIds: List<Long>): Map<Long, SpotSummaryView> =
+        spotQueryPort.findSpotBasicsIn(spotIds).mapValues { (spotId, basics) ->
+            SpotSummaryView(
+                id = spotId,
+                title = basics.title,
+                thumbnailImageUrl = basics.thumbnailImageUrl,
+                categoryCode = basics.category.name,
+            )
+        }
+
     override fun spotIdsWithin(
         longitude: Double,
         latitude: Double,

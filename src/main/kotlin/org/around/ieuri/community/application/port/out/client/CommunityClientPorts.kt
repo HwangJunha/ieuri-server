@@ -62,6 +62,12 @@ interface SpotLookupPort {
 interface MemberLookupPort {
     /** 글·댓글에 실을 최소 작성자 정보. 존재하지 않으면 null이며 그것이 존재 확인이다. */
     fun findAuthor(memberId: Long): PostAuthorView?
+
+    /**
+     * 여러 작성자를 **한 번에**. 피드 카드마다 물으면 20장에 조회가 20번 붙는다(N+1).
+     * 탈퇴 등으로 없는 회원은 결과에 키가 없다.
+     */
+    fun findAuthors(memberIds: List<Long>): Map<Long, PostAuthorView>
 }
 
 /**

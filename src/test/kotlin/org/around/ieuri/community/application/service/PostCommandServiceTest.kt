@@ -24,7 +24,6 @@ import org.around.ieuri.community.application.query.PostTargetView
 import org.around.ieuri.community.domain.aggregate.Post
 import org.around.ieuri.community.domain.vo.PostTarget
 import org.around.ieuri.community.domain.vo.PostTargetType
-import org.around.ieuri.community.domain.vo.PostTopic
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.Test
@@ -66,7 +65,7 @@ class PostCommandServiceTest {
                 id = 1L,
                 target = p.target,
                 authorId = p.authorId,
-                topic = p.topic,
+                tags = p.tags,
                 title = p.title,
                 body = p.body,
                 photoKeys = p.photoKeys,
@@ -86,7 +85,7 @@ class PostCommandServiceTest {
     ) =
         service.createPost(
             CreatePostCommand(
-                target = target, topic = PostTopic.QUESTION,
+                target = target, tags = emptyList(),
                 title = title, body = body, photoKeys = photoKeys,
             ),
             memberId,
@@ -204,7 +203,7 @@ class PostCommandServiceTest {
     @Test
     fun `작성자는 자신의 글을 삭제할 수 있다`() {
         val post = Post.restore(
-            id = 1L, target = target, authorId = memberId, topic = PostTopic.QUESTION,
+            id = 1L, target = target, authorId = memberId, tags = emptyList(),
             title = "제목", body = "본문", photoKeys = emptyList(), likeCount = 0, commentCount = 0,
             hidden = false, deletedAt = null, createdAt = now,
         )
@@ -219,7 +218,7 @@ class PostCommandServiceTest {
     @Test
     fun `타인의 글 삭제는 NOT_POST_OWNER이고 글은 삭제되지 않는다`() {
         val post = Post.restore(
-            id = 1L, target = target, authorId = memberId, topic = PostTopic.QUESTION,
+            id = 1L, target = target, authorId = memberId, tags = emptyList(),
             title = "제목", body = "본문", photoKeys = emptyList(), likeCount = 0, commentCount = 0,
             hidden = false, deletedAt = null, createdAt = now,
         )
@@ -231,7 +230,7 @@ class PostCommandServiceTest {
     }
 
     private fun storedPost(hidden: Boolean = false, authorId: Long = memberId) = Post.restore(
-        id = 1L, target = target, authorId = authorId, topic = PostTopic.QUESTION,
+        id = 1L, target = target, authorId = authorId, tags = emptyList(),
         title = "원래 제목", body = "원래 본문", photoKeys = emptyList(),
         likeCount = 0, commentCount = 0, hidden = hidden, deletedAt = null, createdAt = now,
     )

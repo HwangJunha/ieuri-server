@@ -112,6 +112,30 @@ class SpotQueryAdapter(
      * keyset 페이징: (updated_at, spot_id) 내림차순이 정렬 키이자 커서다. `first + 1`을 읽어
      * hasNextPage를 판정한다.
      */
+    /**
+     * 여러 spot을 한 번에. 호출자가 목록을 들고 있을 때 행마다 묻지 않게 한다 —
+     * 피드 한 페이지에 20번, 지역 피드에서는 수천 번이 될 수 있다.
+     */
+    @Transactional(readOnly = true)
+    override fun findSpotBasicsIn(spotIds: List<Long>): Map<Long, SpotBasics> {
+        if (spotIds.isEmpty()) return emptyMap()
+
+        return queryFactory
+            .select(spot.id, spot.title, spot.address, spot.thumbnailImageUrl, spot.category, spot.copyright)
+            .from(spot)
+            .where(spot.id.`in`(spotIds))
+            .fetch()
+            .associate { row ->
+                requireNotNull(row.get(spot.id)) to SpotBasics(
+                    title = requireNotNull(row.get(spot.title)),
+                    address = row.get(spot.address),
+                    thumbnailImageUrl = requireNotNull(row.get(spot.thumbnailImageUrl)),
+                    category = requireNotNull(row.get(spot.category)),
+                    copyright = requireNotNull(row.get(spot.copyright)),
+                )
+            }
+    }
+
     override fun findLikedSpots(query: LikedSpotsSearch): CursorPage<LikedSpotView> {
         val cursor = query.after?.let { decodeCursor(it) }
 

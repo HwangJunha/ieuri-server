@@ -2,7 +2,7 @@ package org.around.ieuri.community.domain.aggregate
 
 import org.around.ieuri.community.domain.vo.PhotoObjectKey
 import org.around.ieuri.community.domain.vo.PostTarget
-import org.around.ieuri.community.domain.vo.PostTopic
+import org.around.ieuri.community.domain.vo.PostTag
 import java.time.Instant
 
 /**
@@ -19,7 +19,7 @@ class Post private constructor(
     val id: Long?,
     val target: PostTarget,
     val authorId: Long,
-    val topic: PostTopic,
+    val tags: List<PostTag>,
     title: String,
     body: String,
     photoKeys: List<PhotoObjectKey>,
@@ -144,7 +144,7 @@ class Post private constructor(
         fun create(
             target: PostTarget,
             authorId: Long,
-            topic: PostTopic,
+            tags: List<PostTag>,
             title: String,
             body: String,
             photoKeys: List<PhotoObjectKey>,
@@ -159,11 +159,14 @@ class Post private constructor(
             require(photoKeys.size <= MAX_PHOTOS) { "사진은 최대 ${MAX_PHOTOS}장입니다." }
             require(photoKeys.all { it.ownedBy(authorId) }) { "본인에게 발급된 사진 키가 아닙니다." }
             require(photoKeys.all { it.confirmed }) { "업로드 확인을 마치지 않은 사진 키입니다." }
+            require(tags.size <= PostTag.MAX_PER_POST) { "태그는 최대 ${PostTag.MAX_PER_POST}개입니다." }
+            // 같은 태그를 두 번 붙여도 하나로 본다 — 유저가 "서울"과 "#서울"을 함께 칠 수 있다.
+            val distinctTags = tags.distinctBy { it.normalized }
             return Post(
                 id = null,
                 target = target,
                 authorId = authorId,
-                topic = topic,
+                tags = distinctTags,
                 title = trimmedTitle,
                 body = trimmed,
                 photoKeys = photoKeys,
@@ -180,7 +183,7 @@ class Post private constructor(
             id: Long,
             target: PostTarget,
             authorId: Long,
-            topic: PostTopic,
+            tags: List<PostTag>,
             title: String,
             body: String,
             photoKeys: List<PhotoObjectKey>,
@@ -194,7 +197,7 @@ class Post private constructor(
             id = id,
             target = target,
             authorId = authorId,
-            topic = topic,
+            tags = tags,
             title = title,
             body = body,
             photoKeys = photoKeys,

@@ -3,7 +3,7 @@ package org.around.ieuri.community.application.query
 import org.around.ieuri.community.domain.vo.PostTarget
 import org.around.ieuri.community.domain.vo.PostTargetType
 import org.around.ieuri.community.domain.vo.TargetCategory
-import org.around.ieuri.community.domain.vo.PostTopic
+import org.around.ieuri.community.domain.vo.PostTag
 import java.time.Instant
 
 /**
@@ -43,7 +43,8 @@ data class PostView(
     val id: Long,
     val title: String,
     val body: String,
-    val topic: PostTopic,
+    /** 사용자가 입력한 태그. 표시는 원문 그대로다. */
+    val tags: List<String>,
     val target: PostTargetView,
     val author: PostAuthorView,
     val photoKeys: List<String>,
@@ -98,7 +99,8 @@ data class PostsQuery(
     val longitude: Double?,
     val radiusMeters: Int,
     val category: TargetCategory?,
-    val topic: PostTopic?,
+    /** 태그 필터. 정규화해 매칭하므로 대소문자를 가리지 않는다. */
+    val tag: String?,
     val first: Int,
     val after: String?,
 ) {

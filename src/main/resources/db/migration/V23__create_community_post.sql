@@ -23,7 +23,6 @@ CREATE TABLE community_post (
     -- 그 종류 안에서의 식별자. 종류가 다르면 같은 숫자라도 다른 대상이다.
     target_id     BIGINT       NOT NULL,
     author_id     BIGINT       NOT NULL,
-    topic         VARCHAR(20)  NOT NULL,
     -- 카드에서 볼드로 표시되는 제목. 길이 상한(50자)은 도메인이 소유하고 컬럼은 넉넉히 잡는다 —
     -- body와 같은 이유로 이모지의 코드포인트 수가 층마다 달라지는 것을 막는다.
     title         VARCHAR(100) NOT NULL,
@@ -46,8 +45,6 @@ CREATE TABLE community_post (
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),
     CONSTRAINT ck_community_post_target_type CHECK (target_type IN ('SPOT')),
-    CONSTRAINT ck_community_post_topic
-        CHECK (topic IN ('QUESTION', 'TIP', 'REVIEW', 'COMPANION', 'PHOTO')),
     -- 공백만 남은 제목·본문이 우회로 들어오지 않게 한다. 길이가 아니라 "비어 있지 않음"만 본다.
     CONSTRAINT ck_community_post_title_not_blank CHECK (btrim(title) <> ''),
     CONSTRAINT ck_community_post_body_not_blank CHECK (btrim(body) <> ''),
@@ -61,10 +58,6 @@ CREATE TABLE community_post (
 -- target_type이 선행이라 종류가 늘어도 서로의 조회를 방해하지 않는다.
 CREATE INDEX idx_community_post_target_feed
     ON community_post (target_type, target_id, created_at DESC, id DESC);
-
--- 주제 필터가 붙는 경로(R8). 지역 피드는 대상 id 목록을 IN으로 받으므로 위 인덱스를 탄다.
-CREATE INDEX idx_community_post_topic_feed
-    ON community_post (topic, created_at DESC, id DESC);
 
 -- 작성자 기준 조회(차단 필터의 반대편, 탈퇴 시 정리).
 CREATE INDEX idx_community_post_author ON community_post (author_id);

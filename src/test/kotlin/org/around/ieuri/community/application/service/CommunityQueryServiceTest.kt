@@ -83,7 +83,7 @@ class CommunityQueryServiceTest {
         longitude = longitude,
         radiusMeters = radiusMeters,
         category = category,
-        topic = null,
+        tag = null,
         first = first,
         after = null,
     )

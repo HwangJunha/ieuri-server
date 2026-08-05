@@ -42,6 +42,9 @@ interface SpotQueryPort {
      */
     fun findSpotBasics(spotId: Long): SpotBasics?
 
+    /** 여러 spot의 기본 정보를 **IN 절 한 번**으로. 없는 id는 결과에 키가 없다. */
+    fun findSpotBasicsIn(spotIds: List<Long>): Map<Long, SpotBasics>
+
     /** 회원이 좋아요(LIKE)한 spot 한 페이지. DISLIKE는 제외하고 요청 언어로 한정한다. */
     fun findLikedSpots(query: LikedSpotsSearch): CursorPage<LikedSpotView>
 

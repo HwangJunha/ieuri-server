@@ -16,7 +16,6 @@ import org.around.ieuri.community.application.query.PostAuthorView
 import org.around.ieuri.community.domain.aggregate.Post
 import org.around.ieuri.community.domain.vo.PostTarget
 import org.around.ieuri.community.domain.vo.PostTargetType
-import org.around.ieuri.community.domain.vo.PostTopic
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -33,7 +32,7 @@ class PostLikeCommandServiceTest {
     private val service = PostLikeCommandService(likeRepository, postRepository)
 
     private fun post(likeCount: Int) = Post.restore(
-        id = postId, target = PostTarget(PostTargetType.SPOT, 1L), authorId = 42L, topic = PostTopic.QUESTION,
+        id = postId, target = PostTarget(PostTargetType.SPOT, 1L), authorId = 42L, tags = emptyList(),
         title = "제목", body = "본문", photoKeys = emptyList(), likeCount = likeCount, commentCount = 0,
         hidden = false, deletedAt = null, createdAt = Instant.EPOCH,
     )

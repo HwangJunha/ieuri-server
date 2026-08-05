@@ -4,7 +4,6 @@ import org.around.ieuri.community.domain.aggregate.Post
 import org.around.ieuri.community.domain.vo.PhotoObjectKey
 import org.around.ieuri.community.domain.vo.PostTarget
 import org.around.ieuri.community.domain.vo.PostTargetType
-import org.around.ieuri.community.domain.vo.PostTopic
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.Test
@@ -29,7 +28,7 @@ class PostTest {
     ) = Post.create(
         target = target,
         authorId = authorId,
-        topic = PostTopic.QUESTION,
+        tags = emptyList(),
         title = title,
         body = body,
         photoKeys = photoKeys,
