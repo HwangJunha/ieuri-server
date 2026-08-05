@@ -214,8 +214,6 @@ type CreatePostPayload implements BaseResponse {
     userErrors: [UserError!]!
     "생성된 글의 id. 성공 시 채워진다. 글 내용은 이 id로 Query.post를 조회한다."
     postId: ID
-    "항상 null이다. spot·author가 요청 시에만 조회되는 지연 필드라 생성 응답에서 조립하지 않는다 — postId로 다시 조회할 것."
-    post: Post
 }
 
 input EditPostInput {
@@ -252,8 +250,6 @@ type CreateCommentPayload implements BaseResponse {
     userErrors: [UserError!]!
     "생성된 댓글의 id. 성공 시 채워진다."
     commentId: ID
-    "항상 null이다. 이유는 CreatePostPayload.post와 같다 — commentId와 comments(postId:)로 조회할 것."
-    comment: Comment
 }
 
 input DeleteCommentInput {
