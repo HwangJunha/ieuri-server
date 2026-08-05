@@ -32,12 +32,6 @@ interface BlockJpaRepository : JpaRepository<BlockEntity, Long> {
     fun existsByBlockerIdAndBlockedId(blockerId: Long, blockedId: Long): Boolean
 
     fun deleteByBlockerIdAndBlockedId(blockerId: Long, blockedId: Long): Long
-
-    /** 내가 차단한 상대들. 양방향 해석의 한쪽이다. */
-    fun findAllByBlockerId(blockerId: Long): List<BlockEntity>
-
-    /** 나를 차단한 사람들. 양방향 해석의 반대쪽이다. */
-    fun findAllByBlockedId(blockedId: Long): List<BlockEntity>
 }
 
 interface ReportJpaRepository : JpaRepository<ReportEntity, Long> {

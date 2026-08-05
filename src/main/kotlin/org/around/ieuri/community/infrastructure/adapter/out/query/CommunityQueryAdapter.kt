@@ -3,6 +3,7 @@ package org.around.ieuri.community.infrastructure.adapter.out.query
 import com.querydsl.core.types.dsl.BooleanExpression
 import com.querydsl.core.types.dsl.BooleanPath
 import com.querydsl.core.types.dsl.DateTimePath
+import com.querydsl.core.types.dsl.Expressions
 import com.querydsl.core.types.dsl.NumberPath
 import com.querydsl.jpa.JPAExpressions
 import com.querydsl.jpa.impl.JPAQueryFactory
@@ -119,12 +120,21 @@ class CommunityQueryAdapter(
      * 통째로 우회되므로, 조건을 따로 쓰지 않고 [visibleToViewer]를 그대로 쓴다.
      */
     @Transactional(readOnly = true)
-    override fun findPost(postId: Long, viewer: ViewerContext): PostView? =
-        queryFactory
+    override fun findPost(postId: Long, viewer: ViewerContext): PostView? {
+        val entity = queryFactory
             .selectFrom(post)
             .where(post.id.eq(postId), visibleToViewer(viewer))
-            .fetchOne()
-            ?.let { it.toPostView(viewer, likedPostIds(viewer, listOf(postId))) }
+            .fetchOne() ?: return null
+
+        // 단건이라도 지연 컬렉션을 읽지 않는다 — 피드와 같은 조회 경로를 쓴다.
+        val ids = listOf(postId)
+        return entity.toPostView(
+            viewer = viewer,
+            likedIds = likedPostIds(viewer, ids),
+            tags = tagNamesOf(ids)[postId].orEmpty(),
+            photoKeys = photoKeysOf(ids)[postId].orEmpty(),
+        )
+    }
 
     @Transactional(readOnly = true)
     override fun findComments(search: PostCommentsSearch): CursorPage<CommentView> {
@@ -236,6 +246,25 @@ class CommunityQueryAdapter(
         createdAt = requireNotNull(createdAt),
     )
 
+    /**
+     * 차단 관계를 **한 번의 쿼리로** 읽는다. 양방향이라 두 방향을 OR로 묶고, 내가 어느 쪽이냐에
+     * 따라 상대 id가 달라지므로 CASE로 고른다.
+     *
+     * 엔티티를 로드하지 않고 id만 프로젝션한다 — 필요한 것은 상대 id 하나뿐이다.
+     */
+    @Transactional(readOnly = true)
+    override fun findBlockedMemberIds(memberId: Long): Set<Long> =
+        queryFactory
+            .select(
+                Expressions.cases()
+                    .`when`(block.blockerId.eq(memberId)).then(block.blockedId)
+                    .otherwise(block.blockerId),
+            )
+            .from(block)
+            .where(block.blockerId.eq(memberId).or(block.blockedId.eq(memberId)))
+            .fetch()
+            .toSet()
+
     /** 앱의 켜진 칩만 순서대로. 구성이 없으면 빈 목록이다 — 오류가 아니다. */
     @Transactional(readOnly = true)
     override fun findChips(appKey: AppKey, language: ContentLanguage): List<CommunityChipView> =
@@ -278,13 +307,22 @@ class CommunityQueryAdapter(
         val hasNextPage = rows.size > first
         val pageRows = if (hasNextPage) rows.take(first) else rows
 
-        // 좋아요 여부는 한 번에 조회한다 — 행마다 물으면 페이지 하나에 쿼리가 20번 붙는다.
-        val likedIds = likedPostIds(viewer, pageRows.mapNotNull { it.id })
+        // 아래 셋은 전부 **한 번씩** 조회한다. 행마다 물으면 페이지 하나에 쿼리가 60번 붙는다.
+        val postIds = pageRows.mapNotNull { it.id }
+        val likedIds = likedPostIds(viewer, postIds)
+        val tagsByPost = tagNamesOf(postIds)
+        val photosByPost = photoKeysOf(postIds)
 
         val edges = pageRows.map { entity ->
+            val postId = requireNotNull(entity.id)
             CursorEdge(
-                cursor = encodeCursor(requireNotNull(entity.createdAt), requireNotNull(entity.id)),
-                node = entity.toPostView(viewer, likedIds),
+                cursor = encodeCursor(requireNotNull(entity.createdAt), postId),
+                node = entity.toPostView(
+                    viewer = viewer,
+                    likedIds = likedIds,
+                    tags = tagsByPost[postId].orEmpty(),
+                    photoKeys = photosByPost[postId].orEmpty(),
+                ),
             )
         }
         return cursorPageOf(edges, hasNextPage = hasNextPage, hasPreviousPage = cursor != null)
@@ -333,6 +371,47 @@ class CommunityQueryAdapter(
         createdAtPath.lt(cursor.createdAt)
             .or(createdAtPath.eq(cursor.createdAt).and(idPath.lt(cursor.id)))
 
+    /**
+     * 여러 글의 태그를 한 번에. 지연 컬렉션(PostEntity.tags)을 그대로 읽으면 글마다 쿼리가 나간다.
+     * 입력 순서와 무관하게 글별로 묶어 돌려주며, 태그가 없는 글은 키가 없다.
+     */
+    private fun tagNamesOf(postIds: List<Long>): Map<Long, List<String>> {
+        if (postIds.isEmpty()) return emptyMap()
+
+        val rows = queryFactory
+            .select(tag.post.id, tag.name)
+            .from(tag)
+            .where(tag.post.id.`in`(postIds))
+            .orderBy(tag.id.asc())
+            .fetch()
+
+        val grouped = mutableMapOf<Long, MutableList<String>>()
+        for (row in rows) {
+            val postId = requireNotNull(row.get(tag.post.id))
+            grouped.getOrPut(postId) { mutableListOf() } += requireNotNull(row.get(tag.name))
+        }
+        return grouped
+    }
+
+    /** 여러 글의 사진 키를 한 번에. position 순서가 표시 순서다. */
+    private fun photoKeysOf(postIds: List<Long>): Map<Long, List<String>> {
+        if (postIds.isEmpty()) return emptyMap()
+
+        val rows = queryFactory
+            .select(photo.post.id, photo.objectKey)
+            .from(photo)
+            .where(photo.post.id.`in`(postIds))
+            .orderBy(photo.position.asc())
+            .fetch()
+
+        val grouped = mutableMapOf<Long, MutableList<String>>()
+        for (row in rows) {
+            val postId = requireNotNull(row.get(photo.post.id))
+            grouped.getOrPut(postId) { mutableListOf() } += requireNotNull(row.get(photo.objectKey))
+        }
+        return grouped
+    }
+
     /** 호출자가 좋아요한 글 id. 행마다 묻지 않고 한 번에 읽는다. */
     private fun likedPostIds(viewer: ViewerContext, postIds: List<Long>): Set<Long> {
         if (postIds.isEmpty()) return emptySet()
@@ -351,13 +430,15 @@ class CommunityQueryAdapter(
     private fun PostEntity.toPostView(
         viewer: ViewerContext,
         likedIds: Set<Long>,
+        tags: List<String>,
+        photoKeys: List<String>,
     ): PostView {
         val postId = requireNotNull(id)
         return PostView(
             id = postId,
             title = title,
             body = body,
-            tags = tags.map { it.name },
+            tags = tags,
             // 대상의 제목·썸네일은 상대 도메인 소유라 리졸버가 필드 단위로 채운다.
             // 제목·썸네일·카테고리는 상대 도메인 소유라 리졸버가 필드 단위로 채운다.
             target = PostTargetView(
@@ -368,7 +449,7 @@ class CommunityQueryAdapter(
                 category = null,
             ),
             author = PostAuthorView(id = authorId, nickname = "", profileImageUrl = null),
-            photoKeys = photos.sortedBy { it.position }.map { it.objectKey },
+            photoKeys = photoKeys,
             likeCount = likeCount,
             commentCount = commentCount,
             likedByViewer = postId in likedIds,

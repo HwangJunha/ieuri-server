@@ -4,7 +4,6 @@ import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.community.application.policy.CommunityPolicy
 import org.around.ieuri.community.application.port.`in`.query.CommunityQueryUseCase
 import org.around.ieuri.community.application.port.out.client.SpotLookupPort
-import org.around.ieuri.community.application.port.out.persistence.BlockRepositoryPort
 import org.around.ieuri.community.application.port.out.query.BlockedUsersSearch
 import org.around.ieuri.community.application.port.out.query.CommunityQueryPort
 import org.around.ieuri.community.application.port.out.query.PostCommentsSearch
@@ -38,7 +37,6 @@ import org.springframework.stereotype.Service
 @Service
 class CommunityQueryService(
     private val communityQueryPort: CommunityQueryPort,
-    private val blockRepositoryPort: BlockRepositoryPort,
     private val spotLookupPort: SpotLookupPort,
     private val policy: CommunityPolicy,
 ) : CommunityQueryUseCase {
@@ -138,7 +136,7 @@ class CommunityQueryService(
     /** 호출자의 차단 관계를 **양방향으로** 읽어 담는다. */
     private fun viewerContext(memberId: Long): ViewerContext = ViewerContext(
         memberId = memberId,
-        blockedMemberIds = blockRepositoryPort.findRelatedMemberIds(memberId),
+        blockedMemberIds = communityQueryPort.findBlockedMemberIds(memberId),
     )
 
     private fun clampPageSize(first: Int): Int = first.coerceIn(1, policy.maxPageSize)

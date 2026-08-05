@@ -115,14 +115,6 @@ class BlockPersistenceAdapter(
 
     override fun delete(blockerId: Long, blockedId: Long): Boolean =
         repository.deleteByBlockerIdAndBlockedId(blockerId, blockedId) > 0
-
-    /**
-     * **양방향 해석.** 내가 차단한 사람과 나를 차단한 사람을 합집합으로 돌려준다 —
-     * 저장은 단방향 한 건이지만 필터는 양쪽 모두를 제외해야 한다.
-     */
-    override fun findRelatedMemberIds(memberId: Long): Set<Long> =
-        repository.findAllByBlockerId(memberId).map { it.blockedId }.toSet() +
-            repository.findAllByBlockedId(memberId).map { it.blockerId }.toSet()
 }
 
 @Component

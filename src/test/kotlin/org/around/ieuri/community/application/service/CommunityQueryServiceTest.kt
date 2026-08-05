@@ -9,7 +9,6 @@ import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.CursorPageInfo
 import org.around.ieuri.community.application.policy.CommunityPolicy
 import org.around.ieuri.community.application.port.out.client.SpotLookupPort
-import org.around.ieuri.community.application.port.out.persistence.BlockRepositoryPort
 import org.around.ieuri.community.application.port.out.query.BlockedUsersSearch
 import org.around.ieuri.community.application.port.out.query.CommunityQueryPort
 import org.around.ieuri.community.application.port.out.query.PostCommentsSearch
@@ -44,7 +43,6 @@ class CommunityQueryServiceTest {
     private val memberId = 7L
 
     private val queryPort = mockk<CommunityQueryPort>()
-    private val blockRepository = mockk<BlockRepositoryPort>()
     private val spotLookup = mockk<SpotLookupPort>()
 
     private val policy = CommunityPolicy(
@@ -57,7 +55,7 @@ class CommunityQueryServiceTest {
         allowedContentTypes = setOf("image/jpeg"),
     )
 
-    private val service = CommunityQueryService(queryPort, blockRepository, spotLookup, policy)
+    private val service = CommunityQueryService(queryPort, spotLookup, policy)
 
     private fun <T> emptyPage() = CursorPage<T>(
         edges = emptyList(),
@@ -66,7 +64,7 @@ class CommunityQueryServiceTest {
     )
 
     private fun givenBlocked(vararg ids: Long) {
-        every { blockRepository.findRelatedMemberIds(memberId) } returns ids.toSet()
+        every { queryPort.findBlockedMemberIds(memberId) } returns ids.toSet()
     }
 
     /** 대상·좌표를 주지 않은 전체 피드 조회. 개별 테스트가 필요한 인자만 덮어쓴다. */

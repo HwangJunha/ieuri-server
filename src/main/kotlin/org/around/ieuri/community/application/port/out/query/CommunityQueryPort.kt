@@ -36,6 +36,12 @@ interface CommunityQueryPort {
 
     fun findBlockedUsers(search: BlockedUsersSearch): CursorPage<BlockedUserView>
 
+    /**
+     * [memberId]와 차단 관계에 있는 상대의 id. **양방향을 한 번의 쿼리로** 읽는다 —
+     * 내가 차단한 쪽과 나를 차단한 쪽을 OR로 묶고 상대 id만 프로젝션한다.
+     */
+    fun findBlockedMemberIds(memberId: Long): Set<Long>
+
     /** 앱의 켜진 칩만 순서대로. 구성이 없으면 빈 목록이다. */
     fun findChips(appKey: AppKey, language: ContentLanguage): List<CommunityChipView>
 }

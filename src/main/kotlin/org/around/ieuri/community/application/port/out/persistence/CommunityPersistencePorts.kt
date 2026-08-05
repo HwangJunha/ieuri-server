@@ -34,19 +34,14 @@ interface PostLikeRepositoryPort {
 }
 
 /**
- * 차단 관계. [findRelatedMemberIds]가 양방향 해석의 핵심이다 — 네 조회 경로가 모두 이걸 쓴다.
+ * 차단 쓰기. **조회는 여기 없다** — 피드 필터가 쓰는 양방향 해석은 읽기 경로라
+ * CommunityQueryPort.findBlockedMemberIds가 담당한다(한 번의 쿼리로 읽는다).
  */
 interface BlockRepositoryPort {
     /** 새로 저장했으면 true, 이미 차단 중이었으면 false(멱등 no-op). */
     fun save(block: Block): Boolean
 
     fun delete(blockerId: Long, blockedId: Long): Boolean
-
-    /**
-     * [memberId]와 차단 관계에 있는 모든 상대의 id. **양방향이다** — 내가 차단한 사람과
-     * 나를 차단한 사람을 합집합으로 돌려준다.
-     */
-    fun findRelatedMemberIds(memberId: Long): Set<Long>
 }
 
 /** 신고 유일성·집계. */
