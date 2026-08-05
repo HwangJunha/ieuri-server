@@ -75,7 +75,7 @@ class CommunityMutationResolver(
 
     @DgsMutation
     fun createPost(@InputArgument input: CreatePostInput): CreatePostPayload = withCommunityUserErrors(
-        onError = { CreatePostPayload(success = false, userErrors = it, post = null, postId = null) },
+        onError = { CreatePostPayload(success = false, userErrors = it, postId = null) },
     ) {
         val memberId = currentMemberProvider.requireMemberId()
         val postId = postCommandUseCase.createPost(
@@ -93,7 +93,7 @@ class CommunityMutationResolver(
         // 요구하는데, 그 둘은 필드 리졸버가 요청 시에만 가져오는 지연 필드다 — 여기서 채우려면
         // 클라이언트가 고르지도 않은 다른 도메인 조회를 매번 왕복해야 한다.
         // 클라이언트는 postId로 `post(id:)`를 조회한다.
-        CreatePostPayload(success = true, userErrors = emptyList(), post = null, postId = postId)
+        CreatePostPayload(success = true, userErrors = emptyList(), postId = postId)
     }
 
     @DgsMutation
@@ -126,7 +126,7 @@ class CommunityMutationResolver(
     fun createComment(@InputArgument input: CreateCommentInput): CreateCommentPayload =
         withCommunityUserErrors(
             onError = {
-                CreateCommentPayload(success = false, userErrors = it, comment = null, commentId = null)
+                CreateCommentPayload(success = false, userErrors = it, commentId = null)
             },
         ) {
             val memberId = currentMemberProvider.requireMemberId()
@@ -138,7 +138,6 @@ class CommunityMutationResolver(
             CreateCommentPayload(
                 success = true,
                 userErrors = emptyList(),
-                comment = null,
                 commentId = commentId,
             )
         }
