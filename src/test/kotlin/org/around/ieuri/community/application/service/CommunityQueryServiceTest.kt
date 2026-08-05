@@ -300,6 +300,63 @@ class CommunityQueryServiceTest {
         assertTrue(service.communityChips(unknown, ContentLanguage.KO).isEmpty())
     }
 
+    // ---------- 지연 필드 ----------
+    //
+    // 태그·사진·카테고리·장소·좋아요는 각각 다른 테이블에 있어 **글 목록과 함께 읽지
+    // 않는다.** 클라이언트가 그 필드를 고른 경우에만 DataLoader가 조회를 부른다.
+    // 여기를 놓치면 `{ id title }`만 물어도 조회가 다섯 번 붙어 지연 필드가 무의미해진다.
+
+    @Test
+    fun `피드 조회 자체는 지연 필드를 하나도 읽지 않는다`() {
+        givenBlocked()
+        every { queryPort.findPosts(any()) } returns emptyPage()
+
+        service.posts(query(), memberId)
+
+        // 하나라도 불리면 그 필드를 고르지 않은 클라이언트가 값을 치르게 된다.
+        verify(exactly = 0) { queryPort.findTagsOf(any()) }
+        verify(exactly = 0) { queryPort.findPhotoKeysOf(any()) }
+        verify(exactly = 0) { queryPort.findCategoriesOf(any()) }
+        verify(exactly = 0) { queryPort.findSpotIdsOf(any()) }
+        verify(exactly = 0) { queryPort.findLikedPostIds(any(), any()) }
+    }
+
+    @Test
+    fun `단건 조회도 지연 필드를 읽지 않는다`() {
+        givenBlocked()
+        every { queryPort.findPost(42L, any()) } returns null
+
+        service.post(42L, memberId)
+
+        verify(exactly = 0) { queryPort.findTagsOf(any()) }
+        verify(exactly = 0) { queryPort.findCategoriesOf(any()) }
+        verify(exactly = 0) { queryPort.findSpotIdsOf(any()) }
+    }
+
+    @Test
+    fun `지연 필드는 여러 글을 한 번에 읽는다`() {
+        val postIds = listOf(1L, 2L, 3L)
+        every { queryPort.findTagsOf(postIds) } returns mapOf(1L to listOf("야경"))
+
+        val tags = service.postTags(postIds)
+
+        // 글마다 부르면 피드 한 페이지에 쿼리가 스무 번 붙는다(N+1).
+        verify(exactly = 1) { queryPort.findTagsOf(postIds) }
+        assertEquals(listOf("야경"), tags[1L])
+        // 값이 없는 글은 키가 없다 — 채우는 것은 호출자(DataLoader)의 몫이다.
+        assertNull(tags[2L])
+    }
+
+    @Test
+    fun `좋아요 판정은 차단 관계를 읽지 않는다`() {
+        every { queryPort.findLikedPostIds(memberId, listOf(1L)) } returns setOf(1L)
+
+        service.likedPostIds(listOf(1L), memberId)
+
+        // 차단은 좋아요 여부에 영향을 주지 않는다 — 읽으면 쿼리가 공짜로 한 번 더 붙는다.
+        verify(exactly = 0) { queryPort.findBlockedMemberIds(any()) }
+    }
+
     private fun summary(spotId: Long, category: TargetCategory?) = PostSpotView(
         id = spotId,
         title = "대상",

@@ -67,11 +67,14 @@ class JjwtTokenProviderTest {
     fun `변조되었거나 형식이 잘못된 토큰은 거부된다`() {
         assertFailsWith<InvalidTokenException> { provider.parseRefreshToken("not-a-jwt") }
 
-        // 서명 끝 한 글자를 **다른 글자로** 바꾼다. 고정 문자열을 이어붙이면 원래 값과 같아질 수 있어
-        // 토큰이 그대로 유효해진다(간헐적 실패의 원인).
+        // **페이로드**의 한 글자를 바꾼다. 서명 끝 글자를 건드리면 간헐적으로 통과한다 —
+        // base64url의 마지막 문자는 남는 비트만 싣기 때문에, 서로 다른 문자가 같은 바이트열로
+        // 디코딩되어 서명이 그대로 유효해지는 경우가 있다.
         val issued = provider.issueRefreshToken(100L)
-        val last = issued.token.last()
-        val tampered = issued.token.dropLast(1) + if (last == 'A') 'B' else 'A'
-        assertFailsWith<InvalidTokenException> { provider.parseRefreshToken(tampered) }
+        val (header, payload, signature) = issued.token.split('.')
+        val flipped = payload.first().let { if (it == 'e') 'f' else 'e' } + payload.drop(1)
+        assertFailsWith<InvalidTokenException> {
+            provider.parseRefreshToken("$header.$flipped.$signature")
+        }
     }
 }
