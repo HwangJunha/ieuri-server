@@ -1,6 +1,6 @@
 package org.around.ieuri.community.application.command
 
-import org.around.ieuri.community.domain.vo.PostTarget
+import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.domain.vo.PostTag
 import org.around.ieuri.community.domain.vo.ReportReason
 import org.around.ieuri.community.domain.vo.ReportTargetType
@@ -11,8 +11,10 @@ import org.around.ieuri.community.domain.vo.ReportTargetType
  */
 
 data class CreatePostCommand(
-    /** 글이 붙는 대상. 종류와 id가 함께여야 대상 하나를 가리킨다. */
-    val target: PostTarget,
+    /** 글의 카테고리. 필수 — 상단 칩이 이 값으로 거른다. */
+    val category: TargetCategory,
+    /** 연결할 장소. **선택이다** — null이면 카테고리에만 속하는 글이다. */
+    val spotId: Long?,
     /** 사용자가 입력한 태그. 최대 5개이며 중복은 하나로 합쳐진다. */
     val tags: List<String>,
     val title: String,
@@ -28,6 +30,8 @@ data class EditPostCommand(
     val postId: Long,
     val title: String,
     val body: String,
+    /** 사진 키 전체 목록으로 교체. null이면 사진을 건드리지 않는다. */
+    val photoKeys: List<String>?,
 ) {
     init {
         require(postId > 0) { "postId는 양수여야 합니다." }
@@ -79,9 +83,15 @@ data class ReportContentCommand(
  * presigned URL 발급 입력. contentType·contentLength는 **서명에 포함되므로** 클라이언트가
  * 업로드 시 선언한 값과 정확히 일치해야 한다 — 선언과 다른 파일을 올리면 R2가 거부한다.
  */
-data class IssuePostImageUploadUrlCommand(
+data class PostImageUploadRequest(
     val contentType: String,
     val contentLength: Long,
 )
 
-data class ConfirmPostImageUploadCommand(val objectKey: String)
+/** 여러 장을 한 번에 발급한다. 하나라도 어긋나면 전부 발급하지 않는다. */
+data class IssuePostImageUploadUrlsCommand(val images: List<PostImageUploadRequest>)
+
+/** 여러 장을 한 번에 확인한다. 장별로 성패가 갈린다. */
+data class ConfirmPostImageUploadsCommand(val objectKeys: List<String>)
+
+data class DeletePostImageCommand(val objectKey: String)

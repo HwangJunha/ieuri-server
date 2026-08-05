@@ -17,12 +17,10 @@ import org.around.ieuri.community.application.port.out.query.ViewerContext
 import org.around.ieuri.community.application.query.BlockedUsersQuery
 import org.around.ieuri.community.application.query.CommunityChipView
 import org.around.ieuri.community.application.query.PostCommentsQuery
-import org.around.ieuri.community.application.query.PostTargetView
+import org.around.ieuri.community.application.query.PostSpotView
 import org.around.ieuri.community.application.query.PostsQuery
 import org.around.ieuri.community.domain.vo.AppKey
 import org.around.ieuri.community.domain.vo.ContentLanguage
-import org.around.ieuri.community.domain.vo.PostTarget
-import org.around.ieuri.community.domain.vo.PostTargetType
 import org.around.ieuri.community.domain.vo.TargetCategory
 import java.time.Duration
 import kotlin.test.Test
@@ -69,14 +67,14 @@ class CommunityQueryServiceTest {
 
     /** 대상·좌표를 주지 않은 전체 피드 조회. 개별 테스트가 필요한 인자만 덮어쓴다. */
     private fun query(
-        target: PostTarget? = null,
+        spotId: Long? = null,
         latitude: Double? = null,
         longitude: Double? = null,
         radiusMeters: Int = 20_000,
         category: TargetCategory? = null,
         first: Int = 20,
     ) = PostsQuery(
-        target = target,
+        spotId = spotId,
         latitude = latitude,
         longitude = longitude,
         radiusMeters = radiusMeters,
@@ -95,40 +93,35 @@ class CommunityQueryServiceTest {
     // ---------- 피드 범위 ----------
 
     @Test
-    fun `대상을 주면 그 대상 하나로 좁힌다`() {
+    fun `장소를 주면 그 장소 하나로 좁힌다`() {
         givenBlocked()
         val search = captureSearch()
-        val target = PostTarget(PostTargetType.SPOT, 42L)
+        service.posts(query(spotId = 42L), memberId)
 
-        service.posts(query(target = target), memberId)
-
-        assertEquals(listOf(target), search.captured.targets)
+        assertEquals(listOf(42L), search.captured.spotIds)
     }
 
     @Test
-    fun `대상도 좌표도 없으면 대상으로 좁히지 않는다 - 전체 피드다`() {
+    fun `장소도 좌표도 없으면 장소로 좁히지 않는다 - 전체 피드다`() {
         givenBlocked()
         val search = captureSearch()
 
         service.posts(query(), memberId)
 
-        assertNull(search.captured.targets)
+        assertNull(search.captured.spotIds)
         // 대상 조회 자체를 하지 않는다.
         verify(exactly = 0) { spotLookup.findIdsWithin(any(), any(), any(), any()) }
     }
 
     @Test
-    fun `좌표를 주면 반경 안의 대상으로 좁힌다`() {
+    fun `좌표를 주면 반경 안의 장소로 좁힌다`() {
         givenBlocked()
         every { spotLookup.findIdsWithin(any(), any(), any(), any()) } returns listOf(7L, 8L)
         val search = captureSearch()
 
         service.posts(query(latitude = 37.5, longitude = 127.0), memberId)
 
-        assertEquals(
-            listOf(PostTarget(PostTargetType.SPOT, 7L), PostTarget(PostTargetType.SPOT, 8L)),
-            search.captured.targets,
-        )
+        assertEquals(listOf(7L, 8L), search.captured.spotIds)
     }
 
     @Test
@@ -138,66 +131,44 @@ class CommunityQueryServiceTest {
 
         service.posts(query(latitude = 37.5), memberId)
 
-        assertNull(search.captured.targets)
+        assertNull(search.captured.spotIds)
         verify(exactly = 0) { spotLookup.findIdsWithin(any(), any(), any(), any()) }
     }
 
     @Test
-    fun `대상과 좌표가 함께 오면 대상이 이긴다`() {
+    fun `장소와 좌표가 함께 오면 장소가 이긴다`() {
         givenBlocked()
         val search = captureSearch()
-        val target = PostTarget(PostTargetType.SPOT, 42L)
+        service.posts(query(spotId = 42L, latitude = 37.5, longitude = 127.0), memberId)
 
-        service.posts(query(target = target, latitude = 37.5, longitude = 127.0), memberId)
-
-        assertEquals(listOf(target), search.captured.targets)
+        assertEquals(listOf(42L), search.captured.spotIds)
         verify(exactly = 0) { spotLookup.findIdsWithin(any(), any(), any(), any()) }
     }
 
     // ---------- 상단 칩 필터 ----------
 
     @Test
-    fun `상단 추천 칩은 대상 카테고리로 거른다`() {
+    fun `상단 추천 칩은 조회 조건으로 그대로 넘어간다`() {
+        // 카테고리는 이제 **글이 직접 들고 있다** — spot에서 유도하지 않으므로
+        // 장소 없는 글도 칩에 걸린다.
         givenBlocked()
-        every { spotLookup.findIdsWithin(any(), any(), any(), any()) } returns listOf(1L, 2L)
-        every { spotLookup.findSummaries(any()) } returns mapOf(
-            1L to summary(1L, TargetCategory.RESTAURANT),
-            2L to summary(2L, TargetCategory.FESTIVAL_EVENT),
-        )
         val search = captureSearch()
 
-        service.posts(
-            query(latitude = 37.5, longitude = 127.0, category = TargetCategory.RESTAURANT),
-            memberId,
-        )
+        service.posts(query(category = TargetCategory.RESTAURANT), memberId)
 
-        assertEquals(listOf(PostTarget(PostTargetType.SPOT, 1L)), search.captured.targets)
-    }
-
-    @Test
-    fun `칩을 고르지 않으면 카테고리 조회 자체를 하지 않는다`() {
-        givenBlocked()
-        every { spotLookup.findIdsWithin(any(), any(), any(), any()) } returns listOf(1L)
-        every { queryPort.findPosts(any()) } returns emptyPage()
-
-        service.posts(query(latitude = 37.5, longitude = 127.0), memberId)
-
+        assertEquals(TargetCategory.RESTAURANT, search.captured.category)
+        // 카테고리를 알아내려고 장소를 물을 이유가 없다.
         verify(exactly = 0) { spotLookup.findSummaries(any()) }
     }
 
     @Test
-    fun `카테고리가 없는 대상은 칩 선택 시 제외된다`() {
+    fun `칩을 고르지 않으면 카테고리 조건이 없다`() {
         givenBlocked()
-        every { spotLookup.findIdsWithin(any(), any(), any(), any()) } returns listOf(3L)
-        every { spotLookup.findSummaries(any()) } returns mapOf(3L to summary(3L, null))
         val search = captureSearch()
 
-        service.posts(
-            query(latitude = 37.5, longitude = 127.0, category = TargetCategory.RESTAURANT),
-            memberId,
-        )
+        service.posts(query(), memberId)
 
-        assertTrue(search.captured.targets!!.isEmpty())
+        assertNull(search.captured.category)
     }
 
     // ---------- 모더레이션 ----------
@@ -329,8 +300,7 @@ class CommunityQueryServiceTest {
         assertTrue(service.communityChips(unknown, ContentLanguage.KO).isEmpty())
     }
 
-    private fun summary(spotId: Long, category: TargetCategory?) = PostTargetView(
-        type = PostTargetType.SPOT,
+    private fun summary(spotId: Long, category: TargetCategory?) = PostSpotView(
         id = spotId,
         title = "대상",
         thumbnailImageUrl = "url",

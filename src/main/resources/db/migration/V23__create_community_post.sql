@@ -1,15 +1,14 @@
 -- community 도메인: 글 애그리게이트 루트(SPEC-0010 R1~R4).
 --
--- **글이 붙는 대상은 관광지에 한정되지 않는다.** `community`는 특정 도메인의 부속물이 아니라
--- 커뮤니티 플랫폼이며, 지금은 spot에만 붙지만 앞으로 상품·경매 등 다른 도메인의 대상에도
--- 붙는다. 그래서 `spot_id`가 아니라 (target_type, target_id) 다형 참조다.
--- 새 대상 종류가 생겨도 enum 값과 조회 어댑터만 늘고 스키마는 그대로다.
+-- **글 자체는 무엇에도 매여 있지 않다.** 글이 spot에 붙었는지 카테고리에 붙었는지는
+-- 연결 테이블(community_post_spot·community_post_chip)이 들고 있다.
 --
--- target_id에 물리 FK를 걸 수 없다 — 가리키는 테이블이 행마다 다르고, 어느 쪽이든 다른
--- 도메인이라 도메인 간 FK 금지 규칙에도 걸린다(V11의 member_id 선례). 대상 존재 확인은
--- 애플리케이션이 글 작성 시점에 한다. 대상이 삭제돼도 글은 자동으로 정리되지 않는다.
+-- 다형 참조(target_type, target_id)를 쓰지 않는 이유는 그것이 "종류마다 의미가 달라지는
+-- 컬럼"이라 읽는 쪽에서 매번 분기해야 하고, 종류별 제약을 DB가 강제하지 못하기 때문이다.
+-- 연결 테이블로 나누면 각자 자기 규칙(개수 상한·유일성)을 자기 테이블에서 지킨다.
 --
--- author_id도 같은 이유로 plain 컬럼이다(auth의 member.id).
+-- author_id는 auth의 member.id를 가리키지만 물리 FK를 두지 않는다(V11의 선례) —
+-- 도메인 간 FK 금지 규칙이며, 커뮤니티가 별도 애플리케이션으로 분리될 때 따라가야 한다.
 --
 -- like_count·comment_count는 파생값이지만 컬럼으로 적재한다. 매 조회마다 세면 피드 한 페이지에
 -- 카운트 쿼리가 20번 붙는다. 갱신은 좋아요·댓글 커맨드가 같은 트랜잭션에서 한다.
@@ -18,10 +17,6 @@
 -- 조회 시점에 신고 수를 세지 않는다 — 피드 필터가 인덱스를 타야 하기 때문이다.
 CREATE TABLE community_post (
     id            BIGINT       GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    -- 글이 붙는 대상의 종류. 지금은 SPOT뿐이고 값이 늘어난다.
-    target_type   VARCHAR(20)  NOT NULL,
-    -- 그 종류 안에서의 식별자. 종류가 다르면 같은 숫자라도 다른 대상이다.
-    target_id     BIGINT       NOT NULL,
     author_id     BIGINT       NOT NULL,
     -- 카드에서 볼드로 표시되는 제목. 길이 상한(50자)은 도메인이 소유하고 컬럼은 넉넉히 잡는다 —
     -- body와 같은 이유로 이모지의 코드포인트 수가 층마다 달라지는 것을 막는다.
@@ -44,7 +39,6 @@ CREATE TABLE community_post (
     deleted_at    TIMESTAMPTZ,
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    CONSTRAINT ck_community_post_target_type CHECK (target_type IN ('SPOT')),
     -- 공백만 남은 제목·본문이 우회로 들어오지 않게 한다. 길이가 아니라 "비어 있지 않음"만 본다.
     CONSTRAINT ck_community_post_title_not_blank CHECK (btrim(title) <> ''),
     CONSTRAINT ck_community_post_body_not_blank CHECK (btrim(body) <> ''),
@@ -52,12 +46,10 @@ CREATE TABLE community_post (
     CONSTRAINT ck_community_post_comment_count CHECK (comment_count >= 0)
 );
 
--- 대상별 피드(R6): WHERE target_type = ? AND target_id = ? AND deleted_at IS NULL
---                 ORDER BY created_at DESC, id DESC
--- 정렬 키와 타이브레이크까지 인덱스에 담아 keyset 페이징이 인덱스만으로 전진한다(V21과 같은 형태).
--- target_type이 선행이라 종류가 늘어도 서로의 조회를 방해하지 않는다.
-CREATE INDEX idx_community_post_target_feed
-    ON community_post (target_type, target_id, created_at DESC, id DESC);
+-- 전체 피드의 정렬 키. 대상으로 좁히는 조회는 연결 테이블이 글 id를 먼저 걸러 주므로
+-- 여기서는 정렬만 담당한다.
+CREATE INDEX idx_community_post_feed
+    ON community_post (created_at DESC, id DESC);
 
 -- 작성자 기준 조회(차단 필터의 반대편, 탈퇴 시 정리).
 CREATE INDEX idx_community_post_author ON community_post (author_id);

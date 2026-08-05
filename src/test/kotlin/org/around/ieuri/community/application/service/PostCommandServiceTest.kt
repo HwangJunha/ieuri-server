@@ -20,10 +20,9 @@ import org.around.ieuri.community.application.port.out.client.ClockPort
 import org.around.ieuri.community.application.port.out.client.ObjectStoragePort
 import org.around.ieuri.community.application.port.out.client.SpotLookupPort
 import org.around.ieuri.community.application.port.out.persistence.PostRepositoryPort
-import org.around.ieuri.community.application.query.PostTargetView
+import org.around.ieuri.community.application.query.PostSpotView
 import org.around.ieuri.community.domain.aggregate.Post
-import org.around.ieuri.community.domain.vo.PostTarget
-import org.around.ieuri.community.domain.vo.PostTargetType
+import org.around.ieuri.community.domain.vo.TargetCategory
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.Test
@@ -35,7 +34,7 @@ import kotlin.test.assertTrue
 class PostCommandServiceTest {
 
     private val memberId = 7L
-    private val target = PostTarget(PostTargetType.SPOT, 42L)
+    private val spotId = 42L
     private val now = Instant.parse("2026-08-05T00:00:00Z")
 
     private val postRepository = mockk<PostRepositoryPort>()
@@ -48,10 +47,9 @@ class PostCommandServiceTest {
     private fun confirmedKey(owner: Long = memberId) = "images/$owner/${UUID.randomUUID()}"
 
     private fun givenValidSpotAndAuthor() {
-        every { spotLookup.findSummary(target.id) } returns
-            PostTargetView(
-                type = PostTargetType.SPOT,
-                id = target.id,
+        every { spotLookup.findSummary(spotId) } returns
+            PostSpotView(
+                id = spotId,
                 title = "경복궁",
                 thumbnailImageUrl = "https://img/1.jpg",
                 category = null,
@@ -63,7 +61,8 @@ class PostCommandServiceTest {
             val p = firstArg<Post>()
             Post.restore(
                 id = 1L,
-                target = p.target,
+                category = p.category,
+                spotId = p.spotId,
                 authorId = p.authorId,
                 tags = p.tags,
                 title = p.title,
@@ -85,7 +84,8 @@ class PostCommandServiceTest {
     ) =
         service.createPost(
             CreatePostCommand(
-                target = target, tags = emptyList(),
+                category = TargetCategory.TOURIST_SPOT,
+            spotId = spotId, tags = emptyList(),
                 title = title, body = body, photoKeys = photoKeys,
             ),
             memberId,
@@ -136,7 +136,7 @@ class PostCommandServiceTest {
 
     @Test
     fun `존재하지 않는 대상이면 SPOT_NOT_FOUND이고 글은 생성되지 않는다`() {
-        every { spotLookup.findSummary(target.id) } returns null
+        every { spotLookup.findSummary(spotId) } returns null
 
         assertFailsWith<SpotNotFoundException> { create() }
         verify(exactly = 0) { postRepository.save(any()) }
@@ -203,7 +203,8 @@ class PostCommandServiceTest {
     @Test
     fun `작성자는 자신의 글을 삭제할 수 있다`() {
         val post = Post.restore(
-            id = 1L, target = target, authorId = memberId, tags = emptyList(),
+            id = 1L, category = TargetCategory.TOURIST_SPOT,
+            spotId = spotId, authorId = memberId, tags = emptyList(),
             title = "제목", body = "본문", photoKeys = emptyList(), likeCount = 0, commentCount = 0,
             hidden = false, deletedAt = null, createdAt = now,
         )
@@ -218,7 +219,8 @@ class PostCommandServiceTest {
     @Test
     fun `타인의 글 삭제는 NOT_POST_OWNER이고 글은 삭제되지 않는다`() {
         val post = Post.restore(
-            id = 1L, target = target, authorId = memberId, tags = emptyList(),
+            id = 1L, category = TargetCategory.TOURIST_SPOT,
+            spotId = spotId, authorId = memberId, tags = emptyList(),
             title = "제목", body = "본문", photoKeys = emptyList(), likeCount = 0, commentCount = 0,
             hidden = false, deletedAt = null, createdAt = now,
         )
@@ -230,7 +232,8 @@ class PostCommandServiceTest {
     }
 
     private fun storedPost(hidden: Boolean = false, authorId: Long = memberId) = Post.restore(
-        id = 1L, target = target, authorId = authorId, tags = emptyList(),
+        id = 1L, category = TargetCategory.TOURIST_SPOT,
+            spotId = spotId, authorId = authorId, tags = emptyList(),
         title = "원래 제목", body = "원래 본문", photoKeys = emptyList(),
         likeCount = 0, commentCount = 0, hidden = hidden, deletedAt = null, createdAt = now,
     )
@@ -241,7 +244,7 @@ class PostCommandServiceTest {
         every { postRepository.findById(1L) } returns post
         every { postRepository.save(any()) } returns post
 
-        service.editPost(EditPostCommand(1L, "새 제목", "새 본문"), memberId)
+        service.editPost(EditPostCommand(1L, "새 제목", "새 본문", null), memberId)
 
         assertEquals("새 제목", post.title)
         assertEquals("새 본문", post.body)
@@ -253,7 +256,7 @@ class PostCommandServiceTest {
         every { postRepository.findById(1L) } returns storedPost(authorId = memberId + 1)
 
         assertFailsWith<NotPostOwnerException> {
-            service.editPost(EditPostCommand(1L, "제목", "본문"), memberId)
+            service.editPost(EditPostCommand(1L, "제목", "본문", null), memberId)
         }
         verify(exactly = 0) { postRepository.save(any()) }
     }
@@ -264,7 +267,7 @@ class PostCommandServiceTest {
         every { postRepository.findById(1L) } returns post
 
         assertFailsWith<HiddenPostNotEditableException> {
-            service.editPost(EditPostCommand(1L, "무해한 제목", "무해한 본문"), memberId)
+            service.editPost(EditPostCommand(1L, "무해한 제목", "무해한 본문", null), memberId)
         }
         assertEquals("원래 본문", post.body)
         verify(exactly = 0) { postRepository.save(any()) }
@@ -272,11 +275,11 @@ class PostCommandServiceTest {
 
     @Test
     fun `수정도 제목과 본문 길이를 서로 다른 코드로 거부한다`() {
-        assertFailsWith<PostTitleRequiredException> { service.editPost(EditPostCommand(1L, " ", "본문"), memberId) }
+        assertFailsWith<PostTitleRequiredException> { service.editPost(EditPostCommand(1L, " ", "본문", null), memberId) }
         assertFailsWith<PostTitleLengthInvalidException> {
-            service.editPost(EditPostCommand(1L, "가".repeat(51), "본문"), memberId)
+            service.editPost(EditPostCommand(1L, "가".repeat(51), "본문", null), memberId)
         }
-        assertFailsWith<PostBodyRequiredException> { service.editPost(EditPostCommand(1L, "제목", " "), memberId) }
+        assertFailsWith<PostBodyRequiredException> { service.editPost(EditPostCommand(1L, "제목", " ", null), memberId) }
         // 형식 검증이 조회보다 먼저다.
         verify(exactly = 0) { postRepository.findById(any()) }
     }
@@ -285,7 +288,7 @@ class PostCommandServiceTest {
     fun `존재하지 않는 글 수정은 POST_NOT_FOUND다`() {
         every { postRepository.findById(1L) } returns null
         assertFailsWith<PostNotFoundException> {
-            service.editPost(EditPostCommand(1L, "제목", "본문"), memberId)
+            service.editPost(EditPostCommand(1L, "제목", "본문", null), memberId)
         }
     }
 

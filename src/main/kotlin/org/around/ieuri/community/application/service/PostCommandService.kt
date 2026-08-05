@@ -56,8 +56,10 @@ class PostCommandService(
         if (body.length > Post.BODY_MAX_LENGTH) throw PostBodyLengthInvalidException()
         if (command.photoKeys.size > Post.MAX_PHOTOS) throw TooManyPhotosException()
 
-        // 반환값은 쓰지 않는다 — 부재가 곧 대상 유효성 판정이다.
-        if (spotLookupPort.findSummary(command.target.id) == null) throw SpotNotFoundException()
+        // **장소는 선택이다.** 준 경우에만 존재를 확인한다 — 부재가 곧 유효성 판정이다.
+        if (command.spotId != null && spotLookupPort.findSummary(command.spotId) == null) {
+            throw SpotNotFoundException()
+        }
 
         // 형식이 어긋난 태그는 조용히 버리지 않고 거부한다 — 유저가 입력한 것이 사라지면
         // 왜 안 붙었는지 알 수 없다.
@@ -77,7 +79,8 @@ class PostCommandService(
         }
 
         val post = Post.create(
-            target = command.target,
+            category = command.category,
+            spotId = command.spotId,
             authorId = memberId,
             tags = tags,
             title = title,

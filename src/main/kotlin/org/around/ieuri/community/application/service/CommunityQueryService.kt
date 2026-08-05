@@ -19,8 +19,6 @@ import org.around.ieuri.community.application.query.PostsQuery
 import org.around.ieuri.community.domain.vo.AppKey
 import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.around.ieuri.community.domain.vo.PostTag
-import org.around.ieuri.community.domain.vo.PostTarget
-import org.around.ieuri.community.domain.vo.PostTargetType
 import org.around.ieuri.community.domain.vo.TargetCategory
 import org.springframework.stereotype.Service
 
@@ -42,13 +40,14 @@ class CommunityQueryService(
 ) : CommunityQueryUseCase {
 
     /**
-     * 글 피드. **인자 조합이 범위를 정한다** — 대상 하나, 좌표 반경, 또는 전체다.
-     * 정렬·페이징·모더레이션 필터는 세 경우가 모두 같다.
+     * 글 피드. **인자 조합이 범위를 정한다** — 장소 하나, 좌표 반경, 카테고리, 또는 전체다.
+     * 정렬·페이징·모더레이션 필터는 모든 경우가 같다.
      */
     override fun posts(query: PostsQuery, memberId: Long): CursorPage<PostView> =
         communityQueryPort.findPosts(
             PostsSearch(
-                targets = resolveTargets(query),
+                spotIds = resolveSpotIds(query),
+                category = query.category,
                 // 태그는 정규화해 넘긴다 — 대소문자·선행 #을 가리지 않게 하려는 것이다.
                 normalizedTag = query.tag?.let { PostTag.parseOrNull(it)?.normalized },
                 first = clampPageSize(query.first),
@@ -58,47 +57,27 @@ class CommunityQueryService(
         )
 
     /**
-     * 어떤 대상의 글을 볼지 정한다. null이면 대상으로 좁히지 않는다(전체 피드).
+     * 어떤 장소의 글을 볼지 정한다. null이면 장소로 좁히지 않는다.
      *
      * 좌표를 받으면 반경 안의 spot을 **tourism에 물어** 목록으로 바꾼다 — `spot` 테이블은
-     * tourism의 것이라 커뮤니티가 직접 조회하지 않는다. 대상 수가 상한을 넘으면 잘리므로
-     * 반경이 매우 넓으면 결과가 부분집합이 될 수 있다.
+     * tourism의 것이라 커뮤니티가 직접 조회하지 않는다. 상한을 넘으면 잘리므로 반경이
+     * 매우 넓으면 결과가 부분집합이 될 수 있다.
      */
-    private fun resolveTargets(query: PostsQuery): List<PostTarget>? {
-        if (query.target != null) {
-            return listOf(query.target)
+    private fun resolveSpotIds(query: PostsQuery): List<Long>? {
+        if (query.spotId != null) {
+            return listOf(query.spotId)
         }
         if (!query.hasCoordinates) {
             return null
         }
 
-        val spotIds = spotLookupPort.findIdsWithin(
+        return spotLookupPort.findIdsWithin(
             latitude = requireNotNull(query.latitude),
             longitude = requireNotNull(query.longitude),
             // 상한 초과는 오류가 아니라 절삭이다.
             radiusMeters = query.radiusMeters.coerceIn(1, policy.maxRadiusMeters),
             limit = policy.maxNearbySpots,
         )
-        return filterByCategory(spotIds, query.category)
-    }
-
-    /**
-     * 상단 칩 필터. 카테고리는 spot이 들고 있으므로 요약을 한 번에 읽어 거른다.
-     * 칩을 고르지 않았으면 조회 자체를 하지 않는다.
-     */
-    private fun filterByCategory(spotIds: List<Long>, category: TargetCategory?): List<PostTarget> {
-        if (category == null) {
-            return spotIds.map { PostTarget(PostTargetType.SPOT, it) }
-        }
-
-        val summaries = spotLookupPort.findSummaries(spotIds)
-        val matched = mutableListOf<PostTarget>()
-        for (spotId in spotIds) {
-            if (summaries[spotId]?.category == category) {
-                matched += PostTarget(PostTargetType.SPOT, spotId)
-            }
-        }
-        return matched
     }
 
     override fun post(postId: Long, memberId: Long): PostView? =

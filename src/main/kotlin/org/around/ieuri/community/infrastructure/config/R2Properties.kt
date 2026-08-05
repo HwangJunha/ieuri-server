@@ -16,8 +16,11 @@ data class R2Properties(
     val accessKey: String = "",
     val secretAccessKey: String = "",
     val bucket: String = "",
-    /** presigned URL 유효 기간. */
-    val uploadUrlTtl: Duration = Duration.ofMinutes(5),
+    /**
+     * presigned URL 유효 기간. 여러 장을 연달아 올리는 동안 만료되지 않아야 하고,
+     * 모바일 네트워크에서 대용량 사진은 느리다.
+     */
+    val uploadUrlTtl: Duration = Duration.ofMinutes(30),
     val maxUploadBytes: Long = 10L * 1024 * 1024,
     val allowedContentTypes: List<String> = listOf("image/jpeg", "image/png", "image/webp"),
 )

@@ -1,9 +1,8 @@
 package org.around.ieuri.community.domain
 
 import org.around.ieuri.community.domain.aggregate.Post
+import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.domain.vo.PhotoObjectKey
-import org.around.ieuri.community.domain.vo.PostTarget
-import org.around.ieuri.community.domain.vo.PostTargetType
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.Test
@@ -16,7 +15,7 @@ import kotlin.test.assertTrue
 class PostTest {
 
     private val authorId = 7L
-    private val target = PostTarget(PostTargetType.SPOT, 42L)
+    private val spotId = 42L
 
     private fun confirmedKey(memberId: Long = authorId): PhotoObjectKey =
         PhotoObjectKey.issue(memberId, UUID.randomUUID()).toConfirmed()
@@ -26,7 +25,8 @@ class PostTest {
         body: String = "본문",
         photoKeys: List<PhotoObjectKey> = emptyList(),
     ) = Post.create(
-        target = target,
+        category = TargetCategory.TOURIST_SPOT,
+        spotId = spotId,
         authorId = authorId,
         tags = emptyList(),
         title = title,

@@ -17,9 +17,8 @@ import org.around.ieuri.community.application.port.out.persistence.ReportReposit
 import org.around.ieuri.community.application.query.PostAuthorView
 import org.around.ieuri.community.domain.aggregate.Comment
 import org.around.ieuri.community.domain.aggregate.Post
+import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.domain.aggregate.Report
-import org.around.ieuri.community.domain.vo.PostTarget
-import org.around.ieuri.community.domain.vo.PostTargetType
 import org.around.ieuri.community.domain.vo.ReportReason
 import org.around.ieuri.community.domain.vo.ReportTargetType
 import java.time.Instant
@@ -47,7 +46,8 @@ class ReportCommandServiceTest {
 
     private fun post(id: Long = targetPostId, commentCount: Int = 0) = Post.restore(
         id = id,
-        target = PostTarget(PostTargetType.SPOT, 1L),
+        category = TargetCategory.TOURIST_SPOT,
+        spotId = 1L,
         authorId = 42L,
         tags = emptyList(),
         title = "제목",

@@ -19,12 +19,11 @@ import org.around.ieuri.community.application.query.BlockedUserView
 import org.around.ieuri.community.application.query.CommentView
 import org.around.ieuri.community.application.query.CommunityChipView
 import org.around.ieuri.community.application.query.PostAuthorView
-import org.around.ieuri.community.application.query.PostTargetView
+import org.around.ieuri.community.application.query.PostSpotView
 import org.around.ieuri.community.application.query.PostView
 import org.around.ieuri.community.domain.vo.AppKey
-import org.around.ieuri.community.domain.vo.PostTarget
-import org.around.ieuri.community.domain.vo.PostTargetType
 import org.around.ieuri.community.domain.vo.ContentLanguage
+import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.CommentEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QBlockEntity
@@ -33,6 +32,8 @@ import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostLikeEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostPhotoEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostChipEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostSpotEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostTagEntity
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -61,6 +62,8 @@ class CommunityQueryAdapter(
     private val like = QPostLikeEntity.postLikeEntity
     private val chip = QCommunityChipEntity.communityChipEntity
     private val tag = QPostTagEntity.postTagEntity
+    private val postChip = QPostChipEntity.postChipEntity
+    private val postSpot = QPostSpotEntity.postSpotEntity
     private val block = QBlockEntity.blockEntity
 
     /**
@@ -71,14 +74,24 @@ class CommunityQueryAdapter(
      */
     @Transactional(readOnly = true)
     override fun findPosts(search: PostsSearch): CursorPage<PostView> {
-        val targets = search.targets
-        if (targets != null && targets.isEmpty()) {
+        val spotIds = search.spotIds
+        if (spotIds != null && spotIds.isEmpty()) {
             return cursorPageOf(emptyList(), hasNextPage = false, hasPreviousPage = search.after != null)
         }
 
         val conditions = mutableListOf<BooleanExpression>()
-        if (targets != null) {
-            conditions += targetCondition(targets)
+        if (spotIds != null) {
+            // 장소로 좁힌다. 연결 테이블을 서브쿼리로 걸어 조인이 행을 늘리지 않게 한다.
+            conditions += post.id.`in`(
+                JPAExpressions.select(postSpot.postId).from(postSpot)
+                    .where(postSpot.spotId.`in`(spotIds)),
+            )
+        }
+        if (search.category != null) {
+            conditions += post.id.`in`(
+                JPAExpressions.select(postChip.postId).from(postChip)
+                    .where(postChip.category.eq(search.category)),
+            )
         }
         if (search.normalizedTag != null) {
             // 태그가 붙은 글만. 서브쿼리로 걸어 조인이 행을 늘리지 않게 한다.
@@ -95,24 +108,6 @@ class CommunityQueryAdapter(
             after = search.after,
             extraConditions = conditions,
         )
-    }
-
-    /**
-     * 대상 조건. 종류별로 묶어 `(종류 = ? AND id IN (...))`를 OR로 잇는다 —
-     * 종류가 다르면 같은 숫자라도 다른 대상이므로 id만으로 거르면 엉뚱한 글이 섞인다.
-     */
-    private fun targetCondition(targets: List<PostTarget>): BooleanExpression {
-        val byType = mutableMapOf<PostTargetType, MutableList<Long>>()
-        for (target in targets) {
-            byType.getOrPut(target.type) { mutableListOf() } += target.id
-        }
-
-        var condition: BooleanExpression? = null
-        for ((type, ids) in byType) {
-            val one = post.targetType.eq(type).and(post.targetId.`in`(ids))
-            condition = condition?.or(one) ?: one
-        }
-        return requireNotNull(condition) { "대상이 비어 있으면 이 함수를 부르지 않는다." }
     }
 
     /**
@@ -133,6 +128,8 @@ class CommunityQueryAdapter(
             likedIds = likedPostIds(viewer, ids),
             tags = tagNamesOf(ids)[postId].orEmpty(),
             photoKeys = photoKeysOf(ids)[postId].orEmpty(),
+            category = requireNotNull(categoriesOf(ids)[postId]) { "글($postId)에 카테고리 연결이 없다." },
+            spotId = spotIdsOf(ids)[postId],
         )
     }
 
@@ -312,6 +309,8 @@ class CommunityQueryAdapter(
         val likedIds = likedPostIds(viewer, postIds)
         val tagsByPost = tagNamesOf(postIds)
         val photosByPost = photoKeysOf(postIds)
+        val categoriesByPost = categoriesOf(postIds)
+        val spotIdsByPost = spotIdsOf(postIds)
 
         val edges = pageRows.map { entity ->
             val postId = requireNotNull(entity.id)
@@ -322,6 +321,10 @@ class CommunityQueryAdapter(
                     likedIds = likedIds,
                     tags = tagsByPost[postId].orEmpty(),
                     photoKeys = photosByPost[postId].orEmpty(),
+                    category = requireNotNull(categoriesByPost[postId]) {
+                        "글($postId)에 카테고리 연결이 없다."
+                    },
+                    spotId = spotIdsByPost[postId],
                 ),
             )
         }
@@ -370,6 +373,34 @@ class CommunityQueryAdapter(
     ): BooleanExpression =
         createdAtPath.lt(cursor.createdAt)
             .or(createdAtPath.eq(cursor.createdAt).and(idPath.lt(cursor.id)))
+
+    /** 여러 글의 카테고리를 한 번에. 지연 연관을 읽으면 글마다 쿼리가 나간다. */
+    private fun categoriesOf(postIds: List<Long>): Map<Long, TargetCategory> {
+        if (postIds.isEmpty()) return emptyMap()
+
+        return queryFactory
+            .select(postChip.postId, postChip.category)
+            .from(postChip)
+            .where(postChip.postId.`in`(postIds))
+            .fetch()
+            .associate {
+                requireNotNull(it.get(postChip.postId)) to requireNotNull(it.get(postChip.category))
+            }
+    }
+
+    /** 여러 글의 연결 장소를 한 번에. 장소가 없는 글은 키가 없다. */
+    private fun spotIdsOf(postIds: List<Long>): Map<Long, Long> {
+        if (postIds.isEmpty()) return emptyMap()
+
+        return queryFactory
+            .select(postSpot.postId, postSpot.spotId)
+            .from(postSpot)
+            .where(postSpot.postId.`in`(postIds))
+            .fetch()
+            .associate {
+                requireNotNull(it.get(postSpot.postId)) to requireNotNull(it.get(postSpot.spotId))
+            }
+    }
 
     /**
      * 여러 글의 태그를 한 번에. 지연 컬렉션(PostEntity.tags)을 그대로 읽으면 글마다 쿼리가 나간다.
@@ -432,6 +463,8 @@ class CommunityQueryAdapter(
         likedIds: Set<Long>,
         tags: List<String>,
         photoKeys: List<String>,
+        category: TargetCategory,
+        spotId: Long?,
     ): PostView {
         val postId = requireNotNull(id)
         return PostView(
@@ -439,15 +472,12 @@ class CommunityQueryAdapter(
             title = title,
             body = body,
             tags = tags,
-            // 대상의 제목·썸네일은 상대 도메인 소유라 리졸버가 필드 단위로 채운다.
-            // 제목·썸네일·카테고리는 상대 도메인 소유라 리졸버가 필드 단위로 채운다.
-            target = PostTargetView(
-                type = targetType,
-                id = targetId,
-                title = "",
-                thumbnailImageUrl = "",
-                category = null,
-            ),
+            category = category,
+            // 장소의 제목·썸네일은 tourism 소유라 리졸버가 필드 단위로 채운다.
+            // 여기서는 id만 실어 "연결이 있는지"를 알린다.
+            spot = spotId?.let {
+                PostSpotView(id = it, title = "", thumbnailImageUrl = "", category = null)
+            },
             author = PostAuthorView(id = authorId, nickname = "", profileImageUrl = null),
             photoKeys = photoKeys,
             likeCount = likeCount,

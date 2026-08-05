@@ -113,4 +113,14 @@ class R2ObjectStorageAdapter(
             DeleteObjectRequest.builder().bucket(properties.bucket).key(sourceKey).build(),
         )
     }
+
+    /**
+     * S3의 DeleteObject는 없는 키에도 성공을 돌려준다 — 그것이 멱등이라는 뜻이며
+     * 호출자가 존재를 먼저 확인할 필요가 없다.
+     */
+    override fun delete(objectKey: String) {
+        s3Client.deleteObject(
+            DeleteObjectRequest.builder().bucket(properties.bucket).key(objectKey).build(),
+        )
+    }
 }

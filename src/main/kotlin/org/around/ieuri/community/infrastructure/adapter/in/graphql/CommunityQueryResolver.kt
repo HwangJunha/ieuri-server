@@ -13,12 +13,10 @@ import org.around.ieuri.community.application.query.BlockedUsersQuery
 import org.around.ieuri.common.pagination.CursorPageInfo
 import org.around.ieuri.community.application.query.CommentView
 import org.around.ieuri.community.application.query.PostAuthorView
-import org.around.ieuri.community.application.query.PostTargetView
+import org.around.ieuri.community.application.query.PostSpotView
 import org.around.ieuri.community.application.query.PostCommentsQuery
 import org.around.ieuri.community.application.query.PostView
 import org.around.ieuri.community.application.query.PostsQuery
-import org.around.ieuri.community.domain.vo.PostTarget
-import org.around.ieuri.community.domain.vo.PostTargetType
 import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.infrastructure.app.AppKeyContext
 import org.around.ieuri.community.infrastructure.locale.CommunityLocaleContext
@@ -28,8 +26,7 @@ import org.around.ieuri.common.graphql.generated.types.BlockedUserEdge as GqlBlo
 import org.around.ieuri.common.graphql.generated.types.CommunityChip as GqlCommunityChip
 import org.around.ieuri.common.graphql.generated.types.PageInfo as GqlPageInfo
 import org.around.ieuri.common.graphql.generated.types.PostAuthor as GqlPostAuthor
-import org.around.ieuri.common.graphql.generated.types.PostTarget as GqlPostTarget
-import org.around.ieuri.common.graphql.generated.types.PostTargetType as GqlPostTargetType
+import org.around.ieuri.common.graphql.generated.types.PostSpot as GqlPostSpot
 import org.around.ieuri.common.graphql.generated.types.TargetCategory as GqlTargetCategory
 
 /**
@@ -58,8 +55,7 @@ class CommunityQueryResolver(
      */
     @DgsQuery
     fun posts(
-        @InputArgument targetType: GqlPostTargetType?,
-        @InputArgument targetId: Long?,
+        @InputArgument spotId: Long?,
         @InputArgument latitude: Double?,
         @InputArgument longitude: Double?,
         @InputArgument radiusMeters: Int?,
@@ -69,16 +65,9 @@ class CommunityQueryResolver(
         @InputArgument after: String?,
     ): PostConnection {
         val memberId = currentMemberProvider.requireMemberId()
-        // 종류와 id가 함께여야 대상 하나를 가리킨다 — 하나만 주면 대상 지정이 아니다.
-        val target = if (targetType != null && targetId != null) {
-            PostTarget(PostTargetType.valueOf(targetType.name), targetId)
-        } else {
-            null
-        }
-
         val page = communityQueryUseCase.posts(
             PostsQuery(
-                target = target,
+                spotId = spotId,
                 latitude = latitude,
                 longitude = longitude,
                 radiusMeters = radiusMeters ?: DEFAULT_RADIUS_METERS,
@@ -159,12 +148,18 @@ class CommunityQueryResolver(
             )
         }
 
-    /** 대상 칩. 상대 도메인을 물어야 하므로 **요청된 경우에만** 조회한다. */
-    @DgsData(parentType = "Post", field = "target")
-    fun postTarget(dfe: DgsDataFetchingEnvironment): CompletableFuture<GqlPostTarget?> {
-        val loader = dfe.getDataLoader<Long, PostTargetView>(PostTargetDataLoader.NAME)
-            ?: error("DataLoader '${PostTargetDataLoader.NAME}'가 등록되지 않았다.")
-        return loader.load(dfe.postSource().target.id).thenApply { it?.toGql() }
+    /**
+     * 장소 칩. **연결된 장소가 없으면 null이다** — 조회 자체를 하지 않는다.
+     * 있으면 tourism을 물어야 하므로 요청된 경우에만 배치로 읽는다.
+     */
+    @DgsData(parentType = "Post", field = "spot")
+    fun postSpot(dfe: DgsDataFetchingEnvironment): CompletableFuture<GqlPostSpot?> {
+        val spotId = dfe.postSource().spot?.id
+            ?: return CompletableFuture.completedFuture(null)
+
+        val loader = dfe.getDataLoader<Long, PostSpotView>(PostSpotDataLoader.NAME)
+            ?: error("DataLoader '${PostSpotDataLoader.NAME}'가 등록되지 않았다.")
+        return loader.load(spotId).thenApply { it?.toGql() }
     }
 
     /** 작성자. auth를 물어야 하므로 요청된 경우에만 조회한다. */
@@ -215,8 +210,7 @@ class CommunityQueryResolver(
      * 회원 정보가 없어도 글은 남는다(탈퇴해도 글·댓글은 보존한다). 작성자 표시가 비면
      * 클라이언트가 렌더에 실패하므로 대체 표기를 내려준다.
      */
-    private fun PostTargetView.toGql() = GqlPostTarget(
-        type = GqlPostTargetType.valueOf(type.name),
+    private fun PostSpotView.toGql() = GqlPostSpot(
         id = id,
         title = title,
         thumbnailImageUrl = thumbnailImageUrl,

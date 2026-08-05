@@ -1,15 +1,17 @@
 package org.around.ieuri.community.application.port.`in`.command
 
 import org.around.ieuri.community.application.command.BlockUserCommand
-import org.around.ieuri.community.application.command.ConfirmPostImageUploadCommand
+import org.around.ieuri.community.application.command.ConfirmPostImageUploadsCommand
+import org.around.ieuri.community.application.command.DeletePostImageCommand
 import org.around.ieuri.community.application.command.CreateCommentCommand
 import org.around.ieuri.community.application.command.CreatePostCommand
 import org.around.ieuri.community.application.command.DeleteCommentCommand
 import org.around.ieuri.community.application.command.DeletePostCommand
 import org.around.ieuri.community.application.command.EditPostCommand
-import org.around.ieuri.community.application.command.IssuePostImageUploadUrlCommand
+import org.around.ieuri.community.application.command.IssuePostImageUploadUrlsCommand
 import org.around.ieuri.community.application.command.LikePostCommand
 import org.around.ieuri.community.application.command.ReportContentCommand
+import org.around.ieuri.community.application.query.PostImageConfirmResult
 import org.around.ieuri.community.application.query.PostImageUploadUrlView
 
 /**
@@ -60,8 +62,21 @@ interface ReportCommandUseCase {
  * 두 단계가 나뉜 이유는 확인 시점에야 실제 크기·매직바이트를 볼 수 있기 때문이다.
  */
 interface PostImageUploadUseCase {
-    fun issueUploadUrl(command: IssuePostImageUploadUrlCommand, memberId: Long): PostImageUploadUrlView
+    /** 여러 장을 한 번에 발급한다 — 5장이면 왕복 1회다. 하나라도 어긋나면 전부 거부한다. */
+    fun issueUploadUrls(
+        command: IssuePostImageUploadUrlsCommand,
+        memberId: Long,
+    ): List<PostImageUploadUrlView>
 
-    /** 검증을 통과한 최종 오브젝트 키. 글 생성에는 이 키를 넘긴다. */
-    fun confirmUpload(command: ConfirmPostImageUploadCommand, memberId: Long): String
+    /** 여러 장을 한 번에 확인한다. **장별로 성패가 갈린다.** */
+    fun confirmUploads(
+        command: ConfirmPostImageUploadsCommand,
+        memberId: Long,
+    ): PostImageConfirmResult
+
+    /**
+     * 업로드한 사진을 지운다. 글에 붙이기 전에도, 붙인 뒤에도 쓴다 —
+     * 클라이언트가 이미지를 치울 통로가 있어야 한다.
+     */
+    fun deleteImage(command: DeletePostImageCommand, memberId: Long)
 }

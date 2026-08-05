@@ -4,29 +4,29 @@ import com.netflix.graphql.dgs.DgsDataLoader
 import org.around.ieuri.community.application.port.out.client.MemberLookupPort
 import org.around.ieuri.community.application.port.out.client.SpotLookupPort
 import org.around.ieuri.community.application.query.PostAuthorView
-import org.around.ieuri.community.application.query.PostTargetView
+import org.around.ieuri.community.application.query.PostSpotView
 import org.dataloader.MappedBatchLoader
 import org.springframework.stereotype.Component
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 
 /**
- * 대상(spot) 배치 로더. 피드 한 페이지의 대상 id를 모아 **한 번에** 조회한다.
+ * 장소(spot) 배치 로더. 피드 한 페이지의 대상 id를 모아 **한 번에** 조회한다.
  *
  * 없으면 카드 20장에 spot 조회가 20번 붙는다(N+1). GraphQL의 필드 리졸버는 카드마다
  * 호출되므로, 배치하지 않으면 지연 조회의 이점이 N+1로 상쇄된다.
  */
-@DgsDataLoader(name = PostTargetDataLoader.NAME)
+@DgsDataLoader(name = PostSpotDataLoader.NAME)
 @Component
-class PostTargetDataLoader(
+class PostSpotDataLoader(
     private val spotLookupPort: SpotLookupPort,
-) : MappedBatchLoader<Long, PostTargetView> {
+) : MappedBatchLoader<Long, PostSpotView> {
 
-    override fun load(spotIds: Set<Long>): CompletionStage<Map<Long, PostTargetView>> =
+    override fun load(spotIds: Set<Long>): CompletionStage<Map<Long, PostSpotView>> =
         CompletableFuture.completedFuture(spotLookupPort.findSummaries(spotIds.toList()))
 
     companion object {
-        const val NAME = "postTarget"
+        const val NAME = "postSpot"
     }
 }
 

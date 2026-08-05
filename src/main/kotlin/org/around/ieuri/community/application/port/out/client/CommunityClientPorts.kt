@@ -1,7 +1,7 @@
 package org.around.ieuri.community.application.port.out.client
 
 import org.around.ieuri.community.application.query.PostAuthorView
-import org.around.ieuri.community.application.query.PostTargetView
+import org.around.ieuri.community.application.query.PostSpotView
 import java.time.Instant
 
 /**
@@ -33,6 +33,9 @@ interface ObjectStoragePort {
 
     /** 검증을 통과한 오브젝트를 확정 위치로 옮긴다(복사 후 원본 삭제). */
     fun move(sourceKey: String, targetKey: String)
+
+    /** 오브젝트를 지운다. 이미 없어도 오류가 아니다(멱등). */
+    fun delete(objectKey: String)
 }
 
 /**
@@ -44,7 +47,7 @@ interface ObjectStoragePort {
  */
 interface SpotLookupPort {
     /** 피드 카드용 요약. 존재하지 않으면 null이며 그것이 대상 유효성 판정이다. */
-    fun findSummary(spotId: Long): PostTargetView?
+    fun findSummary(spotId: Long): PostSpotView?
 
     /**
      * 좌표 반경 안의 spot id. [limit]을 넘으면 **조용히 잘린다** — 넓은 반경에서 수만 건이
@@ -53,7 +56,7 @@ interface SpotLookupPort {
     fun findIdsWithin(latitude: Double, longitude: Double, radiusMeters: Int, limit: Int): List<Long>
 
     /** 여러 spot의 요약을 한 번에. 카테고리 칩 필터가 쓴다 — 행마다 물으면 조회가 20번 붙는다. */
-    fun findSummaries(spotIds: List<Long>): Map<Long, PostTargetView>
+    fun findSummaries(spotIds: List<Long>): Map<Long, PostSpotView>
 }
 
 /**

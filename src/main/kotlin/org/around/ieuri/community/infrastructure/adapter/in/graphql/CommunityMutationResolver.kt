@@ -5,12 +5,16 @@ import com.netflix.graphql.dgs.DgsMutation
 import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.common.graphql.generated.types.BlockUserInput
 import org.around.ieuri.common.graphql.generated.types.BlockUserPayload
-import org.around.ieuri.common.graphql.generated.types.ConfirmPostImageUploadInput
-import org.around.ieuri.common.graphql.generated.types.ConfirmPostImageUploadPayload
+import org.around.ieuri.common.graphql.generated.types.ConfirmPostImageUploadsInput
+import org.around.ieuri.common.graphql.generated.types.ConfirmPostImageUploadsPayload
 import org.around.ieuri.common.graphql.generated.types.CreateCommentInput
 import org.around.ieuri.common.graphql.generated.types.CreateCommentPayload
-import org.around.ieuri.common.graphql.generated.types.CreatePostImageUploadUrlInput
-import org.around.ieuri.common.graphql.generated.types.CreatePostImageUploadUrlPayload
+import org.around.ieuri.common.graphql.generated.types.CreatePostImageUploadUrlsInput
+import org.around.ieuri.common.graphql.generated.types.CreatePostImageUploadUrlsPayload
+import org.around.ieuri.common.graphql.generated.types.DeletePostImageInput
+import org.around.ieuri.common.graphql.generated.types.DeletePostImagePayload
+import org.around.ieuri.common.graphql.generated.types.PostImageUploadFailure
+import org.around.ieuri.common.graphql.generated.types.PostImageUploadUrl
 import org.around.ieuri.common.graphql.generated.types.CreatePostInput
 import org.around.ieuri.common.graphql.generated.types.CreatePostPayload
 import org.around.ieuri.common.graphql.generated.types.DeleteCommentInput
@@ -29,13 +33,15 @@ import org.around.ieuri.common.graphql.generated.types.UnlikePostInput
 import org.around.ieuri.common.graphql.generated.types.UnlikePostPayload
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.community.application.command.BlockUserCommand
-import org.around.ieuri.community.application.command.ConfirmPostImageUploadCommand
+import org.around.ieuri.community.application.command.ConfirmPostImageUploadsCommand
+import org.around.ieuri.community.application.command.DeletePostImageCommand
 import org.around.ieuri.community.application.command.CreateCommentCommand
 import org.around.ieuri.community.application.command.CreatePostCommand
 import org.around.ieuri.community.application.command.DeleteCommentCommand
 import org.around.ieuri.community.application.command.DeletePostCommand
 import org.around.ieuri.community.application.command.EditPostCommand
-import org.around.ieuri.community.application.command.IssuePostImageUploadUrlCommand
+import org.around.ieuri.community.application.command.IssuePostImageUploadUrlsCommand
+import org.around.ieuri.community.application.command.PostImageUploadRequest
 import org.around.ieuri.community.application.command.LikePostCommand
 import org.around.ieuri.community.application.command.ReportContentCommand
 import org.around.ieuri.community.application.port.`in`.command.BlockCommandUseCase
@@ -44,8 +50,7 @@ import org.around.ieuri.community.application.port.`in`.command.PostCommandUseCa
 import org.around.ieuri.community.application.port.`in`.command.PostImageUploadUseCase
 import org.around.ieuri.community.application.port.`in`.command.PostLikeCommandUseCase
 import org.around.ieuri.community.application.port.`in`.command.ReportCommandUseCase
-import org.around.ieuri.community.domain.vo.PostTarget
-import org.around.ieuri.community.domain.vo.PostTargetType
+import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.domain.vo.ReportReason
 import org.around.ieuri.community.domain.vo.ReportTargetType
 import org.springframework.stereotype.Component
@@ -75,10 +80,8 @@ class CommunityMutationResolver(
         val memberId = currentMemberProvider.requireMemberId()
         val postId = postCommandUseCase.createPost(
             command = CreatePostCommand(
-                target = PostTarget(
-                    type = PostTargetType.valueOf(input.targetType.name),
-                    id = input.targetId,
-                ),
+                category = TargetCategory.valueOf(input.category.name),
+                spotId = input.spotId,
                 tags = input.tags,
                 title = input.title,
                 body = input.body,
@@ -99,7 +102,12 @@ class CommunityMutationResolver(
     ) {
         val memberId = currentMemberProvider.requireMemberId()
         postCommandUseCase.editPost(
-            EditPostCommand(postId = input.postId, title = input.title, body = input.body),
+            EditPostCommand(
+                postId = input.postId,
+                title = input.title,
+                body = input.body,
+                photoKeys = input.photoKeys,
+            ),
             memberId,
         )
         EditPostPayload(success = true, userErrors = emptyList())
@@ -164,45 +172,76 @@ class CommunityMutationResolver(
     }
 
     @DgsMutation
-    fun createPostImageUploadUrl(
-        @InputArgument input: CreatePostImageUploadUrlInput,
-    ): CreatePostImageUploadUrlPayload = withCommunityUserErrors(
+    fun createPostImageUploadUrls(
+        @InputArgument input: CreatePostImageUploadUrlsInput,
+    ): CreatePostImageUploadUrlsPayload = withCommunityUserErrors(
         onError = {
-            CreatePostImageUploadUrlPayload(
-                success = false, userErrors = it,
-                uploadUrl = null, objectKey = null, expiresAt = null,
+            CreatePostImageUploadUrlsPayload(success = false, userErrors = it, uploadUrls = emptyList())
+        },
+    ) {
+        val memberId = currentMemberProvider.requireMemberId()
+        val issued = postImageUploadUseCase.issueUploadUrls(
+            IssuePostImageUploadUrlsCommand(
+                images = input.images.map {
+                    PostImageUploadRequest(
+                        contentType = it.contentType,
+                        contentLength = it.contentLength.toLong(),
+                    )
+                },
+            ),
+            memberId,
+        )
+        CreatePostImageUploadUrlsPayload(
+            success = true,
+            userErrors = emptyList(),
+            uploadUrls = issued.map {
+                PostImageUploadUrl(
+                    uploadUrl = it.uploadUrl,
+                    objectKey = it.objectKey,
+                    expiresAt = it.expiresAt.toString(),
+                )
+            },
+        )
+    }
+
+    /**
+     * 확인은 **장별로 성패가 갈린다.** success는 전부 성공했을 때만 true이며, 일부만 실패해도
+     * 나머지 confirmed는 그대로 쓸 수 있다.
+     */
+    @DgsMutation
+    fun confirmPostImageUploads(
+        @InputArgument input: ConfirmPostImageUploadsInput,
+    ): ConfirmPostImageUploadsPayload = withCommunityUserErrors(
+        onError = {
+            ConfirmPostImageUploadsPayload(
+                success = false, userErrors = it, confirmed = emptyList(), failed = emptyList(),
             )
         },
     ) {
         val memberId = currentMemberProvider.requireMemberId()
-        val issued = postImageUploadUseCase.issueUploadUrl(
-            IssuePostImageUploadUrlCommand(
-                contentType = input.contentType,
-                contentLength = input.contentLength.toLong(),
-            ),
+        val result = postImageUploadUseCase.confirmUploads(
+            ConfirmPostImageUploadsCommand(input.objectKeys),
             memberId,
         )
-        CreatePostImageUploadUrlPayload(
-            success = true,
+        ConfirmPostImageUploadsPayload(
+            success = result.failed.isEmpty(),
             userErrors = emptyList(),
-            uploadUrl = issued.uploadUrl,
-            objectKey = issued.objectKey,
-            expiresAt = issued.expiresAt.toString(),
+            confirmed = result.confirmed,
+            failed = result.failed.map {
+                PostImageUploadFailure(objectKey = it.objectKey, code = it.code)
+            },
         )
     }
 
     @DgsMutation
-    fun confirmPostImageUpload(
-        @InputArgument input: ConfirmPostImageUploadInput,
-    ): ConfirmPostImageUploadPayload = withCommunityUserErrors(
-        onError = { ConfirmPostImageUploadPayload(success = false, userErrors = it, objectKey = null) },
+    fun deletePostImage(
+        @InputArgument input: DeletePostImageInput,
+    ): DeletePostImagePayload = withCommunityUserErrors(
+        onError = { DeletePostImagePayload(success = false, userErrors = it) },
     ) {
         val memberId = currentMemberProvider.requireMemberId()
-        val confirmed = postImageUploadUseCase.confirmUpload(
-            ConfirmPostImageUploadCommand(input.objectKey),
-            memberId,
-        )
-        ConfirmPostImageUploadPayload(success = true, userErrors = emptyList(), objectKey = confirmed)
+        postImageUploadUseCase.deleteImage(DeletePostImageCommand(input.objectKey), memberId)
+        DeletePostImagePayload(success = true, userErrors = emptyList())
     }
 
     @DgsMutation

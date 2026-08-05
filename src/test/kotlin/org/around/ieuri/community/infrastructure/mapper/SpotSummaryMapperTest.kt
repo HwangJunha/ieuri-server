@@ -1,8 +1,7 @@
 package org.around.ieuri.community.infrastructure.mapper
 
-import org.around.ieuri.community.domain.vo.PostTargetType
 import org.around.ieuri.community.domain.vo.TargetCategory
-import org.around.ieuri.community.infrastructure.adapter.out.client.mapper.toPostTargetView
+import org.around.ieuri.community.infrastructure.adapter.out.client.mapper.toPostSpotView
 import org.around.ieuri.tourism.application.query.SpotSummaryView
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -21,9 +20,8 @@ class SpotSummaryMapperTest {
             title = "경복궁",
             thumbnailImageUrl = "https://img/gyeongbok.jpg",
             categoryCode = "TOURIST_SPOT",
-        ).toPostTargetView()
+        ).toPostSpotView()
 
-        assertEquals(PostTargetType.SPOT, view.type)
         assertEquals(11094L, view.id)
         assertEquals("경복궁", view.title)
         assertEquals("https://img/gyeongbok.jpg", view.thumbnailImageUrl)
@@ -35,11 +33,11 @@ class SpotSummaryMapperTest {
         // 여행코스는 국문 전용, 교통은 외국어 전용이다. 둘 다 값 집합에 있어야 칩이 뜬다.
         assertEquals(
             TargetCategory.TRAVEL_COURSE,
-            summary(categoryCode = "TRAVEL_COURSE").toPostTargetView().category,
+            summary(categoryCode = "TRAVEL_COURSE").toPostSpotView().category,
         )
         assertEquals(
             TargetCategory.TRANSPORT,
-            summary(categoryCode = "TRANSPORT").toPostTargetView().category,
+            summary(categoryCode = "TRANSPORT").toPostSpotView().category,
         )
     }
 
@@ -49,7 +47,7 @@ class SpotSummaryMapperTest {
         TargetCategory.entries.forEach { category ->
             assertEquals(
                 category,
-                summary(categoryCode = category.name).toPostTargetView().category,
+                summary(categoryCode = category.name).toPostSpotView().category,
                 "${category.name}이 옮겨지지 않는다",
             )
         }
@@ -57,8 +55,8 @@ class SpotSummaryMapperTest {
 
     @Test
     fun `모르는 카테고리 코드는 null이다 - 칩으로 걸러지지 않을 뿐 조회는 성공한다`() {
-        assertNull(summary(categoryCode = "UNKNOWN_CODE").toPostTargetView().category)
-        assertNull(summary(categoryCode = "").toPostTargetView().category)
+        assertNull(summary(categoryCode = "UNKNOWN_CODE").toPostSpotView().category)
+        assertNull(summary(categoryCode = "").toPostSpotView().category)
     }
 
     private fun summary(categoryCode: String) = SpotSummaryView(

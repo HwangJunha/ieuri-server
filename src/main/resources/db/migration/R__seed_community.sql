@@ -22,10 +22,7 @@
 -- 판별 기준은 "시드가 쓰는 회원이 시드가 쓰는 spot에 쓴 글"이며, 사람이 손으로 만든 글은 건드리지 않는다.
 
 -- 1) 이전 시드 정리. 댓글·사진·좋아요는 FK ON DELETE CASCADE로 함께 지워진다.
-DELETE FROM community_post
-WHERE target_type = 'SPOT'
-  AND target_id IN (11094, 10997, 33313, 32775, 9471, 27574, 11104)
-  AND author_id IN (12, 14, 15, 16, 17, 18, 19, 20);
+DELETE FROM community_post WHERE author_id IN (12, 14, 15, 16, 17, 18, 19, 20);
 
 DELETE FROM community_block   WHERE blocker_id IN (18, 20) AND blocked_id IN (18, 19, 20);
 DELETE FROM community_report  WHERE reporter_id IN (12, 14, 15, 16, 17, 18, 19, 20);
@@ -41,76 +38,127 @@ INSERT INTO community_block (blocker_id, blocked_id, created_at) VALUES
 -- 3) 글. created_at을 서로 다르게 줘서 최신순 정렬과 커서 페이징을 눈으로 확인할 수 있게 한다.
 --    본문에 이모지를 섞어 UTF8 저장·조회를 함께 확인한다(가족 이모지는 코드포인트 7자다).
 INSERT INTO community_post
-    (target_type, target_id, author_id, title, body,
-     like_count, comment_count, hidden, created_at, updated_at)
+    (author_id, title, body, like_count, comment_count, hidden, created_at, updated_at)
 VALUES
     -- 20번(주인공)의 글 — 본인에게 ownedByViewer=true로 보인다
     -- comment_count=4 : 보이는 댓글 4건(12·14·15·19번). 19번 댓글은 20번에게만 차단으로 가려질 뿐
     -- 숨김이 아니므로 **숫자에는 포함된다** — 차단은 보는 사람마다 다르지만 숫자는 모두에게 같다(R23-4).
     -- 17번의 숨김 댓글 1건만 이 수에서 빠진다.
-    ('SPOT', 11094, 20, '경복궁 야간개장 후기',
+    (20, '경복궁 야간개장 후기',
      '경복궁 야간개장 다녀왔어요 🌙 한복 입고 가면 입장료가 무료라 사람이 정말 많네요. 수문장 교대식은 꼭 보세요!',
      12, 4, FALSE, now() - interval '2 hours', now() - interval '2 hours'),
-    ('SPOT', 11094, 20, '경복궁 주차 어디에 하나요?',
+    (20, '경복궁 주차 어디에 하나요?',
      '경복궁 근처에 주차할 만한 곳 있을까요? 🚗 주말에 차 가져가려는데 고민이네요.',
      2, 2, FALSE, now() - interval '1 day', now() - interval '1 day'),
-    ('SPOT', 33313, 20, '북촌 골목 사진 몇 장',
+    (20, '북촌 골목 사진 몇 장',
      '북촌 골목에서 찍은 사진 몇 장 올려요 📸 오후 4시쯤 빛이 제일 예뻤습니다.',
      31, 1, FALSE, now() - interval '5 days', now() - interval '5 days'),
-    ('SPOT', 11104, 20, '주말 해운대 같이 가실 분',
+    (20, '주말 해운대 같이 가실 분',
      '이번 주말 해운대 같이 가실 분 🌊 뚜벅이라 대중교통으로 움직입니다.',
      4, 0, FALSE, now() - interval '6 hours', now() - interval '6 hours'),
 
     -- 12·14·15·16번 — 20번에게 정상적으로 보이는 타인의 글
-    ('SPOT', 11094, 12, '경복궁 휴무일 주의하세요',
+    (12, '경복궁 휴무일 주의하세요',
      '경복궁은 매주 화요일 휴무예요. 헛걸음하지 마세요 🙏',
      45, 2, FALSE, now() - interval '3 hours', now() - interval '3 hours'),
-    ('SPOT', 10997, 14, '덕수궁 돌담길 야경 추천',
+    (14, '덕수궁 돌담길 야경 추천',
      '덕수궁 돌담길 산책하기 좋아요. 저녁에 조명 켜지면 분위기가 확 달라집니다 ✨',
      18, 1, FALSE, now() - interval '8 hours', now() - interval '8 hours'),
-    ('SPOT', 32775, 15, '인사동 기념품 가게 추천해주세요',
+    (15, '인사동 기념품 가게 추천해주세요',
      '인사동에서 기념품 살 만한 가게 추천해주세요! 외국인 친구 선물용이에요 🎁',
      7, 1, FALSE, now() - interval '12 hours', now() - interval '12 hours'),
-    ('SPOT', 9471, 16, '청계천 야경 사진',
+    (16, '청계천 야경 사진',
      '청계천 야경 🌃 여름 밤에 발 담그고 있으면 시원해요.',
      23, 0, FALSE, now() - interval '2 days', now() - interval '2 days'),
-    ('SPOT', 27574, 12, '서울광장 잔디 개방 기간',
+    (12, '서울광장 잔디 개방 기간',
      '서울광장 잔디밭은 4월~10월에만 개방합니다. 돗자리 챙겨가세요 🧺',
      9, 0, FALSE, now() - interval '4 days', now() - interval '4 days'),
 
     -- **수정된 글**. edited=TRUE이면 클라이언트가 "수정됨"을 표시해야 한다.
     -- updated_at이 created_at보다 뒤인 것도 함께 확인할 수 있다.
-    ('SPOT', 10997, 15, '덕수궁 입장료 정보 (수정됨)',
+    (15, '덕수궁 입장료 정보 (수정됨)',
      '덕수궁 입장료 1,000원입니다. 문화가 있는 날은 무료예요 ✨ (정보 갱신했습니다)',
      6, 0, FALSE, now() - interval '10 hours', now() - interval '30 minutes'),
 
     -- 19번 — 20이 차단한 상대. **20의 피드에 이 두 건이 나오면 차단 필터가 깨진 것이다.**
-    ('SPOT', 11094, 19, '[차단검증] 20번에게 안 보여야 하는 글',
+    (19, '[차단검증] 20번에게 안 보여야 하는 글',
      '[차단검증] 20번이 차단한 사용자의 글입니다. 20번 피드에 보이면 안 됩니다.',
      3, 0, FALSE, now() - interval '4 hours', now() - interval '4 hours'),
-    ('SPOT', 33313, 19, '[차단검증] 19번의 두 번째 글',
+    (19, '[차단검증] 19번의 두 번째 글',
      '[차단검증] 19번의 두 번째 글. 마찬가지로 20번에게는 보이지 않아야 합니다.',
      1, 0, FALSE, now() - interval '7 hours', now() - interval '7 hours'),
 
     -- 18번 — 20을 차단한 상대. **차단이 양방향이므로 20의 피드에 나오면 안 된다.**
-    ('SPOT', 10997, 18, '[역차단검증] 18번이 20번을 차단',
+    (18, '[역차단검증] 18번이 20번을 차단',
      '[역차단검증] 18번이 20번을 차단했습니다. 20번 피드에 이 글이 보이면 양방향 해석이 빠진 것입니다.',
      5, 0, FALSE, now() - interval '9 hours', now() - interval '9 hours'),
 
     -- 17번 — 자동 숨김된 글. **작성자 17에게만 보이고 20·다른 사람에게는 안 보인다.**
-    ('SPOT', 11094, 17, '[숨김검증] 자동 숨김된 글',
+    (17, '[숨김검증] 자동 숨김된 글',
      '[숨김검증] 신고 5건이 쌓여 자동 숨김된 글입니다. 작성자 본인(17)에게만 hidden=true로 보입니다.',
      0, 0, TRUE, now() - interval '1 day', now() - interval '1 day'),
 
     -- 17번의 정상 글 — 숨김이 글 단위이지 사람 단위가 아님을 보여준다(R22)
-    ('SPOT', 9471, 17, '[대조군] 17번의 정상 글',
+    (17, '[대조군] 17번의 정상 글',
      '[대조군] 같은 작성자(17)의 정상 글. 신고당한 것은 위 글이지 이 사람이 아니므로 모두에게 보입니다.',
-     14, 0, FALSE, now() - interval '3 days', now() - interval '3 days');
+     14, 0, FALSE, now() - interval '3 days', now() - interval '3 days'),
+    -- **장소 없이 카테고리만으로 쓴 글.** spot이 선택임을 확인하는 대조군이다.
+    (14, '여행 짐 싸는 팁 공유해요',
+     '캐리어에 옷 넣을 때 돌돌 말면 공간이 확 줄어요 🧳 다들 어떻게 싸시나요?',
+     3, 0, FALSE, now() - interval '11 hours', now() - interval '11 hours');
 
 -- 위 글 하나를 수정된 상태로 표시한다. INSERT에 edited를 직접 넣지 않고 UPDATE로 두는 이유는
 -- "수정은 나중에 일어난 일"이라는 것을 시드 자체가 드러내기 위함이다.
 UPDATE community_post SET edited = TRUE
-WHERE target_type = 'SPOT' AND target_id = 10997 AND author_id = 15;
+WHERE title = '덕수궁 입장료 정보 (수정됨)' AND author_id = 15;
+
+
+-- 3-1) 글 ↔ 카테고리. **모든 글에 붙는다** — 장소 유무와 무관하게 칩으로 걸러져야 한다.
+INSERT INTO community_post_chip (post_id, category)
+SELECT p.id, v.category
+FROM community_post p
+JOIN (VALUES
+    ('경복궁 야간개장 후기', 20, 'TOURIST_SPOT'),
+    ('경복궁 주차 어디에 하나요?', 20, 'TOURIST_SPOT'),
+    ('북촌 골목 사진 몇 장', 20, 'TOURIST_SPOT'),
+    ('주말 해운대 같이 가실 분', 20, 'LEISURE_SPORTS'),
+    ('경복궁 휴무일 주의하세요', 12, 'TOURIST_SPOT'),
+    ('덕수궁 돌담길 야경 추천', 14, 'TOURIST_SPOT'),
+    ('인사동 기념품 가게 추천해주세요', 15, 'SHOPPING'),
+    ('청계천 야경 사진', 16, 'TOURIST_SPOT'),
+    ('서울광장 잔디 개방 기간', 12, 'FESTIVAL_EVENT'),
+    ('덕수궁 입장료 정보 (수정됨)', 15, 'TOURIST_SPOT'),
+    ('[차단검증] 20번에게 안 보여야 하는 글', 19, 'TOURIST_SPOT'),
+    ('[차단검증] 19번의 두 번째 글', 19, 'TOURIST_SPOT'),
+    ('[역차단검증] 18번이 20번을 차단', 18, 'TOURIST_SPOT'),
+    ('[숨김검증] 자동 숨김된 글', 17, 'TOURIST_SPOT'),
+    ('[대조군] 17번의 정상 글', 17, 'TOURIST_SPOT'),
+    ('여행 짐 싸는 팁 공유해요', 14, 'TRAVEL_COURSE')
+) AS v(title, author_id, category)
+  ON p.title = v.title AND p.author_id = v.author_id;
+
+-- 3-2) 글 ↔ 장소. **선택이다** — 위 '여행 짐 싸는 팁' 글에는 없다.
+INSERT INTO community_post_spot (post_id, spot_id)
+SELECT p.id, v.spot_id
+FROM community_post p
+JOIN (VALUES
+    ('경복궁 야간개장 후기', 20, 11094),
+    ('경복궁 주차 어디에 하나요?', 20, 11094),
+    ('북촌 골목 사진 몇 장', 20, 33313),
+    ('주말 해운대 같이 가실 분', 20, 11104),
+    ('경복궁 휴무일 주의하세요', 12, 11094),
+    ('덕수궁 돌담길 야경 추천', 14, 10997),
+    ('인사동 기념품 가게 추천해주세요', 15, 32775),
+    ('청계천 야경 사진', 16, 9471),
+    ('서울광장 잔디 개방 기간', 12, 27574),
+    ('덕수궁 입장료 정보 (수정됨)', 15, 10997),
+    ('[차단검증] 20번에게 안 보여야 하는 글', 19, 11094),
+    ('[차단검증] 19번의 두 번째 글', 19, 33313),
+    ('[역차단검증] 18번이 20번을 차단', 18, 10997),
+    ('[숨김검증] 자동 숨김된 글', 17, 11094),
+    ('[대조군] 17번의 정상 글', 17, 9471)
+) AS v(title, author_id, spot_id)
+  ON p.title = v.title AND p.author_id = v.author_id;
 
 -- 4) 사진 키. 실제 R2에 오브젝트가 없으므로 **CDN에서는 깨진 이미지로 나온다** — 키 배열과
 --    순서(position)가 계약대로 내려오는지 확인하는 용도다.
@@ -118,12 +166,12 @@ INSERT INTO community_post_photo (post_id, object_key, position)
 SELECT p.id, 'images/20/00000000-0000-4000-8000-00000000000' || g.n, g.n
 FROM community_post p
 CROSS JOIN (VALUES (0), (1), (2)) AS g(n)
-WHERE p.author_id = 20 AND p.target_id = 33313;
+WHERE p.author_id = 20 AND p.title = '북촌 골목 사진 몇 장';
 
 INSERT INTO community_post_photo (post_id, object_key, position)
 SELECT p.id, 'images/16/00000000-0000-4000-8000-00000000010', 0
 FROM community_post p
-WHERE p.author_id = 16 AND p.target_id = 9471;
+WHERE p.author_id = 16 AND p.title = '청계천 야경 사진';
 
 -- 5) 댓글. comment_count는 **숨김 댓글만** 제외한 수다(R23).
 --    차단은 보는 사람마다 다르지만 숫자는 모두에게 같아야 하므로, 차단 대상의 댓글은 수에 남는다.
@@ -133,26 +181,27 @@ FROM community_post p
 JOIN (VALUES
     -- 20번의 경복궁 후기(comment_count = 4) → 숨김 아닌 댓글 4건 + 숨김 1건.
     -- 19번 댓글은 20번 화면에서만 차단으로 가려지고 숫자에는 남는다.
-    (11094, 20, 12, '저도 지난주에 다녀왔어요! 한복 대여점이 근처에 많더라고요 😊', FALSE, 1),
-    (11094, 20, 14, '수문장 교대식 시간표가 어떻게 되나요?',                        FALSE, 1),
-    (11094, 20, 15, '사진 잘 보고 갑니다 👍',                                      FALSE, 1),
-    (11094, 20, 19, '[차단검증] 20이 차단한 19의 댓글. 20에게는 보이지 않아야 합니다.', FALSE, 1),
+    ('경복궁 야간개장 후기', 20, 12, '저도 지난주에 다녀왔어요! 한복 대여점이 근처에 많더라고요 😊', FALSE, 1),
+    ('경복궁 야간개장 후기', 20, 14, '수문장 교대식 시간표가 어떻게 되나요?', FALSE, 1),
+    ('경복궁 야간개장 후기', 20, 15, '사진 잘 보고 갑니다 👍', FALSE, 1),
+    ('경복궁 야간개장 후기', 20, 19, '[차단검증] 20이 차단한 19의 댓글. 20에게는 보이지 않아야 합니다.', FALSE, 1),
     -- 숨김 댓글 — comment_count(4)에 들어가 있지 않다. 목록에도 작성자 17에게만 보인다.
-    (11094, 20, 17, '[숨김검증] 신고 누적으로 숨겨진 댓글. 숫자에는 안 잡힙니다.',      TRUE,  2),
+    ('경복궁 야간개장 후기', 20, 17, '[숨김검증] 신고 누적으로 숨겨진 댓글. 숫자에는 안 잡힙니다.', TRUE, 2),
 
     -- 20번의 주차 질문(comment_count = 2)
-    (11094, 20, 12, '주차장 협소해서 대중교통 추천드려요 🚇 3호선 경복궁역 5번 출구요.', FALSE, 3),
-    (11094, 20, 16, '주말엔 진짜 자리 없어요. 근처 사설주차장도 만차입니다.',            FALSE, 4),
+    ('경복궁 주차 어디에 하나요?', 20, 12, '주차장 협소해서 대중교통 추천드려요 🚇 3호선 경복궁역 5번 출구요.', FALSE, 3),
+    ('경복궁 주차 어디에 하나요?', 20, 16, '주말엔 진짜 자리 없어요. 근처 사설주차장도 만차입니다.', FALSE, 4),
 
     -- 타인 글의 댓글
-    (11094, 12, 20, '오 몰랐네요. 저장해둡니다 🔖',                                  FALSE, 2),
-    (11094, 12, 14, '작년에 화요일에 갔다가 그냥 돌아왔었어요 😭',                      FALSE, 5),
-    (10997, 14, 20, '돌담길 야경 좋죠. 저도 좋아하는 코스예요.',                       FALSE, 6),
-    (32775, 15, 20, '쌈지길 안에 아기자기한 가게 많아요!',                             FALSE, 7),
-    (33313, 20, 18, '[역차단검증] 18의 댓글. 20에게는 보이지 않아야 합니다.',            FALSE, 8)
-) AS c(target_id, post_author, author_id, body, hidden, age)
-  ON p.target_id = c.target_id AND p.author_id = c.post_author
-WHERE p.target_type = 'SPOT';
+    ('경복궁 휴무일 주의하세요', 12, 20, '오 몰랐네요. 저장해둡니다 🔖', FALSE, 2),
+    ('경복궁 휴무일 주의하세요', 12, 14, '작년에 화요일에 갔다가 그냥 돌아왔었어요 😭', FALSE, 5),
+    ('덕수궁 돌담길 야경 추천', 14, 20, '돌담길 야경 좋죠. 저도 좋아하는 코스예요.', FALSE, 6),
+    ('인사동 기념품 가게 추천해주세요', 15, 20, '쌈지길 안에 아기자기한 가게 많아요!', FALSE, 7),
+    -- 북촌 글(comment_count = 1). 18은 20을 차단했으므로 20에게만 이 댓글이 가려진다 —
+    -- 그래도 숫자에는 남아, 20의 화면에서 "1건인데 목록은 비어 있음"이 된다(R23-4 확인용).
+    ('북촌 골목 사진 몇 장', 20, 18, '[역차단검증] 18의 댓글. 20에게는 보이지 않아야 합니다.', FALSE, 8)
+) AS c(post_title, post_author, author_id, body, hidden, age)
+  ON p.title = c.post_title AND p.author_id = c.post_author;
 
 -- 6) 좋아요. like_count 컬럼과 실제 행 수는 일부러 다르다 — 카운트는 파생 저장값이고
 --    likedByViewer는 이 행으로 판정되므로, 두 값의 출처가 다름을 보여준다.
@@ -160,16 +209,15 @@ WHERE p.target_type = 'SPOT';
 INSERT INTO community_post_like (post_id, member_id, created_at)
 SELECT p.id, 20, now() - interval '1 hour'
 FROM community_post p
-WHERE p.target_type = 'SPOT'
-  AND ((p.author_id = 12    AND p.target_id = 11094)
-    OR (p.author_id = 14 AND p.target_id = 10997));
+WHERE (p.author_id = 12 AND p.title = '경복궁 휴무일 주의하세요')
+   OR (p.author_id = 14 AND p.title = '덕수궁 돌담길 야경 추천');
 
 -- 다른 회원들의 좋아요 — 20번 글에 붙여 본인 글의 반응을 보이게 한다.
 INSERT INTO community_post_like (post_id, member_id, created_at)
 SELECT p.id, m.member_id, now() - interval '2 hours'
 FROM community_post p
 CROSS JOIN (VALUES (12), (14), (15), (16)) AS m(member_id)
-WHERE p.target_type = 'SPOT' AND p.author_id = 20;
+WHERE p.author_id = 20;
 
 -- 7) 신고. 17번의 숨김 글에 **서로 다른 신고자 5명**을 붙여 임계값 도달 상태를 재현한다.
 --    글의 hidden이 이미 TRUE인 것과 이 5건이 앞뒤가 맞아야 한다.
@@ -184,7 +232,7 @@ JOIN (VALUES
     (20, 'OTHER',                 '기타 사유 상세입니다. OTHER는 상세가 필수입니다.')
 ) AS r(reporter_id, reason, detail)
   ON TRUE
-WHERE p.target_type = 'SPOT' AND p.author_id = 17 AND p.hidden = TRUE;
+WHERE p.author_id = 17 AND p.hidden = TRUE;
 
 -- 사용자 대상 신고 — 5명이 신고해도 **아무 자동 조치가 없음**을 확인하는 데이터다(R22).
 -- 19번의 글이 여전히 hidden=FALSE인 것이 그 증거다.
@@ -248,22 +296,23 @@ INSERT INTO community_post_tag (post_id, name, normalized)
 SELECT p.id, t.name, t.normalized
 FROM community_post p
 JOIN (VALUES
-    (11094, 20, '야간개장', '야간개장'),
-    (11094, 20, '한복',     '한복'),
-    (33313, 20, '사진맛집', '사진맛집'),
-    (11094, 12, '꿀팁',     '꿀팁'),
-    (10997, 14, '야경',     '야경'),
+    ('경복궁 야간개장 후기', 20, '야간개장', '야간개장'),
+    ('경복궁 야간개장 후기', 20, '한복', '한복'),
+    ('북촌 골목 사진 몇 장', 20, '사진맛집', '사진맛집'),
+    ('경복궁 휴무일 주의하세요', 12, '꿀팁', '꿀팁'),
+    ('덕수궁 돌담길 야경 추천', 14, '야경', '야경'),
+    -- 장소 없는 글에도 태그가 붙는다 — 태그는 spot과 무관하다.
+    ('여행 짐 싸는 팁 공유해요', 14, '짐싸기', '짐싸기'),
     -- 대소문자가 다른 같은 태그. normalized가 같아 태그 검색에 함께 잡혀야 한다.
-    (9471,  16, 'Seoul',    'seoul'),
-    (27574, 12, 'seoul',    'seoul')
-) AS t(target_id, author_id, name, normalized)
-  ON p.target_id = t.target_id AND p.author_id = t.author_id
-WHERE p.target_type = 'SPOT';
+    ('청계천 야경 사진', 16, 'Seoul', 'seoul'),
+    ('서울광장 잔디 개방 기간', 12, 'seoul', 'seoul')
+) AS t(post_title, author_id, name, normalized)
+  ON p.title = t.post_title AND p.author_id = t.author_id;
 
 -- ============================================================
 -- 확인용 쿼리 (실행되지 않는 주석이다. 필요할 때 복사해서 쓴다.)
 --
--- 20번에게 보이는 글 — 15건 중 11건이어야 한다.
+-- 20번에게 보이는 글 — 16건 중 12건이어야 한다.
 --   제외 4건 = 19의 2건 + 18의 1건(차단) + 17의 숨김 1건. 본인 글 4건은 다 보인다.
 --
 --   SELECT p.id, p.author_id, p.title, p.hidden, left(p.body, 30) AS body
@@ -278,13 +327,15 @@ WHERE p.target_type = 'SPOT';
 --   ORDER BY p.created_at DESC;
 --
 -- 같은 조회를 17번으로 하면 자기 숨김 글이 하나 더 보인다(작성자 예외).
--- 미인증(차단 관계 없음)으로 하면 숨김 1건만 빠져 14건이 보인다.
+-- 차단 관계가 없는 사람(예: 12번)으로 보면 숨김 1건만 빠져 15건이 보인다.
 --
--- 지역 피드 — 서울 시청 반경 5km. 해운대(11104) 글은 331km 밖이라 빠져야 한다.
+-- 지역 피드 — 서울 시청 반경 5km. 해운대(11104) 글은 331km 밖이라 빠지고,
+-- 장소 없는 글('여행 짐 싸는 팁')은 community_post_spot 행이 없어 애초에 조인되지 않는다.
 --
 --   SELECT p.id, s.title, p.title
 --   FROM community_post p
---   JOIN spot s ON s.id = p.target_id AND p.target_type = 'SPOT'
+--   JOIN community_post_spot ps ON ps.post_id = p.id
+--   JOIN spot s ON s.id = ps.spot_id
 --   WHERE p.deleted_at IS NULL
 --     AND ST_DWithin(s.location, ST_MakePoint(126.9780, 37.5665)::geography, 5000)
 --   ORDER BY p.created_at DESC;

@@ -1,7 +1,5 @@
 package org.around.ieuri.community.application.query
 
-import org.around.ieuri.community.domain.vo.PostTarget
-import org.around.ieuri.community.domain.vo.PostTargetType
 import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.domain.vo.PostTag
 import java.time.Instant
@@ -11,18 +9,12 @@ import java.time.Instant
  * 도메인/JPA 어느 쪽도 아니다. 리졸버가 이 DTO를 GraphQL 응답 타입으로 매핑한다.
  */
 
-/**
- * 피드 카드의 대상 칩. 대상 도메인의 전체 모델이 아니라 칩에 필요한 최소 정보만 담는다.
- *
- * 종류가 무엇이든 같은 모양이다 — 관광지든 상품이든 카드에 필요한 것은 제목과 썸네일뿐이며,
- * 그래서 종류가 늘어도 이 타입과 피드 렌더링은 그대로다.
- */
-data class PostTargetView(
-    val type: PostTargetType,
+/** 피드 카드의 장소 칩. spot 전체가 아니라 칩에 필요한 최소 정보만 담는다. */
+data class PostSpotView(
     val id: Long,
     val title: String,
     val thumbnailImageUrl: String,
-    /** 상단 추천 칩이 거르는 축. 카테고리 개념이 없는 종류는 null이다. */
+    /** spot이 속한 카테고리. 글 작성 시 기본값 제안에 쓴다. */
     val category: TargetCategory?,
 )
 
@@ -45,7 +37,9 @@ data class PostView(
     val body: String,
     /** 사용자가 입력한 태그. 표시는 원문 그대로다. */
     val tags: List<String>,
-    val target: PostTargetView,
+    val category: TargetCategory,
+    /** 연결된 장소. 없으면 null이며, 카드는 장소 칩 없이 그려진다. */
+    val spot: PostSpotView?,
     val author: PostAuthorView,
     val photoKeys: List<String>,
     val likeCount: Int,
@@ -88,13 +82,26 @@ data class PostImageUploadUrlView(
     val expiresAt: Instant,
 )
 
+/** 확인 결과. 장별로 성패가 갈린다 — 한 장이 실패해도 나머지는 확정된다. */
+data class PostImageConfirmResult(
+    val confirmed: List<String>,
+    val failed: List<PostImageConfirmFailure>,
+)
+
+data class PostImageConfirmFailure(
+    val objectKey: String,
+    /** 실패 사유. 미업로드·타인 키·형식 위반을 구분하지 않는다(키 존재를 캐낼 수 있어서다). */
+    val code: String,
+)
+
 /**
  * 글 피드 조회 입력. 인자 조합으로 범위가 정해진다 — 대상 하나, 좌표 반경, 또는 전체다.
  *
  * [radiusMeters]·[category]는 좌표를 줄 때만 의미가 있다.
  */
 data class PostsQuery(
-    val target: PostTarget?,
+    /** 이 장소에 붙은 글만. null이면 장소로 좁히지 않는다. */
+    val spotId: Long?,
     val latitude: Double?,
     val longitude: Double?,
     val radiusMeters: Int,

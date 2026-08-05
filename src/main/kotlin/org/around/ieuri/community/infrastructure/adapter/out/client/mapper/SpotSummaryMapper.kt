@@ -1,7 +1,6 @@
 package org.around.ieuri.community.infrastructure.adapter.out.client.mapper
 
-import org.around.ieuri.community.application.query.PostTargetView
-import org.around.ieuri.community.domain.vo.PostTargetType
+import org.around.ieuri.community.application.query.PostSpotView
 import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.tourism.application.query.SpotSummaryView
 
@@ -13,8 +12,7 @@ import org.around.ieuri.tourism.application.query.SpotSummaryView
  * 상대 도메인의 domain 패키지에 의존하게 되고, 그것이 도메인 추출을 막는다.
  * 모르는 값이면 null이며 그 대상은 카테고리 칩으로 걸러지지 않는다.
  */
-fun SpotSummaryView.toPostTargetView(): PostTargetView = PostTargetView(
-    type = PostTargetType.SPOT,
+fun SpotSummaryView.toPostSpotView(): PostSpotView = PostSpotView(
     id = id,
     title = title,
     thumbnailImageUrl = thumbnailImageUrl,

@@ -1,14 +1,15 @@
 package org.around.ieuri.community.domain.aggregate
 
 import org.around.ieuri.community.domain.vo.PhotoObjectKey
-import org.around.ieuri.community.domain.vo.PostTarget
+import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.domain.vo.PostTag
 import java.time.Instant
 
 /**
  * 커뮤니티 글. 애그리게이트 루트.
  *
- * 글은 [target]에 붙는다 — 관광지에 한정되지 않으며 종류가 늘어도 이 모델은 그대로다.
+ * 글은 [category]에 반드시 속하고 [spotId]에는 선택적으로 붙는다 — 장소를 고르지 않아도
+ * 카테고리만으로 글을 쓸 수 있다.
  *
  * likeCount·commentCount는 파생값이지만 애그리게이트가 들고 있다 — 매 조회마다 세지 않는다.
  * 갱신은 좋아요·댓글·신고 커맨드가 이 애그리게이트를 거쳐서 한다.
@@ -17,7 +18,10 @@ import java.time.Instant
  */
 class Post private constructor(
     val id: Long?,
-    val target: PostTarget,
+    /** 글의 카테고리. 상단 칩이 이 값으로 거른다. spot 유무와 무관하게 항상 있다. */
+    val category: TargetCategory,
+    /** 연결된 장소. **선택이다** — 장소 없이 카테고리만으로도 글을 쓸 수 있다. */
+    val spotId: Long?,
     val authorId: Long,
     val tags: List<PostTag>,
     title: String,
@@ -142,7 +146,8 @@ class Post private constructor(
          * 애플리케이션 계층의 책임이다. 남의 키인지 확인하는 데 저장소를 왕복할 이유가 없다.
          */
         fun create(
-            target: PostTarget,
+            category: TargetCategory,
+            spotId: Long?,
             authorId: Long,
             tags: List<PostTag>,
             title: String,
@@ -150,6 +155,7 @@ class Post private constructor(
             photoKeys: List<PhotoObjectKey>,
         ): Post {
             require(authorId > 0) { "authorId는 양수여야 합니다." }
+            require(spotId == null || spotId > 0) { "spotId는 양수여야 합니다." }
             val trimmedTitle = title.trim()
             require(trimmedTitle.isNotEmpty()) { "제목은 비어 있을 수 없습니다." }
             require(trimmedTitle.length <= TITLE_MAX_LENGTH) { "제목은 ${TITLE_MAX_LENGTH}자를 넘을 수 없습니다." }
@@ -164,7 +170,8 @@ class Post private constructor(
             val distinctTags = tags.distinctBy { it.normalized }
             return Post(
                 id = null,
-                target = target,
+                category = category,
+                spotId = spotId,
                 authorId = authorId,
                 tags = distinctTags,
                 title = trimmedTitle,
@@ -181,7 +188,8 @@ class Post private constructor(
         /** 저장소에서 복원. 불변식은 생성 시점에 이미 통과했으므로 다시 검사하지 않는다. */
         fun restore(
             id: Long,
-            target: PostTarget,
+            category: TargetCategory,
+            spotId: Long?,
             authorId: Long,
             tags: List<PostTag>,
             title: String,
@@ -195,7 +203,8 @@ class Post private constructor(
             edited: Boolean = false,
         ): Post = Post(
             id = id,
-            target = target,
+            category = category,
+            spotId = spotId,
             authorId = authorId,
             tags = tags,
             title = title,

@@ -3,15 +3,15 @@ package org.around.ieuri.community.infrastructure.mapper
 import org.around.ieuri.community.domain.aggregate.Block
 import org.around.ieuri.community.domain.aggregate.Comment
 import org.around.ieuri.community.domain.aggregate.Post
+import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.domain.aggregate.PostLike
 import org.around.ieuri.community.domain.aggregate.Report
 import org.around.ieuri.community.domain.vo.PhotoObjectKey
-import org.around.ieuri.community.domain.vo.PostTarget
-import org.around.ieuri.community.domain.vo.PostTargetType
 import org.around.ieuri.community.domain.vo.ReportReason
 import org.around.ieuri.community.domain.vo.ReportTargetType
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.BlockEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.CommentEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostChipEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostLikeEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostPhotoEntity
@@ -37,8 +37,6 @@ class CommunityMapperTest {
     fun `글 엔티티가 도메인으로 필드마다 옮겨진다`() {
         val entity = PostEntity(
             id = 1L,
-            targetType = PostTargetType.SPOT,
-            targetId = 2L,
             authorId = 3L,
             title = "제목",
             body = "본문",
@@ -53,11 +51,12 @@ class CommunityMapperTest {
         entity.photos = mutableListOf(
             PostPhotoEntity(post = entity, objectKey = "images/3/$uuid", position = 0),
         )
+        entity.chip = PostChipEntity(post = entity, category = TargetCategory.TOURIST_SPOT)
 
         val domain = entity.toDomain()
 
         assertEquals(1L, domain.id)
-        assertEquals(PostTarget(PostTargetType.SPOT, 2L), domain.target)
+        
         assertEquals(3L, domain.authorId)
         assertEquals("본문", domain.body)
         assertEquals(4, domain.likeCount)
@@ -71,7 +70,7 @@ class CommunityMapperTest {
     @Test
     fun `글 사진은 position 순서대로 옮겨진다`() {
         val entity = PostEntity(
-            id = 1L, targetType = PostTargetType.SPOT, targetId = 2L, authorId = 3L,
+            id = 1L, authorId = 3L,
             title = "제목", body = "본문",
             createdAt = createdAt, updatedAt = createdAt,
         )
@@ -85,17 +84,20 @@ class CommunityMapperTest {
 
         assertEquals(
             listOf("images/3/$first", "images/3/$second"),
-            entity.toDomain().photoKeys.map { it.value },
+            entity.also { it.chip = PostChipEntity(post = it, category = TargetCategory.TOURIST_SPOT) }
+                .toDomain().photoKeys.map { it.value },
         )
     }
 
     @Test
     fun `nullable 필드가 모두 null인 글도 옮겨진다`() {
         val entity = PostEntity(
-            id = 1L, targetType = PostTargetType.SPOT, targetId = 2L, authorId = 3L,
+            id = 1L, authorId = 3L,
             title = "제목", body = "본문",
             deletedAt = null, createdAt = createdAt, updatedAt = createdAt,
         )
+
+        entity.chip = PostChipEntity(post = entity, category = TargetCategory.TOURIST_SPOT)
 
         val domain = entity.toDomain()
 
@@ -108,15 +110,14 @@ class CommunityMapperTest {
         val keyA = PhotoObjectKey.issue(3L, UUID.randomUUID()).toConfirmed()
         val keyB = PhotoObjectKey.issue(3L, UUID.randomUUID()).toConfirmed()
         val domain = Post.create(
-            target = PostTarget(PostTargetType.SPOT, 2L), authorId = 3L, tags = emptyList(),
+            category = TargetCategory.TOURIST_SPOT,
+        spotId = 2L, authorId = 3L, tags = emptyList(),
             title = "제목", body = "본문", photoKeys = listOf(keyA, keyB),
         )
 
         val entity = domain.toNewEntity()
 
         assertNull(entity.id)
-        assertEquals(PostTargetType.SPOT, entity.targetType)
-        assertEquals(2L, entity.targetId)
         assertEquals(3L, entity.authorId)
         assertEquals("본문", entity.body)
         assertEquals(0, entity.likeCount)

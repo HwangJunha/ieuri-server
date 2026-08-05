@@ -1,8 +1,8 @@
 package org.around.ieuri.community.infrastructure.adapter.out.client
 
 import org.around.ieuri.community.application.port.out.client.SpotLookupPort
-import org.around.ieuri.community.application.query.PostTargetView
-import org.around.ieuri.community.infrastructure.adapter.out.client.mapper.toPostTargetView
+import org.around.ieuri.community.application.query.PostSpotView
+import org.around.ieuri.community.infrastructure.adapter.out.client.mapper.toPostSpotView
 import org.around.ieuri.tourism.application.port.`in`.query.SpotQueryUseCase
 import org.springframework.stereotype.Component
 
@@ -20,8 +20,8 @@ class SpotLookupAdapter(
     private val spotQueryUseCase: SpotQueryUseCase,
 ) : SpotLookupPort {
 
-    override fun findSummary(spotId: Long): PostTargetView? =
-        spotQueryUseCase.spotSummary(spotId)?.toPostTargetView()
+    override fun findSummary(spotId: Long): PostSpotView? =
+        spotQueryUseCase.spotSummary(spotId)?.toPostSpotView()
 
     /** 반경 조건은 tourism이 계산한다 — `spot` 테이블을 아는 코드가 그쪽에 머물게 하려는 것이다. */
     override fun findIdsWithin(
@@ -42,7 +42,7 @@ class SpotLookupAdapter(
      * 행마다 findSummary를 부르지 않는다 — 지역 피드는 대상이 수천 건일 수 있어
      * 그렇게 하면 쿼리가 그 수만큼 나간다.
      */
-    override fun findSummaries(spotIds: List<Long>): Map<Long, PostTargetView> =
+    override fun findSummaries(spotIds: List<Long>): Map<Long, PostSpotView> =
         spotQueryUseCase.spotSummaries(spotIds.distinct())
-            .mapValues { (_, summary) -> summary.toPostTargetView() }
+            .mapValues { (_, summary) -> summary.toPostSpotView() }
 }

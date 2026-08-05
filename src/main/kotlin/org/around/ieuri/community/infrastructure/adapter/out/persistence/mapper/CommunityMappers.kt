@@ -7,12 +7,13 @@ import org.around.ieuri.community.domain.aggregate.PostLike
 import org.around.ieuri.community.domain.aggregate.Report
 import org.around.ieuri.community.domain.vo.PhotoObjectKey
 import org.around.ieuri.community.domain.vo.PostTag
-import org.around.ieuri.community.domain.vo.PostTarget
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.BlockEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.CommentEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostLikeEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostChipEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostPhotoEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostSpotEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostTagEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.ReportEntity
 
@@ -28,7 +29,8 @@ import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.
  */
 fun PostEntity.toDomain(): Post = Post.restore(
     id = requireNotNull(id) { "적재된 글에는 id가 있어야 한다." },
-    target = PostTarget(type = targetType, id = targetId),
+    category = requireNotNull(chip?.category) { "적재된 글에는 카테고리가 있어야 한다." },
+    spotId = spot?.spotId,
     authorId = authorId,
     tags = tags.map { PostTag.restore(it.name, it.normalized) },
     title = title,
@@ -54,8 +56,6 @@ fun PostEntity.toDomain(): Post = Post.restore(
  */
 fun Post.toNewEntity(): PostEntity {
     val entity = PostEntity(
-        targetType = target.type,
-        targetId = target.id,
         authorId = authorId,
         title = title,
         body = body,
@@ -71,6 +71,9 @@ fun Post.toNewEntity(): PostEntity {
     entity.tags = tags.map {
         PostTagEntity(post = entity, name = it.name, normalized = it.normalized)
     }.toMutableList()
+    // 연결은 글이 만들어진 뒤에 붙인다 — @MapsId가 부모의 id를 받아 쓰기 때문이다.
+    entity.chip = PostChipEntity(post = entity, category = category)
+    entity.spot = spotId?.let { PostSpotEntity(post = entity, spotId = it) }
     return entity
 }
 

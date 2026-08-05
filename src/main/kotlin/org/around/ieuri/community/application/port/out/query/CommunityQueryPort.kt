@@ -7,8 +7,7 @@ import org.around.ieuri.community.application.query.CommentView
 import org.around.ieuri.community.application.query.PostView
 import org.around.ieuri.community.domain.vo.AppKey
 import org.around.ieuri.community.domain.vo.ContentLanguage
-import org.around.ieuri.community.domain.vo.PostTarget
-import org.around.ieuri.community.domain.vo.PostTargetType
+import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.domain.vo.PostTag
 
 /**
@@ -61,14 +60,16 @@ data class ViewerContext(
 )
 
 /**
- * 글 피드 조회 조건. **대상 해소가 끝난 상태로 온다** — 좌표 반경 판정은 그 대상을 소유한
- * 도메인의 몫이고, 이 포트는 글만 다룬다.
+ * 글 피드 조회 조건. **장소 해소가 끝난 상태로 온다** — 좌표 반경 판정은 spot을 소유한
+ * tourism의 몫이고, 이 포트는 글만 다룬다.
  *
- * [targets]가 null이면 대상으로 좁히지 않는다(전체 피드). 빈 목록이면 결과도 비어 있다 —
- * 반경 안에 대상이 하나도 없는 경우이며, 구현은 빈 `IN` 절을 만들지 않도록 조기 반환해야 한다.
+ * [spotIds]가 null이면 장소로 좁히지 않는다(전체 피드). 빈 목록이면 결과도 비어 있다 —
+ * 반경 안에 장소가 하나도 없는 경우이며, 구현은 빈 `IN` 절을 만들지 않도록 조기 반환해야 한다.
  */
 data class PostsSearch(
-    val targets: List<PostTarget>?,
+    val spotIds: List<Long>?,
+    /** 상단 칩. null이면 카테고리로 좁히지 않는다. */
+    val category: TargetCategory?,
     /** 정규화된 태그. null이면 태그로 좁히지 않는다. */
     val normalizedTag: String?,
     val first: Int,
