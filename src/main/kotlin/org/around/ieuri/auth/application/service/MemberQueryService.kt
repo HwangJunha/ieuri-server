@@ -4,6 +4,7 @@ import org.around.ieuri.auth.application.exception.MemberNotFoundException
 import org.around.ieuri.auth.application.port.`in`.query.MemberQueryUseCase
 import org.around.ieuri.auth.application.port.out.query.MemberQueryPort
 import org.around.ieuri.auth.application.query.MemberDetailView
+import org.around.ieuri.auth.application.query.MemberPublicProfileView
 import org.around.ieuri.auth.application.query.MemberSummaryView
 import org.around.ieuri.auth.application.query.MembersQuery
 import org.around.ieuri.auth.application.query.MeView
@@ -28,4 +29,8 @@ class MemberQueryService(
             ?: throw MemberNotFoundException("회원을 찾을 수 없습니다.")
 
     override fun members(query: MembersQuery): CursorPage<MemberSummaryView> = memberQueryPort.findMembers(query)
+
+    /** 부재는 예외가 아니라 null이다 — 호출자가 존재 확인 용도로도 쓴다. */
+    override fun memberPublicProfile(memberId: Long): MemberPublicProfileView? =
+        memberQueryPort.findPublicProfile(memberId)
 }

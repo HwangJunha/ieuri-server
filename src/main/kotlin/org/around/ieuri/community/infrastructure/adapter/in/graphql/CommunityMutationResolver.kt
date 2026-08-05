@@ -1,0 +1,244 @@
+package org.around.ieuri.community.infrastructure.adapter.`in`.graphql
+
+import com.netflix.graphql.dgs.DgsComponent
+import com.netflix.graphql.dgs.DgsMutation
+import com.netflix.graphql.dgs.InputArgument
+import org.around.ieuri.common.graphql.generated.types.BlockUserInput
+import org.around.ieuri.common.graphql.generated.types.BlockUserPayload
+import org.around.ieuri.common.graphql.generated.types.ConfirmPostImageUploadInput
+import org.around.ieuri.common.graphql.generated.types.ConfirmPostImageUploadPayload
+import org.around.ieuri.common.graphql.generated.types.CreateCommentInput
+import org.around.ieuri.common.graphql.generated.types.CreateCommentPayload
+import org.around.ieuri.common.graphql.generated.types.CreatePostImageUploadUrlInput
+import org.around.ieuri.common.graphql.generated.types.CreatePostImageUploadUrlPayload
+import org.around.ieuri.common.graphql.generated.types.CreatePostInput
+import org.around.ieuri.common.graphql.generated.types.CreatePostPayload
+import org.around.ieuri.common.graphql.generated.types.DeleteCommentInput
+import org.around.ieuri.common.graphql.generated.types.DeleteCommentPayload
+import org.around.ieuri.common.graphql.generated.types.DeletePostInput
+import org.around.ieuri.common.graphql.generated.types.DeletePostPayload
+import org.around.ieuri.common.graphql.generated.types.EditPostInput
+import org.around.ieuri.common.graphql.generated.types.EditPostPayload
+import org.around.ieuri.common.graphql.generated.types.LikePostInput
+import org.around.ieuri.common.graphql.generated.types.LikePostPayload
+import org.around.ieuri.common.graphql.generated.types.ReportContentInput
+import org.around.ieuri.common.graphql.generated.types.ReportContentPayload
+import org.around.ieuri.common.graphql.generated.types.UnblockUserInput
+import org.around.ieuri.common.graphql.generated.types.UnblockUserPayload
+import org.around.ieuri.common.graphql.generated.types.UnlikePostInput
+import org.around.ieuri.common.graphql.generated.types.UnlikePostPayload
+import org.around.ieuri.common.security.CurrentMemberProvider
+import org.around.ieuri.community.application.command.BlockUserCommand
+import org.around.ieuri.community.application.command.ConfirmPostImageUploadCommand
+import org.around.ieuri.community.application.command.CreateCommentCommand
+import org.around.ieuri.community.application.command.CreatePostCommand
+import org.around.ieuri.community.application.command.DeleteCommentCommand
+import org.around.ieuri.community.application.command.DeletePostCommand
+import org.around.ieuri.community.application.command.EditPostCommand
+import org.around.ieuri.community.application.command.IssuePostImageUploadUrlCommand
+import org.around.ieuri.community.application.command.LikePostCommand
+import org.around.ieuri.community.application.command.ReportContentCommand
+import org.around.ieuri.community.application.port.`in`.command.BlockCommandUseCase
+import org.around.ieuri.community.application.port.`in`.command.CommentCommandUseCase
+import org.around.ieuri.community.application.port.`in`.command.PostCommandUseCase
+import org.around.ieuri.community.application.port.`in`.command.PostImageUploadUseCase
+import org.around.ieuri.community.application.port.`in`.command.PostLikeCommandUseCase
+import org.around.ieuri.community.application.port.`in`.command.ReportCommandUseCase
+import org.around.ieuri.community.domain.vo.PostTarget
+import org.around.ieuri.community.domain.vo.PostTargetType
+import org.around.ieuri.community.domain.vo.PostTopic
+import org.around.ieuri.community.domain.vo.ReportReason
+import org.around.ieuri.community.domain.vo.ReportTargetType
+import org.springframework.stereotype.Component
+
+/**
+ * 커뮤니티 쓰기 리졸버. 전부 인증이 필요하며, 비로그인은 UnauthorizedException이
+ * withCommunityUserErrors에 붙잡히지 않고 최상위 errors[]로 전파된다.
+ *
+ * 리졸버는 얇게 둔다 — 입력을 커맨드로 옮기고 결과를 payload로 옮길 뿐 판단하지 않는다.
+ */
+@DgsComponent
+@Component
+class CommunityMutationResolver(
+    private val postCommandUseCase: PostCommandUseCase,
+    private val commentCommandUseCase: CommentCommandUseCase,
+    private val postLikeCommandUseCase: PostLikeCommandUseCase,
+    private val blockCommandUseCase: BlockCommandUseCase,
+    private val reportCommandUseCase: ReportCommandUseCase,
+    private val postImageUploadUseCase: PostImageUploadUseCase,
+    private val currentMemberProvider: CurrentMemberProvider,
+) {
+
+    @DgsMutation
+    fun createPost(@InputArgument input: CreatePostInput): CreatePostPayload = withCommunityUserErrors(
+        onError = { CreatePostPayload(success = false, userErrors = it, post = null, postId = null) },
+    ) {
+        val memberId = currentMemberProvider.requireMemberId()
+        val postId = postCommandUseCase.createPost(
+            command = CreatePostCommand(
+                target = PostTarget(
+                    type = PostTargetType.valueOf(input.targetType.name),
+                    id = input.targetId,
+                ),
+                topic = PostTopic.valueOf(input.topic.name),
+                title = input.title,
+                body = input.body,
+                photoKeys = input.photoKeys,
+            ),
+            memberId = memberId,
+        )
+        // **post는 항상 null이고 대신 postId를 준다.** 생성 타입 Post는 spot·author를 생성자에서
+        // 요구하는데, 그 둘은 필드 리졸버가 요청 시에만 가져오는 지연 필드다 — 여기서 채우려면
+        // 클라이언트가 고르지도 않은 다른 도메인 조회를 매번 왕복해야 한다.
+        // 클라이언트는 postId로 `post(id:)`를 조회한다.
+        CreatePostPayload(success = true, userErrors = emptyList(), post = null, postId = postId)
+    }
+
+    @DgsMutation
+    fun editPost(@InputArgument input: EditPostInput): EditPostPayload = withCommunityUserErrors(
+        onError = { EditPostPayload(success = false, userErrors = it) },
+    ) {
+        val memberId = currentMemberProvider.requireMemberId()
+        postCommandUseCase.editPost(
+            EditPostCommand(postId = input.postId, title = input.title, body = input.body),
+            memberId,
+        )
+        EditPostPayload(success = true, userErrors = emptyList())
+    }
+
+    @DgsMutation
+    fun deletePost(@InputArgument input: DeletePostInput): DeletePostPayload = withCommunityUserErrors(
+        onError = { DeletePostPayload(success = false, userErrors = it) },
+    ) {
+        val memberId = currentMemberProvider.requireMemberId()
+        postCommandUseCase.deletePost(DeletePostCommand(input.postId), memberId)
+        DeletePostPayload(success = true, userErrors = emptyList())
+    }
+
+    @DgsMutation
+    fun createComment(@InputArgument input: CreateCommentInput): CreateCommentPayload =
+        withCommunityUserErrors(
+            onError = {
+                CreateCommentPayload(success = false, userErrors = it, comment = null, commentId = null)
+            },
+        ) {
+            val memberId = currentMemberProvider.requireMemberId()
+            val commentId = commentCommandUseCase.createComment(
+                CreateCommentCommand(postId = input.postId, body = input.body),
+                memberId,
+            )
+            // comment가 null이고 commentId를 주는 이유는 createPost와 같다.
+            CreateCommentPayload(
+                success = true,
+                userErrors = emptyList(),
+                comment = null,
+                commentId = commentId,
+            )
+        }
+
+    @DgsMutation
+    fun deleteComment(@InputArgument input: DeleteCommentInput): DeleteCommentPayload =
+        withCommunityUserErrors(
+            onError = { DeleteCommentPayload(success = false, userErrors = it) },
+        ) {
+            val memberId = currentMemberProvider.requireMemberId()
+            commentCommandUseCase.deleteComment(DeleteCommentCommand(input.commentId), memberId)
+            DeleteCommentPayload(success = true, userErrors = emptyList())
+        }
+
+    @DgsMutation
+    fun likePost(@InputArgument input: LikePostInput): LikePostPayload = withCommunityUserErrors(
+        onError = { LikePostPayload(success = false, userErrors = it, likeCount = null) },
+    ) {
+        val memberId = currentMemberProvider.requireMemberId()
+        val likeCount = postLikeCommandUseCase.like(LikePostCommand(input.postId), memberId)
+        LikePostPayload(success = true, userErrors = emptyList(), likeCount = likeCount)
+    }
+
+    @DgsMutation
+    fun unlikePost(@InputArgument input: UnlikePostInput): UnlikePostPayload = withCommunityUserErrors(
+        onError = { UnlikePostPayload(success = false, userErrors = it, likeCount = null) },
+    ) {
+        val memberId = currentMemberProvider.requireMemberId()
+        val likeCount = postLikeCommandUseCase.unlike(LikePostCommand(input.postId), memberId)
+        UnlikePostPayload(success = true, userErrors = emptyList(), likeCount = likeCount)
+    }
+
+    @DgsMutation
+    fun createPostImageUploadUrl(
+        @InputArgument input: CreatePostImageUploadUrlInput,
+    ): CreatePostImageUploadUrlPayload = withCommunityUserErrors(
+        onError = {
+            CreatePostImageUploadUrlPayload(
+                success = false, userErrors = it,
+                uploadUrl = null, objectKey = null, expiresAt = null,
+            )
+        },
+    ) {
+        val memberId = currentMemberProvider.requireMemberId()
+        val issued = postImageUploadUseCase.issueUploadUrl(
+            IssuePostImageUploadUrlCommand(
+                contentType = input.contentType,
+                contentLength = input.contentLength.toLong(),
+            ),
+            memberId,
+        )
+        CreatePostImageUploadUrlPayload(
+            success = true,
+            userErrors = emptyList(),
+            uploadUrl = issued.uploadUrl,
+            objectKey = issued.objectKey,
+            expiresAt = issued.expiresAt.toString(),
+        )
+    }
+
+    @DgsMutation
+    fun confirmPostImageUpload(
+        @InputArgument input: ConfirmPostImageUploadInput,
+    ): ConfirmPostImageUploadPayload = withCommunityUserErrors(
+        onError = { ConfirmPostImageUploadPayload(success = false, userErrors = it, objectKey = null) },
+    ) {
+        val memberId = currentMemberProvider.requireMemberId()
+        val confirmed = postImageUploadUseCase.confirmUpload(
+            ConfirmPostImageUploadCommand(input.objectKey),
+            memberId,
+        )
+        ConfirmPostImageUploadPayload(success = true, userErrors = emptyList(), objectKey = confirmed)
+    }
+
+    @DgsMutation
+    fun blockUser(@InputArgument input: BlockUserInput): BlockUserPayload = withCommunityUserErrors(
+        onError = { BlockUserPayload(success = false, userErrors = it) },
+    ) {
+        val memberId = currentMemberProvider.requireMemberId()
+        blockCommandUseCase.block(BlockUserCommand(input.targetMemberId), memberId)
+        BlockUserPayload(success = true, userErrors = emptyList())
+    }
+
+    @DgsMutation
+    fun unblockUser(@InputArgument input: UnblockUserInput): UnblockUserPayload = withCommunityUserErrors(
+        onError = { UnblockUserPayload(success = false, userErrors = it) },
+    ) {
+        val memberId = currentMemberProvider.requireMemberId()
+        blockCommandUseCase.unblock(BlockUserCommand(input.targetMemberId), memberId)
+        UnblockUserPayload(success = true, userErrors = emptyList())
+    }
+
+    @DgsMutation
+    fun reportContent(@InputArgument input: ReportContentInput): ReportContentPayload =
+        withCommunityUserErrors(
+            onError = { ReportContentPayload(success = false, userErrors = it) },
+        ) {
+            val memberId = currentMemberProvider.requireMemberId()
+            reportCommandUseCase.report(
+                ReportContentCommand(
+                    targetType = ReportTargetType.valueOf(input.targetType.name),
+                    targetId = input.targetId,
+                    reason = ReportReason.valueOf(input.reason.name),
+                    detail = input.detail,
+                ),
+                memberId,
+            )
+            ReportContentPayload(success = true, userErrors = emptyList())
+        }
+}

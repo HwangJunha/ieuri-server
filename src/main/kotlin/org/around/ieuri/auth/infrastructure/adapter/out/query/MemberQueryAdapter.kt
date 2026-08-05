@@ -9,6 +9,7 @@ import org.around.ieuri.auth.application.port.out.security.EmailEncryptorPort
 import org.around.ieuri.auth.application.query.MembersQuery
 import org.around.ieuri.auth.application.query.MeView
 import org.around.ieuri.auth.application.query.MemberDetailView
+import org.around.ieuri.auth.application.query.MemberPublicProfileView
 import org.around.ieuri.auth.application.query.MemberSummaryView
 import org.around.ieuri.common.pagination.CursorEdge
 import org.around.ieuri.common.pagination.CursorPage
@@ -89,6 +90,25 @@ class MemberQueryAdapter(
             createdAt = requireNotNull(row.get(member.createdAt)),
         )
     }
+
+    /**
+     * 표시용 최소 정보. `member` 존재를 확인하고 프로필을 얹는다 — 프로필이 없어도 회원은
+     * 존재하므로 leftJoin이며, 닉네임은 기존 조회와 같은 기본값으로 채운다.
+     */
+    override fun findPublicProfile(memberId: Long): MemberPublicProfileView? =
+        queryFactory
+            .select(profile.nickname, profile.profileImageUrl)
+            .from(member)
+            .leftJoin(profile).on(profile.memberId.eq(member.id))
+            .where(member.id.eq(memberId))
+            .fetchOne()
+            ?.let {
+                MemberPublicProfileView(
+                    memberId = memberId,
+                    nickname = it.get(profile.nickname) ?: DEFAULT_NICKNAME,
+                    profileImageUrl = it.get(profile.profileImageUrl),
+                )
+            }
 
     override fun findMembers(query: MembersQuery): CursorPage<MemberSummaryView> {
         val first = query.first.coerceIn(1, MAX_PAGE_SIZE)

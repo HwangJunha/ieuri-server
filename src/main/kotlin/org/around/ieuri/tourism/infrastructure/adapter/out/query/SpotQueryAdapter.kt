@@ -42,6 +42,14 @@ class SpotQueryAdapter(
     override fun countNearby(query: NearbySpotSearch): Int =
         spatialQueryAdapter.countNearby(query)
 
+    @Transactional(readOnly = true)
+    override fun findSpotIdsWithin(
+        longitude: Double,
+        latitude: Double,
+        radiusMeters: Int,
+        limit: Int,
+    ): List<Long> = spatialQueryAdapter.findIdsWithin(longitude, latitude, radiusMeters, limit)
+
     /** 그 회원이 해당 언어에서 이미 반응한 관광지 id. 언어는 `spot` 조인으로 판정한다. */
     override fun findReactedSpotIds(memberId: Long, language: DomainLocale): Set<Long> =
         queryFactory

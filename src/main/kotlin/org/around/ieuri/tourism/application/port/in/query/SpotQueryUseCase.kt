@@ -8,6 +8,7 @@ import org.around.ieuri.tourism.application.query.SpotImageView
 import org.around.ieuri.tourism.application.query.SpotInfoItemView
 import org.around.ieuri.tourism.application.query.SpotIntroView
 import org.around.ieuri.tourism.application.query.SpotPageView
+import org.around.ieuri.tourism.application.query.SpotSummaryView
 import org.around.ieuri.tourism.application.query.SpotsQuery
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
@@ -49,6 +50,23 @@ interface SpotQueryUseCase {
 
     /** 좋아요 수(요청 시에만). 캐시 비대상이며 매번 실시간 집계한다. */
     fun spotLikeCount(spotId: Long): Long
+
+    /**
+     * spot 행이 보유한 최소 식별 정보. **upstream을 호출하지 않는다** — `spot` 한 행을 읽을 뿐이다.
+     *
+     * 다른 도메인이 spotId 유효성을 확인하고 칩·요약을 그릴 때 쓰는 진입점이다. 그 용도로
+     * [spotDetail]을 쓰면 검증 한 번에 TourAPI 왕복이 붙는다. 부재는 예외가 아니라 null이다.
+     */
+    fun spotSummary(spotId: Long): SpotSummaryView?
+
+    /**
+     * 좌표 반경 안에 있는 spot의 id. 다른 도메인이 "이 반경의 spot들"을 조건으로 쓸 때의 진입점이며,
+     * `spot` 테이블을 아는 코드가 tourism 안에 머물게 한다.
+     *
+     * [limit]을 넘는 결과는 **조용히 잘린다** — 반경이 넓으면 수만 건이 되어 호출자의 `IN` 절을
+     * 무너뜨리기 때문이다. 호출자는 잘림을 감안해야 한다.
+     */
+    fun spotIdsWithin(longitude: Double, latitude: Double, radiusMeters: Int, limit: Int): List<Long>
 
     /**
      * 회원이 좋아요한 spot 한 페이지. likedAt 내림차순, 동률은 spot.id로 타이브레이크.

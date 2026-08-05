@@ -68,6 +68,35 @@ class SpotSpatialQueryAdapter(
     }
 
     /**
+     * 중심에서 반경 안에 있는 spot의 id만. 다른 도메인이 반경 조건을 필요로 할 때 쓰는 진입점이며,
+     * `spot` 테이블을 아는 코드가 tourism 밖으로 새지 않게 한다.
+     *
+     * [limit]으로 상한을 둔다 — 100km 반경이면 수만 건이 나올 수 있고, 호출자가 이 결과를
+     * `IN` 절에 넣으면 파라미터 수와 실행 계획이 함께 무너진다. 상한에 걸리면 조용히 잘리므로
+     * 호출자는 그것을 감안해야 한다.
+     */
+    fun findIdsWithin(
+        longitude: Double,
+        latitude: Double,
+        radiusMeters: Int,
+        limit: Int,
+    ): List<Long> =
+        jdbcTemplate.query(
+            """
+            SELECT id FROM spot
+            WHERE ST_DWithin(location, $CENTER, ?)
+            ORDER BY id
+            LIMIT ?
+            """.trimIndent(),
+            { rs, _ -> rs.getLong("id") },
+            // 파라미터 순서: CENTER의 (경도, 위도)가 먼저, 그다음 반경·상한.
+            longitude,
+            latitude,
+            radiusMeters.toDouble(),
+            limit,
+        )
+
+    /**
      * 조회와 카운트가 **같은 조건**을 쓰도록 한 곳에서 만든다. 둘이 갈리면 hasNext와 totalCount가
      * 서로 어긋난다.
      *

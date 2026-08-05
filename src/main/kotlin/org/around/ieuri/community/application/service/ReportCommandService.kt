@@ -1,0 +1,104 @@
+package org.around.ieuri.community.application.service
+
+import org.around.ieuri.community.application.command.ReportContentCommand
+import org.around.ieuri.community.application.exception.AlreadyReportedException
+import org.around.ieuri.community.application.exception.CommentNotFoundException
+import org.around.ieuri.community.application.exception.MemberNotFoundException
+import org.around.ieuri.community.application.exception.PostNotFoundException
+import org.around.ieuri.community.application.exception.ReportDetailRequiredException
+import org.around.ieuri.community.application.port.`in`.command.ReportCommandUseCase
+import org.around.ieuri.community.application.port.out.client.MemberLookupPort
+import org.around.ieuri.community.application.port.out.persistence.CommentRepositoryPort
+import org.around.ieuri.community.application.port.out.persistence.PostRepositoryPort
+import org.around.ieuri.community.application.port.out.persistence.ReportRepositoryPort
+import org.around.ieuri.community.domain.aggregate.Report
+import org.around.ieuri.community.domain.vo.ReportTargetType
+import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
+
+/**
+ * 신고. 기록한 뒤 자동 숨김 임계값 도달 여부를 같은 트랜잭션에서 확인한다 — 알림이 비범위라
+ * 도메인 이벤트를 발행할 이유가 없고, 동기 처리로 충분하다.
+ *
+ * **대상 종류에 따라 갈린다.** POST·COMMENT만 서로 다른 신고자 5명에서 숨김으로 전환되고,
+ * MEMBER 신고는 기록만 하고 어떤 자동 조치도 하지 않는다 — 신고 몇 건으로 한 사람의 글이
+ * 일괄로 사라지면 조직적 신고가 곧 침묵 수단이 된다.
+ *
+ * 댓글이 숨김으로 전환되면 글의 commentCount를 함께 내린다 — 보이지 않는 댓글이 숫자에는
+ * 잡히면 유저는 세어 보고 버그라고 판단한다.
+ */
+@Service
+class ReportCommandService(
+    private val reportRepositoryPort: ReportRepositoryPort,
+    private val postRepositoryPort: PostRepositoryPort,
+    private val commentRepositoryPort: CommentRepositoryPort,
+    private val memberLookupPort: MemberLookupPort,
+) : ReportCommandUseCase {
+
+    @Transactional
+    override fun report(command: ReportContentCommand, memberId: Long) {
+        if (command.reason.requiresDetail && command.detail?.trim().isNullOrEmpty()) {
+            throw ReportDetailRequiredException()
+        }
+        requireTargetExists(command.targetType, command.targetId)
+
+        val inserted = reportRepositoryPort.save(
+            Report.create(
+                reporterId = memberId,
+                targetType = command.targetType,
+                targetId = command.targetId,
+                reason = command.reason,
+                detail = command.detail,
+            ),
+        )
+        // 같은 대상을 두 번 신고할 수 없다. 거부하지 않고 통과시키면 한 사람이 임계값을
+        // 혼자 채울 수 있다.
+        if (!inserted) throw AlreadyReportedException()
+
+        applyAutoHideIfNeeded(command.targetType, command.targetId)
+    }
+
+    private fun requireTargetExists(targetType: ReportTargetType, targetId: Long) {
+        val exists = when (targetType) {
+            ReportTargetType.POST -> postRepositoryPort.findById(targetId) != null
+            ReportTargetType.COMMENT -> commentRepositoryPort.findById(targetId) != null
+            ReportTargetType.MEMBER -> memberLookupPort.findAuthor(targetId) != null
+        }
+        if (exists) return
+        throw when (targetType) {
+            ReportTargetType.POST -> PostNotFoundException()
+            ReportTargetType.COMMENT -> CommentNotFoundException()
+            ReportTargetType.MEMBER -> MemberNotFoundException()
+        }
+    }
+
+    /** MEMBER는 [ReportTargetType.autoHideable]이 false라 집계 조회조차 하지 않는다. */
+    private fun applyAutoHideIfNeeded(targetType: ReportTargetType, targetId: Long) {
+        if (!targetType.autoHideable) return
+
+        val reporters = reportRepositoryPort.countDistinctReporters(targetType, targetId)
+        if (!Report.reachesAutoHideThreshold(targetType, reporters)) return
+
+        when (targetType) {
+            ReportTargetType.POST -> postRepositoryPort.findById(targetId)?.let {
+                if (it.hidden) return
+                it.hide()
+                postRepositoryPort.save(it)
+            }
+
+            ReportTargetType.COMMENT -> commentRepositoryPort.findById(targetId)?.let {
+                // 이미 숨겨져 있으면 commentCount를 다시 내리지 않는다 — 두 번 내리면
+                // 숫자가 실제보다 작아진다.
+                if (it.hidden) return
+                it.hide()
+                commentRepositoryPort.save(it)
+                postRepositoryPort.findById(it.postId)?.let { post ->
+                    post.decreaseCommentCount()
+                    postRepositoryPort.save(post)
+                }
+            }
+
+            ReportTargetType.MEMBER -> Unit
+        }
+    }
+}

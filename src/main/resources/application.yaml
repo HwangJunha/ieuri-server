@@ -88,6 +88,36 @@ ieuri:
     secret: ${IEURI_JWT_SECRET}
     access-ttl: 5m
     refresh-ttl: 30d
+  # Cloudflare R2(S3 호환) 오브젝트 스토리지. 사진은 클라이언트가 presigned URL로 직접 PUT하며
+  # 서버는 이미지 바이트를 중계하지 않는다.
+  #
+  # 자격증명은 환경변수로만 주입한다(응답·로그 어디에도 노출 금지). 값이 없으면 부팅은 되지만
+  # 발급 시점에 실패한다 — TourAPI serviceKey와 같은 취급이다.
+  #
+  # 쓰기는 인증된 s3-endpoint로만 간다. **조회용 공개 도메인(cdn.ieuri.co.kr)은 여기 없다** —
+  # 서버가 그 URL을 만들 일이 없기 때문이다. DB에는 object key만 저장하고 클라이언트가
+  # 자기 설정의 공개 베이스와 조합해 쓴다(그래서 CDN이 바뀌어도 서버 배포가 필요 없다).
+  r2:
+    s3-endpoint: ${IERUI_R2_ENDPOINT:}
+    access-key: ${IEURI_R2_ACCESS_KEY:}
+    secret-access-key: ${IEURI_R2_SECRET_ACCESS_KEY:}
+    bucket: ${IEURI_R2_BUCKET:ieuri-dev}
+    upload-url-ttl: 5m
+    max-upload-bytes: 10485760
+    allowed-content-types:
+      - image/jpeg
+      - image/png
+      - image/webp
+  community:
+    # 커넥션 first 상한. 초과 요청은 오류가 아니라 절삭된다.
+    max-page-size: 50
+    # 지역 피드 반경 상한. 초과 요청은 상한으로 절삭된다.
+    # (기본 반경 20000은 GraphQL 스키마의 기본값이라 여기 두지 않는다 — 두 곳에 두면 갈린다.)
+    max-radius-meters: 100000
+    # 지역 피드가 한 번에 다룰 대상 수 상한. 넘으면 조용히 잘린다 — 넓은 반경에서 수만 건이
+    # 나오면 IN 절의 파라미터 수와 실행 계획이 함께 무너지기 때문이다.
+    max-nearby-spots: 2000
+
   # SNS id_token 검증. aud로 검증할 클라이언트 ID/앱 키는 공개 식별자라 env 오버라이드
   # 가능한 기본값으로 둔다. jwks-uri/issuer는 provider 고정값. 모든 환경에서 실검증한다.
   # TourAPI(한국관광공사) 접근. serviceKey는 4개 언어 공용 단일 키(실측 B-4) — 언어는 base-url 선택에만 영향.

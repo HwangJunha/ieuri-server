@@ -72,6 +72,15 @@ class LayeredArchitectureTest {
             .check(classes)
     }
 
+    /**
+     * 도메인 간 상호작용은 **상대 도메인의 `port/in`으로만** 한다. 규칙의 핵심은 "의존이 없다"가
+     * 아니라 "의존이 인바운드 포트를 통한다"이므로, 두 예외를 명시적으로 둔다.
+     *
+     *  - `common..`      : 공유 커널. 모든 도메인이 쓴다.
+     *  - `..port.in..`   : 상대 도메인의 인바운드 포트와 그것이 노출하는 read DTO(`application.query`).
+     *                      호출하는 쪽은 반드시 `infrastructure`여야 한다 — 도메인·애플리케이션이
+     *                      다른 도메인의 이름을 알면 추출이 불가능해진다.
+     */
     @Test
     fun `도메인은 다른 도메인의 내부에 의존하지 않는다`() {
         slices().matching("org.around.ieuri.(*)..")
@@ -79,6 +88,16 @@ class LayeredArchitectureTest {
             .ignoreDependency(
                 DescribedPredicate.alwaysTrue<JavaClass>(),
                 JavaClass.Predicates.resideInAPackage("org.around.ieuri.common.."),
+            )
+            // 인바운드 포트 호출은 어댑터(infrastructure)에서만 허용한다.
+            .ignoreDependency(
+                JavaClass.Predicates.resideInAPackage("..infrastructure.adapter.out.client.."),
+                JavaClass.Predicates.resideInAPackage("..application.port.in.."),
+            )
+            // 인바운드 포트가 돌려주는 read DTO. 포트만 허용하고 반환 타입을 막으면 포트를 쓸 수 없다.
+            .ignoreDependency(
+                JavaClass.Predicates.resideInAPackage("..infrastructure.adapter.out.client.."),
+                JavaClass.Predicates.resideInAPackage("..application.query.."),
             )
             .because("도메인 간 상호작용은 상대 도메인의 port/in 또는 발행된 도메인 이벤트로만 한다")
             .check(classes)
