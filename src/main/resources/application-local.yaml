@@ -5,6 +5,8 @@ ieuri:
     # 개발 전용 AES-256 키(base64 32바이트) — 운영에서는 절대 사용 금지, 환경변수로 교체.
     key: aWV1cmlfbG9jYWxfZGV2X2FlczI1Nl9rZXlfMzJieXQ=
     pepper: aWV1cmktbG9jYWwtZGV2LXBlcHBlcg==
+    # 로그인 식별자 보호(HMAC)용. 한번 정하면 사실상 교체 불가라 검증 코드용과 분리한다.
+    identifier-pepper: aWV1cmktbG9jYWwtZGV2LWlkZW50aWZpZXItcGVwcGVy
   mail:
     from: no-reply-dev@ieuri.local
   jwt:

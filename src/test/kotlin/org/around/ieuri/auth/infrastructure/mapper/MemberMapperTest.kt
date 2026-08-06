@@ -132,6 +132,8 @@ class MemberMapperTest {
         assertEquals(true, entity.ageVerified)
         // reconstitute는 passwordHash를 싣지 않으므로 SNS 회원과 같은 null이다.
         assertNull(entity.passwordHash)
+        // 폐기용 토큰은 가입 시점에 없다 — 별도 갱신 경로로만 채워진다(SPEC-0012 R6).
+        assertNull(entity.providerRefreshTokenEncrypted)
     }
 
     // ── toNewProfileEntity ──────────────────────────────────────────

@@ -15,6 +15,7 @@ import org.around.ieuri.auth.application.port.`in`.command.LogoutResult
 import org.around.ieuri.auth.application.port.`in`.command.TokenPairResult
 import org.around.ieuri.auth.application.port.out.client.SnsIdentityVerifierPort
 import org.around.ieuri.auth.application.port.out.persistence.MemberRepositoryPort
+import org.around.ieuri.auth.application.port.out.security.LoginIdentifierProtectorPort
 import org.around.ieuri.auth.application.port.out.security.PasswordEncoderPort
 import org.around.ieuri.auth.application.port.out.token.RefreshTokenStorePort
 import org.around.ieuri.auth.application.port.out.token.TokenProviderPort
@@ -38,6 +39,8 @@ class AuthTokenService(
     private val refreshTokenStore: RefreshTokenStorePort,
     private val tokenIssuer: TokenIssuer,
     private val passwordEncoder: PasswordEncoderPort,
+    private val identifierProtector: LoginIdentifierProtectorPort,
+    private val providerTokenCollector: ProviderTokenCollector,
     private val clock: Clock,
 ) : AuthTokenUseCase {
 
@@ -58,6 +61,10 @@ class AuthTokenService(
         ensureLoginable(
             authentication.memberId, authentication.status, authentication.suspendedUntil, authentication.suspensionReason, now,
         )
+
+        // 탈퇴 시 연결 해제용 토큰 보충. 실패해도 로그인은 성공한다(R7).
+        providerTokenCollector.collect(authentication.memberId, command.provider, command.authorizationCode)
+
         return tokenIssuer.issueFor(authentication.memberId)
     }
 
@@ -70,7 +77,7 @@ class AuthTokenService(
         val now = clock.instant()
         val email = Email(command.email).value
 
-        val auth = memberRepository.findEmailAuthentication(email)
+        val auth = memberRepository.findEmailAuthentication(identifierProtector.protect(email))
             ?: throw InvalidCredentialsException("이메일 또는 비밀번호가 올바르지 않습니다.")
         // passwordHash가 없으면 SNS 계정 → 이메일 로그인 불가(존재 여부는 드러내지 않음).
         val passwordHash = auth.passwordHash

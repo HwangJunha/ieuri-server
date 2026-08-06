@@ -6,6 +6,8 @@ import org.around.ieuri.auth.application.command.WithdrawMemberCommand
 import org.around.ieuri.auth.application.exception.MemberNotFoundException
 import org.around.ieuri.auth.application.port.`in`.command.LifecycleResult
 import org.around.ieuri.auth.application.port.`in`.command.MemberLifecycleUseCase
+import org.around.ieuri.auth.application.port.out.client.RevokeSnsConnectionCommand
+import org.around.ieuri.auth.application.port.out.client.SnsRevokeResult
 import org.around.ieuri.auth.application.port.out.client.SnsTokenRevokerPort
 import org.around.ieuri.auth.application.port.out.event.DomainEventPublisherPort
 import org.around.ieuri.auth.application.port.out.persistence.AuditLogPort
@@ -34,7 +36,10 @@ class MemberLifecycleService(
 
     /**
      * 탈퇴(본인). 회원과 소유 데이터(프로필·동의이력·이메일검증)를 **행 삭제**한다(hard delete).
-     * SNS provider 토큰 폐기 시도 → 삭제 → refresh 전량 폐기 → 감사 기록(비-PII)·이벤트.
+     * provider 연결 해제 시도 → 삭제 → refresh 전량 폐기 → 감사 기록(비-PII)·이벤트.
+     *
+     * 해제는 회원 삭제 **앞**에서 한다 — 폐기용 토큰이 회원 행에 있어 삭제 후에는 읽을 수 없다.
+     * 해제 실패는 탈퇴를 막지 않는다(R11). 포트가 예외를 던지지 않으므로 트랜잭션도 롤백되지 않는다.
      *
      * [MemberWithdrawn]은 **커밋 후에** 다른 도메인으로 나간다(SPEC-0011 R17). 그래서 회원은
      * 지워졌는데 글이 아직 남아 있는 창이 생기는데, 스펙이 이 창을 허용한다 — 한 도메인의
@@ -46,9 +51,25 @@ class MemberLifecycleService(
         val member = memberRepository.load(command.memberId)
             ?: throw MemberNotFoundException("회원을 찾을 수 없습니다.")
 
-        snsTokenRevoker.revoke(member.provider, member.providerUserId.value)
+        val revokeResult = snsTokenRevoker.revoke(
+            RevokeSnsConnectionCommand(
+                provider = member.provider,
+                providerUserId = member.providerUserId.value,
+                providerRefreshToken = memberRepository.findProviderRefreshToken(command.memberId),
+            ),
+        )
+
         memberRepository.deleteMember(command.memberId)
         refreshTokenStore.revokeAllByMember(command.memberId)
+
+        // 해제 실패는 provider와 회원 식별자로만 남긴다. 토큰·이메일은 남기지 않는다(R11).
+        if (revokeResult is SnsRevokeResult.Failed) {
+            auditLog.record(
+                memberId = command.memberId,
+                eventType = "SNS_UNLINK_FAILED",
+                payload = mapOf("provider" to member.provider.name, "reason" to revokeResult.reason),
+            )
+        }
 
         auditLog.record(
             memberId = command.memberId,

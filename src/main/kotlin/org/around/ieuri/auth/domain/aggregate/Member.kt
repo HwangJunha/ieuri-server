@@ -135,12 +135,16 @@ class Member private constructor(
         }
 
         /**
-         * 자체(EMAIL) 회원가입. provider=EMAIL, provider_user_id=정규화된 이메일, 비밀번호 해시를 보관한다.
+         * 자체(EMAIL) 회원가입. provider=EMAIL, 비밀번호 해시를 보관한다.
          * 이메일 인증 전이므로 emailVerified=false로 시작하고, 인증 코드 검증 시 활성화된다.
          * 필수 약관 동의·만 14세 불변식은 SNS 가입과 동일하게 강제한다.
+         *
+         * providerUserId는 정규화된 이메일을 복원 불가능하게 보호한 값이다(SPEC-0012 R1).
+         * 보호 방식은 인프라의 관심사라 도메인이 알지 못하며, 호출자가 변환해 넘긴다.
          */
         fun registerByEmail(
             email: Email,
+            providerUserId: ProviderUserId,
             passwordHash: PasswordHash,
             nickname: Nickname,
             ageVerified: Boolean,
@@ -157,7 +161,7 @@ class Member private constructor(
             return Member(
                 id = null,
                 provider = Provider.EMAIL,
-                providerUserId = ProviderUserId(email.value),
+                providerUserId = providerUserId,
                 email = email,
                 emailVerifiedInitial = false,
                 statusInitial = MemberStatus.ACTIVE,

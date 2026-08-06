@@ -59,6 +59,17 @@ class MemberPersistenceAdapter(
         // 트랜잭션 커밋 시 dirty-check로 UPDATE.
     }
 
+    override fun updateProviderRefreshToken(memberId: Long, refreshToken: String) {
+        val entity = memberRepository.findById(memberId).orElse(null) ?: return
+        entity.providerRefreshTokenEncrypted = encryptor.encrypt(refreshToken)
+        // 트랜잭션 커밋 시 dirty-check로 UPDATE.
+    }
+
+    override fun findProviderRefreshToken(memberId: Long): String? {
+        val entity = memberRepository.findById(memberId).orElse(null) ?: return null
+        return entity.providerRefreshTokenEncrypted?.let { encryptor.decrypt(it) }
+    }
+
     override fun findEmailByMemberId(memberId: Long): Email? {
         val entity = memberRepository.findById(memberId).orElse(null) ?: return null
         return Email(encryptor.decrypt(entity.emailEncrypted))
@@ -74,8 +85,8 @@ class MemberPersistenceAdapter(
         )
     }
 
-    override fun findEmailAuthentication(email: String): EmailAuthentication? {
-        val entity = memberRepository.findByProviderAndProviderUserId(Provider.EMAIL, email) ?: return null
+    override fun findEmailAuthentication(protectedIdentifier: String): EmailAuthentication? {
+        val entity = memberRepository.findByProviderAndProviderUserId(Provider.EMAIL, protectedIdentifier) ?: return null
         return EmailAuthentication(
             memberId = requireNotNull(entity.id),
             status = entity.status,

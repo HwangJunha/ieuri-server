@@ -27,6 +27,7 @@ import org.around.ieuri.auth.application.port.out.persistence.MemberRepositoryPo
 import org.around.ieuri.auth.application.port.out.persistence.PasswordResetRepositoryPort
 import org.around.ieuri.auth.application.port.out.persistence.RoleRepositoryPort
 import org.around.ieuri.auth.application.port.out.persistence.TermsRepositoryPort
+import org.around.ieuri.auth.application.port.out.security.LoginIdentifierProtectorPort
 import org.around.ieuri.auth.application.port.out.security.PasswordEncoderPort
 import org.around.ieuri.auth.application.port.out.security.VerificationCodeGeneratorPort
 import org.around.ieuri.auth.application.port.out.token.RefreshTokenStorePort
@@ -69,6 +70,8 @@ class MemberRegistrationService(
     private val passwordEncoder: PasswordEncoderPort,
     private val profileRepository: MemberProfileRepositoryPort,
     private val nicknameGenerator: NicknameGenerator,
+    private val identifierProtector: LoginIdentifierProtectorPort,
+    private val providerTokenCollector: ProviderTokenCollector,
     private val clock: Clock,
 ) : MemberRegistrationUseCase {
 
@@ -121,6 +124,9 @@ class MemberRegistrationService(
         // 기본 역할(USER) 부여. 관리 역할은 부트스트랩/역할 부여로만 얻는다.
         roleRepository.assignRoleToMember(memberId, Role.USER)
 
+        // 탈퇴 시 연결 해제용 토큰 확보. 실패해도 가입은 성공한다(R7).
+        providerTokenCollector.collect(memberId, command.provider, command.authorizationCode)
+
         var verificationPublicId: UUID? = null
         if (!member.emailVerified) {
             val plainCode = codeGenerator.generate()
@@ -157,7 +163,7 @@ class MemberRegistrationService(
     override fun registerByEmail(command: RegisterEmailMemberCommand): RegisterMemberResult {
         val now = clock.instant()
         val email = Email(command.email)
-        val providerUserId = ProviderUserId(email.value)
+        val providerUserId = ProviderUserId(identifierProtector.protect(email.value))
 
         if (memberRepository.existsByProviderAndProviderUserId(Provider.EMAIL, providerUserId)) {
             throw MemberAlreadyRegisteredException("이미 가입된 이메일입니다.")
@@ -170,6 +176,7 @@ class MemberRegistrationService(
 
         val member = Member.registerByEmail(
             email = email,
+            providerUserId = providerUserId,
             passwordHash = passwordHash,
             nickname = nickname,
             ageVerified = command.ageVerified,
@@ -267,7 +274,7 @@ class MemberRegistrationService(
     override fun requestPasswordReset(command: RequestPasswordResetCommand) {
         val now = clock.instant()
         val email = Email(command.email).value
-        val auth = memberRepository.findEmailAuthentication(email)
+        val auth = memberRepository.findEmailAuthentication(identifierProtector.protect(email))
         // 계정 열거 방지: 계정이 없거나 비밀번호가 없는(SNS) 계정이면 아무 일도 하지 않고 조용히 성공한다.
         if (auth?.passwordHash == null) return
 
@@ -290,7 +297,7 @@ class MemberRegistrationService(
     override fun resetPassword(command: ResetPasswordCommand): ResetPasswordResult {
         val now = clock.instant()
         val email = Email(command.email).value
-        val auth = memberRepository.findEmailAuthentication(email)
+        val auth = memberRepository.findEmailAuthentication(identifierProtector.protect(email))
         // 계정 없음/비밀번호 없음/활성 챌린지 없음은 모두 동일하게 처리(계정 열거 방지).
         if (auth?.passwordHash == null) return ResetPasswordResult(success = false, failureReason = "INVALID_OR_EXPIRED")
         val reset = passwordResetRepository.findActiveByMemberId(auth.memberId)

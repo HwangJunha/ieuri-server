@@ -51,6 +51,7 @@ class MemberMutationResolver(
             ageVerified = input.ageVerified,
             // 생성된 TermsCode enum → String (도메인/커맨드는 데이터주도로 String 유지)
             agreements = input.agreements.map { AgreementInput(it.termsCode.name, it.agreed) },
+            authorizationCode = input.authorizationCode,
         )
         val result = memberRegistrationUseCase.registerBySns(command)
         RegisterSnsMemberPayload(

@@ -39,6 +39,8 @@ spring:
   # @EnableJdbcJobRepository로 명시한다. 스키마는 여전히 Flyway 소유다(V14).
   flyway:
     enabled: true
+    # Java 마이그레이션(V39)은 여기 없어도 된다 — Boot가 JavaMigration 빈을 주입해 등록한다.
+    # 오히려 여기 패키지를 더하면 컴파일된 클래스 디렉터리를 중복 스캔해 "more than one migration"으로 부팅이 깨진다.
     locations: classpath:db/migration
     # 공유 DB의 public 스키마에 무관한 기존 객체가 있을 수 있어, v0로 baseline 후 V1부터 전부 적용한다
     # (기존 DB에 Flyway를 도입하는 표준 방식). baseline-version=0이라 V1 마이그레이션이 스킵되지 않는다.
@@ -86,6 +88,9 @@ ieuri:
     # local: application-local.yaml이 개발 전용 값으로 오버라이드한다.
     key: ${IEURI_ENCRYPTION_KEY}
     pepper: ${IEURI_ENCRYPTION_PEPPER}
+    # 로그인 식별자 보호(HMAC)용. 바꾸면 기존 EMAIL 회원이 로그인 불가가 되므로 사실상 교체 불가다.
+    # 그래서 교체 가능해야 하는 위 pepper와 값을 공유하지 않는다.
+    identifier-pepper: ${IEURI_ENCRYPTION_IDENTIFIER_PEPPER}
   jwt:
     issuer: ieuri
     # prod: 환경변수 주입(기본값 없음 → fail-fast). local: application-local.yaml이 오버라이드.
@@ -202,3 +207,21 @@ ieuri:
         - ${KAKAO_NATIVE_APP_KEY:f3d974f8c5a77ab1fb0673c353f9cb62}
       jwks-uri: https://kauth.kakao.com/.well-known/jwks.json
       issuer: https://kauth.kakao.com
+  # 탈퇴 시 provider 연결 해제용 자격증명(SPEC-0012). 위 sns 블록의 공개 식별자와 성격이 달라
+  # 일부러 분리했다 — 섞으면 실수로 로그에 찍기 쉽다. 전부 환경변수로만 주입하며 기본값을 두지 않는다.
+  # 값이 비면 해당 provider 해제는 실패로 기록되고 탈퇴 자체는 계속된다.
+  sns-revoke:
+    apple:
+      team-id: ${APPLE_TEAM_ID:}
+      key-id: ${APPLE_KEY_ID:}
+      client-id: ${APPLE_CLIENT_ID:}
+      # .p8 파일의 PEM 내용. 개행은 \n으로 이스케이프해 주입한다. 저장소에 커밋하지 않는다.
+      private-key: ${APPLE_PRIVATE_KEY:}
+    google:
+      client-id: ${GOOGLE_REVOKE_CLIENT_ID:}
+      client-secret: ${GOOGLE_REVOKE_CLIENT_SECRET:}
+    kakao:
+      # 어드민 키 + 회원번호로 해제하므로 토큰 저장이 필요 없다.
+      admin-key: ${KAKAO_ADMIN_KEY:}
+    # 탈퇴 트랜잭션 안에서 호출하므로 대기 상한이 필수다(R11).
+    timeout: 3s

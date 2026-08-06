@@ -2,6 +2,7 @@ package org.around.ieuri.auth.application.service
 
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import io.mockk.verify
 import org.around.ieuri.auth.application.command.LoginCommand
 import org.around.ieuri.auth.application.command.LoginEmailCommand
@@ -16,9 +17,11 @@ import org.around.ieuri.auth.application.exception.TokenReuseDetectedException
 import org.around.ieuri.auth.application.port.`in`.command.TokenPairResult
 import org.around.ieuri.auth.application.port.out.client.SnsIdentity
 import org.around.ieuri.auth.application.port.out.client.SnsIdentityVerifierPort
+import org.around.ieuri.auth.application.port.out.client.SnsTokenExchangerPort
 import org.around.ieuri.auth.application.port.out.persistence.EmailAuthentication
 import org.around.ieuri.auth.application.port.out.persistence.MemberAuthentication
 import org.around.ieuri.auth.application.port.out.persistence.MemberRepositoryPort
+import org.around.ieuri.auth.application.port.out.security.LoginIdentifierProtectorPort
 import org.around.ieuri.auth.application.port.out.security.PasswordEncoderPort
 import org.around.ieuri.auth.application.port.out.token.RefreshTokenClaims
 import org.around.ieuri.auth.application.port.out.token.RefreshTokenStorePort
@@ -35,6 +38,7 @@ import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 /** AuthTokenService — SNS 로그인·refresh 회전·로그아웃 오케스트레이션 검증. */
@@ -46,11 +50,23 @@ class AuthTokenServiceTest {
     private val refreshTokenStore = mockk<RefreshTokenStorePort>(relaxed = true)
     private val tokenIssuer = mockk<TokenIssuer>()
     private val passwordEncoder = mockk<PasswordEncoderPort>()
+
+    /** 보호 변환 스텁: 결정론적이고 평문과 구분되게 접두사를 붙인다(실제 HMAC은 어댑터 관심사). */
+    private val identifierProtector = object : LoginIdentifierProtectorPort {
+        override fun protect(normalizedIdentifier: String) = "protected:$normalizedIdentifier"
+    }
+
+    private val tokenExchanger = mockk<SnsTokenExchangerPort>()
+
+    // 교환·저장 로직이 실제로 실행되도록 목이 아니라 실제 인스턴스를 조립한다.
+    private val providerTokenCollector = ProviderTokenCollector(tokenExchanger, memberRepository)
+
     private val now = Instant.parse("2026-07-17T00:00:00Z")
     private val clock = Clock.fixed(now, ZoneOffset.UTC)
 
     private val service = AuthTokenService(
-        snsVerifier, memberRepository, tokenProvider, refreshTokenStore, tokenIssuer, passwordEncoder, clock,
+        snsVerifier, memberRepository, tokenProvider, refreshTokenStore, tokenIssuer, passwordEncoder,
+        identifierProtector, providerTokenCollector, clock,
     )
 
     private val tokens = TokenPairResult("acc", "ref", "Bearer", 300, 2_592_000)
@@ -119,6 +135,57 @@ class AuthTokenServiceTest {
         verify { tokenIssuer.issueFor(100L) }
     }
 
+    // --- loginBySns: provider 토큰 보충 (SPEC-0012 R5·R7) ---
+
+    private fun givenActiveSnsMember() {
+        every { snsVerifier.verify(any(), any()) } returns identity()
+        every { memberRepository.findAuthentication(any(), any()) } returns
+            MemberAuthentication(100L, MemberStatus.ACTIVE, null, null)
+        every { tokenIssuer.issueFor(100L) } returns tokens
+    }
+
+    @Test
+    fun `로그인에 authorizationCode가 있으면 교환한 refresh token을 저장한다`() {
+        givenActiveSnsMember()
+        every { tokenExchanger.exchangeForRefreshToken(Provider.GOOGLE, "auth-code-1") } returns "provider-refresh-1"
+
+        assertEquals(tokens, service.loginBySns(loginCommand.copy(authorizationCode = "auth-code-1")))
+
+        verify { memberRepository.updateProviderRefreshToken(100L, "provider-refresh-1") }
+    }
+
+    @Test
+    fun `로그인에 authorizationCode가 없으면 교환도 저장도 시도하지 않는다`() {
+        givenActiveSnsMember()
+
+        assertEquals(tokens, service.loginBySns(loginCommand))
+
+        verify(exactly = 0) { tokenExchanger.exchangeForRefreshToken(any(), any()) }
+        verify(exactly = 0) { memberRepository.updateProviderRefreshToken(any(), any()) }
+    }
+
+    @Test
+    fun `재로그인 시 새로 교환한 토큰으로 덮어쓴다`() {
+        givenActiveSnsMember()
+        every { tokenExchanger.exchangeForRefreshToken(Provider.GOOGLE, "auth-code-2") } returns "provider-refresh-2"
+
+        service.loginBySns(loginCommand.copy(authorizationCode = "auth-code-2"))
+
+        // 기존 값 확인 없이 그대로 갱신을 지시한다 — 덮어쓰기는 저장소 계약이다(R5).
+        verify(exactly = 1) { memberRepository.updateProviderRefreshToken(100L, "provider-refresh-2") }
+        verify(exactly = 0) { memberRepository.findProviderRefreshToken(any()) }
+    }
+
+    @Test
+    fun `교환이 실패해도 로그인은 성공하고 토큰을 저장하지 않는다`() {
+        givenActiveSnsMember()
+        every { tokenExchanger.exchangeForRefreshToken(any(), any()) } throws RuntimeException("provider 장애")
+
+        assertEquals(tokens, service.loginBySns(loginCommand.copy(authorizationCode = "auth-code-3")))
+
+        verify(exactly = 0) { memberRepository.updateProviderRefreshToken(any(), any()) }
+    }
+
     // --- loginByEmail ---
 
     private val emailLoginCommand = LoginEmailCommand("user@example.com", "Passw0rd!")
@@ -131,12 +198,39 @@ class AuthTokenServiceTest {
 
     @Test
     fun `이메일-비밀번호가 맞고 인증완료면 토큰을 발급한다`() {
-        every { memberRepository.findEmailAuthentication("user@example.com") } returns emailAuth()
+        every { memberRepository.findEmailAuthentication("protected:user@example.com") } returns emailAuth()
         every { passwordEncoder.matches("Passw0rd!", "hashed-pw") } returns true
         every { tokenIssuer.issueFor(100L) } returns tokens
 
         assertEquals(tokens, service.loginByEmail(emailLoginCommand))
         verify { tokenIssuer.issueFor(100L) }
+    }
+
+    @Test
+    fun `이메일 조회는 평문이 아니라 보호된 식별자로 한다`() {
+        val queried = slot<String>()
+        every { memberRepository.findEmailAuthentication(capture(queried)) } returns emailAuth()
+        every { passwordEncoder.matches(any(), any()) } returns true
+        every { tokenIssuer.issueFor(100L) } returns tokens
+
+        service.loginByEmail(emailLoginCommand)
+
+        assertEquals("protected:user@example.com", queried.captured)
+        assertNotEquals("user@example.com", queried.captured)
+    }
+
+    @Test
+    fun `대소문자·공백만 다른 이메일도 같은 회원으로 판정한다`() {
+        val queried = mutableListOf<String>()
+        every { memberRepository.findEmailAuthentication(capture(queried)) } returns emailAuth()
+        every { passwordEncoder.matches(any(), any()) } returns true
+        every { tokenIssuer.issueFor(100L) } returns tokens
+
+        service.loginByEmail(LoginEmailCommand("user@example.com", "Passw0rd!"))
+        service.loginByEmail(LoginEmailCommand("  USER@Example.COM  ", "Passw0rd!"))
+
+        // 정규화(Email VO) → 보호 변환 순서라 두 입력이 같은 조회 키가 된다.
+        assertEquals(queried[0], queried[1])
     }
 
     @Test
