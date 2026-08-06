@@ -19,6 +19,7 @@ DROP TABLE IF EXISTS community_post_spot  CASCADE;
 DROP TABLE IF EXISTS community_post_chip  CASCADE;
 DROP TABLE IF EXISTS community_comment    CASCADE;
 DROP TABLE IF EXISTS community_post_like  CASCADE;
+DROP TABLE IF EXISTS community_post_hide  CASCADE;
 DROP TABLE IF EXISTS community_report     CASCADE;
 DROP TABLE IF EXISTS community_block      CASCADE;
 DROP TABLE IF EXISTS community_chip       CASCADE;
@@ -52,4 +53,5 @@ COMMIT;
 --   V32 community_post.view_count       조회수
 --   V33 community_comment.parent_comment_id  대댓글(깊이 2단계)
 --   V34 community_post_spot.map_x/map_y/location  글의 좌표(반경 조회용)
+--   V35 community_post_hide            사용자별 글 숨김
 --   R__ seed_community        글 16건(장소 없는 글 1건 포함) + 칩 34건

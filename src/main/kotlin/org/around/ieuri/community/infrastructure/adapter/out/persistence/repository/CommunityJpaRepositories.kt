@@ -5,6 +5,7 @@ import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.CommentEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostChipEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostHideEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostLikeEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostPhotoEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostTagEntity
@@ -39,6 +40,14 @@ interface PostChipJpaRepository : JpaRepository<PostChipEntity, Long>
 
 /** 글 ↔ 장소. 장소는 선택이라 행이 없을 수 있다. */
 interface PostSpotJpaRepository : JpaRepository<PostSpotEntity, Long>
+
+/** 글 숨김. 유일 제약이 멱등을 판정하므로 exists→save 순으로 쓴다. */
+interface PostHideJpaRepository : JpaRepository<PostHideEntity, Long> {
+    fun existsByMemberIdAndPostId(memberId: Long, postId: Long): Boolean
+
+    /** 지운 행 수를 돌려준다 — 0이면 원래 숨기지 않았다는 뜻이고 멱등 no-op 판정의 근거다. */
+    fun deleteByMemberIdAndPostId(memberId: Long, postId: Long): Long
+}
 
 interface CommentJpaRepository : JpaRepository<CommentEntity, Long> {
     fun findByIdAndDeletedAtIsNull(id: Long): CommentEntity?

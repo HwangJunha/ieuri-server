@@ -65,6 +65,7 @@ class CommunityQueryResolver(
         @InputArgument category: GqlTargetCategory?,
         @InputArgument tag: String?,
         @InputArgument sort: GqlPostSortOrder?,
+        @InputArgument hiddenByViewer: Boolean?,
         @InputArgument first: Int?,
         @InputArgument after: String?,
     ): PostConnection {
@@ -79,6 +80,7 @@ class CommunityQueryResolver(
                 tag = tag,
                 // 스키마 기본값이 LATEST라 null이 오는 경우는 없지만, 계약을 코드에도 남긴다.
                 sort = sort?.let { PostSortOrder.valueOf(it.name) } ?: PostSortOrder.LATEST,
+                hiddenByViewer = hiddenByViewer ?: false,
                 first = first ?: DEFAULT_PAGE_SIZE,
                 after = after,
             ),

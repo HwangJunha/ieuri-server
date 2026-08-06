@@ -54,7 +54,7 @@ class PostImageUploadServiceTest {
 
     private fun jpeg(bytes: Long = 1_024L) = PostImageUploadRequest("image/jpeg", bytes)
 
-    private fun pendingKey(owner: Long = memberId) = "pending/$owner/${UUID.randomUUID()}"
+    private fun pendingKey(owner: Long = memberId) = "pending/community/$owner/${UUID.randomUUID()}"
 
     /** 실제 JPEG 시그니처. 매직바이트 판정을 통과하는 최소 바이트열이다. */
     private fun jpegMagic() = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte()) +
@@ -94,7 +94,7 @@ class PostImageUploadServiceTest {
             .objectKey
 
         // 키에 memberId가 들어가는 것이 나중에 소유권 판정의 근거가 된다.
-        assertTrue(key.startsWith("pending/$memberId/"), "키가 pending/$memberId/로 시작하지 않는다: $key")
+        assertTrue(key.startsWith("pending/community/$memberId/"), "키가 pending/community/$memberId/로 시작하지 않는다: $key")
     }
 
     @Test
@@ -262,7 +262,7 @@ class PostImageUploadServiceTest {
     @Test
     fun `형식이 깨진 키는 저장소를 묻지 않고 거부한다`() {
         val result = service.confirmUploads(
-            ConfirmPostImageUploadsCommand(listOf("pending/7/uuid가-아님", "말도-안-되는-키")),
+            ConfirmPostImageUploadsCommand(listOf("pending/community/7/uuid가-아님", "말도-안-되는-키")),
             memberId,
         )
 
@@ -274,7 +274,7 @@ class PostImageUploadServiceTest {
     fun `이미 확정된 키를 다시 확인하면 실패한다`() {
         // 원본이 pending에 없으므로 재확인은 성공할 수 없다. 조용히 통과시키면
         // 클라이언트가 move가 두 번 일어났다고 착각한다.
-        val key = "images/$memberId/${UUID.randomUUID()}"
+        val key = "images/community/$memberId/${UUID.randomUUID()}"
 
         val result = service.confirmUploads(ConfirmPostImageUploadsCommand(listOf(key)), memberId)
 
@@ -318,7 +318,7 @@ class PostImageUploadServiceTest {
     @Test
     fun `본인 키는 임시든 확정이든 지운다`() {
         val pending = pendingKey()
-        val confirmed = "images/$memberId/${UUID.randomUUID()}"
+        val confirmed = "images/community/$memberId/${UUID.randomUUID()}"
         every { storage.delete(any()) } returns Unit
 
         service.deleteImage(DeletePostImageCommand(pending), memberId)

@@ -64,6 +64,13 @@ data class DeleteCommentCommand(val commentId: Long) {
     }
 }
 
+/** 글 숨김·해제. 내 화면에서만 감추는 것이라 작성자 여부를 보지 않는다. */
+data class HidePostCommand(val postId: Long) {
+    init {
+        require(postId > 0) { "postId는 양수여야 합니다." }
+    }
+}
+
 data class LikePostCommand(val postId: Long) {
     init {
         require(postId > 0) { "postId는 양수여야 합니다." }

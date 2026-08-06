@@ -165,13 +165,13 @@ JOIN spot s ON s.id = v.spot_id;
 -- 4) 사진 키. 실제 R2에 오브젝트가 없으므로 **CDN에서는 깨진 이미지로 나온다** — 키 배열과
 --    순서(position)가 계약대로 내려오는지 확인하는 용도다.
 INSERT INTO community_post_photo (post_id, object_key, position)
-SELECT p.id, 'images/20/00000000-0000-4000-8000-00000000000' || g.n, g.n
+SELECT p.id, 'images/community/20/00000000-0000-4000-8000-00000000000' || g.n, g.n
 FROM community_post p
 CROSS JOIN (VALUES (0), (1), (2)) AS g(n)
 WHERE p.author_id = 20 AND p.title = '북촌 골목 사진 몇 장';
 
 INSERT INTO community_post_photo (post_id, object_key, position)
-SELECT p.id, 'images/16/00000000-0000-4000-8000-00000000010', 0
+SELECT p.id, 'images/community/16/00000000-0000-4000-8000-00000000010', 0
 FROM community_post p
 WHERE p.author_id = 16 AND p.title = '청계천 야경 사진';
 

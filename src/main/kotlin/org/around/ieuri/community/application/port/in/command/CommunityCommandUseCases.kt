@@ -9,6 +9,7 @@ import org.around.ieuri.community.application.command.DeleteCommentCommand
 import org.around.ieuri.community.application.command.DeletePostCommand
 import org.around.ieuri.community.application.command.EditPostCommand
 import org.around.ieuri.community.application.command.IssuePostImageUploadUrlsCommand
+import org.around.ieuri.community.application.command.HidePostCommand
 import org.around.ieuri.community.application.command.LikePostCommand
 import org.around.ieuri.community.application.command.ReportContentCommand
 import org.around.ieuri.community.application.query.PostImageConfirmResult
@@ -44,6 +45,18 @@ interface PostLikeCommandUseCase {
     fun like(command: LikePostCommand, memberId: Long): Int
 
     fun unlike(command: LikePostCommand, memberId: Long): Int
+}
+
+/**
+ * 글 숨김. **차단과 다른 축이다** — 차단은 사람 단위, 이쪽은 글 하나다.
+ * 개별 콘텐츠를 감출 수단이 없으면 글 하나 때문에 작성자를 통째로 차단해야 한다.
+ *
+ * 중복 숨김·미숨김 해제 모두 오류가 아니라 멱등 no-op이다.
+ */
+interface PostHideCommandUseCase {
+    fun hide(command: HidePostCommand, memberId: Long)
+
+    fun unhide(command: HidePostCommand, memberId: Long)
 }
 
 /** 차단. 중복 차단·미차단 해제 모두 오류가 아니라 멱등 no-op이다. */

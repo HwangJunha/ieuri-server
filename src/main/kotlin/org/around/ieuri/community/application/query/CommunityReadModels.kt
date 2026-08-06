@@ -120,6 +120,8 @@ data class PostsQuery(
      * 정렬 방식. 좌표가 없으면 거리를 잴 기준이 없어 DISTANCE도 LATEST로 떨어진다.
      */
     val sort: PostSortOrder,
+    /** true면 **숨긴 글만** 본다(해제 화면). 기본은 false로 숨긴 글을 제외한다. */
+    val hiddenByViewer: Boolean = false,
     val first: Int,
     val after: String?,
 ) {

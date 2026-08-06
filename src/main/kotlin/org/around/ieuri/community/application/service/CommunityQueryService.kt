@@ -58,6 +58,7 @@ class CommunityQueryService(
             // 태그는 정규화해 넘긴다 — 대소문자·선행 #을 가리지 않게 하려는 것이다.
             normalizedTag = query.tag?.let { PostTag.parseOrNull(it)?.normalized },
             sort = effectiveSort(query),
+            hiddenByViewer = query.hiddenByViewer,
             first = clampPageSize(query.first),
             after = query.after,
             viewer = viewerContext(memberId),
@@ -161,10 +162,16 @@ class CommunityQueryService(
     override fun communityChips(appKey: AppKey, language: ContentLanguage): List<CommunityChipView> =
         communityQueryPort.findChips(appKey, language)
 
-    /** 호출자의 차단 관계를 **양방향으로** 읽어 담는다. */
+    /**
+     * 호출자의 차단 관계를 **양방향으로** 읽어 담고, 개별로 숨긴 글 id도 함께 담는다.
+     *
+     * 둘 다 조회 시점에 한 번 읽는 이유는 필터가 쿼리 조건으로 들어가야 하기 때문이다 —
+     * 조회 후 걸러내면 `first: 20`을 요청했는데 15건만 남는다.
+     */
     private fun viewerContext(memberId: Long): ViewerContext = ViewerContext(
         memberId = memberId,
         blockedMemberIds = communityQueryPort.findBlockedMemberIds(memberId),
+        hiddenPostIds = communityQueryPort.findHiddenPostIds(memberId),
     )
 
     private fun clampPageSize(first: Int): Int = first.coerceIn(1, policy.maxPageSize)

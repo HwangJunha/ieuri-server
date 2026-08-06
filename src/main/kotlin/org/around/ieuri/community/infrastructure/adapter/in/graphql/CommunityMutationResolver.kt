@@ -3,6 +3,9 @@ package org.around.ieuri.community.infrastructure.adapter.`in`.graphql
 import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsMutation
 import com.netflix.graphql.dgs.InputArgument
+import org.around.ieuri.common.graphql.generated.types.HidePostInput
+import org.around.ieuri.common.graphql.generated.types.HidePostPayload
+import org.around.ieuri.common.graphql.generated.types.UnhidePostPayload
 import org.around.ieuri.common.graphql.generated.types.BlockUserInput
 import org.around.ieuri.common.graphql.generated.types.BlockUserPayload
 import org.around.ieuri.common.graphql.generated.types.ConfirmPostImageUploadsInput
@@ -42,11 +45,13 @@ import org.around.ieuri.community.application.command.DeletePostCommand
 import org.around.ieuri.community.application.command.EditPostCommand
 import org.around.ieuri.community.application.command.IssuePostImageUploadUrlsCommand
 import org.around.ieuri.community.application.command.PostImageUploadRequest
+import org.around.ieuri.community.application.command.HidePostCommand
 import org.around.ieuri.community.application.command.LikePostCommand
 import org.around.ieuri.community.application.command.ReportContentCommand
 import org.around.ieuri.community.application.port.`in`.command.BlockCommandUseCase
 import org.around.ieuri.community.application.port.`in`.command.CommentCommandUseCase
 import org.around.ieuri.community.application.port.`in`.command.PostCommandUseCase
+import org.around.ieuri.community.application.port.`in`.command.PostHideCommandUseCase
 import org.around.ieuri.community.application.port.`in`.command.PostImageUploadUseCase
 import org.around.ieuri.community.application.port.`in`.command.PostLikeCommandUseCase
 import org.around.ieuri.community.application.port.`in`.command.ReportCommandUseCase
@@ -68,6 +73,7 @@ class CommunityMutationResolver(
     private val commentCommandUseCase: CommentCommandUseCase,
     private val postLikeCommandUseCase: PostLikeCommandUseCase,
     private val blockCommandUseCase: BlockCommandUseCase,
+    private val postHideCommandUseCase: PostHideCommandUseCase,
     private val reportCommandUseCase: ReportCommandUseCase,
     private val postImageUploadUseCase: PostImageUploadUseCase,
     private val currentMemberProvider: CurrentMemberProvider,
@@ -245,6 +251,24 @@ class CommunityMutationResolver(
         val memberId = currentMemberProvider.requireMemberId()
         postImageUploadUseCase.deleteImage(DeletePostImageCommand(input.objectKey), memberId)
         DeletePostImagePayload(success = true, userErrors = emptyList())
+    }
+
+    @DgsMutation
+    fun hidePost(@InputArgument input: HidePostInput): HidePostPayload = withCommunityUserErrors(
+        onError = { HidePostPayload(success = false, userErrors = it) },
+    ) {
+        val memberId = currentMemberProvider.requireMemberId()
+        postHideCommandUseCase.hide(HidePostCommand(input.postId), memberId)
+        HidePostPayload(success = true, userErrors = emptyList())
+    }
+
+    @DgsMutation
+    fun unhidePost(@InputArgument input: HidePostInput): UnhidePostPayload = withCommunityUserErrors(
+        onError = { UnhidePostPayload(success = false, userErrors = it) },
+    ) {
+        val memberId = currentMemberProvider.requireMemberId()
+        postHideCommandUseCase.unhide(HidePostCommand(input.postId), memberId)
+        UnhidePostPayload(success = true, userErrors = emptyList())
     }
 
     @DgsMutation

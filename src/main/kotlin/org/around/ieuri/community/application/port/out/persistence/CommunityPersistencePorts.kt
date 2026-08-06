@@ -81,6 +81,20 @@ interface PostLikeRepositoryPort {
 }
 
 /**
+ * 글 숨김 쓰기. **community_post.hidden과 다른 개념이다** — 그쪽은 신고 누적으로 모두에게
+ * 감춰진 것이고, 여기는 한 사용자가 자기 화면에서만 감춘 것이다.
+ *
+ * 좋아요·차단과 같이 멱등 판정을 저장소의 유일 제약이 맡는다.
+ */
+interface PostHideRepositoryPort {
+    /** 새로 숨겼으면 true, 이미 숨겨져 있었으면 false(멱등 no-op). */
+    fun save(memberId: Long, postId: Long): Boolean
+
+    /** 실제로 해제했으면 true, 원래 숨기지 않았으면 false(멱등 no-op). */
+    fun delete(memberId: Long, postId: Long): Boolean
+}
+
+/**
  * 차단 쓰기. **조회는 여기 없다** — 피드 필터가 쓰는 양방향 해석은 읽기 경로라
  * CommunityQueryPort.findBlockedMemberIds가 담당한다(한 번의 쿼리로 읽는다).
  */

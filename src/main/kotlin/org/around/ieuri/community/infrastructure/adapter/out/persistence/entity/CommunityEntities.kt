@@ -185,6 +185,29 @@ class PostLikeEntity(
     }
 }
 
+/** 사용자가 개별 글을 숨긴 기록. community_post.hidden(신고 누적)과 다른 개념이다. */
+@Entity
+@Table(name = "community_post_hide")
+class PostHideEntity(
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    var id: Long? = null,
+
+    @Column(name = "member_id", nullable = false)
+    var memberId: Long,
+
+    @Column(name = "post_id", nullable = false)
+    var postId: Long,
+
+    @Column(name = "created_at", nullable = false)
+    var createdAt: Instant? = null,
+) {
+    @PrePersist
+    fun onCreate() {
+        if (createdAt == null) createdAt = Instant.now()
+    }
+}
+
 @Entity
 @Table(name = "community_block")
 class BlockEntity(

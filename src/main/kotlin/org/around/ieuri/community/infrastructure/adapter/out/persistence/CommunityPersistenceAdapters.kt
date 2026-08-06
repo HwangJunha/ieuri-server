@@ -5,6 +5,7 @@ import org.around.ieuri.community.application.port.out.persistence.CommentReposi
 import org.around.ieuri.community.application.port.out.persistence.PostLikeRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.PostRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.PostCounterPort
+import org.around.ieuri.community.application.port.out.persistence.PostHideRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.PostModerationPort
 import org.around.ieuri.community.application.port.out.persistence.ReportRepositoryPort
 import org.around.ieuri.community.domain.aggregate.Block
@@ -24,6 +25,8 @@ import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.BlockJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.CommentJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.PostChipJpaRepository
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostHideEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.PostHideJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.PostJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.PostLikeJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.PostPhotoJpaRepository
@@ -247,6 +250,29 @@ class PostLikePersistenceAdapter(
 
     override fun delete(postId: Long, memberId: Long): Boolean =
         repository.deleteByPostIdAndMemberId(postId, memberId) > 0
+}
+
+/**
+ * 글 숨김. 좋아요·차단과 같은 형태다 — exists 검사 뒤 insert 사이에 동시 요청이 끼어들 수
+ * 있어 유일 제약 위반도 함께 잡는다. 그 경우도 "이미 숨겨져 있었다"와 같은 결과다.
+ */
+@Component
+class PostHidePersistenceAdapter(
+    private val repository: PostHideJpaRepository,
+) : PostHideRepositoryPort {
+
+    override fun save(memberId: Long, postId: Long): Boolean {
+        if (repository.existsByMemberIdAndPostId(memberId, postId)) return false
+        return try {
+            repository.saveAndFlush(PostHideEntity(memberId = memberId, postId = postId))
+            true
+        } catch (e: DataIntegrityViolationException) {
+            false
+        }
+    }
+
+    override fun delete(memberId: Long, postId: Long): Boolean =
+        repository.deleteByMemberIdAndPostId(memberId, postId) > 0
 }
 
 @Component

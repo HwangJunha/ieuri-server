@@ -57,6 +57,20 @@ class PostSpatialQueryAdapter(
         conditions += "(p.hidden = FALSE OR p.author_id = ?)"
         params += search.viewer.memberId
 
+        // 개별 숨김. hiddenByViewer면 뒤집어 숨긴 글만 남긴다 — 그러지 않으면 해제할 방법이 없다.
+        val hiddenPostIds = search.viewer.hiddenPostIds
+        when {
+            search.hiddenByViewer && hiddenPostIds.isEmpty() -> conditions += "FALSE"
+            search.hiddenByViewer -> {
+                conditions += "p.id IN (${placeholders(hiddenPostIds.size)})"
+                params.addAll(hiddenPostIds)
+            }
+            hiddenPostIds.isNotEmpty() -> {
+                conditions += "p.id NOT IN (${placeholders(hiddenPostIds.size)})"
+                params.addAll(hiddenPostIds)
+            }
+        }
+
         if (search.viewer.blockedMemberIds.isNotEmpty()) {
             conditions += "p.author_id NOT IN (${placeholders(search.viewer.blockedMemberIds.size)})"
             params.addAll(search.viewer.blockedMemberIds)

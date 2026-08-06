@@ -21,6 +21,11 @@ extend type Query {
         tag: String
         "정렬 방식. 무엇이 보이는지까지 정한다 — PostSortOrder 설명 참고."
         sort: PostSortOrder = LATEST
+        """
+        true면 **내가 숨긴 글만** 나온다(숨김 해제 화면). 기본 false는 숨긴 글을 제외한다.
+        다른 필터·정렬과 함께 쓸 수 있다 — 숨긴 글도 카테고리·태그로 좁히거나 거리순으로 볼 수 있다.
+        """
+        hiddenByViewer: Boolean = false
         first: Int = 20
         after: String
     ): PostConnection!
@@ -68,6 +73,16 @@ extend type Mutation {
 
     "업로드한 사진을 지운다. 글에 붙이기 전(작성 취소·재선택)에도, 붙인 뒤(editPost로 뺀 키 정리)에도 쓴다. 본인이 발급받은 키만 지울 수 있다."
     deletePostImage(input: DeletePostImageInput!): DeletePostImagePayload!
+
+    """
+    이 글을 **내 화면에서만** 숨긴다. 글은 그대로 남고 다른 사람에게는 계속 보인다.
+    남의 글이든 내 글이든 숨길 수 있으며 멱등이다 — 이미 숨긴 글에 다시 호출해도 오류가 아니다.
+    신고(reportContent)와 다르다: 신고는 운영 조치를 요청하는 것이고, 이것은 개인 화면 설정이다.
+    """
+    hidePost(input: HidePostInput!): HidePostPayload!
+
+    "숨김 해제. 멱등 — 숨기지 않은 글에 호출해도 오류가 아니다. 삭제된 글의 기록도 지울 수 있다."
+    unhidePost(input: HidePostInput!): UnhidePostPayload!
 
     "사용자 차단. 양방향 — 차단 후 서로의 글·댓글이 모든 피드에서 보이지 않는다."
     blockUser(input: BlockUserInput!): BlockUserPayload!
@@ -378,6 +393,20 @@ input DeletePostImageInput {
 }
 
 type DeletePostImagePayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+}
+
+input HidePostInput {
+    postId: ID!
+}
+
+type HidePostPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+}
+
+type UnhidePostPayload implements BaseResponse {
     success: Boolean!
     userErrors: [UserError!]!
 }

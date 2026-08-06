@@ -86,6 +86,9 @@ interface CommunityQueryPort {
      */
     fun findBlockedMemberIds(memberId: Long): Set<Long>
 
+    /** [memberId]가 개별로 숨긴 글의 id. 피드 필터가 이 집합을 제외한다. */
+    fun findHiddenPostIds(memberId: Long): Set<Long>
+
     /** 앱의 켜진 칩만 순서대로. 구성이 없으면 빈 목록이다. */
     fun findChips(appKey: AppKey, language: ContentLanguage): List<CommunityChipView>
 }
@@ -124,6 +127,13 @@ interface PostSpatialQueryPort {
 data class ViewerContext(
     val memberId: Long,
     val blockedMemberIds: Set<Long>,
+    /**
+     * 호출자가 **개별로 숨긴** 글의 id. 차단이 사람 단위라면 이쪽은 글 단위다.
+     *
+     * 조회 시점에 한 번 읽어 담는 이유는 차단과 같다 — 필터가 쿼리 조건으로 들어가야
+     * `first: 20`을 요청했을 때 20건이 온다.
+     */
+    val hiddenPostIds: Set<Long> = emptySet(),
 )
 
 /**
@@ -149,6 +159,11 @@ data class PostsSearch(
      * DISTANCE는 반경 안 장소에 붙은 글만 담는다(거리 없는 글은 자리가 없다).
      */
     val sort: PostSortOrder,
+    /**
+     * true면 **숨긴 글만** 돌려준다(해제 화면). 이때는 숨김 필터를 우회해야 한다 —
+     * 그러지 않으면 항상 빈 목록이라 사용자가 숨김을 되돌릴 방법이 없다.
+     */
+    val hiddenByViewer: Boolean,
     val first: Int,
     val after: String?,
     val viewer: ViewerContext,

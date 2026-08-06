@@ -44,7 +44,7 @@ class PostCommandServiceTest {
 
     private val service = PostCommandService(postRepository, spotLookup, storage, clock)
 
-    private fun confirmedKey(owner: Long = memberId) = "images/$owner/${UUID.randomUUID()}"
+    private fun confirmedKey(owner: Long = memberId) = "images/community/$owner/${UUID.randomUUID()}"
 
     private fun givenValidSpotAndAuthor() {
         every { spotLookup.findSummary(spotId) } returns
@@ -183,7 +183,7 @@ class PostCommandServiceTest {
     fun `확인을 거치지 않은 pending 키는 PHOTO_NOT_UPLOADED다`() {
         givenValidSpotAndAuthor()
         assertFailsWith<PhotoNotUploadedException> {
-            create(photoKeys = listOf("pending/$memberId/${UUID.randomUUID()}"))
+            create(photoKeys = listOf("pending/community/$memberId/${UUID.randomUUID()}"))
         }
     }
 

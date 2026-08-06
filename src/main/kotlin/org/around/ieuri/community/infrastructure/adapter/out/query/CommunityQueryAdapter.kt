@@ -34,6 +34,7 @@ import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QCommentEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QCommunityChipEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostHideEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostLikeEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostPhotoEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostChipEntity
@@ -69,6 +70,7 @@ class CommunityQueryAdapter(
     private val postChip = QPostChipEntity.postChipEntity
     private val postSpot = QPostSpotEntity.postSpotEntity
     private val block = QBlockEntity.blockEntity
+    private val postHide = QPostHideEntity.postHideEntity
 
 
     /**
@@ -93,8 +95,24 @@ class CommunityQueryAdapter(
                 spotCondition(search.spotId),
                 categoryCondition(search.category),
                 tagCondition(search.normalizedTag),
+                hideCondition(search),
             ),
         )
+
+    /**
+     * 개별 숨김 필터. **[PostsSearch.hiddenByViewer]가 true면 뒤집힌다** — 숨긴 글만 남긴다.
+     * 그 경로까지 제외해 버리면 목록이 항상 비어 사용자가 숨김을 되돌릴 수 없다.
+     */
+    private fun hideCondition(search: PostsSearch): BooleanExpression? {
+        val hidden = search.viewer.hiddenPostIds
+        return when {
+            // 숨긴 글이 없는데 숨긴 글만 달라고 하면 결과도 없어야 한다.
+            search.hiddenByViewer && hidden.isEmpty() -> post.id.isNull
+            search.hiddenByViewer -> post.id.`in`(hidden)
+            hidden.isEmpty() -> null
+            else -> post.id.notIn(hidden)
+        }
+    }
 
     /**
      * 아래 셋은 **조건이 필요 없으면 null**을 돌려준다. QueryDSL의 where는 null을 무시하므로
@@ -309,6 +327,15 @@ class CommunityQueryAdapter(
             )
             .from(block)
             .where(block.blockerId.eq(memberId).or(block.blockedId.eq(memberId)))
+            .fetch()
+            .toSet()
+
+    @Transactional(readOnly = true)
+    override fun findHiddenPostIds(memberId: Long): Set<Long> =
+        queryFactory
+            .select(postHide.postId)
+            .from(postHide)
+            .where(postHide.memberId.eq(memberId))
             .fetch()
             .toSet()
 

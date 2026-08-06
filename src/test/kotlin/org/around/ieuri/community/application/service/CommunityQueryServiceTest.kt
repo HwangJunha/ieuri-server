@@ -73,6 +73,12 @@ class CommunityQueryServiceTest {
 
     private fun givenBlocked(vararg ids: Long) {
         every { queryPort.findBlockedMemberIds(memberId) } returns ids.toSet()
+        // 숨긴 글이 없는 것이 기본. 필요한 테스트만 givenHidden으로 덮어쓴다.
+        every { queryPort.findHiddenPostIds(memberId) } returns emptySet()
+    }
+
+    private fun givenHidden(vararg postIds: Long) {
+        every { queryPort.findHiddenPostIds(memberId) } returns postIds.toSet()
     }
 
     /** 대상·좌표를 주지 않은 전체 피드 조회. 개별 테스트가 필요한 인자만 덮어쓴다. */
@@ -83,6 +89,7 @@ class CommunityQueryServiceTest {
         radiusMeters: Int = 20_000,
         category: TargetCategory? = null,
         sort: PostSortOrder = PostSortOrder.LATEST,
+        hiddenByViewer: Boolean = false,
         first: Int = 20,
     ) = PostsQuery(
         spotId = spotId,
@@ -92,6 +99,7 @@ class CommunityQueryServiceTest {
         category = category,
         tag = null,
         sort = sort,
+        hiddenByViewer = hiddenByViewer,
         first = first,
         after = null,
     )
@@ -364,6 +372,56 @@ class CommunityQueryServiceTest {
         service.posts(query(latitude = 37.5, longitude = 127.0), memberId)
 
         verify(exactly = 0) { spatialPort.findPostsByDistance(any()) }
+    }
+
+    // ---------- 개별 숨김 ----------
+
+    @Test
+    fun `숨긴 글 id가 조회 컨텍스트에 담긴다`() {
+        givenBlocked()
+        givenHidden(5L, 7L)
+        val search = captureSearch()
+
+        service.posts(query(), memberId)
+
+        // 필터가 쿼리 조건으로 들어가야 first만큼 채워진다 — 조회 후 걸러내면 모자란다.
+        assertEquals(setOf(5L, 7L), search.captured.viewer.hiddenPostIds)
+    }
+
+    @Test
+    fun `기본은 숨긴 글을 제외한다`() {
+        givenBlocked()
+        givenHidden(5L)
+        val search = captureSearch()
+
+        service.posts(query(), memberId)
+
+        assertEquals(false, search.captured.hiddenByViewer)
+    }
+
+    @Test
+    fun `숨긴 글만 보기는 그대로 전달된다`() {
+        givenBlocked()
+        givenHidden(5L)
+        val search = captureSearch()
+
+        service.posts(query(hiddenByViewer = true), memberId)
+
+        // 이 경로는 숨김 필터를 뒤집어야 한다 — 그러지 않으면 해제할 방법이 없다.
+        assertEquals(true, search.captured.hiddenByViewer)
+        assertEquals(setOf(5L), search.captured.viewer.hiddenPostIds)
+    }
+
+    @Test
+    fun `단건 조회도 숨김 컨텍스트를 거친다`() {
+        givenBlocked()
+        givenHidden(99L)
+        val viewer = slot<ViewerContext>()
+        every { queryPort.findPost(any(), capture(viewer)) } returns null
+
+        service.post(99L, memberId)
+
+        assertEquals(setOf(99L), viewer.captured.hiddenPostIds)
     }
 
     // ---------- 조회수 ----------
