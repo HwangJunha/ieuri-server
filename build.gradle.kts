@@ -56,6 +56,11 @@ dependencies {
     // Spring Boot 4는 자동구성을 모듈로 분리했다. Flyway 자동구성(FlywayAutoConfiguration)은
     // flyway-core가 아니라 이 모듈에 있으므로 명시적으로 추가해야 마이그레이션이 부팅 시 실행된다.
     implementation("org.springframework.boot:spring-boot-flyway")
+    // Cloudflare R2(S3 호환) presigned URL 발급과 확인 단계의 오브젝트 조작(SPEC-0010 R18·R19).
+    // 서명을 손으로 만들지 않는다 — SigV4는 정본 요청 문자열 한 글자만 어긋나도 조용히 실패하고,
+    // Content-Type·Content-Length를 서명 항목에 넣는 일까지 SDK가 네이티브로 지원한다.
+    // S3Presigner도 이 아티팩트에 들어 있다 — 별도의 s3-presigner 모듈은 존재하지 않는다.
+    implementation("software.amazon.awssdk:s3:2.31.77")
     // JWT (JVM 표준 라이브러리 jjwt). api만 컴파일 의존, 구현/직렬화는 런타임.
     // 자체 발급 HS256 토큰 전용.
     implementation("io.jsonwebtoken:jjwt-api:0.12.6")
@@ -113,3 +118,28 @@ tasks.withType<com.netflix.graphql.dgs.codegen.gradle.GenerateJavaTask> {
     // 리졸버에 도달하기 전에 GraphQL이 자체 오류로 거부한다.
     typeMapping = mutableMapOf("ID" to "kotlin.Long")
 }
+
+// 생성된 GraphQL 타입을 **소스 디렉터리로 등록한다.**
+//
+// 등록하지 않아도 Gradle 빌드는 통과한다 — codegen 플러그인이 컴파일 태스크에 출력을 직접
+// 얹기 때문이다. 문제는 IDE다: IntelliJ는 이 디렉터리가 소스인 줄 모르므로 생성 타입
+// (CreatePostInput, PostTopic …)과 @InputArgument를 전부 미해결로 표시한다. 빌드는 되는데
+// 에디터만 빨갛게 되는 상태이며, build/를 지우고 다시 임포트하면 잠깐 낫다가 재발한다.
+//
+// srcDir로 명시하면 Gradle 임포트가 이 경로를 IDE에 알려 준다.
+sourceSets {
+    main {
+        kotlin.srcDir(layout.buildDirectory.dir("generated/sources/dgs-codegen"))
+    }
+}
+
+// 컴파일 전에 코드 생성이 끝나 있도록 한다. 위 srcDir만 두면 IDE 임포트 시점에 디렉터리가
+// 비어 있을 수 있고, 그러면 등록해 놓고도 미해결로 남는다.
+//
+// **IDE에서 빨간 줄이 보이면 `./gradlew generateJava`를 먼저 돌린 뒤 Gradle sync를 한다.**
+// generateJava는 출력이 지워져도 UP-TO-DATE로 건너뛸 수 있어(빌드 캐시), 그 상태로 임포트하면
+// 소스 루트는 등록돼 있는데 안이 비어 미해결로 보인다.
+tasks.named("compileKotlin") {
+    dependsOn(tasks.withType<com.netflix.graphql.dgs.codegen.gradle.GenerateJavaTask>())
+}
+

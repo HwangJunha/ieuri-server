@@ -1,0 +1,470 @@
+extend type Query {
+    """
+    글 피드. 인자 조합으로 범위가 정해진다:
+      - spotId              : 그 장소에 붙은 글 (spot 상세 화면)
+      - latitude·longitude  : 좌표 반경 안의 장소들에 붙은 글 (커뮤니티 탭)
+      - 둘 다 없으면         : 전체 피드
+    category·tag는 위 범위와 **독립적으로** 걸린다 — 장소 없이 카테고리만으로도 거를 수 있다.
+    sort는 정렬뿐 아니라 **무엇이 보이는지**도 바꾼다(PostSortOrder 참고).
+    """
+    posts(
+        "이 장소에 붙은 글만."
+        spotId: ID
+        "좌표 반경으로 좁힌다. longitude와 함께 줘야 한다."
+        latitude: Float
+        longitude: Float
+        "검색 반경(미터). 좌표를 줄 때만 쓰인다. 기본 20000, 상한 100000 — 초과 시 절삭."
+        radiusMeters: Int = 20000
+        "상단 추천 칩. 글의 카테고리로 거른다. 장소 유무와 무관하다."
+        category: TargetCategory
+        "태그로 필터링. 대소문자와 선행 #을 가리지 않는다. 생략하면 전체."
+        tag: String
+        "정렬 방식. 무엇이 보이는지까지 정한다 — PostSortOrder 설명 참고."
+        sort: PostSortOrder = LATEST
+        """
+        true면 **내가 숨긴 글만** 나온다(숨김 해제 화면). 기본 false는 숨긴 글을 제외한다.
+        다른 필터·정렬과 함께 쓸 수 있다 — 숨긴 글도 카테고리·태그로 좁히거나 거리순으로 볼 수 있다.
+        """
+        hiddenByViewer: Boolean = false
+        first: Int = 20
+        after: String
+    ): PostConnection!
+
+    "글의 **최상위** 댓글 목록. 최신순. 대댓글은 Comment.replies로 내려간다. 피드와 동일하게 차단·숨김이 걸러진다."
+    comments(postId: ID!, first: Int = 20, after: String): CommentConnection!
+
+    "글 단건. 차단 관계의 작성자이거나 자동 숨김된 글은 작성자 본인이 아닌 한 null이다. 삭제된 글도 null이며, 모두 오류가 아니라 통상적인 부재다."
+    post(id: ID!): Post
+
+    "호출자가 차단한 사용자 목록."
+    blockedUsers(first: Int = 20, after: String): BlockedUserConnection!
+
+    "커뮤니티 상단 카테고리 칩. 앱(X-App-Key 헤더)과 언어(Accept-Language)마다 구성이 다르다. 표시 문구는 내려주지 않는다 — 클라이언트가 category를 매핑한다. 구성이 없으면 빈 목록이며 오류가 아니다."
+    communityChips: [CommunityChip!]!
+}
+
+extend type Mutation {
+    "글 생성. 카테고리·제목·본문 필수이고 장소는 선택이다. photoKeys는 confirmPostImageUploads를 통과한 키여야 한다."
+    createPost(input: CreatePostInput!): CreatePostPayload!
+
+    "본인 글 수정. 제목·본문은 필수이고 사진·카테고리·장소·태그는 준 것만 바뀐다. 신고 누적으로 숨겨진 글은 수정할 수 없다(POST_NOT_EDITABLE)."
+    editPost(input: EditPostInput!): EditPostPayload!
+
+    "본인 글 삭제. 타인의 글은 거부된다."
+    deletePost(input: DeletePostInput!): DeletePostPayload!
+
+    "댓글 작성. 1단계만 — 대댓글 없음."
+    createComment(input: CreateCommentInput!): CreateCommentPayload!
+
+    "본인 댓글 삭제."
+    deleteComment(input: DeleteCommentInput!): DeleteCommentPayload!
+
+    "좋아요. 멱등 — 이미 좋아요한 글에 다시 호출해도 중복 집계되지 않는다."
+    likePost(input: LikePostInput!): LikePostPayload!
+
+    "좋아요 취소. 멱등 — 좋아요하지 않은 글에 호출해도 오류가 아니다."
+    unlikePost(input: UnlikePostInput!): UnlikePostPayload!
+
+    "사진 여러 장의 presigned PUT URL을 **한 번에** 발급한다. 최대 5장, 30분 만료. contentType과 contentLength가 서명에 포함되므로 업로드 시 선언한 값과 정확히 일치해야 한다. 실제 업로드는 클라이언트가 오브젝트 스토리지로 직접 PUT하며 GraphQL을 거치지 않는다."
+    createPostImageUploadUrls(input: CreatePostImageUploadUrlsInput!): CreatePostImageUploadUrlsPayload!
+
+    "업로드 완료 확인을 **한 번에**. 서버가 각 키의 실제 크기와 매직바이트를 검증하고, 통과한 것만 확정 위치로 옮긴다. **장별로 성패가 갈린다** — 한 장이 실패해도 나머지는 확정된다."
+    confirmPostImageUploads(input: ConfirmPostImageUploadsInput!): ConfirmPostImageUploadsPayload!
+
+    "업로드한 사진을 지운다. 글에 붙이기 전(작성 취소·재선택)에도, 붙인 뒤(editPost로 뺀 키 정리)에도 쓴다. 본인이 발급받은 키만 지울 수 있다."
+    deletePostImage(input: DeletePostImageInput!): DeletePostImagePayload!
+
+    """
+    이 글을 **내 화면에서만** 숨긴다. 글은 그대로 남고 다른 사람에게는 계속 보인다.
+    남의 글이든 내 글이든 숨길 수 있으며 멱등이다 — 이미 숨긴 글에 다시 호출해도 오류가 아니다.
+    신고(reportContent)와 다르다: 신고는 운영 조치를 요청하는 것이고, 이것은 개인 화면 설정이다.
+    """
+    hidePost(input: HidePostInput!): HidePostPayload!
+
+    "숨김 해제. 멱등 — 숨기지 않은 글에 호출해도 오류가 아니다. 삭제된 글의 기록도 지울 수 있다."
+    unhidePost(input: HidePostInput!): UnhidePostPayload!
+
+    "사용자 차단. 양방향 — 차단 후 서로의 글·댓글이 모든 피드에서 보이지 않는다."
+    blockUser(input: BlockUserInput!): BlockUserPayload!
+
+    "차단 해제."
+    unblockUser(input: UnblockUserInput!): UnblockUserPayload!
+
+    "글·댓글·사용자 신고. 같은 대상을 두 번 신고할 수 없다."
+    reportContent(input: ReportContentInput!): ReportContentPayload!
+}
+
+"""
+피드 정렬 방식. **정렬뿐 아니라 무엇이 보이는지도 정한다.**
+
+거리순은 장소에 붙은 글만 다룰 수 있다 — 거리 없는 글을 거리순 목록의 어디에 둘지 정할
+방법이 없기 때문이다. 장소 없이 쓴 글까지 보려면 최신순을 쓴다.
+"""
+enum PostSortOrder {
+    "최신순. 좌표로 좁힌 경우에도 **장소 없이 쓴 글이 함께** 나온다."
+    LATEST
+    """
+    가까운 순. 좌표 반경 안의 장소에 붙은 글만 나오며 **장소 없이 쓴 글은 빠진다.**
+    같은 장소의 글끼리는 최신순이다. 좌표를 주지 않으면 거리를 잴 기준이 없어 LATEST와 같게 동작한다.
+    커서 형식이 최신순과 달라 **정렬을 바꾸면 커서를 버리고 첫 페이지부터 다시 조회해야 한다** —
+    이전 커서를 그대로 넘기면 INVALID_INPUT이 온다.
+    """
+    DISTANCE
+}
+
+"대상의 카테고리. 커뮤니티 상단 추천 칩이 이 축으로 피드를 거른다. tourism의 SpotCategory와 값이 같다."
+enum TargetCategory {
+    TOURIST_SPOT
+    CULTURAL_FACILITY
+    FESTIVAL_EVENT
+    TRAVEL_COURSE
+    LEISURE_SPORTS
+    LODGING
+    SHOPPING
+    RESTAURANT
+    TRANSPORT
+}
+
+"피드 카드의 장소 칩. 요청 언어 기준 spot.id이며 Query.spotDetail(id:)에 그대로 넘길 수 있다."
+type PostSpot {
+    id: ID!
+    title: String!
+    thumbnailImageUrl: String!
+    "이 장소의 카테고리. 글 작성 화면에서 기본값을 제안할 때 쓴다."
+    category: TargetCategory
+}
+
+type Post {
+    id: ID!
+    "글 제목. 1~50자. 카드에서 볼드로 표시된다."
+    title: String!
+    "1~500자."
+    body: String!
+    "사용자가 입력한 태그. 최대 5개이며 입력한 원문 그대로 내려간다(대소문자 보존)."
+    tags: [String!]!
+    "글의 카테고리. 장소 유무와 무관하게 항상 있다."
+    category: TargetCategory!
+    "연결된 장소. **선택이다** — null이면 장소 없이 카테고리에만 속하는 글이다."
+    spot: PostSpot
+    author: PostAuthor!
+    "업로드를 마친 오브젝트 키. 최대 5개, 첨부 순서대로. 서버는 이미지 바이트를 중계하지 않으며, 클라이언트가 CDN 베이스 URL과 조합해 사용한다."
+    photoKeys: [String!]!
+    likeCount: Int!
+    "숨겨진 댓글은 제외한 수. 모든 호출자에게 같은 값이며, 자기 댓글이 숨겨진 사용자에게도 동일하다."
+    commentCount: Int!
+    "조회수. **글 단건 조회(post(id:))에서만 오르며 피드 목록에서는 오르지 않는다.** 같은 사용자가 여러 번 봐도 중복을 걸러 내지 않으므로 고유 방문자 수가 아니다. 증가는 응답과 별개로 처리되어, 방금 올린 조회가 이 응답에 반영되지 않을 수 있다."
+    viewCount: Int!
+    "호출자가 좋아요했는지."
+    likedByViewer: Boolean!
+    "호출자가 작성자인지. 클라이언트의 수정·삭제 수단 노출 여부를 결정한다."
+    ownedByViewer: Boolean!
+    "신고 누적으로 자동 숨김되었는지. 작성자가 아닌 호출자에게는 애초에 결과에 포함되지 않으므로, 작성자 본인만 이 값이 true인 자기 글을 본다."
+    hidden: Boolean!
+    "수정된 적이 있는지. 클라이언트가 \"수정됨\"을 표시한다."
+    edited: Boolean!
+    "ISO-8601. 정렬 기준."
+    createdAt: String!
+    """
+    댓글 미리보기. 최신순 몇 건만 내려주며 **페이지네이션이 없다** —
+    목록 안에 목록을 중첩하면 커서 관리가 화면마다 갈린다.
+    전체 목록과 더 보기는 루트의 comments(postId:)를 쓴다.
+    피드와 동일하게 차단·숨김이 걸러지며, 전체 개수는 commentCount다.
+    """
+    commentPreview: [Comment!]!
+}
+
+"글·댓글에 실리는 최소 작성자 정보."
+type PostAuthor {
+    id: ID!
+    nickname: String!
+    profileImageUrl: String
+}
+
+type Comment {
+    id: ID!
+    "1~500자. 글 본문과 같은 범위를 적용한다."
+    body: String!
+    author: PostAuthor!
+    ownedByViewer: Boolean!
+    hidden: Boolean!
+    createdAt: String!
+    "이 댓글이 답글이면 부모 댓글의 id, 최상위 댓글이면 null. 클라이언트가 들여쓰기 판정에 쓴다."
+    parentCommentId: ID
+    """
+    이 댓글에 달린 답글. **오래된 순이며 페이지네이션이 없다** — 대화의 흐름이라 최신순으로
+    뒤집으면 문맥이 끊기고, 깊이가 2단계라 한 댓글의 답글이 화면을 넘길 만큼 많지 않다.
+    최상위 댓글에서만 값이 있다 — 답글의 replies는 항상 빈 목록이다(깊이 2단계).
+    피드와 동일하게 차단·숨김이 걸러진다.
+    """
+    replies: [Comment!]!
+}
+
+"정렬: createdAt 내림차순. 기본 20, 상한 50 — 초과 요청은 상한으로 절삭된다. 총 개수는 제공하지 않으며 pageInfo.hasNextPage로 소진을 판정한다."
+type PostConnection {
+    edges: [PostEdge!]!
+    pageInfo: PageInfo!
+}
+
+type PostEdge {
+    cursor: String!
+    node: Post!
+}
+
+"최상위 댓글만. 정렬: createdAt 내림차순. 기본 20, 상한 50 — 초과 요청은 상한으로 절삭된다."
+type CommentConnection {
+    edges: [CommentEdge!]!
+    pageInfo: PageInfo!
+}
+
+type CommentEdge {
+    cursor: String!
+    node: Comment!
+}
+
+"정렬: 차단 시각 내림차순. 기본 20, 상한 50 — 초과 요청은 상한으로 절삭된다."
+type BlockedUserConnection {
+    edges: [BlockedUserEdge!]!
+    pageInfo: PageInfo!
+}
+
+type BlockedUserEdge {
+    cursor: String!
+    node: PostAuthor!
+    "차단 시각(ISO-8601). 정렬 기준."
+    blockedAt: String!
+}
+
+"커뮤니티 상단의 카테고리 칩 하나. 누르면 posts(category:)로 그 카테고리의 글만 조회한다."
+type CommunityChip {
+    category: TargetCategory!
+    "표시 순서. 작은 값이 왼쪽이다."
+    position: Int!
+}
+
+input CreatePostInput {
+    "글의 카테고리. 필수다."
+    category: TargetCategory!
+    "연결할 장소. **선택이다** — 생략하면 카테고리에만 속하는 글이 된다."
+    spotId: ID
+    "사용자가 입력한 태그. 최대 5개. 공백 없이 30자 이내이며 선행 #은 제거된다. 빈 목록도 유효하다."
+    tags: [String!]!
+    "1~50자. 앞뒤 공백은 제거된 뒤 판정한다."
+    title: String!
+    "1~500자. 앞뒤 공백은 제거된 뒤 판정한다."
+    body: String!
+    "confirmPostImageUploads가 반환한 확정 키. 최대 5개이며 배열 순서가 표시 순서다. 빈 목록도 유효하다 — 사진은 선택이다."
+    photoKeys: [String!]!
+}
+
+type CreatePostPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+    "생성된 글의 id. 성공 시 채워진다. 글 내용은 이 id로 Query.post를 조회한다."
+    postId: ID
+}
+
+input EditPostInput {
+    postId: ID!
+    "1~50자."
+    title: String!
+    "1~500자."
+    body: String!
+    "사진 키 **전체 목록으로 교체한다**. 빠진 키는 글에서 떨어지고 새 키는 붙는다. 생략하면 사진을 건드리지 않는다. 떨어진 사진의 오브젝트는 남으므로 필요하면 deletePostImage로 지운다."
+    photoKeys: [String!]
+    "바꿀 카테고리. 생략하면 그대로 둔다."
+    category: TargetCategory
+    """
+    true면 spotId로 장소를 바꾼다 — **spotId를 함께 생략하면 장소를 뗀다**(카테고리만 있는 글이 된다).
+    false(기본)면 spotId 값과 무관하게 장소를 건드리지 않는다. 장소를 "떼는 것"과 "그대로 두는 것"을
+    spotId의 null 하나로 구분할 수 없어 이 플래그로 의도를 받는다.
+    """
+    changeSpot: Boolean = false
+    "바꿀 장소. changeSpot이 true일 때만 쓰인다."
+    spotId: ID
+    "태그 **전체 목록으로 교체한다**. 생략하면 태그를 건드리지 않고, 빈 배열이면 전부 뗀다. 규칙은 생성과 같다."
+    tags: [String!]
+}
+
+type EditPostPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+}
+
+input DeletePostInput {
+    postId: ID!
+}
+
+type DeletePostPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+}
+
+input CreateCommentInput {
+    postId: ID!
+    body: String!
+    """
+    답글을 달 대상 댓글. 생략하면 최상위 댓글이 된다.
+    **답글에 답글을 달아도 거부되지 않는다** — 그 답글의 부모(최상위)에 달린 것으로 눕혀
+    깊이 2단계를 유지한다. 따라서 응답의 parentCommentId가 여기 넘긴 값과 다를 수 있다.
+    다른 글의 댓글을 지정하면 COMMENT_NOT_FOUND다.
+    """
+    parentCommentId: ID
+}
+
+type CreateCommentPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+    "생성된 댓글의 id. 성공 시 채워진다."
+    commentId: ID
+}
+
+input DeleteCommentInput {
+    commentId: ID!
+}
+
+type DeleteCommentPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+}
+
+input LikePostInput {
+    postId: ID!
+}
+
+type LikePostPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+    "연산 후의 좋아요 수."
+    likeCount: Int
+}
+
+input UnlikePostInput {
+    postId: ID!
+}
+
+type UnlikePostPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+    likeCount: Int
+}
+
+"사진 한 장의 업로드 요청."
+input PostImageUploadRequest {
+    "선언한 MIME 타입. image/jpeg · image/png · image/webp만 허용된다. 서명에 포함되므로 업로드 요청의 Content-Type과 정확히 일치해야 한다."
+    contentType: String!
+    "선언한 바이트 크기. 상한 10485760(10MiB). 서명에 포함되므로 업로드 요청의 Content-Length와 정확히 일치해야 한다."
+    contentLength: Int!
+}
+
+input CreatePostImageUploadUrlsInput {
+    "최대 5장. 한 장이라도 형식·크기가 어긋나면 **전부 발급되지 않는다** — 부분 발급은 클라이언트가 추적하기 어렵다."
+    images: [PostImageUploadRequest!]!
+}
+
+"발급된 URL 한 장."
+type PostImageUploadUrl {
+    "presigned PUT URL. 단일 오브젝트 키 스코프."
+    uploadUrl: String!
+    "이 URL이 가리키는 임시 오브젝트 키. 업로드 후 confirmPostImageUploads로 되돌려준다."
+    objectKey: String!
+    "발급 시각 + 30분(ISO-8601)."
+    expiresAt: String!
+}
+
+type CreatePostImageUploadUrlsPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+    "요청한 순서대로. 실패 시 빈 목록이다."
+    uploadUrls: [PostImageUploadUrl!]!
+}
+
+input ConfirmPostImageUploadsInput {
+    "createPostImageUploadUrls가 반환한 임시 키들."
+    objectKeys: [String!]!
+}
+
+"확인에 실패한 키 하나. 어느 사진이 왜 안 됐는지 알려 준다."
+type PostImageUploadFailure {
+    objectKey: String!
+    "실패 사유. 지금은 PHOTO_NOT_UPLOADED 하나다 — 미업로드·타인 키·형식 위반을 구분하지 않는다."
+    code: String!
+}
+
+type ConfirmPostImageUploadsPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+    "검증을 통과해 확정된 최종 키. CreatePostInput.photoKeys로 넘긴다."
+    confirmed: [String!]!
+    "실패한 키. **한 장이 실패해도 나머지는 확정된다** — success는 전부 성공했을 때만 true다."
+    failed: [PostImageUploadFailure!]!
+}
+
+input DeletePostImageInput {
+    "지울 오브젝트 키. 임시(pending)·확정(images) 둘 다 가능하다."
+    objectKey: String!
+}
+
+type DeletePostImagePayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+}
+
+input HidePostInput {
+    postId: ID!
+}
+
+type HidePostPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+}
+
+type UnhidePostPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+}
+
+input BlockUserInput {
+    targetMemberId: ID!
+}
+
+type BlockUserPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+}
+
+input UnblockUserInput {
+    targetMemberId: ID!
+}
+
+type UnblockUserPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+}
+
+enum ReportTargetType {
+    POST
+    COMMENT
+    "사용자 대상 신고는 기록만 되며 누적되어도 자동 조치가 없다. 자동 숨김은 POST·COMMENT에만 적용된다."
+    MEMBER
+}
+
+"신고 사유 고정 집합."
+enum ReportReason {
+    SPAM
+    ABUSE
+    INAPPROPRIATE_CONTENT
+    OTHER
+}
+
+input ReportContentInput {
+    targetType: ReportTargetType!
+    targetId: ID!
+    reason: ReportReason!
+    "자유 서술. reason이 OTHER이면 필수 — 서버가 검증한다."
+    detail: String
+}
+
+type ReportContentPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+}

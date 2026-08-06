@@ -42,8 +42,20 @@ interface SpotQueryPort {
      */
     fun findSpotBasics(spotId: Long): SpotBasics?
 
+    /** 여러 spot의 기본 정보를 **IN 절 한 번**으로. 없는 id는 결과에 키가 없다. */
+    fun findSpotBasicsIn(spotIds: List<Long>): Map<Long, SpotBasics>
+
     /** 회원이 좋아요(LIKE)한 spot 한 페이지. DISLIKE는 제외하고 요청 언어로 한정한다. */
     fun findLikedSpots(query: LikedSpotsSearch): CursorPage<LikedSpotView>
+
+    /** 반경 안의 spot id. [limit]을 넘으면 잘린다 — 호출자가 그것을 감안해야 한다. */
+    fun findSpotIdsWithin(
+        longitude: Double,
+        latitude: Double,
+        radiusMeters: Int,
+        limit: Int,
+        categoryCode: String? = null,
+    ): List<Long>
 }
 
 /**
@@ -56,6 +68,10 @@ data class SpotBasics(
     val thumbnailImageUrl: String,
     val category: SpotCategory,
     val copyright: CopyrightType,
+    /** 경도. 다른 도메인이 이 좌표를 복사해 자기 반경 조회에 쓴다. */
+    val longitude: Double,
+    /** 위도. */
+    val latitude: Double,
 )
 
 /**

@@ -30,6 +30,7 @@ import org.around.ieuri.tourism.application.query.SpotImageView
 import org.around.ieuri.tourism.application.query.SpotInfoItemView
 import org.around.ieuri.tourism.application.query.SpotIntroView
 import org.around.ieuri.tourism.application.query.SpotPageView
+import org.around.ieuri.tourism.application.query.SpotSummaryView
 import org.around.ieuri.tourism.application.query.SpotView
 import org.around.ieuri.tourism.application.query.SpotsQuery
 import org.around.ieuri.tourism.domain.aggregate.SpotDetail
@@ -246,6 +247,43 @@ class SpotQueryService(
      * 포트이며, write-behind는 upstream 파생 데이터만 다룬다.
      */
     override fun spotLikeCount(spotId: Long): Long = spotQueryPort.countLikes(spotId)
+
+    /**
+     * `spot` 한 행만 읽는다 — 캐시도 upstream도 타지 않는다. 부재는 예외가 아니라 null이며,
+     * 호출자가 그것을 "유효하지 않은 spotId"로 해석한다.
+     */
+    override fun spotSummaries(spotIds: List<Long>): Map<Long, SpotSummaryView> =
+        spotQueryPort.findSpotBasicsIn(spotIds).mapValues { (spotId, basics) ->
+            SpotSummaryView(
+                id = spotId,
+                title = basics.title,
+                thumbnailImageUrl = basics.thumbnailImageUrl,
+                categoryCode = basics.category.name,
+                longitude = basics.longitude,
+                latitude = basics.latitude,
+            )
+        }
+
+    override fun spotIdsWithin(
+        longitude: Double,
+        latitude: Double,
+        radiusMeters: Int,
+        limit: Int,
+        categoryCode: String?,
+    ): List<Long> =
+        spotQueryPort.findSpotIdsWithin(longitude, latitude, radiusMeters, limit, categoryCode)
+
+    override fun spotSummary(spotId: Long): SpotSummaryView? =
+        spotQueryPort.findSpotBasics(spotId)?.let {
+            SpotSummaryView(
+                id = spotId,
+                title = it.title,
+                thumbnailImageUrl = it.thumbnailImageUrl,
+                categoryCode = it.category.name,
+                longitude = it.longitude,
+                latitude = it.latitude,
+            )
+        }
 
     /**
      * 좋아요 목록(SPEC-0008 R-15~R-17). LIKE만·본인 것만·요청 언어만 — 세 조건 모두 조회 포트가

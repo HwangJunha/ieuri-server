@@ -42,6 +42,16 @@ class SpotQueryAdapter(
     override fun countNearby(query: NearbySpotSearch): Int =
         spatialQueryAdapter.countNearby(query)
 
+    @Transactional(readOnly = true)
+    override fun findSpotIdsWithin(
+        longitude: Double,
+        latitude: Double,
+        radiusMeters: Int,
+        limit: Int,
+        categoryCode: String?,
+    ): List<Long> =
+        spatialQueryAdapter.findIdsWithin(longitude, latitude, radiusMeters, limit, categoryCode)
+
     /** 그 회원이 해당 언어에서 이미 반응한 관광지 id. 언어는 `spot` 조인으로 판정한다. */
     override fun findReactedSpotIds(memberId: Long, language: DomainLocale): Set<Long> =
         queryFactory
@@ -83,7 +93,10 @@ class SpotQueryAdapter(
     /** 상세 본문이 부재할 때 응답을 구성할 `spot` 행의 값. */
     override fun findSpotBasics(spotId: Long): SpotBasics? =
         queryFactory
-            .select(spot.title, spot.address, spot.thumbnailImageUrl, spot.category, spot.copyright)
+            .select(
+                spot.title, spot.address, spot.thumbnailImageUrl,
+                spot.category, spot.copyright, spot.mapX, spot.mapY,
+            )
             .from(spot)
             .where(spot.id.eq(spotId))
             .fetchFirst()
@@ -94,6 +107,8 @@ class SpotQueryAdapter(
                     thumbnailImageUrl = requireNotNull(it.get(spot.thumbnailImageUrl)),
                     category = requireNotNull(it.get(spot.category)),
                     copyright = requireNotNull(it.get(spot.copyright)),
+                    longitude = requireNotNull(it.get(spot.mapX)),
+                    latitude = requireNotNull(it.get(spot.mapY)),
                 )
             }
 
@@ -104,6 +119,35 @@ class SpotQueryAdapter(
      * keyset 페이징: (updated_at, spot_id) 내림차순이 정렬 키이자 커서다. `first + 1`을 읽어
      * hasNextPage를 판정한다.
      */
+    /**
+     * 여러 spot을 한 번에. 호출자가 목록을 들고 있을 때 행마다 묻지 않게 한다 —
+     * 피드 한 페이지에 20번, 지역 피드에서는 수천 번이 될 수 있다.
+     */
+    @Transactional(readOnly = true)
+    override fun findSpotBasicsIn(spotIds: List<Long>): Map<Long, SpotBasics> {
+        if (spotIds.isEmpty()) return emptyMap()
+
+        return queryFactory
+            .select(
+                spot.id, spot.title, spot.address, spot.thumbnailImageUrl,
+                spot.category, spot.copyright, spot.mapX, spot.mapY,
+            )
+            .from(spot)
+            .where(spot.id.`in`(spotIds))
+            .fetch()
+            .associate { row ->
+                requireNotNull(row.get(spot.id)) to SpotBasics(
+                    title = requireNotNull(row.get(spot.title)),
+                    address = row.get(spot.address),
+                    thumbnailImageUrl = requireNotNull(row.get(spot.thumbnailImageUrl)),
+                    category = requireNotNull(row.get(spot.category)),
+                    copyright = requireNotNull(row.get(spot.copyright)),
+                    longitude = requireNotNull(row.get(spot.mapX)),
+                    latitude = requireNotNull(row.get(spot.mapY)),
+                )
+            }
+    }
+
     override fun findLikedSpots(query: LikedSpotsSearch): CursorPage<LikedSpotView> {
         val cursor = query.after?.let { decodeCursor(it) }
 

@@ -65,6 +65,8 @@ Given a slice from `domain-slice-generator`, produce:
 
 Cover edge cases and failure paths, not just the happy path. Prefer table/parameterized tests for VO validation.
 
+**Prove each new test can fail.** Break the code it covers — invert the condition, drop the guard — and confirm *that* test goes red. A test written against already-correct code often asserts nothing; you only learn which when the assertion is the thing standing between you and a regression. Restore the code and re-run the whole suite before moving on.
+
 ## Reviewing existing tests — flag these
 
 - Any `@SpringBootTest` / `@DataJpaTest` / Testcontainers / DGS query-execution test. **Delete it.**

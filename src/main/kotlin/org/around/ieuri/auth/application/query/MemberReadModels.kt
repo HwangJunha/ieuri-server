@@ -36,6 +36,16 @@ data class MemberDetailView(
     val createdAt: Instant,
 )
 
+/**
+ * 표시용 최소 회원 정보. 권한 불요이며 **이메일을 담지 않는다**(복호화도 하지 않는다).
+ * 다른 도메인이 작성자·대상 회원을 표시할 때 쓰는 형태다.
+ */
+data class MemberPublicProfileView(
+    val memberId: Long,
+    val nickname: String,
+    val profileImageUrl: String?,
+)
+
 /** 관리자 회원 목록 항목. 최소수집: 대량 복호화 회피를 위해 이메일은 포함하지 않는다. */
 data class MemberSummaryView(
     val memberId: Long,

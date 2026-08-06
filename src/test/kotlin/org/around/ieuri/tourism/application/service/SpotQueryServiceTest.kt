@@ -120,6 +120,8 @@ class SpotQueryServiceTest {
         thumbnailImageUrl = "https://img/100.jpg",
         category = SpotCategory.TOURIST_SPOT,
         copyright = CopyrightType.TYPE1,
+        longitude = 127.0,
+        latitude = 37.5,
     )
 
     /** 적재된 본문(존재). */
