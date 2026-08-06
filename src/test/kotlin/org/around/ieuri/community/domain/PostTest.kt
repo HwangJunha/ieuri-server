@@ -1,6 +1,7 @@
 package org.around.ieuri.community.domain
 
 import org.around.ieuri.community.domain.aggregate.Post
+import org.around.ieuri.community.domain.vo.PostTag
 import org.around.ieuri.community.domain.vo.SpotPoint
 import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.domain.vo.PhotoObjectKey
@@ -8,6 +9,7 @@ import java.time.Instant
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -213,5 +215,97 @@ class PostTest {
         val post = create()
         post.deleteBy(authorId, Instant.EPOCH)
         assertFalse(post.visibleTo(authorId))
+    }
+
+    // ---------- 수정 (카테고리·장소·태그·사진) ----------
+
+    @Test
+    fun `카테고리를 바꿀 수 있다`() {
+        val post = create()
+
+        post.changeCategory(TargetCategory.RESTAURANT)
+
+        assertEquals(TargetCategory.RESTAURANT, post.category)
+    }
+
+    @Test
+    fun `장소를 바꾸면 좌표도 함께 바뀐다`() {
+        val post = create()
+
+        post.changeSpot(99L, SpotPoint(128.5, 35.5))
+
+        assertEquals(99L, post.spotId)
+        assertEquals(SpotPoint(128.5, 35.5), post.spotPoint)
+    }
+
+    @Test
+    fun `장소를 뗄 수 있다`() {
+        val post = create()
+
+        post.changeSpot(null, null)
+
+        assertNull(post.spotId)
+        assertNull(post.spotPoint)
+    }
+
+    @Test
+    fun `장소와 좌표는 함께 있거나 함께 없어야 한다`() {
+        val post = create()
+
+        // 좌표 없이 장소만 바꾸면 그 글이 지역 피드의 거리순에서 조용히 사라진다.
+        assertFailsWith<IllegalArgumentException> { post.changeSpot(99L, null) }
+        assertFailsWith<IllegalArgumentException> { post.changeSpot(null, SpotPoint(127.0, 37.5)) }
+    }
+
+    @Test
+    fun `태그를 교체하면 같은 태그는 하나로 본다`() {
+        val post = create()
+
+        post.replaceTags(
+            listOf(
+                PostTag.restore("Seoul", "seoul"),
+                PostTag.restore("seoul", "seoul"),
+                PostTag.restore("야경", "야경"),
+            ),
+        )
+
+        // 유저가 "서울"과 "#서울"을 함께 칠 수 있다.
+        assertEquals(2, post.tags.size)
+        assertEquals(listOf("Seoul", "야경"), post.tags.map { it.name })
+    }
+
+    @Test
+    fun `태그는 6개부터 거부된다`() {
+        val post = create()
+        val six = (1..6).map { PostTag.restore("태그$it", "태그$it") }
+
+        assertFailsWith<IllegalArgumentException> { post.replaceTags(six) }
+    }
+
+    @Test
+    fun `사진을 교체할 수 있다`() {
+        val post = create(photoKeys = listOf(confirmedKey()))
+        val next = listOf(confirmedKey(), confirmedKey())
+
+        post.replacePhotos(next)
+
+        assertEquals(next, post.photoKeys)
+    }
+
+    @Test
+    fun `남의 사진 키로는 교체할 수 없다`() {
+        val post = create()
+
+        assertFailsWith<IllegalArgumentException> {
+            post.replacePhotos(listOf(confirmedKey(memberId = authorId + 1)))
+        }
+    }
+
+    @Test
+    fun `확인을 마치지 않은 키로는 교체할 수 없다`() {
+        val post = create()
+        val pending = PhotoObjectKey.issue(authorId, UUID.randomUUID())
+
+        assertFailsWith<IllegalArgumentException> { post.replacePhotos(listOf(pending)) }
     }
 }

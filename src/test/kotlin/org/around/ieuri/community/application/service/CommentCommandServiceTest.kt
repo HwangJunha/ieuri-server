@@ -2,6 +2,7 @@ package org.around.ieuri.community.application.service
 
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import io.mockk.verify
 import org.around.ieuri.community.application.command.CreateCommentCommand
 import org.around.ieuri.community.application.command.DeleteCommentCommand
@@ -46,8 +47,14 @@ class CommentCommandServiceTest {
         every { moderationPort.exists(postId) } returns exists
     }
 
-    private fun comment(authorId: Long = memberId, hidden: Boolean = false) = Comment.restore(
-        id = commentId, postId = postId, authorId = authorId, body = "댓글",
+    private fun comment(
+        authorId: Long = memberId,
+        hidden: Boolean = false,
+        id: Long = commentId,
+        parentCommentId: Long? = null,
+    ) = Comment.restore(
+        id = id, postId = postId, parentCommentId = parentCommentId,
+        authorId = authorId, body = "댓글",
         hidden = hidden, deletedAt = null, createdAt = now,
     )
 
@@ -91,6 +98,90 @@ class CommentCommandServiceTest {
             service.createComment(CreateCommentCommand(postId, "댓글"), memberId)
         }
         verify(exactly = 0) { commentRepository.save(any()) }
+    }
+
+    // ---------- 대댓글 (깊이 2단계) ----------
+
+    @Test
+    fun `최상위 댓글에 답글을 달면 그 댓글이 부모다`() {
+        givenPostExists()
+        givenSaveEchoesBackWithId()
+        val parent = comment(id = 5L)
+        every { commentRepository.findById(5L) } returns parent
+        val saved = slot<Comment>()
+        every { commentRepository.save(capture(saved)) } answers {
+            firstArg<Comment>().let {
+                Comment.restore(
+                    id = commentId, postId = it.postId, parentCommentId = it.parentCommentId,
+                    authorId = it.authorId, body = it.body, hidden = it.hidden,
+                    deletedAt = it.deletedAt, createdAt = now,
+                )
+            }
+        }
+
+        service.createComment(CreateCommentCommand(postId, "답글", parentCommentId = 5L), memberId)
+
+        assertEquals(5L, saved.captured.parentCommentId)
+    }
+
+    @Test
+    fun `대댓글에 답글을 달면 3단계가 되지 않고 최상위에 눕는다`() {
+        givenPostExists()
+        // 5번의 답글인 9번에 답글을 단다.
+        val reply = comment(id = 9L, parentCommentId = 5L)
+        every { commentRepository.findById(9L) } returns reply
+        val saved = slot<Comment>()
+        every { commentRepository.save(capture(saved)) } answers {
+            firstArg<Comment>().let {
+                Comment.restore(
+                    id = commentId, postId = it.postId, parentCommentId = it.parentCommentId,
+                    authorId = it.authorId, body = it.body, hidden = it.hidden,
+                    deletedAt = it.deletedAt, createdAt = now,
+                )
+            }
+        }
+
+        service.createComment(CreateCommentCommand(postId, "답글의 답글", parentCommentId = 9L), memberId)
+
+        // 거부하는 대신 부모의 부모(최상위)에 붙인다 — 9가 아니라 5다.
+        assertEquals(5L, saved.captured.parentCommentId)
+    }
+
+    @Test
+    fun `다른 글의 댓글은 부모가 될 수 없다`() {
+        givenPostExists()
+        // postId가 다른 댓글이다. 허용하면 글 A의 목록에 글 B의 답글이 섞인다.
+        every { commentRepository.findById(5L) } returns Comment.restore(
+            id = 5L, postId = postId + 999, authorId = memberId, body = "남의 글 댓글",
+            hidden = false, deletedAt = null, createdAt = now,
+        )
+
+        assertFailsWith<CommentNotFoundException> {
+            service.createComment(CreateCommentCommand(postId, "답글", parentCommentId = 5L), memberId)
+        }
+        verify(exactly = 0) { commentRepository.save(any()) }
+    }
+
+    @Test
+    fun `없는 댓글에 답글을 달 수 없다`() {
+        givenPostExists()
+        every { commentRepository.findById(5L) } returns null
+
+        assertFailsWith<CommentNotFoundException> {
+            service.createComment(CreateCommentCommand(postId, "답글", parentCommentId = 5L), memberId)
+        }
+    }
+
+    @Test
+    fun `대댓글도 댓글 수에 포함된다`() {
+        givenPostExists()
+        givenSaveEchoesBackWithId()
+        every { commentRepository.findById(5L) } returns comment(id = 5L)
+
+        service.createComment(CreateCommentCommand(postId, "답글", parentCommentId = 5L), memberId)
+
+        // "댓글 3개"인데 열어서 5개면 어긋나 보인다.
+        verify(exactly = 1) { counterPort.increaseCommentCount(postId) }
     }
 
     @Test
