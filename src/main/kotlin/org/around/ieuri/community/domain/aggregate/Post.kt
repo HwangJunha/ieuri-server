@@ -3,6 +3,7 @@ package org.around.ieuri.community.domain.aggregate
 import org.around.ieuri.community.domain.vo.PhotoObjectKey
 import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.domain.vo.PostTag
+import org.around.ieuri.community.domain.vo.SpotPoint
 import java.time.Instant
 
 /**
@@ -22,6 +23,11 @@ class Post private constructor(
     val category: TargetCategory,
     /** 연결된 장소. **선택이다** — 장소 없이 카테고리만으로도 글을 쓸 수 있다. */
     val spotId: Long?,
+    /**
+     * 장소의 좌표. [spotId]가 있을 때만 있다. 적재 시 복사해 두는 값이며 — 지역 피드가
+     * tourism에 spot 목록을 되묻지 않게 한다 — 조회 응답에는 쓰이지 않는다.
+     */
+    val spotPoint: SpotPoint?,
     val authorId: Long,
     val tags: List<PostTag>,
     title: String,
@@ -161,6 +167,7 @@ class Post private constructor(
         fun create(
             category: TargetCategory,
             spotId: Long?,
+            spotPoint: SpotPoint?,
             authorId: Long,
             tags: List<PostTag>,
             title: String,
@@ -169,6 +176,10 @@ class Post private constructor(
         ): Post {
             require(authorId > 0) { "authorId는 양수여야 합니다." }
             require(spotId == null || spotId > 0) { "spotId는 양수여야 합니다." }
+            // 장소가 있으면 좌표도 있어야 한다. 없으면 그 글이 지역 피드에서 조용히 사라진다.
+            require((spotId == null) == (spotPoint == null)) {
+                "장소와 좌표는 함께 있거나 함께 없어야 합니다."
+            }
             val trimmedTitle = title.trim()
             require(trimmedTitle.isNotEmpty()) { "제목은 비어 있을 수 없습니다." }
             require(trimmedTitle.length <= TITLE_MAX_LENGTH) { "제목은 ${TITLE_MAX_LENGTH}자를 넘을 수 없습니다." }
@@ -185,6 +196,7 @@ class Post private constructor(
                 id = null,
                 category = category,
                 spotId = spotId,
+                spotPoint = spotPoint,
                 authorId = authorId,
                 tags = distinctTags,
                 title = trimmedTitle,
@@ -204,6 +216,7 @@ class Post private constructor(
             category: TargetCategory,
             spotId: Long?,
             authorId: Long,
+            spotPoint: SpotPoint? = null,
             tags: List<PostTag>,
             title: String,
             body: String,
@@ -218,6 +231,7 @@ class Post private constructor(
             id = id,
             category = category,
             spotId = spotId,
+            spotPoint = spotPoint,
             authorId = authorId,
             tags = tags,
             title = title,

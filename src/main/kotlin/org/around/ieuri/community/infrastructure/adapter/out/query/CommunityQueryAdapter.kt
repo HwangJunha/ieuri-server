@@ -6,6 +6,7 @@ import com.querydsl.core.types.dsl.BooleanExpression
 import com.querydsl.core.types.dsl.BooleanPath
 import com.querydsl.core.types.dsl.DateTimePath
 import com.querydsl.core.types.dsl.Expressions
+import com.querydsl.core.types.dsl.NumberExpression
 import com.querydsl.core.types.dsl.NumberPath
 import com.querydsl.jpa.JPAExpressions
 import com.querydsl.jpa.impl.JPAQueryFactory
@@ -15,6 +16,7 @@ import org.around.ieuri.common.pagination.cursorPageOf
 import org.around.ieuri.community.application.port.out.query.BlockedUsersSearch
 import org.around.ieuri.community.application.port.out.query.CommunityQueryPort
 import org.around.ieuri.community.application.port.out.query.PostCommentsSearch
+import org.around.ieuri.community.application.port.out.query.PostsArea
 import org.around.ieuri.community.application.port.out.query.PostsSearch
 import org.around.ieuri.community.application.port.out.query.ViewerContext
 import org.around.ieuri.community.application.query.BlockedUserView
@@ -76,113 +78,139 @@ class CommunityQueryAdapter(
      * 빈 `IN` 절은 SQL에서 유효하지 않으므로 조기 반환한다.
      */
     @Transactional(readOnly = true)
-    /**
-     * **정렬 방식이 무엇이 보이는지까지 정한다.**
-     *
-     * DISTANCE는 반경 안 spot에 붙은 글만 담고 가까운 순으로 준다. LATEST는 장소로 좁힌
-     * 경우에도 **장소 없는 글을 함께** 담는다 — 그러지 않으면 장소를 고르지 않고 쓴 글이
-     * 지역 피드에서 영원히 보이지 않는다.
-     */
-    override fun findPosts(search: PostsSearch): CursorPage<PostView> {
-        val spotIds = search.spotIds
-        // 반경 안에 spot이 하나도 없으면 DISTANCE는 결과가 없다. LATEST는 장소 없는 글이
-        // 남아 있으므로 조기 반환하지 않는다.
-        if (spotIds != null && spotIds.isEmpty() && search.sort == PostSortOrder.DISTANCE) {
-            return cursorPageOf(emptyList(), hasNextPage = false, hasPreviousPage = search.after != null)
-        }
-
-        val conditions = mutableListOf<BooleanExpression>()
-        if (spotIds != null && spotIds.isNotEmpty() && search.sort == PostSortOrder.DISTANCE) {
-            // 장소로 좁힌다. 연결 테이블을 서브쿼리로 걸어 조인이 행을 늘리지 않게 한다.
-            conditions += post.id.`in`(
-                JPAExpressions.select(postSpot.postId).from(postSpot)
-                    .where(postSpot.spotId.`in`(spotIds)),
-            )
-        }
-        if (search.category != null) {
-            conditions += post.id.`in`(
-                JPAExpressions.select(postChip.postId).from(postChip)
-                    .where(postChip.category.eq(search.category)),
-            )
-        }
-        if (search.normalizedTag != null) {
-            // 태그가 붙은 글만. 서브쿼리로 걸어 조인이 행을 늘리지 않게 한다.
-            conditions += post.id.`in`(
-                JPAExpressions.select(tag.postId)
-                    .from(tag)
-                    .where(tag.normalized.eq(search.normalizedTag)),
-            )
-        }
-
-        return when (search.sort) {
+    override fun findPosts(search: PostsSearch): CursorPage<PostView> =
+        when (search.sort) {
             PostSortOrder.LATEST -> findPosts(
                 viewer = search.viewer,
                 first = search.first,
                 after = search.after,
-                extraConditions = conditions,
+                extraConditions = listOfNotNull(
+                    spotCondition(search.spotId),
+                    // **반경은 LATEST에서 걸지 않는다** — 장소 없이 쓴 글도 함께 담기 위함이다.
+                    // 그러지 않으면 그런 글이 지역 피드에서 영원히 보이지 않는다.
+                    categoryCondition(search.category),
+                    tagCondition(search.normalizedTag),
+                ),
             )
 
-            PostSortOrder.DISTANCE -> findPostsByDistance(
-                search = search,
-                spotIds = requireNotNull(spotIds) { "거리순은 좌표로 좁힌 경우에만 온다." },
-                extraConditions = conditions,
-            )
+            PostSortOrder.DISTANCE -> findPostsByDistance(search)
         }
-    }
 
     /**
-     * 거리순 피드. **정렬 키가 글에 없다** — 거리는 글이 아니라 그 글이 붙은 spot의 속성이고,
-     * spot 목록은 이미 가까운 순으로 넘어온다. 그래서 그 순서를 SQL의 `CASE`로 옮겨 정렬한다.
+     * 거리순 피드. **반경 조건과 정렬을 글 조회에 직접 건다** — 좌표를 연결 행에 복사해 둔
+     * 덕분이며, tourism에 spot 목록을 되묻지 않으므로 그 목록의 상한이 사라졌다.
      *
-     * 커서는 목록 내 위치(offset)다. `(createdAt, id)` 키셋을 쓸 수 없는 이유는 정렬 키가
-     * 거리라서이며, 거리를 커서에 실으면 좌표가 조금만 달라져도 커서가 무의미해진다.
-     * 오프셋이라 페이징 도중 글이 추가되면 밀릴 수 있으나, spot 상한(2000) 안에서 도는
-     * 조회라 실무상 영향이 작다.
+     * 커서는 거리와 (createdAt, id)를 함께 담는 키셋이다. 거리가 실제 값이라 오프셋을 쓰지
+     * 않아도 되고, 그래서 페이징 도중 글이 추가돼도 항목이 밀리지 않는다.
      */
-    private fun findPostsByDistance(
-        search: PostsSearch,
-        spotIds: List<Long>,
-        extraConditions: List<BooleanExpression>,
-    ): CursorPage<PostView> {
-        val offset = search.after?.let { decodeOffsetCursor(it) } ?: 0
-
-        // spot 목록의 인덱스를 순위로 매긴다 — 목록의 순서가 곧 거리 순서다.
-        val distanceRank = Expressions.cases()
-            .let { cases ->
-                var builder = cases.`when`(postSpot.spotId.eq(spotIds.first())).then(0)
-                spotIds.drop(1).forEachIndexed { index, spotId ->
-                    builder = builder.`when`(postSpot.spotId.eq(spotId)).then(index + 1)
-                }
-                builder.otherwise(Int.MAX_VALUE)
-            }
+    private fun findPostsByDistance(search: PostsSearch): CursorPage<PostView> {
+        val area = requireNotNull(search.area) { "거리순은 좌표를 준 경우에만 온다." }
+        val cursor = search.after?.let { decodeDistanceCursor(it) }
+        val distance = distanceExpression(area)
 
         val rows = queryFactory
-            .select(post, distanceRank)
+            .select(post, distance)
             .from(post)
+            // 장소가 있는 글만 거리를 가진다 — inner join이 곧 그 필터다.
             .join(postSpot).on(postSpot.postId.eq(post.id))
-            .where(*extraConditions.toTypedArray(), visibleToViewer(search.viewer))
-            // 같은 spot의 글끼리는 최신순이다. id까지 넣어야 순서가 요청마다 흔들리지 않는다.
+            .where(
+                withinRadius(area),
+                spotCondition(search.spotId),
+                categoryCondition(search.category),
+                tagCondition(search.normalizedTag),
+                visibleToViewer(search.viewer),
+                cursor?.let { distanceKeysetCondition(distance, it) },
+            )
+            // 같은 거리의 글끼리는 최신순이다. id까지 넣어야 순서가 요청마다 흔들리지 않는다.
             .orderBy(
-                OrderSpecifier(Order.ASC, distanceRank),
+                OrderSpecifier(Order.ASC, distance),
                 post.createdAt.desc(),
                 post.id.desc(),
             )
-            .offset(offset.toLong())
             .limit((search.first + 1).toLong())
             .fetch()
 
         val hasNextPage = rows.size > search.first
-        val pageRows = (if (hasNextPage) rows.take(search.first) else rows)
-            .map { requireNotNull(it.get(post)) }
-
-        val edges = pageRows.mapIndexed { index, entity ->
+        val edges = (if (hasNextPage) rows.take(search.first) else rows).map { row ->
+            val entity = requireNotNull(row.get(post))
             CursorEdge(
-                cursor = encodeOffsetCursor(offset + index + 1),
+                cursor = encodeDistanceCursor(
+                    distanceMeters = requireNotNull(row.get(distance)),
+                    createdAt = requireNotNull(entity.createdAt),
+                    id = requireNotNull(entity.id),
+                ),
                 node = entity.toPostView(search.viewer),
             )
         }
-        return cursorPageOf(edges, hasNextPage = hasNextPage, hasPreviousPage = offset > 0)
+        return cursorPageOf(edges, hasNextPage = hasNextPage, hasPreviousPage = cursor != null)
     }
+
+    /**
+     * 커서 이후로 넘어간다. 정렬이 (거리 오름차순, 생성일 내림차순, id 내림차순)이므로
+     * 비교도 그 순서다 — JPQL에 행 값 생성자가 없어 OR로 편다.
+     */
+    private fun distanceKeysetCondition(
+        distance: NumberExpression<Double>,
+        cursor: DistanceCursor,
+    ): BooleanExpression =
+        distance.gt(cursor.distanceMeters)
+            .or(
+                distance.eq(cursor.distanceMeters).and(
+                    post.createdAt.lt(cursor.createdAt).or(
+                        post.createdAt.eq(cursor.createdAt).and(post.id.lt(cursor.id)),
+                    ),
+                ),
+            )
+
+    /**
+     * 중심에서의 거리(미터). PostGIS 함수라 QueryDSL로 표현되지 않아 템플릿으로 부른다 —
+     * 이 표현식만 예외이고 나머지 조건은 전부 타입 안전하다.
+     */
+    private fun distanceExpression(area: PostsArea): NumberExpression<Double> =
+        Expressions.numberTemplate(
+            Double::class.java,
+            "st_distance({0}, st_makepoint({1}, {2}))",
+            postSpot.location, area.longitude, area.latitude,
+        )
+
+    /**
+     * 반경 필터는 반드시 `ST_DWithin`이다 — `ST_Distance(...) <= radius`로 쓰면 전 행을
+     * 계산해 GiST 인덱스를 타지 못한다.
+     */
+    private fun withinRadius(area: PostsArea): BooleanExpression =
+        Expressions.booleanTemplate(
+            "st_dwithin({0}, st_makepoint({1}, {2}), {3})",
+            postSpot.location, area.longitude, area.latitude, area.radiusMeters.toDouble(),
+        )
+
+    /**
+     * 아래 셋은 **조건이 필요 없으면 null**을 돌려준다. QueryDSL의 where는 null을 무시하므로
+     * 호출부에서 if로 리스트를 쌓지 않아도 된다 — 이 파일의 다른 필터와 같은 관용구다.
+     */
+    private fun spotCondition(spotId: Long?): BooleanExpression? =
+        spotId?.let {
+            // 연결 테이블을 서브쿼리로 걸어 조인이 행을 늘리지 않게 한다.
+            post.id.`in`(
+                JPAExpressions.select(postSpot.postId).from(postSpot)
+                    .where(postSpot.spotId.eq(it)),
+            )
+        }
+
+    private fun categoryCondition(category: TargetCategory?): BooleanExpression? =
+        category?.let {
+            post.id.`in`(
+                JPAExpressions.select(postChip.postId).from(postChip)
+                    .where(postChip.category.eq(it)),
+            )
+        }
+
+    private fun tagCondition(normalizedTag: String?): BooleanExpression? =
+        normalizedTag?.let {
+            post.id.`in`(
+                JPAExpressions.select(tag.postId).from(tag)
+                    .where(tag.normalized.eq(it)),
+            )
+        }
 
     /**
      * 단건 조회. **피드와 같은 필터를 거친다** — 여기가 뚫리면 딥링크 하나로 차단과 자동 숨김이

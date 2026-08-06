@@ -45,7 +45,6 @@ class PostImageUploadServiceTest {
         maxPageSize = 50,
         commentPreviewSize = 3,
         maxRadiusMeters = 100_000,
-        maxNearbySpots = 2_000,
         uploadUrlTtl = ttl,
         maxUploadBytes = maxBytes,
         allowedContentTypes = setOf("image/jpeg", "image/png", "image/webp"),

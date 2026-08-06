@@ -1,6 +1,7 @@
 package org.around.ieuri.community.domain
 
 import org.around.ieuri.community.domain.aggregate.Post
+import org.around.ieuri.community.domain.vo.SpotPoint
 import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.domain.vo.PhotoObjectKey
 import java.time.Instant
@@ -27,6 +28,7 @@ class PostTest {
     ) = Post.create(
         category = TargetCategory.TOURIST_SPOT,
         spotId = spotId,
+        spotPoint = spotId?.let { SpotPoint(127.0, 37.5) },
         authorId = authorId,
         tags = emptyList(),
         title = title,

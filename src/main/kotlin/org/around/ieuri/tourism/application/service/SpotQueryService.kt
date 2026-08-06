@@ -259,6 +259,8 @@ class SpotQueryService(
                 title = basics.title,
                 thumbnailImageUrl = basics.thumbnailImageUrl,
                 categoryCode = basics.category.name,
+                longitude = basics.longitude,
+                latitude = basics.latitude,
             )
         }
 
@@ -278,6 +280,8 @@ class SpotQueryService(
                 title = it.title,
                 thumbnailImageUrl = it.thumbnailImageUrl,
                 categoryCode = it.category.name,
+                longitude = it.longitude,
+                latitude = it.latitude,
             )
         }
 

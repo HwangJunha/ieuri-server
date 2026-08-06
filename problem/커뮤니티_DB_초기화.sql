@@ -51,4 +51,5 @@ COMMIT;
 --   V31 community_post_spot / community_post_chip   글 ↔ 장소·카테고리 연결
 --   V32 community_post.view_count       조회수
 --   V33 community_comment.parent_comment_id  대댓글(깊이 2단계)
+--   V34 community_post_spot.map_x/map_y/location  글의 좌표(반경 조회용)
 --   R__ seed_community        글 16건(장소 없는 글 1건 포함) + 칩 34건

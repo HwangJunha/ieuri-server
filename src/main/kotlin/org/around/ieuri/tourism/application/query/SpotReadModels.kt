@@ -78,6 +78,12 @@ data class SpotSummaryView(
      * domain 패키지에 의존하게 되고, 그것이 도메인 추출을 막는다.
      */
     val categoryCode: String,
+    /**
+     * 경도·위도. **다른 도메인이 이 좌표를 복사해 두고 자기 반경 조회에 쓴다** —
+     * 매번 tourism에 spot 목록을 물으면 그 목록의 상한이 곧 상대 도메인의 조회 한계가 된다.
+     */
+    val longitude: Double,
+    val latitude: Double,
 )
 
 /** 운영 정보 read DTO. 카테고리별 TourAPI 필드를 공통 이름으로 정규화한 결과(어댑터가 수행). */

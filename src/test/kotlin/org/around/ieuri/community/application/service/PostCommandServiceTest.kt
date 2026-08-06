@@ -53,6 +53,8 @@ class PostCommandServiceTest {
                 title = "경복궁",
                 thumbnailImageUrl = "https://img/1.jpg",
                 category = null,
+        longitude = 127.0,
+        latitude = 37.5,
             )
     }
 

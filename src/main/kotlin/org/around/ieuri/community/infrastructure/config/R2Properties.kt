@@ -34,5 +34,4 @@ data class CommunityProperties(
     val commentPreviewSize: Int = 3,
     val maxRadiusMeters: Int = 100_000,
     /** 지역 피드가 한 번에 다룰 spot 수 상한. 넘으면 잘린다. */
-    val maxNearbySpots: Int = 2_000,
 )

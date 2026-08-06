@@ -93,7 +93,10 @@ class SpotQueryAdapter(
     /** 상세 본문이 부재할 때 응답을 구성할 `spot` 행의 값. */
     override fun findSpotBasics(spotId: Long): SpotBasics? =
         queryFactory
-            .select(spot.title, spot.address, spot.thumbnailImageUrl, spot.category, spot.copyright)
+            .select(
+                spot.title, spot.address, spot.thumbnailImageUrl,
+                spot.category, spot.copyright, spot.mapX, spot.mapY,
+            )
             .from(spot)
             .where(spot.id.eq(spotId))
             .fetchFirst()
@@ -104,6 +107,8 @@ class SpotQueryAdapter(
                     thumbnailImageUrl = requireNotNull(it.get(spot.thumbnailImageUrl)),
                     category = requireNotNull(it.get(spot.category)),
                     copyright = requireNotNull(it.get(spot.copyright)),
+                    longitude = requireNotNull(it.get(spot.mapX)),
+                    latitude = requireNotNull(it.get(spot.mapY)),
                 )
             }
 
@@ -123,7 +128,10 @@ class SpotQueryAdapter(
         if (spotIds.isEmpty()) return emptyMap()
 
         return queryFactory
-            .select(spot.id, spot.title, spot.address, spot.thumbnailImageUrl, spot.category, spot.copyright)
+            .select(
+                spot.id, spot.title, spot.address, spot.thumbnailImageUrl,
+                spot.category, spot.copyright, spot.mapX, spot.mapY,
+            )
             .from(spot)
             .where(spot.id.`in`(spotIds))
             .fetch()
@@ -134,6 +142,8 @@ class SpotQueryAdapter(
                     thumbnailImageUrl = requireNotNull(row.get(spot.thumbnailImageUrl)),
                     category = requireNotNull(row.get(spot.category)),
                     copyright = requireNotNull(row.get(spot.copyright)),
+                    longitude = requireNotNull(row.get(spot.mapX)),
+                    latitude = requireNotNull(row.get(spot.mapY)),
                 )
             }
     }

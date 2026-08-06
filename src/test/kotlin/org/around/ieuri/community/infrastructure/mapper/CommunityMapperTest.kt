@@ -4,6 +4,7 @@ import org.around.ieuri.community.domain.aggregate.Block
 import org.around.ieuri.community.domain.aggregate.Comment
 import org.around.ieuri.community.domain.aggregate.Post
 import org.around.ieuri.community.domain.vo.PostTag
+import org.around.ieuri.community.domain.vo.SpotPoint
 import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.domain.aggregate.PostLike
 import org.around.ieuri.community.domain.aggregate.Report
@@ -84,7 +85,7 @@ class CommunityMapperTest {
         val keyB = PhotoObjectKey.issue(3L, UUID.randomUUID()).toConfirmed()
         val domain = Post.create(
             category = TargetCategory.TOURIST_SPOT,
-            spotId = 2L, authorId = 3L, tags = emptyList(),
+            spotId = 2L, spotPoint = SpotPoint(127.0, 37.5), authorId = 3L, tags = emptyList(),
             title = "제목", body = "본문", photoKeys = listOf(keyA, keyB),
         )
 
@@ -143,7 +144,7 @@ class CommunityMapperTest {
         val keyB = PhotoObjectKey.issue(3L, UUID.randomUUID()).toConfirmed()
         val domain = Post.create(
             category = TargetCategory.TOURIST_SPOT,
-        spotId = 2L, authorId = 3L, tags = emptyList(),
+        spotId = 2L, spotPoint = SpotPoint(127.0, 37.5), authorId = 3L, tags = emptyList(),
             title = "제목", body = "본문", photoKeys = listOf(keyA, keyB),
         )
 

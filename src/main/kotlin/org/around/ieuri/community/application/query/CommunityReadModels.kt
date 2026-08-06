@@ -17,6 +17,13 @@ data class PostSpotView(
     val thumbnailImageUrl: String,
     /** spot이 속한 카테고리. 글 작성 시 기본값 제안에 쓴다. */
     val category: TargetCategory?,
+    /**
+     * 경도·위도. **글을 만들 때 이 값을 복사해 둔다** — 반경 조회가 tourism에 spot 목록을
+     * 되묻지 않게 하려는 것이며, 그래야 목록 상한이 피드의 한계가 되지 않는다.
+     * 조회 응답에는 쓰이지 않아 리졸버가 내려주지 않는다.
+     */
+    val longitude: Double,
+    val latitude: Double,
 )
 
 /** 글·댓글에 실리는 최소 작성자 정보. 커뮤니티 표면에는 이메일·권한·상태가 필요 없다. */

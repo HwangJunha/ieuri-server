@@ -23,21 +23,6 @@ class SpotLookupAdapter(
     override fun findSummary(spotId: Long): PostSpotView? =
         spotQueryUseCase.spotSummary(spotId)?.toPostSpotView()
 
-    /** 반경 조건은 tourism이 계산한다 — `spot` 테이블을 아는 코드가 그쪽에 머물게 하려는 것이다. */
-    override fun findIdsWithin(
-        latitude: Double,
-        longitude: Double,
-        radiusMeters: Int,
-        limit: Int,
-        categoryCode: String?,
-    ): List<Long> = spotQueryUseCase.spotIdsWithin(
-        longitude = longitude,
-        latitude = latitude,
-        radiusMeters = radiusMeters,
-        limit = limit,
-        categoryCode = categoryCode,
-    )
-
     /**
      * 여러 spot을 **한 번의 조회로** 가져온다. 존재하지 않는 spot은 결과에서 빠진다.
      *

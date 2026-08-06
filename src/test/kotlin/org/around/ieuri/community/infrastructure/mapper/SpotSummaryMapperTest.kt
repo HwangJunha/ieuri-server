@@ -20,12 +20,17 @@ class SpotSummaryMapperTest {
             title = "경복궁",
             thumbnailImageUrl = "https://img/gyeongbok.jpg",
             categoryCode = "TOURIST_SPOT",
+            longitude = 126.9770,
+            latitude = 37.5796,
         ).toPostSpotView()
 
         assertEquals(11094L, view.id)
         assertEquals("경복궁", view.title)
         assertEquals("https://img/gyeongbok.jpg", view.thumbnailImageUrl)
         assertEquals(TargetCategory.TOURIST_SPOT, view.category)
+        // 좌표는 글 적재 시 복사돼 지역 피드의 반경 조건이 된다 — 빠지면 그 글이 조용히 사라진다.
+        assertEquals(126.9770, view.longitude)
+        assertEquals(37.5796, view.latitude)
     }
 
     @Test
@@ -64,5 +69,7 @@ class SpotSummaryMapperTest {
         title = "대상",
         thumbnailImageUrl = "url",
         categoryCode = categoryCode,
+        longitude = 127.0,
+        latitude = 37.5,
     )
 }

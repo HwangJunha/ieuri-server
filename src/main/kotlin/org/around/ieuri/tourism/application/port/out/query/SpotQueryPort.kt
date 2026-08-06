@@ -68,6 +68,10 @@ data class SpotBasics(
     val thumbnailImageUrl: String,
     val category: SpotCategory,
     val copyright: CopyrightType,
+    /** 경도. 다른 도메인이 이 좌표를 복사해 자기 반경 조회에 쓴다. */
+    val longitude: Double,
+    /** 위도. */
+    val latitude: Double,
 )
 
 /**

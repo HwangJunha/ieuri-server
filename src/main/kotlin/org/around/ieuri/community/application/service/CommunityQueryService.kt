@@ -9,6 +9,7 @@ import org.around.ieuri.community.application.port.out.event.CommunityEventPubli
 import org.around.ieuri.community.application.port.out.query.BlockedUsersSearch
 import org.around.ieuri.community.application.port.out.query.CommunityQueryPort
 import org.around.ieuri.community.application.port.out.query.PostCommentsSearch
+import org.around.ieuri.community.application.port.out.query.PostsArea
 import org.around.ieuri.community.application.port.out.query.PostsSearch
 import org.around.ieuri.community.application.port.out.query.ViewerContext
 import org.around.ieuri.community.application.query.BlockedUserView
@@ -50,7 +51,8 @@ class CommunityQueryService(
     override fun posts(query: PostsQuery, memberId: Long): CursorPage<PostView> =
         communityQueryPort.findPosts(
             PostsSearch(
-                spotIds = resolveSpotIds(query),
+                spotId = query.spotId,
+                area = resolveArea(query),
                 category = query.category,
                 // 태그는 정규화해 넘긴다 — 대소문자·선행 #을 가리지 않게 하려는 것이다.
                 normalizedTag = query.tag?.let { PostTag.parseOrNull(it)?.normalized },
@@ -74,29 +76,19 @@ class CommunityQueryService(
         }
 
     /**
-     * 어떤 장소의 글을 볼지 정한다. null이면 장소로 좁히지 않는다.
+     * 좌표 반경. 좌표를 주지 않으면 null이고 반경으로 좁히지 않는다.
      *
-     * 좌표를 받으면 반경 안의 spot을 **tourism에 물어** 목록으로 바꾼다 — `spot` 테이블은
-     * tourism의 것이라 커뮤니티가 직접 조회하지 않는다. 상한을 넘으면 잘리므로 반경이
-     * 매우 넓으면 결과가 부분집합이 될 수 있다.
+     * **tourism에 spot 목록을 묻지 않는다.** 글이 자기 좌표를 들고 있어 반경 조건을 글
+     * 조회에 직접 걸 수 있기 때문이며, 덕분에 목록 상한(2000)이 피드의 한계가 되던 문제가
+     * 사라졌다 — 실측하면 기본 반경 20km 안에 spot이 12,000개가 넘는다.
      */
-    private fun resolveSpotIds(query: PostsQuery): List<Long>? {
-        if (query.spotId != null) {
-            return listOf(query.spotId)
-        }
-        if (!query.hasCoordinates) {
-            return null
-        }
-
-        return spotLookupPort.findIdsWithin(
-            latitude = requireNotNull(query.latitude),
+    private fun resolveArea(query: PostsQuery): PostsArea? {
+        if (!query.hasCoordinates) return null
+        return PostsArea(
             longitude = requireNotNull(query.longitude),
+            latitude = requireNotNull(query.latitude),
             // 상한 초과는 오류가 아니라 절삭이다.
             radiusMeters = query.radiusMeters.coerceIn(1, policy.maxRadiusMeters),
-            limit = policy.maxNearbySpots,
-            // 카테고리를 spot 조회 단계에서 걸러 상한(2000)이 관련 없는 spot으로 채워지는 것을
-            // 막는다. 맛집 칩을 눌렀는데 상한이 주변 편의점으로 소진되면 결과가 비어 보인다.
-            categoryCode = query.category?.name,
         )
     }
 

@@ -49,22 +49,6 @@ interface SpotLookupPort {
     /** 피드 카드용 요약. 존재하지 않으면 null이며 그것이 대상 유효성 판정이다. */
     fun findSummary(spotId: Long): PostSpotView?
 
-    /**
-     * 좌표 반경 안의 spot id를 **가까운 순으로**. [limit]을 넘으면 조용히 잘리며 — 넓은 반경에서
-     * 수만 건이 나오면 이 결과를 받는 쪽의 조회 조건이 무너진다 — 잘리는 쪽은 먼 spot이다.
-     *
-     * 목록의 **순서가 곧 거리 순서**라, 거리순 정렬은 이 순서를 그대로 쓴다.
-     *
-     * [categoryCode]를 주면 그 카테고리의 spot만. null이면 거르지 않는다.
-     */
-    fun findIdsWithin(
-        latitude: Double,
-        longitude: Double,
-        radiusMeters: Int,
-        limit: Int,
-        categoryCode: String? = null,
-    ): List<Long>
-
     /** 여러 spot의 요약을 한 번에. 카테고리 칩 필터가 쓴다 — 행마다 물으면 조회가 20번 붙는다. */
     fun findSummaries(spotIds: List<Long>): Map<Long, PostSpotView>
 }

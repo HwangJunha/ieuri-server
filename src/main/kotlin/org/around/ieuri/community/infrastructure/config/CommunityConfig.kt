@@ -28,7 +28,6 @@ class CommunityConfig {
         maxPageSize = community.maxPageSize,
         commentPreviewSize = community.commentPreviewSize,
         maxRadiusMeters = community.maxRadiusMeters,
-        maxNearbySpots = community.maxNearbySpots,
         uploadUrlTtl = r2.uploadUrlTtl,
         maxUploadBytes = r2.maxUploadBytes,
         allowedContentTypes = r2.allowedContentTypes.map { it.trim().lowercase() }.toSet(),

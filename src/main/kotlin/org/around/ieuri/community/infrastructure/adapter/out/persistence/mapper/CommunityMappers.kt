@@ -92,9 +92,21 @@ fun PostTagEntity.toPostTag(): PostTag = PostTag.restore(name, normalized)
 fun Post.toChipEntity(postId: Long): PostChipEntity =
     PostChipEntity(postId = postId, category = category)
 
-/** 장소는 선택이라 없으면 null이며, 그때는 연결 행 자체를 만들지 않는다. */
-fun Post.toSpotEntity(postId: Long): PostSpotEntity? =
-    spotId?.let { PostSpotEntity(postId = postId, spotId = it) }
+/**
+ * 장소는 선택이라 없으면 null이며, 그때는 연결 행 자체를 만들지 않는다.
+ *
+ * 좌표를 함께 적재한다 — 지역 피드가 tourism에 spot 목록을 되묻지 않게 하는 값이다.
+ * geography 컬럼은 트리거가 map_x/map_y에서 파생시키므로 여기서 다루지 않는다.
+ */
+fun Post.toSpotEntity(postId: Long): PostSpotEntity? {
+    val point = spotPoint ?: return null
+    return PostSpotEntity(
+        postId = postId,
+        spotId = requireNotNull(spotId) { "좌표가 있으면 장소도 있어야 한다." },
+        mapX = point.longitude,
+        mapY = point.latitude,
+    )
+}
 
 fun CommentEntity.toDomain(): Comment = Comment.restore(
     id = requireNotNull(id) { "적재된 댓글에는 id가 있어야 한다." },

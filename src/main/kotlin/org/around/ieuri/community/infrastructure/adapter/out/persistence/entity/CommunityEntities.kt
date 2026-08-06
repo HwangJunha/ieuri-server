@@ -356,6 +356,25 @@ class PostSpotEntity(
     @Column(name = "spot_id", nullable = false)
     var spotId: Long,
 
+    /**
+     * 글이 붙은 장소의 좌표. **geography 컬럼은 매핑하지 않는다** — 트리거가 이 둘에서
+     * 파생시키므로 JPA가 PostGIS 타입을 알 필요가 없다(spot 테이블과 같은 방식).
+     */
+    @Column(name = "map_x", nullable = false)
+    var mapX: Double,
+
+    @Column(name = "map_y", nullable = false)
+    var mapY: Double,
+
+    /**
+     * map_x/map_y에서 트리거가 파생시키는 geography 값. **읽기 전용이다** —
+     * 쓰기는 트리거가 하고, 여기서는 반경 조건·거리 정렬이 참조할 경로만 필요하다.
+     * 타입을 String으로 두는 이유는 JPA가 PostGIS 타입을 몰라도 되게 하려는 것이며,
+     * 값을 실제로 읽어 쓰는 곳은 없다.
+     */
+    @Column(name = "location", insertable = false, updatable = false)
+    var location: String? = null,
+
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant? = null,
 ) {

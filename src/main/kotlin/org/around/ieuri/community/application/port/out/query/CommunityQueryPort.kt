@@ -101,31 +101,38 @@ data class ViewerContext(
 )
 
 /**
- * 글 피드 조회 조건. **장소 해소가 끝난 상태로 온다** — 좌표 반경 판정은 spot을 소유한
- * tourism의 몫이고, 이 포트는 글만 다룬다.
+ * 글 피드 조회 조건.
  *
- * [spotIds]가 null이면 장소로 좁히지 않는다(전체 피드). 빈 목록이면 결과도 비어 있다 —
- * 반경 안에 장소가 하나도 없는 경우이며, 구현은 빈 `IN` 절을 만들지 않도록 조기 반환해야 한다.
+ * **좌표 반경을 그대로 넘긴다.** 이전에는 tourism에 반경 안 spot id 목록을 물어 `IN` 절에
+ * 넣었는데, 그 목록의 상한(2000)이 곧 피드의 한계가 됐다 — 실측하면 기본 반경 20km 안에
+ * spot이 12,000개가 넘어 대부분이 조용히 잘렸다. 글이 자기 좌표를 들고 있으므로 반경 조건을
+ * 글 조회에 직접 건다.
  */
 data class PostsSearch(
-    /**
-     * 좁힐 장소. **순서가 곧 거리 순서다**(가까운 spot이 앞). [sort]가 DISTANCE일 때
-     * 이 순서를 그대로 정렬에 쓴다.
-     */
-    val spotIds: List<Long>?,
+    /** 이 장소에 붙은 글만. null이면 장소 하나로 좁히지 않는다. */
+    val spotId: Long?,
+    /** 좌표 반경. null이면 반경으로 좁히지 않는다. */
+    val area: PostsArea?,
     /** 상단 칩. null이면 카테고리로 좁히지 않는다. */
     val category: TargetCategory?,
     /** 정규화된 태그. null이면 태그로 좁히지 않는다. */
     val normalizedTag: String?,
     /**
      * 정렬 방식. **무엇이 보이는지까지 정한다** —
-     * LATEST는 [spotIds]로 좁힌 경우에도 장소 없는 글을 함께 담고,
-     * DISTANCE는 [spotIds]에 속한 글만 담는다(거리 없는 글은 자리가 없다).
+     * LATEST는 [area]로 좁힌 경우에도 장소 없는 글을 함께 담고,
+     * DISTANCE는 반경 안 장소에 붙은 글만 담는다(거리 없는 글은 자리가 없다).
      */
     val sort: PostSortOrder,
     val first: Int,
     val after: String?,
     val viewer: ViewerContext,
+)
+
+/** 반경 조회의 중심과 거리. 상한 절삭은 애플리케이션이 이미 마친 상태로 온다. */
+data class PostsArea(
+    val longitude: Double,
+    val latitude: Double,
+    val radiusMeters: Int,
 )
 
 data class PostCommentsSearch(

@@ -22,6 +22,7 @@ import org.around.ieuri.community.application.port.out.persistence.PostRepositor
 import org.around.ieuri.community.domain.aggregate.Post
 import org.around.ieuri.community.domain.vo.PhotoObjectKey
 import org.around.ieuri.community.domain.vo.PostTag
+import org.around.ieuri.community.domain.vo.SpotPoint
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -57,8 +58,11 @@ class PostCommandService(
         if (command.photoKeys.size > Post.MAX_PHOTOS) throw TooManyPhotosException()
 
         // **장소는 선택이다.** 준 경우에만 존재를 확인한다 — 부재가 곧 유효성 판정이다.
-        if (command.spotId != null && spotLookupPort.findSummary(command.spotId) == null) {
-            throw SpotNotFoundException()
+        // 좌표를 여기서 함께 받아 글에 복사한다 — 지역 피드가 tourism에 spot 목록을
+        // 되묻지 않게 하는 값이며, 그래야 목록 상한이 피드의 한계가 되지 않는다.
+        val spotPoint = command.spotId?.let { spotId ->
+            val summary = spotLookupPort.findSummary(spotId) ?: throw SpotNotFoundException()
+            SpotPoint(longitude = summary.longitude, latitude = summary.latitude)
         }
 
         // 형식이 어긋난 태그는 조용히 버리지 않고 거부한다 — 유저가 입력한 것이 사라지면
@@ -73,6 +77,7 @@ class PostCommandService(
         val post = Post.create(
             category = command.category,
             spotId = command.spotId,
+            spotPoint = spotPoint,
             authorId = memberId,
             tags = tags,
             title = title,

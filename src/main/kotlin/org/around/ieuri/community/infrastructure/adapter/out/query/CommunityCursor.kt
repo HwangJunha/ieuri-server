@@ -31,23 +31,30 @@ fun decodeCursor(cursor: String): CommunityCursor =
     }
 
 /**
- * 거리순 피드의 오프셋 커서. **keyset이 아니다** — 정렬 키가 거리인데 거리는 글이 아니라
- * spot의 속성이고, 커서에 실으면 좌표가 조금만 달라져도 무의미해진다.
+ * 거리순 피드의 커서. 정렬 키 (거리, createdAt, id)를 담는다.
  *
- * `o:` 접두어로 keyset 커서와 구분한다. 정렬을 바꾸면서 이전 커서를 그대로 넘기면
+ * 오프셋이 아니라 **키셋**이다 — 좌표를 글 쪽에 복사해 둔 덕분에 거리가 실제 값이 되었고,
+ * 그래서 페이징 도중 글이 추가돼도 항목이 밀리지 않는다.
+ *
+ * `d:` 접두어로 최신순 커서와 구분한다. 정렬을 바꾸면서 이전 커서를 그대로 넘기면
  * 조용히 엉뚱한 위치로 가는 대신 오류가 난다.
  */
-fun encodeOffsetCursor(offset: Int): String =
-    Base64.getUrlEncoder().withoutPadding()
-        .encodeToString("o:$offset".toByteArray(StandardCharsets.UTF_8))
+data class DistanceCursor(val distanceMeters: Double, val createdAt: Instant, val id: Long)
 
-fun decodeOffsetCursor(cursor: String): Int =
+fun encodeDistanceCursor(distanceMeters: Double, createdAt: Instant, id: Long): String =
+    Base64.getUrlEncoder().withoutPadding()
+        .encodeToString("d:$distanceMeters|$createdAt|$id".toByteArray(StandardCharsets.UTF_8))
+
+fun decodeDistanceCursor(cursor: String): DistanceCursor =
     try {
         val decoded = String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8)
-        require(decoded.startsWith("o:")) { "거리순 커서가 아닙니다." }
-        decoded.removePrefix("o:").toInt().also {
-            require(it >= 0) { "커서 위치는 음수일 수 없습니다." }
-        }
+        require(decoded.startsWith("d:")) { "거리순 커서가 아닙니다." }
+        val (distance, instant, id) = decoded.removePrefix("d:").split("|", limit = 3)
+        DistanceCursor(
+            distanceMeters = distance.toDouble(),
+            createdAt = Instant.parse(instant),
+            id = id.toLong(),
+        )
     } catch (e: RuntimeException) {
         throw IllegalArgumentException("유효하지 않은 커서입니다.", e)
     }

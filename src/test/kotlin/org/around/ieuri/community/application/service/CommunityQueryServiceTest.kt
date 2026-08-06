@@ -52,7 +52,6 @@ class CommunityQueryServiceTest {
         maxPageSize = 50,
         commentPreviewSize = 3,
         maxRadiusMeters = 100_000,
-        maxNearbySpots = 2_000,
         uploadUrlTtl = Duration.ofMinutes(5),
         maxUploadBytes = 10L * 1024 * 1024,
         allowedContentTypes = setOf("image/jpeg"),
@@ -105,32 +104,36 @@ class CommunityQueryServiceTest {
     fun `장소를 주면 그 장소 하나로 좁힌다`() {
         givenBlocked()
         val search = captureSearch()
+
         service.posts(query(spotId = 42L), memberId)
 
-        assertEquals(listOf(42L), search.captured.spotIds)
+        assertEquals(42L, search.captured.spotId)
+        assertNull(search.captured.area)
     }
 
     @Test
-    fun `장소도 좌표도 없으면 장소로 좁히지 않는다 - 전체 피드다`() {
+    fun `장소도 좌표도 없으면 좁히지 않는다 - 전체 피드다`() {
         givenBlocked()
         val search = captureSearch()
 
         service.posts(query(), memberId)
 
-        assertNull(search.captured.spotIds)
-        // 대상 조회 자체를 하지 않는다.
-        verify(exactly = 0) { spotLookup.findIdsWithin(any(), any(), any(), any(), any()) }
+        assertNull(search.captured.spotId)
+        assertNull(search.captured.area)
     }
 
     @Test
-    fun `좌표를 주면 반경 안의 장소로 좁힌다`() {
+    fun `좌표를 주면 반경을 그대로 넘긴다 - spot 목록을 묻지 않는다`() {
         givenBlocked()
-        every { spotLookup.findIdsWithin(any(), any(), any(), any(), any()) } returns listOf(7L, 8L)
         val search = captureSearch()
 
-        service.posts(query(latitude = 37.5, longitude = 127.0), memberId)
+        service.posts(query(latitude = 37.5, longitude = 127.0, radiusMeters = 5_000), memberId)
 
-        assertEquals(listOf(7L, 8L), search.captured.spotIds)
+        // 이전에는 tourism에 spot id 목록을 물어 IN 절에 넣었고, 그 목록의 상한(2000)이
+        // 곧 피드의 한계였다. 이제 반경 조건이 글 조회로 직접 간다.
+        assertEquals(127.0, search.captured.area?.longitude)
+        assertEquals(37.5, search.captured.area?.latitude)
+        assertEquals(5_000, search.captured.area?.radiusMeters)
     }
 
     @Test
@@ -140,18 +143,29 @@ class CommunityQueryServiceTest {
 
         service.posts(query(latitude = 37.5), memberId)
 
-        assertNull(search.captured.spotIds)
-        verify(exactly = 0) { spotLookup.findIdsWithin(any(), any(), any(), any(), any()) }
+        assertNull(search.captured.area)
     }
 
     @Test
-    fun `장소와 좌표가 함께 오면 장소가 이긴다`() {
+    fun `장소와 좌표를 함께 주면 둘 다 조건이 된다`() {
         givenBlocked()
         val search = captureSearch()
+
         service.posts(query(spotId = 42L, latitude = 37.5, longitude = 127.0), memberId)
 
-        assertEquals(listOf(42L), search.captured.spotIds)
-        verify(exactly = 0) { spotLookup.findIdsWithin(any(), any(), any(), any(), any()) }
+        // 서로 배타적이지 않다 — 둘 다 걸면 그 장소이면서 반경 안인 글이 나온다.
+        assertEquals(42L, search.captured.spotId)
+        assertEquals(127.0, search.captured.area?.longitude)
+    }
+
+    @Test
+    fun `반경은 상한으로 절삭된다 - 오류가 아니다`() {
+        givenBlocked()
+        val search = captureSearch()
+
+        service.posts(query(latitude = 37.5, longitude = 127.0, radiusMeters = 999_999), memberId)
+
+        assertEquals(100_000, search.captured.area?.radiusMeters)
     }
 
     // ---------- 상단 칩 필터 ----------
@@ -238,17 +252,6 @@ class CommunityQueryServiceTest {
     }
 
     @Test
-    fun `반경은 상한으로 절삭된다 - 오류가 아니다`() {
-        givenBlocked()
-        every { spotLookup.findIdsWithin(any(), any(), any(), any(), any()) } returns listOf(1L)
-        every { queryPort.findPosts(any()) } returns emptyPage()
-
-        service.posts(query(latitude = 37.5, longitude = 127.0, radiusMeters = 999_999), memberId)
-
-        verify { spotLookup.findIdsWithin(any(), any(), 100_000, 2_000) }
-    }
-
-    @Test
     fun `차단 목록은 본인 것만 조회한다`() {
         val search = slot<BlockedUsersSearch>()
         every { queryPort.findBlockedUsers(capture(search)) } returns emptyPage()
@@ -312,15 +315,16 @@ class CommunityQueryServiceTest {
     // ---------- 정렬 ----------
 
     @Test
-    fun `카테고리는 spot 조회 단계에서도 걸린다`() {
+    fun `지역 피드가 tourism에 spot 목록을 묻지 않는다`() {
         givenBlocked()
-        every { spotLookup.findIdsWithin(any(), any(), any(), any(), any()) } returns listOf(7L)
-        captureSearch()
+        val search = captureSearch()
 
         service.posts(query(latitude = 37.5, longitude = 127.0, category = TargetCategory.RESTAURANT), memberId)
 
-        // 상한(2000)이 관련 없는 spot으로 채워지면 맛집 칩을 눌러도 결과가 비어 보인다.
-        verify { spotLookup.findIdsWithin(any(), any(), any(), any(), "RESTAURANT") }
+        // 목록을 경유하면 그 상한(2000)이 곧 피드의 한계가 된다 — 실측하면 기본 반경 20km에
+        // spot이 12,000개가 넘어 대부분이 조용히 잘렸다. 이제 그 포트 자체가 없다.
+        assertEquals(TargetCategory.RESTAURANT, search.captured.category)
+        assertEquals(127.0, search.captured.area?.longitude)
     }
 
     @Test
@@ -337,14 +341,13 @@ class CommunityQueryServiceTest {
     @Test
     fun `좌표가 있으면 거리순이 그대로 전달된다`() {
         givenBlocked()
-        every { spotLookup.findIdsWithin(any(), any(), any(), any(), any()) } returns listOf(7L, 8L)
         val search = captureSearch()
 
         service.posts(query(latitude = 37.5, longitude = 127.0, sort = PostSortOrder.DISTANCE), memberId)
 
         assertEquals(PostSortOrder.DISTANCE, search.captured.sort)
-        // 목록의 순서가 곧 거리 순서다 — 어댑터가 이 순서를 정렬에 그대로 쓴다.
-        assertEquals(listOf(7L, 8L), search.captured.spotIds)
+        // 반경이 그대로 넘어간다 — 어댑터가 이 좌표로 거리를 재고 정렬한다.
+        assertEquals(127.0, search.captured.area?.longitude)
     }
 
     // ---------- 조회수 ----------
@@ -460,5 +463,7 @@ class CommunityQueryServiceTest {
         title = "대상",
         thumbnailImageUrl = "url",
         category = category,
+        longitude = 127.0,
+        latitude = 37.5,
     )
 }

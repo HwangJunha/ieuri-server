@@ -17,4 +17,6 @@ fun SpotSummaryView.toPostSpotView(): PostSpotView = PostSpotView(
     title = title,
     thumbnailImageUrl = thumbnailImageUrl,
     category = TargetCategory.fromOrNull(categoryCode),
+    longitude = longitude,
+    latitude = latitude,
 )
