@@ -1,6 +1,8 @@
 package org.around.ieuri.auth.infrastructure.config
 
+import org.around.ieuri.auth.application.policy.ProfileImagePolicy
 import org.around.ieuri.auth.application.policy.VerificationPolicy
+import org.around.ieuri.auth.domain.strategy.NicknameGenerator
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -19,11 +21,24 @@ import java.time.Duration
     RbacProperties::class,
     PasswordProperties::class,
     SnsProperties::class,
+    ProfileImageProperties::class,
 )
 class AuthConfig {
 
     @Bean
     fun clock(): Clock = Clock.systemUTC()
+
+    @Bean
+    fun profileImagePolicy(properties: ProfileImageProperties): ProfileImagePolicy =
+        ProfileImagePolicy(
+            uploadUrlTtl = properties.uploadUrlTtl,
+            maxUploadBytes = properties.maxUploadBytes,
+            allowedContentTypes = properties.allowedContentTypes.map { it.lowercase() }.toSet(),
+        )
+
+    /** 가입 시 닉네임 자동 생성(SPEC-0011 R20). 난수원은 기본값을 쓰고 테스트가 주입한다. */
+    @Bean
+    fun nicknameGenerator(): NicknameGenerator = NicknameGenerator()
 
     @Bean
     fun verificationPolicy(properties: VerificationProperties): VerificationPolicy =

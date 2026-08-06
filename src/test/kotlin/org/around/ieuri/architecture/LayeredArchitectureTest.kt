@@ -80,6 +80,11 @@ class LayeredArchitectureTest {
      *  - `..port.in..`   : 상대 도메인의 인바운드 포트와 그것이 노출하는 read DTO(`application.query`).
      *                      호출하는 쪽은 반드시 `infrastructure`여야 한다 — 도메인·애플리케이션이
      *                      다른 도메인의 이름을 알면 추출이 불가능해진다.
+     *  - `..domain.event..` : 발행된 도메인 이벤트. 구독하는 쪽은 반드시 인바운드 이벤트
+     *                      어댑터(`infrastructure.adapter.in.event`)여야 한다. 이벤트 타입은
+     *                      발행/구독의 **계약**이라 내부가 아니다 — Kafka로 옮기면 같은 자리에
+     *                      메시지 스키마가 온다(POL-028). 애플리케이션 레이어는 이 타입을
+     *                      알지 못하며, 어댑터가 자기 도메인의 port/in으로 번역한다.
      */
     @Test
     fun `도메인은 다른 도메인의 내부에 의존하지 않는다`() {
@@ -98,6 +103,11 @@ class LayeredArchitectureTest {
             .ignoreDependency(
                 JavaClass.Predicates.resideInAPackage("..infrastructure.adapter.out.client.."),
                 JavaClass.Predicates.resideInAPackage("..application.query.."),
+            )
+            // 발행된 도메인 이벤트 구독은 인바운드 이벤트 어댑터에서만 허용한다.
+            .ignoreDependency(
+                JavaClass.Predicates.resideInAPackage("..infrastructure.adapter.in.event.."),
+                JavaClass.Predicates.resideInAPackage("..domain.event.."),
             )
             .because("도메인 간 상호작용은 상대 도메인의 port/in 또는 발행된 도메인 이벤트로만 한다")
             .check(classes)

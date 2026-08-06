@@ -35,6 +35,10 @@ class MemberLifecycleService(
     /**
      * 탈퇴(본인). 회원과 소유 데이터(프로필·동의이력·이메일검증)를 **행 삭제**한다(hard delete).
      * SNS provider 토큰 폐기 시도 → 삭제 → refresh 전량 폐기 → 감사 기록(비-PII)·이벤트.
+     *
+     * [MemberWithdrawn]은 **커밋 후에** 다른 도메인으로 나간다(SPEC-0011 R17). 그래서 회원은
+     * 지워졌는데 글이 아직 남아 있는 창이 생기는데, 스펙이 이 창을 허용한다 — 한 도메인의
+     * 삭제 실패가 다른 도메인을 막지 않고, 실패해도 회원 삭제는 되돌아가지 않는다.
      */
     @Transactional
     override fun withdraw(command: WithdrawMemberCommand): LifecycleResult {

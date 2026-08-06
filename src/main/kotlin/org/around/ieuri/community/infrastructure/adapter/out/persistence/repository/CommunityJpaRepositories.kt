@@ -20,6 +20,12 @@ import org.springframework.data.jpa.repository.JpaRepository
 
 interface PostJpaRepository : JpaRepository<PostEntity, Long> {
     fun findByIdAndDeletedAtIsNull(id: Long): PostEntity?
+
+    /**
+     * 탈퇴 회원의 글 전량 삭제(SPEC-0011 R17). **소프트 삭제가 아니라 행 삭제다** —
+     * 자식 행(사진·태그·댓글·좋아요)은 DB의 ON DELETE CASCADE가 따라 지운다.
+     */
+    fun deleteByAuthorId(authorId: Long): Long
 }
 
 /** 글의 사진. position 순서가 표시 순서다. */
@@ -50,10 +56,16 @@ interface PostHideJpaRepository : JpaRepository<PostHideEntity, Long> {
 
     /** 지운 행 수를 돌려준다 — 0이면 원래 숨기지 않았다는 뜻이고 멱등 no-op 판정의 근거다. */
     fun deleteByMemberIdAndPostId(memberId: Long, postId: Long): Long
+
+    /** 탈퇴 회원이 건 숨김 전량 삭제(R17). */
+    fun deleteByMemberId(memberId: Long): Long
 }
 
 interface CommentJpaRepository : JpaRepository<CommentEntity, Long> {
     fun findByIdAndDeletedAtIsNull(id: Long): CommentEntity?
+
+    /** 탈퇴 회원이 남긴 댓글 전량 삭제(R17). 자기 글의 댓글은 글과 함께 이미 사라진 뒤다. */
+    fun deleteByAuthorId(authorId: Long): Long
 }
 
 interface PostLikeJpaRepository : JpaRepository<PostLikeEntity, Long> {
@@ -61,12 +73,18 @@ interface PostLikeJpaRepository : JpaRepository<PostLikeEntity, Long> {
 
     /** 지운 행 수를 돌려준다 — 0이면 원래 없었다는 뜻이고 멱등 no-op 판정의 근거다. */
     fun deleteByPostIdAndMemberId(postId: Long, memberId: Long): Long
+
+    /** 탈퇴 회원이 누른 좋아요 전량 삭제(R17). */
+    fun deleteByMemberId(memberId: Long): Long
 }
 
 interface BlockJpaRepository : JpaRepository<BlockEntity, Long> {
     fun existsByBlockerIdAndBlockedId(blockerId: Long, blockedId: Long): Boolean
 
     fun deleteByBlockerIdAndBlockedId(blockerId: Long, blockedId: Long): Long
+
+    /** 탈퇴 회원이 걸었거나 회원을 향한 차단 전량 삭제(R17). 양방향을 함께 지운다. */
+    fun deleteByBlockerIdOrBlockedId(blockerId: Long, blockedId: Long): Long
 }
 
 interface ReportJpaRepository : JpaRepository<ReportEntity, Long> {

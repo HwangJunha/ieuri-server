@@ -9,4 +9,7 @@ import org.springframework.data.jpa.repository.JpaRepository
  */
 interface SpotReactionJpaRepository : JpaRepository<SpotReactionEntity, Long> {
     fun findByMemberIdAndSpotId(memberId: Long, spotId: Long): SpotReactionEntity?
+
+    /** 탈퇴 회원의 기록 전량 삭제(SPEC-0011 R17). */
+    fun deleteByMemberId(memberId: Long): Long
 }

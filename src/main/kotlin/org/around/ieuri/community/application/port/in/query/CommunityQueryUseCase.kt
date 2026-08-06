@@ -7,6 +7,7 @@ import org.around.ieuri.community.application.query.BlockedUsersQuery
 import org.around.ieuri.community.application.query.CommentView
 import org.around.ieuri.community.application.query.PostCommentsQuery
 import org.around.ieuri.community.application.query.PostView
+import org.around.ieuri.community.application.query.MyPostsQuery
 import org.around.ieuri.community.application.query.PostsQuery
 import org.around.ieuri.community.domain.vo.AppKey
 import org.around.ieuri.community.domain.vo.ContentLanguage
@@ -58,6 +59,12 @@ interface CommunityQueryUseCase {
     fun commentReplies(parentCommentIds: List<Long>, memberId: Long): Map<Long, List<CommentView>>
 
     fun blockedUsers(query: BlockedUsersQuery, memberId: Long): CursorPage<BlockedUserView>
+
+    /**
+     * 본인이 작성한 글(SPEC-0011 R3). 작성 시각 내림차순이며 **숨김·차단 필터를 거치지
+     * 않는다** — 자기 글은 자기가 숨겼더라도 마이페이지에 보여야 한다.
+     */
+    fun myPosts(query: MyPostsQuery, memberId: Long): CursorPage<PostView>
 
     /**
      * 상단 카테고리 칩. 앱마다·언어마다 구성이 다르므로 둘로 고른다 —

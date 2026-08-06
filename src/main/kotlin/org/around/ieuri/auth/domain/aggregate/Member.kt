@@ -49,6 +49,26 @@ class Member private constructor(
         emailVerified = true
     }
 
+    /**
+     * 닉네임 변경(SPEC-0011 R5). 길이·공백 규칙은 [Nickname]이 판정한다.
+     *
+     * **고유성은 여기서 판정할 수 없다** — 다른 회원을 봐야 알 수 있어 애그리거트 밖의
+     * 사실이다. 애플리케이션이 저장소로 확인하고, 최종 판정은 유니크 제약이 한다.
+     */
+    fun changeNickname(nickname: Nickname) {
+        profile.changeNickname(nickname)
+    }
+
+    /** 프로필 이미지 교체(R6). 확정된 오브젝트 키만 들어온다. */
+    fun changeProfileImage(objectKey: String) {
+        profile.changeProfileImage(objectKey)
+    }
+
+    /** 프로필 이미지 제거(R6). 이미 없어도 오류가 아니다(멱등). */
+    fun removeProfileImage() {
+        profile.changeProfileImage(null)
+    }
+
     /** 관리자 정지. ACTIVE에서 정지하거나, 이미 SUSPENDED면 사유·기간을 갱신한다. */
     fun suspend(reason: String, until: Instant?, now: Instant) {
         require(reason.isNotBlank()) { "정지 사유는 필수입니다." }
@@ -107,7 +127,7 @@ class Member private constructor(
                 suspendedAtInitial = null,
                 suspendedUntilInitial = null,
                 suspensionReasonInitial = null,
-                profile = Profile(nickname = nickname, profileImageUrl = profileImageUrl),
+                profile = Profile(nicknameInitial = nickname, profileImageUrlInitial = profileImageUrl),
                 agreements = agreements,
                 passwordHash = null,
                 createdAt = now,
@@ -145,7 +165,7 @@ class Member private constructor(
                 suspendedAtInitial = null,
                 suspendedUntilInitial = null,
                 suspensionReasonInitial = null,
-                profile = Profile(nickname = nickname, profileImageUrl = null),
+                profile = Profile(nicknameInitial = nickname, profileImageUrlInitial = null),
                 agreements = agreements,
                 passwordHash = passwordHash,
                 createdAt = now,
@@ -181,7 +201,7 @@ class Member private constructor(
             suspendedAtInitial = suspendedAt,
             suspendedUntilInitial = suspendedUntil,
             suspensionReasonInitial = suspensionReason,
-            profile = Profile(nickname = nickname, profileImageUrl = profileImageUrl),
+            profile = Profile(nicknameInitial = nickname, profileImageUrlInitial = profileImageUrl),
             agreements = emptyList(),
             passwordHash = null,
             createdAt = createdAt,

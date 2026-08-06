@@ -13,12 +13,14 @@ import org.around.ieuri.community.application.port.out.client.SpotLookupPort
 import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
 import org.around.ieuri.community.application.port.out.query.BlockedUsersSearch
 import org.around.ieuri.community.application.port.out.query.CommunityQueryPort
+import org.around.ieuri.community.application.port.out.query.MyPostsSearch
 import org.around.ieuri.community.application.port.out.query.PostCommentsSearch
 import org.around.ieuri.community.application.port.out.query.PostSpatialQueryPort
 import org.around.ieuri.community.application.port.out.query.PostsSearch
 import org.around.ieuri.community.application.port.out.query.ViewerContext
 import org.around.ieuri.community.application.query.BlockedUsersQuery
 import org.around.ieuri.community.application.query.CommunityChipView
+import org.around.ieuri.community.application.query.MyPostsQuery
 import org.around.ieuri.community.application.query.PostCommentsQuery
 import org.around.ieuri.community.application.query.PostSpotView
 import org.around.ieuri.community.application.query.PostView
@@ -271,6 +273,59 @@ class CommunityQueryServiceTest {
         service.blockedUsers(BlockedUsersQuery(20, null), memberId)
 
         assertEquals(memberId, search.captured.memberId)
+    }
+
+    // ---------- 내가 쓴 글 (SPEC-0011 R3) ----------
+
+    @Test
+    fun `내가 쓴 글은 인증 주체를 작성자로 고정한다`() {
+        val search = slot<MyPostsSearch>()
+        every { queryPort.findMyPosts(capture(search)) } returns emptyPage()
+
+        service.myPosts(MyPostsQuery(20, null), memberId)
+
+        assertEquals(memberId, search.captured.memberId)
+    }
+
+    @Test
+    fun `내가 쓴 글은 차단 숨김 집합을 읽지 않는다`() {
+        // 자기 글은 자기가 숨겼더라도 마이페이지에 보여야 한다 — 필터를 위한 조회 자체가 없다.
+        every { queryPort.findMyPosts(any()) } returns emptyPage()
+
+        service.myPosts(MyPostsQuery(20, null), memberId)
+
+        verify(exactly = 0) { queryPort.findBlockedMemberIds(any()) }
+        verify(exactly = 0) { queryPort.findHiddenPostIds(any()) }
+    }
+
+    @Test
+    fun `내가 쓴 글도 상한을 넘는 first는 절삭된다`() {
+        val search = slot<MyPostsSearch>()
+        every { queryPort.findMyPosts(capture(search)) } returns emptyPage()
+
+        service.myPosts(MyPostsQuery(999, null), memberId)
+
+        assertEquals(policy.maxPageSize, search.captured.first)
+    }
+
+    @Test
+    fun `내가 쓴 글의 커서는 그대로 전달된다`() {
+        val search = slot<MyPostsSearch>()
+        every { queryPort.findMyPosts(capture(search)) } returns emptyPage()
+
+        service.myPosts(MyPostsQuery(20, "cursor-1"), memberId)
+
+        assertEquals("cursor-1", search.captured.after)
+    }
+
+    @Test
+    fun `내가 쓴 글이 없으면 빈 목록과 hasNextPage 거짓이다`() {
+        every { queryPort.findMyPosts(any()) } returns emptyPage()
+
+        val page = service.myPosts(MyPostsQuery(20, null), memberId)
+
+        assertTrue(page.edges.isEmpty())
+        assertEquals(false, page.pageInfo.hasNextPage)
     }
 
     // ---------- 상단 칩 구성 ----------

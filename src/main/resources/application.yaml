@@ -109,6 +109,15 @@ ieuri:
       - image/jpeg
       - image/png
       - image/webp
+  # 프로필 이미지(SPEC-0011 R6). 버킷은 r2와 같아도 되며 경로가 profile/ 구간으로 갈린다.
+  profile-image:
+    bucket: ${IEURI_R2_BUCKET:ieuri-dev}
+    upload-url-ttl: 30m
+    max-upload-bytes: 10485760
+    allowed-content-types:
+      - image/jpeg
+      - image/png
+      - image/webp
   community:
     # 커넥션 first 상한. 초과 요청은 오류가 아니라 절삭된다.
     max-page-size: 50

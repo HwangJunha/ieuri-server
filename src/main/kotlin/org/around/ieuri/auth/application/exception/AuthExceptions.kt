@@ -57,3 +57,39 @@ class InvalidTokenException(message: String) : RuntimeException(message)
 
 /** 이미 회전·폐기된 refresh가 다시 제출됐을 때(탈취 의심) → 회원 전체 폐기. 최상위 error로 전파된다. */
 class TokenReuseDetectedException(message: String) : RuntimeException(message)
+
+/** 다른 회원이 이미 쓰는 닉네임일 때(SPEC-0011 R5). 상대의 정보는 담지 않는다(POL-013). */
+class NicknameAlreadyTakenException(message: String) :
+    UserFacingException("NICKNAME_ALREADY_TAKEN", message)
+
+/** 닉네임 길이·형식이 규칙을 벗어날 때(R5). */
+class InvalidNicknameException(message: String) :
+    UserFacingException("INVALID_NICKNAME", message)
+
+/** 허용하지 않는 이미지 형식으로 업로드 URL을 요청할 때(R6). */
+class UnsupportedImageTypeException(message: String) :
+    UserFacingException("UNSUPPORTED_IMAGE_TYPE", message)
+
+/** 선언한 크기가 상한을 넘을 때(R6). */
+class ImageTooLargeException(message: String) :
+    UserFacingException("IMAGE_TOO_LARGE", message)
+
+/** 이 회원에게 발급된 적 없는(또는 형식이 어긋난) 오브젝트 키일 때(R6). */
+class ObjectKeyNotFoundException(message: String) :
+    UserFacingException("OBJECT_KEY_NOT_FOUND", message)
+
+/** 발급받았으나 실제 업로드가 확인되지 않은 키일 때(R6). */
+class PhotoNotUploadedException(message: String) :
+    UserFacingException("PHOTO_NOT_UPLOADED", message)
+
+/** 시행 중인 약관에서 코드를 찾을 수 없을 때(R10·R12). */
+class TermsNotFoundException(message: String) :
+    UserFacingException("TERMS_NOT_FOUND", message)
+
+/** 필수 약관을 토글하려 할 때(R10). 필수 약관 철회 경로는 없다. */
+class TermsCodeNotTogglableException(message: String) :
+    UserFacingException("TERMS_CODE_NOT_TOGGLABLE", message)
+
+/** 선택 약관을 필수 동의 경로로 제출할 때(R12). */
+class TermsCodeNotRequiredException(message: String) :
+    UserFacingException("TERMS_CODE_NOT_REQUIRED", message)
