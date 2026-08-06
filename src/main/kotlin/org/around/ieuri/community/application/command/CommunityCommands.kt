@@ -44,9 +44,17 @@ data class DeletePostCommand(val postId: Long) {
     }
 }
 
-data class CreateCommentCommand(val postId: Long, val body: String) {
+/** [parentCommentId]가 있으면 대댓글이다. 대댓글에 답글을 달면 최상위에 눕는다(깊이 2단계). */
+data class CreateCommentCommand(
+    val postId: Long,
+    val body: String,
+    val parentCommentId: Long? = null,
+) {
     init {
         require(postId > 0) { "postId는 양수여야 합니다." }
+        require(parentCommentId == null || parentCommentId > 0) {
+            "parentCommentId는 양수여야 합니다."
+        }
     }
 }
 

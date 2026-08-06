@@ -1,5 +1,7 @@
 package org.around.ieuri.community.infrastructure.adapter.out.query
 
+import com.querydsl.core.types.Order
+import com.querydsl.core.types.OrderSpecifier
 import com.querydsl.core.types.dsl.BooleanExpression
 import com.querydsl.core.types.dsl.BooleanPath
 import com.querydsl.core.types.dsl.DateTimePath
@@ -23,6 +25,7 @@ import org.around.ieuri.community.application.query.PostSpotView
 import org.around.ieuri.community.application.query.PostView
 import org.around.ieuri.community.domain.vo.AppKey
 import org.around.ieuri.community.domain.vo.ContentLanguage
+import org.around.ieuri.community.domain.vo.PostSortOrder
 import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.CommentEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostEntity
@@ -73,14 +76,23 @@ class CommunityQueryAdapter(
      * 빈 `IN` 절은 SQL에서 유효하지 않으므로 조기 반환한다.
      */
     @Transactional(readOnly = true)
+    /**
+     * **정렬 방식이 무엇이 보이는지까지 정한다.**
+     *
+     * DISTANCE는 반경 안 spot에 붙은 글만 담고 가까운 순으로 준다. LATEST는 장소로 좁힌
+     * 경우에도 **장소 없는 글을 함께** 담는다 — 그러지 않으면 장소를 고르지 않고 쓴 글이
+     * 지역 피드에서 영원히 보이지 않는다.
+     */
     override fun findPosts(search: PostsSearch): CursorPage<PostView> {
         val spotIds = search.spotIds
-        if (spotIds != null && spotIds.isEmpty()) {
+        // 반경 안에 spot이 하나도 없으면 DISTANCE는 결과가 없다. LATEST는 장소 없는 글이
+        // 남아 있으므로 조기 반환하지 않는다.
+        if (spotIds != null && spotIds.isEmpty() && search.sort == PostSortOrder.DISTANCE) {
             return cursorPageOf(emptyList(), hasNextPage = false, hasPreviousPage = search.after != null)
         }
 
         val conditions = mutableListOf<BooleanExpression>()
-        if (spotIds != null) {
+        if (spotIds != null && spotIds.isNotEmpty() && search.sort == PostSortOrder.DISTANCE) {
             // 장소로 좁힌다. 연결 테이블을 서브쿼리로 걸어 조인이 행을 늘리지 않게 한다.
             conditions += post.id.`in`(
                 JPAExpressions.select(postSpot.postId).from(postSpot)
@@ -102,12 +114,74 @@ class CommunityQueryAdapter(
             )
         }
 
-        return findPosts(
-            viewer = search.viewer,
-            first = search.first,
-            after = search.after,
-            extraConditions = conditions,
-        )
+        return when (search.sort) {
+            PostSortOrder.LATEST -> findPosts(
+                viewer = search.viewer,
+                first = search.first,
+                after = search.after,
+                extraConditions = conditions,
+            )
+
+            PostSortOrder.DISTANCE -> findPostsByDistance(
+                search = search,
+                spotIds = requireNotNull(spotIds) { "거리순은 좌표로 좁힌 경우에만 온다." },
+                extraConditions = conditions,
+            )
+        }
+    }
+
+    /**
+     * 거리순 피드. **정렬 키가 글에 없다** — 거리는 글이 아니라 그 글이 붙은 spot의 속성이고,
+     * spot 목록은 이미 가까운 순으로 넘어온다. 그래서 그 순서를 SQL의 `CASE`로 옮겨 정렬한다.
+     *
+     * 커서는 목록 내 위치(offset)다. `(createdAt, id)` 키셋을 쓸 수 없는 이유는 정렬 키가
+     * 거리라서이며, 거리를 커서에 실으면 좌표가 조금만 달라져도 커서가 무의미해진다.
+     * 오프셋이라 페이징 도중 글이 추가되면 밀릴 수 있으나, spot 상한(2000) 안에서 도는
+     * 조회라 실무상 영향이 작다.
+     */
+    private fun findPostsByDistance(
+        search: PostsSearch,
+        spotIds: List<Long>,
+        extraConditions: List<BooleanExpression>,
+    ): CursorPage<PostView> {
+        val offset = search.after?.let { decodeOffsetCursor(it) } ?: 0
+
+        // spot 목록의 인덱스를 순위로 매긴다 — 목록의 순서가 곧 거리 순서다.
+        val distanceRank = Expressions.cases()
+            .let { cases ->
+                var builder = cases.`when`(postSpot.spotId.eq(spotIds.first())).then(0)
+                spotIds.drop(1).forEachIndexed { index, spotId ->
+                    builder = builder.`when`(postSpot.spotId.eq(spotId)).then(index + 1)
+                }
+                builder.otherwise(Int.MAX_VALUE)
+            }
+
+        val rows = queryFactory
+            .select(post, distanceRank)
+            .from(post)
+            .join(postSpot).on(postSpot.postId.eq(post.id))
+            .where(*extraConditions.toTypedArray(), visibleToViewer(search.viewer))
+            // 같은 spot의 글끼리는 최신순이다. id까지 넣어야 순서가 요청마다 흔들리지 않는다.
+            .orderBy(
+                OrderSpecifier(Order.ASC, distanceRank),
+                post.createdAt.desc(),
+                post.id.desc(),
+            )
+            .offset(offset.toLong())
+            .limit((search.first + 1).toLong())
+            .fetch()
+
+        val hasNextPage = rows.size > search.first
+        val pageRows = (if (hasNextPage) rows.take(search.first) else rows)
+            .map { requireNotNull(it.get(post)) }
+
+        val edges = pageRows.mapIndexed { index, entity ->
+            CursorEdge(
+                cursor = encodeOffsetCursor(offset + index + 1),
+                node = entity.toPostView(search.viewer),
+            )
+        }
+        return cursorPageOf(edges, hasNextPage = hasNextPage, hasPreviousPage = offset > 0)
     }
 
     /**
@@ -134,6 +208,9 @@ class CommunityQueryAdapter(
             .where(
                 comment.postId.eq(search.postId),
                 comment.deletedAt.isNull,
+                // **최상위 댓글만.** 대댓글은 Comment.replies가 부모별로 따로 내려준다 —
+                // 섞어서 평평하게 주면 클라이언트가 트리를 다시 조립해야 한다.
+                comment.parentCommentId.isNull,
                 // 피드와 같은 두 단계: 차단 제외 후 숨김 제외(작성자 본인은 예외).
                 blockExclusion(viewer, comment.authorId),
                 hiddenExclusion(viewer, comment.hidden, comment.authorId),
@@ -236,12 +313,44 @@ class CommunityQueryAdapter(
      */
     private fun CommentEntity.toCommentView(viewer: ViewerContext) = CommentView(
         id = requireNotNull(id),
+        parentCommentId = parentCommentId,
         body = body,
         author = PostAuthorView(id = authorId, nickname = "", profileImageUrl = null),
         ownedByViewer = authorId == viewer.memberId,
         hidden = hidden,
         createdAt = requireNotNull(createdAt),
     )
+
+    /**
+     * 여러 최상위 댓글의 대댓글을 **한 번에** 읽는다. 댓글마다 물으면 목록 한 페이지에
+     * 쿼리가 그 수만큼 붙는다(N+1) — DataLoader가 부모 id를 모아 이 메서드를 한 번 부른다.
+     *
+     * 대댓글은 **오래된 순**이다. 대화의 흐름이라 최신순으로 뒤집으면 문맥이 끊긴다
+     * (최상위 목록은 여전히 최신순이다). 페이지네이션은 없다 — 목록 안의 목록에 커서를 두면
+     * 화면마다 커서 관리가 갈린다.
+     */
+    @Transactional(readOnly = true)
+    override fun findRepliesOf(
+        parentCommentIds: List<Long>,
+        viewer: ViewerContext,
+    ): Map<Long, List<CommentView>> {
+        if (parentCommentIds.isEmpty()) return emptyMap()
+
+        return queryFactory
+            .selectFrom(comment)
+            .where(
+                comment.parentCommentId.`in`(parentCommentIds),
+                comment.deletedAt.isNull,
+                blockExclusion(viewer, comment.authorId),
+                hiddenExclusion(viewer, comment.hidden, comment.authorId),
+            )
+            .orderBy(comment.createdAt.asc(), comment.id.asc())
+            .fetch()
+            .groupBy(
+                { requireNotNull(it.parentCommentId) },
+                { it.toCommentView(viewer) },
+            )
+    }
 
     /**
      * 차단 관계를 **한 번의 쿼리로** 읽는다. 양방향이라 두 방향을 OR로 묶고, 내가 어느 쪽이냐에

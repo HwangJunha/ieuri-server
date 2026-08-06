@@ -34,9 +34,42 @@ class CommentTest {
     }
 
     @Test
-    fun `부모 댓글을 가리키는 필드가 존재하지 않는다 - 1단계 댓글임을 구조로 고정한다`() {
-        val fieldNames = Comment::class.members.map { it.name }
-        assertFalse(fieldNames.any { it.contains("parent", ignoreCase = true) })
+    fun `부모를 주지 않으면 최상위 댓글이다`() {
+        val comment = create()
+
+        assertNull(comment.parentCommentId)
+        assertFalse(comment.isReply)
+    }
+
+    @Test
+    fun `부모를 주면 대댓글이다`() {
+        val reply = Comment.create(postId = 1L, authorId = authorId, body = "답글", parentCommentId = 5L)
+
+        assertEquals(5L, reply.parentCommentId)
+        assertTrue(reply.isReply)
+    }
+
+    @Test
+    fun `최상위 댓글에 답글을 달면 그 댓글이 부모다`() {
+        val top = Comment.restore(
+            id = 5L, postId = 1L, authorId = authorId, body = "댓글",
+            hidden = false, deletedAt = null, createdAt = Instant.EPOCH,
+        )
+
+        assertEquals(5L, Comment.replyParentIdFor(top))
+    }
+
+    @Test
+    fun `대댓글에 답글을 달면 3단계가 되지 않고 최상위에 눕는다`() {
+        // 거부하는 대신 부모의 부모를 실제 부모로 잡는다 — 사용자에게는 답글이 정상적으로
+        // 달린 것으로 보이고, 트리는 2단계로 유지된다.
+        val reply = Comment.restore(
+            id = 9L, postId = 1L, authorId = authorId, body = "답글",
+            hidden = false, deletedAt = null, createdAt = Instant.EPOCH,
+            parentCommentId = 5L,
+        )
+
+        assertEquals(5L, Comment.replyParentIdFor(reply))
     }
 
     @Test

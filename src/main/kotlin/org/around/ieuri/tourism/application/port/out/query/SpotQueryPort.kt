@@ -49,7 +49,13 @@ interface SpotQueryPort {
     fun findLikedSpots(query: LikedSpotsSearch): CursorPage<LikedSpotView>
 
     /** 반경 안의 spot id. [limit]을 넘으면 잘린다 — 호출자가 그것을 감안해야 한다. */
-    fun findSpotIdsWithin(longitude: Double, latitude: Double, radiusMeters: Int, limit: Int): List<Long>
+    fun findSpotIdsWithin(
+        longitude: Double,
+        latitude: Double,
+        radiusMeters: Int,
+        limit: Int,
+        categoryCode: String? = null,
+    ): List<Long>
 }
 
 /**

@@ -20,6 +20,7 @@ import org.around.ieuri.community.application.query.PostView
 import org.around.ieuri.community.application.query.PostsQuery
 import org.around.ieuri.community.domain.vo.AppKey
 import org.around.ieuri.community.domain.vo.ContentLanguage
+import org.around.ieuri.community.domain.vo.PostSortOrder
 import org.around.ieuri.community.domain.vo.PostTag
 import org.around.ieuri.community.domain.vo.TargetCategory
 import org.springframework.stereotype.Service
@@ -53,11 +54,24 @@ class CommunityQueryService(
                 category = query.category,
                 // 태그는 정규화해 넘긴다 — 대소문자·선행 #을 가리지 않게 하려는 것이다.
                 normalizedTag = query.tag?.let { PostTag.parseOrNull(it)?.normalized },
+                sort = effectiveSort(query),
                 first = clampPageSize(query.first),
                 after = query.after,
                 viewer = viewerContext(memberId),
             ),
         )
+
+    /**
+     * 좌표가 없으면 거리를 잴 기준이 없어 **거리순 요청도 최신순으로 떨어진다.**
+     * 오류로 돌려주지 않는 이유는 클라이언트가 위치 권한을 못 받은 상태에서도 피드를
+     * 그려야 하기 때문이다 — 정렬만 바뀌고 화면은 뜬다.
+     */
+    private fun effectiveSort(query: PostsQuery): PostSortOrder =
+        if (query.sort == PostSortOrder.DISTANCE && !query.hasCoordinates) {
+            PostSortOrder.LATEST
+        } else {
+            query.sort
+        }
 
     /**
      * 어떤 장소의 글을 볼지 정한다. null이면 장소로 좁히지 않는다.
@@ -80,6 +94,9 @@ class CommunityQueryService(
             // 상한 초과는 오류가 아니라 절삭이다.
             radiusMeters = query.radiusMeters.coerceIn(1, policy.maxRadiusMeters),
             limit = policy.maxNearbySpots,
+            // 카테고리를 spot 조회 단계에서 걸러 상한(2000)이 관련 없는 spot으로 채워지는 것을
+            // 막는다. 맛집 칩을 눌렀는데 상한이 주변 편의점으로 소진되면 결과가 비어 보인다.
+            categoryCode = query.category?.name,
         )
     }
 
@@ -111,6 +128,12 @@ class CommunityQueryService(
             limitPerPost = policy.commentPreviewSize,
             viewer = viewerContext(memberId),
         )
+
+    override fun commentReplies(
+        parentCommentIds: List<Long>,
+        memberId: Long,
+    ): Map<Long, List<CommentView>> =
+        communityQueryPort.findRepliesOf(parentCommentIds, viewerContext(memberId))
 
     // 지연 필드 다섯. 포트로 그대로 넘긴다 — 여기서 더할 규칙이 없다.
     override fun postTags(postIds: List<Long>): Map<Long, List<String>> =

@@ -41,11 +41,31 @@ class CommentCommandService(
         if (!postModerationPort.exists(command.postId)) throw PostNotFoundException()
 
         val saved = commentRepositoryPort.save(
-            Comment.create(postId = command.postId, authorId = memberId, body = body),
+            Comment.create(
+                postId = command.postId,
+                authorId = memberId,
+                body = body,
+                parentCommentId = command.parentCommentId?.let { resolveReplyParentId(it, command.postId) },
+            ),
         )
+        // 대댓글도 댓글 수에 포함된다 — "댓글 3개"인데 열어서 5개면 어긋나 보인다.
         postCounterPort.increaseCommentCount(command.postId)
 
         return requireNotNull(saved.id) { "저장된 댓글에는 id가 있어야 한다." }
+    }
+
+    /**
+     * 답글이 붙을 실제 부모. **대댓글에 답글을 달면 그 부모(최상위)에 눕는다** — 거부하는
+     * 대신 2단계로 유지하며, 사용자에게는 답글이 정상적으로 달린 것으로 보인다.
+     *
+     * 다른 글의 댓글을 부모로 지정하면 거부한다. 허용하면 글 A의 댓글 목록에 글 B의 답글이
+     * 섞이고 댓글 수도 어긋난다.
+     */
+    private fun resolveReplyParentId(parentCommentId: Long, postId: Long): Long {
+        val parent = commentRepositoryPort.findById(parentCommentId)
+            ?: throw CommentNotFoundException()
+        if (parent.postId != postId) throw CommentNotFoundException()
+        return Comment.replyParentIdFor(parent)
     }
 
     @Transactional

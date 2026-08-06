@@ -29,3 +29,25 @@ fun decodeCursor(cursor: String): CommunityCursor =
     } catch (e: RuntimeException) {
         throw IllegalArgumentException("유효하지 않은 커서입니다.", e)
     }
+
+/**
+ * 거리순 피드의 오프셋 커서. **keyset이 아니다** — 정렬 키가 거리인데 거리는 글이 아니라
+ * spot의 속성이고, 커서에 실으면 좌표가 조금만 달라져도 무의미해진다.
+ *
+ * `o:` 접두어로 keyset 커서와 구분한다. 정렬을 바꾸면서 이전 커서를 그대로 넘기면
+ * 조용히 엉뚱한 위치로 가는 대신 오류가 난다.
+ */
+fun encodeOffsetCursor(offset: Int): String =
+    Base64.getUrlEncoder().withoutPadding()
+        .encodeToString("o:$offset".toByteArray(StandardCharsets.UTF_8))
+
+fun decodeOffsetCursor(cursor: String): Int =
+    try {
+        val decoded = String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8)
+        require(decoded.startsWith("o:")) { "거리순 커서가 아닙니다." }
+        decoded.removePrefix("o:").toInt().also {
+            require(it >= 0) { "커서 위치는 음수일 수 없습니다." }
+        }
+    } catch (e: RuntimeException) {
+        throw IllegalArgumentException("유효하지 않은 커서입니다.", e)
+    }

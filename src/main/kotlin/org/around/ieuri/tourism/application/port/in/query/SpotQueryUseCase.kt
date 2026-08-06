@@ -66,10 +66,19 @@ interface SpotQueryUseCase {
      * 좌표 반경 안에 있는 spot의 id. 다른 도메인이 "이 반경의 spot들"을 조건으로 쓸 때의 진입점이며,
      * `spot` 테이블을 아는 코드가 tourism 안에 머물게 한다.
      *
-     * [limit]을 넘는 결과는 **조용히 잘린다** — 반경이 넓으면 수만 건이 되어 호출자의 `IN` 절을
-     * 무너뜨리기 때문이다. 호출자는 잘림을 감안해야 한다.
+     * **가까운 순으로 돌려준다.** [limit]을 넘는 결과는 조용히 잘리므로 — 반경이 넓으면 수만
+     * 건이 되어 호출자의 `IN` 절을 무너뜨린다 — 잘리는 쪽이 먼 spot이어야 한다.
+     *
+     * [categoryCode]를 주면 그 카테고리만. null이면 거르지 않는다. 도메인 enum이 아니라
+     * 문자열인 이유는 다른 도메인이 SpotCategory를 import하지 않게 하려는 것이다.
      */
-    fun spotIdsWithin(longitude: Double, latitude: Double, radiusMeters: Int, limit: Int): List<Long>
+    fun spotIdsWithin(
+        longitude: Double,
+        latitude: Double,
+        radiusMeters: Int,
+        limit: Int,
+        categoryCode: String? = null,
+    ): List<Long>
 
     /**
      * 회원이 좋아요한 spot 한 페이지. likedAt 내림차순, 동률은 spot.id로 타이브레이크.

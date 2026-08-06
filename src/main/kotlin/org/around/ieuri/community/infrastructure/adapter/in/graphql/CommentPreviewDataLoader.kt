@@ -39,3 +39,31 @@ class CommentPreviewDataLoader(
         const val NAME = "commentPreview"
     }
 }
+
+/**
+ * 대댓글 배치 로더. 최상위 댓글 id를 모아 **한 번에** 조회한다.
+ *
+ * 없으면 댓글 20개짜리 목록에 대댓글 쿼리가 20번 붙는다(N+1). 미리보기 로더와 같은 형태다.
+ *
+ * 대댓글의 replies는 항상 빈 목록이다 — 깊이가 2단계라 답글에는 답글이 달리지 않는다.
+ * 조회 자체는 막지 않는다(결과가 비어 있을 뿐이라 분기를 더할 이유가 없다).
+ */
+@DgsDataLoader(name = CommentReplyDataLoader.NAME)
+@Component
+class CommentReplyDataLoader(
+    private val communityQueryUseCase: CommunityQueryUseCase,
+    private val currentMemberProvider: CurrentMemberProvider,
+) : MappedBatchLoader<Long, List<CommentView>> {
+
+    override fun load(parentCommentIds: Set<Long>): CompletionStage<Map<Long, List<CommentView>>> {
+        val memberId = currentMemberProvider.requireMemberId()
+        val replies = communityQueryUseCase.commentReplies(parentCommentIds.toList(), memberId)
+        // 답글이 없는 댓글은 결과에 키가 없다 — 빈 목록으로 채워야 리졸버가 null을 만나지 않는다.
+        val complete = parentCommentIds.associateWith { replies[it].orEmpty() }
+        return CompletableFuture.completedFuture(complete)
+    }
+
+    companion object {
+        const val NAME = "commentReply"
+    }
+}

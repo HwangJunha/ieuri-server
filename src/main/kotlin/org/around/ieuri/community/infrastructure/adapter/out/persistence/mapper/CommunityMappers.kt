@@ -99,6 +99,7 @@ fun Post.toSpotEntity(postId: Long): PostSpotEntity? =
 fun CommentEntity.toDomain(): Comment = Comment.restore(
     id = requireNotNull(id) { "적재된 댓글에는 id가 있어야 한다." },
     postId = postId,
+    parentCommentId = parentCommentId,
     authorId = authorId,
     body = body,
     hidden = hidden,
@@ -108,6 +109,7 @@ fun CommentEntity.toDomain(): Comment = Comment.restore(
 
 fun Comment.toNewEntity(): CommentEntity = CommentEntity(
     postId = postId,
+    parentCommentId = parentCommentId,
     authorId = authorId,
     body = body,
     hidden = hidden,

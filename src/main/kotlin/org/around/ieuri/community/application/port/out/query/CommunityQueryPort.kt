@@ -8,6 +8,7 @@ import org.around.ieuri.community.application.query.PostView
 import org.around.ieuri.community.domain.vo.AppKey
 import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.around.ieuri.community.domain.vo.TargetCategory
+import org.around.ieuri.community.domain.vo.PostSortOrder
 import org.around.ieuri.community.domain.vo.PostTag
 
 /**
@@ -64,6 +65,15 @@ interface CommunityQueryPort {
      */
     fun findLikeCount(postId: Long): Int?
 
+    /**
+     * 여러 최상위 댓글의 대댓글을 **한 번에**. 오래된 순이며 페이지네이션이 없다.
+     * 대댓글이 없는 댓글은 결과에 키가 없다.
+     */
+    fun findRepliesOf(
+        parentCommentIds: List<Long>,
+        viewer: ViewerContext,
+    ): Map<Long, List<CommentView>>
+
     fun findBlockedUsers(search: BlockedUsersSearch): CursorPage<BlockedUserView>
 
     /**
@@ -98,11 +108,21 @@ data class ViewerContext(
  * 반경 안에 장소가 하나도 없는 경우이며, 구현은 빈 `IN` 절을 만들지 않도록 조기 반환해야 한다.
  */
 data class PostsSearch(
+    /**
+     * 좁힐 장소. **순서가 곧 거리 순서다**(가까운 spot이 앞). [sort]가 DISTANCE일 때
+     * 이 순서를 그대로 정렬에 쓴다.
+     */
     val spotIds: List<Long>?,
     /** 상단 칩. null이면 카테고리로 좁히지 않는다. */
     val category: TargetCategory?,
     /** 정규화된 태그. null이면 태그로 좁히지 않는다. */
     val normalizedTag: String?,
+    /**
+     * 정렬 방식. **무엇이 보이는지까지 정한다** —
+     * LATEST는 [spotIds]로 좁힌 경우에도 장소 없는 글을 함께 담고,
+     * DISTANCE는 [spotIds]에 속한 글만 담는다(거리 없는 글은 자리가 없다).
+     */
+    val sort: PostSortOrder,
     val first: Int,
     val after: String?,
     val viewer: ViewerContext,

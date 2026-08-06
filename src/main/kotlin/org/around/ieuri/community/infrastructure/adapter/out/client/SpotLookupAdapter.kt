@@ -29,11 +29,13 @@ class SpotLookupAdapter(
         longitude: Double,
         radiusMeters: Int,
         limit: Int,
+        categoryCode: String?,
     ): List<Long> = spotQueryUseCase.spotIdsWithin(
         longitude = longitude,
         latitude = latitude,
         radiusMeters = radiusMeters,
         limit = limit,
+        categoryCode = categoryCode,
     )
 
     /**

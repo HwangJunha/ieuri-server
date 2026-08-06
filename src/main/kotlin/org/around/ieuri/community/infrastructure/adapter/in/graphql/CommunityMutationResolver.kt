@@ -131,7 +131,11 @@ class CommunityMutationResolver(
         ) {
             val memberId = currentMemberProvider.requireMemberId()
             val commentId = commentCommandUseCase.createComment(
-                CreateCommentCommand(postId = input.postId, body = input.body),
+                CreateCommentCommand(
+                    postId = input.postId,
+                    body = input.body,
+                    parentCommentId = input.parentCommentId?.toLong(),
+                ),
                 memberId,
             )
             // comment가 null이고 commentId를 주는 이유는 createPost와 같다.

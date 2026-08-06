@@ -24,6 +24,7 @@ import org.around.ieuri.community.application.query.PostView
 import org.around.ieuri.community.application.query.PostsQuery
 import org.around.ieuri.community.domain.vo.AppKey
 import org.around.ieuri.community.domain.vo.ContentLanguage
+import org.around.ieuri.community.domain.vo.PostSortOrder
 import org.around.ieuri.community.domain.vo.TargetCategory
 import java.time.Duration
 import java.time.Instant
@@ -78,6 +79,7 @@ class CommunityQueryServiceTest {
         longitude: Double? = null,
         radiusMeters: Int = 20_000,
         category: TargetCategory? = null,
+        sort: PostSortOrder = PostSortOrder.LATEST,
         first: Int = 20,
     ) = PostsQuery(
         spotId = spotId,
@@ -86,6 +88,7 @@ class CommunityQueryServiceTest {
         radiusMeters = radiusMeters,
         category = category,
         tag = null,
+        sort = sort,
         first = first,
         after = null,
     )
@@ -116,13 +119,13 @@ class CommunityQueryServiceTest {
 
         assertNull(search.captured.spotIds)
         // 대상 조회 자체를 하지 않는다.
-        verify(exactly = 0) { spotLookup.findIdsWithin(any(), any(), any(), any()) }
+        verify(exactly = 0) { spotLookup.findIdsWithin(any(), any(), any(), any(), any()) }
     }
 
     @Test
     fun `좌표를 주면 반경 안의 장소로 좁힌다`() {
         givenBlocked()
-        every { spotLookup.findIdsWithin(any(), any(), any(), any()) } returns listOf(7L, 8L)
+        every { spotLookup.findIdsWithin(any(), any(), any(), any(), any()) } returns listOf(7L, 8L)
         val search = captureSearch()
 
         service.posts(query(latitude = 37.5, longitude = 127.0), memberId)
@@ -138,7 +141,7 @@ class CommunityQueryServiceTest {
         service.posts(query(latitude = 37.5), memberId)
 
         assertNull(search.captured.spotIds)
-        verify(exactly = 0) { spotLookup.findIdsWithin(any(), any(), any(), any()) }
+        verify(exactly = 0) { spotLookup.findIdsWithin(any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -148,7 +151,7 @@ class CommunityQueryServiceTest {
         service.posts(query(spotId = 42L, latitude = 37.5, longitude = 127.0), memberId)
 
         assertEquals(listOf(42L), search.captured.spotIds)
-        verify(exactly = 0) { spotLookup.findIdsWithin(any(), any(), any(), any()) }
+        verify(exactly = 0) { spotLookup.findIdsWithin(any(), any(), any(), any(), any()) }
     }
 
     // ---------- 상단 칩 필터 ----------
@@ -237,7 +240,7 @@ class CommunityQueryServiceTest {
     @Test
     fun `반경은 상한으로 절삭된다 - 오류가 아니다`() {
         givenBlocked()
-        every { spotLookup.findIdsWithin(any(), any(), any(), any()) } returns listOf(1L)
+        every { spotLookup.findIdsWithin(any(), any(), any(), any(), any()) } returns listOf(1L)
         every { queryPort.findPosts(any()) } returns emptyPage()
 
         service.posts(query(latitude = 37.5, longitude = 127.0, radiusMeters = 999_999), memberId)
@@ -304,6 +307,44 @@ class CommunityQueryServiceTest {
         every { queryPort.findChips(unknown, ContentLanguage.KO) } returns emptyList()
 
         assertTrue(service.communityChips(unknown, ContentLanguage.KO).isEmpty())
+    }
+
+    // ---------- 정렬 ----------
+
+    @Test
+    fun `카테고리는 spot 조회 단계에서도 걸린다`() {
+        givenBlocked()
+        every { spotLookup.findIdsWithin(any(), any(), any(), any(), any()) } returns listOf(7L)
+        captureSearch()
+
+        service.posts(query(latitude = 37.5, longitude = 127.0, category = TargetCategory.RESTAURANT), memberId)
+
+        // 상한(2000)이 관련 없는 spot으로 채워지면 맛집 칩을 눌러도 결과가 비어 보인다.
+        verify { spotLookup.findIdsWithin(any(), any(), any(), any(), "RESTAURANT") }
+    }
+
+    @Test
+    fun `좌표가 없으면 거리순 요청도 최신순으로 떨어진다`() {
+        givenBlocked()
+        val search = captureSearch()
+
+        service.posts(query(sort = PostSortOrder.DISTANCE), memberId)
+
+        // 거리를 잴 기준이 없다. 오류 대신 정렬만 바꿔 화면은 뜨게 한다.
+        assertEquals(PostSortOrder.LATEST, search.captured.sort)
+    }
+
+    @Test
+    fun `좌표가 있으면 거리순이 그대로 전달된다`() {
+        givenBlocked()
+        every { spotLookup.findIdsWithin(any(), any(), any(), any(), any()) } returns listOf(7L, 8L)
+        val search = captureSearch()
+
+        service.posts(query(latitude = 37.5, longitude = 127.0, sort = PostSortOrder.DISTANCE), memberId)
+
+        assertEquals(PostSortOrder.DISTANCE, search.captured.sort)
+        // 목록의 순서가 곧 거리 순서다 — 어댑터가 이 순서를 정렬에 그대로 쓴다.
+        assertEquals(listOf(7L, 8L), search.captured.spotIds)
     }
 
     // ---------- 조회수 ----------

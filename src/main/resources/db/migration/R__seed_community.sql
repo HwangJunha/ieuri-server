@@ -208,6 +208,25 @@ JOIN (VALUES
 UPDATE community_post SET view_count = like_count * 7 + 13
 WHERE author_id IN (12, 14, 15, 16, 17, 18, 19, 20);
 
+-- 5-2) 대댓글. **깊이 2단계 확인용** — 최상위 댓글에 답글이 달린 모습과,
+--      대댓글의 replies가 비어 있는 것을 함께 본다. comment_count에는 이 답글들도 포함된다.
+INSERT INTO community_comment (post_id, parent_comment_id, author_id, body, hidden, created_at, updated_at)
+SELECT c.post_id, c.id, v.author_id, v.body, FALSE,
+       c.created_at + interval '10 minutes', c.created_at + interval '10 minutes'
+FROM community_comment c
+JOIN community_post p ON p.id = c.post_id
+JOIN (VALUES
+    ('수문장 교대식 시간표가 어떻게 되나요?', 20, '10시, 14시 두 번이에요! 정각에 시작합니다 ⏰'),
+    ('수문장 교대식 시간표가 어떻게 되나요?', 12, '겨울에는 시간이 조금 달라질 수 있어요.')
+) AS v(parent_body, author_id, body)
+  ON c.body = v.parent_body
+WHERE p.title = '경복궁 야간개장 후기' AND p.author_id = 20
+  AND c.parent_comment_id IS NULL;
+
+-- 위 답글 2건을 댓글 수에 반영한다. 대댓글도 댓글이다.
+UPDATE community_post SET comment_count = comment_count + 2
+WHERE title = '경복궁 야간개장 후기' AND author_id = 20;
+
 -- 6) 좋아요. like_count 컬럼과 실제 행 수는 일부러 다르다 — 카운트는 파생 저장값이고
 --    likedByViewer는 이 행으로 판정되므로, 두 값의 출처가 다름을 보여준다.
 --    20번이 누른 좋아요만 넣어 20의 피드에서 likedByViewer=true가 뜨는 글을 만든다.

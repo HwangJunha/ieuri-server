@@ -128,6 +128,10 @@ class CommentEntity(
     @Column(name = "post_id", nullable = false)
     var postId: Long,
 
+    /** 최상위 댓글이면 null. 깊이 2단계 제한은 도메인이 지킨다(DB는 자기 참조만 막는다). */
+    @Column(name = "parent_comment_id")
+    var parentCommentId: Long? = null,
+
     @Column(name = "author_id", nullable = false)
     var authorId: Long,
 

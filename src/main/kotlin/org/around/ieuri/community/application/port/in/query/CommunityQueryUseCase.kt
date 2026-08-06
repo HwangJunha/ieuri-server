@@ -51,6 +51,12 @@ interface CommunityQueryUseCase {
     /** 호출자가 좋아요한 글의 id만. */
     fun likedPostIds(postIds: List<Long>, memberId: Long): Set<Long>
 
+    /**
+     * 여러 최상위 댓글의 대댓글. 오래된 순이며 페이지네이션이 없다 —
+     * 깊이가 2단계라 한 댓글에 달리는 답글 수가 화면을 넘길 만큼 많지 않다.
+     */
+    fun commentReplies(parentCommentIds: List<Long>, memberId: Long): Map<Long, List<CommentView>>
+
     fun blockedUsers(query: BlockedUsersQuery, memberId: Long): CursorPage<BlockedUserView>
 
     /**

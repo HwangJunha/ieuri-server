@@ -18,6 +18,7 @@ import org.around.ieuri.community.application.query.PostSpotView
 import org.around.ieuri.community.application.query.PostCommentsQuery
 import org.around.ieuri.community.application.query.PostView
 import org.around.ieuri.community.application.query.PostsQuery
+import org.around.ieuri.community.domain.vo.PostSortOrder
 import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.infrastructure.app.AppKeyContext
 import org.around.ieuri.community.infrastructure.locale.CommunityLocaleContext
@@ -27,6 +28,7 @@ import org.around.ieuri.common.graphql.generated.types.BlockedUserEdge as GqlBlo
 import org.around.ieuri.common.graphql.generated.types.CommunityChip as GqlCommunityChip
 import org.around.ieuri.common.graphql.generated.types.PageInfo as GqlPageInfo
 import org.around.ieuri.common.graphql.generated.types.PostAuthor as GqlPostAuthor
+import org.around.ieuri.common.graphql.generated.types.PostSortOrder as GqlPostSortOrder
 import org.around.ieuri.common.graphql.generated.types.PostSpot as GqlPostSpot
 import org.around.ieuri.common.graphql.generated.types.TargetCategory as GqlTargetCategory
 
@@ -62,6 +64,7 @@ class CommunityQueryResolver(
         @InputArgument radiusMeters: Int?,
         @InputArgument category: GqlTargetCategory?,
         @InputArgument tag: String?,
+        @InputArgument sort: GqlPostSortOrder?,
         @InputArgument first: Int?,
         @InputArgument after: String?,
     ): PostConnection {
@@ -74,6 +77,8 @@ class CommunityQueryResolver(
                 radiusMeters = radiusMeters ?: DEFAULT_RADIUS_METERS,
                 category = category?.let { TargetCategory.valueOf(it.name) },
                 tag = tag,
+                // 스키마 기본값이 LATEST라 null이 오는 경우는 없지만, 계약을 코드에도 남긴다.
+                sort = sort?.let { PostSortOrder.valueOf(it.name) } ?: PostSortOrder.LATEST,
                 first = first ?: DEFAULT_PAGE_SIZE,
                 after = after,
             ),
@@ -205,6 +210,17 @@ class CommunityQueryResolver(
         name: String,
     ): DataLoader<Long, V> =
         getDataLoader<Long, V>(name) ?: error("DataLoader '$name'가 등록되지 않았다.")
+
+    /**
+     * 답글. **요청된 경우에만** 배치로 읽는다 — 목록만 그리는 화면은 조회가 붙지 않는다.
+     * 답글의 replies는 항상 빈 목록이다(깊이 2단계).
+     */
+    @DgsData(parentType = "Comment", field = "replies")
+    fun commentReplies(dfe: DgsDataFetchingEnvironment): CompletableFuture<List<CommentView>> {
+        val source = dfe.getSource<CommentView>()
+            ?: error("Comment 필드 리졸버는 부모가 반환한 CommentView를 소스로 받아야 한다.")
+        return dfe.loader<List<CommentView>>(CommentReplyDataLoader.NAME).load(source.id)
+    }
 
     @DgsData(parentType = "Comment", field = "author")
     fun commentAuthor(dfe: DgsDataFetchingEnvironment): CompletableFuture<GqlPostAuthor> {

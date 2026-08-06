@@ -1,6 +1,7 @@
 package org.around.ieuri.community.application.query
 
 import org.around.ieuri.community.domain.vo.TargetCategory
+import org.around.ieuri.community.domain.vo.PostSortOrder
 import org.around.ieuri.community.domain.vo.PostTag
 import java.time.Instant
 
@@ -52,6 +53,8 @@ data class PostView(
 
 data class CommentView(
     val id: Long,
+    /** 최상위 댓글이면 null. 있으면 그 댓글에 달린 대댓글이다. */
+    val parentCommentId: Long?,
     val body: String,
     val author: PostAuthorView,
     val ownedByViewer: Boolean,
@@ -106,6 +109,10 @@ data class PostsQuery(
     val category: TargetCategory?,
     /** 태그 필터. 정규화해 매칭하므로 대소문자를 가리지 않는다. */
     val tag: String?,
+    /**
+     * 정렬 방식. 좌표가 없으면 거리를 잴 기준이 없어 DISTANCE도 LATEST로 떨어진다.
+     */
+    val sort: PostSortOrder,
     val first: Int,
     val after: String?,
 ) {

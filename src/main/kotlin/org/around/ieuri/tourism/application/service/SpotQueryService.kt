@@ -267,7 +267,9 @@ class SpotQueryService(
         latitude: Double,
         radiusMeters: Int,
         limit: Int,
-    ): List<Long> = spotQueryPort.findSpotIdsWithin(longitude, latitude, radiusMeters, limit)
+        categoryCode: String?,
+    ): List<Long> =
+        spotQueryPort.findSpotIdsWithin(longitude, latitude, radiusMeters, limit, categoryCode)
 
     override fun spotSummary(spotId: Long): SpotSummaryView? =
         spotQueryPort.findSpotBasics(spotId)?.let {
