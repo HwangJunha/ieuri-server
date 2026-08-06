@@ -24,6 +24,7 @@
 -- 1) 이전 시드 정리. 댓글·사진·좋아요는 FK ON DELETE CASCADE로 함께 지워진다.
 DELETE FROM community_post WHERE author_id IN (12, 14, 15, 16, 17, 18, 19, 20);
 
+DELETE FROM community_post_hide WHERE member_id IN (12, 14, 15, 16, 17, 18, 19, 20);
 DELETE FROM community_block   WHERE blocker_id IN (18, 20) AND blocked_id IN (18, 19, 20);
 DELETE FROM community_report  WHERE reporter_id IN (12, 14, 15, 16, 17, 18, 19, 20);
 
@@ -316,6 +317,25 @@ INSERT INTO community_chip (app_key, language, category, position, enabled) VALU
     ('demo-app', 'KO', 'SHOPPING', 0, TRUE),
     ('demo-app', 'KO', 'LEISURE_SPORTS', 1, TRUE);
 
+-- 8-1) 개별 글 숨김. **community_post.hidden과 다른 개념이다** — 그쪽은 신고 누적으로
+--      모두에게 감춰진 것이고, 이건 한 사람이 자기 화면에서만 감춘 것이다.
+--
+--      20번이 남의 글 2건을 숨긴 상태로 둔다:
+--        - posts()          → 그 2건이 빠져 **12건 중 10건**만 보인다
+--        - posts(hiddenByViewer: true) → 그 2건만 나온다(해제 화면)
+--        - post(id:)        → 숨긴 글은 null이다
+--
+--      숨긴 글의 작성자(12·16)는 차단 대상이 아니다 — 그 사람의 **다른 글은 그대로 보인다**.
+--      그것이 차단과 숨기기가 다른 축이라는 증거다(12번은 서울광장 글이 남는다).
+INSERT INTO community_post_hide (member_id, post_id, created_at)
+SELECT 20, p.id, now() - interval '30 minutes'
+FROM community_post p
+JOIN (VALUES
+    ('경복궁 휴무일 주의하세요', 12),
+    ('청계천 야경 사진', 16)
+) AS v(title, author_id)
+  ON p.title = v.title AND p.author_id = v.author_id;
+
 -- 9) 태그. **사용자가 입력하는 값**이라 고정 목록이 아니다 — 같은 태그가 여러 글에 붙는
 --    모습과, 대소문자가 달라도 같은 태그로 묶이는 것을 확인할 수 있게 넣는다.
 INSERT INTO community_post_tag (post_id, name, normalized)
@@ -338,8 +358,14 @@ JOIN (VALUES
 -- ============================================================
 -- 확인용 쿼리 (실행되지 않는 주석이다. 필요할 때 복사해서 쓴다.)
 --
--- 20번에게 보이는 글 — 16건 중 12건이어야 한다.
---   제외 4건 = 19의 2건 + 18의 1건(차단) + 17의 숨김 1건. 본인 글 4건은 다 보인다.
+-- 20번에게 보이는 글 — 16건 중 **10건**이어야 한다.
+--   제외 6건 = 19의 2건 + 18의 1건(차단) + 17의 자동 숨김 1건 + 20이 개별로 숨긴 2건.
+--   본인 글 4건은 다 보인다.
+--
+-- 개별 숨김만 확인하려면:
+--   SELECT p.id, p.title FROM community_post p
+--   JOIN community_post_hide h ON h.post_id = p.id AND h.member_id = 20;
+--   → 2건(경복궁 휴무일, 청계천 야경). posts(hiddenByViewer: true)가 이 둘을 줘야 한다.
 --
 --   SELECT p.id, p.author_id, p.title, p.hidden, left(p.body, 30) AS body
 --   FROM community_post p
