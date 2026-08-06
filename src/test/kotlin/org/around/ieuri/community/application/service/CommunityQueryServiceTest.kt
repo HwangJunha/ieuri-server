@@ -14,6 +14,7 @@ import org.around.ieuri.community.application.port.out.event.CommunityEventPubli
 import org.around.ieuri.community.application.port.out.query.BlockedUsersSearch
 import org.around.ieuri.community.application.port.out.query.CommunityQueryPort
 import org.around.ieuri.community.application.port.out.query.PostCommentsSearch
+import org.around.ieuri.community.application.port.out.query.PostSpatialQueryPort
 import org.around.ieuri.community.application.port.out.query.PostsSearch
 import org.around.ieuri.community.application.port.out.query.ViewerContext
 import org.around.ieuri.community.application.query.BlockedUsersQuery
@@ -47,6 +48,7 @@ class CommunityQueryServiceTest {
 
     private val queryPort = mockk<CommunityQueryPort>()
     private val spotLookup = mockk<SpotLookupPort>()
+    private val spatialPort = mockk<PostSpatialQueryPort>()
 
     private val policy = CommunityPolicy(
         maxPageSize = 50,
@@ -59,7 +61,9 @@ class CommunityQueryServiceTest {
 
     private val eventPublisher = mockk<CommunityEventPublisherPort>(relaxed = true)
 
-    private val service = CommunityQueryService(queryPort, spotLookup, eventPublisher, policy)
+    private val service = CommunityQueryService(
+        queryPort, spatialPort, spotLookup, eventPublisher, policy,
+    )
 
     private fun <T> emptyPage() = CursorPage<T>(
         edges = emptyList(),
@@ -339,15 +343,27 @@ class CommunityQueryServiceTest {
     }
 
     @Test
-    fun `좌표가 있으면 거리순이 그대로 전달된다`() {
+    fun `거리순은 공간 조회 포트로 간다`() {
         givenBlocked()
-        val search = captureSearch()
+        val search = slot<PostsSearch>()
+        every { spatialPort.findPostsByDistance(capture(search)) } returns emptyPage()
 
         service.posts(query(latitude = 37.5, longitude = 127.0, sort = PostSortOrder.DISTANCE), memberId)
 
+        // PostGIS라 구현 기술이 갈린다 — 포트를 나눠 그 사실을 계약에 드러낸다.
         assertEquals(PostSortOrder.DISTANCE, search.captured.sort)
-        // 반경이 그대로 넘어간다 — 어댑터가 이 좌표로 거리를 재고 정렬한다.
         assertEquals(127.0, search.captured.area?.longitude)
+        verify(exactly = 0) { queryPort.findPosts(any()) }
+    }
+
+    @Test
+    fun `최신순은 공간 조회 포트를 쓰지 않는다`() {
+        givenBlocked()
+        captureSearch()
+
+        service.posts(query(latitude = 37.5, longitude = 127.0), memberId)
+
+        verify(exactly = 0) { spatialPort.findPostsByDistance(any()) }
     }
 
     // ---------- 조회수 ----------

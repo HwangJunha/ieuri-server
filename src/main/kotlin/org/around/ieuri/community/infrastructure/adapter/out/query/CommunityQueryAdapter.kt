@@ -27,7 +27,6 @@ import org.around.ieuri.community.application.query.PostSpotView
 import org.around.ieuri.community.application.query.PostView
 import org.around.ieuri.community.domain.vo.AppKey
 import org.around.ieuri.community.domain.vo.ContentLanguage
-import org.around.ieuri.community.domain.vo.PostSortOrder
 import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.CommentEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostEntity
@@ -59,7 +58,6 @@ import java.time.Instant
 @Component
 class CommunityQueryAdapter(
     private val queryFactory: JPAQueryFactory,
-    private val spatialQueryAdapter: PostSpatialQueryAdapter,
 ) : CommunityQueryPort {
 
     private val post = QPostEntity.postEntity
@@ -79,83 +77,24 @@ class CommunityQueryAdapter(
      * [PostsSearch.targets]가 null이면 대상으로 좁히지 않고, 빈 목록이면 결과도 비어 있다 —
      * 빈 `IN` 절은 SQL에서 유효하지 않으므로 조기 반환한다.
      */
+    /**
+     * 최신순 피드.
+     *
+     * **반경 조건을 걸지 않는다** — 장소 없이 쓴 글도 함께 담기 위함이며, 그러지 않으면
+     * 그런 글이 지역 피드에서 영원히 보이지 않는다. 거리순은 [PostSpatialQueryAdapter]다.
+     */
     @Transactional(readOnly = true)
     override fun findPosts(search: PostsSearch): CursorPage<PostView> =
-        when (search.sort) {
-            PostSortOrder.LATEST -> findPosts(
-                viewer = search.viewer,
-                first = search.first,
-                after = search.after,
-                extraConditions = listOfNotNull(
-                    spotCondition(search.spotId),
-                    // **반경은 LATEST에서 걸지 않는다** — 장소 없이 쓴 글도 함께 담기 위함이다.
-                    // 그러지 않으면 그런 글이 지역 피드에서 영원히 보이지 않는다.
-                    categoryCondition(search.category),
-                    tagCondition(search.normalizedTag),
-                ),
-            )
-
-            PostSortOrder.DISTANCE -> findPostsByDistance(search)
-        }
-
-    /**
-     * 거리순 피드. 반경·거리 정렬은 [PostSpatialQueryAdapter]가 생 SQL로 처리하고
-     (PostGIS 함수는 QueryDSL로 표현되지 않는다), 여기서는 그 id로 글을 읽어 나머지 필터를 건다.
-     *
-     * **두 단계로 나눈 이유**: geography 컬럼을 엔티티에 매핑할 수 없어(대응 Kotlin 타입이
-     * 없고, 매핑하면 ddl-auto=validate가 기동을 막는다) 반경 조건을 QueryDSL로 쓸 방법이 없다.
-     * map_x/map_y로 매번 점을 만들면 표현은 되지만 GiST 인덱스를 타지 못한다
-     * (실측: Seq Scan 389ms 대 Bitmap Index Scan 119ms).
-     *
-     * 공간 조회는 **차단·숨김을 모른다.** 그래서 넉넉히 읽고 여기서 다시 좁힌 뒤 잘라낸다 —
-     * 필터를 양쪽에 두면 한쪽만 고쳐지는 사고가 난다.
-     */
-    private fun findPostsByDistance(search: PostsSearch): CursorPage<PostView> {
-        val area = requireNotNull(search.area) { "거리순은 좌표를 준 경우에만 온다." }
-        val cursor = search.after?.let { decodeDistanceCursor(it) }
-
-        val spatialRows = spatialQueryAdapter.findPostIdsWithin(
-            area = area,
-            // 차단·숨김으로 걸러질 몫을 감안해 넉넉히 읽는다. 그래도 모자라면 그 페이지가
-            // 짧아질 뿐이며 hasNextPage가 false가 되어 조회가 끝난다.
-            limit = (search.first + 1) * SPATIAL_OVERFETCH,
-            afterDistanceMeters = cursor?.distanceMeters,
-            afterCreatedAtEpochMilli = cursor?.createdAt?.toEpochMilli(),
-            afterId = cursor?.id,
-        )
-        if (spatialRows.isEmpty()) {
-            return cursorPageOf(emptyList(), hasNextPage = false, hasPreviousPage = cursor != null)
-        }
-
-        val distanceByPostId = spatialRows.associate { it.postId to it.distanceMeters }
-        val visible = queryFactory
-            .selectFrom(post)
-            .where(
-                post.id.`in`(distanceByPostId.keys),
+        findPosts(
+            viewer = search.viewer,
+            first = search.first,
+            after = search.after,
+            extraConditions = listOfNotNull(
                 spotCondition(search.spotId),
                 categoryCondition(search.category),
                 tagCondition(search.normalizedTag),
-                visibleToViewer(search.viewer),
-            )
-            .fetch()
-            // 공간 조회가 정한 순서를 그대로 따른다 — 거리·최신·id 순이 이미 반영돼 있다.
-            .associateBy { requireNotNull(it.id) }
-
-        val ordered = spatialRows.mapNotNull { visible[it.postId] }
-        val hasNextPage = ordered.size > search.first
-        val edges = (if (hasNextPage) ordered.take(search.first) else ordered).map { entity ->
-            val postId = requireNotNull(entity.id)
-            CursorEdge(
-                cursor = encodeDistanceCursor(
-                    distanceMeters = requireNotNull(distanceByPostId[postId]),
-                    createdAt = requireNotNull(entity.createdAt),
-                    id = postId,
-                ),
-                node = entity.toPostView(search.viewer),
-            )
-        }
-        return cursorPageOf(edges, hasNextPage = hasNextPage, hasPreviousPage = cursor != null)
-    }
+            ),
+        )
 
     /**
      * 아래 셋은 **조건이 필요 없으면 null**을 돌려준다. QueryDSL의 where는 null을 무시하므로
@@ -551,27 +490,4 @@ class CommunityQueryAdapter(
             .toSet()
     }
 
-    /** community_post 한 행이 가진 것만 옮긴다. 나머지 필드는 DataLoader가 채운다. */
-    private fun PostEntity.toPostView(viewer: ViewerContext): PostView =
-        PostView(
-            id = requireNotNull(id),
-            title = title,
-            body = body,
-            authorId = authorId,
-            likeCount = likeCount,
-            commentCount = commentCount,
-            viewCount = viewCount,
-            ownedByViewer = authorId == viewer.memberId,
-            hidden = hidden,
-            edited = edited,
-            createdAt = requireNotNull(createdAt),
-        )
-
-    private companion object {
-        /**
-         * 공간 조회가 차단·숨김을 모르므로 그만큼 더 읽는다. 3배는 실측이 아니라 여유값이며,
-         * 모자라면 그 페이지가 짧아질 뿐 정합성이 깨지지는 않는다.
-         */
-        const val SPATIAL_OVERFETCH = 3
-    }
 }

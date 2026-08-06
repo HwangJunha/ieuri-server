@@ -9,6 +9,7 @@ import org.around.ieuri.community.application.port.out.event.CommunityEventPubli
 import org.around.ieuri.community.application.port.out.query.BlockedUsersSearch
 import org.around.ieuri.community.application.port.out.query.CommunityQueryPort
 import org.around.ieuri.community.application.port.out.query.PostCommentsSearch
+import org.around.ieuri.community.application.port.out.query.PostSpatialQueryPort
 import org.around.ieuri.community.application.port.out.query.PostsArea
 import org.around.ieuri.community.application.port.out.query.PostsSearch
 import org.around.ieuri.community.application.port.out.query.ViewerContext
@@ -39,6 +40,7 @@ import org.springframework.stereotype.Service
 @Service
 class CommunityQueryService(
     private val communityQueryPort: CommunityQueryPort,
+    private val postSpatialQueryPort: PostSpatialQueryPort,
     private val spotLookupPort: SpotLookupPort,
     private val eventPublisher: CommunityEventPublisherPort,
     private val policy: CommunityPolicy,
@@ -48,20 +50,24 @@ class CommunityQueryService(
      * 글 피드. **인자 조합이 범위를 정한다** — 장소 하나, 좌표 반경, 카테고리, 또는 전체다.
      * 정렬·페이징·모더레이션 필터는 모든 경우가 같다.
      */
-    override fun posts(query: PostsQuery, memberId: Long): CursorPage<PostView> =
-        communityQueryPort.findPosts(
-            PostsSearch(
-                spotId = query.spotId,
-                area = resolveArea(query),
-                category = query.category,
-                // 태그는 정규화해 넘긴다 — 대소문자·선행 #을 가리지 않게 하려는 것이다.
-                normalizedTag = query.tag?.let { PostTag.parseOrNull(it)?.normalized },
-                sort = effectiveSort(query),
-                first = clampPageSize(query.first),
-                after = query.after,
-                viewer = viewerContext(memberId),
-            ),
+    override fun posts(query: PostsQuery, memberId: Long): CursorPage<PostView> {
+        val search = PostsSearch(
+            spotId = query.spotId,
+            area = resolveArea(query),
+            category = query.category,
+            // 태그는 정규화해 넘긴다 — 대소문자·선행 #을 가리지 않게 하려는 것이다.
+            normalizedTag = query.tag?.let { PostTag.parseOrNull(it)?.normalized },
+            sort = effectiveSort(query),
+            first = clampPageSize(query.first),
+            after = query.after,
+            viewer = viewerContext(memberId),
         )
+        // **정렬에 따라 포트가 갈린다** — 거리순은 PostGIS라 구현 기술이 다르다.
+        return when (search.sort) {
+            PostSortOrder.LATEST -> communityQueryPort.findPosts(search)
+            PostSortOrder.DISTANCE -> postSpatialQueryPort.findPostsByDistance(search)
+        }
+    }
 
     /**
      * 좌표가 없으면 거리를 잴 기준이 없어 **거리순 요청도 최신순으로 떨어진다.**

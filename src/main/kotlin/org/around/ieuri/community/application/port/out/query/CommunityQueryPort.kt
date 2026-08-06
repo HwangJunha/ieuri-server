@@ -15,6 +15,10 @@ import org.around.ieuri.community.domain.vo.PostTag
  * 커뮤니티 읽기 아웃바운드 포트(CQRS 읽기). 애그리게이트를 우회해 필요한 값만 프로젝션한다.
  */
 interface CommunityQueryPort {
+    /**
+     * 최신순 피드. **거리순은 [PostSpatialQueryPort]가 담당한다** — PostGIS 함수를 QueryDSL로
+     * 표현할 수 없어 구현 기술이 갈리며, 포트를 나눠 그 사실을 계약에 드러낸다.
+     */
     fun findPosts(search: PostsSearch): CursorPage<PostView>
 
     /** 글 단건. 피드와 같은 모더레이션 필터를 거치며, 걸러지면 null이다. */
@@ -84,6 +88,28 @@ interface CommunityQueryPort {
 
     /** 앱의 켜진 칩만 순서대로. 구성이 없으면 빈 목록이다. */
     fun findChips(appKey: AppKey, language: ContentLanguage): List<CommunityChipView>
+}
+
+/**
+ * 거리순 피드 전용 읽기 포트.
+ *
+ * **별도 포트인 이유는 구현 기술이 다르기 때문이다.** 반경 조건과 거리 정렬은 PostGIS
+ * 함수인데 QueryDSL로 표현되지 않고, `location`(geography)은 대응하는 Kotlin 타입이 없어
+ * 엔티티에 매핑조차 할 수 없다 — 매핑하면 ddl-auto=validate가 기동을 막는다.
+ * map_x/map_y로 매번 점을 만들어 우회하면 GiST 인덱스를 타지 못한다
+ * (실측: Seq Scan 389ms 대 Index Scan 0.3ms).
+ *
+ * 포트를 나눠 두면 application이 어댑터끼리 몰래 엮이는 대신 이 계약만 보고 쓴다.
+ */
+interface PostSpatialQueryPort {
+    /**
+     * 반경 안의 글을 **가까운 순으로** 한 페이지. 같은 거리면 최신순이다.
+     *
+     * 모더레이션·카테고리·태그 필터를 **이 조회가 함께 건다** — 일부만 걸고 나머지를 뒤에서
+     * 거르면 요청한 개수를 채우려고 넉넉히 읽어야 하고, 그때 몇 배를 읽을지가 근거 없는
+     * 상수가 된다. 한 번에 거르면 요청 개수가 곧 정확한 페이지 크기다.
+     */
+    fun findPostsByDistance(search: PostsSearch): CursorPage<PostView>
 }
 
 /**
