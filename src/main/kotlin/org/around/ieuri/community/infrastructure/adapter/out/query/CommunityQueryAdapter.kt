@@ -59,6 +59,7 @@ import java.time.Instant
 @Component
 class CommunityQueryAdapter(
     private val queryFactory: JPAQueryFactory,
+    private val spatialQueryAdapter: PostSpatialQueryAdapter,
 ) : CommunityQueryPort {
 
     private val post = QPostEntity.postEntity
@@ -70,6 +71,7 @@ class CommunityQueryAdapter(
     private val postChip = QPostChipEntity.postChipEntity
     private val postSpot = QPostSpotEntity.postSpotEntity
     private val block = QBlockEntity.blockEntity
+
 
     /**
      * 글 피드. 대상 범위만 다르고 정렬·페이징·모더레이션 필터는 세 경우가 같다.
@@ -97,91 +99,63 @@ class CommunityQueryAdapter(
         }
 
     /**
-     * 거리순 피드. **반경 조건과 정렬을 글 조회에 직접 건다** — 좌표를 연결 행에 복사해 둔
-     * 덕분이며, tourism에 spot 목록을 되묻지 않으므로 그 목록의 상한이 사라졌다.
+     * 거리순 피드. 반경·거리 정렬은 [PostSpatialQueryAdapter]가 생 SQL로 처리하고
+     (PostGIS 함수는 QueryDSL로 표현되지 않는다), 여기서는 그 id로 글을 읽어 나머지 필터를 건다.
      *
-     * 커서는 거리와 (createdAt, id)를 함께 담는 키셋이다. 거리가 실제 값이라 오프셋을 쓰지
-     * 않아도 되고, 그래서 페이징 도중 글이 추가돼도 항목이 밀리지 않는다.
+     * **두 단계로 나눈 이유**: geography 컬럼을 엔티티에 매핑할 수 없어(대응 Kotlin 타입이
+     * 없고, 매핑하면 ddl-auto=validate가 기동을 막는다) 반경 조건을 QueryDSL로 쓸 방법이 없다.
+     * map_x/map_y로 매번 점을 만들면 표현은 되지만 GiST 인덱스를 타지 못한다
+     * (실측: Seq Scan 389ms 대 Bitmap Index Scan 119ms).
+     *
+     * 공간 조회는 **차단·숨김을 모른다.** 그래서 넉넉히 읽고 여기서 다시 좁힌 뒤 잘라낸다 —
+     * 필터를 양쪽에 두면 한쪽만 고쳐지는 사고가 난다.
      */
     private fun findPostsByDistance(search: PostsSearch): CursorPage<PostView> {
         val area = requireNotNull(search.area) { "거리순은 좌표를 준 경우에만 온다." }
         val cursor = search.after?.let { decodeDistanceCursor(it) }
-        val distance = distanceExpression(area)
 
-        val rows = queryFactory
-            .select(post, distance)
-            .from(post)
-            // 장소가 있는 글만 거리를 가진다 — inner join이 곧 그 필터다.
-            .join(postSpot).on(postSpot.postId.eq(post.id))
+        val spatialRows = spatialQueryAdapter.findPostIdsWithin(
+            area = area,
+            // 차단·숨김으로 걸러질 몫을 감안해 넉넉히 읽는다. 그래도 모자라면 그 페이지가
+            // 짧아질 뿐이며 hasNextPage가 false가 되어 조회가 끝난다.
+            limit = (search.first + 1) * SPATIAL_OVERFETCH,
+            afterDistanceMeters = cursor?.distanceMeters,
+            afterCreatedAtEpochMilli = cursor?.createdAt?.toEpochMilli(),
+            afterId = cursor?.id,
+        )
+        if (spatialRows.isEmpty()) {
+            return cursorPageOf(emptyList(), hasNextPage = false, hasPreviousPage = cursor != null)
+        }
+
+        val distanceByPostId = spatialRows.associate { it.postId to it.distanceMeters }
+        val visible = queryFactory
+            .selectFrom(post)
             .where(
-                withinRadius(area),
+                post.id.`in`(distanceByPostId.keys),
                 spotCondition(search.spotId),
                 categoryCondition(search.category),
                 tagCondition(search.normalizedTag),
                 visibleToViewer(search.viewer),
-                cursor?.let { distanceKeysetCondition(distance, it) },
             )
-            // 같은 거리의 글끼리는 최신순이다. id까지 넣어야 순서가 요청마다 흔들리지 않는다.
-            .orderBy(
-                OrderSpecifier(Order.ASC, distance),
-                post.createdAt.desc(),
-                post.id.desc(),
-            )
-            .limit((search.first + 1).toLong())
             .fetch()
+            // 공간 조회가 정한 순서를 그대로 따른다 — 거리·최신·id 순이 이미 반영돼 있다.
+            .associateBy { requireNotNull(it.id) }
 
-        val hasNextPage = rows.size > search.first
-        val edges = (if (hasNextPage) rows.take(search.first) else rows).map { row ->
-            val entity = requireNotNull(row.get(post))
+        val ordered = spatialRows.mapNotNull { visible[it.postId] }
+        val hasNextPage = ordered.size > search.first
+        val edges = (if (hasNextPage) ordered.take(search.first) else ordered).map { entity ->
+            val postId = requireNotNull(entity.id)
             CursorEdge(
                 cursor = encodeDistanceCursor(
-                    distanceMeters = requireNotNull(row.get(distance)),
+                    distanceMeters = requireNotNull(distanceByPostId[postId]),
                     createdAt = requireNotNull(entity.createdAt),
-                    id = requireNotNull(entity.id),
+                    id = postId,
                 ),
                 node = entity.toPostView(search.viewer),
             )
         }
         return cursorPageOf(edges, hasNextPage = hasNextPage, hasPreviousPage = cursor != null)
     }
-
-    /**
-     * 커서 이후로 넘어간다. 정렬이 (거리 오름차순, 생성일 내림차순, id 내림차순)이므로
-     * 비교도 그 순서다 — JPQL에 행 값 생성자가 없어 OR로 편다.
-     */
-    private fun distanceKeysetCondition(
-        distance: NumberExpression<Double>,
-        cursor: DistanceCursor,
-    ): BooleanExpression =
-        distance.gt(cursor.distanceMeters)
-            .or(
-                distance.eq(cursor.distanceMeters).and(
-                    post.createdAt.lt(cursor.createdAt).or(
-                        post.createdAt.eq(cursor.createdAt).and(post.id.lt(cursor.id)),
-                    ),
-                ),
-            )
-
-    /**
-     * 중심에서의 거리(미터). PostGIS 함수라 QueryDSL로 표현되지 않아 템플릿으로 부른다 —
-     * 이 표현식만 예외이고 나머지 조건은 전부 타입 안전하다.
-     */
-    private fun distanceExpression(area: PostsArea): NumberExpression<Double> =
-        Expressions.numberTemplate(
-            Double::class.java,
-            "st_distance({0}, st_makepoint({1}, {2}))",
-            postSpot.location, area.longitude, area.latitude,
-        )
-
-    /**
-     * 반경 필터는 반드시 `ST_DWithin`이다 — `ST_Distance(...) <= radius`로 쓰면 전 행을
-     * 계산해 GiST 인덱스를 타지 못한다.
-     */
-    private fun withinRadius(area: PostsArea): BooleanExpression =
-        Expressions.booleanTemplate(
-            "st_dwithin({0}, st_makepoint({1}, {2}), {3})",
-            postSpot.location, area.longitude, area.latitude, area.radiusMeters.toDouble(),
-        )
 
     /**
      * 아래 셋은 **조건이 필요 없으면 null**을 돌려준다. QueryDSL의 where는 null을 무시하므로
@@ -592,4 +566,12 @@ class CommunityQueryAdapter(
             edited = edited,
             createdAt = requireNotNull(createdAt),
         )
+
+    private companion object {
+        /**
+         * 공간 조회가 차단·숨김을 모르므로 그만큼 더 읽는다. 3배는 실측이 아니라 여유값이며,
+         * 모자라면 그 페이지가 짧아질 뿐 정합성이 깨지지는 않는다.
+         */
+        const val SPATIAL_OVERFETCH = 3
+    }
 }

@@ -366,14 +366,10 @@ class PostSpotEntity(
     @Column(name = "map_y", nullable = false)
     var mapY: Double,
 
-    /**
-     * map_x/map_y에서 트리거가 파생시키는 geography 값. **읽기 전용이다** —
-     * 쓰기는 트리거가 하고, 여기서는 반경 조건·거리 정렬이 참조할 경로만 필요하다.
-     * 타입을 String으로 두는 이유는 JPA가 PostGIS 타입을 몰라도 되게 하려는 것이며,
-     * 값을 실제로 읽어 쓰는 곳은 없다.
-     */
-    @Column(name = "location", insertable = false, updatable = false)
-    var location: String? = null,
+    // location(geography)은 **매핑하지 않는다.** 트리거가 map_x/map_y에서 파생시키므로
+    // 애플리케이션이 쓸 일이 없고, 매핑하면 Hibernate가 PostGIS 타입을 검증하려 들어
+    // ddl-auto=validate가 기동을 막는다(엔티티에 맞는 Kotlin 타입이 없다).
+    // 반경 조건·거리 정렬은 QueryDSL 템플릿이 컬럼 이름을 직접 쓴다.
 
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant? = null,
