@@ -56,6 +56,14 @@ interface CommunityQueryPort {
      */
     fun findLikedPostIds(memberId: Long, postIds: List<Long>): Set<Long>
 
+    /**
+     * 갱신된 좋아요 수. 카운터를 원자적으로 올린 **뒤** 읽는다 — 쓰기가 애그리게이트를 거치지
+     * 않으므로 갱신값이 커맨드의 반환으로 따라오지 않기 때문이다.
+     *
+     * 글이 없으면 null. 커맨드가 방금 갱신한 직후라 실제로는 항상 존재한다.
+     */
+    fun findLikeCount(postId: Long): Int?
+
     fun findBlockedUsers(search: BlockedUsersSearch): CursorPage<BlockedUserView>
 
     /**

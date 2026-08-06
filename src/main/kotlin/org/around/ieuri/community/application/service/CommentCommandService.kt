@@ -10,7 +10,8 @@ import org.around.ieuri.community.application.exception.PostNotFoundException
 import org.around.ieuri.community.application.port.`in`.command.CommentCommandUseCase
 import org.around.ieuri.community.application.port.out.client.ClockPort
 import org.around.ieuri.community.application.port.out.persistence.CommentRepositoryPort
-import org.around.ieuri.community.application.port.out.persistence.PostRepositoryPort
+import org.around.ieuri.community.application.port.out.persistence.PostCounterPort
+import org.around.ieuri.community.application.port.out.persistence.PostModerationPort
 import org.around.ieuri.community.domain.aggregate.Comment
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -24,7 +25,8 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class CommentCommandService(
     private val commentRepositoryPort: CommentRepositoryPort,
-    private val postRepositoryPort: PostRepositoryPort,
+    private val postCounterPort: PostCounterPort,
+    private val postModerationPort: PostModerationPort,
     private val clockPort: ClockPort,
 ) : CommentCommandUseCase {
 
@@ -35,13 +37,13 @@ class CommentCommandService(
         if (body.isEmpty()) throw CommentBodyRequiredException()
         if (body.length > Comment.BODY_MAX_LENGTH) throw CommentBodyLengthInvalidException()
 
-        val post = postRepositoryPort.findById(command.postId) ?: throw PostNotFoundException()
+        // 존재 확인만 필요하다 — 애그리게이트를 복원하면 태그·사진까지 읽는다.
+        if (!postModerationPort.exists(command.postId)) throw PostNotFoundException()
 
         val saved = commentRepositoryPort.save(
             Comment.create(postId = command.postId, authorId = memberId, body = body),
         )
-        post.increaseCommentCount()
-        postRepositoryPort.save(post)
+        postCounterPort.increaseCommentCount(command.postId)
 
         return requireNotNull(saved.id) { "저장된 댓글에는 id가 있어야 한다." }
     }
@@ -55,11 +57,7 @@ class CommentCommandService(
         if (!comment.deleteBy(memberId, clockPort.now())) throw NotCommentOwnerException()
         commentRepositoryPort.save(comment)
 
-        if (countedBeforeDelete) {
-            postRepositoryPort.findById(comment.postId)?.let {
-                it.decreaseCommentCount()
-                postRepositoryPort.save(it)
-            }
-        }
+        // 0 아래로 내려가지 않는 것은 어댑터의 조건절이 보장한다.
+        if (countedBeforeDelete) postCounterPort.decreaseCommentCount(comment.postId)
     }
 }

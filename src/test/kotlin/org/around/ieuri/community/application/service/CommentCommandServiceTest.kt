@@ -12,10 +12,9 @@ import org.around.ieuri.community.application.exception.NotCommentOwnerException
 import org.around.ieuri.community.application.exception.PostNotFoundException
 import org.around.ieuri.community.application.port.out.client.ClockPort
 import org.around.ieuri.community.application.port.out.persistence.CommentRepositoryPort
-import org.around.ieuri.community.application.port.out.persistence.PostRepositoryPort
+import org.around.ieuri.community.application.port.out.persistence.PostCounterPort
+import org.around.ieuri.community.application.port.out.persistence.PostModerationPort
 import org.around.ieuri.community.domain.aggregate.Comment
-import org.around.ieuri.community.domain.aggregate.Post
-import org.around.ieuri.community.domain.vo.TargetCategory
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -35,17 +34,17 @@ class CommentCommandServiceTest {
     private val now = Instant.parse("2026-08-05T00:00:00Z")
 
     private val commentRepository = mockk<CommentRepositoryPort>()
-    private val postRepository = mockk<PostRepositoryPort>()
+    private val counterPort = mockk<PostCounterPort>(relaxed = true)
+    private val moderationPort = mockk<PostModerationPort>()
     private val clock = mockk<ClockPort> { every { now() } returns now }
 
-    private val service = CommentCommandService(commentRepository, postRepository, clock)
-
-    private fun post(commentCount: Int) = Post.restore(
-        id = postId, category = TargetCategory.TOURIST_SPOT,
-        spotId = 1L, authorId = 99L, tags = emptyList(),
-        title = "제목", body = "본문", photoKeys = emptyList(), likeCount = 0, commentCount = commentCount,
-        hidden = false, deletedAt = null, createdAt = now,
+    private val service = CommentCommandService(
+        commentRepository, counterPort, moderationPort, clock,
     )
+
+    private fun givenPostExists(exists: Boolean = true) {
+        every { moderationPort.exists(postId) } returns exists
+    }
 
     private fun comment(authorId: Long = memberId, hidden: Boolean = false) = Comment.restore(
         id = commentId, postId = postId, authorId = authorId, body = "댓글",
@@ -64,13 +63,13 @@ class CommentCommandServiceTest {
 
     @Test
     fun `댓글을 달면 글의 댓글 수가 1 증가한다`() {
-        val parent = post(commentCount = 0)
-        every { postRepository.findById(postId) } returns parent
-        every { postRepository.save(any()) } returns parent
+        givenPostExists()
         givenSaveEchoesBackWithId()
 
         assertEquals(commentId, service.createComment(CreateCommentCommand(postId, "댓글"), memberId))
-        assertEquals(1, parent.commentCount)
+
+        // 계수는 DB가 원자적으로 올린다 — 애그리게이트를 복원하지 않는다.
+        verify(exactly = 1) { counterPort.increaseCommentCount(postId) }
     }
 
     @Test
@@ -86,7 +85,7 @@ class CommentCommandServiceTest {
 
     @Test
     fun `존재하지 않는 글에는 댓글을 달 수 없다`() {
-        every { postRepository.findById(postId) } returns null
+        givenPostExists(exists = false)
 
         assertFailsWith<PostNotFoundException> {
             service.createComment(CreateCommentCommand(postId, "댓글"), memberId)
@@ -97,48 +96,39 @@ class CommentCommandServiceTest {
     @Test
     fun `본인 댓글을 삭제하면 글의 댓글 수가 1 감소한다`() {
         val target = comment()
-        val parent = post(commentCount = 3)
         every { commentRepository.findById(commentId) } returns target
         every { commentRepository.save(any()) } returns target
-        every { postRepository.findById(postId) } returns parent
-        every { postRepository.save(any()) } returns parent
 
         service.deleteComment(DeleteCommentCommand(commentId), memberId)
 
         assertTrue(target.deleted)
-        assertEquals(2, parent.commentCount)
+        verify(exactly = 1) { counterPort.decreaseCommentCount(postId) }
     }
 
     @Test
     fun `이미 숨겨진 댓글을 삭제해도 댓글 수는 그대로다 - 숨김 시점에 이미 내렸다`() {
         val target = comment(hidden = true)
-        val parent = post(commentCount = 3)
         every { commentRepository.findById(commentId) } returns target
         every { commentRepository.save(any()) } returns target
-        every { postRepository.findById(postId) } returns parent
 
         service.deleteComment(DeleteCommentCommand(commentId), memberId)
 
         assertTrue(target.deleted)
-        assertEquals(3, parent.commentCount)
         // 두 번 내리면 숫자가 실제보다 작아진다.
-        verify(exactly = 0) { postRepository.save(any()) }
+        verify(exactly = 0) { counterPort.decreaseCommentCount(any()) }
     }
 
     @Test
     fun `타인의 댓글은 삭제할 수 없고 댓글 수도 변하지 않는다`() {
         val target = comment(authorId = memberId + 1)
-        val parent = post(commentCount = 3)
         every { commentRepository.findById(commentId) } returns target
-        every { postRepository.findById(postId) } returns parent
 
         assertFailsWith<NotCommentOwnerException> {
             service.deleteComment(DeleteCommentCommand(commentId), memberId)
         }
         assertFalse(target.deleted)
-        assertEquals(3, parent.commentCount)
         verify(exactly = 0) { commentRepository.save(any()) }
-        verify(exactly = 0) { postRepository.save(any()) }
+        verify(exactly = 0) { counterPort.decreaseCommentCount(any()) }
     }
 
     @Test

@@ -96,7 +96,7 @@ class CommunityQueryAdapter(
         if (search.normalizedTag != null) {
             // 태그가 붙은 글만. 서브쿼리로 걸어 조인이 행을 늘리지 않게 한다.
             conditions += post.id.`in`(
-                JPAExpressions.select(tag.post.id)
+                JPAExpressions.select(tag.postId)
                     .from(tag)
                     .where(tag.normalized.eq(search.normalizedTag)),
             )
@@ -189,6 +189,15 @@ class CommunityQueryAdapter(
         }
         return previews
     }
+
+    /** 커맨드가 원자적으로 갱신한 뒤 읽는다 — 쓰기가 애그리게이트를 거치지 않기 때문이다. */
+    @Transactional(readOnly = true)
+    override fun findLikeCount(postId: Long): Int? =
+        queryFactory
+            .select(post.likeCount)
+            .from(post)
+            .where(post.id.eq(postId))
+            .fetchOne()
 
     @Transactional(readOnly = true)
     override fun findBlockedUsers(search: BlockedUsersSearch): CursorPage<BlockedUserView> {
@@ -386,15 +395,15 @@ class CommunityQueryAdapter(
         if (postIds.isEmpty()) return emptyMap()
 
         val rows = queryFactory
-            .select(tag.post.id, tag.name)
+            .select(tag.postId, tag.name)
             .from(tag)
-            .where(tag.post.id.`in`(postIds))
+            .where(tag.postId.`in`(postIds))
             .orderBy(tag.id.asc())
             .fetch()
 
         val grouped = mutableMapOf<Long, MutableList<String>>()
         for (row in rows) {
-            val postId = requireNotNull(row.get(tag.post.id))
+            val postId = requireNotNull(row.get(tag.postId))
             grouped.getOrPut(postId) { mutableListOf() } += requireNotNull(row.get(tag.name))
         }
         return grouped
@@ -406,15 +415,15 @@ class CommunityQueryAdapter(
         if (postIds.isEmpty()) return emptyMap()
 
         val rows = queryFactory
-            .select(photo.post.id, photo.objectKey)
+            .select(photo.postId, photo.objectKey)
             .from(photo)
-            .where(photo.post.id.`in`(postIds))
+            .where(photo.postId.`in`(postIds))
             .orderBy(photo.position.asc())
             .fetch()
 
         val grouped = mutableMapOf<Long, MutableList<String>>()
         for (row in rows) {
-            val postId = requireNotNull(row.get(photo.post.id))
+            val postId = requireNotNull(row.get(photo.postId))
             grouped.getOrPut(postId) { mutableListOf() } += requireNotNull(row.get(photo.objectKey))
         }
         return grouped

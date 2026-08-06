@@ -1,7 +1,7 @@
 package org.around.ieuri.community.infrastructure.adapter.out.event
 
 import org.around.ieuri.community.application.event.PostViewed
-import org.around.ieuri.community.application.port.out.persistence.PostViewCountPort
+import org.around.ieuri.community.application.port.out.persistence.PostCounterPort
 import org.slf4j.LoggerFactory
 import org.springframework.context.event.EventListener
 import org.springframework.scheduling.annotation.Async
@@ -21,7 +21,7 @@ import org.springframework.stereotype.Component
  */
 @Component
 class PostViewCountListener(
-    private val viewCountPort: PostViewCountPort,
+    private val postCounterPort: PostCounterPort,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -29,7 +29,7 @@ class PostViewCountListener(
     @EventListener
     fun on(event: PostViewed) {
         try {
-            viewCountPort.increase(event.postId)
+            postCounterPort.increaseViewCount(event.postId)
         } catch (e: Exception) {
             // DB 장애 등. 조회수는 근사치라 재시도하지 않는다.
             log.warn("post view count increase failed: postId={}", event.postId, e)

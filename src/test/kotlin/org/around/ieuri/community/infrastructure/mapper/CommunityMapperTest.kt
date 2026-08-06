@@ -3,6 +3,7 @@ package org.around.ieuri.community.infrastructure.mapper
 import org.around.ieuri.community.domain.aggregate.Block
 import org.around.ieuri.community.domain.aggregate.Comment
 import org.around.ieuri.community.domain.aggregate.Post
+import org.around.ieuri.community.domain.vo.PostTag
 import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.domain.aggregate.PostLike
 import org.around.ieuri.community.domain.aggregate.Report
@@ -14,8 +15,12 @@ import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostLikeEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostPhotoEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostTagEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toDomain
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toNewEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toPhotoEntities
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toPhotoKey
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toPostTag
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.Test
@@ -46,14 +51,24 @@ class CommunityMapperTest {
             createdAt = createdAt,
             updatedAt = Instant.parse("2026-08-07T00:00:00Z"),
         )
-        val uuid = UUID.randomUUID()
-        entity.photos = mutableListOf(
-            PostPhotoEntity(post = entity, objectKey = "images/3/$uuid", position = 0),
+        val key = PhotoObjectKey.issue(3L, UUID.randomUUID()).toConfirmed()
+        val tag = PostTag.restore("야경", "야경")
+
+        // 태그·사진은 별도 테이블이라 **호출자가 읽어 넘긴다** — 엔티티에 컬렉션을 두면
+        // 글을 읽을 때마다 자식 조회가 따라붙는다.
+        val domain = entity.toDomain(
+            category = TargetCategory.TOURIST_SPOT,
+            spotId = 9L,
+            tags = listOf(tag),
+            photoKeys = listOf(key),
         )
-        val domain = entity.toDomain(category = TargetCategory.TOURIST_SPOT, spotId = null)
 
         assertEquals(1L, domain.id)
-        
+        assertEquals(TargetCategory.TOURIST_SPOT, domain.category)
+        assertEquals(9L, domain.spotId)
+        assertEquals(listOf(tag), domain.tags)
+        assertEquals(listOf(key), domain.photoKeys)
+        assertEquals("제목", domain.title)
         assertEquals(3L, domain.authorId)
         assertEquals("본문", domain.body)
         assertEquals(4, domain.likeCount)
@@ -61,29 +76,43 @@ class CommunityMapperTest {
         assertEquals(true, domain.hidden)
         assertEquals(deletedAt, domain.deletedAt)
         assertEquals(createdAt, domain.createdAt)
-        assertEquals(listOf("images/3/$uuid"), domain.photoKeys.map { it.value })
     }
 
     @Test
-    fun `글 사진은 position 순서대로 옮겨진다`() {
-        val entity = PostEntity(
-            id = 1L, authorId = 3L,
-            title = "제목", body = "본문",
-            createdAt = createdAt, updatedAt = createdAt,
-        )
-        val first = UUID.randomUUID()
-        val second = UUID.randomUUID()
-        // 일부러 뒤섞어 담는다 — 정렬이 빠지면 실패한다.
-        entity.photos = mutableListOf(
-            PostPhotoEntity(post = entity, objectKey = "images/3/$second", position = 1),
-            PostPhotoEntity(post = entity, objectKey = "images/3/$first", position = 0),
+    fun `사진 엔티티는 배열 순서대로 position을 받는다`() {
+        val keyA = PhotoObjectKey.issue(3L, UUID.randomUUID()).toConfirmed()
+        val keyB = PhotoObjectKey.issue(3L, UUID.randomUUID()).toConfirmed()
+        val domain = Post.create(
+            category = TargetCategory.TOURIST_SPOT,
+            spotId = 2L, authorId = 3L, tags = emptyList(),
+            title = "제목", body = "본문", photoKeys = listOf(keyA, keyB),
         )
 
-        assertEquals(
-            listOf("images/3/$first", "images/3/$second"),
-            entity.toDomain(category = TargetCategory.TOURIST_SPOT, spotId = null)
-                .photoKeys.map { it.value },
-        )
+        val photos = domain.toPhotoEntities(postId = 1L)
+
+        // 배열 순서가 곧 표시 순서다. 읽을 때의 정렬은 리포지토리 쿼리가 보장한다.
+        assertEquals(listOf(keyA.value, keyB.value), photos.map { it.objectKey })
+        assertEquals(listOf<Short>(0, 1), photos.map { it.position })
+        assertEquals(listOf(1L, 1L), photos.map { it.postId })
+    }
+
+    @Test
+    fun `사진 키 문자열이 도메인 키로 옮겨진다`() {
+        val key = PhotoObjectKey.issue(3L, UUID.randomUUID()).toConfirmed()
+        val entity = PostPhotoEntity(postId = 1L, objectKey = key.value, position = 0)
+
+        assertEquals(key, entity.toPhotoKey())
+    }
+
+    @Test
+    fun `태그 엔티티가 도메인 태그로 옮겨진다`() {
+        val entity = PostTagEntity(postId = 1L, name = "Seoul", normalized = "seoul")
+
+        val tag = entity.toPostTag()
+
+        // 표기는 원문 보존, 매칭은 정규화된 값이다.
+        assertEquals("Seoul", tag.name)
+        assertEquals("seoul", tag.normalized)
     }
 
     @Test
@@ -94,14 +123,22 @@ class CommunityMapperTest {
             deletedAt = null, createdAt = createdAt, updatedAt = createdAt,
         )
 
-        val domain = entity.toDomain(category = TargetCategory.TOURIST_SPOT, spotId = null)
+        val domain = entity.toDomain(
+            category = TargetCategory.TOURIST_SPOT,
+            spotId = null,
+            tags = emptyList(),
+            photoKeys = emptyList(),
+        )
 
         assertNull(domain.deletedAt)
+        // 장소는 선택이라 없는 것이 정상이다.
+        assertNull(domain.spotId)
         assertTrue(domain.photoKeys.isEmpty())
+        assertTrue(domain.tags.isEmpty())
     }
 
     @Test
-    fun `도메인 글이 새 엔티티로 필드마다 옮겨지고 사진에 순서가 부여된다`() {
+    fun `도메인 글이 새 엔티티로 필드마다 옮겨진다`() {
         val keyA = PhotoObjectKey.issue(3L, UUID.randomUUID()).toConfirmed()
         val keyB = PhotoObjectKey.issue(3L, UUID.randomUUID()).toConfirmed()
         val domain = Post.create(
@@ -119,10 +156,6 @@ class CommunityMapperTest {
         assertEquals(0, entity.commentCount)
         assertEquals(false, entity.hidden)
         assertNull(entity.deletedAt)
-        assertEquals(listOf(keyA.value, keyB.value), entity.photos.map { it.objectKey })
-        assertEquals(listOf<Short>(0, 1), entity.photos.map { it.position })
-        // 사진은 부모를 역참조해야 FK가 채워진다.
-        assertTrue(entity.photos.all { it.post === entity })
     }
 
     @Test

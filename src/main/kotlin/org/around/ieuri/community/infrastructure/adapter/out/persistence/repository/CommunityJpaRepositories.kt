@@ -6,6 +6,8 @@ import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostChipEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostLikeEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostPhotoEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostTagEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostSpotEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.ReportEntity
 import org.springframework.data.jpa.repository.JpaRepository
@@ -17,6 +19,19 @@ import org.springframework.data.jpa.repository.JpaRepository
 
 interface PostJpaRepository : JpaRepository<PostEntity, Long> {
     fun findByIdAndDeletedAtIsNull(id: Long): PostEntity?
+}
+
+/** 글의 사진. position 순서가 표시 순서다. */
+interface PostPhotoJpaRepository : JpaRepository<PostPhotoEntity, Long> {
+    fun findByPostIdOrderByPositionAsc(postId: Long): List<PostPhotoEntity>
+
+    /** 사진 교체 시 기존 행을 지운다. 지운 행 수는 쓰지 않는다. */
+    fun deleteByPostId(postId: Long): Long
+}
+
+/** 글의 태그. 입력 순서를 id 순서가 보존한다. */
+interface PostTagJpaRepository : JpaRepository<PostTagEntity, Long> {
+    fun findByPostIdOrderByIdAsc(postId: Long): List<PostTagEntity>
 }
 
 /** 글 ↔ 카테고리. PK가 post_id라 findById가 곧 글 단위 조회다. */

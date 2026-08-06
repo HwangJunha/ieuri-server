@@ -111,6 +111,19 @@ class Post private constructor(
         return true
     }
 
+    /**
+     * 사진을 **전체 목록으로 교체한다.** 빠진 키는 글에서 떨어지고 새 키는 붙는다.
+     *
+     * 떨어진 사진의 오브젝트는 스토리지에 남는다 — 지우는 것은 클라이언트가 deletePostImage로
+     * 할 일이다. 여기서 지우면 같은 키를 다른 글이 쓰고 있을 때 그 글의 사진이 깨진다.
+     */
+    fun replacePhotos(newPhotoKeys: List<PhotoObjectKey>) {
+        require(newPhotoKeys.size <= MAX_PHOTOS) { "사진은 최대 ${MAX_PHOTOS}장입니다." }
+        require(newPhotoKeys.all { it.ownedBy(authorId) }) { "본인에게 발급된 사진 키가 아닙니다." }
+        require(newPhotoKeys.all { it.confirmed }) { "업로드 확인을 마치지 않은 사진 키입니다." }
+        photoKeys = newPhotoKeys
+    }
+
     /** 신고 누적으로 숨긴다. 이미 숨겨진 글에 다시 불려도 안전하다. */
     fun hide() {
         hidden = true

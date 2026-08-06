@@ -1,19 +1,12 @@
 package org.around.ieuri.community.infrastructure.adapter.out.persistence.entity
 
-import jakarta.persistence.CascadeType
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
-import jakarta.persistence.FetchType
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
-import jakarta.persistence.JoinColumn
-import jakarta.persistence.MapsId
-import jakarta.persistence.OneToMany
-import jakarta.persistence.OneToOne
-import jakarta.persistence.OrderBy
 import jakarta.persistence.PrePersist
 import jakarta.persistence.PreUpdate
 import jakarta.persistence.Table
@@ -68,32 +61,14 @@ class PostEntity(
     @Column(name = "deleted_at")
     var deletedAt: Instant? = null,
 
-    /**
-     * 사진은 글의 일부이고 순서가 계약이라 애그리게이트 내부 컬렉션으로 둔다.
-     * 글 없이 존재할 수 없으므로 cascade + orphanRemoval이 맞다.
-     */
-    @OneToMany(
-        mappedBy = "post",
-        cascade = [CascadeType.ALL],
-        orphanRemoval = true,
-        fetch = FetchType.LAZY,
-    )
-    @OrderBy("position ASC")
-    var photos: MutableList<PostPhotoEntity> = mutableListOf(),
-
-    /** 사용자가 입력한 태그. 글과 함께 적재·삭제된다. */
-    @OneToMany(
-        mappedBy = "post",
-        cascade = [CascadeType.ALL],
-        orphanRemoval = true,
-        fetch = FetchType.LAZY,
-    )
-    var tags: MutableList<PostTagEntity> = mutableListOf(),
-
-    // 카테고리·장소 연결(community_post_chip·community_post_spot)은 **연관으로 두지 않는다.**
-    // nullable @OneToOne(mappedBy)은 lazy가 될 수 없다 — 프록시를 줄지 null을 줄지 정하려고
-    // Hibernate가 행마다 SELECT를 날려, FetchType.LAZY를 붙여도 피드 한 페이지에 N+1이 생긴다.
-    // 적재는 PostChipRepository·PostSpotRepository가, 조회는 QueryDSL과 DataLoader가 맡는다.
+    // **자식 컬렉션을 두지 않는다.** 사진·태그·카테고리·장소 어느 것도 여기서 참조하지 않는다.
+    //
+    // 부모가 컬렉션을 들면 글을 여러 건 읽을 때마다 자식 조회가 건수만큼 따라붙고(N+1),
+    // 한 건만 읽어도 매퍼가 접근하는 순간 쿼리가 나간다. 연관은 자식 쪽 @ManyToOne만 남기고
+    // (실무에서 @OneToMany보다 @ManyToOne을 선호하는 이유다), 적재·조회는 각 리포지토리와
+    // QueryDSL이 명시적으로 한다 — 언제 무엇을 읽는지가 코드에 드러난다.
+    //
+    // 삭제는 DB의 ON DELETE CASCADE가 받는다(JPA cascade와 별개로 동작한다).
 
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant? = null,
@@ -121,10 +96,12 @@ class PostPhotoEntity(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long? = null,
 
-    /** 도메인 내부 참조라 연관으로 둔다 — 글과 함께 적재·삭제되기 때문이다. */
-    @jakarta.persistence.ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "post_id", nullable = false)
-    var post: PostEntity,
+    /**
+     * 연관이 아니라 plain 컬럼이다. 부모를 프록시로 들고 있을 이유가 없고, 이 편이
+     * 댓글·좋아요와 같은 모양이라 도메인 전체가 한 가지 규칙을 따른다.
+     */
+    @Column(name = "post_id", nullable = false)
+    var postId: Long,
 
     @Column(name = "object_key", nullable = false, length = 512)
     var objectKey: String,
@@ -319,9 +296,8 @@ class PostTagEntity(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long? = null,
 
-    @jakarta.persistence.ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "post_id", nullable = false)
-    var post: PostEntity,
+    @Column(name = "post_id", nullable = false)
+    var postId: Long,
 
     @Column(name = "name", nullable = false, length = 30)
     var name: String,

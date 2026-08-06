@@ -7,7 +7,13 @@ import org.around.ieuri.community.domain.aggregate.PostLike
 import org.around.ieuri.community.domain.aggregate.Report
 import org.around.ieuri.community.domain.vo.ReportTargetType
 
-/** 글 적재·조회. 삭제는 소프트 삭제이므로 [save]가 삭제 상태도 함께 반영한다. */
+/**
+ * 글 애그리게이트 적재·조회. **전체 상태가 필요한 연산만 이 포트를 쓴다** — 지금은 글 수정뿐이다.
+ *
+ * [findById]는 태그·사진까지 갖춘 완전한 애그리게이트를 복원하므로 여러 번의 조회가 필요하다.
+ * 카운터 증감이나 존재 확인처럼 일부만 필요한 연산은 [PostCounterPort]·[PostModerationPort]를
+ * 쓴다 — 그쪽이 훨씬 싸고, 카운터는 동시성까지 더 정확하다.
+ */
 interface PostRepositoryPort {
     /** 삭제되지 않은 글만. 없으면 null. */
     fun findById(postId: Long): Post?
@@ -16,15 +22,44 @@ interface PostRepositoryPort {
 }
 
 /**
- * 조회수 증가. **애그리게이트를 거치지 않는다** — 읽고 고쳐 쓰면 동시 조회가 서로의 증가를
- * 덮어써 조회수가 누락된다. `view_count = view_count + 1` 한 문장이라 DB가 원자적으로 처리한다.
+ * 글의 파생 계수 증감. **애그리게이트를 거치지 않는다.**
  *
- * 조회수는 글의 불변식에 관여하지 않는 단순 계수라 이 우회가 정당하다 — 좋아요는 좋아요 행과
- * 집계가 한 트랜잭션에서 맞아야 해서 애그리게이트를 거친다.
+ * 읽고 고쳐 쓰면 동시 요청이 서로의 증가를 덮어써 계수가 실제보다 작아진다 — 두 사람이 같은
+ * 글에 동시에 좋아요를 누르면 하나가 사라지는 식이다. `count = count + 1` 한 문장은 DB가
+ * 원자적으로 처리해 그 경합이 아예 없다.
+ *
+ * 계수는 글의 불변식에 관여하지 않는 단순 숫자라 이 우회가 정당하다. **유일성 판정은 여전히
+ * 저장소의 제약이 맡는다** — 이 포트는 판정 결과를 숫자에 반영할 뿐이다.
+ *
+ * 삭제된 글은 갱신하지 않으며, 대상이 없어도 오류가 아니다(0건 갱신).
  */
-interface PostViewCountPort {
-    /** 삭제된 글은 올리지 않는다. 대상이 없으면 조용히 지나간다 — 조회수는 실패시킬 값이 아니다. */
-    fun increase(postId: Long)
+interface PostCounterPort {
+    fun increaseLikeCount(postId: Long)
+
+    /** 0 아래로 내려가지 않는다 — DB의 CHECK 제약과 조건절이 함께 막는다. */
+    fun decreaseLikeCount(postId: Long)
+
+    fun increaseCommentCount(postId: Long)
+
+    fun decreaseCommentCount(postId: Long)
+
+    fun increaseViewCount(postId: Long)
+}
+
+/**
+ * 존재 확인과 상태 전환. 애그리게이트 전체를 복원할 이유가 없는 연산들이다.
+ *
+ * 신고의 대상 확인은 "있는가"만 물으면 되는데 애그리게이트를 복원하면 태그·사진까지 읽는다.
+ */
+interface PostModerationPort {
+    /** 삭제되지 않은 글이 있는지. */
+    fun exists(postId: Long): Boolean
+
+    /**
+     * 신고 누적에 따른 자동 숨김. **이미 숨겨져 있으면 아무것도 하지 않고 false**를 돌려준다 —
+     * 호출자가 그 값으로 중복 처리를 건너뛴다.
+     */
+    fun hide(postId: Long): Boolean
 }
 
 interface CommentRepositoryPort {

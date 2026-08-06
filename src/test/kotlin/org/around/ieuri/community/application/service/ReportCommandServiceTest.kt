@@ -12,7 +12,8 @@ import org.around.ieuri.community.application.exception.PostNotFoundException
 import org.around.ieuri.community.application.exception.ReportDetailRequiredException
 import org.around.ieuri.community.application.port.out.client.MemberLookupPort
 import org.around.ieuri.community.application.port.out.persistence.CommentRepositoryPort
-import org.around.ieuri.community.application.port.out.persistence.PostRepositoryPort
+import org.around.ieuri.community.application.port.out.persistence.PostCounterPort
+import org.around.ieuri.community.application.port.out.persistence.PostModerationPort
 import org.around.ieuri.community.application.port.out.persistence.ReportRepositoryPort
 import org.around.ieuri.community.application.query.PostAuthorView
 import org.around.ieuri.community.domain.aggregate.Comment
@@ -36,28 +37,13 @@ class ReportCommandServiceTest {
     private val targetCommentId = 200L
 
     private val reportRepository = mockk<ReportRepositoryPort>()
-    private val postRepository = mockk<PostRepositoryPort>()
+    private val counterPort = mockk<PostCounterPort>(relaxed = true)
+    private val moderationPort = mockk<PostModerationPort>()
     private val commentRepository = mockk<CommentRepositoryPort>()
     private val memberLookup = mockk<MemberLookupPort>()
 
     private val service = ReportCommandService(
-        reportRepository, postRepository, commentRepository, memberLookup,
-    )
-
-    private fun post(id: Long = targetPostId, commentCount: Int = 0) = Post.restore(
-        id = id,
-        category = TargetCategory.TOURIST_SPOT,
-        spotId = 1L,
-        authorId = 42L,
-        tags = emptyList(),
-        title = "제목",
-        body = "본문",
-        photoKeys = emptyList(),
-        likeCount = 0,
-        commentCount = commentCount,
-        hidden = false,
-        deletedAt = null,
-        createdAt = Instant.EPOCH,
+        reportRepository, counterPort, moderationPort, commentRepository, memberLookup,
     )
 
     private fun comment(id: Long = targetCommentId, postId: Long = targetPostId, hidden: Boolean = false) =
@@ -79,7 +65,7 @@ class ReportCommandServiceTest {
 
     @Test
     fun `신고가 기록된다`() {
-        every { postRepository.findById(targetPostId) } returns post()
+        every { moderationPort.exists(targetPostId) } returns true
         every { reportRepository.save(any()) } returns true
         every { reportRepository.countDistinctReporters(any(), any()) } returns 1
 
@@ -90,7 +76,7 @@ class ReportCommandServiceTest {
 
     @Test
     fun `같은 대상을 두 번 신고하면 거부된다`() {
-        every { postRepository.findById(targetPostId) } returns post()
+        every { moderationPort.exists(targetPostId) } returns true
         every { reportRepository.save(any()) } returns false
 
         assertFailsWith<AlreadyReportedException> { reportPost() }
@@ -100,12 +86,12 @@ class ReportCommandServiceTest {
     fun `OTHER 사유에 상세 사유가 없으면 대상 조회 전에 거부된다`() {
         assertFailsWith<ReportDetailRequiredException> { reportPost(ReportReason.OTHER, null) }
         assertFailsWith<ReportDetailRequiredException> { reportPost(ReportReason.OTHER, "  ") }
-        verify(exactly = 0) { postRepository.findById(any()) }
+        verify(exactly = 0) { moderationPort.exists(any()) }
     }
 
     @Test
     fun `대상 종류에 따라 다른 부재 코드가 반환된다`() {
-        every { postRepository.findById(any()) } returns null
+        every { moderationPort.exists(any()) } returns false
         every { commentRepository.findById(any()) } returns null
         every { memberLookup.findAuthor(any()) } returns null
 
@@ -122,29 +108,25 @@ class ReportCommandServiceTest {
 
     @Test
     fun `신고자 4명이면 글은 숨겨지지 않는다`() {
-        val target = post()
-        every { postRepository.findById(targetPostId) } returns target
+        every { moderationPort.exists(targetPostId) } returns true
         every { reportRepository.save(any()) } returns true
         every { reportRepository.countDistinctReporters(ReportTargetType.POST, targetPostId) } returns 4
 
         reportPost()
 
-        assertFalse(target.hidden)
-        verify(exactly = 0) { postRepository.save(any()) }
+        verify(exactly = 0) { moderationPort.hide(any()) }
     }
 
     @Test
     fun `서로 다른 신고자 5명이면 글이 숨겨진다`() {
-        val target = post()
-        every { postRepository.findById(targetPostId) } returns target
+        every { moderationPort.exists(targetPostId) } returns true
         every { reportRepository.save(any()) } returns true
         every { reportRepository.countDistinctReporters(ReportTargetType.POST, targetPostId) } returns 5
-        every { postRepository.save(any()) } returns target
+        every { moderationPort.hide(targetPostId) } returns true
 
         reportPost()
 
-        assertTrue(target.hidden)
-        verify { postRepository.save(target) }
+        verify(exactly = 1) { moderationPort.hide(targetPostId) }
     }
 
     @Test
@@ -160,17 +142,14 @@ class ReportCommandServiceTest {
 
         // 집계 조회조차 하지 않는다 — 자동 조치 대상이 아니기 때문이다.
         verify(exactly = 0) { reportRepository.countDistinctReporters(any(), any()) }
-        verify(exactly = 0) { postRepository.save(any()) }
+        verify(exactly = 0) { moderationPort.hide(any()) }
     }
 
     @Test
     fun `댓글이 숨겨지면 글의 댓글 수가 1 감소한다`() {
         val target = comment()
-        val parent = post(commentCount = 3)
         every { commentRepository.findById(targetCommentId) } returns target
         every { commentRepository.save(any()) } returns target
-        every { postRepository.findById(targetPostId) } returns parent
-        every { postRepository.save(any()) } returns parent
         every { reportRepository.save(any()) } returns true
         every { reportRepository.countDistinctReporters(ReportTargetType.COMMENT, targetCommentId) } returns 5
 
@@ -180,15 +159,13 @@ class ReportCommandServiceTest {
         )
 
         assertTrue(target.hidden)
-        assertEquals(2, parent.commentCount)
+        verify(exactly = 1) { counterPort.decreaseCommentCount(targetPostId) }
     }
 
     @Test
     fun `이미 숨겨진 댓글은 댓글 수를 다시 내리지 않는다`() {
         val target = comment(hidden = true)
-        val parent = post(commentCount = 3)
         every { commentRepository.findById(targetCommentId) } returns target
-        every { postRepository.findById(targetPostId) } returns parent
         every { reportRepository.save(any()) } returns true
         every { reportRepository.countDistinctReporters(ReportTargetType.COMMENT, targetCommentId) } returns 6
 
@@ -197,13 +174,12 @@ class ReportCommandServiceTest {
             reporterId,
         )
 
-        assertEquals(3, parent.commentCount)
-        verify(exactly = 0) { postRepository.save(any()) }
+        verify(exactly = 0) { counterPort.decreaseCommentCount(any()) }
     }
 
     @Test
     fun `상세 사유는 신고 레코드에 트리밍되어 담긴다`() {
-        every { postRepository.findById(targetPostId) } returns post()
+        every { moderationPort.exists(targetPostId) } returns true
         val captured = slot<Report>()
         every { reportRepository.save(capture(captured)) } returns true
         every { reportRepository.countDistinctReporters(any(), any()) } returns 1

@@ -32,19 +32,20 @@ import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.
  * 카테고리·장소는 별도 테이블이라 **호출자가 읽어 넘긴다** — 엔티티에 연관으로 두면
  * nullable @OneToOne이 lazy가 되지 않아 조회마다 N+1이 붙는다(PostEntity 주석 참고).
  */
-fun PostEntity.toDomain(category: TargetCategory, spotId: Long?): Post = Post.restore(
+fun PostEntity.toDomain(
+    category: TargetCategory,
+    spotId: Long?,
+    tags: List<PostTag>,
+    photoKeys: List<PhotoObjectKey>,
+): Post = Post.restore(
     id = requireNotNull(id) { "적재된 글에는 id가 있어야 한다." },
     category = category,
     spotId = spotId,
     authorId = authorId,
-    tags = tags.map { PostTag.restore(it.name, it.normalized) },
+    tags = tags,
     title = title,
     body = body,
-    photoKeys = photos.sortedBy { it.position }.map {
-        requireNotNull(PhotoObjectKey.parse(it.objectKey)) {
-            "적재된 사진 키(${it.objectKey})의 형식이 올바르지 않다."
-        }
-    },
+    photoKeys = photoKeys,
     likeCount = likeCount,
     commentCount = commentCount,
     hidden = hidden,
@@ -56,11 +57,11 @@ fun PostEntity.toDomain(category: TargetCategory, spotId: Long?): Post = Post.re
 /**
  * 도메인 글을 새 엔티티로. id·시각은 DB가 채운다.
  *
- * 사진은 부모를 역참조하므로 엔티티를 만든 **뒤에** 붙인다 — 순서를 뒤집으면 아직 없는
- * 부모를 가리키게 된다.
+ * **자식(사진·태그·연결)은 붙이지 않는다.** 전부 글의 id가 정해진 뒤에야 만들 수 있어
+ * 어댑터가 저장 후 따로 적재한다.
  */
-fun Post.toNewEntity(): PostEntity {
-    val entity = PostEntity(
+fun Post.toNewEntity(): PostEntity =
+    PostEntity(
         authorId = authorId,
         title = title,
         body = body,
@@ -70,16 +71,22 @@ fun Post.toNewEntity(): PostEntity {
         edited = edited,
         deletedAt = deletedAt,
     )
-    entity.photos = photoKeys.mapIndexed { index, key ->
-        PostPhotoEntity(post = entity, objectKey = key.value, position = index.toShort())
-    }.toMutableList()
-    entity.tags = tags.map {
-        PostTagEntity(post = entity, name = it.name, normalized = it.normalized)
-    }.toMutableList()
-    // 카테고리·장소 연결은 여기서 만들지 않는다 — 글의 id가 있어야 만들 수 있어
-    // 어댑터가 글을 저장한 뒤 붙인다.
-    return entity
-}
+
+/** 배열 순서가 표시 순서다 — position에 그대로 싣는다. */
+fun Post.toPhotoEntities(postId: Long): List<PostPhotoEntity> =
+    photoKeys.mapIndexed { index, key ->
+        PostPhotoEntity(postId = postId, objectKey = key.value, position = index.toShort())
+    }
+
+fun Post.toTagEntities(postId: Long): List<PostTagEntity> =
+    tags.map { PostTagEntity(postId = postId, name = it.name, normalized = it.normalized) }
+
+fun PostPhotoEntity.toPhotoKey(): PhotoObjectKey =
+    requireNotNull(PhotoObjectKey.parse(objectKey)) {
+        "적재된 사진 키(${objectKey})의 형식이 올바르지 않다."
+    }
+
+fun PostTagEntity.toPostTag(): PostTag = PostTag.restore(name, normalized)
 
 /** 글의 id가 정해진 **뒤에** 만든다 — post_id가 PK다. */
 fun Post.toChipEntity(postId: Long): PostChipEntity =

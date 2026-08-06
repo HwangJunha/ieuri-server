@@ -4,7 +4,8 @@ import org.around.ieuri.community.application.port.out.persistence.BlockReposito
 import org.around.ieuri.community.application.port.out.persistence.CommentRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.PostLikeRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.PostRepositoryPort
-import org.around.ieuri.community.application.port.out.persistence.PostViewCountPort
+import org.around.ieuri.community.application.port.out.persistence.PostCounterPort
+import org.around.ieuri.community.application.port.out.persistence.PostModerationPort
 import org.around.ieuri.community.application.port.out.persistence.ReportRepositoryPort
 import org.around.ieuri.community.domain.aggregate.Block
 import org.around.ieuri.community.domain.aggregate.Comment
@@ -15,14 +16,21 @@ import org.around.ieuri.community.domain.vo.ReportTargetType
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toDomain
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toChipEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toNewEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toPhotoEntities
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toPhotoKey
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toPostTag
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toTagEntities
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toSpotEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.BlockJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.CommentJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.PostChipJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.PostJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.PostLikeJpaRepository
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.PostPhotoJpaRepository
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.PostTagJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.PostSpotJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.ReportJpaRepository
+import com.querydsl.core.types.dsl.NumberPath
 import com.querydsl.jpa.impl.JPAQueryFactory
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostEntity
 import org.springframework.dao.DataIntegrityViolationException
@@ -40,8 +48,15 @@ class PostPersistenceAdapter(
     private val repository: PostJpaRepository,
     private val chipRepository: PostChipJpaRepository,
     private val spotRepository: PostSpotJpaRepository,
+    private val photoRepository: PostPhotoJpaRepository,
+    private val tagRepository: PostTagJpaRepository,
 ) : PostRepositoryPort {
 
+    /**
+     * **완전한 애그리게이트를 복원한다** — 그래서 조회가 다섯 번이다. 전체 상태가 필요한
+     * 연산(글 수정)만 이 포트를 써야 하는 이유이며, 카운터 증감이나 존재 확인은
+     * PostCounterPort·PostModerationPort로 간다.
+     */
     override fun findById(postId: Long): Post? {
         val entity = repository.findByIdAndDeletedAtIsNull(postId) ?: return null
         return entity.toDomain(
@@ -49,13 +64,16 @@ class PostPersistenceAdapter(
                 "글($postId)에 카테고리 연결이 없다."
             }.category,
             spotId = spotRepository.findById(postId).orElse(null)?.spotId,
+            tags = tagRepository.findByPostIdOrderByIdAsc(postId).map { it.toPostTag() },
+            photoKeys = photoRepository.findByPostIdOrderByPositionAsc(postId)
+                .map { it.toPhotoKey() },
         )
     }
 
     override fun save(post: Post): Post {
         val id = post.id ?: return create(post)
 
-        // 기존 글 갱신. 카테고리·장소는 수정 대상이 아니라 연결 행을 건드리지 않는다.
+        // 기존 글 갱신. 카테고리·장소·태그는 수정 대상이 아니라 그 행들을 건드리지 않는다.
         val entity = repository.findById(id).orElseThrow {
             IllegalStateException("갱신하려는 글($id)이 존재하지 않는다.")
         }
@@ -66,45 +84,124 @@ class PostPersistenceAdapter(
         entity.commentCount = post.commentCount
         entity.hidden = post.hidden
         entity.deletedAt = post.deletedAt
-        return entity.toDomain(category = post.category, spotId = post.spotId)
+        replacePhotos(id, post)
+        return post
     }
 
     /**
-     * 글을 먼저 저장해 id를 받은 뒤 연결 행을 붙인다 — 연결의 PK가 글의 id라 순서를
-     * 뒤집을 수 없다. 장소는 선택이라 없으면 행을 만들지 않는다.
+     * 글을 먼저 저장해 id를 받은 뒤 자식을 붙인다 — 자식이 전부 글의 id를 필요로 하므로
+     * 순서를 뒤집을 수 없다. 장소는 선택이라 없으면 행을 만들지 않는다.
      */
     private fun create(post: Post): Post {
         val saved = repository.save(post.toNewEntity())
         val postId = requireNotNull(saved.id) { "저장된 글에는 id가 있어야 한다." }
         chipRepository.save(post.toChipEntity(postId))
         post.toSpotEntity(postId)?.let { spotRepository.save(it) }
-        return saved.toDomain(category = post.category, spotId = post.spotId)
+        photoRepository.saveAll(post.toPhotoEntities(postId))
+        tagRepository.saveAll(post.toTagEntities(postId))
+        return saved.toDomain(
+            category = post.category,
+            spotId = post.spotId,
+            tags = post.tags,
+            photoKeys = post.photoKeys,
+        )
+    }
+
+    /**
+     * 사진은 **지우고 다시 넣는다.** 순서가 계약이라 부분 갱신으로는 position을 맞추기
+     * 어렵고, 최대 5장이라 전량 교체의 비용이 무시할 만하다.
+     *
+     * 삭제를 flush하지 않으면 같은 (post_id, position)으로 INSERT가 먼저 나가 유일 제약에
+     * 걸린다 — Hibernate는 INSERT를 DELETE보다 먼저 내보내기 때문이다.
+     */
+    private fun replacePhotos(postId: Long, post: Post) {
+        photoRepository.deleteByPostId(postId)
+        photoRepository.flush()
+        photoRepository.saveAll(post.toPhotoEntities(postId))
     }
 }
 
 /**
- * 조회수 증가. **읽고 고쳐 쓰지 않는다** — 동시 조회가 서로의 증가를 덮어써 조회수가
- * 누락되기 때문이다. `view_count = view_count + 1` 한 문장을 DB가 원자적으로 처리한다.
+ * 파생 계수 증감. **읽고 고쳐 쓰지 않는다** — 동시 요청이 서로의 증가를 덮어써 계수가
+ * 실제보다 작아지기 때문이다. `count = count + 1` 한 문장을 DB가 원자적으로 처리한다.
  *
- * 벌크 update는 영속성 컨텍스트를 우회한다. 같은 트랜잭션에서 이 글을 다시 읽는 곳이
- * 없으므로 문제가 없다 — 증가는 조회 응답을 내보낸 뒤 별도 스레드에서 일어난다.
+ * 벌크 update는 영속성 컨텍스트를 우회한다. 같은 트랜잭션에서 이 글을 **엔티티로** 다시 읽는
+ * 곳이 없어야 한다는 뜻인데, 갱신값은 읽기 포트가 별도 쿼리로 가져오므로 문제가 없다.
  */
 @Component
-class PostViewCountAdapter(
+class PostCounterAdapter(
     private val queryFactory: JPAQueryFactory,
-) : PostViewCountPort {
+) : PostCounterPort {
 
     private val post = QPostEntity.postEntity
 
     @Transactional
-    override fun increase(postId: Long) {
-        // 삭제된 글은 올리지 않는다. 대상이 없으면 0건이 갱신될 뿐 오류가 아니다.
+    override fun increaseLikeCount(postId: Long) = increase(postId, post.likeCount)
+
+    @Transactional
+    override fun decreaseLikeCount(postId: Long) = decrease(postId, post.likeCount)
+
+    @Transactional
+    override fun increaseCommentCount(postId: Long) = increase(postId, post.commentCount)
+
+    @Transactional
+    override fun decreaseCommentCount(postId: Long) = decrease(postId, post.commentCount)
+
+    @Transactional
+    override fun increaseViewCount(postId: Long) = increase(postId, post.viewCount)
+
+    /** 삭제된 글은 올리지 않는다. 대상이 없으면 0건이 갱신될 뿐 오류가 아니다. */
+    private fun increase(postId: Long, counter: NumberPath<Int>) {
         queryFactory
             .update(post)
-            .set(post.viewCount, post.viewCount.add(1))
+            .set(counter, counter.add(1))
             .where(post.id.eq(postId), post.deletedAt.isNull)
             .execute()
     }
+
+    /**
+     * **0 아래로 내려가지 않는다.** 조건절이 0인 행을 아예 건드리지 않으므로 CHECK 제약도
+     * 걸리지 않는다 — 음수를 쓰려다 예외가 나는 대신 조용히 0으로 머문다.
+     */
+    private fun decrease(postId: Long, counter: NumberPath<Int>) {
+        queryFactory
+            .update(post)
+            .set(counter, counter.subtract(1))
+            .where(post.id.eq(postId), post.deletedAt.isNull, counter.gt(0))
+            .execute()
+    }
+}
+
+/**
+ * 존재 확인과 상태 전환. 애그리게이트를 복원하지 않는다 — 신고의 대상 확인은 "있는가"만
+ * 물으면 되는데 복원하면 태그·사진까지 읽는다.
+ */
+@Component
+class PostModerationAdapter(
+    private val queryFactory: JPAQueryFactory,
+) : PostModerationPort {
+
+    private val post = QPostEntity.postEntity
+
+    @Transactional(readOnly = true)
+    override fun exists(postId: Long): Boolean =
+        queryFactory
+            .selectOne()
+            .from(post)
+            .where(post.id.eq(postId), post.deletedAt.isNull)
+            .fetchFirst() != null
+
+    /**
+     * 이미 숨겨진 글은 조건절에서 걸러져 0건이 갱신되고 false가 된다. 호출자가 그 값으로
+     * 중복 처리를 건너뛰므로, 신고가 더 쌓여도 댓글 수를 두 번 내리는 일이 없다.
+     */
+    @Transactional
+    override fun hide(postId: Long): Boolean =
+        queryFactory
+            .update(post)
+            .set(post.hidden, true)
+            .where(post.id.eq(postId), post.deletedAt.isNull, post.hidden.isFalse)
+            .execute() > 0
 }
 
 @Component

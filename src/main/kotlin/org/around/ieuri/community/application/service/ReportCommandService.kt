@@ -9,7 +9,8 @@ import org.around.ieuri.community.application.exception.ReportDetailRequiredExce
 import org.around.ieuri.community.application.port.`in`.command.ReportCommandUseCase
 import org.around.ieuri.community.application.port.out.client.MemberLookupPort
 import org.around.ieuri.community.application.port.out.persistence.CommentRepositoryPort
-import org.around.ieuri.community.application.port.out.persistence.PostRepositoryPort
+import org.around.ieuri.community.application.port.out.persistence.PostCounterPort
+import org.around.ieuri.community.application.port.out.persistence.PostModerationPort
 import org.around.ieuri.community.application.port.out.persistence.ReportRepositoryPort
 import org.around.ieuri.community.domain.aggregate.Report
 import org.around.ieuri.community.domain.vo.ReportTargetType
@@ -30,7 +31,8 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class ReportCommandService(
     private val reportRepositoryPort: ReportRepositoryPort,
-    private val postRepositoryPort: PostRepositoryPort,
+    private val postCounterPort: PostCounterPort,
+    private val postModerationPort: PostModerationPort,
     private val commentRepositoryPort: CommentRepositoryPort,
     private val memberLookupPort: MemberLookupPort,
 ) : ReportCommandUseCase {
@@ -60,7 +62,7 @@ class ReportCommandService(
 
     private fun requireTargetExists(targetType: ReportTargetType, targetId: Long) {
         val exists = when (targetType) {
-            ReportTargetType.POST -> postRepositoryPort.findById(targetId) != null
+            ReportTargetType.POST -> postModerationPort.exists(targetId)
             ReportTargetType.COMMENT -> commentRepositoryPort.findById(targetId) != null
             ReportTargetType.MEMBER -> memberLookupPort.findAuthor(targetId) != null
         }
@@ -80,11 +82,8 @@ class ReportCommandService(
         if (!Report.reachesAutoHideThreshold(targetType, reporters)) return
 
         when (targetType) {
-            ReportTargetType.POST -> postRepositoryPort.findById(targetId)?.let {
-                if (it.hidden) return
-                it.hide()
-                postRepositoryPort.save(it)
-            }
+            // 이미 숨겨져 있으면 0건이 갱신되고 false다 — 중복 처리가 조건절에서 걸러진다.
+            ReportTargetType.POST -> postModerationPort.hide(targetId)
 
             ReportTargetType.COMMENT -> commentRepositoryPort.findById(targetId)?.let {
                 // 이미 숨겨져 있으면 commentCount를 다시 내리지 않는다 — 두 번 내리면
@@ -92,10 +91,7 @@ class ReportCommandService(
                 if (it.hidden) return
                 it.hide()
                 commentRepositoryPort.save(it)
-                postRepositoryPort.findById(it.postId)?.let { post ->
-                    post.decreaseCommentCount()
-                    postRepositoryPort.save(post)
-                }
+                postCounterPort.decreaseCommentCount(it.postId)
             }
 
             ReportTargetType.MEMBER -> Unit

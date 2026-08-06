@@ -67,16 +67,8 @@ class PostCommandService(
             PostTag.parseOrNull(raw) ?: throw InvalidTagException()
         }
 
-        val photoKeys = command.photoKeys.map { raw ->
-            val key = PhotoObjectKey.parse(raw) ?: throw PhotoNotUploadedException()
-            // 소유권과 확인 여부는 저장소를 묻지 않고 판정한다.
-            if (!key.ownedBy(memberId) || !key.confirmed) throw PhotoNotUploadedException()
-            key
-        }
         // 하나라도 없으면 글 전체를 생성하지 않는다 — 부분 생성은 없다.
-        photoKeys.forEach { key ->
-            if (objectStoragePort.findSize(key.value) == null) throw PhotoNotUploadedException()
-        }
+        val photoKeys = command.photoKeys.map { verifiedPhotoKey(it, memberId) }
 
         val post = Post.create(
             category = command.category,
@@ -107,10 +99,29 @@ class PostCommandService(
         if (body.isEmpty()) throw PostBodyRequiredException()
         if (body.length > Post.BODY_MAX_LENGTH) throw PostBodyLengthInvalidException()
 
+        // **사진을 준 경우에만** 검증한다. null은 "건드리지 않는다"는 뜻이라 빈 배열과 다르다.
+        val photoKeys = command.photoKeys?.let { raw ->
+            if (raw.size > Post.MAX_PHOTOS) throw TooManyPhotosException()
+            raw.map { verifiedPhotoKey(it, memberId) }
+        }
+
         val post = postRepositoryPort.findById(command.postId) ?: throw PostNotFoundException()
         if (post.authorId != memberId) throw NotPostOwnerException()
         if (!post.editBy(memberId, title, body)) throw HiddenPostNotEditableException()
+        photoKeys?.let { post.replacePhotos(it) }
         postRepositoryPort.save(post)
+    }
+
+    /**
+     * 키의 형식·소유권·확인 여부를 판정하고 실제 오브젝트가 있는지까지 본다.
+     * 세 실패를 한 코드로 뭉뚱그리는 이유는 남의 키가 존재하는지 캐낼 수 있어서다.
+     */
+    private fun verifiedPhotoKey(raw: String, memberId: Long): PhotoObjectKey {
+        val key = PhotoObjectKey.parse(raw) ?: throw PhotoNotUploadedException()
+        // 소유권과 확인 여부는 저장소를 묻지 않고 판정한다.
+        if (!key.ownedBy(memberId) || !key.confirmed) throw PhotoNotUploadedException()
+        if (objectStoragePort.findSize(key.value) == null) throw PhotoNotUploadedException()
+        return key
     }
 
     @Transactional
