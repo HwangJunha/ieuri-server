@@ -4,6 +4,7 @@ import org.around.ieuri.community.application.port.out.persistence.BlockReposito
 import org.around.ieuri.community.application.port.out.persistence.CommentRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.PostLikeRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.PostRepositoryPort
+import org.around.ieuri.community.application.port.out.persistence.PostViewCountPort
 import org.around.ieuri.community.application.port.out.persistence.ReportRepositoryPort
 import org.around.ieuri.community.domain.aggregate.Block
 import org.around.ieuri.community.domain.aggregate.Comment
@@ -22,8 +23,11 @@ import org.around.ieuri.community.infrastructure.adapter.out.persistence.reposit
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.PostLikeJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.PostSpotJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.ReportJpaRepository
+import com.querydsl.jpa.impl.JPAQueryFactory
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostEntity
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Component
+import org.springframework.transaction.annotation.Transactional
 
 /**
  * 글 적재. 갱신은 **관리 엔티티에 도메인 변경을 얹어** dirty-checking으로 UPDATE를 낸다 —
@@ -75,6 +79,31 @@ class PostPersistenceAdapter(
         chipRepository.save(post.toChipEntity(postId))
         post.toSpotEntity(postId)?.let { spotRepository.save(it) }
         return saved.toDomain(category = post.category, spotId = post.spotId)
+    }
+}
+
+/**
+ * 조회수 증가. **읽고 고쳐 쓰지 않는다** — 동시 조회가 서로의 증가를 덮어써 조회수가
+ * 누락되기 때문이다. `view_count = view_count + 1` 한 문장을 DB가 원자적으로 처리한다.
+ *
+ * 벌크 update는 영속성 컨텍스트를 우회한다. 같은 트랜잭션에서 이 글을 다시 읽는 곳이
+ * 없으므로 문제가 없다 — 증가는 조회 응답을 내보낸 뒤 별도 스레드에서 일어난다.
+ */
+@Component
+class PostViewCountAdapter(
+    private val queryFactory: JPAQueryFactory,
+) : PostViewCountPort {
+
+    private val post = QPostEntity.postEntity
+
+    @Transactional
+    override fun increase(postId: Long) {
+        // 삭제된 글은 올리지 않는다. 대상이 없으면 0건이 갱신될 뿐 오류가 아니다.
+        queryFactory
+            .update(post)
+            .set(post.viewCount, post.viewCount.add(1))
+            .where(post.id.eq(postId), post.deletedAt.isNull)
+            .execute()
     }
 }
 

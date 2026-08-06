@@ -7,8 +7,10 @@ import io.mockk.slot
 import io.mockk.verify
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.CursorPageInfo
+import org.around.ieuri.community.application.event.PostViewed
 import org.around.ieuri.community.application.policy.CommunityPolicy
 import org.around.ieuri.community.application.port.out.client.SpotLookupPort
+import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
 import org.around.ieuri.community.application.port.out.query.BlockedUsersSearch
 import org.around.ieuri.community.application.port.out.query.CommunityQueryPort
 import org.around.ieuri.community.application.port.out.query.PostCommentsSearch
@@ -18,11 +20,13 @@ import org.around.ieuri.community.application.query.BlockedUsersQuery
 import org.around.ieuri.community.application.query.CommunityChipView
 import org.around.ieuri.community.application.query.PostCommentsQuery
 import org.around.ieuri.community.application.query.PostSpotView
+import org.around.ieuri.community.application.query.PostView
 import org.around.ieuri.community.application.query.PostsQuery
 import org.around.ieuri.community.domain.vo.AppKey
 import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.around.ieuri.community.domain.vo.TargetCategory
 import java.time.Duration
+import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -53,7 +57,9 @@ class CommunityQueryServiceTest {
         allowedContentTypes = setOf("image/jpeg"),
     )
 
-    private val service = CommunityQueryService(queryPort, spotLookup, policy)
+    private val eventPublisher = mockk<CommunityEventPublisherPort>(relaxed = true)
+
+    private val service = CommunityQueryService(queryPort, spotLookup, eventPublisher, policy)
 
     private fun <T> emptyPage() = CursorPage<T>(
         edges = emptyList(),
@@ -300,6 +306,43 @@ class CommunityQueryServiceTest {
         assertTrue(service.communityChips(unknown, ContentLanguage.KO).isEmpty())
     }
 
+    // ---------- 조회수 ----------
+
+    @Test
+    fun `글 단건을 보면 조회 이벤트가 발행된다`() {
+        givenBlocked()
+        every { queryPort.findPost(99L, any()) } returns postView(id = 99L)
+
+        service.post(99L, memberId)
+
+        // 증가 자체는 리스너가 비동기로 한다 — 조회 응답이 UPDATE를 기다리지 않는다.
+        verify(exactly = 1) { eventPublisher.publish(PostViewed(99L)) }
+    }
+
+    @Test
+    fun `피드 목록은 조회수를 올리지 않는다`() {
+        givenBlocked()
+        every { queryPort.findPosts(any()) } returns emptyPage()
+
+        service.posts(query(), memberId)
+
+        // 카드가 스쳐 지나가는 것은 조회가 아니다. 세면 스크롤 한 번에 수십이 올라
+        // 숫자가 의미를 잃는다.
+        verify(exactly = 0) { eventPublisher.publish(any()) }
+    }
+
+    @Test
+    fun `차단이나 숨김으로 못 본 글은 조회수를 올리지 않는다`() {
+        givenBlocked(11L)
+        // 걸러져 null이 나온 경우다.
+        every { queryPort.findPost(99L, any()) } returns null
+
+        service.post(99L, memberId)
+
+        // 보지 못한 것을 조회로 셀 수는 없다.
+        verify(exactly = 0) { eventPublisher.publish(any()) }
+    }
+
     // ---------- 지연 필드 ----------
     //
     // 태그·사진·카테고리·장소·좋아요는 각각 다른 테이블에 있어 **글 목록과 함께 읽지
@@ -356,6 +399,20 @@ class CommunityQueryServiceTest {
         // 차단은 좋아요 여부에 영향을 주지 않는다 — 읽으면 쿼리가 공짜로 한 번 더 붙는다.
         verify(exactly = 0) { queryPort.findBlockedMemberIds(any()) }
     }
+
+    private fun postView(id: Long) = PostView(
+        id = id,
+        title = "제목",
+        body = "본문",
+        authorId = 3L,
+        likeCount = 0,
+        commentCount = 0,
+        viewCount = 0,
+        ownedByViewer = false,
+        hidden = false,
+        edited = false,
+        createdAt = Instant.parse("2026-08-05T00:00:00Z"),
+    )
 
     private fun summary(spotId: Long, category: TargetCategory?) = PostSpotView(
         id = spotId,

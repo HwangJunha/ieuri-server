@@ -440,6 +440,7 @@ class CommunityQueryAdapter(
             authorId = authorId,
             likeCount = likeCount,
             commentCount = commentCount,
+            viewCount = viewCount,
             ownedByViewer = authorId == viewer.memberId,
             hidden = hidden,
             edited = edited,

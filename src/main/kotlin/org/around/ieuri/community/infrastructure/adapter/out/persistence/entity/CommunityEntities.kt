@@ -54,6 +54,10 @@ class PostEntity(
     @Column(name = "comment_count", nullable = false)
     var commentCount: Int = 0,
 
+    /** 조회수. 증가는 PostViewCountAdapter의 원자적 UPDATE가 하며 여기서 고치지 않는다. */
+    @Column(name = "view_count", nullable = false)
+    var viewCount: Int = 0,
+
     @Column(name = "hidden", nullable = false)
     var hidden: Boolean = false,
 

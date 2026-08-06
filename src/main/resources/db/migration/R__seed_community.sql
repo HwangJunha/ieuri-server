@@ -203,6 +203,11 @@ JOIN (VALUES
 ) AS c(post_title, post_author, author_id, body, hidden, age)
   ON p.title = c.post_title AND p.author_id = c.post_author;
 
+-- 5-1) 조회수. 좋아요 수와 일부러 다른 값을 준다 — 둘은 출처가 다른 별개의 계수이며,
+--      조회수는 중복을 걸러 내지 않아 통상 좋아요보다 훨씬 크다.
+UPDATE community_post SET view_count = like_count * 7 + 13
+WHERE author_id IN (12, 14, 15, 16, 17, 18, 19, 20);
+
 -- 6) 좋아요. like_count 컬럼과 실제 행 수는 일부러 다르다 — 카운트는 파생 저장값이고
 --    likedByViewer는 이 행으로 판정되므로, 두 값의 출처가 다름을 보여준다.
 --    20번이 누른 좋아요만 넣어 20의 피드에서 likedByViewer=true가 뜨는 글을 만든다.

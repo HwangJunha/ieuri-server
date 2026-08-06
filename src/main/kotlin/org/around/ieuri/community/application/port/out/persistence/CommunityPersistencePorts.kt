@@ -15,6 +15,18 @@ interface PostRepositoryPort {
     fun save(post: Post): Post
 }
 
+/**
+ * 조회수 증가. **애그리게이트를 거치지 않는다** — 읽고 고쳐 쓰면 동시 조회가 서로의 증가를
+ * 덮어써 조회수가 누락된다. `view_count = view_count + 1` 한 문장이라 DB가 원자적으로 처리한다.
+ *
+ * 조회수는 글의 불변식에 관여하지 않는 단순 계수라 이 우회가 정당하다 — 좋아요는 좋아요 행과
+ * 집계가 한 트랜잭션에서 맞아야 해서 애그리게이트를 거친다.
+ */
+interface PostViewCountPort {
+    /** 삭제된 글은 올리지 않는다. 대상이 없으면 조용히 지나간다 — 조회수는 실패시킬 값이 아니다. */
+    fun increase(postId: Long)
+}
+
 interface CommentRepositoryPort {
     fun findById(commentId: Long): Comment?
 

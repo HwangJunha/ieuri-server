@@ -41,6 +41,8 @@ data class PostView(
     val authorId: Long,
     val likeCount: Int,
     val commentCount: Int,
+    /** 조회수. 상세 조회에서만 오르며 중복을 방지하지 않는다. */
+    val viewCount: Int,
     val ownedByViewer: Boolean,
     val hidden: Boolean,
     /** 수정된 적이 있는지. 클라이언트가 "수정됨"을 표시한다. */

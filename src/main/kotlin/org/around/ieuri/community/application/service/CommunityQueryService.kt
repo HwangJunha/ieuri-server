@@ -1,9 +1,11 @@
 package org.around.ieuri.community.application.service
 
 import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.community.application.event.PostViewed
 import org.around.ieuri.community.application.policy.CommunityPolicy
 import org.around.ieuri.community.application.port.`in`.query.CommunityQueryUseCase
 import org.around.ieuri.community.application.port.out.client.SpotLookupPort
+import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
 import org.around.ieuri.community.application.port.out.query.BlockedUsersSearch
 import org.around.ieuri.community.application.port.out.query.CommunityQueryPort
 import org.around.ieuri.community.application.port.out.query.PostCommentsSearch
@@ -36,6 +38,7 @@ import org.springframework.stereotype.Service
 class CommunityQueryService(
     private val communityQueryPort: CommunityQueryPort,
     private val spotLookupPort: SpotLookupPort,
+    private val eventPublisher: CommunityEventPublisherPort,
     private val policy: CommunityPolicy,
 ) : CommunityQueryUseCase {
 
@@ -80,8 +83,17 @@ class CommunityQueryService(
         )
     }
 
-    override fun post(postId: Long, memberId: Long): PostView? =
-        communityQueryPort.findPost(postId, viewerContext(memberId))
+    /**
+     * 글 단건. **여기서만 조회수가 오른다** — 피드 목록에서는 오르지 않는다.
+     *
+     * 증가는 이벤트로 넘겨 비동기로 처리하므로 응답이 UPDATE를 기다리지 않는다. 차단·숨김에
+     * 걸려 못 본 글은 세지 않는다 — 보지 못한 것을 조회로 셀 수는 없다.
+     */
+    override fun post(postId: Long, memberId: Long): PostView? {
+        val view = communityQueryPort.findPost(postId, viewerContext(memberId)) ?: return null
+        eventPublisher.publish(PostViewed(postId))
+        return view
+    }
 
     override fun comments(query: PostCommentsQuery, memberId: Long): CursorPage<CommentView> =
         communityQueryPort.findComments(
