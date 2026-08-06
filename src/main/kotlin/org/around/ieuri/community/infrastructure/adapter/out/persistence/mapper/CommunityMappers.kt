@@ -7,6 +7,7 @@ import org.around.ieuri.community.domain.aggregate.PostLike
 import org.around.ieuri.community.domain.aggregate.Report
 import org.around.ieuri.community.domain.vo.PhotoObjectKey
 import org.around.ieuri.community.domain.vo.PostTag
+import org.around.ieuri.community.domain.vo.SpotPoint
 import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.BlockEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.CommentEntity
@@ -35,12 +36,14 @@ import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.
 fun PostEntity.toDomain(
     category: TargetCategory,
     spotId: Long?,
+    spotPoint: SpotPoint?,
     tags: List<PostTag>,
     photoKeys: List<PhotoObjectKey>,
 ): Post = Post.restore(
     id = requireNotNull(id) { "적재된 글에는 id가 있어야 한다." },
     category = category,
     spotId = spotId,
+    spotPoint = spotPoint,
     authorId = authorId,
     tags = tags,
     title = title,

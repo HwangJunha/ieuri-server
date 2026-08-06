@@ -19,17 +19,11 @@ import java.time.Instant
  */
 class Post private constructor(
     val id: Long?,
-    /** 글의 카테고리. 상단 칩이 이 값으로 거른다. spot 유무와 무관하게 항상 있다. */
-    val category: TargetCategory,
-    /** 연결된 장소. **선택이다** — 장소 없이 카테고리만으로도 글을 쓸 수 있다. */
-    val spotId: Long?,
-    /**
-     * 장소의 좌표. [spotId]가 있을 때만 있다. 적재 시 복사해 두는 값이며 — 지역 피드가
-     * tourism에 spot 목록을 되묻지 않게 한다 — 조회 응답에는 쓰이지 않는다.
-     */
-    val spotPoint: SpotPoint?,
+    category: TargetCategory,
+    spotId: Long?,
+    spotPoint: SpotPoint?,
     val authorId: Long,
-    val tags: List<PostTag>,
+    tags: List<PostTag>,
     title: String,
     body: String,
     photoKeys: List<PhotoObjectKey>,
@@ -39,6 +33,25 @@ class Post private constructor(
     deletedAt: Instant?,
     val createdAt: Instant?,
 ) {
+    /** 글의 카테고리. 상단 칩이 이 값으로 거른다. spot 유무와 무관하게 항상 있다. */
+    var category: TargetCategory = category
+        private set
+
+    /** 연결된 장소. **선택이다** — 장소 없이 카테고리만으로도 글을 쓸 수 있다. */
+    var spotId: Long? = spotId
+        private set
+
+    /**
+     * 장소의 좌표. [spotId]가 있을 때만 있다. 적재 시 복사해 두는 값이며 — 지역 피드가
+     * tourism에 spot 목록을 되묻지 않게 한다 — 조회 응답에는 쓰이지 않는다.
+     */
+    var spotPoint: SpotPoint? = spotPoint
+        private set
+
+    /** 사용자가 입력한 태그. 최대 5개이며 같은 태그는 하나로 본다. */
+    var tags: List<PostTag> = tags
+        private set
+
     var title: String = title
         private set
 
@@ -96,8 +109,8 @@ class Post private constructor(
      * 다른 내용으로 바꿔치기하면 그 기록이 사유와 무관한 글을 가리키게 되고, 검토 도구가 나중에
      * 보는 것이 증거로서 의미를 잃는다.
      *
-     * 사진·주제·대상은 바꿀 수 없다 — 사진은 R2 확인 흐름을 다시 타야 하고, 대상이 바뀌면 글이
-     * 다른 장소의 피드로 순간이동한다.
+     * **제목·본문만 여기서 바꾼다.** 사진·카테고리·장소·태그는 각각 별도 메서드가 맡는다 —
+     * 검증에 저장소·외부 도메인 조회가 필요해 애플리케이션 계층이 준비한 값을 받아야 한다.
      *
      * 소유자가 아니거나 숨겨진 글이면 false를 돌려주고 상태를 바꾸지 않는다 — 예외 종류 선택은
      * 애플리케이션 계층의 몫이다.
@@ -128,6 +141,34 @@ class Post private constructor(
         require(newPhotoKeys.all { it.ownedBy(authorId) }) { "본인에게 발급된 사진 키가 아닙니다." }
         require(newPhotoKeys.all { it.confirmed }) { "업로드 확인을 마치지 않은 사진 키입니다." }
         photoKeys = newPhotoKeys
+    }
+
+    /**
+     * 카테고리를 바꾼다. 글이 상단 칩에서 다른 자리로 옮겨 간다.
+     */
+    fun changeCategory(newCategory: TargetCategory) {
+        category = newCategory
+    }
+
+    /**
+     * 연결 장소를 바꾼다. **좌표가 함께 와야 한다** — 좌표 없이 장소만 바꾸면 그 글이
+     * 지역 피드의 거리순에서 조용히 사라진다.
+     *
+     * 둘 다 null이면 장소를 뗀다(카테고리만 있는 글이 된다).
+     */
+    fun changeSpot(newSpotId: Long?, newSpotPoint: SpotPoint?) {
+        require((newSpotId == null) == (newSpotPoint == null)) {
+            "장소와 좌표는 함께 있거나 함께 없어야 합니다."
+        }
+        require(newSpotId == null || newSpotId > 0) { "spotId는 양수여야 합니다." }
+        spotId = newSpotId
+        spotPoint = newSpotPoint
+    }
+
+    /** 태그를 **전체 목록으로 교체한다.** 같은 태그를 두 번 넣어도 하나로 본다. */
+    fun replaceTags(newTags: List<PostTag>) {
+        require(newTags.size <= PostTag.MAX_PER_POST) { "태그는 최대 ${PostTag.MAX_PER_POST}개입니다." }
+        tags = newTags.distinctBy { it.normalized }
     }
 
     /** 신고 누적으로 숨긴다. 이미 숨겨진 글에 다시 불려도 안전하다. */

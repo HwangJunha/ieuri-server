@@ -14,6 +14,7 @@ import org.around.ieuri.community.application.exception.PostTitleLengthInvalidEx
 import org.around.ieuri.community.application.exception.PostTitleRequiredException
 import org.around.ieuri.community.application.exception.SpotNotFoundException
 import org.around.ieuri.community.application.exception.TooManyPhotosException
+import org.around.ieuri.community.application.exception.TooManyTagsException
 import org.around.ieuri.community.application.port.`in`.command.PostCommandUseCase
 import org.around.ieuri.community.application.port.out.client.ClockPort
 import org.around.ieuri.community.application.port.out.client.ObjectStoragePort
@@ -110,10 +111,28 @@ class PostCommandService(
             raw.map { verifiedPhotoKey(it, memberId) }
         }
 
+        // 태그는 형식이 어긋나면 조용히 버리지 않고 거부한다 — 유저가 입력한 것이 사라지면
+        // 왜 안 붙었는지 알 수 없다.
+        val tags = command.tags?.map { raw ->
+            PostTag.parseOrNull(raw) ?: throw InvalidTagException()
+        }
+        if (tags != null && tags.size > PostTag.MAX_PER_POST) throw TooManyTagsException()
+
+        // 장소를 바꾼다면 좌표를 함께 받아 둔다 — 좌표 없이 장소만 바꾸면 그 글이 지역
+        // 피드의 거리순에서 조용히 사라진다.
+        val newSpotPoint = command.spotId?.let { spotId ->
+            val summary = spotLookupPort.findSummary(spotId) ?: throw SpotNotFoundException()
+            SpotPoint(longitude = summary.longitude, latitude = summary.latitude)
+        }
+
         val post = postRepositoryPort.findById(command.postId) ?: throw PostNotFoundException()
         if (post.authorId != memberId) throw NotPostOwnerException()
         if (!post.editBy(memberId, title, body)) throw HiddenPostNotEditableException()
         photoKeys?.let { post.replacePhotos(it) }
+        command.category?.let { post.changeCategory(it) }
+        // spotId가 null이어도 changeSpot이면 장소를 떼는 것이다 — null 하나로는 구분되지 않는다.
+        if (command.changeSpot) post.changeSpot(command.spotId, newSpotPoint)
+        tags?.let { post.replaceTags(it) }
         postRepositoryPort.save(post)
     }
 

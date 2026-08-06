@@ -33,6 +33,9 @@ interface PostPhotoJpaRepository : JpaRepository<PostPhotoEntity, Long> {
 /** 글의 태그. 입력 순서를 id 순서가 보존한다. */
 interface PostTagJpaRepository : JpaRepository<PostTagEntity, Long> {
     fun findByPostIdOrderByIdAsc(postId: Long): List<PostTagEntity>
+
+    /** 태그 교체 시 기존 행을 지운다. 지운 행 수는 쓰지 않는다. */
+    fun deleteByPostId(postId: Long): Long
 }
 
 /** 글 ↔ 카테고리. PK가 post_id라 findById가 곧 글 단위 조회다. */

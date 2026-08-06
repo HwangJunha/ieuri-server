@@ -113,6 +113,10 @@ class CommunityMutationResolver(
                 title = input.title,
                 body = input.body,
                 photoKeys = input.photoKeys,
+                category = input.category?.let { TargetCategory.valueOf(it.name) },
+                changeSpot = input.changeSpot ?: false,
+                spotId = input.spotId?.toLong(),
+                tags = input.tags,
             ),
             memberId,
         )

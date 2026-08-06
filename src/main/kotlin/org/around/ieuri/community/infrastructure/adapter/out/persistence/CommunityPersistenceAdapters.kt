@@ -14,6 +14,7 @@ import org.around.ieuri.community.domain.aggregate.Post
 import org.around.ieuri.community.domain.aggregate.PostLike
 import org.around.ieuri.community.domain.aggregate.Report
 import org.around.ieuri.community.domain.vo.ReportTargetType
+import org.around.ieuri.community.domain.vo.SpotPoint
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toDomain
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toChipEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toNewEntity
@@ -62,11 +63,15 @@ class PostPersistenceAdapter(
      */
     override fun findById(postId: Long): Post? {
         val entity = repository.findByIdAndDeletedAtIsNull(postId) ?: return null
+        // **좌표까지 함께 복원한다.** 빠뜨리면 장소를 바꾸지 않은 수정에서도 좌표가 null이 되어
+        // 연결 행이 지워지고, 그 글이 지역 피드에서 조용히 사라진다.
+        val spot = spotRepository.findById(postId).orElse(null)
         return entity.toDomain(
             category = requireNotNull(chipRepository.findById(postId).orElse(null)) {
                 "글($postId)에 카테고리 연결이 없다."
             }.category,
-            spotId = spotRepository.findById(postId).orElse(null)?.spotId,
+            spotId = spot?.spotId,
+            spotPoint = spot?.let { SpotPoint(longitude = it.mapX, latitude = it.mapY) },
             tags = tagRepository.findByPostIdOrderByIdAsc(postId).map { it.toPostTag() },
             photoKeys = photoRepository.findByPostIdOrderByPositionAsc(postId)
                 .map { it.toPhotoKey() },
@@ -76,7 +81,6 @@ class PostPersistenceAdapter(
     override fun save(post: Post): Post {
         val id = post.id ?: return create(post)
 
-        // 기존 글 갱신. 카테고리·장소·태그는 수정 대상이 아니라 그 행들을 건드리지 않는다.
         val entity = repository.findById(id).orElseThrow {
             IllegalStateException("갱신하려는 글($id)이 존재하지 않는다.")
         }
@@ -88,6 +92,9 @@ class PostPersistenceAdapter(
         entity.hidden = post.hidden
         entity.deletedAt = post.deletedAt
         replacePhotos(id, post)
+        replaceTags(id, post)
+        replaceChip(id, post)
+        replaceSpot(id, post)
         return post
     }
 
@@ -105,6 +112,7 @@ class PostPersistenceAdapter(
         return saved.toDomain(
             category = post.category,
             spotId = post.spotId,
+            spotPoint = post.spotPoint,
             tags = post.tags,
             photoKeys = post.photoKeys,
         )
@@ -121,6 +129,46 @@ class PostPersistenceAdapter(
         photoRepository.deleteByPostId(postId)
         photoRepository.flush()
         photoRepository.saveAll(post.toPhotoEntities(postId))
+    }
+
+    /** 태그도 사진과 같은 이유로 전량 교체한다 — 최대 5개라 비용이 무시할 만하다. */
+    private fun replaceTags(postId: Long, post: Post) {
+        tagRepository.deleteByPostId(postId)
+        tagRepository.flush()
+        tagRepository.saveAll(post.toTagEntities(postId))
+    }
+
+    /**
+     * 카테고리 연결. PK가 post_id라 **기존 행을 찾아 값만 바꾼다** — 지우고 다시 넣으면
+     * 같은 PK로 INSERT가 먼저 나가 충돌한다.
+     */
+    private fun replaceChip(postId: Long, post: Post) {
+        val chip = chipRepository.findById(postId).orElse(null)
+        if (chip == null) {
+            chipRepository.save(post.toChipEntity(postId))
+        } else {
+            chip.category = post.category
+        }
+    }
+
+    /**
+     * 장소 연결. **장소를 뗐으면 행을 지운다** — 남겨 두면 그 글이 지역 피드에 계속 뜬다.
+     *
+     * 좌표까지 함께 갱신한다. geography는 트리거가 map_x/map_y에서 파생시킨다.
+     */
+    private fun replaceSpot(postId: Long, post: Post) {
+        val existing = spotRepository.findById(postId).orElse(null)
+        val next = post.toSpotEntity(postId)
+        when {
+            next == null && existing != null -> spotRepository.delete(existing)
+            next == null -> Unit
+            existing == null -> spotRepository.save(next)
+            else -> {
+                existing.spotId = next.spotId
+                existing.mapX = next.mapX
+                existing.mapY = next.mapY
+            }
+        }
     }
 }
 

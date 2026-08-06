@@ -7,6 +7,7 @@ import org.around.ieuri.community.application.command.CreatePostCommand
 import org.around.ieuri.community.application.command.DeletePostCommand
 import org.around.ieuri.community.application.command.EditPostCommand
 import org.around.ieuri.community.application.exception.HiddenPostNotEditableException
+import org.around.ieuri.community.application.exception.InvalidTagException
 import org.around.ieuri.community.application.exception.NotPostOwnerException
 import org.around.ieuri.community.application.exception.PhotoNotUploadedException
 import org.around.ieuri.community.application.exception.PostBodyLengthInvalidException
@@ -22,11 +23,14 @@ import org.around.ieuri.community.application.port.out.client.SpotLookupPort
 import org.around.ieuri.community.application.port.out.persistence.PostRepositoryPort
 import org.around.ieuri.community.application.query.PostSpotView
 import org.around.ieuri.community.domain.aggregate.Post
+import org.around.ieuri.community.domain.vo.SpotPoint
+import org.around.ieuri.community.domain.vo.PostTag
 import org.around.ieuri.community.domain.vo.TargetCategory
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
@@ -235,10 +239,147 @@ class PostCommandServiceTest {
 
     private fun storedPost(hidden: Boolean = false, authorId: Long = memberId) = Post.restore(
         id = 1L, category = TargetCategory.TOURIST_SPOT,
-            spotId = spotId, authorId = authorId, tags = emptyList(),
+        spotId = spotId, authorId = authorId, tags = emptyList(),
+        // 저장소가 좌표까지 복원한다 — 빠뜨리면 장소를 안 바꾼 수정에서도 연결이 지워진다.
+        spotPoint = SpotPoint(127.0, 37.5),
         title = "원래 제목", body = "원래 본문", photoKeys = emptyList(),
         likeCount = 0, commentCount = 0, hidden = hidden, deletedAt = null, createdAt = now,
     )
+
+    // ---------- 카테고리·장소·태그 수정 ----------
+
+    @Test
+    fun `주지 않은 항목은 그대로 둔다`() {
+        val post = storedPost()
+        every { postRepository.findById(1L) } returns post
+        every { postRepository.save(any()) } returns post
+
+        service.editPost(EditPostCommand(1L, "새 제목", "새 본문", null), memberId)
+
+        // null은 "건드리지 않는다"는 뜻이다 — 빈 값과 다르다.
+        assertEquals(TargetCategory.TOURIST_SPOT, post.category)
+        assertEquals(spotId, post.spotId)
+        assertTrue(post.tags.isEmpty())
+    }
+
+    @Test
+    fun `장소를 바꾸지 않으면 좌표가 유지된다`() {
+        val post = storedPost()
+        every { postRepository.findById(1L) } returns post
+        every { postRepository.save(any()) } returns post
+
+        service.editPost(EditPostCommand(1L, "새 제목", "새 본문", null), memberId)
+
+        // 좌표가 날아가면 연결 행이 지워져 그 글이 지역 피드에서 조용히 사라진다.
+        assertEquals(SpotPoint(127.0, 37.5), post.spotPoint)
+    }
+
+    @Test
+    fun `카테고리를 바꿀 수 있다`() {
+        val post = storedPost()
+        every { postRepository.findById(1L) } returns post
+        every { postRepository.save(any()) } returns post
+
+        service.editPost(
+            EditPostCommand(1L, "제목", "본문", null, category = TargetCategory.RESTAURANT),
+            memberId,
+        )
+
+        assertEquals(TargetCategory.RESTAURANT, post.category)
+    }
+
+    @Test
+    fun `장소를 바꾸면 좌표도 함께 바뀐다`() {
+        val post = storedPost()
+        every { postRepository.findById(1L) } returns post
+        every { postRepository.save(any()) } returns post
+        every { spotLookup.findSummary(99L) } returns PostSpotView(
+            id = 99L, title = "새 장소", thumbnailImageUrl = "url", category = null,
+            longitude = 128.5, latitude = 35.5,
+        )
+
+        service.editPost(
+            EditPostCommand(1L, "제목", "본문", null, changeSpot = true, spotId = 99L),
+            memberId,
+        )
+
+        assertEquals(99L, post.spotId)
+        assertEquals(SpotPoint(128.5, 35.5), post.spotPoint)
+    }
+
+    @Test
+    fun `changeSpot으로 장소를 뗄 수 있다`() {
+        val post = storedPost()
+        every { postRepository.findById(1L) } returns post
+        every { postRepository.save(any()) } returns post
+
+        // spotId를 주지 않은 채 changeSpot만 true — 장소를 떼겠다는 뜻이다.
+        service.editPost(
+            EditPostCommand(1L, "제목", "본문", null, changeSpot = true, spotId = null),
+            memberId,
+        )
+
+        assertNull(post.spotId)
+        assertNull(post.spotPoint)
+    }
+
+    @Test
+    fun `없는 장소로 바꾸면 SPOT_NOT_FOUND다`() {
+        every { spotLookup.findSummary(99L) } returns null
+
+        assertFailsWith<SpotNotFoundException> {
+            service.editPost(
+                EditPostCommand(1L, "제목", "본문", null, changeSpot = true, spotId = 99L),
+                memberId,
+            )
+        }
+        verify(exactly = 0) { postRepository.save(any()) }
+    }
+
+    @Test
+    fun `태그를 교체할 수 있다`() {
+        val post = storedPost()
+        every { postRepository.findById(1L) } returns post
+        every { postRepository.save(any()) } returns post
+
+        service.editPost(
+            EditPostCommand(1L, "제목", "본문", null, tags = listOf("야경", "#사진")),
+            memberId,
+        )
+
+        // 선행 #은 제거되고 원문 표기는 보존된다.
+        assertEquals(listOf("야경", "사진"), post.tags.map { it.name })
+    }
+
+    @Test
+    fun `빈 배열을 주면 태그를 전부 뗀다`() {
+        val post = Post.restore(
+            id = 1L, category = TargetCategory.TOURIST_SPOT,
+            spotId = spotId, authorId = memberId,
+            spotPoint = SpotPoint(127.0, 37.5),
+            tags = listOf(PostTag.restore("야경", "야경")),
+            title = "제목", body = "본문", photoKeys = emptyList(),
+            likeCount = 0, commentCount = 0, hidden = false, deletedAt = null, createdAt = now,
+        )
+        every { postRepository.findById(1L) } returns post
+        every { postRepository.save(any()) } returns post
+
+        service.editPost(EditPostCommand(1L, "제목", "본문", null, tags = emptyList()), memberId)
+
+        // null(그대로 두기)과 빈 배열(전부 떼기)은 다르다.
+        assertTrue(post.tags.isEmpty())
+    }
+
+    @Test
+    fun `형식이 어긋난 태그는 거부한다`() {
+        assertFailsWith<InvalidTagException> {
+            service.editPost(
+                EditPostCommand(1L, "제목", "본문", null, tags = listOf("맛집 추천")),
+                memberId,
+            )
+        }
+        verify(exactly = 0) { postRepository.save(any()) }
+    }
 
     @Test
     fun `본인 글의 제목과 본문을 수정할 수 있다`() {

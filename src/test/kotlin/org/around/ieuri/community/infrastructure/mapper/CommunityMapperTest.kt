@@ -60,6 +60,7 @@ class CommunityMapperTest {
         val domain = entity.toDomain(
             category = TargetCategory.TOURIST_SPOT,
             spotId = 9L,
+            spotPoint = SpotPoint(127.0, 37.5),
             tags = listOf(tag),
             photoKeys = listOf(key),
         )
@@ -127,6 +128,7 @@ class CommunityMapperTest {
         val domain = entity.toDomain(
             category = TargetCategory.TOURIST_SPOT,
             spotId = null,
+            spotPoint = null,
             tags = emptyList(),
             photoKeys = emptyList(),
         )
