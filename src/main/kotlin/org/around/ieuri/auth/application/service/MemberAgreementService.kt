@@ -3,9 +3,9 @@ package org.around.ieuri.auth.application.service
 import org.around.ieuri.auth.application.command.AgreeToRequiredTermsCommand
 import org.around.ieuri.auth.application.command.UpdateAgreementCommand
 import org.around.ieuri.auth.application.exception.TermsCodeNotRequiredException
-import org.around.ieuri.auth.application.exception.TermsCodeNotTogglableException
 import org.around.ieuri.auth.application.exception.TermsNotFoundException
 import org.around.ieuri.auth.application.port.`in`.command.MemberAgreementUseCase
+import org.around.ieuri.auth.application.port.out.persistence.AuditLogPort
 import org.around.ieuri.auth.application.port.out.persistence.MemberAgreementRepositoryPort
 import org.around.ieuri.auth.application.port.out.persistence.TermsKey
 import org.around.ieuri.auth.application.port.out.persistence.TermsRepositoryPort
@@ -29,6 +29,7 @@ import java.time.Clock
 class MemberAgreementService(
     private val termsRepository: TermsRepositoryPort,
     private val agreementRepository: MemberAgreementRepositoryPort,
+    private val auditLog: AuditLogPort,
     private val clock: Clock,
 ) : MemberAgreementUseCase {
 
@@ -37,17 +38,18 @@ class MemberAgreementService(
         statusesOf(memberId, termsRepository.findActiveTerms(clock.instant()))
 
     /**
-     * 선택 약관만 토글한다. 필수 약관은 거절 — 철회 경로를 만들지 않는 것이 스펙의 결정이며,
-     * 필수 약관 철회는 사실상 서비스 이용 중단이라 탈퇴로만 가능하다.
+     * 약관 동의를 켜고 끈다. **필수 약관도 철회할 수 있다** — 동의 철회권은 동의와 대등한
+     * 수단으로 보장되어야 하며, 탈퇴로만 물릴 수 있게 하면 철회와 계정 삭제가 강제로 묶인다.
+     *
+     * 철회해도 서버가 다른 오퍼레이션을 거절하지는 않는다. 필수 약관을 철회하면
+     * `agreements`의 그 항목이 `required=true, agreed=false`가 되고, 이용 제한은
+     * 클라이언트가 그 값을 보고 건다(R11과 같은 규약).
      */
     @Transactional
     override fun updateAgreement(command: UpdateAgreementCommand): AgreementStatusView {
         val activeTerms = termsRepository.findActiveTerms(clock.instant())
         val terms = activeTerms.firstOrNull { it.code == command.termsCode }
             ?: throw TermsNotFoundException("시행 중인 약관이 아닙니다.")
-        if (terms.required) {
-            throw TermsCodeNotTogglableException("필수 약관은 개별로 끌 수 없습니다.")
-        }
 
         append(command.memberId, listOf(terms), command.agreed)
 
@@ -78,10 +80,30 @@ class MemberAgreementService(
         return statusesOf(command.memberId, activeTerms)
     }
 
-    /** 동의/비동의 행을 추가한다. 전부 같은 시각을 쓴다 — 한 번의 사용자 행위이기 때문이다. */
+    /**
+     * 동의/비동의 행을 추가한다. 전부 같은 시각을 쓴다 — 한 번의 사용자 행위이기 때문이다.
+     *
+     * **감사 로그에도 남긴다.** `member_terms_agreement`는 탈퇴 시 회원과 함께 지워지는데
+     * (FK 자식이다), 하필 철회·탈퇴가 증빙이 가장 필요한 사건이다. `member_audit_log`는
+     * FK가 없어 탈퇴 후에도 남으므로 그쪽이 이력의 최종 보관처다.
+     *
+     * 두 곳에 쓰는 이유는 역할이 다르기 때문이다 — 동의 테이블은 현재 상태 계산용(조회가
+     * 잦다)이고, 감사 로그는 보존용이다. 감사 로그로 상태를 계산하려 들면 JSONB 스캔이 된다.
+     */
     private fun append(memberId: Long, terms: List<TermsView>, agreed: Boolean) {
         if (terms.isEmpty()) return
         val now = clock.instant()
+
+        auditLog.record(
+            memberId = memberId,
+            eventType = if (agreed) "TERMS_AGREED" else "TERMS_WITHDRAWN",
+            // 약관 본문이 아니라 식별자만 담는다 — 개인정보를 로그에 남기지 않는다(POL-013).
+            payload = mapOf(
+                "terms" to terms.map { mapOf("code" to it.code, "version" to it.version, "required" to it.required) },
+                "agreed" to agreed,
+            ),
+        )
+
         agreementRepository.append(
             memberId,
             terms.map {

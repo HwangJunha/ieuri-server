@@ -52,7 +52,7 @@ type Mutation {
     confirmProfileImageUpload(input: ConfirmProfileImageUploadInput!): ConfirmProfileImageUploadPayload!
     "프로필 이미지 제거. 멱등 — 이미 없어도 성공한다."
     removeProfileImage: RemoveProfileImagePayload!
-    "선택 약관(LOCATION·MARKETING) 동의를 개별로 켜고 끈다. 필수 약관은 이 뮤테이션으로 다루지 않는다."
+    "약관 동의를 개별로 켜고 끈다. 필수 약관도 철회할 수 있으며, 철회하면 required가 참이면서 agreed가 거짓인 상태가 되어 클라이언트가 이용 게이트를 건다. 서버는 철회한 회원의 다른 오퍼레이션을 거절하지 않는다."
     updateAgreement(input: UpdateAgreementInput!): UpdateAgreementPayload!
     "미동의 상태인 필수 약관에 동의한다. 동의만 받으며 철회는 받지 않는다 — 필수 약관 철회는 사실상 서비스 이용 중단이므로 탈퇴로만 가능하다. 모든 필수 약관이 동의되면 이용 게이트가 해제된다."
     agreeToRequiredTerms(input: AgreeToRequiredTermsInput!): AgreeToRequiredTermsPayload!
@@ -119,7 +119,7 @@ type RemoveProfileImagePayload implements BaseResponse {
 }
 
 input UpdateAgreementInput {
-    "LOCATION 또는 MARKETING만 허용된다. 필수 약관 코드를 넣으면 실패한다."
+    "시행 중인 약관이어야 한다. 필수·선택을 가리지 않는다."
     termsCode: TermsCode!
     agreed: Boolean!
 }

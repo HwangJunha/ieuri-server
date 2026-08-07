@@ -7,9 +7,9 @@ import io.mockk.verify
 import org.around.ieuri.auth.application.command.AgreeToRequiredTermsCommand
 import org.around.ieuri.auth.application.command.UpdateAgreementCommand
 import org.around.ieuri.auth.application.exception.TermsCodeNotRequiredException
-import org.around.ieuri.auth.application.exception.TermsCodeNotTogglableException
 import org.around.ieuri.auth.application.exception.TermsNotFoundException
 import org.around.ieuri.auth.application.port.out.persistence.AgreementRecord
+import org.around.ieuri.auth.application.port.out.persistence.AuditLogPort
 import org.around.ieuri.auth.application.port.out.persistence.MemberAgreementRepositoryPort
 import org.around.ieuri.auth.application.port.out.persistence.TermsKey
 import org.around.ieuri.auth.application.port.out.persistence.TermsRepositoryPort
@@ -39,9 +39,11 @@ class MemberAgreementServiceTest {
 
     private val termsRepository = mockk<TermsRepositoryPort>()
     private val agreementRepository = mockk<MemberAgreementRepositoryPort>(relaxed = true)
+    private val auditLog = mockk<AuditLogPort>(relaxed = true)
     private val service = MemberAgreementService(
         termsRepository,
         agreementRepository,
+        auditLog,
         Clock.fixed(now, ZoneOffset.UTC),
     )
 
@@ -159,13 +161,63 @@ class MemberAgreementServiceTest {
     }
 
     @Test
-    fun `필수 약관은 토글할 수 없다`() {
+    fun `필수 약관도 철회할 수 있다`() {
+        // 동의 철회권은 동의와 대등한 수단으로 보장되어야 한다 — 탈퇴로만 물릴 수 있게 하면
+        // 철회와 계정 삭제가 강제로 묶인다.
         givenTerms()
+        givenHistory(TermsKey("SERVICE", "1.0") to AgreementRecord(false, now))
+        val appended = slot<List<Agreement>>()
+        every { agreementRepository.append(memberId, capture(appended)) } returns Unit
 
-        assertFailsWith<TermsCodeNotTogglableException> {
-            service.updateAgreement(UpdateAgreementCommand(memberId, "SERVICE", agreed = false))
-        }
-        verify(exactly = 0) { agreementRepository.append(any(), any()) }
+        val status = service.updateAgreement(UpdateAgreementCommand(memberId, "SERVICE", agreed = false))
+
+        assertFalse(status.agreed)
+        // 필수 약관이라는 사실은 그대로다 — 클라이언트는 이 조합으로 게이트를 건다.
+        assertTrue(status.required)
+        assertFalse(appended.captured.single().agreed)
+    }
+
+    @Test
+    fun `철회한 필수 약관은 다시 동의할 수 있다`() {
+        givenTerms()
+        givenHistory(TermsKey("SERVICE", "1.0") to AgreementRecord(true, now))
+
+        val status = service.updateAgreement(UpdateAgreementCommand(memberId, "SERVICE", agreed = true))
+
+        assertTrue(status.agreed)
+    }
+
+    // --- 감사 로그 (동의 이력 보존) ---
+
+    @Test
+    fun `동의와 철회를 감사 로그에 남긴다`() {
+        // member_terms_agreement는 탈퇴 시 회원과 함께 지워진다 — 철회·탈퇴가 증빙이 가장
+        // 필요한 사건인데 그때 사라지므로, FK가 없는 감사 로그가 최종 보관처다.
+        givenTerms()
+        givenHistory()
+
+        service.updateAgreement(UpdateAgreementCommand(memberId, "MARKETING", agreed = true))
+        verify { auditLog.record(memberId, "TERMS_AGREED", any()) }
+
+        service.updateAgreement(UpdateAgreementCommand(memberId, "MARKETING", agreed = false))
+        verify { auditLog.record(memberId, "TERMS_WITHDRAWN", any()) }
+    }
+
+    @Test
+    fun `감사 로그에 약관 식별자만 담고 본문은 담지 않는다`() {
+        givenTerms()
+        givenHistory()
+        val payload = slot<Map<String, Any?>>()
+        every { auditLog.record(memberId, any(), capture(payload)) } returns Unit
+
+        service.updateAgreement(UpdateAgreementCommand(memberId, "MARKETING", agreed = true))
+
+        val recorded = payload.captured
+        assertEquals(true, recorded["agreed"])
+        @Suppress("UNCHECKED_CAST")
+        val terms = recorded["terms"] as List<Map<String, Any?>>
+        assertEquals("MARKETING", terms.single()["code"])
+        assertEquals("1.0", terms.single()["version"])
     }
 
     @Test

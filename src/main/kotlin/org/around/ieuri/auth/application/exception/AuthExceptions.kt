@@ -86,10 +86,6 @@ class PhotoNotUploadedException(message: String) :
 class TermsNotFoundException(message: String) :
     UserFacingException("TERMS_NOT_FOUND", message)
 
-/** 필수 약관을 토글하려 할 때(R10). 필수 약관 철회 경로는 없다. */
-class TermsCodeNotTogglableException(message: String) :
-    UserFacingException("TERMS_CODE_NOT_TOGGLABLE", message)
-
 /** 선택 약관을 필수 동의 경로로 제출할 때(R12). */
 class TermsCodeNotRequiredException(message: String) :
     UserFacingException("TERMS_CODE_NOT_REQUIRED", message)
