@@ -33,7 +33,15 @@ class AppleClientSecretFactory(
             .compact()
     }
 
-    /** PEM(.p8)에서 헤더/푸터와 개행을 걷어내고 PKCS#8 EC 개인키로 만든다. */
+    /**
+     * PEM(.p8)에서 헤더/푸터와 개행을 걷어내고 PKCS#8 EC 개인키로 만든다.
+     * 개행이 리터럴 `\n`으로 오는 것은 환경변수로 여러 줄을 주입하기 때문이다.
+     *
+     * PEM 라이브러리를 쓰지 않는다 — 클래스패스의 nimbus-jose-jwt가 파서를 제공하지만
+     * BouncyCastle을 런타임에 요구하고, 그건 이 프로젝트에 없다. Apple .p8은 PKCS#8로
+     * 고정이라 JDK 표준(KeyFactory)이 그대로 읽으므로 한 형식 때문에 암호 라이브러리를
+     * 더할 이유가 없다. 다른 형식(PKCS#1, 암호화된 PEM)을 받아야 해지면 그때 도입한다.
+     */
     private fun parsePrivateKey(pem: String): PrivateKey {
         val base64 = pem
             .replace("-----BEGIN PRIVATE KEY-----", "")
