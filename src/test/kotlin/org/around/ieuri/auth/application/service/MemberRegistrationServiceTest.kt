@@ -23,6 +23,7 @@ import org.around.ieuri.auth.application.command.RequestPasswordResetCommand
 import org.around.ieuri.auth.application.command.ResetPasswordCommand
 import org.around.ieuri.auth.application.event.PasswordResetRequested
 import org.around.ieuri.auth.application.port.out.persistence.EmailAuthentication
+import org.around.ieuri.auth.application.port.out.persistence.MemberProfileRepositoryPort
 import org.around.ieuri.auth.application.port.out.persistence.PasswordResetRepositoryPort
 import org.around.ieuri.auth.application.port.out.persistence.TermsView
 import org.around.ieuri.auth.application.port.out.security.PasswordEncoderPort
@@ -34,6 +35,8 @@ import org.around.ieuri.auth.domain.event.EmailVerified
 import org.around.ieuri.auth.domain.event.MemberRegistered
 import org.around.ieuri.auth.domain.vo.MemberStatus
 import org.around.ieuri.auth.domain.vo.Provider
+import org.around.ieuri.auth.domain.strategy.NicknameGenerator
+import kotlin.random.Random
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -64,9 +67,16 @@ class MemberRegistrationServiceTest {
     private val refreshTokenStore = mockk<RefreshTokenStorePort>(relaxed = true)
     private val clock = Clock.fixed(Instant.parse("2026-07-16T00:00:00Z"), ZoneOffset.UTC)
 
+    /** 가입 시 닉네임은 자동 생성된다(SPEC-0011 R20). 기본은 충돌 없음. */
+    private val profileRepository = mockk<MemberProfileRepositoryPort> {
+        every { existsByNicknameExcludingMember(any(), any()) } returns false
+    }
+    private val nicknameGenerator = NicknameGenerator(Random(20260807))
+
     private val service = MemberRegistrationService(
         snsVerifier, memberRepository, roleRepository, termsRepository, verificationRepository,
-        passwordResetRepository, refreshTokenStore, codeGenerator, auditLog, eventPublisher, policy, passwordEncoder, clock,
+        passwordResetRepository, refreshTokenStore, codeGenerator, auditLog, eventPublisher, policy, passwordEncoder,
+        profileRepository, nicknameGenerator, clock,
     )
 
     private val activeTerms = listOf(

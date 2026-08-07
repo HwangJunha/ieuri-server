@@ -139,3 +139,9 @@ data class BlockedUsersQuery(
     val first: Int,
     val after: String?,
 )
+
+/** 내가 쓴 글 조회 조건(SPEC-0011 R3). 위치·카테고리 인자가 없다 — 소유 글 조회는 위치와 무관하다. */
+data class MyPostsQuery(
+    val first: Int,
+    val after: String?,
+)

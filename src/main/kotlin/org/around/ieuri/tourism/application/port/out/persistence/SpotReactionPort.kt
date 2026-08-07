@@ -12,4 +12,7 @@ interface SpotReactionPort {
 
     /** 신규 생성 또는 재평가 저장(upsert). */
     fun save(reaction: SpotReaction)
+
+    /** 탈퇴 회원의 기록 전량 삭제(SPEC-0011 R17). 지운 행 수를 돌려준다. */
+    fun deleteByMember(memberId: Long): Long
 }

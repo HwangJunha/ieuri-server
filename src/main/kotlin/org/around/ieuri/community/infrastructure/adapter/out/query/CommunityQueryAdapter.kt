@@ -15,6 +15,7 @@ import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.cursorPageOf
 import org.around.ieuri.community.application.port.out.query.BlockedUsersSearch
 import org.around.ieuri.community.application.port.out.query.CommunityQueryPort
+import org.around.ieuri.community.application.port.out.query.MyPostsSearch
 import org.around.ieuri.community.application.port.out.query.PostCommentsSearch
 import org.around.ieuri.community.application.port.out.query.PostsArea
 import org.around.ieuri.community.application.port.out.query.PostsSearch
@@ -234,6 +235,39 @@ class CommunityQueryAdapter(
             .from(post)
             .where(post.id.eq(postId))
             .fetchOne()
+
+    /**
+     * 내가 쓴 글(SPEC-0011 R3). **[visibleToViewer]를 쓰지 않는다** — 자기 글은 자기가
+     * 숨겼더라도 마이페이지에 보여야 하고, 자기 자신과는 차단 관계가 없다.
+     * 걸러 내는 것은 삭제된 글뿐이다.
+     */
+    @Transactional(readOnly = true)
+    override fun findMyPosts(search: MyPostsSearch): CursorPage<PostView> {
+        val cursor = search.after?.let { decodeCursor(it) }
+        // 자기 글만 보므로 차단·숨김 집합이 필요 없다. 빈 컨텍스트가 곧 필터 없음이다.
+        val viewer = ViewerContext(memberId = search.memberId, blockedMemberIds = emptySet())
+
+        val rows = queryFactory
+            .selectFrom(post)
+            .where(
+                post.authorId.eq(search.memberId),
+                post.deletedAt.isNull,
+                cursor?.let { keysetCondition(post.createdAt, post.id, it) },
+            )
+            .orderBy(post.createdAt.desc(), post.id.desc())
+            .limit((search.first + 1).toLong())
+            .fetch()
+
+        val hasNextPage = rows.size > search.first
+        val pageRows = if (hasNextPage) rows.take(search.first) else rows
+        val edges = pageRows.map { entity ->
+            CursorEdge(
+                cursor = encodeCursor(requireNotNull(entity.createdAt), requireNotNull(entity.id)),
+                node = entity.toPostView(viewer),
+            )
+        }
+        return cursorPageOf(edges, hasNextPage = hasNextPage, hasPreviousPage = cursor != null)
+    }
 
     @Transactional(readOnly = true)
     override fun findBlockedUsers(search: BlockedUsersSearch): CursorPage<BlockedUserView> {

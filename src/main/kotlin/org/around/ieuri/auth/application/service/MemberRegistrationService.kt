@@ -22,6 +22,7 @@ import org.around.ieuri.auth.application.port.out.client.SnsIdentityVerifierPort
 import org.around.ieuri.auth.application.port.out.event.DomainEventPublisherPort
 import org.around.ieuri.auth.application.port.out.persistence.AuditLogPort
 import org.around.ieuri.auth.application.port.out.persistence.EmailVerificationRepositoryPort
+import org.around.ieuri.auth.application.port.out.persistence.MemberProfileRepositoryPort
 import org.around.ieuri.auth.application.port.out.persistence.MemberRepositoryPort
 import org.around.ieuri.auth.application.port.out.persistence.PasswordResetRepositoryPort
 import org.around.ieuri.auth.application.port.out.persistence.RoleRepositoryPort
@@ -36,6 +37,7 @@ import org.around.ieuri.auth.domain.aggregate.Role
 import org.around.ieuri.auth.domain.aggregate.VerificationResult
 import org.around.ieuri.auth.domain.event.EmailVerified
 import org.around.ieuri.auth.domain.event.MemberRegistered
+import org.around.ieuri.auth.domain.strategy.NicknameGenerator
 import org.around.ieuri.auth.domain.vo.Agreement
 import org.around.ieuri.auth.domain.vo.Email
 import org.around.ieuri.auth.domain.vo.Nickname
@@ -65,8 +67,21 @@ class MemberRegistrationService(
     private val eventPublisher: DomainEventPublisherPort,
     private val verificationPolicy: VerificationPolicy,
     private val passwordEncoder: PasswordEncoderPort,
+    private val profileRepository: MemberProfileRepositoryPort,
+    private val nicknameGenerator: NicknameGenerator,
     private val clock: Clock,
 ) : MemberRegistrationUseCase {
+
+    /**
+     * 가입 시 닉네임 자동 생성(SPEC-0011 R20). 이미 쓰이는 값이면 생성기가 다시 뽑는다.
+     *
+     * 회원이 아직 없어 "본인 제외"의 기준이 없으므로 [NEW_MEMBER_ID]로 조회한다 —
+     * 존재하지 않는 id라 사실상 전체 대상 조회다.
+     */
+    private fun generateNickname(): Nickname =
+        nicknameGenerator.generate { candidate ->
+            profileRepository.existsByNicknameExcludingMember(candidate, NEW_MEMBER_ID)
+        }
 
     @Transactional
     override fun registerBySns(command: RegisterMemberCommand): RegisterMemberResult {
@@ -81,7 +96,9 @@ class MemberRegistrationService(
 
         val submittedEmail = Email(command.submittedEmail)
         val providerEmail = identity.email?.let { Email(it) }
-        val nickname = Nickname(identity.nickname?.takeIf { it.isNotBlank() } ?: "여행자")
+        // provider가 준 값을 쓰지 않는다(SPEC-0011 R20, POL-006 개정) — 실명이 그대로
+        // 노출되거나 같은 값이 여러 회원에게 들어와 고유성을 깨뜨린다.
+        val nickname = generateNickname()
 
         val (agreements, requiredCodes) = buildAgreements(command.agreements, now)
 
@@ -148,7 +165,8 @@ class MemberRegistrationService(
 
         val (agreements, requiredCodes) = buildAgreements(command.agreements, now)
         val passwordHash = PasswordHash(passwordEncoder.encode(command.password))
-        val nickname = Nickname(email.value.substringBefore('@').take(NICKNAME_MAX_LENGTH))
+        // 이메일 로컬파트를 쓰지 않는다(R20) — 주소 일부가 표시명으로 새어 나간다.
+        val nickname = generateNickname()
 
         val member = Member.registerByEmail(
             email = email,
@@ -317,6 +335,7 @@ class MemberRegistrationService(
     private data class AgreementBuild(val agreements: List<Agreement>, val requiredCodes: Set<String>)
 
     private companion object {
-        const val NICKNAME_MAX_LENGTH = 50
+        /** 아직 회원이 없어 '본인 제외'의 기준이 없을 때 쓰는 자리값. 존재하지 않는 id다. */
+        const val NEW_MEMBER_ID = 0L
     }
 }

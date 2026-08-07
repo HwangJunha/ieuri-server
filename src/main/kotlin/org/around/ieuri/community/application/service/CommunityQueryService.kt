@@ -7,6 +7,7 @@ import org.around.ieuri.community.application.port.`in`.query.CommunityQueryUseC
 import org.around.ieuri.community.application.port.out.client.SpotLookupPort
 import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
 import org.around.ieuri.community.application.port.out.query.BlockedUsersSearch
+import org.around.ieuri.community.application.port.out.query.MyPostsSearch
 import org.around.ieuri.community.application.port.out.query.CommunityQueryPort
 import org.around.ieuri.community.application.port.out.query.PostCommentsSearch
 import org.around.ieuri.community.application.port.out.query.PostSpatialQueryPort
@@ -19,6 +20,7 @@ import org.around.ieuri.community.application.query.BlockedUsersQuery
 import org.around.ieuri.community.application.query.CommentView
 import org.around.ieuri.community.application.query.PostCommentsQuery
 import org.around.ieuri.community.application.query.PostView
+import org.around.ieuri.community.application.query.MyPostsQuery
 import org.around.ieuri.community.application.query.PostsQuery
 import org.around.ieuri.community.domain.vo.AppKey
 import org.around.ieuri.community.domain.vo.ContentLanguage
@@ -153,6 +155,19 @@ class CommunityQueryService(
     override fun blockedUsers(query: BlockedUsersQuery, memberId: Long): CursorPage<BlockedUserView> =
         communityQueryPort.findBlockedUsers(
             BlockedUsersSearch(
+                memberId = memberId,
+                first = clampPageSize(query.first),
+                after = query.after,
+            ),
+        )
+
+    /**
+     * 내가 쓴 글. **[viewerContext]를 쓰지 않는다** — 차단·숨김 집합을 읽을 이유가 없고,
+     * 자기 글은 자기가 숨겼더라도 마이페이지에 보여야 한다(R3).
+     */
+    override fun myPosts(query: MyPostsQuery, memberId: Long): CursorPage<PostView> =
+        communityQueryPort.findMyPosts(
+            MyPostsSearch(
                 memberId = memberId,
                 first = clampPageSize(query.first),
                 after = query.after,

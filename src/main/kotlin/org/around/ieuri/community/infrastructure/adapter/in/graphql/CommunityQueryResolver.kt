@@ -17,6 +17,7 @@ import org.around.ieuri.community.application.query.PostAuthorView
 import org.around.ieuri.community.application.query.PostSpotView
 import org.around.ieuri.community.application.query.PostCommentsQuery
 import org.around.ieuri.community.application.query.PostView
+import org.around.ieuri.community.application.query.MyPostsQuery
 import org.around.ieuri.community.application.query.PostsQuery
 import org.around.ieuri.community.domain.vo.PostSortOrder
 import org.around.ieuri.community.domain.vo.TargetCategory
@@ -84,6 +85,26 @@ class CommunityQueryResolver(
                 first = first ?: DEFAULT_PAGE_SIZE,
                 after = after,
             ),
+            memberId = memberId,
+        )
+        return PostConnection(
+            edges = page.edges.map { PostEdge(cursor = it.cursor, node = it.node) },
+            pageInfo = page.pageInfo.toGql(),
+        )
+    }
+
+    /**
+     * 내가 쓴 글(SPEC-0011 R3). 위치·반경 인자가 없고 숨김·차단 필터도 걸리지 않는다 —
+     * 자기 글은 자기가 숨겼더라도 마이페이지에 보여야 한다.
+     */
+    @DgsQuery
+    fun myPosts(
+        @InputArgument first: Int?,
+        @InputArgument after: String?,
+    ): PostConnection {
+        val memberId = currentMemberProvider.requireMemberId()
+        val page = communityQueryUseCase.myPosts(
+            MyPostsQuery(first = first ?: DEFAULT_PAGE_SIZE, after = after),
             memberId = memberId,
         )
         return PostConnection(

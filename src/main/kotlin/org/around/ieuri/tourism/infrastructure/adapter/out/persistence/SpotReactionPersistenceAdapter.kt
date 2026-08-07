@@ -34,4 +34,10 @@ class SpotReactionPersistenceAdapter(
         }
         repository.save(reaction.toNewEntity())
     }
+
+    /**
+     * 파생 삭제라 영속성 컨텍스트를 우회한다. 이 트랜잭션에서 같은 엔티티를 다시 읽는 코드가
+     * 없으므로 안전하다. 트랜잭션은 호출자(서비스)가 연다.
+     */
+    override fun deleteByMember(memberId: Long): Long = repository.deleteByMemberId(memberId)
 }

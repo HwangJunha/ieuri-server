@@ -44,6 +44,10 @@ spring:
     # (기존 DB에 Flyway를 도입하는 표준 방식). baseline-version=0이라 V1 마이그레이션이 스킵되지 않는다.
     baseline-on-migrate: true
     baseline-version: 0
+    # 적용된 적 있는 R__ 파일을 지우면 validate가 APPLIED_REPEATABLE_MIGRATION_NOT_RESOLVED로
+    # 막는다. 시드용 R__은 의도적으로 지울 수 있으므로(R__seed_test_account를 시드더로 옮겼다)
+    # 그 경우만 무시한다. 버전 마이그레이션(V__)의 누락·체크섬 변경은 그대로 잡힌다.
+    ignore-migration-patterns: "repeatable:missing"
   data:
     redis:
       # refresh 토큰 저장소(Valkey, Redis 프로토콜 호환). 값은 전부 환경변수 외부화.
@@ -103,6 +107,15 @@ ieuri:
     secret-access-key: ${IEURI_R2_SECRET_ACCESS_KEY:}
     bucket: ${IEURI_R2_BUCKET:ieuri-dev}
     # 여러 장을 연달아 올리는 동안 만료되지 않아야 한다. 모바일에서 대용량 사진은 느리다.
+    upload-url-ttl: 30m
+    max-upload-bytes: 10485760
+    allowed-content-types:
+      - image/jpeg
+      - image/png
+      - image/webp
+  # 프로필 이미지(SPEC-0011 R6). 버킷은 r2와 같아도 되며 경로가 profile/ 구간으로 갈린다.
+  profile-image:
+    bucket: ${IEURI_R2_BUCKET:ieuri-dev}
     upload-url-ttl: 30m
     max-upload-bytes: 10485760
     allowed-content-types:

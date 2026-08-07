@@ -9,6 +9,8 @@ type Query {
     members(status: MemberStatus, roleCode: String, first: Int = 20, after: String): MemberConnection!
     "할당 가능한 역할 목록. role:assign 권한이 필요하다."
     assignableRoles: [RoleInfo!]!
+    "호출자의 약관별 동의 상태. 필수·선택을 모두 포함한다. required가 참이면서 agreed가 거짓인 항목이 있으면 클라이언트가 이용 게이트를 건다."
+    agreements: [AgreementStatus!]!
 }
 
 type Mutation {
@@ -42,6 +44,103 @@ type Mutation {
     assignRole(input: AssignRoleInput!): RoleChangePayload!
     "역할 회수(관리자). role:revoke 권한 필요. 본인의 마지막 관리 역할 회수는 거부된다."
     revokeRole(input: RevokeRoleInput!): RoleChangePayload!
+    "닉네임 변경. 회원 간 고유해야 하며 중복 시 실패한다."
+    changeNickname(input: ChangeNicknameInput!): ChangeNicknamePayload!
+    "프로필 이미지 업로드용 presigned PUT URL 발급. profile 네임스페이스의 단일 오브젝트 키를 쓴다(게시물 이미지 키와 분리된다). 실제 업로드는 클라이언트가 오브젝트 스토리지로 직접 PUT하며 GraphQL을 거치지 않는다."
+    createProfileImageUploadUrl(input: CreateProfileImageUploadUrlInput!): CreateProfileImageUploadUrlPayload!
+    "프로필 이미지 업로드 완료 확인. 서버가 실제 크기와 매직바이트를 검증하고 통과하면 확정 위치로 옮겨 회원에 반영한다."
+    confirmProfileImageUpload(input: ConfirmProfileImageUploadInput!): ConfirmProfileImageUploadPayload!
+    "프로필 이미지 제거. 멱등 — 이미 없어도 성공한다."
+    removeProfileImage: RemoveProfileImagePayload!
+    "약관 동의를 개별로 켜고 끈다. 필수 약관도 철회할 수 있으며, 철회하면 required가 참이면서 agreed가 거짓인 상태가 되어 클라이언트가 이용 게이트를 건다. 서버는 철회한 회원의 다른 오퍼레이션을 거절하지 않는다."
+    updateAgreement(input: UpdateAgreementInput!): UpdateAgreementPayload!
+    "미동의 상태인 필수 약관에 동의한다. 동의만 받으며 철회는 받지 않는다 — 필수 약관 철회는 사실상 서비스 이용 중단이므로 탈퇴로만 가능하다. 모든 필수 약관이 동의되면 이용 게이트가 해제된다."
+    agreeToRequiredTerms(input: AgreeToRequiredTermsInput!): AgreeToRequiredTermsPayload!
+}
+
+"약관 1건에 대한 호출자의 동의 상태."
+type AgreementStatus {
+    termsCode: TermsCode!
+    "필수 약관 여부. 참이면 미동의 시 이용 게이트 대상이다."
+    required: Boolean!
+    "현재 시행 중인 버전에 대한 동의 여부. 새 버전이 시행되면 이전 버전의 동의는 이월되지 않으므로 거짓이 된다."
+    agreed: Boolean!
+    "현재 시행 중인 버전에 동의한 시각(ISO-8601). 미동의 상태면 null이다."
+    agreedAt: String
+    "현재 시행 중인 약관 문서 버전."
+    version: String!
+}
+
+input ChangeNicknameInput {
+    "앞뒤 공백은 제거되어 저장된다. 2자 이상 20자 이하."
+    nickname: String!
+}
+
+type ChangeNicknamePayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+    "성공 시 반영된 닉네임."
+    nickname: String
+}
+
+input CreateProfileImageUploadUrlInput {
+    "image/jpeg · image/png · image/webp만 허용된다. 서명에 포함되므로 업로드 요청의 Content-Type과 정확히 일치해야 한다."
+    contentType: String!
+    "선언한 바이트 크기. 상한 10485760(10MiB). 서명에 포함되므로 Content-Length와 정확히 일치해야 한다."
+    contentLength: Int!
+}
+
+type CreateProfileImageUploadUrlPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+    "presigned PUT URL. 단일 오브젝트 키 스코프. 실패 시 null."
+    uploadUrl: String
+    "업로드 후 confirmProfileImageUpload로 되돌려줄 임시 오브젝트 키. profile 네임스페이스."
+    objectKey: String
+    "발급 시각 + 30분(ISO-8601)."
+    expiresAt: String
+}
+
+input ConfirmProfileImageUploadInput {
+    "createProfileImageUploadUrl이 반환한 임시 키."
+    objectKey: String!
+}
+
+type ConfirmProfileImageUploadPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+    "반영된 최종 오브젝트 키. 서버는 이미지 바이트를 중계하지 않으며 클라이언트가 CDN 베이스 URL과 조합해 사용한다."
+    profileImageKey: String
+}
+
+type RemoveProfileImagePayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+}
+
+input UpdateAgreementInput {
+    "시행 중인 약관이어야 한다. 필수·선택을 가리지 않는다."
+    termsCode: TermsCode!
+    agreed: Boolean!
+}
+
+type UpdateAgreementPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+    "반영 후의 상태."
+    agreement: AgreementStatus
+}
+
+input AgreeToRequiredTermsInput {
+    "동의할 필수 약관 코드. 미동의 상태인 필수 약관을 한 번에 넘긴다. 선택 약관 코드를 넣으면 실패한다."
+    termsCodes: [TermsCode!]!
+}
+
+type AgreeToRequiredTermsPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+    "반영 후 전체 약관 상태. 클라이언트가 게이트 해제 여부를 이 값으로 재계산한다."
+    agreements: [AgreementStatus!]!
 }
 
 "모든 mutation 응답이 구현하는 공통 규약. success와 도메인 검증 실패(userErrors)를 담는다."

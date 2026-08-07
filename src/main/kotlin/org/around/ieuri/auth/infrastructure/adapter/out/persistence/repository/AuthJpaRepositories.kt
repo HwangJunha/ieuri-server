@@ -21,10 +21,22 @@ interface MemberJpaRepository : JpaRepository<MemberEntity, Long> {
 interface MemberProfileJpaRepository : JpaRepository<MemberProfileEntity, Long> {
     fun findByMemberId(memberId: Long): MemberProfileEntity?
     fun deleteByMemberId(memberId: Long)
+
+    /** 닉네임 중복 판정. 본인은 제외한다 — 같은 값 재제출은 중복이 아니다(SPEC-0011 R5). */
+    fun existsByNicknameAndMemberIdNot(nickname: String, memberId: Long): Boolean
 }
 
 interface MemberTermsAgreementJpaRepository : JpaRepository<MemberTermsAgreementEntity, Long> {
     fun deleteByMemberId(memberId: Long)
+
+    /**
+     * 회원의 약관별 **현재 상태**. `(member_id, terms_id)` 유일 제약(V38) 덕분에 약관 하나에
+     * 한 행이며, 여기서 고를 것이 없다 — 이력은 member_audit_log가 갖는다.
+     */
+    fun findByMemberId(memberId: Long): List<MemberTermsAgreementEntity>
+
+    /** 재동의·철회 시 갱신할 관리 엔티티. 없으면 신규 동의다. */
+    fun findByMemberIdAndTermsId(memberId: Long, termsId: Long): MemberTermsAgreementEntity?
 }
 
 interface TermsJpaRepository : JpaRepository<TermsEntity, Long> {

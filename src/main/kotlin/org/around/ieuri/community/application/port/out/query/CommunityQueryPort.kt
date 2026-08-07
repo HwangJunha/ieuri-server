@@ -81,6 +81,14 @@ interface CommunityQueryPort {
     fun findBlockedUsers(search: BlockedUsersSearch): CursorPage<BlockedUserView>
 
     /**
+     * 본인이 작성한 글(SPEC-0011 R3). 작성 시각 내림차순.
+     *
+     * **모더레이션 필터를 거치지 않는다** — 자기 글은 자기가 숨겼더라도 마이페이지에 보여야
+     * 하고, 자기 자신과는 차단 관계가 없다. 삭제된 글만 제외한다.
+     */
+    fun findMyPosts(search: MyPostsSearch): CursorPage<PostView>
+
+    /**
      * [memberId]와 차단 관계에 있는 상대의 id. **양방향을 한 번의 쿼리로** 읽는다 —
      * 내가 차단한 쪽과 나를 차단한 쪽을 OR로 묶고 상대 id만 프로젝션한다.
      */
@@ -184,6 +192,13 @@ data class PostCommentsSearch(
 )
 
 data class BlockedUsersSearch(
+    val memberId: Long,
+    val first: Int,
+    val after: String?,
+)
+
+/** 내가 쓴 글 조회 조건(SPEC-0011 R3). 위치·카테고리로 좁히지 않는다. */
+data class MyPostsSearch(
     val memberId: Long,
     val first: Int,
     val after: String?,
