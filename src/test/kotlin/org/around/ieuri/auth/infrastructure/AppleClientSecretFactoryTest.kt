@@ -3,12 +3,15 @@ package org.around.ieuri.auth.infrastructure
 import io.jsonwebtoken.Jwts
 import org.around.ieuri.auth.infrastructure.adapter.out.client.AppleClientSecretFactory
 import org.around.ieuri.auth.infrastructure.config.SnsRevokeProperties
+import org.springframework.core.io.ByteArrayResource
 import java.security.KeyPairGenerator
 import java.security.spec.ECGenParameterSpec
 import java.time.Instant
 import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -24,20 +27,20 @@ class AppleClientSecretFactoryTest {
         initialize(ECGenParameterSpec("secp256r1"))
     }.generateKeyPair()
 
-    /** 애플 .p8과 같은 형식(PKCS#8 PEM)을 만들고, 환경변수 주입처럼 개행을 리터럴 \n으로 바꾼다. */
-    private val escapedPem: String = buildString {
+    /** 애플 .p8과 같은 형식(PKCS#8 PEM). 실제 파일처럼 Resource로 넘긴다. */
+    private val pem: String = buildString {
         append("-----BEGIN PRIVATE KEY-----\n")
         append(Base64.getMimeEncoder(64, "\n".toByteArray()).encodeToString(keyPair.private.encoded))
         append("\n-----END PRIVATE KEY-----\n")
-    }.replace("\n", "\\n")
+    }
 
-    private fun factory(privateKey: String = escapedPem) = AppleClientSecretFactory(
+    private fun factory(privateKeyPem: String = pem) = AppleClientSecretFactory(
         SnsRevokeProperties(
             apple = SnsRevokeProperties.Apple(
                 teamId = "TEAM123456",
                 keyId = "KEY7890123",
                 clientId = "kr.ieuri.example",
-                privateKey = privateKey,
+                privateKeyLocation = ByteArrayResource(privateKeyPem.toByteArray()),
             ),
         ),
     )
@@ -71,10 +74,17 @@ class AppleClientSecretFactoryTest {
     }
 
     @Test
-    fun `개행이 그대로인 PEM도 읽는다`() {
-        // 주입 방식에 따라 실제 개행으로 올 수도 있다. 둘 다 같은 키로 해석되어야 한다.
-        val literalNewlinePem = escapedPem.replace("\\n", "\n")
-        val secret = factory(literalNewlinePem).create(now)
-        assertEquals("ES256", Jwts.parser().verifyWith(keyPair.public).build().parseSignedClaims(secret).header.algorithm)
+    fun `키 경로가 없으면 설정되지 않은 것으로 본다`() {
+        // 자격증명 미설정 시 해제를 시도하지 않고 실패로 기록만 남긴다(R11).
+        val notConfigured = SnsRevokeProperties.Apple(
+            teamId = "TEAM123456",
+            keyId = "KEY7890123",
+            clientId = "kr.ieuri.example",
+            privateKeyLocation = null,
+        )
+        assertFalse(notConfigured.isConfigured())
+        assertFailsWith<IllegalArgumentException> {
+            AppleClientSecretFactory(SnsRevokeProperties(apple = notConfigured)).create(now)
+        }
     }
 }

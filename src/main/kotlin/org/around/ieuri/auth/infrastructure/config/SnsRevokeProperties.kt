@@ -1,6 +1,7 @@
 package org.around.ieuri.auth.infrastructure.config
 
 import org.springframework.boot.context.properties.ConfigurationProperties
+import org.springframework.core.io.Resource
 import java.time.Duration
 
 /**
@@ -17,15 +18,23 @@ data class SnsRevokeProperties(
     val kakao: Kakao = Kakao(),
     val timeout: Duration = Duration.ofSeconds(3),
 ) {
-    /** client secret을 ES256 JWT로 직접 서명해야 한다. privateKey는 .p8 파일의 PEM 내용이다. */
+    /**
+     * client secret을 ES256 JWT로 직접 서명해야 한다.
+     *
+     * 개인키는 **파일 경로로만** 받는다(`file:`/`classpath:` 접두사를 Spring이 해석한다).
+     * 여러 줄 PEM을 환경변수에 넣으려면 개행을 이스케이프해야 해서 깨지기 쉽고,
+     * 환경변수는 `/proc/<pid>/environ`과 크래시 덤프에 노출된다.
+     * k8s/k3s에서는 Secret을 볼륨으로 마운트하고 그 경로를 주면 된다.
+     */
     data class Apple(
         val teamId: String = "",
         val keyId: String = "",
         val clientId: String = "",
-        val privateKey: String = "",
+        val privateKeyLocation: Resource? = null,
     ) {
         fun isConfigured(): Boolean =
-            teamId.isNotBlank() && keyId.isNotBlank() && clientId.isNotBlank() && privateKey.isNotBlank()
+            teamId.isNotBlank() && keyId.isNotBlank() && clientId.isNotBlank() &&
+                privateKeyLocation?.exists() == true
     }
 
     /** client secret 문자열을 그대로 쓴다. */

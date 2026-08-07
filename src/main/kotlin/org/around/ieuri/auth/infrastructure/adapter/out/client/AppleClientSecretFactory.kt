@@ -11,16 +11,26 @@ import java.util.Base64
 import java.util.Date
 
 /**
- * 애플 client secret 생성기. 애플은 client secret 문자열이 아니라 **ES256으로 직접 서명한 JWT**를 요구한다.
+ * 애플 client secret 생성기. 애플은 client secret 문자열이 아니라 **ES256으로 서명한 JWT**를 요구한다.
  * (iss=teamId, sub=clientId, aud=https://appleid.apple.com, kid 헤더=keyId)
  *
- * 개인키는 개발자 계정에서 받은 .p8 파일의 PEM 내용이며 환경변수로만 주입된다.
+ * 개인키(.p8)는 기동 시 한 번만 읽어 캐시한다 — 탈퇴마다 디스크를 읽을 이유가 없고,
+ * 키가 없거나 형식이 깨졌으면 첫 탈퇴가 아니라 기동 시점에 드러나는 편이 낫다.
  */
 @Component
 class AppleClientSecretFactory(
     private val properties: SnsRevokeProperties,
 ) {
+    /** 자격증명 미설정이면 null이다(해제를 시도하지 않고 실패로 기록만 남긴다. R11). */
+    private val privateKey: PrivateKey? = properties.apple
+        .takeIf { it.isConfigured() }
+        ?.privateKeyLocation
+        ?.let { resource ->
+            parsePrivateKey(resource.inputStream.use { it.readBytes().toString(Charsets.UTF_8) })
+        }
+
     fun create(now: Instant): String {
+        val key = requireNotNull(privateKey) { "애플 revoke 개인키가 설정되지 않았습니다." }
         val apple = properties.apple
         return Jwts.builder()
             .header().keyId(apple.keyId).and()
@@ -29,24 +39,22 @@ class AppleClientSecretFactory(
             .audience().add(APPLE_AUDIENCE).and()
             .issuedAt(Date.from(now))
             .expiration(Date.from(now.plusSeconds(SECRET_TTL_SECONDS)))
-            .signWith(parsePrivateKey(apple.privateKey))
+            .signWith(key)
             .compact()
     }
 
     /**
-     * PEM(.p8)에서 헤더/푸터와 개행을 걷어내고 PKCS#8 EC 개인키로 만든다.
-     * 개행이 리터럴 `\n`으로 오는 것은 환경변수로 여러 줄을 주입하기 때문이다.
+     * PEM(.p8)에서 헤더/푸터를 걷어내고 PKCS#8 EC 개인키로 만든다.
      *
-     * PEM 라이브러리를 쓰지 않는다 — 클래스패스의 nimbus-jose-jwt가 파서를 제공하지만
-     * BouncyCastle을 런타임에 요구하고, 그건 이 프로젝트에 없다. Apple .p8은 PKCS#8로
-     * 고정이라 JDK 표준(KeyFactory)이 그대로 읽으므로 한 형식 때문에 암호 라이브러리를
-     * 더할 이유가 없다. 다른 형식(PKCS#1, 암호화된 PEM)을 받아야 해지면 그때 도입한다.
+     * PEM 라이브러리를 쓰지 않는다 — 애플 .p8은 **개인키만** 담긴 PKCS#8이라
+     * nimbus의 `JWK.parseFromPEMEncodedObjects`가 공개키를 요구하며 거부하고
+     * ("Missing PEM-encoded public key"), BouncyCastle을 직접 쓰면 암호 라이브러리가
+     * 컴파일 의존성으로 올라온다. PKCS#8은 JDK KeyFactory가 그대로 읽는다.
      */
     private fun parsePrivateKey(pem: String): PrivateKey {
         val base64 = pem
             .replace("-----BEGIN PRIVATE KEY-----", "")
             .replace("-----END PRIVATE KEY-----", "")
-            .replace("\\n", "")
             .filterNot { it.isWhitespace() }
         val keySpec = PKCS8EncodedKeySpec(Base64.getDecoder().decode(base64))
         return KeyFactory.getInstance("EC").generatePrivate(keySpec)
