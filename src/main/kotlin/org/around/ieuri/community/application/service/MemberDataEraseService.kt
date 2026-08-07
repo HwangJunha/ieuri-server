@@ -4,6 +4,7 @@ import org.around.ieuri.community.application.port.`in`.command.MemberDataEraseU
 import org.around.ieuri.community.application.port.out.persistence.MemberDataErasePort
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 
 /**
@@ -20,7 +21,13 @@ class MemberDataEraseService(
     private val erasePort: MemberDataErasePort,
 ) : MemberDataEraseUseCase {
 
-    @Transactional
+    /**
+     * **REQUIRES_NEW여야 한다.** 이 유스케이스는 `AFTER_COMMIT` 리스너가 부르는데, 그 시점의
+     * 원본 트랜잭션은 이미 커밋됐으면서도 스레드에 **묶여 있다.** 기본 전파(REQUIRED)로 두면
+     * 커밋할 수 없는 그 트랜잭션에 조용히 합류해 삭제가 흘러가지 않는다 —
+     * 예외도 나지 않아 성공한 것처럼 보인다(실제로 탈퇴 후 글·댓글이 남았다).
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     override fun eraseMemberData(memberId: Long) {
         val posts = erasePort.deletePostsByAuthor(memberId)
         val comments = erasePort.deleteCommentsByAuthor(memberId)

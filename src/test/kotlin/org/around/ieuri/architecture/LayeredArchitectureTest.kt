@@ -150,4 +150,47 @@ class LayeredArchitectureTest {
                 }
         }
     }
+
+    /**
+     * `AFTER_COMMIT` 리스너가 부르는 유스케이스는 **`REQUIRES_NEW`여야 한다.**
+     *
+     * 그 시점의 원본 트랜잭션은 이미 커밋됐으면서도 스레드에 묶여 있다. 기본 전파(REQUIRED)로
+     * 두면 커밋할 수 없는 그 트랜잭션에 조용히 합류해 **쓰기가 흘러가지 않는다** — 예외도
+     * 나지 않아 성공한 것처럼 보인다. 실제로 탈퇴 후 글·댓글이 남는 사고가 났다.
+     *
+     * 목으로 짠 단위 테스트는 전파를 볼 수 없고 컴파일도 통과하므로, 여기서 구조로 막는다.
+     * 읽기 전용이거나 DB를 만지지 않는 리스너(메일 발송 등)는 대상이 아니다.
+     */
+    @Test
+    fun `AFTER_COMMIT 리스너가 부르는 쓰기 유스케이스는 REQUIRES_NEW여야 한다`() {
+        val listenerMethods = classes
+            .flatMap { it.methods }
+            .filter { it.isAnnotatedWith("org.springframework.transaction.event.TransactionalEventListener") }
+
+        // 리스너가 직접 호출하는 유스케이스 구현들. 인터페이스 호출이라 대상 타입으로 되짚는다.
+        val calledUseCases = listenerMethods
+            .flatMap { it.methodCallsFromSelf }
+            .map { it.targetOwner }
+            .filter { it.packageName.startsWith("org.around.ieuri") }
+            .flatMap { target -> classes.filter { it.allRawInterfaces.contains(target) } }
+            .filter { it.isAnnotatedWith("org.springframework.stereotype.Service") }
+            .distinct()
+
+        val offenders = calledUseCases.flatMap { service ->
+            service.methods
+                .filter { it.isAnnotatedWith("org.springframework.transaction.annotation.Transactional") }
+                .filterNot { method ->
+                    val annotation = method.getAnnotationOfType(
+                        "org.springframework.transaction.annotation.Transactional",
+                    )
+                    annotation.properties["propagation"]?.toString()?.contains("REQUIRES_NEW") == true
+                }
+                .map { "${service.simpleName}.${it.name}()" }
+        }
+
+        check(offenders.isEmpty()) {
+            "AFTER_COMMIT 리스너가 부르는데 REQUIRES_NEW가 아니다(쓰기가 조용히 사라진다):\n" +
+                offenders.joinToString("\n") { "  $it" }
+        }
+    }
 }
