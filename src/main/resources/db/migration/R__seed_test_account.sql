@@ -84,10 +84,9 @@ ON CONFLICT DO NOTHING;
 -- 5) 시행 중인 약관 전부에 동의. 코드별 최신 버전만 고른다 —
 --    버전이 올라가면 이전 동의는 이월되지 않아 게이트가 걸리기 때문이다(R11).
 --
---    동의 이력은 append-only라 유니크 제약이 없다. 중복 누적을 막기 위해 이 계정의
---    이력을 지우고 다시 넣는다(테스트 계정이라 법적 증빙 대상이 아니다).
-DELETE FROM member_terms_agreement WHERE member_id = 14;
-
+--    **지우지 않고 upsert한다.** (member_id, terms_id) 유일 제약(V38) 위에서 동작하며,
+--    기동할 때마다 로그인·게이트 통과 상태로 되돌린다. 철회를 시험한 뒤 재기동하면
+--    다시 동의 상태가 된다 — 감사 로그의 철회 기록은 그대로 남는다.
 INSERT INTO member_terms_agreement (member_id, terms_id, terms_code, terms_version, agreed, agreed_at)
 SELECT 14, t.id, t.code, t.version, TRUE, now()
 FROM terms t
@@ -96,7 +95,10 @@ JOIN (
     FROM terms
     WHERE effective_at <= now()
     GROUP BY code
-) latest ON latest.code = t.code AND latest.version = t.version;
+) latest ON latest.code = t.code AND latest.version = t.version
+ON CONFLICT (member_id, terms_id) DO UPDATE SET
+    agreed    = TRUE,
+    agreed_at = now();
 
 -- ============================================================
 -- 확인용 쿼리 (실행되지 않는 주석이다. 필요할 때 복사해서 쓴다.)

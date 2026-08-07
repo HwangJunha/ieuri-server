@@ -30,10 +30,13 @@ interface MemberTermsAgreementJpaRepository : JpaRepository<MemberTermsAgreement
     fun deleteByMemberId(memberId: Long)
 
     /**
-     * 회원의 동의 이력 전량. append-only라 같은 약관 버전에 여러 행이 있을 수 있어
-     * **가장 최근 것을 고르는 일은 호출자가 한다**(정렬만 보장한다).
+     * 회원의 약관별 **현재 상태**. `(member_id, terms_id)` 유일 제약(V38) 덕분에 약관 하나에
+     * 한 행이며, 여기서 고를 것이 없다 — 이력은 member_audit_log가 갖는다.
      */
-    fun findByMemberIdOrderByAgreedAtAscIdAsc(memberId: Long): List<MemberTermsAgreementEntity>
+    fun findByMemberId(memberId: Long): List<MemberTermsAgreementEntity>
+
+    /** 재동의·철회 시 갱신할 관리 엔티티. 없으면 신규 동의다. */
+    fun findByMemberIdAndTermsId(memberId: Long, termsId: Long): MemberTermsAgreementEntity?
 }
 
 interface TermsJpaRepository : JpaRepository<TermsEntity, Long> {

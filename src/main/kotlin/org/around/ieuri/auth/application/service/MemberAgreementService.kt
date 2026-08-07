@@ -19,8 +19,9 @@ import java.time.Clock
 /**
  * 약관 동의 조회·변경(SPEC-0011 R9~R12).
  *
- * **동의 이력은 append-only다** — 철회도 `agreed = false` 행을 추가하는 것이지 기존 행을
- * 고치거나 지우지 않는다. 법적 증빙이라 덮어쓰지 않는다.
+ * **이력과 상태를 나눠 둔다.** `member_terms_agreement`는 현재 상태(약관당 한 행)이고,
+ * 동의·철회 **이력은 감사 로그**가 갖는다 — 상태 테이블은 회원 삭제 시 함께 지워지지만
+ * 감사 로그는 FK가 없어 남기 때문이다(철회·탈퇴가 증빙이 가장 필요한 사건이다).
  *
  * 상태 판정의 핵심은 **버전이 올라가면 이전 동의가 이월되지 않는다**는 것이다. 시행 중인
  * 버전에 대한 이력이 없으면 미동의이며, 필수 약관이면 클라이언트가 게이트를 건다.
@@ -51,7 +52,7 @@ class MemberAgreementService(
         val terms = activeTerms.firstOrNull { it.code == command.termsCode }
             ?: throw TermsNotFoundException("시행 중인 약관이 아닙니다.")
 
-        append(command.memberId, listOf(terms), command.agreed)
+        record(command.memberId, listOf(terms), command.agreed)
 
         return statusesOf(command.memberId, activeTerms).first { it.termsCode == command.termsCode }
     }
@@ -75,22 +76,19 @@ class MemberAgreementService(
             terms
         }
 
-        append(command.memberId, targets, agreed = true)
+        record(command.memberId, targets, agreed = true)
 
         return statusesOf(command.memberId, activeTerms)
     }
 
     /**
-     * 동의/비동의 행을 추가한다. 전부 같은 시각을 쓴다 — 한 번의 사용자 행위이기 때문이다.
+     * 동의/철회를 기록한다. 전부 같은 시각을 쓴다 — 한 번의 사용자 행위이기 때문이다.
      *
-     * **감사 로그에도 남긴다.** `member_terms_agreement`는 탈퇴 시 회원과 함께 지워지는데
-     * (FK 자식이다), 하필 철회·탈퇴가 증빙이 가장 필요한 사건이다. `member_audit_log`는
-     * FK가 없어 탈퇴 후에도 남으므로 그쪽이 이력의 최종 보관처다.
-     *
-     * 두 곳에 쓰는 이유는 역할이 다르기 때문이다 — 동의 테이블은 현재 상태 계산용(조회가
-     * 잦다)이고, 감사 로그는 보존용이다. 감사 로그로 상태를 계산하려 들면 JSONB 스캔이 된다.
+     * **두 곳에 쓴다.** 감사 로그가 이력(append-only, 탈퇴 후에도 보존)이고, 동의 테이블은
+     * 현재 상태(약관당 한 행)다. 감사 로그로 상태를 계산하려 들면 JSONB 스캔이 되므로
+     * 상태 테이블을 따로 둔다.
      */
-    private fun append(memberId: Long, terms: List<TermsView>, agreed: Boolean) {
+    private fun record(memberId: Long, terms: List<TermsView>, agreed: Boolean) {
         if (terms.isEmpty()) return
         val now = clock.instant()
 
@@ -104,7 +102,7 @@ class MemberAgreementService(
             ),
         )
 
-        agreementRepository.append(
+        agreementRepository.upsert(
             memberId,
             terms.map {
                 Agreement(
@@ -125,7 +123,7 @@ class MemberAgreementService(
      * 미동의로 떨어진다. 미동의면 `agreedAt`은 null이다.
      */
     private fun statusesOf(memberId: Long, activeTerms: List<TermsView>): List<AgreementStatusView> {
-        val history = agreementRepository.findLatestAgreements(memberId)
+        val history = agreementRepository.findCurrentAgreements(memberId)
         return activeTerms.map { terms ->
             val record = history[TermsKey(terms.code, terms.version)]
             val agreed = record?.agreed == true

@@ -29,7 +29,7 @@ import kotlin.test.assertTrue
  * 약관 동의 조회·변경(SPEC-0011 R9~R12).
  *
  * 가장 중요한 계약은 **버전이 올라가면 이전 동의가 이월되지 않는다**는 것과,
- * **철회도 행 추가로 표현한다**(append-only)는 것이다.
+ * **이력은 감사 로그가, 현재 상태는 동의 테이블이 갖는다**는 분리다.
  */
 class MemberAgreementServiceTest {
 
@@ -59,7 +59,7 @@ class MemberAgreementServiceTest {
     }
 
     private fun givenHistory(vararg entries: Pair<TermsKey, AgreementRecord>) {
-        every { agreementRepository.findLatestAgreements(memberId) } returns entries.toMap()
+        every { agreementRepository.findCurrentAgreements(memberId) } returns entries.toMap()
     }
 
     // --- R9 상태 조회 ---
@@ -138,7 +138,7 @@ class MemberAgreementServiceTest {
         givenTerms()
         givenHistory(TermsKey("MARKETING", "1.0") to AgreementRecord(false, now))
         val appended = slot<List<Agreement>>()
-        every { agreementRepository.append(memberId, capture(appended)) } returns Unit
+        every { agreementRepository.upsert(memberId, capture(appended)) } returns Unit
 
         val status = service.updateAgreement(UpdateAgreementCommand(memberId, "MARKETING", agreed = false))
 
@@ -167,7 +167,7 @@ class MemberAgreementServiceTest {
         givenTerms()
         givenHistory(TermsKey("SERVICE", "1.0") to AgreementRecord(false, now))
         val appended = slot<List<Agreement>>()
-        every { agreementRepository.append(memberId, capture(appended)) } returns Unit
+        every { agreementRepository.upsert(memberId, capture(appended)) } returns Unit
 
         val status = service.updateAgreement(UpdateAgreementCommand(memberId, "SERVICE", agreed = false))
 
@@ -239,7 +239,7 @@ class MemberAgreementServiceTest {
             TermsKey("PRIVACY", "1.0") to AgreementRecord(true, now),
         )
         val appended = slot<List<Agreement>>()
-        every { agreementRepository.append(memberId, capture(appended)) } returns Unit
+        every { agreementRepository.upsert(memberId, capture(appended)) } returns Unit
 
         val statuses = service.agreeToRequiredTerms(
             AgreeToRequiredTermsCommand(memberId, listOf("SERVICE", "PRIVACY")),
@@ -272,7 +272,7 @@ class MemberAgreementServiceTest {
                 AgreeToRequiredTermsCommand(memberId, listOf("SERVICE", "MARKETING")),
             )
         }
-        verify(exactly = 0) { agreementRepository.append(any(), any()) }
+        verify(exactly = 0) { agreementRepository.upsert(any(), any()) }
     }
 
     @Test
@@ -284,7 +284,7 @@ class MemberAgreementServiceTest {
                 AgreeToRequiredTermsCommand(memberId, listOf("SERVICE", "UNKNOWN")),
             )
         }
-        verify(exactly = 0) { agreementRepository.append(any(), any()) }
+        verify(exactly = 0) { agreementRepository.upsert(any(), any()) }
     }
 
     @Test
@@ -292,7 +292,7 @@ class MemberAgreementServiceTest {
         givenTerms()
         givenHistory(TermsKey("SERVICE", "1.0") to AgreementRecord(true, now))
         val appended = slot<List<Agreement>>()
-        every { agreementRepository.append(memberId, capture(appended)) } returns Unit
+        every { agreementRepository.upsert(memberId, capture(appended)) } returns Unit
 
         service.agreeToRequiredTerms(AgreeToRequiredTermsCommand(memberId, listOf("SERVICE", "SERVICE")))
 
