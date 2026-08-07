@@ -112,4 +112,42 @@ class LayeredArchitectureTest {
             .because("도메인 간 상호작용은 상대 도메인의 port/in 또는 발행된 도메인 이벤트로만 한다")
             .check(classes)
     }
+
+    /**
+     * 스테레오타입 빈의 **단순 클래스명이 겹치지 않아야 한다.**
+     *
+     * Spring은 이름을 명시하지 않은 `@Component` 계열의 빈 이름을 단순 클래스명으로 짓는다.
+     * 그래서 패키지가 달라도 이름이 같으면 컴포넌트 스캔이 실패한다
+     * (`ConflictingBeanDefinitionException`) — **컴파일과 단위 테스트는 전부 통과하고
+     * 기동에서만 터진다.**
+     *
+     * 도메인마다 같은 역할의 어댑터를 두는 이 구조에서는 이름이 겹치기 쉽다(실제로
+     * `MemberWithdrawnListener`가 community·tourism 양쪽에 생겨 기동이 막혔다).
+     * 빈 이름을 명시하는 대신 클래스명에 도메인을 붙이는 쪽을 관례로 삼는다 —
+     * 로그와 스택트레이스에서도 어느 도메인인지 바로 보인다.
+     */
+    @Test
+    fun `스프링 빈의 단순 클래스명은 도메인 간에 겹치지 않는다`() {
+        val stereotypes = setOf(
+            "org.springframework.stereotype.Component",
+            "org.springframework.stereotype.Service",
+            "org.springframework.stereotype.Repository",
+            "org.springframework.context.annotation.Configuration",
+            "com.netflix.graphql.dgs.DgsComponent",
+        )
+
+        val duplicates = classes
+            .filter { candidate -> stereotypes.any { candidate.isAnnotatedWith(it) } }
+            // 빈 이름을 직접 지정했다면 클래스명이 겹쳐도 충돌하지 않는다.
+            .filterNot { it.isAnnotatedWith("org.springframework.context.annotation.Bean") }
+            .groupBy { it.simpleName }
+            .filterValues { it.size > 1 }
+
+        check(duplicates.isEmpty()) {
+            "빈 이름이 충돌하는 클래스가 있다(기동 시 ConflictingBeanDefinitionException):\n" +
+                duplicates.entries.joinToString("\n") { (name, found) ->
+                    "  $name → ${found.joinToString(", ") { it.name }}"
+                }
+        }
+    }
 }

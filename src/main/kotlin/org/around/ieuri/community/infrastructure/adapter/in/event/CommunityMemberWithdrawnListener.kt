@@ -19,11 +19,15 @@ import org.springframework.transaction.event.TransactionalEventListener
  * 다른 도메인의 리스너까지 막힌다(R17의 마지막 두 인수 기준). 실패는 기록만 남기고, 보상은
  * 재시도와 실패 기록으로 처리한다.
  *
+ * **클래스 이름에 도메인을 붙인다.** Spring은 단순 클래스명으로 빈 이름을 짓기 때문에,
+ * tourism의 같은 리스너와 이름이 겹치면 패키지가 달라도 기동이 실패한다
+ * (ConflictingBeanDefinitionException).
+ *
  * 도메인 이벤트 타입만 auth에서 가져온다 — 발행/구독의 계약이라 내부 의존이 아니다.
  * Kafka로 옮기면 이 클래스가 컨슈머로 바뀌고 애플리케이션 레이어는 그대로다(POL-028).
  */
 @Component
-class MemberWithdrawnListener(
+class CommunityMemberWithdrawnListener(
     private val memberDataEraseUseCase: MemberDataEraseUseCase,
 ) {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -36,6 +40,6 @@ class MemberWithdrawnListener(
     }
 
     private companion object {
-        private val log = LoggerFactory.getLogger(MemberWithdrawnListener::class.java)
+        private val log = LoggerFactory.getLogger(CommunityMemberWithdrawnListener::class.java)
     }
 }
