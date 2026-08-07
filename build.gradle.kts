@@ -69,6 +69,10 @@ dependencies {
     // 외부 SNS id_token(RS256/ES256) 서명 검증 + JWKS 원격 조회/캐시. jjwt는 JWKS 조회를
     // 지원하지 않아 별도 라이브러리를 쓴다. Google/Apple/Kakao 공개키로 서명·iss·aud·exp 검증.
     implementation("com.nimbusds:nimbus-jose-jwt:9.40")
+    // 애플 revoke용 .p8(PEM) 개인키 파싱. 손으로 헤더를 떼고 Base64를 디코드하는 대신
+    // 표준 PEM 파서를 쓴다. nimbus의 JWK.parseFromPEMEncodedObjects는 쓸 수 없다 —
+    // .p8은 개인키만 담고 있는데 그 API는 JWK 조립에 공개키를 함께 요구한다.
+    implementation("org.bouncycastle:bcpkix-jdk18on:1.80")
     runtimeOnly("org.postgresql:postgresql")
     testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")
     testImplementation("io.mockk:mockk:1.13.13")
