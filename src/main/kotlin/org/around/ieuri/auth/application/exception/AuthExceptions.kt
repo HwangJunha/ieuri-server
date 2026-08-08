@@ -89,3 +89,20 @@ class TermsNotFoundException(message: String) :
 /** 선택 약관을 필수 동의 경로로 제출할 때(R12). */
 class TermsCodeNotRequiredException(message: String) :
     UserFacingException("TERMS_CODE_NOT_REQUIRED", message)
+
+/** 다른 회원이 이미 쓰는 주소로 이메일을 바꾸려 할 때(SPEC-0011 R7). 상대 정보는 담지 않는다(POL-013). */
+class EmailAlreadyInUseException(message: String) :
+    UserFacingException("EMAIL_ALREADY_IN_USE", message)
+
+/** 현재 자신의 이메일과 같은 주소를 제출할 때(R7). 보낼 코드가 없으므로 요청 자체를 거절한다. */
+class SameAsCurrentEmailException(message: String) :
+    UserFacingException("SAME_AS_CURRENT_EMAIL", message)
+
+/** 이메일 형식이 올바르지 않을 때(R7). */
+class InvalidEmailFormatException(message: String) :
+    UserFacingException("INVALID_EMAIL_FORMAT", message)
+
+/** 재발송 쿨다운(60초) 이내 재요청(R7). 기존 VERIFICATION_RATE_LIMITED와 코드를 나눈다 —
+ *  클라이언트가 이메일 변경 화면에서만 다른 안내를 띄운다. */
+class ResendCooldownActiveException(message: String) :
+    UserFacingException("RESEND_COOLDOWN_ACTIVE", message)

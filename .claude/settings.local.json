@@ -98,9 +98,6 @@
       "Read(//**/*.pem)",
       "Read(//**/*.key)",
       "Read(//**/application-*.yaml)",
-      "Bash(git push:*)",
-      "Bash(git commit:*)",
-      "Bash(gh pr:*)",
       "Bash(docker:*)",
       "Bash(kubectl:*)"
     ],

@@ -1,5 +1,6 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.persistence
 
+import org.around.ieuri.auth.application.exception.MemberNotFoundException
 import org.around.ieuri.auth.application.port.out.persistence.EmailAuthentication
 import org.around.ieuri.auth.application.port.out.persistence.MemberAuthentication
 import org.around.ieuri.auth.application.port.out.persistence.MemberRepositoryPort
@@ -17,6 +18,7 @@ import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.M
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.MemberRoleJpaRepository
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.MemberTermsAgreementJpaRepository
 import org.springframework.stereotype.Component
+import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 
 /**
@@ -73,6 +75,26 @@ class MemberPersistenceAdapter(
     override fun findEmailByMemberId(memberId: Long): Email? {
         val entity = memberRepository.findById(memberId).orElse(null) ?: return null
         return Email(encryptor.decrypt(entity.emailEncrypted))
+    }
+
+    /**
+     * 이메일 교체(SPEC-0011 R7·R8). managed 엔티티를 고쳐 dirty-check에 맡긴다.
+     *
+     * **[protectedIdentifier]가 있으면 provider_user_id도 같은 트랜잭션에서 바꾼다** —
+     * `Provider.EMAIL` 회원은 그 컬럼이 로그인 식별자라, 이메일만 바꾸면 다음 로그인이
+     * 실패한다. 둘이 갈리면 계정이 잠기므로 한 메서드로 묶었다.
+     *
+     * `(provider, provider_user_id)` 유니크 제약이 최종 판정자다 — 경합으로 같은 주소를
+     * 동시에 확정하려는 두 요청 중 하나는 여기서 걸린다.
+     */
+    @Transactional
+    override fun updateEmail(memberId: Long, newEmail: Email, protectedIdentifier: String?) {
+        val entity = memberRepository.findById(memberId).orElse(null)
+            ?: throw MemberNotFoundException("회원을 찾을 수 없습니다.")
+        entity.emailEncrypted = encryptor.encrypt(newEmail.value)
+        if (protectedIdentifier != null) {
+            entity.providerUserId = protectedIdentifier
+        }
     }
 
     override fun findAuthentication(provider: Provider, providerUserId: ProviderUserId): MemberAuthentication? {

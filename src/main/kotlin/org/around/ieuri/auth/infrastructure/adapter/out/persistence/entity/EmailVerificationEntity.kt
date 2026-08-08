@@ -1,12 +1,15 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity
 
 import jakarta.persistence.Column
+import jakarta.persistence.EnumType
 import jakarta.persistence.Entity
+import jakarta.persistence.Enumerated
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.PrePersist
 import jakarta.persistence.Table
+import org.around.ieuri.auth.domain.vo.VerificationPurpose
 import java.time.Instant
 import java.util.UUID
 
@@ -44,6 +47,15 @@ class EmailVerificationEntity(
 
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant? = null,
+
+    /** 가입 검증인지 이메일 변경인지(SPEC-0011 R7). 이름으로 저장한다 — 순서에 의존하지 않는다. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "purpose", nullable = false, length = 20)
+    var purpose: VerificationPurpose = VerificationPurpose.REGISTRATION,
+
+    /** 이메일 변경 시 확정할 새 주소의 암호문(POL-012). 가입 검증에는 null. */
+    @Column(name = "target_email_encrypted", length = 512)
+    var targetEmailEncrypted: String? = null,
 ) {
     @PrePersist
     fun onCreate() {
