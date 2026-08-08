@@ -15,6 +15,8 @@ data class RegisterMemberCommand(
     /** 만 14세 이상 확인 체크값. */
     val ageVerified: Boolean,
     val agreements: List<AgreementInput>,
+    /** 탈퇴 시 연결 해제용 토큰을 확보하기 위한 provider authorization code. 확보 실패해도 가입은 성공한다. */
+    val authorizationCode: String? = null,
 ) {
     init {
         require(idToken.isNotBlank()) { "idToken은 필수입니다." }

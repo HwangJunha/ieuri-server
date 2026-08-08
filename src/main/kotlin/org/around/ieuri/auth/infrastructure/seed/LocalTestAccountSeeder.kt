@@ -1,6 +1,7 @@
 package org.around.ieuri.auth.infrastructure.seed
 
 import jakarta.persistence.EntityManager
+import org.around.ieuri.auth.application.port.out.security.LoginIdentifierProtectorPort
 import org.slf4j.LoggerFactory
 import org.springframework.boot.ApplicationArguments
 import org.springframework.boot.ApplicationRunner
@@ -23,16 +24,20 @@ import org.springframework.transaction.annotation.Transactional
  * `member.id = 14`로 못 박는 이유는 `R__seed_community.sql`이 `author_id = 14`로 글·댓글을
  * 넣기 때문이다. id가 달라지면 그 데이터가 작성자 없는 상태로 남는다.
  *
- * **해시와 암호문은 앱이 만든 값을 그대로 쓴다.** 비밀번호 해시는
+ * **비밀번호 해시와 이메일 암호문은 앱이 만든 값을 그대로 쓴다.** 비밀번호 해시는
  * `bcrypt(base64(HMAC-SHA256(pw, pepper)))`이고 pepper는 환경변수로 덮일 수 있어
  * 다시 계산하면 특정 셸에서만 맞는다. 이메일은 AES-256-GCM(랜덤 IV)이라 재현이 불가능하다.
  * 로컬 키를 바꾸면 이 두 상수도 다시 떠 와야 한다(앱으로 가입 후 두 컬럼 복사).
+ *
+ * 반면 `provider_user_id`는 상수로 두지 않고 [LoginIdentifierProtectorPort]로 매번 계산한다 —
+ * 결정론적이라 재현이 가능하고, identifier-pepper를 바꿔도 이 시더는 따라온다.
  */
 @Component
 @Profile("local")
 @Order(SEED_ORDER)
 class LocalTestAccountSeeder(
     private val entityManager: EntityManager,
+    private val identifierProtector: LoginIdentifierProtectorPort,
 ) : ApplicationRunner {
 
     @Transactional
@@ -59,7 +64,7 @@ class LocalTestAccountSeeder(
             id, provider, provider_user_id, email_encrypted, email_verified,
             status, age_verified, password_hash, created_at, updated_at
         ) OVERRIDING SYSTEM VALUE
-        VALUES (:id, 'EMAIL', :email, :emailEncrypted, TRUE, 'ACTIVE', TRUE, :passwordHash, now(), now())
+        VALUES (:id, 'EMAIL', :providerUserId, :emailEncrypted, TRUE, 'ACTIVE', TRUE, :passwordHash, now(), now())
         ON CONFLICT (id) DO UPDATE SET
             provider          = EXCLUDED.provider,
             provider_user_id  = EXCLUDED.provider_user_id,
@@ -74,7 +79,9 @@ class LocalTestAccountSeeder(
             updated_at        = now()
         """.trimIndent(),
         "id" to MEMBER_ID,
-        "email" to EMAIL,
+        // provider_user_id는 평문 이메일이 아니라 보호된 식별자다(SPEC-0012 R1).
+        // 평문을 넣으면 매 기동마다 마이그레이션 결과를 되돌려 이 계정이 로그인 불가가 된다.
+        "providerUserId" to identifierProtector.protect(EMAIL),
         "emailEncrypted" to EMAIL_ENCRYPTED,
         "passwordHash" to PASSWORD_HASH,
     )

@@ -41,6 +41,10 @@ class MemberEntity(
     @Column(name = "password_hash", length = 255)
     var passwordHash: String? = null,
 
+    /** 탈퇴 시 provider 연결 해제용 refresh token(암호문). Kakao·EMAIL 회원은 null이다. */
+    @Column(name = "provider_refresh_token_encrypted", length = 1024)
+    var providerRefreshTokenEncrypted: String? = null,
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     var status: MemberStatus,

@@ -3,7 +3,9 @@ package org.around.ieuri.auth.domain
 import org.around.ieuri.auth.domain.aggregate.Member
 import org.around.ieuri.auth.domain.vo.Agreement
 import org.around.ieuri.auth.domain.vo.Email
+import org.around.ieuri.auth.domain.vo.MemberStatus
 import org.around.ieuri.auth.domain.vo.Nickname
+import org.around.ieuri.auth.domain.vo.PasswordHash
 import org.around.ieuri.auth.domain.vo.Provider
 import org.around.ieuri.auth.domain.vo.ProviderUserId
 import java.time.Instant
@@ -97,5 +99,58 @@ class MemberTest {
         assertFalse(member.emailVerified)
         member.markEmailVerified()
         assertTrue(member.emailVerified)
+    }
+
+    // --- registerByEmail (SPEC-0012 R1) ---
+
+    private fun registerByEmail(
+        email: String = "user@example.com",
+        providerUserId: String = "protected-value",
+    ): Member = Member.registerByEmail(
+        email = Email(email),
+        providerUserId = ProviderUserId(providerUserId),
+        passwordHash = PasswordHash("hashed-pw"),
+        nickname = Nickname("여행자"),
+        ageVerified = true,
+        agreements = agreements("SERVICE" to true, "PRIVACY" to true),
+        requiredTermsCodes = requiredCodes,
+        now = now,
+    )
+
+    @Test
+    fun `이메일 가입은 넘겨받은 식별자를 그대로 쓰고 이메일에서 파생하지 않는다`() {
+        val member = registerByEmail(email = "user@example.com", providerUserId = "protected-value")
+
+        assertEquals(Provider.EMAIL, member.provider)
+        assertEquals("protected-value", member.providerUserId.value)
+        assertEquals("user@example.com", member.email.value)
+        assertFalse(member.emailVerified)
+    }
+
+    @Test
+    fun `이메일 가입도 필수 약관 미동의면 거부된다`() {
+        assertFailsWith<IllegalArgumentException> {
+            Member.registerByEmail(
+                email = Email("user@example.com"),
+                providerUserId = ProviderUserId("protected-value"),
+                passwordHash = PasswordHash("hashed-pw"),
+                nickname = Nickname("여행자"),
+                ageVerified = true,
+                agreements = agreements("SERVICE" to true),
+                requiredTermsCodes = requiredCodes,
+                now = now,
+            )
+        }
+    }
+
+    // --- 상태값 집합 (SPEC-0012 R12) ---
+
+    @Test
+    fun `회원 상태는 ACTIVE와 SUSPENDED 둘뿐이다`() {
+        // 탈퇴는 행 삭제라 WITHDRAWN 같은 상태값이 존재해선 안 된다.
+        assertEquals(
+            listOf(MemberStatus.ACTIVE, MemberStatus.SUSPENDED),
+            MemberStatus.entries.toList(),
+        )
     }
 }

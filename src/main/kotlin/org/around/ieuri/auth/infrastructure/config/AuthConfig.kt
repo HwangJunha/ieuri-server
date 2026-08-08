@@ -6,6 +6,8 @@ import org.around.ieuri.auth.domain.strategy.NicknameGenerator
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.http.client.SimpleClientHttpRequestFactory
+import org.springframework.web.client.RestClient
 import java.time.Clock
 import java.time.Duration
 
@@ -22,11 +24,25 @@ import java.time.Duration
     PasswordProperties::class,
     SnsProperties::class,
     ProfileImageProperties::class,
+    SnsRevokeProperties::class,
 )
 class AuthConfig {
 
     @Bean
     fun clock(): Clock = Clock.systemUTC()
+
+    /**
+     * provider 토큰 교환·연결 해제 호출용 RestClient. 타임아웃이 곧 R11의 대기 상한이다 —
+     * 이 호출은 탈퇴 트랜잭션 안에서 일어나므로 상한이 없으면 트랜잭션이 무한정 길어진다.
+     */
+    @Bean
+    fun snsRevokeRestClient(builder: RestClient.Builder, properties: SnsRevokeProperties): RestClient {
+        val requestFactory = SimpleClientHttpRequestFactory().apply {
+            setConnectTimeout(properties.timeout)
+            setReadTimeout(properties.timeout)
+        }
+        return builder.requestFactory(requestFactory).build()
+    }
 
     @Bean
     fun profileImagePolicy(properties: ProfileImageProperties): ProfileImagePolicy =

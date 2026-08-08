@@ -31,7 +31,11 @@ class AuthTokenMutationResolver(
         onError = { authTokenErrorPayload(it) },
     ) {
         authTokenUseCase.loginBySns(
-            LoginCommand(provider = Provider.valueOf(input.provider.name), idToken = input.idToken),
+            LoginCommand(
+                provider = Provider.valueOf(input.provider.name),
+                idToken = input.idToken,
+                authorizationCode = input.authorizationCode,
+            ),
         ).toPayload()
     }
 

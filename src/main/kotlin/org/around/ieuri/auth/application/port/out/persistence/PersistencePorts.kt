@@ -35,8 +35,20 @@ interface MemberRepositoryPort {
     /** 로그인용 인증 정보 조회. (provider, provider_user_id)로 회원의 id·상태를 반환. 없으면 null. */
     fun findAuthentication(provider: Provider, providerUserId: ProviderUserId): MemberAuthentication?
 
-    /** 자체(EMAIL) 로그인용 인증 정보. 정규화된 이메일로 조회하며 비밀번호 해시·검증 여부를 포함한다. 없으면 null. */
-    fun findEmailAuthentication(email: String): EmailAuthentication?
+    /**
+     * 자체(EMAIL) 로그인용 인증 정보. 비밀번호 해시·검증 여부를 포함한다. 없으면 null.
+     * 인자는 평문 이메일이 아니라 보호된 로그인 식별자다(LoginIdentifierProtectorPort.protect 결과).
+     */
+    fun findEmailAuthentication(protectedIdentifier: String): EmailAuthentication?
+
+    /**
+     * provider 폐기용 refresh token을 저장한다(암호화는 구현이 책임진다. SPEC-0012 R6).
+     * 이미 값이 있으면 덮어쓴다 — 재로그인 시 provider가 새 토큰을 주기 때문이다.
+     */
+    fun updateProviderRefreshToken(memberId: Long, refreshToken: String)
+
+    /** 저장된 provider refresh token을 복호화해 반환한다. 없으면 null. */
+    fun findProviderRefreshToken(memberId: Long): String?
 
     /** 상태 변경(정지/복구)용 도메인 회원 로드. 동의 이력은 재적재하지 않는다. */
     fun load(memberId: Long): Member?
