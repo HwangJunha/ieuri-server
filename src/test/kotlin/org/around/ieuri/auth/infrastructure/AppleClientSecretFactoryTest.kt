@@ -45,7 +45,11 @@ class AppleClientSecretFactoryTest {
         ),
     )
 
-    private val now = Instant.parse("2026-08-08T00:00:00Z")
+    /**
+     * 고정 시각을 쓰지 않는다 — client secret은 5분 만료라, 과거로 고정하면 파서가
+     * 만료로 거부해 시간이 지나면 깨지는 테스트가 된다. 만료 자체는 아래에서 따로 검증한다.
+     */
+    private val now: Instant = Instant.now()
 
     @Test
     fun `설정된 팀 키 클라이언트 값이 JWT에 실린다`() {
@@ -66,11 +70,12 @@ class AppleClientSecretFactoryTest {
     }
 
     @Test
-    fun `만료는 발급 시각 이후다`() {
+    fun `만료는 발급 5분 뒤다`() {
         val claims = Jwts.parser().verifyWith(keyPair.public).build()
             .parseSignedClaims(factory().create(now)).payload
         assertEquals(now.epochSecond, claims.issuedAt.toInstant().epochSecond)
-        assertTrue(claims.expiration.toInstant().isAfter(now))
+        // 애플은 6개월까지 허용하나 짧게 잡는다 — 매 호출 새로 만들므로 길게 둘 이유가 없다.
+        assertEquals(now.epochSecond + 300, claims.expiration.toInstant().epochSecond)
     }
 
     @Test
