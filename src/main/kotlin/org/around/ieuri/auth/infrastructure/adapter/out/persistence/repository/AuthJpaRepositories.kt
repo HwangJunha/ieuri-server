@@ -1,6 +1,7 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository
 
 import org.around.ieuri.auth.domain.vo.Provider
+import org.around.ieuri.auth.domain.vo.VerificationPurpose
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.EmailVerificationEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberAuditLogEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberEntity
@@ -48,6 +49,12 @@ interface EmailVerificationJpaRepository : JpaRepository<EmailVerificationEntity
 
     /** 가장 최근에 발급된 챌린지. 재발송 쿨다운 판정에 쓴다. */
     fun findFirstByMemberIdOrderByCreatedAtDesc(memberId: Long): EmailVerificationEntity?
+
+    /** 용도별 최근 챌린지. 쿨다운을 가입 검증과 이메일 변경으로 나눠 센다(SPEC-0011 R7). */
+    fun findFirstByMemberIdAndPurposeOrderByCreatedAtDesc(
+        memberId: Long,
+        purpose: VerificationPurpose,
+    ): EmailVerificationEntity?
 
     fun deleteByMemberId(memberId: Long)
 }

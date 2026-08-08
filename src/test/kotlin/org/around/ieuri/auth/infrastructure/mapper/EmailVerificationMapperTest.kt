@@ -1,6 +1,7 @@
 package org.around.ieuri.auth.infrastructure.mapper
 
 import org.around.ieuri.auth.domain.aggregate.EmailVerification
+import org.around.ieuri.auth.domain.vo.VerificationPurpose
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.EmailVerificationEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.mapper.toDomain
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.mapper.toNewEntity
@@ -32,6 +33,8 @@ class EmailVerificationMapperTest {
         consumed = true,
         verifiedAt = verifiedAt,
         createdAt = createdAt,
+        purpose = VerificationPurpose.EMAIL_CHANGE,
+        targetEmailEncrypted = "enc:new@example.com",
     )
 
     private fun domain(verifiedAt: Instant? = this.verifiedAt): EmailVerification =
@@ -46,6 +49,8 @@ class EmailVerificationMapperTest {
             consumed = true,
             verifiedAt = verifiedAt,
             createdAt = createdAt,
+            purpose = VerificationPurpose.EMAIL_CHANGE,
+            targetEmailEncrypted = "enc:new@example.com",
         )
 
     @Test
@@ -62,6 +67,8 @@ class EmailVerificationMapperTest {
         assertEquals(true, result.consumed)
         assertEquals(verifiedAt, result.verifiedAt)
         assertEquals(createdAt, result.createdAt)
+        assertEquals(VerificationPurpose.EMAIL_CHANGE, result.purpose)
+        assertEquals("enc:new@example.com", result.targetEmailEncrypted)
     }
 
     @Test

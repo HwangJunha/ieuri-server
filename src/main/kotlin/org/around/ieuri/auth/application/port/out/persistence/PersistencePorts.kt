@@ -7,6 +7,7 @@ import org.around.ieuri.auth.domain.vo.Email
 import org.around.ieuri.auth.domain.vo.MemberStatus
 import org.around.ieuri.auth.domain.vo.Provider
 import org.around.ieuri.auth.domain.vo.ProviderUserId
+import org.around.ieuri.auth.domain.vo.VerificationPurpose
 import java.time.Instant
 import java.util.UUID
 
@@ -31,6 +32,16 @@ interface MemberRepositoryPort {
 
     /** 검증메일 재발송 등을 위해 저장된 이메일을 복호화해 반환한다. */
     fun findEmailByMemberId(memberId: Long): Email?
+
+    /**
+     * 이메일 교체(SPEC-0011 R7·R8). managed 엔티티에 반영한다(dirty-check).
+     *
+     * **[protectedIdentifier]를 함께 받는 이유**: `Provider.EMAIL` 회원은 provider_user_id가
+     * 곧 로그인 식별자(이메일의 HMAC)라 이메일만 바꾸면 다음 로그인이 실패한다. 두 값이
+     * 반드시 같은 트랜잭션에서 함께 바뀌어야 하므로 한 메서드로 묶는다.
+     * SNS 회원은 provider가 준 불투명 식별자를 쓰므로 null을 준다(건드리지 않는다).
+     */
+    fun updateEmail(memberId: Long, newEmail: Email, protectedIdentifier: String?)
 
     /** 로그인용 인증 정보 조회. (provider, provider_user_id)로 회원의 id·상태를 반환. 없으면 null. */
     fun findAuthentication(provider: Provider, providerUserId: ProviderUserId): MemberAuthentication?
@@ -105,6 +116,15 @@ interface EmailVerificationRepositoryPort {
 
     /** 재발송 rate limit 판정을 위한 가장 최근 발급 시각. */
     fun findLatestCreatedAtByMemberId(memberId: Long): Instant?
+
+    /**
+     * 용도별 가장 최근 발급 시각. **쿨다운을 용도로 나눠 센다**(SPEC-0011 R7) —
+     * 가입 검증과 이메일 변경이 한 창을 공유하면 한쪽을 보낸 직후 다른 쪽이 막힌다.
+     */
+    fun findLatestCreatedAtByMemberIdAndPurpose(memberId: Long, purpose: VerificationPurpose): Instant?
+
+    /** 해당 용도의 활성 챌린지만 폐기한다. 다른 용도의 진행 중인 검증을 건드리지 않는다. */
+    fun consumeActiveByMemberIdAndPurpose(memberId: Long, purpose: VerificationPurpose, at: Instant)
 }
 
 /** 감사 이력(outbox 겸용) 기록 포트. payload 직렬화는 구현이 책임진다. */

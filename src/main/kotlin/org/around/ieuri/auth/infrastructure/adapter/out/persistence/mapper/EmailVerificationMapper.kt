@@ -16,6 +16,8 @@ fun EmailVerificationEntity.toDomain(): EmailVerification =
         consumed = consumed,
         verifiedAt = verifiedAt,
         createdAt = requireNotNull(createdAt),
+        purpose = purpose,
+        targetEmailEncrypted = targetEmailEncrypted,
     )
 
 /** 도메인 모델을 새 엔티티로 옮긴다. id는 DB가 채운다. */
@@ -29,4 +31,6 @@ fun EmailVerification.toNewEntity(): EmailVerificationEntity =
         maxAttempts = maxAttempts,
         consumed = consumed,
         verifiedAt = verifiedAt,
+        purpose = purpose,
+        targetEmailEncrypted = targetEmailEncrypted,
     )

@@ -54,6 +54,12 @@ type Mutation {
     removeProfileImage: RemoveProfileImagePayload!
     "약관 동의를 개별로 켜고 끈다. 필수 약관도 철회할 수 있으며, 철회하면 required가 참이면서 agreed가 거짓인 상태가 되어 클라이언트가 이용 게이트를 건다. 서버는 철회한 회원의 다른 오퍼레이션을 거절하지 않는다."
     updateAgreement(input: UpdateAgreementInput!): UpdateAgreementPayload!
+    "이메일 변경 요청. 새 주소로 6자리 코드를 발송한다. confirmEmailChange를 통과하기 전까지 Me.email은 기존 값으로 유지된다. SNS·EMAIL 가입 유형 모두 사용할 수 있다."
+    changeEmail(input: ChangeEmailInput!): ChangeEmailPayload!
+    "이메일 변경 코드 확인. 통과하면 Me.email이 새 주소로 교체된다."
+    confirmEmailChange(input: ConfirmEmailChangeInput!): ConfirmEmailChangePayload!
+    "이메일 변경 코드 재발송. changeEmail이 발급한 핸들을 재사용하며 대상 주소는 그대로다. 쿨다운 60초."
+    resendEmailChange(input: ResendEmailChangeInput!): ResendEmailChangePayload!
     "미동의 상태인 필수 약관에 동의한다. 동의만 받으며 철회는 받지 않는다 — 필수 약관 철회는 사실상 서비스 이용 중단이므로 탈퇴로만 가능하다. 모든 필수 약관이 동의되면 이용 게이트가 해제된다."
     agreeToRequiredTerms(input: AgreeToRequiredTermsInput!): AgreeToRequiredTermsPayload!
 }
@@ -116,6 +122,45 @@ type ConfirmProfileImageUploadPayload implements BaseResponse {
 type RemoveProfileImagePayload implements BaseResponse {
     success: Boolean!
     userErrors: [UserError!]!
+}
+
+input ChangeEmailInput {
+    "새 이메일 주소. 현재 값과 같거나 다른 회원이 쓰는 주소면 실패한다."
+    newEmail: String!
+}
+
+type ChangeEmailPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+    "코드 검증에 사용할 핸들. 실패 시 null."
+    verificationId: String
+    "발급 시각 + 10분(ISO-8601)."
+    expiresAt: String
+}
+
+input ConfirmEmailChangeInput {
+    verificationId: String!
+    code: String!
+}
+
+type ConfirmEmailChangePayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+    "성공 시 반영된 새 이메일."
+    email: String
+    "실패 사유(EXPIRED/CONSUMED/MAX_ATTEMPTS_EXCEEDED/CODE_MISMATCH). 성공 시 null. 기존 VerifyEmailPayload와 동일한 어휘를 쓴다."
+    failureReason: String
+}
+
+input ResendEmailChangeInput {
+    verificationId: String!
+}
+
+type ResendEmailChangePayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+    verificationId: String
+    expiresAt: String
 }
 
 input UpdateAgreementInput {
