@@ -53,6 +53,19 @@ Uses the Gradle wrapper (`./gradlew`); Gradle 9.5.1, Java toolchain 25.
 
   **Do not write infrastructure tests.** No tests that boot a Spring context to prove wiring, no tests that hit a real database or Valkey, no tests that assert thread names, executor behavior, shutdown timing, or queue saturation. Those verify the framework rather than our logic, and they are slow and brittle. If an infrastructure concern seems to need pinning, that is a signal to use a well-trodden Spring idiom (see the rule above) whose behavior does not need re-proving. Verify infrastructure by running it, not by encoding it in the suite.
 
+- **테스트는 "작업 완료" 시점에 쓴다 — 그 전에는 쓰지 않는다.** 작업 중에는 요건이 계속
+  바뀌어, 먼저 쓴 테스트를 요건이 바뀔 때마다 다시 쓰게 된다. 그 비용이 조기 검증의 이득보다
+  크다. 작업 중에는 **컴파일만 통과**시키고(`./gradlew compileKotlin compileTestKotlin`),
+  전체 테스트는 돌리지 않는다.
+
+  사용자가 **"작업 완료"**라고 하면 그때:
+    1. `.claude/finalizing` 플래그 파일을 만든다(훅이 이 파일로 완료 단계를 판정한다).
+    2. 이번 작업이 만든 도메인·애플리케이션 로직의 테스트를 쓴다.
+    3. `./gradlew test`가 통과해야 마무리할 수 있다(Stop 훅이 막는다).
+    4. 정책 변경이 있으면 `ieuri-recorder/problem/`에 요청 문서를 남긴다.
+
+  플래그는 작업이 끝나면 지운다 — 남아 있으면 다음 작업의 첫 편집부터 전체 테스트가 돈다.
+
 - **Design by domain, for future extraction.** Keep domain logic at the core and independent of delivery/persistence adapters, following hexagonal ports-and-adapters. All domains share this one application today, so structure each domain so it can be lifted out into its own application later without rewriting the core.
 
 - **The domain model is never a JPA entity — always kept separate. This is a project-wide rule with no exceptions.** Every `domain/` type is pure Kotlin with no persistence concerns. JPA `@Entity` classes live only under `infrastructure/adapter/out/persistence`, with mappers converting between the domain model and the persistence model. This applies to *every* domain, including simple CRUD-heavy ones — not just rich domains. The rationale is domain purity and, above all, **code consistency**: one predictable shape across every domain makes the codebase far easier to read and reason about, and removes the per-domain "is this one separated or merged?" judgment. The accepted cost is mapping boilerplate; do not try to eliminate it by reusing JPA entities as domain models.
@@ -175,6 +188,14 @@ Schema is owned by **Flyway migrations**, never by Hibernate. The domain-model �
 
 ## Git strategy
 
+**커밋은 사람이 한다.** `git commit`은 권한 설정에서 막혀 있다. Claude는 코드를 쓰고,
+커밋 단위와 메시지는 사용자가 정한다 — 무엇을 하나의 변경으로 묶을지는 저장소의 이력을
+읽을 사람의 판단이기 때문이다.
+
+그래서 턴을 마칠 때 **커밋되지 않은 변경을 남기는 것이 정상이다.** 무엇을 바꿨는지
+요약으로 알리고, 커밋을 대신하려 들지 않는다. push와 PR은 사용자가 커밋한 뒤 요청하면
+할 수 있다(권한이 ask).
+
 **Work in a git worktree by default.** Several slices run concurrently, so each unit of work gets its own worktree instead of sharing the checkout — otherwise parallel sessions collide on the working tree, the Gradle build directory, and `.claude/last-test-status`. `worktree.bgIsolation` is set to `worktree` in `.claude/settings.local.json`; when a task starts in an existing session, call `EnterWorktree` rather than branching in place. One worktree per branch, named after it.
 
 > `worktree.baseRef` is `origin/dev`, so a fresh worktree branches from `dev` — matching the rule that features cut from `dev`. It does **not** branch from your current HEAD, so uncommitted work in the shared checkout does not carry over.
@@ -223,18 +244,34 @@ permanent identifier shared by the spec, the issue, the log, and the published p
 it in the branch makes the whole chain greppable. A step or plan number still does not belong
 there — it stops meaning anything the moment the plan changes.
 
-### When the spec is wrong
+### When the spec is wrong — fix the spec, not just the code
 
-**Do not fix it in code.** If you hit a case the spec does not cover, a technical impossibility,
-or a needed contract change:
+요건은 작업하면서 바뀐다. 바뀐 요건을 코드에만 반영하고 스펙을 그대로 두면 스펙이 세 기능
+만에 무의미해진다. 그래서 **스펙과 설계 문서는 구현자가 직접 고친다.**
 
-1. Stop.
-2. Comment on the issue: `[AMEND] SPEC-XXXX: <what you hit and why the spec cannot stand>`
-3. Wait. The planner harness folds it back with `/amend`, and the spec is updated with a change
-   history entry.
+스펙이 다루지 않은 경우, 기술적으로 불가능한 요구, 계약 변경이 필요할 때:
 
-Implementing something different and mentioning it later is what makes a spec worthless within
-three features. The temptation is strongest when the deviation is small.
+1. `Specs/SPEC-XXXX/spec.md`(볼트)와 `problem/SPEC-XXXX-server.md`를 고친다.
+2. **변경 이력에 날짜·무엇을·왜를 남긴다.** 이력 없는 수정은 드리프트와 구분되지 않는다.
+3. 이슈에도 한 줄 남긴다 — 플래너가 다음 스펙을 쓸 때 이 결정을 본다.
+
+고친 내용은 턴 마무리의 **확인할 것**에 반드시 적는다. 스펙을 조용히 바꾸는 것은 코드를
+조용히 다르게 구현하는 것과 같은 문제다.
+
+### 정책은 recorder 소유다 — 직접 고치지 않는다
+
+`Specs/policies.md`는 **여러 스펙이 함께 전제하는 문서**다. 한 구현자가 고치면 다른 스펙의
+전제가 조용히 무너지므로, 훅이 쓰기를 막는다.
+
+정책을 새로 올리거나 기존 정책을 개정해야 하면 **사용자가 "작업 완료"라고 한 시점에**
+요청 문서를 남긴다:
+
+```
+/Users/junha/git/ieuri/ieuri-recorder/problem/<주제>.md
+```
+
+무엇을·왜 바꿔야 하는지와 **구현이 실제로 확정한 내용**을 적는다. 스펙의 정책 후보 문구와
+구현 결과가 다르면 그 차이를 명시한다 — recorder는 스펙이 아니라 이 문서를 보고 승격한다.
 
 ### Contract
 
