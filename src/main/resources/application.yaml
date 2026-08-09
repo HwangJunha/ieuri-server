@@ -206,6 +206,40 @@ ieuri:
     detail-absence-ttl: 7d
     connect-timeout-millis: 3000
     read-timeout-millis: 5000
+  # 서울시 실시간 도시데이터(SPEC-0014). 인증키는 환경변수로만 주입한다.
+  # **키가 비어 있어도 기동에 실패하지 않는다** — 혼잡도 레이어만 degraded로 응답하고
+  # 지도의 나머지는 정상 동작한다. 로컬에서 키 없이 지도를 띄울 수 있어야 한다.
+  seoul-citydata:
+    api-key: ${IEURI_SEOUL_CITYDATA_API_KEY:}
+    base-url: ${IEURI_SEOUL_CITYDATA_BASE_URL:http://openapi.seoul.go.kr:8088}
+    # 같은 구역 재호출 최소 간격. 데이터가 약 30분 지연되어 도착하므로 5분 경계 TTL은
+    # 같은 데이터를 반복 호출한다 — [TBD] 실측 후 크게 잡을수록 호출량이 준다.
+    min-refetch-seconds: ${IEURI_SEOUL_CITYDATA_MIN_REFETCH_SECONDS:300}
+    # 일일 호출 상한. 닿으면 업스트림을 더 부르지 않고 캐시만 쓴다 — 쿼터를 넘겨
+    # 차단당하는 것보다 낡은 데이터를 주는 편이 낫다.
+    daily-call-limit: ${IEURI_SEOUL_CITYDATA_DAILY_CALL_LIMIT:1000}
+    # 한 번에 조회할 구역 수 상한. 벌크 호출이 없어 구역 수가 곧 호출 수라 클램프가
+    # 아니라 거절이다(TOO_MANY_AREA_IDS). [TBD]
+    max-area-ids: 20
+    # TourAPI보다 짧게 잡는다 — 실패해도 degraded로 흡수되므로 오래 매달리는 것보다
+    # 빨리 포기하고 캐시를 주는 편이 낫다.
+    connect-timeout-millis: 5000
+    read-timeout-millis: 10000
+  # 지도 뷰포트 조회(SPEC-0014). 아래 수치는 전부 [TBD]이며 실측으로 확정한다 —
+  # 코드 수정 없이 조정하려고 설정으로 뺐다. 카카오맵 줌은 1~14이며 클수록 확대다.
+  map-viewport:
+    min-zoom: 1
+    max-zoom: 14
+    # 이 줌 미만이면 클러스터링한다. 개별 마커와 클러스터는 상호배타적이다.
+    cluster-zoom-threshold: 10
+    # 뷰포트 면적 상한(위경도 도 곱). 전 지구 bbox 한 번으로 전체를 긁어가는 것을 막는
+    # 것이 목적이라 정밀할 필요가 없다. 4.0은 대략 2°×2°로 남한 전체를 담는 크기다.
+    max-area-square-degrees: 4.0
+    max-spot-markers: 500
+    max-clusters: 100
+    max-event-markers: 200
+    # 최저 줌의 그리드 셀 크기(도). 줌이 1 오를 때마다 절반이 된다.
+    cluster-grid-size-at-min-zoom: 1.0
   sns:
     google:
       # id_token의 aud는 플랫폼별로 다르다: iOS→iOS 클라이언트 ID, Android/Web→웹 클라이언트 ID.

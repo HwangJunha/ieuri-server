@@ -1,0 +1,351 @@
+extend type Query {
+    """
+    뷰포트(bbox) 안의 지도 마커. spot과 문화행사를 함께 반환한다.
+
+    **커서 페이지네이션을 쓰지 않는다.** 지도에는 순서도 "다음 페이지"도 없어, 확대·이동은
+    이어 읽기가 아니라 새로운 질의다. 대신 줌별 결과 상한과 truncated 플래그로 "확대하면 더
+    있다"를 알린다.
+
+    줌이 임계값 미만이면 clusters가, 이상이면 spots가 채워진다. 둘은 상호배타적이다.
+
+    오류: 뒤집히거나 범위를 벗어난 bbox는 INVALID_BBOX, 면적 상한 초과는 BBOX_TOO_LARGE,
+    유효 범위 밖 줌은 INVALID_ZOOM.
+    """
+    mapViewport(
+        bbox: MapBoundsInput!
+
+        "카카오맵 줌 레벨(1~14, 클수록 확대). 클러스터링 여부와 결과 상한을 결정한다."
+        zoom: Int!
+
+        "spot 카테고리 필터. 생략하면 전체."
+        category: SpotCategory
+    ): MapViewportResult!
+
+    """
+    서울 121곳의 실시간 혼잡도. 폴리곤 채색용 데이터이며 **폴리곤 좌표는 담지 않는다** —
+    경계는 seoulCongestionAreas로 분리했고 구역 id로 조인한다.
+
+    **areaIds 또는 bbox 중 하나는 필수다.** 둘 다 없으면 AREA_FILTER_REQUIRED로 거절한다.
+    업스트림에 벌크 호출이 없어 1곳당 1회 호출이 강제되고 일일 쿼터가 있으므로, 범위 없는
+    전체 조회는 쿼터를 한 번에 소진시킨다.
+
+    업스트림 장애는 오류가 아니라 degraded 표식으로 표현한다 — 이 필드가 실패해도
+    mapViewport는 별개 최상위 필드이므로 영향받지 않는다.
+
+    오류: 121곳에 없는 구역 id는 CONGESTION_AREA_NOT_FOUND, 구역 id 개수 초과는
+    TOO_MANY_AREA_IDS.
+    """
+    seoulCongestion(
+        "조회할 구역 id(POI001 형태). bbox와 함께 주면 이 값이 우선하고 bbox는 무시된다."
+        areaIds: [String!]
+
+        "뷰포트에 걸치는 구역만 조회한다. 걸치는 구역이 없으면 빈 결과이며 오류가 아니다."
+        bbox: MapBoundsInput
+    ): SeoulCongestionResult!
+
+    """
+    서울 121곳의 폴리곤 경계와 메타데이터. 사실상 정적인 데이터다.
+
+    클라이언트는 앱 시작 시 1회 조회해 캐시하고, seoulCongestion 응답과 구역 id로 조인한다.
+    경계 좌표를 실시간 응답마다 반복 전송하지 않기 위한 분리다.
+    """
+    seoulCongestionAreas: [CongestionAreaBoundary!]!
+}
+
+"""
+뷰포트 사각형. 위경도 4개를 평탄하게 받는다. 경계선에 걸친 대상은 포함한다.
+
+minLat < maxLat, minLng < maxLng 이어야 한다 — 날짜변경선을 넘는 bbox(minLng > maxLng)는
+지원하지 않으며 INVALID_BBOX로 거절된다.
+"""
+input MapBoundsInput {
+    minLat: Float!
+    minLng: Float!
+    maxLat: Float!
+    maxLng: Float!
+}
+
+"뷰포트 마커 조회 결과."
+type MapViewportResult {
+    """
+    개별 spot 마커. 클러스터링 임계 줌 미만에서는 빈 목록이며 clusters가 대신 채워진다.
+    spots와 clusters가 동시에 채워지는 일은 없다.
+    """
+    spots: [MapSpot!]!
+
+    "저줌 클러스터. spots가 비어 있을 때만 값이 있다."
+    clusters: [SpotCluster!]!
+
+    """
+    뷰포트 안의 문화행사 마커. 클러스터링 대상이 아니다 — 행사는 밀집도가 낮아 항상 개별
+    마커로 표시한다.
+
+    서울 실시간 데이터에서 오므로 서울 밖 뷰포트에서는 비어 있고, 아직 캐시가 없는 구역도
+    비어 있다. 빈 목록은 오류가 아니다.
+    """
+    events: [CulturalEvent!]!
+
+    """
+    결과가 줌별 상한을 초과해 일부만 반환됐다는 뜻. 클라이언트는 확대 유도 안내를 표시한다.
+
+    상한 값 자체는 노출하지 않는다 — 튜닝 대상이며 클라이언트가 숫자에 의존하면 안 된다.
+    """
+    truncated: Boolean!
+}
+
+"""
+지도 마커 1개. 목록용 Spot과 달리 **거리를 담지 않는다** — bbox 조회에는 거리를 잴
+중심점이 없다. 마커에 그리지 않는 주소·저작권 표기도 담지 않으며, 상세는 탭 후
+spotDetail로 조회한다.
+"""
+type MapSpot {
+    "안정적 식별자. 언어별로 다르므로 언어를 바꾸면 목록을 다시 받아야 한다."
+    id: ID!
+    title: String!
+    "카드 이미지 URL(https). 이미지가 없는 항목은 결과에서 제외되므로 항상 존재한다."
+    thumbnailImageUrl: String!
+    category: SpotCategory!
+    "경도."
+    lng: Float!
+    "위도."
+    lat: Float!
+}
+
+"""
+저줌 클러스터 1개. 개별 spot 상세를 담지 않는다 — 탭하면 확대해 다시 조회하는 흐름을
+전제한다.
+"""
+type SpotCluster {
+    "클러스터 중심 경도. 셀 중심이 아니라 묶인 spot 좌표의 평균이다."
+    centerLng: Float!
+
+    "클러스터 중심 위도."
+    centerLat: Float!
+
+    "묶인 spot 개수."
+    count: Int!
+
+    """
+    우세 카테고리. 아이콘 선택에 쓴다.
+
+    **과반(50% 초과)을 차지하는 카테고리만 값이 된다.** 섞여서 과반이 없으면 null이다 —
+    2:2:1처럼 실질적으로 섞인 클러스터에 특정 아이콘이 붙으면 사실과 다른 인상을 준다.
+    """
+    dominantCategory: SpotCategory
+}
+
+"""
+문화행사 1건.
+
+업스트림은 좌표 이름이 직관과 반대(X가 경도, Y가 위도)지만 이 계약은 lng/lat로 바로잡아
+노출한다.
+"""
+type CulturalEvent {
+    "안정적 식별자. 업스트림에 명시적 id가 없어 서버가 제목과 좌표로 부여한다. 불투명 문자열이다."
+    id: String!
+
+    title: String!
+
+    "행사 장소명. 자유 텍스트이며 주소가 아니다. 업스트림에 없으면 빈 문자열이다."
+    place: String!
+
+    """
+    행사 기간 원문. 업스트림이 "2026-08-07~2026-08-10" 형태의 단일 문자열이라 그대로
+    노출한다. 시작·종료 분리를 계약에 넣지 않는 이유: 업스트림 형식이 항상 이 형태라는
+    보장이 없어 파싱 실패 시 계약 위반이 된다. 표시 가공은 클라이언트 몫이다.
+
+    업스트림에 없으면 빈 문자열이다.
+    """
+    period: String!
+
+    "경도."
+    lng: Float!
+
+    "위도."
+    lat: Float!
+
+    "행사 상세 URL. 없을 수 있다."
+    url: String
+}
+
+"""
+혼잡도 4단계. 업스트림의 한국어 표시 문구를 그대로 노출하지 않기 위한 안정적 식별자다.
+
+판정 기준은 최근 28일 평균 대비 백분위이며 **절대 인원수가 아니다** — 새벽 시간대 도심이
+RELAXED로 나오는 것은 정상 동작이다.
+"""
+enum CongestionLevel {
+    "여유 — 평균의 50% 이하"
+    RELAXED
+
+    "보통 — 50% 초과 75% 이하"
+    NORMAL
+
+    "약간 붐빔 — 75% 초과 100% 이하"
+    SLIGHTLY_CROWDED
+
+    "붐빔 — 100% 초과"
+    CROWDED
+}
+
+"""
+상업 활성도 4단계. CongestionLevel과는 독립적인 축이다 — 같은 구역에서 서로 다른 값일 수
+있어 enum을 분리했다.
+"""
+enum CommercialActivityLevel {
+    "한산한 시간대"
+    QUIET
+
+    """
+    보통 시간대. 실측 기준선이 없는 구역도 업스트림이 이 값으로 고정 반환하므로,
+    CommercialStatus.isDefaulted로 실측과 구분해야 한다.
+    """
+    NORMAL
+
+    "바쁜 시간대"
+    BUSY
+
+    "분주한 시간대"
+    PEAK
+}
+
+"구역 1곳의 현재 인구밀집 스냅샷."
+type CongestionSnapshot {
+    level: CongestionLevel!
+
+    "추정 인구 하한."
+    populationMin: Int!
+
+    "추정 인구 상한."
+    populationMax: Int!
+
+    """
+    이 스냅샷이 만들어진 시각 (ISO-8601, 시간대 없는 지역 시각).
+
+    **데이터는 약 30분 지연되어 도착한다.** 클라이언트는 이 값으로 "N시 M분 기준"을
+    표시해야 하며 "지금"으로 표기해서는 안 된다.
+    """
+    observedAt: String!
+}
+
+"12개 시간대 예보 중 1건. 혼잡도와 같은 enum을 쓴다."
+type CongestionForecast {
+    "예보 대상 시각 (ISO-8601)."
+    forecastTime: String!
+
+    level: CongestionLevel!
+    populationMin: Int!
+    populationMax: Int!
+}
+
+"""
+구역 1곳의 상업 활성도.
+
+121곳 중 일부에만 실제 신호가 있다. "데이터 부재"는 CongestionArea.commercial 이 null인
+것으로, "값은 있으나 실측이 아님"은 isDefaulted 로 표현한다 — 3상태 구분이다.
+"""
+type CommercialStatus {
+    level: CommercialActivityLevel!
+
+    """
+    참이면 실측 기준선이 없어 업스트림이 NORMAL로 고정 반환한 값이라는 뜻이다.
+    실제로 "보통"이 관측된 것이 아니라 데이터 부재의 자리표시자다.
+
+    클라이언트는 참일 때 이 값을 신뢰할 수 있는 신호로 표시해서는 안 된다.
+    """
+    isDefaulted: Boolean!
+
+    """
+    이 값이 갱신된 시각 (ISO-8601).
+
+    인구 블록과 **다른 주기로** 갱신되며 야간에는 정지 상태로 관측되었다 — 그래서
+    CongestionSnapshot.observedAt과 별도로 노출한다.
+    """
+    observedAt: String!
+}
+
+"""
+구역 1곳의 실시간 혼잡도.
+폴리곤 좌표는 담지 않는다 — seoulCongestionAreas 와 id로 조인한다.
+"""
+type CongestionArea {
+    "구역 식별자(POI001 형태의 서울시 구역 코드). CongestionAreaBoundary.id 와 같은 조인 키다."
+    id: String!
+
+    """
+    활성 언어로 표기한 구역명. 활성 언어는 Accept-Language 헤더에서 오며(부재 시 EN)
+    인자로 받지 않는다.
+
+    해당 언어의 이름이 없으면 EN, EN도 없으면 KO로 폴백한다.
+    """
+    name: String!
+
+    congestion: CongestionSnapshot!
+
+    """
+    12개 시간대 예보. 업스트림에 예보가 없으면 null이다.
+    **부재는 조회 실패가 아니다** — 최상위 errors[]로 표면화하지 않는다.
+    """
+    forecast: [CongestionForecast!]
+
+    """
+    상업 활성도. 일부 구역에만 값이 있고 나머지는 null이다.
+    **부재는 조회 실패가 아니다.** 부재와 isDefaulted=true 의 차이는 CommercialStatus
+    문서를 참고한다.
+    """
+    commercial: CommercialStatus
+}
+
+"구역 1곳의 정적 폴리곤 경계. 앱 시작 시 1회 조회해 캐시하는 것을 전제한다."
+type CongestionAreaBoundary {
+    "구역 식별자(POI001 형태의 서울시 구역 코드). CongestionArea.id 와 같은 조인 키다."
+    id: String!
+
+    "활성 언어로 표기한 구역명. CongestionArea.name과 같은 규칙이다."
+    name: String!
+
+    "구역 분류 (관광특구 · 고궁·문화유산 · 인구밀집지역 · 발달상권 · 공원)."
+    category: String!
+
+    """
+    폴리곤 경계. GeoJSON과 같은 순서 규약으로 [lng, lat] 쌍이며, 첫 점과 끝 점이 같아
+    닫힌 다각형을 이룬다.
+
+    **단일 폐곡선만 제공한다**(홀·멀티폴리곤 없음). 원본에 내부 링이 있는 구역은 외곽
+    링만 노출한다.
+    """
+    polygon: [[Float!]!]!
+}
+
+"""
+seoulCongestion 결과.
+
+배열을 그대로 반환하지 않고 감싼 이유: 업스트림 장애 시에도 최상위 필드를 오류로 만들지
+않고 데이터로 표현하기 위함이다. 오류로 던지면 클라이언트의 오류 분기로 들어가 지도 전체가
+실패한 것처럼 다뤄지기 쉬운데, 실제로는 한 레이어만 없는 상태다.
+"""
+type SeoulCongestionResult {
+    """
+    요청한 구역들의 혼잡도. 업스트림 전체 실패 시 빈 목록이거나, 캐시가 있으면 캐시된
+    이전 데이터다.
+
+    혼잡도를 해소할 수 없는 구역은 목록에서 빠진다 — 요청한 구역 수와 다를 수 있다.
+    """
+    areas: [CongestionArea!]!
+
+    """
+    참이면 업스트림 실시간 API 호출이 실패해, 이 응답이 캐시된 이전 데이터이거나 비어
+    있다는 뜻이다.
+
+    클라이언트는 이때 혼잡도 레이어만 안내로 대체하고 spot·문화행사 마커는 정상 표시를
+    유지한다.
+    """
+    degraded: Boolean!
+
+    """
+    degraded 이면서 캐시된 데이터를 돌려줄 때, 그 데이터가 어느 시점 것인지 (ISO-8601).
+    여러 구역이면 가장 오래된 시각이다. 정상 응답이면 null이며 각
+    CongestionSnapshot.observedAt 을 쓴다.
+    """
+    staleSince: String
+}
