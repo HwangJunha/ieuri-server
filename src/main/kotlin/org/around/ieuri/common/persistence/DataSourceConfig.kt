@@ -45,11 +45,15 @@ class DataSourceConfig {
      * **검색 노드**를 보게 됐다 — 검색 노드에 `spot`은 있어서 반경 조회는 우연히 동작했고,
      * `congestion_area`가 없어 `seoulCongestionAreas`에서야 드러났다.
      *
-     * `@Primary`이므로 이름 없이 주입받는 쪽은 전부 메인을 본다. 검색 노드로 가야 하는
-     * 어댑터 3종만 `searchJdbcTemplate`을 `@Qualifier`로 지목한다.
+     * **`@Primary`를 붙이지 않는다.** 후보가 둘이어도 주입 파라미터 이름이 `jdbcTemplate`이라
+     * 빈 이름으로 해소된다(Spring의 by-type 동점 처리). `@Primary`는 "이름을 안 써도 이게
+     * 기본"이라는 뜻이라, 검색 노드를 써야 할 곳이 이름을 빠뜨렸을 때 조용히 메인으로
+     * 흘려보낸다 — 그 실수는 오류가 아니라 **잘못된 DB 조회**로 나타나 알아채기 어렵다.
+     * 지금은 두 후보 중 하나를 반드시 이름으로 고르게 되어 있고, 이름이 틀리면 기동이 깨진다.
+     *
+     * 검색 노드로 가야 하는 어댑터 3종은 `searchJdbcTemplate`을 `@Qualifier`로 지목한다.
      */
     @Bean
-    @Primary
     fun jdbcTemplate(dataSource: DataSource): JdbcTemplate = JdbcTemplate(dataSource)
 
     /**
