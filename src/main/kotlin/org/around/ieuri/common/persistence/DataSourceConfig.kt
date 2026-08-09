@@ -2,7 +2,10 @@ package org.around.ieuri.common.persistence
 
 import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.migration.JavaMigration
+import org.springframework.beans.factory.BeanFactoryUtils
 import org.springframework.beans.factory.ObjectProvider
+import org.springframework.beans.factory.config.BeanFactoryPostProcessor
+import org.springframework.orm.jpa.AbstractEntityManagerFactoryBean
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.jdbc.autoconfigure.DataSourceProperties
@@ -75,24 +78,53 @@ class DataSourceConfig {
      * 주는데 그것을 빠뜨리면 Flyway가 **이미 적용된 39를 로컬에서 못 찾아**
      * `Detected applied migration not resolved locally: 39`로 검증이 깨진다.
      *
-     * **JPA보다 먼저 돌아야 한다.** `entityManagerFactory`가 이 빈에 의존하도록 Boot가
-     * 엮어 주므로(`FlywaySchemaManagementProvider`), `ddl-auto: validate`는 마이그레이션이
-     * 끝난 스키마를 검증한다.
+     * **JPA보다 먼저 돌아야 한다.** `ddl-auto: validate`가 마이그레이션이 끝난 스키마를
+     * 봐야 하므로 [entityManagerFactoryDependsOnFlyway]로 순서를 명시한다 — 자동구성이
+     * 물러난 상태라 Boot의 `FlywaySchemaManagementProvider`가 대신 엮어 주지 않는다.
+     *
+     * **Hikari 풀을 쓰지 않고 접속 정보를 직접 넘긴다**(`searchFlyway`와 같은 방식).
+     * 풀을 넘기면 Flyway가 마이그레이션을 마치고 커넥션을 반납한 뒤, 정리 단계에서
+     * `restoreOriginalSchema`로 그 커넥션을 다시 만지다가 `This connection has been closed`
+     * 스택트레이스를 남긴다. 마이그레이션 자체는 이미 끝난 뒤라 무해하지만 기동할 때마다
+     * 찍힌다. Flyway는 부팅 시 한 번 돌고 끝나므로 자체 커넥션으로 충분하다.
      */
     @Bean(initMethod = "migrate")
     fun flyway(
-        dataSource: DataSource,
+        dataSourceProperties: DataSourceProperties,
         properties: FlywayProperties,
         javaMigrations: ObjectProvider<JavaMigration>,
     ): Flyway =
         Flyway.configure()
-            .dataSource(dataSource)
+            .dataSource(
+                dataSourceProperties.url,
+                dataSourceProperties.username,
+                dataSourceProperties.password,
+            )
             .locations(*properties.locations.toTypedArray())
             .baselineOnMigrate(properties.baselineOnMigrate)
             .baselineVersion(properties.baselineVersion)
             .ignoreMigrationPatterns(*properties.ignoreMigrationPatterns.toTypedArray())
             .javaMigrations(*javaMigrations.orderedStream().toList().toTypedArray())
             .load()
+
+    /**
+     * `entityManagerFactory`가 [flyway] **뒤에** 만들어지도록 강제한다.
+     *
+     * 자동구성이 살아 있을 때는 Boot가 `FlywaySchemaManagementProvider`로 이 순서를 엮어
+     * 주는데, `searchFlyway` 때문에 자동구성이 물러나 그 장치가 없다. 순서가 없으면
+     * Hibernate의 `ddl-auto: validate`가 마이그레이션 **전** 스키마를 검증할 수 있고,
+     * 그때 새 테이블이 없다며 기동이 깨진다(V43 같은 신규 마이그레이션에서 드러난다).
+     */
+    @Bean
+    fun entityManagerFactoryDependsOnFlyway(): BeanFactoryPostProcessor =
+        BeanFactoryPostProcessor { beanFactory ->
+            for (name in beanFactory.getBeanNamesForType(AbstractEntityManagerFactoryBean::class.java, true, false)) {
+                // FactoryBean 조회는 `&`가 붙은 이름을 주는데 빈 정의는 그 접두사 없이 등록돼 있다.
+                val definitionName = BeanFactoryUtils.transformedBeanName(name)
+                val definition = beanFactory.getBeanDefinition(definitionName)
+                definition.setDependsOn(*((definition.dependsOn ?: emptyArray()) + "flyway"))
+            }
+        }
 }
 
 /**
