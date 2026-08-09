@@ -21,8 +21,8 @@ import org.springframework.transaction.annotation.Transactional
  * **메인 DB가 아니라 검색 노드를 본다**(searchJdbcTemplate). pg_search 커뮤니티 에디션이
  * 물리 복제를 막아, BM25 인덱스를 논리 복제 구독자로 분리했기 때문이다.
  *
- * 인덱스는 언어별로 나뉘어 있다(search-node V2). 조회가 `language = ?`를 함께 걸어야 그 언어의
- * 부분 인덱스가 선택되고, 동시에 다른 언어 행이 결과에 섞이지 않는다.
+ * 인덱스는 테이블당 하나이고 언어를 가르지 않는다(search-node V2). **언어 격리는 조회의
+ * `language = ?` 조건이 전담한다** — 빠뜨리면 다른 언어 행이 결과에 섞인다(AC-2.3).
  *
  * 검색과 카운트를 한 클래스에 두어 조건을 눈으로 대조할 수 있게 한다 — 갈리면 목록과 건수가 어긋난다.
  */
@@ -31,14 +31,7 @@ class SpotSearchJdbcAdapter(
     @Qualifier("searchJdbcTemplate") private val jdbcTemplate: JdbcTemplate,
 ) : SpotSearchPort {
 
-    /**
-     * 관련도 순 한 페이지. `limit + 1`건을 읽어 호출자가 다음 페이지 존재를 판정한다.
-     *
-     * 정렬 키는 **거리 가중이 끝난 최종 점수**이며 커서에 그대로 실린다. BM25 원점수를 커서에
-     * 넣으면 커서가 가리키는 위치와 실제 정렬 순서가 어긋난다.
-     *
-     * 관련도가 계산식이라 별칭을 WHERE에서 참조할 수 없어 서브쿼리로 한 겹 감싼다.
-     */
+    /** 관련도(거리 가중) 내림차순 + id 오름차순 한 페이지. 다음 페이지 판정은 호출자가 [count]로 한다. */
     @Transactional(readOnly = true)
     override fun search(query: SpotSearchQuery): List<SpotSearchHit> {
         val (where, whereParams) = whereClause(query)
@@ -50,8 +43,7 @@ class SpotSearchJdbcAdapter(
         )
         params.addAll(whereParams)
 
-        // 요청한 개수보다 한 건 더 읽어 호출자가 다음 페이지 존재를 판정한다.
-        params += query.limit + 1
+        params += query.limit
         params += query.offset
 
         // **평면 쿼리여야 한다.** `@@@`·`pdb.score()`·`ORDER BY`·`LIMIT`이 **모두 같은 레벨**에
@@ -65,7 +57,7 @@ class SpotSearchJdbcAdapter(
             SELECT s.id, s.title, s.address, s.thumbnail_image_url, s.map_x, s.map_y,
                    s.category, s.copyright,
                    ST_Distance(s.location, $CENTER) AS distance_meters,
-                   pdb.score(s.id) / (1 + ST_Distance(s.location, $CENTER) / 1000.0) AS relevance
+                   pdb.score(s.id) / (1 + ST_Distance(s.location, $CENTER) / $DISTANCE_HALF_LIFE_M) AS relevance
             FROM spot s
             WHERE $where
             ORDER BY relevance DESC, s.id ASC
@@ -90,7 +82,7 @@ class SpotSearchJdbcAdapter(
         }, *params.toTypedArray())
     }
 
-    /** [search]와 같은 조건(커서 제외)에 걸리는 전체 건수. 검색 페이지가 결과 수를 표시한다. */
+    /** [search]와 같은 조건에 걸리는 전체 건수. 검색 페이지 표시와 hasNext 판정에 쓰인다. */
     @Transactional(readOnly = true)
     override fun count(query: SpotSearchQuery): Int {
         val (where, params) = whereClause(query)
@@ -138,27 +130,52 @@ class SpotSearchJdbcAdapter(
 
     /**
      * 조회와 카운트가 **같은 조건**을 쓰도록 한 곳에서 만든다 — 갈리면 목록과 건수가 어긋난다.
-     * 파라미터는 SQL의 `?` 등장 순서대로 담아 함께 반환한다. CTE의 center가 항상 앞선다.
+     * 파라미터는 SQL의 `?` 등장 순서대로 담아 함께 반환한다.
      *
      * 반경 필터는 반드시 `ST_DWithin`이다. `ST_Distance(...) <= r`로 쓰면 전 행을 계산해
      * GiST 인덱스를 타지 못한다.
      */
     private fun whereClause(query: SpotSearchQuery): Pair<String, List<Any>> {
         val titleField = titleField(query.language)
-        val addressField = addressField(query.language)
         val conditions = mutableListOf(
             // **언어 격리는 이 조건이 전담한다.** BM25 인덱스가 하나뿐이라 언어를 가르지
             // 못하므로, 빠뜨리면 다른 언어 행이 결과에 섞인다(AC-2.3).
             "s.language = ?",
-            // 오타 허용(R3): 편집 거리 1까지 맞춘다. pg_search의 상한은 성능상 2다.
-            "($titleField @@@ ?::pdb.fuzzy(1) OR $addressField @@@ ?::pdb.fuzzy(1))",
+            // **제목은 정확 일치와 오타 허용을 OR로 함께 건다.**
+            //
+            // `pdb.fuzzy` 단독으로 쓰면 BM25 점수가 상수로 고정된다(실측: 전부 1.5) — 그러면
+            // 관련도 순위가 사라져 사실상 거리순 정렬만 남고 R1이 깨진다. 정확 일치 절을 함께
+            // 걸면 점수가 되살아난다(실측: "경복궁" 13.6 → 11.7 차등, "경복궁"이 1등).
+            //
+            // 오타 질의는 정확 일치가 0건이라 fuzzy 쪽만 남아 점수가 평탄해지는데, 그것은
+            // 자연스럽다 — 오타를 친 시점에는 무엇이 더 관련 있는지 판단할 근거가 없다.
+            //
+            // **짧은 질의에는 오타 허용을 끈다**(아래 [fuzzyClause]). 2글자에서 편집 거리 1은
+            // 글자 하나가 통째로 바뀌는 것이라 "가산"이 안산·부산까지 끌어온다(실측 41건 → 4,499건).
+            //
+            // 주소는 n-gram이라 fuzzy만으로도 점수가 갈려(실측 22.7/21.0) 이 처리가 필요 없다.
+            //
+            // **제목은 올리고(3) 주소는 내린다(0.2).** 두 필드의 점수 스케일이 크게 다르기
+            // 때문이다 — n-gram은 긴 질의를 잘게 쪼개 각 조각을 매칭시키므로 점수가 폭증한다.
+            //
+            // 실측한 실패: "BCBG 현대프리미엄아울렛 김포점"을 그대로 검색했을 때 제목이 완전히
+            // 일치하는 spot(196.8)보다, 주소가 "…현대프리미엄아울렛김포점3층"인 **올리브영**이
+            // 308.6으로 이겨 1위를 차지했다. 제목이 정확히 맞는데 주소가 우연히 겹친 쪽에
+            // 밀리는 것은 사용자가 납득할 수 없는 순서다.
+            //
+            // 주소를 0.2로 낮춰도 주소 검색은 그대로 된다(실측: "두산로" 3건 정상). 주소는
+            // 제목에 없는 것을 찾는 **보조 경로**이지 순위를 뒤집을 근거가 아니다.
+            "($titleField @@@ ?::pdb.boost(3)" +
+                " OR $titleField @@@ ?${fuzzyClause(query.text)}" +
+                " OR $ADDRESS_FIELD @@@ ?::pdb.boost($ADDRESS_WEIGHT))",
             // **CTE와 조인하지 않는다** — `spot s, c` 형태면 pg_search가 인덱스를 못 타고
             // `@@@`가 깨진다. 좌표를 두 번 더 바인딩하더라도 평면 조건을 유지한다.
             "ST_DWithin(s.location, $CENTER, ?)",
         )
         val params = mutableListOf<Any>(
             query.language.name,
-            query.text, query.text,
+            // 제목 정확 일치, 제목 fuzzy, 주소 fuzzy 순서다(위 조건절의 `?` 등장 순서).
+            query.text, query.text, query.text,
             query.center.longitude, query.center.latitude, // ST_DWithin의 CENTER
             query.radiusMeters.toDouble(),
         )
@@ -169,6 +186,19 @@ class SpotSearchJdbcAdapter(
         }
         return conditions.joinToString(" AND ") to params
     }
+
+    /**
+     * 질의 길이에 맞는 오타 허용 절(R3).
+     *
+     * **짧은 질의에는 오타를 허용하지 않는다.** 편집 거리 1은 "글자 하나가 바뀌어도 같게 본다"는
+     * 뜻인데, 2글자에서는 그것이 단어의 절반이라 전혀 다른 말이 된다 — "가산"이 안산·부산을
+     * 끌어와 41건짜리 검색이 4,499건이 됐다(실측). 3글자부터는 안정적이다(경복궁 22건).
+     *
+     * Elasticsearch의 `fuzziness: AUTO`도 같은 규칙을 쓴다 — 짧은 항은 정확 일치만 본다.
+     * 반환값은 SQL 조각이라 캐스트가 없으면 그대로 정확 일치가 된다.
+     */
+    private fun fuzzyClause(text: String): String =
+        if (text.length >= MIN_FUZZY_LENGTH) "::pdb.fuzzy(1)" else ""
 
     /**
      * 질의 언어에 해당하는 제목 필드 식(AC-2.2).
@@ -184,17 +214,54 @@ class SpotSearchJdbcAdapter(
         DomainLocale.EN -> "s.title::pdb.alias('title_en')"
     }
 
-    /** [titleField]와 같은 규약의 주소 필드. 주소만 일치하는 spot을 찾기 위한 것이다(AC-1.4). */
-    private fun addressField(language: DomainLocale): String = when (language) {
-        DomainLocale.KO -> "coalesce(s.address, '')"
-        DomainLocale.JA -> "coalesce(s.address, '')::pdb.alias('address_ja')"
-        DomainLocale.ZH -> "coalesce(s.address, '')::pdb.alias('address_zh')"
-        DomainLocale.EN -> "coalesce(s.address, '')::pdb.alias('address_en')"
-    }
 
     private companion object {
         /** 요청 좌표를 geography 점으로. ST_MakePoint는 (경도, 위도) 순서다 — 뒤집으면 조용히 틀린다. */
         const val CENTER = "ST_MakePoint(?, ?)::geography"
+
+        /** 이 길이 미만의 질의는 오타를 허용하지 않는다 — [fuzzyClause] 참조. */
+        const val MIN_FUZZY_LENGTH = 3
+
+        /**
+         * 거리 감쇠의 반감 거리(미터). 관련도는 `BM25 / (1 + 거리 / 이 값)`이라, 이 거리에서
+         * 계수가 0.5가 된다.
+         *
+         * **1km로 두었더니 거리가 관련도를 덮어버렸다.** 13km 지점에서 계수가 0.07까지
+         * 떨어져 BM25 차이가 무의미해졌고, "BCBG 현대프리미엄아울렛 김포점"을 그대로
+         * 검색해도 BM25가 3배 낮은 "BCBG NC 신구로점"이 가깝다는 이유만으로 1위를 가져갔다
+         * (실측: 196.8/13.3km → 13.78 vs 61.5/2.6km → 17.14).
+         *
+         * 5km면 같은 상황에서 김포점이 1위로 돌아오고(53.8 vs 40.5), 가까운 곳 우선(R6)도
+         * 유지된다(실측: "경복궁" 검색에서 0.4km의 "경복궁"이 1위).
+         */
+        const val DISTANCE_HALF_LIFE_M = "5000.0"
+
+        /**
+         * 주소 매칭의 가중치. 제목(3)보다 훨씬 낮다 — 주소는 n-gram이라 긴 질의에서 점수가
+         * 폭증해, 그대로 두면 제목이 정확히 일치하는 spot을 주소가 우연히 겹친 spot이 이긴다.
+         *
+         * **값은 실측으로 정했다.** "BCBG 현대프리미엄아울렛 김포점"을 검색해 제목이 완전히
+         * 일치하는 spot이 1위인지로 판정했다:
+         *   - 1.0 이상 : 실패(주소에 그 이름이 든 올리브영이 이긴다)
+         *   - 0.5      : 성공하지만 98.4 대 97.1로 1%대 차이라 데이터가 조금만 바뀌어도 뒤집힌다
+         *   - 0.2~0.4  : 성공하며 결과가 동일. 그중 마진이 가장 큰 하단값을 택했다(98.4 대 74.2)
+         *
+         * 낮춰도 주소 검색 자체는 죽지 않는다(실측: "두산로" 3건, "금천구" 정상). 가중치는
+         * 결과의 유무가 아니라 **다른 필드와의 경쟁**에만 관여하기 때문이다.
+         *
+         * 주소는 제목에 없는 것을 찾는 보조 경로이지 순위를 뒤집을 근거가 아니다.
+         */
+        const val ADDRESS_WEIGHT = "0.2"
+
+        /**
+         * 주소 필드(AC-1.4). **언어와 무관하다** — 주소는 n-gram으로 색인해 사전을 쓰지 않으므로
+         * 제목처럼 언어별 별칭을 고를 필요가 없다.
+         *
+         * 형태소 분석을 쓰지 않는 이유는 문맥 의존성이다: 주소 안의 "두산로 71"은
+         * `{두산, 로, 71}`로 잘리는데 질의 "두산로"는 단독이라 `{두, 산로}`로 잘려 **겹치는
+         * 토큰이 사라진다**(실측 0건). n-gram은 그 어긋남이 없다.
+         */
+        const val ADDRESS_FIELD = "coalesce(s.address, '')"
 
     }
 }

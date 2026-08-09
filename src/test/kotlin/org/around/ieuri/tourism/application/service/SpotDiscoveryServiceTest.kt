@@ -204,25 +204,44 @@ class SpotDiscoveryServiceTest {
         verify(exactly = 0) { spotSearchPort.search(any()) }
     }
 
-    /** AC-7.3 — 요청 개수 이하로 돌아오면 마지막 페이지다. */
+    /** AC-7.3 — 이 페이지까지로 전체 건수가 소진되면 마지막 페이지다. */
     @Test
-    fun `마지막 페이지에서 hasNextPage가 false다`() {
+    fun `마지막 페이지에서 hasNext가 false다`() {
         every { spotSearchPort.search(any()) } returns listOf(hit(spotId = 1L))
+        every { spotSearchPort.count(any()) } returns 1
 
         val result = service.searchSpots(searchQuery(query = "경복궁", size = 20), DomainLocale.KO)
 
         assertFalse(result.hasNext)
     }
 
-    /** AC-7.3 — 한 건 더 돌아오면 다음 페이지가 있고, 초과분은 응답에서 잘린다. */
+    /**
+     * AC-7.3 — 전체 건수가 남아 있으면 다음 페이지가 있다.
+     *
+     * **hasNext는 totalCount에서 도출된다** — 한 건 더 읽어 판정하지 않는다. 같은 사실을 두
+     * 경로로 구하면 hasNext=false인데 totalCount는 더 있다고 말하는 상태가 생긴다.
+     */
     @Test
-    fun `요청보다 한 건 더 오면 hasNextPage가 true이고 초과분은 잘린다`() {
-        every { spotSearchPort.search(any()) } returns (1..3L).map { hit(spotId = it) }
+    fun `전체 건수가 남아 있으면 hasNext가 true다`() {
+        every { spotSearchPort.search(any()) } returns (1..2L).map { hit(spotId = it) }
+        every { spotSearchPort.count(any()) } returns 5
 
         val result = service.searchSpots(searchQuery(query = "경복궁", size = 2), DomainLocale.KO)
 
         assertTrue(result.hasNext)
         assertEquals(listOf(1L, 2L), result.items.map { it.id })
+        assertEquals(5, result.totalCount)
+    }
+
+    /** 마지막 페이지 경계 — 2페이지에서 4건을 소진하면 다음이 없다. */
+    @Test
+    fun `마지막 페이지 경계에서 hasNext가 false다`() {
+        every { spotSearchPort.search(any()) } returns (3..4L).map { hit(spotId = it) }
+        every { spotSearchPort.count(any()) } returns 4
+
+        val result = service.searchSpots(searchQuery(query = "경복궁", page = 2, size = 2), DomainLocale.KO)
+
+        assertFalse(result.hasNext)
     }
 
     /** POL-018 — 상한 초과는 거절이 아니라 클램프다. */

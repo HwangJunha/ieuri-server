@@ -85,14 +85,16 @@ class SpotDiscoveryService(
             offset = (page - 1) * size,
         )
 
-        // 포트는 size + 1건까지 돌려준다. 초과분은 "다음 페이지가 있다"는 신호일 뿐 싣지 않는다.
-        val hits = spotSearchPort.search(search)
+        val totalCount = spotSearchPort.count(search)
         return SpotSearchResultView(
             userErrors = emptyList(),
-            items = hits.take(size).map { it.spot.toView() },
+            items = spotSearchPort.search(search).map { it.spot.toView() },
             page = page,
-            hasNext = hits.size > size,
-            totalCount = spotSearchPort.count(search),
+            // **totalCount에서 도출한다.** 오프셋 방식이라 전체 건수를 이미 세고 있어, 한 건 더
+            // 읽어 판정하면 같은 사실을 두 경로로 구하는 셈이고 둘이 어긋날 수 있다 —
+            // hasNext=false인데 totalCount는 더 있다고 말하는 상태가 생긴다(`spots`와 같은 규약).
+            hasNext = page.toLong() * size < totalCount.toLong(),
+            totalCount = totalCount,
         )
     }
 

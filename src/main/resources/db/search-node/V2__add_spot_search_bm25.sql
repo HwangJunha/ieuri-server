@@ -32,11 +32,13 @@ USING bm25 (
     (title::pdb.lindera(japanese, 'alias=title_ja')),   -- IPADIC
     (title::pdb.lindera(chinese, 'alias=title_zh')),    -- CC-CEDICT
     (title::pdb.simple('alias=title_en')),              -- 공백 분리 + 어간
-    -- 주소도 같은 구성이다. 주소만 일치하는 spot을 찾기 위한 것이라 제목보다 단순해도 되지만,
-    -- 언어별로 갈라 두지 않으면 CJK 주소가 통째로 한 토큰이 된다.
-    (coalesce(address, '')::pdb.lindera(korean)),
-    (coalesce(address, '')::pdb.lindera(japanese, 'alias=address_ja')),
-    (coalesce(address, '')::pdb.lindera(chinese, 'alias=address_zh')),
-    (coalesce(address, '')::pdb.simple('alias=address_en'))
+    -- **주소는 형태소가 아니라 n-gram이다.** 주소는 도로명·지명 같은 고유명사 덩어리라
+    -- 사전 기반 분석이 잘 맞지 않는다. 실측 예: 주소 안의 "두산로 71"은 `{두산, 로, 71}`로
+    -- 잘리는데 질의 "두산로"는 문맥이 없어 `{두, 산로}`로 잘려 **겹치는 토큰이 없어진다**.
+    -- 2~3글자 n-gram은 문맥에 의존하지 않아 이 어긋남이 생기지 않는다.
+    --
+    -- 언어별로 나누지 않는 이유도 같다 — n-gram은 사전을 쓰지 않아 언어와 무관하다.
+    -- 언어 격리는 조회의 `language = ?` 조건이 전담한다.
+    (coalesce(address, '')::pdb.ngram(2, 3))
 )
 WITH (key_field = 'id');

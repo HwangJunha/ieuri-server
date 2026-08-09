@@ -15,8 +15,11 @@ import org.around.ieuri.tourism.domain.vo.SpotCategory
  */
 interface SpotSearchPort {
     /**
-     * 반경 안에서 [SpotSearchQuery.text]에 일치하는 spot. 관련도(거리 가중) 내림차순 + id 오름차순.
-     * **`limit + 1`건까지 돌려준다** — 초과분은 호출자의 다음 페이지 판정용이며 응답에 싣지 않는다.
+     * 반경 안에서 [SpotSearchQuery.text]에 일치하는 spot 한 페이지.
+     * 관련도(거리 가중) 내림차순 + id 오름차순으로 정확히 [SpotSearchQuery.limit]건까지.
+     *
+     * 다음 페이지 존재는 호출자가 [count]와 오프셋으로 판정한다 — 한 건 더 읽는 방식을 쓰지
+     * 않는 이유는 어차피 전체 건수를 세고 있어 같은 사실을 두 경로로 구하게 되기 때문이다.
      */
     fun search(query: SpotSearchQuery): List<SpotSearchHit>
 
@@ -37,8 +40,7 @@ interface SpotSearchPort {
  * 표현할 수 없다(`pdb.score()`는 SELECT 전용). 반면 OFFSET은 인덱스 안으로 밀려 들어가
  * top-(limit+offset) 힙으로 처리되므로, 여기서는 오프셋이 정직한 계약이다.
  *
- * [limit]·[offset]은 호출자가 이미 상한을 적용한 값이며, 어댑터가 다음 페이지 판정을 위해
- * limit + 1건을 읽는다.
+ * [limit]·[offset]은 호출자가 이미 상한을 적용한 값이다.
  */
 data class SpotSearchQuery(
     val text: String,
