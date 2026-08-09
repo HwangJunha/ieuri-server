@@ -23,9 +23,16 @@ import javax.sql.DataSource
  * 만들면 통째로 물러난다. SPEC-0013이 검색 노드용 DataSource를 추가하면서 그 일이 실제로
  * 벌어졌고, JPA가 검색 노드를 붙잡아 `Unable to determine Dialect`로 기동이 깨졌다.
  *
- * `@Primary`이므로 JPA·배치·기존 어댑터가 전부 이 쪽을 쓴다. 검색 노드로 가야 하는 것은
- * 검색 어댑터 3종뿐이며, 그것들은 `searchJdbcTemplate`을 이름으로 지목한다
- * (tourism의 `SearchDataSourceConfig`).
+ * **`@Primary`가 반드시 필요하다.** JPA·배치 자동구성은 `DataSource`를 **타입으로** 받는데
+ * 후보가 둘(메인·검색 노드)이라 기본값이 없으면 고르지 못한다. 실제로 떼어 보면
+ * `entityManagerFactory`가 아예 만들어지지 않아 기동이 깨진다(실측):
+ *   `Parameter 0 of constructor in MemberPersistenceAdapter required a bean named
+ *    'entityManagerFactory' that could not be found`
+ * 우리 코드는 이름으로 지목할 수 있지만 프레임워크 코드는 그럴 수 없다 — 그래서 여기만
+ * `@Primary`를 남긴다([jdbcTemplate]은 전부 우리 코드가 받으므로 붙이지 않는다).
+ *
+ * 검색 노드로 가야 하는 것은 검색 어댑터 3종뿐이며, 그것들은 `searchJdbcTemplate`을
+ * 이름으로 지목한다(tourism의 `SearchDataSourceConfig`).
  *
  * 도메인이 아니라 `common`에 두는 이유는 이 빈이 전 도메인의 기본 연결이기 때문이다 —
  * tourism 설정에 두면 tourism이 다른 도메인의 영속성을 쥐는 모양이 된다.

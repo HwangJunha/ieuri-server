@@ -14,9 +14,33 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class SeoulCitydataResponse(
+    @get:com.fasterxml.jackson.annotation.JsonProperty("RESULT")
+    val result: Result? = null,
     @get:com.fasterxml.jackson.annotation.JsonProperty("CITYDATA")
     val cityData: CityData? = null,
 ) {
+    /**
+     * 업스트림 처리 결과. 정상은 `INFO-000`이며, 그 외(인증키 무효 `INFO-100`, 쿼터 초과 등)는
+     * 전부 실패로 다룬다.
+     *
+     * **HTTP 상태는 오류일 때도 200이라** 이 값을 봐야 실패를 알 수 있다. 다만 인증키가
+     * 아예 틀린 경우는 JSON을 요청해도 **XML로** 응답이 와서 역직렬화 단계에서 먼저
+     * 깨진다 — 그쪽은 호출부의 catch가 흡수한다.
+     */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    data class Result(
+        @get:com.fasterxml.jackson.annotation.JsonProperty("RESULT.CODE")
+        val code: String? = null,
+        @get:com.fasterxml.jackson.annotation.JsonProperty("RESULT.MESSAGE")
+        val message: String? = null,
+    ) {
+        val isSuccess: Boolean get() = code == SUCCESS_CODE
+
+        companion object {
+            const val SUCCESS_CODE = "INFO-000"
+        }
+    }
+
     @JsonIgnoreProperties(ignoreUnknown = true)
     data class CityData(
         @get:com.fasterxml.jackson.annotation.JsonProperty("AREA_CD")

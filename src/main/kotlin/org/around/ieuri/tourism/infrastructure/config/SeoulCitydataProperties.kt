@@ -12,8 +12,6 @@ import java.time.Duration
  *
  * @param minRefetchSeconds 같은 구역 재호출 최소 간격(초). 데이터가 약 30분 지연되어
  *   도착하므로 5분 경계 TTL은 같은 데이터를 반복 호출한다 — `[TBD]`이며 실측 후 크게 잡는다.
- * @param dailyCallLimit 일일 호출 상한. 닿으면 업스트림을 더 부르지 않고 캐시만 쓴다 —
- *   쿼터를 넘겨 차단당하는 것보다 낡은 데이터를 주는 편이 낫다.
  * @param maxAreaIds 한 번에 조회할 구역 수 상한(R6). 벌크 호출이 없어 구역 수가 곧
  *   호출 수라, 클램프가 아니라 거절이다.
  */
@@ -22,7 +20,6 @@ data class SeoulCitydataProperties(
     val apiKey: String = "",
     val baseUrl: String = "http://openapi.seoul.go.kr:8088",
     val minRefetchSeconds: Long = 300,
-    val dailyCallLimit: Int = 1_000,
     val maxAreaIds: Int = 20,
     val connectTimeoutMillis: Long = 5_000,
     val readTimeoutMillis: Long = 10_000,

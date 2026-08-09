@@ -7,7 +7,6 @@ import org.around.ieuri.tourism.infrastructure.adapter.out.citydata.SeoulCitydat
 import org.around.ieuri.tourism.infrastructure.adapter.out.citydata.mapper.toSnapshotOrNull
 import org.around.ieuri.tourism.infrastructure.config.SeoulCitydataProperties
 import org.springframework.web.client.RestClient
-import java.time.Clock
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -89,23 +88,22 @@ class SeoulCitydataClientTest {
         val keyless = SeoulCitydataClient(
             properties = SeoulCitydataProperties(apiKey = ""),
             seoulCitydataRestClient = mockk<RestClient>(),
-            clock = Clock.systemUTC(),
         )
 
         assertNull(keyless.fetch("POI009", "광화문·덕수궁"))
     }
 
     @Test
-    fun `일일 호출 상한에 닿으면 더 부르지 않는다`() {
-        // spec §9. 쿼터를 넘겨 차단당하는 것보다 낡은 데이터를 주는 편이 낫다.
-        // RestClient가 mockk라 호출이 일어나면 예외가 난다 — 상한 도달 후 null이 나오면
-        // 업스트림을 부르지 않았다는 뜻이다.
-        val limited = SeoulCitydataClient(
-            properties = SeoulCitydataProperties(apiKey = "k", dailyCallLimit = 0),
-            seoulCitydataRestClient = mockk<RestClient>(),
-            clock = Clock.systemUTC(),
-        )
+    fun `RESULT 코드가 정상이면 성공으로 본다`() {
+        // 업스트림은 실패도 HTTP 200으로 주므로 RESULT.CODE가 유일한 판정 근거다.
+        assertEquals(true, SeoulCitydataResponse.Result(code = "INFO-000").isSuccess)
+    }
 
-        assertNull(limited.fetch("POI009", "광화문·덕수궁"))
+    @Test
+    fun `RESULT 코드가 정상이 아니면 실패로 본다`() {
+        // INFO-100(인증키 무효)·쿼터 초과 등이 전부 여기로 온다. 우리가 호출 수를 세는
+        // 대신 업스트림이 알려주는 이 값을 믿는다.
+        assertEquals(false, SeoulCitydataResponse.Result(code = "INFO-100").isSuccess)
+        assertEquals(false, SeoulCitydataResponse.Result(code = null).isSuccess)
     }
 }
