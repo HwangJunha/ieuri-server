@@ -45,6 +45,9 @@ class SearchDataSourceConfig {
                 // 검색은 조회 전용이라 메인만큼 커넥션이 필요 없다.
                 maximumPoolSize = properties.maxPoolSize
                 poolName = "search-pool"
+                // 메인 풀과 같은 이유로 기동 시 첫 커넥션을 재시도한다
+                // (application.yaml의 spring.datasource.hikari 주석 참조).
+                initializationFailTimeout = 30_000
                 // 논리 복제 구독자에 쓰기가 가지 않게 커넥션 단에서 막는다 — 실수로 INSERT가
                 // 나가면 복제가 충돌한다. DDL은 Flyway가 자체 커넥션으로 수행하므로 영향 없다.
                 isReadOnly = true

@@ -26,7 +26,7 @@ class DependsOnProbeTest {
             "entityManagerFactory",
             RootBeanDefinition(LocalContainerEntityManagerFactoryBean::class.java),
         )
-        val bfpp: BeanFactoryPostProcessor = DataSourceConfig().entityManagerFactoryDependsOnFlyway()
+        val bfpp: BeanFactoryPostProcessor = DataSourceConfig.entityManagerFactoryDependsOnFlyway()
         bfpp.postProcessBeanFactory(bf)
 
         val dependsOn = bf.getBeanDefinition("entityManagerFactory").dependsOn

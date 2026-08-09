@@ -115,16 +115,24 @@ class DataSourceConfig {
      * Hibernate의 `ddl-auto: validate`가 마이그레이션 **전** 스키마를 검증할 수 있고,
      * 그때 새 테이블이 없다며 기동이 깨진다(V43 같은 신규 마이그레이션에서 드러난다).
      */
-    @Bean
-    fun entityManagerFactoryDependsOnFlyway(): BeanFactoryPostProcessor =
-        BeanFactoryPostProcessor { beanFactory ->
-            for (name in beanFactory.getBeanNamesForType(AbstractEntityManagerFactoryBean::class.java, true, false)) {
-                // FactoryBean 조회는 `&`가 붙은 이름을 주는데 빈 정의는 그 접두사 없이 등록돼 있다.
-                val definitionName = BeanFactoryUtils.transformedBeanName(name)
-                val definition = beanFactory.getBeanDefinition(definitionName)
-                definition.setDependsOn(*((definition.dependsOn ?: emptyArray()) + "flyway"))
+    companion object {
+        /**
+         * **`@JvmStatic`이어야 한다.** BeanFactoryPostProcessor는 컨테이너 생명주기의 아주
+         * 이른 시점에 만들어지는데, 인스턴스 메서드로 두면 그것을 담은 @Configuration이
+         * 너무 일찍 초기화되어 Spring이 경고를 낸다.
+         */
+        @Bean
+        @JvmStatic
+        fun entityManagerFactoryDependsOnFlyway(): BeanFactoryPostProcessor =
+            BeanFactoryPostProcessor { beanFactory ->
+                for (name in beanFactory.getBeanNamesForType(AbstractEntityManagerFactoryBean::class.java, true, false)) {
+                    // FactoryBean 조회는 `&`가 붙은 이름을 주는데 빈 정의는 그 접두사 없이 등록돼 있다.
+                    val definitionName = BeanFactoryUtils.transformedBeanName(name)
+                    val definition = beanFactory.getBeanDefinition(definitionName)
+                    definition.setDependsOn(*((definition.dependsOn ?: emptyArray()) + "flyway"))
+                }
             }
-        }
+    }
 }
 
 /**
