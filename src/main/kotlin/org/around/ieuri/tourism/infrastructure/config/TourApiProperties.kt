@@ -16,6 +16,11 @@ import java.time.Duration
  * @param maxPageSize    `spots` size 상한. 초과 요청은 클램프.
  * @param maxLikedPageSize `likedSpots` first 상한.
  * @param detailAbsenceTtl 상세 본문 부재 행의 신선도 기준. 부재 행에만 적용되고 정상 행에는 만료가 없다.
+ * @param maxSearchPageSize SPEC-0013 신규 커서 커넥션 3종의 first 상한.
+ * @param maxSuggestionCount 자동완성 limit 상한.
+ * @param maxSearchQueryLength 검색어 길이 상한(자). 초과 시 QUERY_TOO_LONG.
+ * @param maxSearchPage 검색 페이지 상한. 초과 시 PAGE_TOO_DEEP.
+ * @param minPopularLikeCount 인기 목록 진입 좋아요 하한.
  */
 @ConfigurationProperties(prefix = "ieuri.tourapi")
 data class TourApiProperties(
@@ -30,6 +35,11 @@ data class TourApiProperties(
     val maxPageSize: Int = 100,
     val maxLikedPageSize: Int = 100,
     val detailAbsenceTtl: Duration = Duration.ofDays(7),
+    val maxSearchPageSize: Int = 50,
+    val maxSuggestionCount: Int = 10,
+    val maxSearchQueryLength: Int = 100,
+    val maxSearchPage: Int = 500,
+    val minPopularLikeCount: Int = 10,
     val connectTimeoutMillis: Long = 15_000,
     val readTimeoutMillis: Long = 30_000,
 ) {

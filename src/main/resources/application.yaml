@@ -77,6 +77,30 @@ server:
   shutdown: graceful
 
 ieuri:
+  # 검색 전용 노드(SPEC-0013). 메인과 **다른 DB 인스턴스**다 — pg_search 커뮤니티 에디션이
+  # 물리 복제를 막아, BM25 인덱스를 논리 복제 구독자로 분리했다
+  # (problem/SPEC-0013-manifest-pg-search.md).
+  #
+  # **읽기 전용으로 쓴다.** spot 데이터는 논리 복제로 들어오므로 앱이 직접 쓰면 복제와
+  # 충돌한다. 스키마(DDL)만 Flyway가 만들고 이후 쿼리는 SELECT뿐이다.
+  #
+  # 로컬 기본값은 포트만 다른 같은 호스트다(포트포워딩 전제). 운영은 환경변수로 주입한다.
+  # **빈을 조건부로 만들지 않는다** — 검색 어댑터·서비스·리졸버까지 조건이 번져 계층마다
+  # @ConditionalOnProperty가 붙는다. 연결 실패는 그 쿼리에서 드러나는 편이 낫다.
+  # **비밀번호가 메인과 다르다.** CNPG가 클러스터마다 앱 계정 시크릿을 새로 만든다
+  # (`ieuri-search-app`). 계정명은 같은 `ieuri`지만 비밀번호를 물려받으면 인증이 실패한다.
+  #   kubectl get secret -n ieuri-db ieuri-search-app -o jsonpath='{.data.password}' | base64 -d
+  # **`prepareThreshold=0`이 필수다(pg_search 0.25.1 버그 우회).** JDBC는 같은 구문을 5번
+  # 실행한 뒤 6번째부터 서버 측 generic plan을 쓰는데, 그러면 질의어가 Const가 아닌 Param으로
+  # 남아 pg_search가 `@@@` 분류(플랜 타임 상수 폴딩)에 실패한다:
+  #   `internal error: unreachable code: pdb::Query::UnclassifiedString cannot be
+  #    converted into a TantivyQuery`
+  # 6번째 호출부터 터지므로 **간헐적으로 보인다** — psql에서 몇 번 돌려보면 재현되지 않는다.
+  # ParadeDB #5779이며 0.25.2에서 고쳐진다. 확장을 올릴 때 이 파라미터를 걷어낼 것.
+  search-datasource:
+    url: ${IEURI_SEARCH_DB_URL:jdbc:postgresql://localhost:5433/ieuri?prepareThreshold=0}
+    username: ${IEURI_SEARCH_DB_USERNAME:ieuri}
+    password: ${IEURI_SEARCH_DB_PASSWORD}
   mail:
     from: ${MAIL_FROM:}
   verification:

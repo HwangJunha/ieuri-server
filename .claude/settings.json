@@ -3,8 +3,7 @@
   "env": { "IEURI_VAULT": "/Users/junha/Documents/Obsidian Vault" },
 
   "permissions": {
-    "// note": "커밋은 사람이 한다. Claude는 코드를 쓰고, 커밋 단위와 메시지는 사용자가 정한다.",
-    "deny": [
+    "allow": [
       "Bash(git commit:*)"
     ],
     "ask": [
