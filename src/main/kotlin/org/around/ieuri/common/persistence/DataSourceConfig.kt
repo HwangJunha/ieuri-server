@@ -1,6 +1,8 @@
 package org.around.ieuri.common.persistence
 
 import org.flywaydb.core.Flyway
+import org.flywaydb.core.api.migration.JavaMigration
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.jdbc.autoconfigure.DataSourceProperties
@@ -47,18 +49,29 @@ class DataSourceConfig {
      * 자동구성과 동작을 맞춘다 — `baseline-on-migrate`·`baseline-version`·
      * `ignore-migration-patterns`가 거기 있고, 그 의미는 application.yaml의 주석이 설명한다.
      *
+     * **[javaMigrations]를 반드시 넘겨야 한다.** V39(`ProtectEmailLoginIdentifier`)는 pepper가
+     * 필요해 SQL로 쓸 수 없는 Java 마이그레이션이고, 의존성을 주입받는 `@Component`라
+     * 클래스패스 스캔으로는 만들어지지 않는다. 자동구성은 `JavaMigration` 빈을 모아 넘겨
+     * 주는데 그것을 빠뜨리면 Flyway가 **이미 적용된 39를 로컬에서 못 찾아**
+     * `Detected applied migration not resolved locally: 39`로 검증이 깨진다.
+     *
      * **JPA보다 먼저 돌아야 한다.** `entityManagerFactory`가 이 빈에 의존하도록 Boot가
      * 엮어 주므로(`FlywaySchemaManagementProvider`), `ddl-auto: validate`는 마이그레이션이
      * 끝난 스키마를 검증한다.
      */
     @Bean(initMethod = "migrate")
-    fun flyway(dataSource: DataSource, properties: FlywayProperties): Flyway =
+    fun flyway(
+        dataSource: DataSource,
+        properties: FlywayProperties,
+        javaMigrations: ObjectProvider<JavaMigration>,
+    ): Flyway =
         Flyway.configure()
             .dataSource(dataSource)
             .locations(*properties.locations.toTypedArray())
             .baselineOnMigrate(properties.baselineOnMigrate)
             .baselineVersion(properties.baselineVersion)
             .ignoreMigrationPatterns(*properties.ignoreMigrationPatterns.toTypedArray())
+            .javaMigrations(*javaMigrations.orderedStream().toList().toTypedArray())
             .load()
 }
 
