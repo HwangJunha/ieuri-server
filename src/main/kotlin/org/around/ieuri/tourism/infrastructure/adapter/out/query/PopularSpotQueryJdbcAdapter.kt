@@ -1,0 +1,121 @@
+package org.around.ieuri.tourism.infrastructure.adapter.out.query
+
+import org.around.ieuri.tourism.application.port.out.query.PopularSpotQueryPort
+import org.around.ieuri.tourism.application.port.out.query.PopularSpotSearch
+import org.around.ieuri.tourism.application.query.PopularSpotView
+import org.around.ieuri.tourism.application.query.SpotView
+import org.around.ieuri.tourism.domain.vo.CopyrightType
+import org.around.ieuri.tourism.domain.vo.ReactionType
+import org.around.ieuri.tourism.domain.vo.SpotCategory
+import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.stereotype.Component
+import org.springframework.transaction.annotation.Transactional
+
+/**
+ * 인기 spot 조회 어댑터(SPEC-0013 R18). `spot_reaction`의 LIKE를 spot 단위로 집계하며 기간
+ * 제한이 없다. PostGIS 거리 계산 때문에 생 SQL이다.
+ *
+ * 반경 조건이 `spot`에 걸리므로 조인 단계에서 이미 범위가 좁혀진다. 좋아요 하한은 집계 **후**
+ * HAVING으로 적용한다(AC-18.2).
+ *
+ * **메인 DB가 아니라 검색 노드를 본다**(searchJdbcTemplate) — 홈 세 섹션이 같은 노드를 보게
+ * 맞춘다. 좋아요는 메인에 쓰이고 논리 복제로 넘어오므로 **집계에 복제 지연이 반영된다**:
+ * 방금 누른 좋아요가 인기 순위에 즉시 반영되지 않을 수 있다. 순위는 누적 총합이라 한두 건의
+ * 지연이 순서를 뒤집지 않는다.
+ *
+ * `idx_spot_reaction_spot_reaction (spot_id, reaction)`이 이 집계를 받친다.
+ */
+@Component
+class PopularSpotQueryJdbcAdapter(
+    @Qualifier("searchJdbcTemplate") private val jdbcTemplate: JdbcTemplate,
+) : PopularSpotQueryPort {
+
+    /**
+     * 좋아요 내림차순 + id 오름차순. `limit + 1`건을 읽어 호출자가 다음 페이지 존재를 판정한다.
+     *
+     * 집계값이라 별칭을 WHERE에서 참조할 수 없어 서브쿼리로 한 겹 감싼다. 정렬 두 축의 방향이
+     * 달라 like_count에 -1을 곱해 부호를 맞추면 seek이 행 값 비교 한 줄이 된다. 부호 반전은
+     * 여기서만 하며 커서에는 원래 값이 실린다.
+     */
+    @Transactional(readOnly = true)
+    override fun findPopular(query: PopularSpotSearch): List<PopularSpotView> {
+        val (where, whereParams) = whereClause(query)
+        val params = whereParams.toMutableList()
+        params += query.minLikeCount // HAVING
+
+        val seek = if (query.after != null) {
+            params += -query.after.likeCount
+            params += query.after.spotId
+            "WHERE (-like_count, id) > (?, ?)"
+        } else {
+            ""
+        }
+        params += query.limit + 1
+
+        return jdbcTemplate.query(
+            """
+            WITH c AS (SELECT $CENTER AS center)
+            SELECT * FROM (
+                SELECT s.id, s.title, s.address, s.thumbnail_image_url, s.map_x, s.map_y,
+                       s.category, s.copyright,
+                       ST_Distance(s.location, c.center) AS distance_meters,
+                       COUNT(r.id) AS like_count
+                FROM spot s
+                JOIN spot_reaction r ON r.spot_id = s.id AND r.reaction = ?
+                CROSS JOIN c
+                WHERE $where
+                GROUP BY s.id, c.center
+                HAVING COUNT(r.id) >= ?
+            ) ranked
+            $seek
+            ORDER BY like_count DESC, id ASC
+            LIMIT ?
+            """.trimIndent(),
+            { rs, _ ->
+                val copyright = CopyrightType.valueOf(rs.getString("copyright"))
+                PopularSpotView(
+                    spot = SpotView(
+                        id = rs.getLong("id"),
+                        title = rs.getString("title"),
+                        address = rs.getString("address"),
+                        thumbnailImageUrl = rs.getString("thumbnail_image_url"),
+                        distanceMeters = rs.getDouble("distance_meters"),
+                        category = SpotCategory.valueOf(rs.getString("category")),
+                        copyright = copyright,
+                        attributionText = copyright.attributionText,
+                        mapX = rs.getDouble("map_x"),
+                        mapY = rs.getDouble("map_y"),
+                    ),
+                    likeCount = rs.getLong("like_count"),
+                )
+            },
+            *params.toTypedArray(),
+        )
+    }
+
+    /**
+     * 파라미터는 SQL의 `?` 등장 순서대로 담아 함께 반환한다. CTE의 center가 먼저이고, 그다음이
+     * JOIN 조건의 reaction, 그다음이 WHERE 순서다 — HAVING의 하한은 호출자가 이어 붙인다.
+     */
+    private fun whereClause(query: PopularSpotSearch): Pair<String, List<Any>> {
+        val conditions = mutableListOf("s.language = ?", "ST_DWithin(s.location, c.center, ?)")
+        val params = mutableListOf<Any>(
+            query.center.longitude, query.center.latitude, // CTE의 center
+            ReactionType.LIKE.name,                        // JOIN 조건
+            query.language.name,
+            query.radiusMeters.toDouble(),
+        )
+
+        query.category?.let {
+            conditions += "s.category = ?"
+            params += it.name
+        }
+        return conditions.joinToString(" AND ") to params
+    }
+
+    private companion object {
+        /** ST_MakePoint는 (경도, 위도) 순서다 — 뒤집으면 조용히 틀린다. */
+        const val CENTER = "ST_MakePoint(?, ?)::geography"
+    }
+}

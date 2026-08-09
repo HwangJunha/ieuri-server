@@ -8,12 +8,13 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.client.SimpleClientHttpRequestFactory
 import org.springframework.web.client.RestClient
-import java.time.Clock
 import java.time.Duration
 
 /**
  * auth 도메인 인프라 빈 구성. 설정값(VerificationProperties)을 애플리케이션 정책 타입(VerificationPolicy)으로
- * 변환해 핸들러에 주입하고, 테스트 가능성을 위해 Clock을 빈으로 제공한다.
+ * 변환해 핸들러에 주입한다.
+ *
+ * Clock 빈은 여기 없다 — 여러 도메인이 쓰므로 `common/time/ClockConfig`로 옮겼다.
  */
 @Configuration
 @EnableConfigurationProperties(
@@ -27,9 +28,6 @@ import java.time.Duration
     SnsRevokeProperties::class,
 )
 class AuthConfig {
-
-    @Bean
-    fun clock(): Clock = Clock.systemUTC()
 
     /**
      * provider 토큰 교환·연결 해제 호출용 RestClient. 타임아웃이 곧 R11의 대기 상한이다 —

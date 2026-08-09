@@ -63,6 +63,11 @@ class SpotQueryServiceTest {
         maxPageSize = 100,
         maxLikedPageSize = 100,
         detailAbsenceTtl = Duration.ofDays(7),
+        maxSearchPageSize = 50,
+        maxSuggestionCount = 10,
+        maxSearchQueryLength = 100,
+        maxSearchPage = 500,
+        minPopularLikeCount = 10,
     )
     private val service = SpotQueryService(
         tourInfoPort, spotQueryPort, spotCachePort, spotDetailStorePort, eventPublisher, policy,

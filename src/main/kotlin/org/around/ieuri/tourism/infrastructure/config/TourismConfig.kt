@@ -30,6 +30,11 @@ class TourismConfig {
             maxPageSize = properties.maxPageSize,
             maxLikedPageSize = properties.maxLikedPageSize,
             detailAbsenceTtl = properties.detailAbsenceTtl,
+            maxSearchPageSize = properties.maxSearchPageSize,
+            maxSuggestionCount = properties.maxSuggestionCount,
+            maxSearchQueryLength = properties.maxSearchQueryLength,
+            maxSearchPage = properties.maxSearchPage,
+            minPopularLikeCount = properties.minPopularLikeCount,
         )
 
     /**

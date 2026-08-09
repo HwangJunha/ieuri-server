@@ -3,6 +3,7 @@ package org.around.ieuri.tourism.application.query
 import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import java.time.Instant
+import java.time.LocalDate
 
 /**
  * spots 쿼리 입력. 언어는 인자가 아니라 Accept-Language에서 온다(요청 스코프 컨텍스트로 주입).
@@ -140,4 +141,99 @@ data class LikedSpotView(
     val copyright: CopyrightType,
     val attributionText: String,
     val likedAt: Instant,
+)
+
+/**
+ * spot 검색 입력(SPEC-0013 R1-R8). 언어는 인자가 아니라 Accept-Language에서 온다.
+ * [query] 트림·길이 검증은 서비스가 포트 호출 **이전에** 수행한다(AC-8.1).
+ *
+ * **오프셋 페이지네이션이다**([page] 1-base). 관련도가 검색 엔진의 계산값이라 커서 조건으로
+ * 표현할 수 없어서이며, 이유는 `SpotSearchQuery`에 적어 두었다.
+ */
+data class SearchSpotsQuery(
+    val query: String,
+    val latitude: Double,
+    val longitude: Double,
+    val radiusMeters: Int,
+    val category: SpotCategory?,
+    val page: Int,
+    val size: Int,
+)
+
+/**
+ * 검색 응답. 검증 실패도 예외가 아니라 이 형태로 돌아온다(POL-015) — [userErrors]가 비어 있지
+ * 않으면 [items]가 비고 [totalCount]가 0이다. 클라이언트가 null 분기 없이 읽게 하기 위함이다.
+ */
+data class SpotSearchResultView(
+    val userErrors: List<SearchUserError>,
+    val items: List<SpotView>,
+    val page: Int,
+    val hasNext: Boolean,
+    val totalCount: Int,
+) {
+    val success: Boolean get() = userErrors.isEmpty()
+}
+
+/**
+ * 검색 입력 검증 실패 1건. GraphQL UserError로 매핑되지만 application은 DGS를 모르므로
+ * 자체 타입으로 둔다. [code]는 클라이언트 분기 기준이며 메시지가 아니다.
+ */
+data class SearchUserError(
+    val code: String,
+    val message: String,
+    val field: String?,
+)
+
+/** 자동완성 항목 1건(R9). 제목 접두 매칭 결과이며 거리·주소를 담지 않는다. */
+data class SpotSuggestionView(
+    val id: Long,
+    val title: String,
+    val category: SpotCategory,
+)
+
+/** 진행 중 축제 조회 입력(R17). '오늘'은 인자가 아니라 서버 시계에서 온다. */
+data class OngoingFestivalsQuery(
+    val latitude: Double,
+    val longitude: Double,
+    val radiusMeters: Int,
+    val first: Int,
+    val after: String?,
+)
+
+/**
+ * 진행 중 축제 1건의 read DTO. `spot`과 `spot_festival`을 조인한 값이다.
+ * 날짜는 원본이 DATE 컬럼이라 시각 성분이 없다 — 리졸버가 ISO-8601 문자열로 옮긴다.
+ */
+data class FestivalView(
+    val id: Long,
+    val title: String,
+    val address: String?,
+    val thumbnailImageUrl: String,
+    val distanceMeters: Double,
+    val category: SpotCategory,
+    val copyright: CopyrightType,
+    val attributionText: String,
+    val mapX: Double,
+    val mapY: Double,
+    val eventStartDate: LocalDate,
+    val eventEndDate: LocalDate,
+)
+
+/** 인기 spot 조회 입력(R18). 좋아요 최소 기준은 인자가 아니라 정책이다. */
+data class PopularSpotsQuery(
+    val latitude: Double,
+    val longitude: Double,
+    val radiusMeters: Int,
+    val category: SpotCategory?,
+    val first: Int,
+    val after: String?,
+)
+
+/**
+ * 인기 spot 1건의 read DTO. [likeCount]는 순위 근거라 노드가 아니라 엣지의 값이지만,
+ * 프로젝션 단계에서 함께 읽어야 하므로 여기 담고 리졸버가 엣지로 옮긴다.
+ */
+data class PopularSpotView(
+    val spot: SpotView,
+    val likeCount: Long,
 )
