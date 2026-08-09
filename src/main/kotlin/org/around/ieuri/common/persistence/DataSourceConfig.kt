@@ -9,6 +9,7 @@ import org.springframework.boot.jdbc.autoconfigure.DataSourceProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Primary
+import org.springframework.jdbc.core.JdbcTemplate
 import javax.sql.DataSource
 
 /**
@@ -35,6 +36,21 @@ class DataSourceConfig {
     @ConfigurationProperties(prefix = "spring.datasource.hikari")
     fun dataSource(properties: DataSourceProperties): DataSource =
         properties.initializeDataSourceBuilder().build()
+
+    /**
+     * 메인 JdbcTemplate. **[dataSource]·[flyway]와 똑같은 이유로 여기서 명시한다.**
+     *
+     * Boot의 자동구성은 `@ConditionalOnMissingBean(JdbcOperations)`라, `searchJdbcTemplate`이
+     * 있으면 물러난다. 그 결과 `JdbcTemplate`을 타입으로 주입받는 생 SQL 어댑터가 전부
+     * **검색 노드**를 보게 됐다 — 검색 노드에 `spot`은 있어서 반경 조회는 우연히 동작했고,
+     * `congestion_area`가 없어 `seoulCongestionAreas`에서야 드러났다.
+     *
+     * `@Primary`이므로 이름 없이 주입받는 쪽은 전부 메인을 본다. 검색 노드로 가야 하는
+     * 어댑터 3종만 `searchJdbcTemplate`을 `@Qualifier`로 지목한다.
+     */
+    @Bean
+    @Primary
+    fun jdbcTemplate(dataSource: DataSource): JdbcTemplate = JdbcTemplate(dataSource)
 
     /**
      * 메인 DB 마이그레이션. **DataSource와 똑같은 이유로 여기서 명시한다.**
