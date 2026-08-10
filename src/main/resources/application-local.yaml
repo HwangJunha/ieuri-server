@@ -1,6 +1,10 @@
 # 로컬(local) 프로파일 전용 값. 여기 값들은 개발 전용이며 운영 값과 반드시 다르다.
 # 주의: DB 비밀번호는 여기 두지 않는다(셸 환경변수 IEURI_DB_PASSWORD로 주입).
 ieuri:
+  # 검색 노드도 로컬에서는 같은 port-forward 터널 위에 있어, 메인과 같은 이유로 SSL을 끈다
+  # (아래 spring.datasource 주석 참조).
+  search-datasource:
+    url: ${IEURI_SEARCH_DB_URL:jdbc:postgresql://localhost:5433/ieuri?prepareThreshold=0&sslmode=disable}
   encryption:
     # 개발 전용 AES-256 키(base64 32바이트) — 운영에서는 절대 사용 금지, 환경변수로 교체.
     key: aWV1cmlfbG9jYWxfZGV2X2FlczI1Nl9rZXlfMzJieXQ=
@@ -17,5 +21,17 @@ ieuri:
     # 운영은 IEURI_PASSWORD_PEPPER 환경변수로 주입한다.
     pepper: ${IEURI_PASSWORD_PEPPER:IJPEbgPT4Bq9BO4/10GuzlDHpY2hHErWSuTaQHvwd8s=}
 spring:
+  # 로컬은 `kubectl port-forward` 터널로 DB에 붙는데, **그 위에서 SSL 핸드셰이크가 깨진다.**
+  # 서버는 `ssl = on`이라 JDBC가 기본으로 SSL을 시도하고, 터널을 통과하는 순간
+  # `SSL error: Connection reset`으로 실패한다. 그 리셋을 kubectl이 "lost connection to pod"로
+  # 보고 터널을 통째로 내리며, 그때 Flyway가 쓰던 커넥션이 함께 끊겨
+  # `This connection has been closed` 스택트레이스가 기동마다 찍혔다.
+  #
+  # 실측: sslmode=disable로 5회 연결/종료 → 터널 끊김 0회. 기본(SSL) → 즉시 끊김.
+  #
+  # **로컬 전용이다.** 터널 반대편은 localhost이고 트래픽이 기기 밖으로 나가지 않는다.
+  # 운영은 이 프로파일을 쓰지 않으므로 SSL 그대로다.
+  datasource:
+    url: ${IEURI_DB_URL:jdbc:postgresql://localhost:5432/ieuri?sslmode=disable}
   jpa:
     show-sql: true
