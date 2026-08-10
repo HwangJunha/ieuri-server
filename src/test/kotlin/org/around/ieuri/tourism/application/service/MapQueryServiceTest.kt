@@ -16,7 +16,6 @@ import org.around.ieuri.tourism.application.port.out.cache.SeoulCitydataCachePor
 import org.around.ieuri.tourism.application.port.out.client.SeoulCitydataPort
 import org.around.ieuri.tourism.application.port.out.client.SeoulCitydataSnapshot
 import org.around.ieuri.tourism.application.port.out.query.CongestionAreaQueryPort
-import org.around.ieuri.tourism.application.port.out.query.MapClusterSearch
 import org.around.ieuri.tourism.application.port.out.query.MapQueryPort
 import org.around.ieuri.tourism.application.port.out.query.MapViewportSearch
 import org.around.ieuri.tourism.application.query.CulturalEventView
@@ -31,7 +30,6 @@ import org.around.ieuri.tourism.domain.vo.CongestionSnapshot
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.MapBounds
 import org.around.ieuri.tourism.domain.vo.SpotCategory
-import org.around.ieuri.tourism.domain.vo.SpotCluster
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -45,7 +43,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * MapQueryService — SPEC-0014 R2·R3·R5·R6·R9·R11·R13·R14.
+ * MapQueryService — SPEC-0014 R3·R5·R6·R9·R11·R13·R14.
  *
  * 포트를 전부 스텁해 **서비스가 무엇을 호출하고 결과를 어떻게 조립하는지**만 본다. PostGIS
  * 공간 질의의 실제 결과, Valkey 직렬화 왕복, 실제 HTTP는 인프라 영역이라 다루지 않는다.
@@ -64,12 +62,9 @@ class MapQueryServiceTest {
     private val viewportPolicy = MapViewportPolicy(
         minZoom = 1,
         maxZoom = 14,
-        clusterZoomThreshold = 10,
         maxAreaInSquareDegrees = 4.0,
         maxSpotMarkers = 3,
-        maxClusters = 2,
         maxEventMarkers = 2,
-        clusterGridSizeAtMinZoom = 1.0,
     )
     private val citydataPolicy = SeoulCitydataPolicy(
         minRefetchInterval = Duration.ofMinutes(5),
@@ -113,37 +108,21 @@ class MapQueryServiceTest {
     // ---------- mapViewport ----------
 
     @Test
-    fun `줌이 임계값 이상이면 개별 마커만 채워진다`() {
-        // AC R2. spots와 clusters는 상호배타적이다.
+    fun `줌과 무관하게 개별 마커를 돌려준다`() {
+        // 클러스터링을 걷어냈다 — 저줌에서도 같은 조회를 하고 같은 모양으로 돌려준다.
+        // 저줌 화면에서 마커가 빽빽한 것은 클라이언트가 판단할 문제다(2026-08-10 결정).
         every { congestionAreaQueryPort.findAreaCodesWithin(seoulBounds) } returns emptyList()
         every { mapQueryPort.findSpotsWithin(any()) } returns listOf(spot(1), spot(2))
 
-        val result = service.mapViewport(
-            MapViewportQuery(bounds = seoulBounds, zoom = 12, category = null),
-            DomainLocale.KO,
-        )
+        for (zoom in listOf(1, 8, 12, 14)) {
+            val result = service.mapViewport(
+                MapViewportQuery(bounds = seoulBounds, zoom = zoom, category = null),
+                DomainLocale.KO,
+            )
 
-        assertEquals(2, result.spots.size)
-        assertTrue(result.clusters.isEmpty())
-        assertFalse(result.truncated)
-        verify(exactly = 0) { mapQueryPort.findClustersWithin(any()) }
-    }
-
-    @Test
-    fun `줌이 임계값 미만이면 클러스터만 채워진다`() {
-        // AC R2.
-        every { congestionAreaQueryPort.findAreaCodesWithin(seoulBounds) } returns emptyList()
-        every { mapQueryPort.findClustersWithin(any()) } returns
-            listOf(SpotCluster(127.0, 37.5, 12, SpotCategory.SHOPPING))
-
-        val result = service.mapViewport(
-            MapViewportQuery(bounds = seoulBounds, zoom = 9, category = null),
-            DomainLocale.KO,
-        )
-
-        assertEquals(1, result.clusters.size)
-        assertTrue(result.spots.isEmpty())
-        verify(exactly = 0) { mapQueryPort.findSpotsWithin(any()) }
+            assertEquals(2, result.spots.size, "zoom=$zoom")
+            assertFalse(result.truncated, "zoom=$zoom")
+        }
     }
 
     @Test

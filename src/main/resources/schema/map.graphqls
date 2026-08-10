@@ -2,14 +2,13 @@ extend type Query {
     """
     뷰포트 안의 지도 마커. spot과 문화행사를 함께 반환한다.
 
-    줌이 임계값 미만이면 clusters가, 이상이면 spots가 채워진다 — 둘은 상호배타적이다.
     결과가 상한을 넘으면 잘리고 truncated가 참이 된다. 커서 페이지네이션은 없다.
 
     오류: INVALID_BBOX(뒤집힘·범위 밖) · BBOX_TOO_LARGE(면적 초과) · INVALID_ZOOM.
     """
     mapViewport(
         bbox: MapBoundsInput!
-        "카카오맵 줌 레벨(1~14, 클수록 확대)."
+        "카카오맵 줌 레벨(1~14, 클수록 확대). 유효 범위 밖이면 INVALID_ZOOM."
         zoom: Int!
         "생략하면 전체."
         category: SpotCategory
@@ -49,11 +48,7 @@ input MapBoundsInput {
 }
 
 type MapViewportResult {
-    "클러스터링 줌 미만에서는 빈 목록이다."
     spots: [MapSpot!]!
-
-    "spots가 비어 있을 때만 값이 있다."
-    clusters: [SpotCluster!]!
 
     """
     뷰포트 안의 문화행사. 클러스터링하지 않는다.
@@ -77,16 +72,6 @@ type MapSpot {
     lng: Float!
     "위도."
     lat: Float!
-}
-
-"저줌 클러스터 1개. 탭하면 확대해 다시 조회하는 흐름을 전제한다."
-type SpotCluster {
-    "묶인 spot 좌표의 평균이며 셀 중심이 아니다."
-    centerLng: Float!
-    centerLat: Float!
-    count: Int!
-    "과반(50% 초과)을 차지하는 카테고리만 값이 된다. 섞여 있으면 null이다."
-    dominantCategory: SpotCategory
 }
 
 type CulturalEvent {

@@ -6,7 +6,6 @@ import org.around.ieuri.tourism.domain.vo.AreaName
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.MapBounds
 import org.around.ieuri.tourism.domain.vo.SpotCategory
-import org.around.ieuri.tourism.domain.vo.SpotCluster
 
 /**
  * 지도 뷰포트 조회 아웃바운드 포트(SPEC-0014 R1~R3). bbox는 PostGIS `ST_Intersects`로 좁히며
@@ -20,14 +19,6 @@ interface MapQueryPort {
      */
     fun findSpotsWithin(query: MapViewportSearch): List<MapSpotView>
 
-    /**
-     * bbox 안의 spot을 그리드 셀로 묶은 클러스터(R2). 집계는 DB에서 수행한다 — 전체를
-     * 애플리케이션으로 끌어와 묶으면 저줌에서 상한의 의미가 사라진다.
-     *
-     * 중심은 셀 중심이 아니라 **포함된 spot 좌표의 평균**이다. [findSpotsWithin]과 같이
-     * `limit + 1`건까지 돌려준다.
-     */
-    fun findClustersWithin(query: MapClusterSearch): List<SpotCluster>
 }
 
 /**
@@ -64,14 +55,3 @@ data class MapViewportSearch(
     val limit: Int,
 )
 
-/**
- * 클러스터 조회 조건. [gridSizeInDegrees]는 줌에서 유도한 셀 크기이며, 어댑터는 좌표를
- * 이 크기로 나눠 셀에 배정한다.
- */
-data class MapClusterSearch(
-    val language: DomainLocale,
-    val bounds: MapBounds,
-    val category: SpotCategory?,
-    val gridSizeInDegrees: Double,
-    val limit: Int,
-)

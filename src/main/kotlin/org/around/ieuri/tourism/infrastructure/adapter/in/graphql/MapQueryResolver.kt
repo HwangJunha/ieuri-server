@@ -17,7 +17,6 @@ import org.around.ieuri.tourism.domain.vo.CongestionForecast
 import org.around.ieuri.tourism.domain.vo.CongestionSnapshot
 import org.around.ieuri.tourism.domain.vo.MapBounds
 import org.around.ieuri.tourism.domain.vo.SpotCategory
-import org.around.ieuri.tourism.domain.vo.SpotCluster
 import org.around.ieuri.tourism.infrastructure.locale.LocaleContext
 import org.around.ieuri.common.graphql.generated.types.CommercialActivityLevel as GqlCommercialActivityLevel
 import org.around.ieuri.common.graphql.generated.types.CommercialStatus as GqlCommercialStatus
@@ -32,7 +31,6 @@ import org.around.ieuri.common.graphql.generated.types.MapSpot as GqlMapSpot
 import org.around.ieuri.common.graphql.generated.types.MapViewportResult as GqlMapViewportResult
 import org.around.ieuri.common.graphql.generated.types.SeoulCongestionResult as GqlSeoulCongestionResult
 import org.around.ieuri.common.graphql.generated.types.SpotCategory as GqlSpotCategory
-import org.around.ieuri.common.graphql.generated.types.SpotCluster as GqlSpotCluster
 
 /**
  * 지도 조회 GraphQL 리졸버(인바운드 어댑터, CQRS 읽기, SPEC-0014). 언어는 요청 스코프
@@ -40,7 +38,7 @@ import org.around.ieuri.common.graphql.generated.types.SpotCluster as GqlSpotClu
  *
  * **지연 필드(@DgsData)가 없다.** 세 쿼리 모두 자기 필드를 채우는 데 필요한 I/O가 하나로
  * 묶여 있어, 필드를 나눠도 호출 수가 줄지 않는다:
- *  - `mapViewport`의 spots·clusters·events는 상호배타이거나 같은 캐시에서 나온다
+ *  - `mapViewport`의 spots는 한 번의 공간 질의, events는 그 구역들의 캐시에서 나온다
  *  - `seoulCongestion`의 congestion·forecast·commercial은 **업스트림 1회 응답의 세 블록**이다.
  *    나눠 부르면 같은 구역에 대해 호출이 배가되는데, 일일 쿼터 1000건에서 치명적이다
  *  - `seoulCongestionAreas`는 단일 테이블 조회다
@@ -101,7 +99,6 @@ class MapQueryResolver(
 
     private fun MapViewportView.toGql() = GqlMapViewportResult(
         spots = spots.map { it.toGql() },
-        clusters = clusters.map { it.toGql() },
         events = events.map { it.toGql() },
         truncated = truncated,
     )
@@ -115,12 +112,6 @@ class MapQueryResolver(
         lat = lat,
     )
 
-    private fun SpotCluster.toGql() = GqlSpotCluster(
-        centerLng = centerLng,
-        centerLat = centerLat,
-        count = count,
-        dominantCategory = dominantCategory?.let { GqlSpotCategory.valueOf(it.name) },
-    )
 
     private fun CulturalEventView.toGql() = GqlCulturalEvent(
         id = id,

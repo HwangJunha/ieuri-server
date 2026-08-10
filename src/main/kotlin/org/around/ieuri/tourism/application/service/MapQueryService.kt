@@ -12,7 +12,6 @@ import org.around.ieuri.tourism.application.port.out.cache.SeoulCitydataCachePor
 import org.around.ieuri.tourism.application.port.out.client.SeoulCitydataPort
 import org.around.ieuri.tourism.application.port.out.client.SeoulCitydataSnapshot
 import org.around.ieuri.tourism.application.port.out.query.CongestionAreaQueryPort
-import org.around.ieuri.tourism.application.port.out.query.MapClusterSearch
 import org.around.ieuri.tourism.application.port.out.query.MapQueryPort
 import org.around.ieuri.tourism.application.port.out.query.MapViewportSearch
 import org.around.ieuri.tourism.application.query.CongestionAreaBoundaryView
@@ -25,7 +24,6 @@ import org.around.ieuri.tourism.application.query.SeoulCongestionView
 import org.around.ieuri.tourism.domain.vo.AreaName
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.MapBounds
-import org.around.ieuri.tourism.domain.vo.SpotCluster
 import org.springframework.stereotype.Service
 import java.time.Clock
 import java.time.Duration
@@ -54,7 +52,7 @@ class MapQueryService(
 ) : MapQueryUseCase {
 
     /**
-     * 뷰포트 마커. 줌에 따라 개별 마커와 클러스터 중 **한쪽만** 채운다(R2).
+     * 뷰포트 마커.
      *
      * 문화행사는 서울 구역 캐시에서 모은다 — bbox에 걸치는 구역의 캐시된 값만 쓰고
      * 여기서 업스트림을 부르지 않는다. 지도를 움직일 때마다 행사 때문에 쿼터를 태우면
@@ -70,41 +68,21 @@ class MapQueryService(
 
         val events = cachedEventsWithin(query.bounds)
         val eventsTruncated = events.size > viewportPolicy.maxEventMarkers
-        val cappedEvents = events.take(viewportPolicy.maxEventMarkers)
 
-        return if (viewportPolicy.shouldCluster(query.zoom)) {
-            val clusters = mapQueryPort.findClustersWithin(
-                MapClusterSearch(
-                    language = locale,
-                    bounds = query.bounds,
-                    category = query.category,
-                    gridSizeInDegrees = viewportPolicy.gridSizeFor(query.zoom),
-                    // 상한 + 1건을 받아 초과 여부만 판정한다. COUNT(*)를 따로 세지 않는다(R3).
-                    limit = viewportPolicy.maxClusters + 1,
-                ),
-            )
-            MapViewportView(
-                spots = emptyList(),
-                clusters = clusters.take(viewportPolicy.maxClusters),
-                events = cappedEvents,
-                truncated = clusters.size > viewportPolicy.maxClusters || eventsTruncated,
-            )
-        } else {
-            val spots = mapQueryPort.findSpotsWithin(
-                MapViewportSearch(
-                    language = locale,
-                    bounds = query.bounds,
-                    category = query.category,
-                    limit = viewportPolicy.maxSpotMarkers + 1,
-                ),
-            )
-            MapViewportView(
-                spots = spots.take(viewportPolicy.maxSpotMarkers),
-                clusters = emptyList(),
-                events = cappedEvents,
-                truncated = spots.size > viewportPolicy.maxSpotMarkers || eventsTruncated,
-            )
-        }
+        val spots = mapQueryPort.findSpotsWithin(
+            MapViewportSearch(
+                language = locale,
+                bounds = query.bounds,
+                category = query.category,
+                // 상한 + 1건을 받아 초과 여부만 판정한다. COUNT(*)를 따로 세지 않는다(R3).
+                limit = viewportPolicy.maxSpotMarkers + 1,
+            ),
+        )
+        return MapViewportView(
+            spots = spots.take(viewportPolicy.maxSpotMarkers),
+            events = events.take(viewportPolicy.maxEventMarkers),
+            truncated = spots.size > viewportPolicy.maxSpotMarkers || eventsTruncated,
+        )
     }
 
     /**

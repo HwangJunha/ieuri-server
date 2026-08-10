@@ -236,16 +236,11 @@ ieuri:
   map-viewport:
     min-zoom: 1
     max-zoom: 14
-    # 이 줌 미만이면 클러스터링한다. 개별 마커와 클러스터는 상호배타적이다.
-    cluster-zoom-threshold: 10
     # 뷰포트 면적 상한(위경도 도 곱). 전 지구 bbox 한 번으로 전체를 긁어가는 것을 막는
     # 것이 목적이라 정밀할 필요가 없다. 4.0은 대략 2°×2°로 남한 전체를 담는 크기다.
     max-area-square-degrees: 4.0
     max-spot-markers: 500
-    max-clusters: 100
     max-event-markers: 200
-    # 최저 줌의 그리드 셀 크기(도). 줌이 1 오를 때마다 절반이 된다.
-    cluster-grid-size-at-min-zoom: 1.0
   sns:
     google:
       # id_token의 aud는 플랫폼별로 다르다: iOS→iOS 클라이언트 ID, Android/Web→웹 클라이언트 ID.

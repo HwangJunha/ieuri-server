@@ -60,12 +60,9 @@ class TourismConfig {
         MapViewportPolicy(
             minZoom = properties.minZoom,
             maxZoom = properties.maxZoom,
-            clusterZoomThreshold = properties.clusterZoomThreshold,
             maxAreaInSquareDegrees = properties.maxAreaSquareDegrees,
             maxSpotMarkers = properties.maxSpotMarkers,
-            maxClusters = properties.maxClusters,
             maxEventMarkers = properties.maxEventMarkers,
-            clusterGridSizeAtMinZoom = properties.clusterGridSizeAtMinZoom,
         )
 
     @Bean

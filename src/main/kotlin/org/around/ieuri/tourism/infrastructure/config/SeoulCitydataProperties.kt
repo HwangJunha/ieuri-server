@@ -33,21 +33,15 @@ data class SeoulCitydataProperties(
  *
  * 카카오맵 줌은 1~14 범위이며 **숫자가 클수록 확대**다.
  *
- * @param clusterZoomThreshold 이 줌 미만이면 클러스터링(R2).
  * @param maxAreaSquareDegrees 뷰포트 면적 상한(도 곱, R5).
  * @param maxSpotMarkers 개별 마커 상한(R3).
- * @param maxClusters 클러스터 상한(R3).
  * @param maxEventMarkers 문화행사 마커 상한.
- * @param clusterGridSizeAtMinZoom 최저 줌의 그리드 셀 크기(도). 줌 1당 절반이 된다.
  */
 @ConfigurationProperties(prefix = "ieuri.map-viewport")
 data class MapViewportProperties(
     val minZoom: Int = 1,
     val maxZoom: Int = 14,
-    val clusterZoomThreshold: Int = 10,
     val maxAreaSquareDegrees: Double = 4.0,
     val maxSpotMarkers: Int = 500,
-    val maxClusters: Int = 100,
     val maxEventMarkers: Int = 200,
-    val clusterGridSizeAtMinZoom: Double = 1.0,
 )

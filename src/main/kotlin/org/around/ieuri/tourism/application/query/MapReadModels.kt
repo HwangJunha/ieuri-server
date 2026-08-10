@@ -5,7 +5,6 @@ import org.around.ieuri.tourism.domain.vo.CongestionForecast
 import org.around.ieuri.tourism.domain.vo.CongestionSnapshot
 import org.around.ieuri.tourism.domain.vo.MapBounds
 import org.around.ieuri.tourism.domain.vo.SpotCategory
-import org.around.ieuri.tourism.domain.vo.SpotCluster
 import java.time.LocalDateTime
 
 /**
@@ -21,15 +20,9 @@ data class MapViewportQuery(
     val category: SpotCategory?,
 )
 
-/**
- * mapViewport 응답(R1~R3, R12).
- *
- * [spots]와 [clusters]는 **상호배타적이다** — 줌이 임계값 미만이면 clusters가, 이상이면
- * spots가 채워지고 다른 쪽은 비어 있다(R2).
- */
+/** mapViewport 응답(R1·R3, R12). */
 data class MapViewportView(
     val spots: List<MapSpotView>,
-    val clusters: List<SpotCluster>,
     val events: List<CulturalEventView>,
     val truncated: Boolean,
 )
