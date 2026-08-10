@@ -59,6 +59,23 @@ ieuri:
       # 실측되지 않았다([TBD-3]).** 관광지와 같은 1000으로 시작하고, 업스트림이 거부하면 이 값만 낮춘다.
       page-size: ${IEURI_TOUR_FESTIVAL_PAGE_SIZE:1000}
 
+  # 한국관광공사 빅데이터 4종 동기화(SPEC-0015 §2.1). 잡이 4개로 나뉘어 있고 실행할 하나는
+  # 위 ieuri.tourapi.sync.job이 고른다 — 런처는 등록된 Job 빈 중 이름이 맞는 것을 돌린다:
+  #   ktoVisitorCountSyncJob        일 단위 (CronJob: 매일)
+  #   ktoConcentrationRateSyncJob   일 단위 (CronJob: 매일)
+  #   ktoStayIntensitySyncJob       월 단위 (CronJob: 매월 17일 이후)
+  #   ktoSpendingIntensitySyncJob   월 단위 (CronJob: 매월 17일 이후)
+  #
+  # 갱신 주기가 일/월로 갈려 하나의 잡으로 묶지 않는다 — 묶으면 월 단위 종이 매일 헛돈다.
+  kto-bigdata:
+    sync:
+      # 방문자수 조회의 소급 일수. **이동통신 원천이 4일 지연 공개된다**(spec §4.6) —
+      # 오늘 날짜로 부르면 빈 응답이 온다. 데이터랩 포털의 갱신 주기 표에서 확인한 관측
+      # 사실이며 API 매뉴얼에 없는 값이라(계약상 보장이 아님) 설정으로 둔다.
+      visitor-lag-days: 4
+      # 월 단위 지표의 소급 개월. 매월 16일 발표라 이번 달을 요청하면 대부분 빈 응답이다.
+      monthly-lag-months: 1
+
 logging:
   level:
     org.springframework.batch: INFO

@@ -1,9 +1,13 @@
 package org.around.ieuri.tourism.infrastructure.config
 
 import org.around.ieuri.tourism.application.policy.MapViewportPolicy
+import org.around.ieuri.tourism.application.policy.RegionRecommendationPolicy
 import org.around.ieuri.tourism.application.policy.SeoulCitydataPolicy
 import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
+import org.around.ieuri.tourism.domain.vo.DistanceScoring
+import org.around.ieuri.tourism.domain.vo.RegionScoreWeights
 import org.around.ieuri.tourism.infrastructure.batch.FestivalSyncProperties
+import org.around.ieuri.tourism.infrastructure.batch.KtoBigDataSyncProperties
 import org.around.ieuri.tourism.infrastructure.batch.SpotSyncProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -24,6 +28,8 @@ import java.time.Duration
     FestivalSyncProperties::class,
     SeoulCitydataProperties::class,
     MapViewportProperties::class,
+    KtoBigDataProperties::class,
+    KtoBigDataSyncProperties::class,
 )
 class TourismConfig {
 
@@ -71,6 +77,41 @@ class TourismConfig {
             minRefetchInterval = properties.minRefetchInterval,
             maxAreaIds = properties.maxAreaIds,
         )
+
+    /**
+     * 지역 추천 정책(SPEC-0015 §3.3). 계수는 전부 설정에서 온 잠정값이다(POL-044).
+     *
+     * `scoreWeights`가 비어 있으면 균등 가중이다 — 설정이 덜 채워진 상태를 "그 항목을 쓰지
+     * 않겠다"로 해석하지 않는다.
+     */
+    @Bean
+    fun regionRecommendationPolicy(properties: KtoBigDataProperties): RegionRecommendationPolicy =
+        RegionRecommendationPolicy(
+            weights = if (properties.scoreWeights.isEmpty()) {
+                RegionScoreWeights.uniform()
+            } else {
+                RegionScoreWeights(properties.scoreWeights)
+            },
+            distanceScoring = DistanceScoring(properties.distanceHalfLifeMeters),
+            minFactorCount = properties.minFactorCount,
+            defaultLimit = properties.defaultLimit,
+            maxLimit = properties.maxLimit,
+        )
+
+    /**
+     * KTO 빅데이터 호출용 RestClient(SPEC-0015). TourAPI 쪽과 분리한다 — 서비스 경로가 셋으로
+     * 갈리고 배치 경로라 읽기 타임아웃을 길게 잡을 수 있다(요청 스레드를 매달지 않는다).
+     *
+     * base-url은 서비스별로 달라 여기서 고정하지 않고 어댑터가 매 호출 절대 URI로 넘긴다.
+     */
+    @Bean
+    fun ktoBigDataRestClient(builder: RestClient.Builder, properties: KtoBigDataProperties): RestClient {
+        val requestFactory = SimpleClientHttpRequestFactory().apply {
+            setConnectTimeout(Duration.ofMillis(properties.connectTimeoutMillis))
+            setReadTimeout(Duration.ofMillis(properties.readTimeoutMillis))
+        }
+        return builder.requestFactory(requestFactory).build()
+    }
 
     /**
      * 서울 실시간 도시데이터 호출용 RestClient. TourAPI 쪽보다 타임아웃을 짧게 잡는다 —
