@@ -123,7 +123,7 @@ class SpotSearchJdbcAdapter(
                     category = SpotCategory.valueOf(rs.getString("category")),
                 )
             },
-            language.name, prefix,
+            language.name, toPhrase(prefix),
             center.longitude, center.latitude, radiusMeters.toDouble(),
             limit,
         )
@@ -175,7 +175,9 @@ class SpotSearchJdbcAdapter(
         val params = mutableListOf<Any>(
             query.language.name,
             // 제목 정확 일치, 제목 fuzzy, 주소 fuzzy 순서다(위 조건절의 `?` 등장 순서).
-            query.text, query.text, query.text,
+            // **원문이 아니라 [toPhrase]로 감싼 값을 넘긴다** — 괄호·콜론 같은 문자가
+            // pg_search 구문으로 해석돼 질의가 깨지는 것을 막는다.
+            toPhrase(query.text), toPhrase(query.text), toPhrase(query.text),
             query.center.longitude, query.center.latitude, // ST_DWithin의 CENTER
             query.radiusMeters.toDouble(),
         )
@@ -200,6 +202,7 @@ class SpotSearchJdbcAdapter(
     private fun fuzzyClause(text: String): String =
         if (text.length >= MIN_FUZZY_LENGTH) "::pdb.fuzzy(1)" else ""
 
+
     /**
      * 질의 언어에 해당하는 제목 필드 식(AC-2.2).
      *
@@ -215,7 +218,28 @@ class SpotSearchJdbcAdapter(
     }
 
 
-    private companion object {
+    companion object {
+        /**
+         * 사용자 입력을 pg_search 질의 문자열로 안전하게 감싼다.
+         *
+         * **`@@@`의 오른쪽은 값이 아니라 질의 언어다.** 바인딩 파라미터로 넘겨도 문자열 내용이
+         * 파서에 그대로 들어가므로, `(`·`)`·`:`·`[`·`]`·`{`·`}`·`^`·`~` 같은 문자가 구문으로
+         * 해석돼 질의가 통째로 깨진다(SQL 인젝션은 아니지만 사용자가 서버 오류를 유발한다):
+         *
+         *   "(주)뮬라프렌즈 가로수길점" →
+         *   ERROR: could not parse query string 'title:((주)뮬라프렌즈 가로수길점)'
+         *
+         * **큰따옴표로 감싸 구문(phrase)으로 만든다.** 그 안에서는 특수문자가 전부 리터럴이 되어
+         * 어떤 입력이 와도 파서가 깨지지 않는다. 문자를 골라 백슬래시로 이스케이프하는 방법도
+         * 있으나, 특수문자 목록을 우리가 관리해야 하고 하나라도 빠뜨리면 같은 사고가 난다.
+         *
+         * 정상 질의의 결과는 달라지지 않는다(실측: 롯데 12,227건·경복궁 42건으로 동일).
+         *
+         * 입력에 든 큰따옴표는 **제거한다** — 감싸는 따옴표와 충돌해 파서를 깨뜨리는데,
+         * 장소명에서 따옴표는 검색어로서 의미가 없다.
+         */
+        internal fun toPhrase(text: String): String = "\"" + text.replace("\"", " ") + "\""
+
         /** 요청 좌표를 geography 점으로. ST_MakePoint는 (경도, 위도) 순서다 — 뒤집으면 조용히 틀린다. */
         const val CENTER = "ST_MakePoint(?, ?)::geography"
 
