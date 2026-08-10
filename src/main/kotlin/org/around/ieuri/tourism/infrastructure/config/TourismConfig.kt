@@ -1,5 +1,7 @@
 package org.around.ieuri.tourism.infrastructure.config
 
+import org.around.ieuri.tourism.application.policy.MapViewportPolicy
+import org.around.ieuri.tourism.application.policy.SeoulCitydataPolicy
 import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
 import org.around.ieuri.tourism.infrastructure.batch.FestivalSyncProperties
 import org.around.ieuri.tourism.infrastructure.batch.SpotSyncProperties
@@ -20,6 +22,8 @@ import java.time.Duration
     TourApiProperties::class,
     SpotSyncProperties::class,
     FestivalSyncProperties::class,
+    SeoulCitydataProperties::class,
+    MapViewportProperties::class,
 )
 class TourismConfig {
 
@@ -44,6 +48,40 @@ class TourismConfig {
      */
     @Bean
     fun tourApiRestClient(builder: RestClient.Builder, properties: TourApiProperties): RestClient {
+        val requestFactory = SimpleClientHttpRequestFactory().apply {
+            setConnectTimeout(Duration.ofMillis(properties.connectTimeoutMillis))
+            setReadTimeout(Duration.ofMillis(properties.readTimeoutMillis))
+        }
+        return builder.requestFactory(requestFactory).build()
+    }
+
+    @Bean
+    fun mapViewportPolicy(properties: MapViewportProperties): MapViewportPolicy =
+        MapViewportPolicy(
+            minZoom = properties.minZoom,
+            maxZoom = properties.maxZoom,
+            maxAreaInSquareDegrees = properties.maxAreaSquareDegrees,
+            maxSpotMarkers = properties.maxSpotMarkers,
+            maxEventMarkers = properties.maxEventMarkers,
+        )
+
+    @Bean
+    fun seoulCitydataPolicy(properties: SeoulCitydataProperties): SeoulCitydataPolicy =
+        SeoulCitydataPolicy(
+            minRefetchInterval = properties.minRefetchInterval,
+            maxAreaIds = properties.maxAreaIds,
+        )
+
+    /**
+     * 서울 실시간 도시데이터 호출용 RestClient. TourAPI 쪽보다 타임아웃을 짧게 잡는다 —
+     * 이 호출이 실패해도 degraded로 흡수되므로(R11), 오래 매달리는 것보다 빨리 포기하고
+     * 캐시를 주는 편이 낫다.
+     */
+    @Bean
+    fun seoulCitydataRestClient(
+        builder: RestClient.Builder,
+        properties: SeoulCitydataProperties,
+    ): RestClient {
         val requestFactory = SimpleClientHttpRequestFactory().apply {
             setConnectTimeout(Duration.ofMillis(properties.connectTimeoutMillis))
             setReadTimeout(Duration.ofMillis(properties.readTimeoutMillis))

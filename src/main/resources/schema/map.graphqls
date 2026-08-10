@@ -1,0 +1,187 @@
+extend type Query {
+    """
+    뷰포트 안의 지도 마커. spot과 문화행사를 함께 반환한다.
+
+    결과가 상한을 넘으면 잘리고 truncated가 참이 된다. 커서 페이지네이션은 없다.
+
+    오류: INVALID_BBOX(뒤집힘·범위 밖) · BBOX_TOO_LARGE(면적 초과) · INVALID_ZOOM.
+    """
+    mapViewport(
+        bbox: MapBoundsInput!
+        "카카오맵 줌 레벨(1~14, 클수록 확대). 유효 범위 밖이면 INVALID_ZOOM."
+        zoom: Int!
+        "생략하면 전체."
+        category: SpotCategory
+    ): MapViewportResult!
+
+    """
+    서울 121곳의 실시간 혼잡도. 폴리곤 좌표는 담지 않으며 seoulCongestionAreas와 id로 조인한다.
+
+    areaIds 또는 bbox 중 하나는 필수다. 업스트림 장애는 오류가 아니라 degraded로 표현된다.
+
+    오류: AREA_FILTER_REQUIRED(둘 다 없음) · CONGESTION_AREA_NOT_FOUND · TOO_MANY_AREA_IDS.
+    """
+    seoulCongestion(
+        "bbox와 함께 주면 이 값이 우선하고 bbox는 무시된다."
+        areaIds: [String!]
+        "걸치는 구역이 없으면 빈 결과이며 오류가 아니다."
+        bbox: MapBoundsInput
+    ): SeoulCongestionResult!
+
+    """
+    서울 121곳의 폴리곤 경계와 메타데이터. 사실상 정적이라 앱 시작 시 1회 조회해 캐시하고,
+    seoulCongestion 응답과 구역 id로 조인하는 것을 전제한다.
+    """
+    seoulCongestionAreas: [CongestionAreaBoundary!]!
+}
+
+"""
+뷰포트 사각형. 경계선에 걸친 대상을 포함한다.
+
+minLat < maxLat, minLng < maxLng여야 한다 — 날짜변경선을 넘는 bbox는 지원하지 않는다.
+"""
+input MapBoundsInput {
+    minLat: Float!
+    minLng: Float!
+    maxLat: Float!
+    maxLng: Float!
+}
+
+type MapViewportResult {
+    spots: [MapSpot!]!
+
+    """
+    뷰포트 안의 문화행사. 클러스터링하지 않는다.
+
+    서울 밖이거나 아직 데이터가 없는 구역에서는 비어 있으며, 빈 목록은 오류가 아니다.
+    """
+    events: [CulturalEvent!]!
+
+    "결과가 상한을 넘어 일부만 반환됐다는 뜻. 상한 값 자체는 노출하지 않는다."
+    truncated: Boolean!
+}
+
+"지도 마커 1개. 상세는 spotDetail로 조회한다."
+type MapSpot {
+    "언어별로 다르므로 언어를 바꾸면 다시 받아야 한다."
+    id: ID!
+    title: String!
+    thumbnailImageUrl: String!
+    category: SpotCategory!
+    "경도."
+    lng: Float!
+    "위도."
+    lat: Float!
+}
+
+type CulturalEvent {
+    "서버가 부여한 불투명 식별자."
+    id: String!
+    title: String!
+    "장소명. 주소가 아니며, 없으면 빈 문자열이다."
+    place: String!
+    """
+    "2026-08-07~2026-08-10" 형태의 원문. 없으면 빈 문자열이다.
+    표시 가공은 클라이언트 몫이다.
+    """
+    period: String!
+    "경도."
+    lng: Float!
+    "위도."
+    lat: Float!
+    url: String
+}
+
+"""
+혼잡도 4단계. 최근 28일 평균 대비 백분위이며 절대 인원수가 아니다 —
+새벽 도심이 RELAXED로 나오는 것은 정상이다.
+"""
+enum CongestionLevel {
+    "평균의 50% 이하"
+    RELAXED
+    "50% 초과 75% 이하"
+    NORMAL
+    "75% 초과 100% 이하"
+    SLIGHTLY_CROWDED
+    "100% 초과"
+    CROWDED
+}
+
+"상업 활성도 4단계. CongestionLevel과 독립적인 축이라 같은 구역에서 다른 값일 수 있다."
+enum CommercialActivityLevel {
+    QUIET
+    "실측 기준선이 없는 구역도 이 값으로 온다 — CommercialStatus.isDefaulted로 구분한다."
+    NORMAL
+    BUSY
+    PEAK
+}
+
+type CongestionSnapshot {
+    level: CongestionLevel!
+    populationMin: Int!
+    populationMax: Int!
+    """
+    이 값이 만들어진 시각(ISO-8601, 시간대 없음).
+
+    **데이터는 약 30분 지연되어 도착한다.** "N시 M분 기준"으로 표시해야 하며 "지금"으로
+    표기해서는 안 된다.
+    """
+    observedAt: String!
+}
+
+type CongestionForecast {
+    "예보 대상 시각(ISO-8601)."
+    forecastTime: String!
+    level: CongestionLevel!
+    populationMin: Int!
+    populationMax: Int!
+}
+
+type CommercialStatus {
+    level: CommercialActivityLevel!
+    """
+    참이면 실측이 아니라 데이터 부재의 자리표시자다.
+    신뢰할 수 있는 신호로 표시해서는 안 된다.
+    """
+    isDefaulted: Boolean!
+    "인구와 다른 주기로 갱신되며 야간에는 멈춰 있을 수 있다(ISO-8601)."
+    observedAt: String!
+}
+
+type CongestionArea {
+    "POI001 형태의 구역 코드. CongestionAreaBoundary.id와 같은 조인 키다."
+    id: String!
+    "활성 언어(Accept-Language, 부재 시 EN) 표기. 해당 언어가 없으면 EN → KO로 폴백한다."
+    name: String!
+    congestion: CongestionSnapshot!
+    "예보가 없으면 null이며, 부재는 오류가 아니다."
+    forecast: [CongestionForecast!]
+    "일부 구역에만 값이 있다. null(부재)과 isDefaulted=true는 다른 상태다."
+    commercial: CommercialStatus
+}
+
+type CongestionAreaBoundary {
+    "POI001 형태의 구역 코드. CongestionArea.id와 같은 조인 키다."
+    id: String!
+    "활성 언어 표기. CongestionArea.name과 같은 규칙이다."
+    name: String!
+    "관광특구 · 고궁·문화유산 · 인구밀집지역 · 발달상권 · 공원."
+    category: String!
+    """
+    [lng, lat] 쌍의 배열. 첫 점과 끝 점이 같은 닫힌 다각형이며 단일 폐곡선이다
+    (홀·멀티폴리곤 없음).
+    """
+    polygon: [[Float!]!]!
+}
+
+type SeoulCongestionResult {
+    "해소하지 못한 구역은 빠지므로 요청한 구역 수와 다를 수 있다."
+    areas: [CongestionArea!]!
+    """
+    참이면 실시간 조회가 실패해 캐시된 이전 데이터이거나 비어 있다는 뜻이다.
+    이때 혼잡도 레이어만 안내로 대체하고 다른 마커는 그대로 표시한다.
+    """
+    degraded: Boolean!
+    "degraded이고 캐시를 돌려줄 때 그 데이터의 시각(ISO-8601). 정상이면 null이다."
+    staleSince: String
+}

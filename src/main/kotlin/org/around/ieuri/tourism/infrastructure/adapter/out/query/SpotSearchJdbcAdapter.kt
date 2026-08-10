@@ -34,7 +34,16 @@ class SpotSearchJdbcAdapter(
     /** 관련도(거리 가중) 내림차순 + id 오름차순 한 페이지. 다음 페이지 판정은 호출자가 [count]로 한다. */
     @Transactional(readOnly = true)
     override fun search(query: SpotSearchQuery): List<SpotSearchHit> {
-        val (where, whereParams) = whereClause(query)
+        val strict = runSearch(query, fuzzyOnly = false)
+        // **정확 일치가 하나도 없을 때만 오타 검색으로 폴백한다**([matchClause] 참조).
+        // 첫 페이지에서 0건이면 그 질의는 정확 모드로 결과가 없다는 뜻이다 — 뒤 페이지를
+        // 보고 있다면 앞 페이지에 결과가 있었으므로 폴백하지 않는다.
+        if (strict.isNotEmpty() || query.offset > 0) return strict
+        return runSearch(query, fuzzyOnly = true)
+    }
+
+    private fun runSearch(query: SpotSearchQuery, fuzzyOnly: Boolean): List<SpotSearchHit> {
+        val (where, whereParams) = whereClause(query, fuzzyOnly)
         // **파라미터 순서는 `?` 등장 순서다.** SELECT의 거리·관련도가 CENTER를 하나씩 쓰고
         // 각각 좌표 둘을 소비하므로, WHERE 몫보다 먼저 넣는다.
         val params = mutableListOf<Any>(
@@ -85,7 +94,14 @@ class SpotSearchJdbcAdapter(
     /** [search]와 같은 조건에 걸리는 전체 건수. 검색 페이지 표시와 hasNext 판정에 쓰인다. */
     @Transactional(readOnly = true)
     override fun count(query: SpotSearchQuery): Int {
-        val (where, params) = whereClause(query)
+        val strict = runCount(query, fuzzyOnly = false)
+        // [search]와 **같은 폴백 규칙**을 써야 목록과 건수가 어긋나지 않는다.
+        if (strict > 0) return strict
+        return runCount(query, fuzzyOnly = true)
+    }
+
+    private fun runCount(query: SpotSearchQuery, fuzzyOnly: Boolean): Int {
+        val (where, params) = whereClause(query, fuzzyOnly)
         return jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM spot s WHERE $where",
             Int::class.java,
@@ -123,7 +139,7 @@ class SpotSearchJdbcAdapter(
                     category = SpotCategory.valueOf(rs.getString("category")),
                 )
             },
-            language.name, prefix,
+            language.name, toPhrase(prefix),
             center.longitude, center.latitude, radiusMeters.toDouble(),
             limit,
         )
@@ -135,7 +151,7 @@ class SpotSearchJdbcAdapter(
      * 반경 필터는 반드시 `ST_DWithin`이다. `ST_Distance(...) <= r`로 쓰면 전 행을 계산해
      * GiST 인덱스를 타지 못한다.
      */
-    private fun whereClause(query: SpotSearchQuery): Pair<String, List<Any>> {
+    private fun whereClause(query: SpotSearchQuery, fuzzyOnly: Boolean = false): Pair<String, List<Any>> {
         val titleField = titleField(query.language)
         val conditions = mutableListOf(
             // **언어 격리는 이 조건이 전담한다.** BM25 인덱스가 하나뿐이라 언어를 가르지
@@ -150,10 +166,7 @@ class SpotSearchJdbcAdapter(
             // 오타 질의는 정확 일치가 0건이라 fuzzy 쪽만 남아 점수가 평탄해지는데, 그것은
             // 자연스럽다 — 오타를 친 시점에는 무엇이 더 관련 있는지 판단할 근거가 없다.
             //
-            // **짧은 질의에는 오타 허용을 끈다**(아래 [fuzzyClause]). 2글자에서 편집 거리 1은
-            // 글자 하나가 통째로 바뀌는 것이라 "가산"이 안산·부산까지 끌어온다(실측 41건 → 4,499건).
-            //
-            // 주소는 n-gram이라 fuzzy만으로도 점수가 갈려(실측 22.7/21.0) 이 처리가 필요 없다.
+            // **짧은 질의(2글자 이하)는 주소 절을 빼고 제목만 본다**(아래 [matchClause]).
             //
             // **제목은 올리고(3) 주소는 내린다(0.2).** 두 필드의 점수 스케일이 크게 다르기
             // 때문이다 — n-gram은 긴 질의를 잘게 쪼개 각 조각을 매칭시키므로 점수가 폭증한다.
@@ -165,19 +178,23 @@ class SpotSearchJdbcAdapter(
             //
             // 주소를 0.2로 낮춰도 주소 검색은 그대로 된다(실측: "두산로" 3건 정상). 주소는
             // 제목에 없는 것을 찾는 **보조 경로**이지 순위를 뒤집을 근거가 아니다.
-            "($titleField @@@ ?::pdb.boost(3)" +
-                " OR $titleField @@@ ?${fuzzyClause(query.text)}" +
-                " OR $ADDRESS_FIELD @@@ ?::pdb.boost($ADDRESS_WEIGHT))",
+            matchClause(titleField, query.text, fuzzyOnly),
             // **CTE와 조인하지 않는다** — `spot s, c` 형태면 pg_search가 인덱스를 못 타고
             // `@@@`가 깨진다. 좌표를 두 번 더 바인딩하더라도 평면 조건을 유지한다.
             "ST_DWithin(s.location, $CENTER, ?)",
         )
-        val params = mutableListOf<Any>(
-            query.language.name,
-            // 제목 정확 일치, 제목 fuzzy, 주소 fuzzy 순서다(위 조건절의 `?` 등장 순서).
-            query.text, query.text, query.text,
-            query.center.longitude, query.center.latitude, // ST_DWithin의 CENTER
-            query.radiusMeters.toDouble(),
+        // **원문이 아니라 [toPhrase]로 감싼 값을 넘긴다** — 괄호·콜론 같은 문자가
+        // pg_search 구문으로 해석돼 질의가 깨지는 것을 막는다.
+        val phrase = toPhrase(query.text)
+        val params = mutableListOf<Any>(query.language.name, phrase)
+        // 정확 모드는 제목·주소 두 자리, 폴백 모드는 제목 fuzzy 한 자리다([matchClause] 참조).
+        // 짧은 질의는 주소 절이 빠지므로 그때만 파라미터를 뺀다 — [matchClause] 참조.
+        if (!fuzzyOnly) params += phrase
+        params.addAll(
+            listOf(
+                query.center.longitude, query.center.latitude, // ST_DWithin의 CENTER
+                query.radiusMeters.toDouble(),
+            ),
         )
 
         query.category?.let {
@@ -188,17 +205,30 @@ class SpotSearchJdbcAdapter(
     }
 
     /**
-     * 질의 길이에 맞는 오타 허용 절(R3).
+     * 매칭 절. **정확 모드와 폴백 모드가 다르다**(R3).
      *
-     * **짧은 질의에는 오타를 허용하지 않는다.** 편집 거리 1은 "글자 하나가 바뀌어도 같게 본다"는
-     * 뜻인데, 2글자에서는 그것이 단어의 절반이라 전혀 다른 말이 된다 — "가산"이 안산·부산을
-     * 끌어와 41건짜리 검색이 4,499건이 됐다(실측). 3글자부터는 안정적이다(경복궁 22건).
+     * 기본은 정확 모드다 — 제목 정확 일치 + 주소. [fuzzyOnly]면 제목 오타 허용만 본다.
      *
-     * Elasticsearch의 `fuzziness: AUTO`도 같은 규칙을 쓴다 — 짧은 항은 정확 일치만 본다.
-     * 반환값은 SQL 조각이라 캐스트가 없으면 그대로 정확 일치가 된다.
+     * **오타 허용을 정확 일치와 OR로 함께 걸지 않는다.** `pdb.fuzzy`의 BM25 점수는 사실상
+     * 평탄해서(실측: boost를 0.1·0.01로 낮춰도 순위가 그대로) 함께 걸면 오타 매칭이 순위를
+     * 오염시킨다 — `롯데`를 정확히 쳤는데 1위가 바뀌고 결과 수가 1018→996으로 줄었으며,
+     * `가산`은 `팔도명가산야채순대국`이 1위로 올라왔다.
+     *
+     * 그래서 **정확 일치가 0건일 때만** 폴백한다([SpotSearchJdbcAdapter.search]·[count]).
+     * 그러면 정타 질의의 순위는 전혀 건드리지 않으면서, `롣데`처럼 정확 일치가 없는 오타에서만
+     * 오타 검색이 동작한다(실측: 995건, 상위가 전부 롯데 계열).
+     *
+     * 폴백에서 주소를 빼는 이유: 주소는 n-gram이라 2글자 조각이 아무 데나 걸려
+     * `강남역데이원의원` 같은 무관한 항목이 1위로 올라온다(실측).
      */
-    private fun fuzzyClause(text: String): String =
-        if (text.length >= MIN_FUZZY_LENGTH) "::pdb.fuzzy(1)" else ""
+    private fun matchClause(titleField: String, text: String, fuzzyOnly: Boolean): String =
+        if (fuzzyOnly) {
+            "$titleField @@@ ?::pdb.fuzzy(1)"
+        } else {
+            "($titleField @@@ ?::pdb.boost(3)" +
+                " OR $ADDRESS_FIELD @@@ ?::pdb.boost($ADDRESS_WEIGHT))"
+        }
+
 
     /**
      * 질의 언어에 해당하는 제목 필드 식(AC-2.2).
@@ -215,11 +245,32 @@ class SpotSearchJdbcAdapter(
     }
 
 
-    private companion object {
+    companion object {
+        /**
+         * 사용자 입력을 pg_search 질의 문자열로 안전하게 감싼다.
+         *
+         * **`@@@`의 오른쪽은 값이 아니라 질의 언어다.** 바인딩 파라미터로 넘겨도 문자열 내용이
+         * 파서에 그대로 들어가므로, `(`·`)`·`:`·`[`·`]`·`{`·`}`·`^`·`~` 같은 문자가 구문으로
+         * 해석돼 질의가 통째로 깨진다(SQL 인젝션은 아니지만 사용자가 서버 오류를 유발한다):
+         *
+         *   "(주)뮬라프렌즈 가로수길점" →
+         *   ERROR: could not parse query string 'title:((주)뮬라프렌즈 가로수길점)'
+         *
+         * **큰따옴표로 감싸 구문(phrase)으로 만든다.** 그 안에서는 특수문자가 전부 리터럴이 되어
+         * 어떤 입력이 와도 파서가 깨지지 않는다. 문자를 골라 백슬래시로 이스케이프하는 방법도
+         * 있으나, 특수문자 목록을 우리가 관리해야 하고 하나라도 빠뜨리면 같은 사고가 난다.
+         *
+         * 정상 질의의 결과는 달라지지 않는다(실측: 롯데 12,227건·경복궁 42건으로 동일).
+         *
+         * 입력에 든 큰따옴표는 **제거한다** — 감싸는 따옴표와 충돌해 파서를 깨뜨리는데,
+         * 장소명에서 따옴표는 검색어로서 의미가 없다.
+         */
+        internal fun toPhrase(text: String): String = "\"" + text.replace("\"", " ") + "\""
+
         /** 요청 좌표를 geography 점으로. ST_MakePoint는 (경도, 위도) 순서다 — 뒤집으면 조용히 틀린다. */
         const val CENTER = "ST_MakePoint(?, ?)::geography"
 
-        /** 이 길이 미만의 질의는 오타를 허용하지 않는다 — [fuzzyClause] 참조. */
+        /** 이 길이 미만의 질의는 주소 절을 빼고 제목만 본다 — [matchClause] 참조. */
         const val MIN_FUZZY_LENGTH = 3
 
         /**
