@@ -61,12 +61,16 @@ fun TourStatsConcentrationRateItem.toSyncCommandOrNull(): SyncConcentrationRateC
     )
 }
 
-/** 체류·소비 강도 공용. 응답 모양이 같아 적재 테이블만 호출자가 고른다. */
+/**
+ * 체류·소비 강도 공용. 적재 테이블은 호출자가 고른다.
+ *
+ * 지표 필드명이 오퍼레이션마다 달라(`tarSjrnDsIx*` / `tarExpDsIx*`) DTO가 합류시킨 값을 쓴다.
+ */
 fun TourStatsDemandIntensityItem.toSyncCommandOrNull(): SyncDemandIntensityCommand? {
     val code = signguCd?.trim()?.takeIf { it.isNotEmpty() } ?: return null
     val month = baseYm.toBaseMonthOrNull() ?: return null
-    val indicator = cateCd?.trim()?.takeIf { it.isNotEmpty() } ?: return null
-    val value = dsCnt.toBigDecimalOrNull() ?: return null
+    val indicator = indicatorCode?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    val value = indicatorValue.toBigDecimalOrNull() ?: return null
 
     return SyncDemandIntensityCommand(
         sigunguCode = code,

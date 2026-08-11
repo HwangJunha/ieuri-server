@@ -45,8 +45,11 @@ data class TourStatsConcentrationRateItem(
 )
 
 /**
- * 체류 강도 · 소비 강도 행. 두 오퍼레이션이 같은 서비스에 있고 응답 모양도 같아 한 타입으로
- * 받는다 — 적재 테이블만 다르다.
+ * 체류 강도 · 소비 강도 행.
+ *
+ * **두 오퍼레이션의 지표 필드명이 서로 다르다**(실측 2026-08-11) — 체류는 `tarSjrnDsIx*`,
+ * 소비는 `tarExpDsIx*`다. 한 타입으로 받되 양쪽 이름을 모두 두고 [indicatorCode] ·
+ * [indicatorValue]로 합류시킨다. 응답에 없는 쪽은 null로 남는다.
  *
  * [baseYm]은 `yyyyMM`이고 적재 시 해당 월 1일 `date`로 정규화한다(V44 주석).
  */
@@ -57,9 +60,18 @@ data class TourStatsDemandIntensityItem(
     val areaCd: String? = null,
     /** 기준월 `yyyyMM`. */
     val baseYm: String? = null,
-    /** 지표 코드. 한 시군구·한 달에 여러 지표가 오므로 자연키에 포함된다. */
-    val cateCd: String? = null,
-    val cateNm: String? = null,
+    /** 체류 강도 지표 코드·값(`21` = 관광체류강도). */
+    val tarSjrnDsIxCd: String? = null,
+    val tarSjrnDsIxNm: String? = null,
+    val tarSjrnDsIxVal: String? = null,
+    /** 소비 강도 지표 코드·값(`22` = 관광소비강도). */
+    val tarExpDsIxCd: String? = null,
+    val tarExpDsIxNm: String? = null,
+    val tarExpDsIxVal: String? = null,
+) {
+    /** 오퍼레이션마다 다른 지표 필드를 하나로 합류시킨다. */
+    val indicatorCode: String? get() = tarSjrnDsIxCd ?: tarExpDsIxCd
+
     /** 지표 값. 소수 문자열이다. */
-    val dsCnt: String? = null,
-)
+    val indicatorValue: String? get() = tarSjrnDsIxVal ?: tarExpDsIxVal
+}

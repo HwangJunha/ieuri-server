@@ -88,7 +88,16 @@ class TourStatsClient(
         pageNo: Int,
         numOfRows: Int,
     ): TourStatsSyncPage<SyncDemandIntensityCommand> =
-        fetchDemandIntensity(OP_STAY_INTENSITY, areaCd, signguCd, baseMonth, pageNo, numOfRows)
+        fetchDemandIntensity(
+            OP_STAY_INTENSITY,
+            PARAM_STAY_INDEX_CODE,
+            properties.stayIndexCode,
+            areaCd,
+            signguCd,
+            baseMonth,
+            pageNo,
+            numOfRows,
+        )
 
     override fun fetchSpendingIntensities(
         areaCd: String,
@@ -97,16 +106,30 @@ class TourStatsClient(
         pageNo: Int,
         numOfRows: Int,
     ): TourStatsSyncPage<SyncDemandIntensityCommand> =
-        fetchDemandIntensity(OP_SPENDING_INTENSITY, areaCd, signguCd, baseMonth, pageNo, numOfRows)
+        fetchDemandIntensity(
+            OP_SPENDING_INTENSITY,
+            PARAM_SPENDING_INDEX_CODE,
+            properties.spendingIndexCode,
+            areaCd,
+            signguCd,
+            baseMonth,
+            pageNo,
+            numOfRows,
+        )
 
     /**
-     * 체류·소비 강도는 같은 서비스의 다른 오퍼레이션이며 응답 모양도 같다.
+     * 체류·소비 강도는 같은 서비스의 다른 오퍼레이션이다.
      *
-     * **월 인자는 `baseYm` 하나다** — `startYm`/`endYm` 구간이 아니다(실측:
-     * `NO_MANDATORY_REQUEST_PARAMETERS_ERROR1(baseYm)`).
+     * **월 인자는 `baseYm` 하나다** — `startYm`/`endYm` 구간이 아니다.
+     *
+     * **지표 코드가 필수다**(실측 2026-08-11). 빼면 오류 없이 `totalCount:0`이 와서 "데이터가
+     * 없다"로 오해하기 쉽다 — 실제로는 요청이 불완전한 것이다. 파라미터명도 오퍼레이션마다
+     * 다르다(`tarSjrnDsIxCd` / `tarExpDsIxCd`).
      */
     private fun fetchDemandIntensity(
         operation: String,
+        indexParamName: String,
+        indexCode: String,
         areaCd: String,
         signguCd: String,
         baseMonth: YearMonth,
@@ -117,6 +140,7 @@ class TourStatsClient(
             queryParam("areaCd", areaCd)
             queryParam("signguCd", signguCd)
             queryParam("baseYm", baseMonth.format(MONTH_FORMAT))
+            queryParam(indexParamName, indexCode)
         }
         return fetchPage(uri, DEMAND_INTENSITY_TYPE) { it.toSyncCommandOrNull() }
     }
@@ -227,6 +251,10 @@ class TourStatsClient(
         const val OP_CONCENTRATION_RATE = "tatsCnctrRatedList"
         const val OP_STAY_INTENSITY = "areaTarSjrnDsList"
         const val OP_SPENDING_INTENSITY = "areaTarExpDsList"
+
+        /** 지표 코드 파라미터명. 오퍼레이션마다 다르다(실측 2026-08-11). */
+        const val PARAM_STAY_INDEX_CODE = "tarSjrnDsIxCd"
+        const val PARAM_SPENDING_INDEX_CODE = "tarExpDsIxCd"
 
         const val MOBILE_OS = "ETC"
         const val MOBILE_APP = "ieuri"
