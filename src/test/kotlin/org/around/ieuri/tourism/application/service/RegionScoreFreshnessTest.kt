@@ -36,6 +36,9 @@ class RegionScoreFreshnessTest {
         distanceScoring = DistanceScoring(30_000.0),
         freshnessDecay = FreshnessDecay(plateauDays = 7, halfLifeDays = 23.0),
         minFactorCount = 2,
+        // 이 테스트의 관심사는 감쇠지 후보 선별이 아니다 — 시도 규모 필터를 무력화해
+        // 픽스처의 지역이 그대로 남게 한다(선별은 RegionCandidateSelectionTest가 본다).
+        minDistrictsPerProvince = 1,
         defaultLimit = 10,
         maxLimit = 50,
     )
@@ -53,6 +56,7 @@ class RegionScoreFreshnessTest {
     ) = RegionFixture(
         region = RegionRow(
             code = code,
+            provinceCode = "11",
             name = AreaName(ko = "강남구", en = "Gangnam-gu", ja = null, zh = null),
             provinceName = AreaName(ko = "서울특별시", en = "Seoul", ja = null, zh = null),
             center = Coordinates(latitude = 37.5, longitude = 127.05),
@@ -218,6 +222,7 @@ class RegionScoreFreshnessTest {
         fun staleFixture(code: String, stay: Double) = RegionFixture(
             region = RegionRow(
                 code = code,
+                provinceCode = "11",
                 name = AreaName(ko = "강남구", en = "Gangnam-gu", ja = null, zh = null),
                 provinceName = AreaName(ko = "서울특별시", en = "Seoul", ja = null, zh = null),
                 center = Coordinates(latitude = 37.5, longitude = 127.05),

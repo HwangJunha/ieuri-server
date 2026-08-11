@@ -20,6 +20,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties
  * @param distanceHalfLifeMeters 거리 감쇠 반감 거리(m). 이 거리에서 거리 점수가 50점이다.
  * @param freshnessPlateauDays / @param freshnessHalfLifeDays 지표 신선도 감쇠(방문자수 전용).
  * @param minFactorCount 추천 대상이 되기 위한 최소 산출 항목 수(R30). 경계값은 포함된다.
+ * @param minDistrictsPerProvince 시도가 후보로 남기 위한 최소 시군구 수. 경계값은 포함된다.
  * @param defaultLimit / @param maxLimit 추천 결과 기본 개수와 상한(R19 · POL-018). 초과는 클램프.
  */
 @ConfigurationProperties(prefix = "ieuri.tour-stats")
@@ -69,8 +70,19 @@ data class TourStatsProperties(
      */
     val distanceHalfLifeMeters: Double = 30_000.0,
 
-    /** 잠정: 2. 항목 1개만으로 산출된 총점이 상위에 오는 것을 막는 최소선. */
-    val minFactorCount: Int = 2,
+    /**
+     * 4. 지표 4종이 모두 있는 지역만 추천한다. 3 이하로 두면 결측이 많은 지역이 남은 항목의
+     * 우연한 고득점만으로 상위에 온다(실측: 화성시가 체류·소비 결측 3항목으로 7위).
+     */
+    val minFactorCount: Int = 4,
+
+    /**
+     * 시도가 추천 후보가 되기 위한 최소 시군구 수. 이보다 적은 시도는 통째로 빠진다.
+     *
+     * 기본 3 — 세종(1)·제주(2)는 "여기 말고 근처 저기"가 성립하지 않는다. 행정구역은 바뀌므로
+     * 코드에 시도 목록을 박지 않고 데이터에서 센다.
+     */
+    val minDistrictsPerProvince: Int = 3,
 
     /** 잠정: 10 / 50. 목록 화면 한 스크롤 분량을 기준으로 잡았다. */
     val defaultLimit: Int = 10,

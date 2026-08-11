@@ -19,11 +19,14 @@ import java.time.LocalDate
 /**
  * 지역 추천 조회 유스케이스 구현(SPEC-0015, CQRS 읽기).
  *
- * 순서가 곧 설계다: 원본 적재 → **적재된 집합에서 정규화 구간 산출**(§3.3) → 신선도 감쇠 →
- * 거리 항목 가산(origin이 있을 때만, R21) → 가중합(R30 미만은 탈락) → 총점 내림차순 정렬
- * (R16) → 개수 제한.
+ * 순서가 곧 설계다: 원본 적재 → **후보 선별**([selectCandidates]) → **남은 후보 집합에서
+ * 정규화 구간 산출**(§3.3) → 신선도 감쇠 → 거리 항목 가산(origin이 있을 때만, R21) → 가중합
+ * (R30 미만은 탈락) → 총점 내림차순 정렬(R16) → 개수 제한.
  *
- * 정규화 구간을 전체 집합에서 뽑기 때문에 **한 지역만 따로 계산할 수 없다** — 척도가 이웃
+ * **선별이 정규화보다 먼저다.** 척도는 실제로 비교 가능한 집합에서 나와야 한다 — 전국에서
+ * 뽑은 구간을 한 시도에 적용하면 그 시도 안의 차이가 눌린다.
+ *
+ * 정규화 구간을 집합 전체에서 뽑기 때문에 **한 지역만 따로 계산할 수 없다** — 척도가 이웃
  * 지역들에 의존한다. 상한을 먼저 적용하면 척도가 바뀌므로 자르기는 마지막이다.
  */
 @Service
@@ -36,7 +39,7 @@ class RegionRecommendationService(
         query: RecommendedRegionQuery,
         locale: DomainLocale,
     ): RecommendedRegionView {
-        val rows = loadMetricRows()
+        val rows = selectCandidates(loadMetricRows(), query.origin)
 
         val normalizations = buildNormalizations(rows)
         val calculator = RegionScoreCalculator(policy.weights, policy.minFactorCount)
@@ -65,6 +68,34 @@ class RegionRecommendationService(
         return RecommendedRegionView(regions = regions)
     }
 
+
+    /**
+     * 추천 후보 선별. 추천은 "여기 말고 **근처** 저기"라서, 비교 대상이 아닌 지역을 먼저 뺀다.
+     *
+     * 1. **선택지가 적은 시도 제외** — 시군구가 [RegionRecommendationPolicy.minDistrictsPerProvince]
+     *    미만인 시도는 통째로 빠진다. 시도 목록을 박지 않고 적재된 데이터에서 센다.
+     * 2. **자기 지역 제외** — origin이 들어앉은 시군구는 추천이 아니라 현재 위치 확인이다.
+     * 3. **같은 시도만** — 다른 시도는 "근처"가 아니다.
+     *
+     * 2·3은 origin이 있고 그 좌표가 실제 시군구에 걸릴 때만 적용된다. origin이 없거나
+     * 바다·해외라 걸리는 지역이 없으면 **오류가 아니라 전국 대상**이며, 1은 그대로 적용된다.
+     */
+    private fun selectCandidates(
+        rows: List<RegionMetricRow>,
+        origin: Coordinates?,
+    ): List<RegionMetricRow> {
+        val eligibleProvinces = rows.groupingBy { it.provinceCode }.eachCount()
+            .filterValues { it >= policy.minDistrictsPerProvince }
+            .keys
+        val inLargeProvince = rows.filter { it.provinceCode in eligibleProvinces }
+
+        val originDistrict = origin?.let { regionMetricQueryPort.findDistrictAt(it) }
+            ?: return inLargeProvince
+
+        return inLargeProvince.filter {
+            it.code != originDistrict.code && it.provinceCode == originDistrict.provinceCode
+        }
+    }
 
     /**
      * 지역 목록과 지표 4종을 각각 읽어 **코드로 합친다**.

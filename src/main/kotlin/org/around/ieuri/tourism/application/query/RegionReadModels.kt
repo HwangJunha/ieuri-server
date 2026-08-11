@@ -60,12 +60,27 @@ data class RegionScoreView(
  *
  * [center]는 기하학적 중심이 아니라 배치가 골라 둔 **대표 위치**다(설계 §11). 대표 위치가
  * 없는 시군구는 애초에 후보에서 빠지므로 이 값은 항상 존재한다.
+ *
+ * [provinceCode]는 [code]의 앞 2자리와 같은 값이지만 별도 컬럼에서 온다 — 후보를 같은 시도로
+ * 좁히고 시군구가 적은 시도를 빼는 데 쓴다.
  */
 data class RegionRow(
     val code: String,
+    val provinceCode: String,
     val name: AreaName,
     val provinceName: AreaName,
     val center: Coordinates,
+)
+
+/**
+ * origin 좌표가 실제로 들어앉은 시군구. 경계 안에 있는 지역이 없으면 이 값 자체가 null이다
+ * (바다·해외).
+ *
+ * 추천에서 이 지역은 빠지고([code]), 후보는 같은 시도로 좁혀진다([provinceCode]).
+ */
+data class OriginDistrict(
+    val code: String,
+    val provinceCode: String,
 )
 
 /**
@@ -87,6 +102,7 @@ data class RegionMetricRow(
     val metrics: Map<RegionScoreFactor, RegionMetric>,
 ) {
     val code: String get() = region.code
+    val provinceCode: String get() = region.provinceCode
     val name: AreaName get() = region.name
     val provinceName: AreaName get() = region.provinceName
     val center: Coordinates get() = region.center

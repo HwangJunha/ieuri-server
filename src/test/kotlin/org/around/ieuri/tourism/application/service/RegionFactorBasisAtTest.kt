@@ -31,6 +31,8 @@ class RegionFactorBasisAtTest {
         distanceScoring = DistanceScoring(30_000.0),
         freshnessDecay = FreshnessDecay(plateauDays = 7, halfLifeDays = 23.0),
         minFactorCount = 2,
+        // 관심사는 기준일 표기지 후보 선별이 아니다 — 시도 규모 필터를 무력화한다.
+        minDistrictsPerProvince = 1,
         defaultLimit = 10,
         maxLimit = 50,
     )
@@ -46,6 +48,7 @@ class RegionFactorBasisAtTest {
     ) = RegionFixture(
         region = RegionRow(
             code = code,
+            provinceCode = "11",
             name = AreaName(ko = "종로구", en = "Jongno-gu", ja = null, zh = null),
             provinceName = AreaName(ko = "서울특별시", en = "Seoul", ja = null, zh = null),
             center = Coordinates(latitude = 37.6, longitude = 126.98),

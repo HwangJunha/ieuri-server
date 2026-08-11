@@ -1,7 +1,9 @@
 package org.around.ieuri.tourism.application.port.out.query
 
+import org.around.ieuri.tourism.application.query.OriginDistrict
 import org.around.ieuri.tourism.application.query.RegionMetric
 import org.around.ieuri.tourism.application.query.RegionRow
+import org.around.ieuri.tourism.domain.vo.Coordinates
 
 /**
  * 시군구 추천 지표 조회 아웃바운드 포트(SPEC-0015 R14·R20).
@@ -19,6 +21,14 @@ interface RegionMetricQueryPort {
      * 지표가 하나도 없는 시군구도 여기에는 들어온다. 최소 항목 수(R30) 판정은 호출자 몫이다.
      */
     fun findRegions(): List<RegionRow>
+
+    /**
+     * origin 좌표를 품은 시군구. **경계 안에 있는 지역이 없으면 null**이다(바다·해외) — 오류가
+     * 아니며, 호출자는 이때 전국 대상으로 되돌린다.
+     *
+     * 대표 위치 유무와 무관하게 경계로만 판정한다 — 자기 지역 판정은 후보 자격과 다른 질문이다.
+     */
+    fun findDistrictAt(origin: Coordinates): OriginDistrict?
 
     /** 시군구 코드 → 오늘 예측 집중률. 오늘 값이 없는 지역은 **키 자체가 없다**(결측, POL-043). */
     fun findConcentrationRates(): Map<String, RegionMetric>

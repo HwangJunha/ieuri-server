@@ -104,6 +104,7 @@ class TourismConfig {
                 halfLifeDays = properties.freshnessHalfLifeDays,
             ),
             minFactorCount = properties.minFactorCount,
+            minDistrictsPerProvince = properties.minDistrictsPerProvince,
             defaultLimit = properties.defaultLimit,
             maxLimit = properties.maxLimit,
         )

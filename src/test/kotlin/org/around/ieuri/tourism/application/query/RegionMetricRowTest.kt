@@ -19,6 +19,7 @@ class RegionMetricRowTest {
 
     private val region = RegionRow(
         code = "11680",
+        provinceCode = "11",
         name = AreaName(ko = "강남구", en = "Gangnam-gu", ja = null, zh = null),
         provinceName = AreaName(ko = "서울특별시", en = "Seoul", ja = null, zh = null),
         center = Coordinates(latitude = 37.5, longitude = 127.05),
@@ -139,6 +140,7 @@ class RegionMetricRowTest {
         val row = row(concentrationRate = 67.4, concentrationBasisDate = LocalDate.of(2026, 8, 11))
 
         assertEquals("11680", row.code)
+        assertEquals("11", row.provinceCode)
         assertEquals("강남구", row.name.ko)
         assertEquals("서울특별시", row.provinceName.ko)
         assertEquals(37.5, row.center.latitude)

@@ -1,6 +1,7 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.query
 
 import org.around.ieuri.tourism.application.port.out.query.RegionMetricQueryPort
+import org.around.ieuri.tourism.application.query.OriginDistrict
 import org.around.ieuri.tourism.application.query.RegionMetric
 import org.around.ieuri.tourism.application.query.RegionRow
 import org.around.ieuri.tourism.domain.vo.AreaName
@@ -39,7 +40,7 @@ class RegionMetricQueryAdapter(
     override fun findRegions(): List<RegionRow> =
         jdbcTemplate.query(
             """
-            SELECT code,
+            SELECT code, province_code,
                    name_ko, name_en, name_ja, name_zh,
                    province_name_ko, province_name_en, province_name_ja, province_name_zh,
                    ST_Y(representative_location::geometry) AS center_lat,
@@ -53,6 +54,7 @@ class RegionMetricQueryAdapter(
         ) { rs, _ ->
             RegionRow(
                 code = rs.getString("code"),
+                provinceCode = rs.getString("province_code"),
                 name = rs.areaName(""),
                 provinceName = rs.areaName("province_"),
                 center = Coordinates(
@@ -61,6 +63,34 @@ class RegionMetricQueryAdapter(
                 ),
             )
         }
+
+    /**
+     * origin 좌표를 품은 시군구 1건. 경계 안에 없으면 null이다(바다·해외).
+     *
+     * **`ST_MakePoint`는 (경도, 위도) 순서다** — 뒤집으면 예외 없이 조용히 0건이 된다.
+     * `boundary`가 geography라 인자도 geography로 캐스팅해야 `idx_district_boundary`를 탄다.
+     *
+     * 경계는 겹치지 않지만 부동소수점 경계선에 정확히 걸린 좌표가 2건을 낼 수 있어 `LIMIT 1`을
+     * 둔다 — 어느 쪽이든 인접 시군구라 추천 결과가 실질적으로 달라지지 않는다.
+     */
+    @Transactional(readOnly = true)
+    override fun findDistrictAt(origin: Coordinates): OriginDistrict? =
+        jdbcTemplate.query(
+            """
+            SELECT code, province_code
+            FROM district
+            WHERE ST_Intersects(boundary, ST_MakePoint(?, ?)::geography)
+            LIMIT 1
+            """.trimIndent(),
+            { rs, _ ->
+                OriginDistrict(
+                    code = rs.getString("code"),
+                    provinceCode = rs.getString("province_code"),
+                )
+            },
+            origin.longitude,
+            origin.latitude,
+        ).firstOrNull()
 
     /**
      * 시군구별 **오늘 예측** 집중률의 평균.
