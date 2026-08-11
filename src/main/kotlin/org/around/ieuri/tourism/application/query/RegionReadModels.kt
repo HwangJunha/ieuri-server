@@ -30,27 +30,50 @@ data class RecommendedRegionView(
  *
  * [scores]에는 **산출 가능했던 항목만** 들어간다 — 부재 항목은 0점으로 채우지 않고 빠진다
  * (POL-043). [scoreFactorCount]가 그 개수이며, 지역마다 다를 수 있다는 사실을 감추지 않는다.
+ *
+ * **총점은 여기 없다.** 내부에서는 정렬 키로 계속 쓰지만(R16) 계약에 내보내지 않는다 —
+ * 가중평균이라 값이 항상 항목 점수 사이에 놓여, 1위 지역이 60점으로 보이는 일이 생긴다.
+ * 추천 순위는 목록 순서가, 항목별 상대 위치는 [RegionScoreView.rank]가 전달한다.
  */
 data class RecommendedRegionItemView(
     val code: String,
     val name: String,
     val provinceName: String,
-    val totalScore: Double,
     val scores: List<RegionScoreView>,
     val scoreFactorCount: Int,
     val center: Coordinates,
 )
 
 /**
- * 항목 점수 1개와 그 근거 데이터의 기준일.
+ * 항목 점수 1개와 그 근거 데이터의 기준일, 그리고 그 항목에서의 순위.
  *
- * **기준일을 도메인 [RegionScore]에 넣지 않는다.** 언제 측정된 값인지는 점수 산출 규칙이
- * 아니라 표시용 출처 정보다 — 도메인 VO에 넣으면 점수 계산이 날짜에 의존하는 것처럼 읽힌다.
+ * **기준일도 순위도 도메인 [RegionScore]에 넣지 않는다.** 언제 측정된 값인지는 표시용 출처
+ * 정보이고, 순위는 한 지역이 아니라 **후보 집합 전체**에서만 정해지는 값이다 — 둘 중 어느
+ * 것도 한 지역의 점수 산출 규칙이 아니다.
  *
  * [basisAt]의 null은 기준일을 알 수 없다는 뜻이다. 요청 시점에 계산되는 DISTANCE가 그렇다 —
  * 적재된 데이터가 아니라 기준일이라는 개념 자체가 없다.
+ *
+ * [rank]는 **1이 가장 좋고**(= [RegionScore.value]가 가장 높음), 상한을 적용하기 전의 후보
+ * 전체에서 매겨진다. 동점은 같은 순위를 받고 다음 순위를 건너뛴다(표준 경쟁 순위).
  */
 data class RegionScoreView(
+    val score: RegionScore,
+    val basisAt: LocalDate?,
+    val rank: Int,
+) {
+    init {
+        require(rank >= 1) { "항목 순위는 1 이상이어야 합니다: $rank" }
+    }
+}
+
+/**
+ * 순위가 붙기 전의 항목 점수 — 순위는 후보 집합이 확정된 뒤에야 정해진다.
+ *
+ * [RegionScoreView]를 임시값으로 먼저 만들면 순위를 못 붙인 인스턴스가 밖으로 샐 수 있어,
+ * 순위 이전 단계를 아예 다른 타입으로 둔다.
+ */
+data class ScoredFactor(
     val score: RegionScore,
     val basisAt: LocalDate?,
 )

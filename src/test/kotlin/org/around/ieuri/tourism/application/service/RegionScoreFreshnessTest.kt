@@ -217,6 +217,7 @@ class RegionScoreFreshnessTest {
     fun `낡은 방문자수는 총점 순위를 실제로 내린다`() {
         // 감쇠를 가중치가 아니라 점수에 곱하는 이유다. 가중치를 깎으면 분모도 함께 줄어
         // 총점이 거의 그대로이고, 낡은 데이터가 대가 없이 통과한다.
+        // 총점은 계약에 없으므로 목록 순서와 항목 순위로 확인한다 — 둘 다 총점/점수에서 나온다.
         val service = service(
             fixture(code = "11680", visitorCount = 600_000.0, visitorDate = today.minusDays(60)),
             fixture(code = "11710", visitorCount = 600_000.0, visitorDate = today),
@@ -225,7 +226,8 @@ class RegionScoreFreshnessTest {
         val regions = service.recommendedRegions(query(), DomainLocale.KO).regions
 
         assertEquals("11710", regions.first().code, "신선한 쪽이 앞에 와야 한다")
-        assertTrue(regions.first().totalScore > regions.last().totalScore)
+        assertEquals(1, regions.first().score(RegionScoreFactor.VISITOR_VOLUME).rank)
+        assertEquals(2, regions.last().score(RegionScoreFactor.VISITOR_VOLUME).rank)
     }
 
     @Test

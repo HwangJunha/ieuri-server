@@ -24,8 +24,8 @@ import org.around.ieuri.common.graphql.generated.types.RegionScoreFactor as GqlR
  * 지역 추천 GraphQL 리졸버(인바운드 어댑터, CQRS 읽기, SPEC-0015). 언어는 요청 스코프
  * `LocaleContext`에서 읽어 유스케이스에 넘긴다(GraphQL 인자 아님, Accept-Language 기반).
  *
- * **지연 필드(@DgsData)를 두지 않는 것이 맞다.** 응답의 모든 필드(이름·총점·항목별 점수·대표
- * 좌표)가 **한 번의 지표 조회와 그 위의 단일 점수 산출 패스**에서 나온다. 필드를 나눠도
+ * **지연 필드(@DgsData)를 두지 않는 것이 맞다.** 응답의 모든 필드(이름·항목별 점수와 순위·
+ * 대표 좌표)가 **한 번의 지표 조회와 그 위의 단일 점수 산출 패스**에서 나온다. 필드를 나눠도
  * 줄어드는 I/O가 없고, 정규화 척도가 전체 집합에 의존해 한 지역만 따로 계산할 수도 없다.
  *
  * **origin은 로깅하지 않는다**(POL-013 · POL-045) — 사용자 본인의 위치다. 저장도 하지 않으며
@@ -80,7 +80,6 @@ class RegionRecommendationResolver(
         code = code,
         name = name,
         provinceName = provinceName,
-        totalScore = totalScore,
         scores = scores.map { it.toGql() },
         scoreFactorCount = scoreFactorCount,
         center = center.toGql(),
@@ -90,6 +89,7 @@ class RegionRecommendationResolver(
     private fun RegionScoreView.toGql() = GqlRegionScore(
         factor = GqlRegionScoreFactor.valueOf(score.factor.name),
         value = score.value,
+        rank = rank,
         basisAt = basisAt?.toString(),
     )
 
