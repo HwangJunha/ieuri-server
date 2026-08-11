@@ -35,7 +35,7 @@ import java.time.Duration
     MapViewportProperties::class,
     TourStatsProperties::class,
     TourStatsSyncProperties::class,
-    SigunguRepresentativeProperties::class,
+    DistrictRepresentativeProperties::class,
 )
 class TourismConfig {
 

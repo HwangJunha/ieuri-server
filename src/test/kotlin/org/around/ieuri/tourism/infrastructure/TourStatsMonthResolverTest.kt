@@ -26,7 +26,7 @@ class TourStatsMonthResolverTest {
     private val calls = mutableListOf<Triple<String, YearMonth, Int>>()
 
     private fun row(code: String) = SyncDemandIntensityCommand(
-        sigunguCode = code,
+        districtCode = code,
         baseMonth = LocalDate.of(2026, 6, 1),
         indicatorCode = "1",
         indicatorValue = BigDecimal.ONE,

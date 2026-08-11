@@ -30,7 +30,7 @@ class TourStatsUpsertJdbcAdapter(
     override fun upsertVisitorCounts(records: List<SyncVisitorCountCommand>): Int {
         if (records.isEmpty()) return 0
         val setter = ParameterizedPreparedStatementSetter<SyncVisitorCountCommand> { ps: PreparedStatement, it ->
-            ps.setString(1, it.sigunguCode)
+            ps.setString(1, it.districtCode)
             ps.setDate(2, Date.valueOf(it.baseDate))
             ps.setString(3, it.visitorType)
             ps.setBigDecimal(4, it.touristCount)
@@ -42,7 +42,7 @@ class TourStatsUpsertJdbcAdapter(
     override fun upsertConcentrationRates(records: List<SyncConcentrationRateCommand>): Int {
         if (records.isEmpty()) return 0
         val setter = ParameterizedPreparedStatementSetter<SyncConcentrationRateCommand> { ps: PreparedStatement, it ->
-            ps.setString(1, it.sigunguCode)
+            ps.setString(1, it.districtCode)
             ps.setString(2, it.touristSpotName)
             ps.setDate(3, Date.valueOf(it.targetDate))
             ps.setBigDecimal(4, it.concentrationRate)
@@ -62,7 +62,7 @@ class TourStatsUpsertJdbcAdapter(
     private fun upsertDemandIntensity(sql: String, records: List<SyncDemandIntensityCommand>): Int {
         if (records.isEmpty()) return 0
         val setter = ParameterizedPreparedStatementSetter<SyncDemandIntensityCommand> { ps: PreparedStatement, it ->
-            ps.setString(1, it.sigunguCode)
+            ps.setString(1, it.districtCode)
             ps.setDate(2, Date.valueOf(it.baseMonth))
             ps.setString(3, it.indicatorCode)
             ps.setBigDecimal(4, it.indicatorValue)
@@ -81,9 +81,9 @@ class TourStatsUpsertJdbcAdapter(
          * 것처럼 보여 "언제 값이 바뀌었나"를 알 수 없다.
          */
         val VISITOR_COUNT_SQL = """
-            INSERT INTO kto_visitor_count (sigungu_code, base_date, visitor_type, tou_num)
+            INSERT INTO kto_visitor_count (district_code, base_date, visitor_type, tou_num)
             VALUES (?, ?, ?, ?)
-            ON CONFLICT (sigungu_code, base_date, visitor_type) DO UPDATE SET
+            ON CONFLICT (district_code, base_date, visitor_type) DO UPDATE SET
                 tou_num    = EXCLUDED.tou_num,
                 updated_at = CASE
                     WHEN kto_visitor_count.tou_num IS DISTINCT FROM EXCLUDED.tou_num
@@ -92,9 +92,9 @@ class TourStatsUpsertJdbcAdapter(
         """.trimIndent()
 
         val CONCENTRATION_RATE_SQL = """
-            INSERT INTO kto_concentration_rate (sigungu_code, tourist_spot_name, target_date, cnctr_rate)
+            INSERT INTO kto_concentration_rate (district_code, tourist_spot_name, target_date, cnctr_rate)
             VALUES (?, ?, ?, ?)
-            ON CONFLICT (sigungu_code, tourist_spot_name, target_date) DO UPDATE SET
+            ON CONFLICT (district_code, tourist_spot_name, target_date) DO UPDATE SET
                 cnctr_rate = EXCLUDED.cnctr_rate,
                 updated_at = CASE
                     WHEN kto_concentration_rate.cnctr_rate IS DISTINCT FROM EXCLUDED.cnctr_rate
@@ -103,9 +103,9 @@ class TourStatsUpsertJdbcAdapter(
         """.trimIndent()
 
         val STAY_INTENSITY_SQL = """
-            INSERT INTO kto_stay_intensity (sigungu_code, base_month, indicator_cd, indicator_value)
+            INSERT INTO kto_stay_intensity (district_code, base_month, indicator_cd, indicator_value)
             VALUES (?, ?, ?, ?)
-            ON CONFLICT (sigungu_code, base_month, indicator_cd) DO UPDATE SET
+            ON CONFLICT (district_code, base_month, indicator_cd) DO UPDATE SET
                 indicator_value = EXCLUDED.indicator_value,
                 updated_at      = CASE
                     WHEN kto_stay_intensity.indicator_value IS DISTINCT FROM EXCLUDED.indicator_value
@@ -114,9 +114,9 @@ class TourStatsUpsertJdbcAdapter(
         """.trimIndent()
 
         val SPENDING_INTENSITY_SQL = """
-            INSERT INTO kto_spending_intensity (sigungu_code, base_month, indicator_cd, indicator_value)
+            INSERT INTO kto_spending_intensity (district_code, base_month, indicator_cd, indicator_value)
             VALUES (?, ?, ?, ?)
-            ON CONFLICT (sigungu_code, base_month, indicator_cd) DO UPDATE SET
+            ON CONFLICT (district_code, base_month, indicator_cd) DO UPDATE SET
                 indicator_value = EXCLUDED.indicator_value,
                 updated_at      = CASE
                     WHEN kto_spending_intensity.indicator_value IS DISTINCT FROM EXCLUDED.indicator_value

@@ -4,7 +4,7 @@ import org.around.ieuri.tourism.application.command.SyncDemandIntensityCommand
 import org.around.ieuri.tourism.application.port.out.client.TourStatsSyncPage
 import org.around.ieuri.tourism.application.port.out.client.TourStatsSyncPort
 import org.around.ieuri.tourism.application.port.out.persistence.TourStatsStorePort
-import org.around.ieuri.tourism.application.port.out.persistence.SigunguCodeQueryPort
+import org.around.ieuri.tourism.application.port.out.persistence.DistrictCodeQueryPort
 import org.around.ieuri.tourism.infrastructure.config.TourStatsProperties
 import org.springframework.batch.core.job.Job
 import org.springframework.batch.core.job.builder.JobBuilder
@@ -50,7 +50,7 @@ class TourStatsSyncJobConfig(
     private val transactionManager: PlatformTransactionManager,
     private val syncPort: TourStatsSyncPort,
     private val storePort: TourStatsStorePort,
-    private val sigunguCodePort: SigunguCodeQueryPort,
+    private val districtCodePort: DistrictCodeQueryPort,
     private val properties: TourStatsProperties,
     private val syncProperties: TourStatsSyncProperties,
 ) {
@@ -61,7 +61,7 @@ class TourStatsSyncJobConfig(
         TourStatsSyncTasklet(
             datasetName = "visitorCount",
             pageSize = properties.pageSize,
-            sigunguCodePort = sigunguCodePort,
+            districtCodePort = districtCodePort,
             // 지역 순회 없음 — 이 API만 지역 필터가 없어 순회 단위를 쓰지 않는다.
             fetchPage = { context, _, pageNo ->
                 // 최근 구간을 매번 통째로 다시 받는다 — upsert라 행이 늘지 않고(R7) 며칠 실패해도
@@ -75,7 +75,7 @@ class TourStatsSyncJobConfig(
                     properties.pageSize,
                 )
             },
-            sigunguCodeOf = { it.sigunguCode },
+            districtCodeOf = { it.districtCode },
             upsert = storePort::upsertVisitorCounts,
             targetsOf = { TourStatsSyncTasklet.NO_REGION },
         ),
@@ -94,7 +94,7 @@ class TourStatsSyncJobConfig(
         TourStatsSyncTasklet(
             datasetName = "concentrationRate",
             pageSize = properties.pageSize,
-            sigunguCodePort = sigunguCodePort,
+            districtCodePort = districtCodePort,
             fetchPage = { _, region, pageNo ->
                 syncPort.fetchConcentrationRates(
                     region.provinceCode,
@@ -103,9 +103,9 @@ class TourStatsSyncJobConfig(
                     properties.pageSize,
                 )
             },
-            sigunguCodeOf = { it.sigunguCode },
+            districtCodeOf = { it.districtCode },
             upsert = storePort::upsertConcentrationRates,
-            targetsOf = SigunguCodeQueryPort::findAllRegions,
+            targetsOf = DistrictCodeQueryPort::findAllRegions,
         ),
     )
 
@@ -147,7 +147,7 @@ class TourStatsSyncJobConfig(
             TourStatsSyncTasklet(
                 datasetName = datasetName,
                 pageSize = properties.pageSize,
-                sigunguCodePort = sigunguCodePort,
+                districtCodePort = districtCodePort,
                 fetchPage = { context, areaCd, pageNo ->
                     resolver.fetchPage(
                         context.executionContext,
@@ -156,9 +156,9 @@ class TourStatsSyncJobConfig(
                         pageNo,
                     )
                 },
-                sigunguCodeOf = { it.sigunguCode },
+                districtCodeOf = { it.districtCode },
                 upsert = upsert,
-                targetsOf = SigunguCodeQueryPort::findAllProvinceCodes,
+                targetsOf = DistrictCodeQueryPort::findAllProvinceCodes,
             ),
         )
     }

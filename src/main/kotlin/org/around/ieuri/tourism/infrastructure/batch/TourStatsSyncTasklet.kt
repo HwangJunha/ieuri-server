@@ -1,8 +1,8 @@
 package org.around.ieuri.tourism.infrastructure.batch
 
 import org.around.ieuri.tourism.application.port.out.client.TourStatsSyncPage
-import org.around.ieuri.tourism.application.port.out.persistence.SigunguCodeQueryPort
-import org.around.ieuri.tourism.application.port.out.persistence.SigunguRegion
+import org.around.ieuri.tourism.application.port.out.persistence.DistrictCodeQueryPort
+import org.around.ieuri.tourism.application.port.out.persistence.DistrictRegion
 import org.slf4j.LoggerFactory
 import org.springframework.batch.core.scope.context.ChunkContext
 import org.springframework.batch.core.step.StepContribution
@@ -40,21 +40,21 @@ data class SyncContext(
  * **빈 응답은 정상이다**(R8) — 다음 대상으로 넘어갈 뿐 예외가 아니다.
  *
  * @param T 적재 레코드 타입.
- * @param R 순회 단위(시군구 [SigunguRegion] · 시도 코드 [String] · 단일 [NO_REGION]).
+ * @param R 순회 단위(시군구 [DistrictRegion] · 시도 코드 [String] · 단일 [NO_REGION]).
  * @param fetchPage (수집 문맥, 순회 단위, 페이지 번호) → 한 페이지. 기준일 해석(일/월)과
  *   기준월 탐색은 잡 구성이 정하며, 실행 간 기억이 필요하면 [SyncContext.executionContext]에 쓴다.
- * @param sigunguCodeOf 레코드의 시군구 코드 추출. R9 필터가 이 값으로 걸린다.
+ * @param districtCodeOf 레코드의 시군구 코드 추출. R9 필터가 이 값으로 걸린다.
  * @param upsert 자연키 upsert. 멱등성이 여기서 성립한다(R7).
  * @param targetsOf 순회 대상. 기본은 지역 순회 없음([NO_REGION] 한 건).
  */
 class TourStatsSyncTasklet<T, R : Any>(
     private val datasetName: String,
     private val pageSize: Int,
-    private val sigunguCodePort: SigunguCodeQueryPort,
+    private val districtCodePort: DistrictCodeQueryPort,
     private val fetchPage: (SyncContext, R, Int) -> TourStatsSyncPage<T>,
-    private val sigunguCodeOf: (T) -> String,
+    private val districtCodeOf: (T) -> String,
     private val upsert: (List<T>) -> Int,
-    private val targetsOf: (SigunguCodeQueryPort) -> List<R>,
+    private val targetsOf: (DistrictCodeQueryPort) -> List<R>,
 ) : Tasklet {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -78,9 +78,9 @@ class TourStatsSyncTasklet<T, R : Any>(
         val runDate = chunkContext.runDate()
         val executionContext = chunkContext.stepContext.stepExecution.executionContext
 
-        val loopTargets = targets ?: targetsOf(sigunguCodePort).also { targets = it }
+        val loopTargets = targets ?: targetsOf(districtCodePort).also { targets = it }
         if (loopTargets.isEmpty()) {
-            log.warn("kto sync: dataset={} 순회 대상이 없습니다 — sigungu 테이블이 비어 있습니다.", datasetName)
+            log.warn("kto sync: dataset={} 순회 대상이 없습니다 — district 테이블이 비어 있습니다.", datasetName)
             return RepeatStatus.FINISHED
         }
 
@@ -90,9 +90,9 @@ class TourStatsSyncTasklet<T, R : Any>(
 
         val page = fetchPage(SyncContext(runDate, executionContext), target, pageNo)
 
-        val codes = knownCodes ?: sigunguCodePort.findAllCodes().also { knownCodes = it }
+        val codes = knownCodes ?: districtCodePort.findAllCodes().also { knownCodes = it }
         // R9 — 미등록 코드 행만 빼고 나머지는 그대로 적재한다. 예외를 던지지 않는다.
-        val (accepted, skipped) = page.records.partition { sigunguCodeOf(it) in codes }
+        val (accepted, skipped) = page.records.partition { districtCodeOf(it) in codes }
         val written = upsert(accepted)
 
         val totalWritten = executionContext.getInt(KEY_WRITTEN, 0) + written

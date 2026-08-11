@@ -7,7 +7,7 @@ TOL = 0.0001  # 약 11m
 
 d = json.load(open('HangJeongDong_ver20240401.geojson'))
 kto = {}; order = []
-for line in open('kto_sigungu_codes.tsv'):
+for line in open('kto_district_codes.tsv'):
     a, an, s, sn = line.rstrip('\n').split('\t')
     kto[s] = (a, an, sn); order.append(s)
 

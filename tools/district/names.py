@@ -27,7 +27,7 @@ SIDO = {
     "전북특별자치도": ("Jeonbuk-do", "全北特別自治道", "全北特別自治道"),
 }
 
-SIGUNGU = {
+DISTRICT = {
     "가평군": ("Gapyeong-gun", "加平郡", "加平郡"),
     "강남구": ("Gangnam-gu", "江南区", "江南區"),
     "강동구": ("Gangdong-gu", "江東区", "江東區"),

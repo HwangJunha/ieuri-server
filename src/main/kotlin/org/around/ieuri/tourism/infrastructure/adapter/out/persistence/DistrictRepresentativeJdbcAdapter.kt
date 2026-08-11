@@ -1,7 +1,7 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.persistence
 
-import org.around.ieuri.tourism.application.port.out.persistence.SigunguRepresentativeRefreshResult
-import org.around.ieuri.tourism.application.port.out.persistence.SigunguRepresentativeUpdatePort
+import org.around.ieuri.tourism.application.port.out.persistence.DistrictRepresentativeRefreshResult
+import org.around.ieuri.tourism.application.port.out.persistence.DistrictRepresentativeUpdatePort
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -14,15 +14,15 @@ import org.springframework.transaction.annotation.Transactional
  * 낡은 대표 위치가 남는다.
  */
 @Component
-class SigunguRepresentativeJdbcAdapter(
+class DistrictRepresentativeJdbcAdapter(
     private val jdbcTemplate: JdbcTemplate,
-) : SigunguRepresentativeUpdatePort {
+) : DistrictRepresentativeUpdatePort {
 
     @Transactional
     override fun refreshRepresentativeLocations(
         cellSizeDegrees: Double,
         minSpotCount: Int,
-    ): SigunguRepresentativeRefreshResult {
+    ): DistrictRepresentativeRefreshResult {
         // 순서가 중요하다 — 먼저 채우고 나서, 이번에 채워지지 않은 것을 지운다.
         // 정리 문장이 선정 조건을 다시 계산하는 이유는 CLEAR_SQL 주석 참조.
         //
@@ -30,7 +30,7 @@ class SigunguRepresentativeJdbcAdapter(
         // 맞아야 하며, 어긋나면 실행 시점에야 "column index is out of range"로 드러난다.
         val selected = jdbcTemplate.update(SELECT_SQL, cellSizeDegrees, minSpotCount)
         val cleared = jdbcTemplate.update(CLEAR_SQL, cellSizeDegrees, minSpotCount)
-        return SigunguRepresentativeRefreshResult(selected = selected, cleared = cleared)
+        return DistrictRepresentativeRefreshResult(selected = selected, cleared = cleared)
     }
 
     /** SQL의 `?` 개수와 인자 개수가 어긋나면 실행 시점에야 드러나므로 테스트가 여기 접근한다. */
@@ -54,7 +54,7 @@ class SigunguRepresentativeJdbcAdapter(
                 SELECT sg.code,
                        ST_SnapToGrid(sp.location::geometry, ?) AS cell,
                        sp.location
-                  FROM sigungu sg
+                  FROM district sg
                   JOIN spot sp ON ST_Intersects(sg.boundary, sp.location)
                  WHERE sp.language = 'KO'
             ),
@@ -85,7 +85,7 @@ class SigunguRepresentativeJdbcAdapter(
                          LIMIT 1) AS location
                   FROM densest d
             )
-            UPDATE sigungu s
+            UPDATE district s
             SET representative_location   = w.location,
                 representative_spot_count = w.spot_count,
                 representative_updated_at = now()
@@ -105,7 +105,7 @@ class SigunguRepresentativeJdbcAdapter(
          * 이미 NULL인 행은 제외해 `cleared`가 "이번에 값을 잃은 지역 수"만 세도록 한다.
          */
         val CLEAR_SQL = """
-            UPDATE sigungu
+            UPDATE district
             SET representative_location   = NULL,
                 representative_spot_count = NULL,
                 representative_updated_at = now()
@@ -114,7 +114,7 @@ class SigunguRepresentativeJdbcAdapter(
                     -- 선정 조건과 **정확히 같은 기준**이어야 한다(KO 한정 · 같은 격자 · 같은 문턱).
                     -- 한쪽만 바뀌면 매 실행마다 넣었다 지웠다를 반복한다.
                     SELECT sg.code
-                      FROM sigungu sg
+                      FROM district sg
                       JOIN spot sp ON ST_Intersects(sg.boundary, sp.location)
                      WHERE sp.language = 'KO'
                      GROUP BY sg.code, ST_SnapToGrid(sp.location::geometry, ?)

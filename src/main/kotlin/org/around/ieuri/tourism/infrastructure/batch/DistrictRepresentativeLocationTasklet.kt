@@ -1,6 +1,6 @@
 package org.around.ieuri.tourism.infrastructure.batch
 
-import org.around.ieuri.tourism.application.port.out.persistence.SigunguRepresentativeUpdatePort
+import org.around.ieuri.tourism.application.port.out.persistence.DistrictRepresentativeUpdatePort
 import org.slf4j.LoggerFactory
 import org.springframework.batch.core.scope.context.ChunkContext
 import org.springframework.batch.core.step.StepContribution
@@ -15,8 +15,8 @@ import org.springframework.batch.infrastructure.repeat.RepeatStatus
  * **`cleared`가 0이 아니면 그 지역들이 추천에서 빠졌다는 뜻이다.** 값이 갑자기 커지면 spot
  * 동기화가 덜 끝난 상태에서 이 잡이 돌았을 가능성을 먼저 본다(실행 순서는 잡 구성 참조).
  */
-class SigunguRepresentativeLocationTasklet(
-    private val updatePort: SigunguRepresentativeUpdatePort,
+class DistrictRepresentativeLocationTasklet(
+    private val updatePort: DistrictRepresentativeUpdatePort,
     private val cellSizeDegrees: Double,
     private val minSpotCount: Int,
 ) : Tasklet {
@@ -28,7 +28,7 @@ class SigunguRepresentativeLocationTasklet(
 
         contribution.incrementWriteCount((result.selected + result.cleared).toLong())
         log.info(
-            "sigungu representative location refreshed: selected={} cleared={} cellSize={} minSpotCount={}",
+            "district representative location refreshed: selected={} cleared={} cellSize={} minSpotCount={}",
             result.selected, result.cleared, cellSizeDegrees, minSpotCount,
         )
         return RepeatStatus.FINISHED

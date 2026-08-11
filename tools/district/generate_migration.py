@@ -4,7 +4,7 @@ import names
 
 geo = json.load(open('final.json'))
 rows = []
-for line in open('kto_sigungu_codes.tsv'):
+for line in open('kto_district_codes.tsv'):
     p = line.rstrip('\n').split('\t')
     if len(p) < 4: continue
     rows.append(tuple(p))
@@ -15,7 +15,7 @@ def q(s):
 out = []
 for area_cd, area_nm, code, sgg_nm in rows:
     g = geo[code]
-    en, ja, zh = names.SIGUNGU[sgg_nm]
+    en, ja, zh = names.DISTRICT[sgg_nm]
     pen, pja, pzh = names.SIDO[area_nm]
     out.append(
         "(" + ", ".join([

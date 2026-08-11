@@ -14,7 +14,7 @@ import java.time.format.DateTimeFormatter
  * KTO 빅데이터 응답 행 → 적재 명령(POL-033).
  *
  * **세 가지 시군구 코드 표기가 여기서 하나가 된다** — `signguCode`(방문자수) ·
- * `signguCd`(나머지) → `sigunguCode`. 이 경계 밖으로 업스트림 이름이 나가지 않는다(설계 §8).
+ * `signguCd`(나머지) → `districtCode`. 이 경계 밖으로 업스트림 이름이 나가지 않는다(설계 §8).
  *
  * 순수 함수다 — I/O도, 로깅도, 코드 유효성 검사도 하지 않는다. 알 수 없는 시군구 코드 필터링은
  * 호출자(배치)의 몫이다(R9).
@@ -39,7 +39,7 @@ fun TourStatsVisitorCountItem.toSyncCommandOrNull(): SyncVisitorCountCommand? {
     val count = touNum.toBigDecimalOrNull() ?: return null
 
     return SyncVisitorCountCommand(
-        sigunguCode = code,
+        districtCode = code,
         baseDate = baseDate,
         visitorType = type,
         touristCount = count,
@@ -54,7 +54,7 @@ fun TourStatsConcentrationRateItem.toSyncCommandOrNull(): SyncConcentrationRateC
     val rate = cnctrRate.toBigDecimalOrNull() ?: return null
 
     return SyncConcentrationRateCommand(
-        sigunguCode = code,
+        districtCode = code,
         touristSpotName = spotName,
         targetDate = targetDate,
         concentrationRate = rate,
@@ -73,7 +73,7 @@ fun TourStatsDemandIntensityItem.toSyncCommandOrNull(): SyncDemandIntensityComma
     val value = indicatorValue.toBigDecimalOrNull() ?: return null
 
     return SyncDemandIntensityCommand(
-        sigunguCode = code,
+        districtCode = code,
         baseMonth = month,
         indicatorCode = indicator,
         indicatorValue = value,

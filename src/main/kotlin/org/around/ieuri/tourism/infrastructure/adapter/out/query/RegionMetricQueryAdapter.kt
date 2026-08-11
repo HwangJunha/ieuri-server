@@ -13,7 +13,7 @@ import java.sql.ResultSet
 /**
  * 시군구 추천 지표 조회 어댑터(SPEC-0015 R14·R20).
  *
- * `sigungu`의 geography 컬럼들이 **JPA 엔티티에 매핑되어 있지 않다** — 매핑하면
+ * `district`의 geography 컬럼들이 **JPA 엔티티에 매핑되어 있지 않다** — 매핑하면
  * `ddl-auto: validate`가 기동 시 실패한다. 그래서 이 질의는 생 SQL로 남는다
  * (`CongestionAreaQueryAdapter`·`SpotSpatialQueryAdapter`와 같은 선례).
  *
@@ -44,7 +44,7 @@ class RegionMetricQueryAdapter(
                    province_name_ko, province_name_en, province_name_ja, province_name_zh,
                    ST_Y(representative_location::geometry) AS center_lat,
                    ST_X(representative_location::geometry) AS center_lng
-            FROM sigungu
+            FROM district
             -- 대표 위치가 없는 시군구는 후보에서 아예 뺀다. 추천해 놓고 그 지역에 갈 곳이
             -- 없으면 추천이 성립하지 않는다. NULL은 배치가 선정에 실패했다는 뜻이다.
             WHERE representative_location IS NOT NULL
@@ -76,12 +76,12 @@ class RegionMetricQueryAdapter(
     override fun findConcentrationRates(): Map<String, RegionMetric> =
         jdbcTemplate.query(
             """
-            SELECT sigungu_code, AVG(cnctr_rate) AS value, target_date AS basis_date
+            SELECT district_code, AVG(cnctr_rate) AS value, target_date AS basis_date
             FROM kto_concentration_rate
             WHERE target_date = (now() AT TIME ZONE 'Asia/Seoul')::date
-            GROUP BY sigungu_code, target_date
+            GROUP BY district_code, target_date
             """.trimIndent(),
-        ) { rs, _ -> rs.getString("sigungu_code") to rs.metric() }.toMap()
+        ) { rs, _ -> rs.getString("district_code") to rs.metric() }.toMap()
 
     /**
      * 시군구별 **최근 7일 평균 방문자수(외지인+외국인)**.
@@ -102,24 +102,24 @@ class RegionMetricQueryAdapter(
         jdbcTemplate.query(
             """
             WITH daily AS (
-                SELECT k.sigungu_code, k.base_date, SUM(k.tou_num) AS day_total
+                SELECT k.district_code, k.base_date, SUM(k.tou_num) AS day_total
                 FROM kto_visitor_count k
                 WHERE k.visitor_type IN ('2', '3')
                   AND k.base_date > (
                       SELECT MAX(m.base_date) - INTERVAL '7 days'
                       FROM kto_visitor_count m
-                      WHERE m.sigungu_code = k.sigungu_code
+                      WHERE m.district_code = k.district_code
                   )
-                GROUP BY k.sigungu_code, k.base_date
+                GROUP BY k.district_code, k.base_date
             )
-            SELECT sigungu_code,
+            SELECT district_code,
                    AVG(day_total) AS value,
                    MAX(base_date) AS basis_date,
                    ((now() AT TIME ZONE 'Asia/Seoul')::date - MAX(base_date)) AS age_days
             FROM daily
-            GROUP BY sigungu_code
+            GROUP BY district_code
             """.trimIndent(),
-        ) { rs, _ -> rs.getString("sigungu_code") to rs.metric(ageColumn = "age_days") }.toMap()
+        ) { rs, _ -> rs.getString("district_code") to rs.metric(ageColumn = "age_days") }.toMap()
 
     /** 시군구별 **최신 월** 체류 강도. 월 단위라 수십 일 지난 값이 정상이며 감쇠하지 않는다. */
     @Transactional(readOnly = true)
@@ -139,12 +139,12 @@ class RegionMetricQueryAdapter(
     private fun findLatestMonthly(table: String): Map<String, RegionMetric> =
         jdbcTemplate.query(
             """
-            SELECT DISTINCT ON (sigungu_code)
-                   sigungu_code, indicator_value AS value, base_month AS basis_date
+            SELECT DISTINCT ON (district_code)
+                   district_code, indicator_value AS value, base_month AS basis_date
             FROM $table
-            ORDER BY sigungu_code, base_month DESC
+            ORDER BY district_code, base_month DESC
             """.trimIndent(),
-        ) { rs, _ -> rs.getString("sigungu_code") to rs.metric() }.toMap()
+        ) { rs, _ -> rs.getString("district_code") to rs.metric() }.toMap()
 
     private fun ResultSet.metric(ageColumn: String? = null) = RegionMetric(
         rawValue = getDouble("value"),

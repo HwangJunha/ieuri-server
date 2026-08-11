@@ -7,7 +7,7 @@
 
 | 파일 | 출처 |
 |---|---|
-| `kto_sigungu_codes.tsv` | KTO 공식 시군구 코드 파일 252행. **명칭·시도명의 권위는 이쪽이다** |
+| `kto_district_codes.tsv` | KTO 공식 시군구 코드 파일 252행. **명칭·시도명의 권위는 이쪽이다** |
 | `names.py` | EN·JA·ZH 명칭 표. 한자 독음 기반 생성물이며 사용자 검수를 1회 거쳤다 |
 | 행정동 경계 GeoJSON | `vuski/admdongkor` `ver20240401` (공공누리, 통계청 원자료 가공) |
 

@@ -17,7 +17,7 @@ import java.time.format.DateTimeFormatter
  * TourAPI 필드명·날짜 형식을 여기 가두고 밖으로는 도메인 언어([FestivalPeriod])로만 내보낸다.
  *
  * **기록된 함정 두 가지를 코드로 지킨다**(스펙 §기록된 함정):
- *  - 구필드(`areaCode`·`sigunguCode`·`cat1~3`)를 요청 필터로 쓰면 **에러 없이 0건**을 반환한다.
+ *  - 구필드(`areaCode`·`districtCode`·`cat1~3`)를 요청 필터로 쓰면 **에러 없이 0건**을 반환한다.
  *    그래서 지역·카테고리 필터를 아예 보내지 않는다.
  *  - `arrange`는 `spot` 적재와 **같은 값**을 쓴다. 대표이미지 필수 조건이 어긋나면 부모 `spot` 행이
  *    없는 축제만 잔뜩 나와 전부 건너뛰어진다(R-2).

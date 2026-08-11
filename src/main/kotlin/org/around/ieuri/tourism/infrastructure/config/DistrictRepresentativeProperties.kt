@@ -19,8 +19,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties
  * @param minSpotCount 가장 밀집한 격자의 최소 KO spot 수. 미달이면 그 시군구는 선정 실패(NULL)로
  *   두어 추천에서 빠진다 — 갈 곳이 없는 지역을 추천하지 않기 위한 문턱이다.
  */
-@ConfigurationProperties(prefix = "ieuri.sigungu-representative")
-data class SigunguRepresentativeProperties(
+@ConfigurationProperties(prefix = "ieuri.district-representative")
+data class DistrictRepresentativeProperties(
     val cellSizeDegrees: Double = 0.02,
     val minSpotCount: Int = 10,
 )

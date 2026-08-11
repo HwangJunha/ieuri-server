@@ -1,7 +1,7 @@
 package org.around.ieuri.tourism.infrastructure.batch
 
-import org.around.ieuri.tourism.application.port.out.persistence.SigunguRepresentativeUpdatePort
-import org.around.ieuri.tourism.infrastructure.config.SigunguRepresentativeProperties
+import org.around.ieuri.tourism.application.port.out.persistence.DistrictRepresentativeUpdatePort
+import org.around.ieuri.tourism.infrastructure.config.DistrictRepresentativeProperties
 import org.springframework.batch.core.job.Job
 import org.springframework.batch.core.job.builder.JobBuilder
 import org.springframework.batch.core.repository.JobRepository
@@ -21,22 +21,22 @@ import org.springframework.transaction.PlatformTransactionManager
  * 런처가 이름으로 잡 하나를 골라 실행하는 구조이고 둘은 별도 CronJob으로 트리거된다.
  * **순서 보장은 CronJob 스케줄의 책임이다**(예: spot 04:00 → 이 잡 06:00).
  *
- * 실행: `--ieuri.tourapi.sync.job=sigunguRepresentativeLocationJob`
+ * 실행: `--ieuri.tourapi.sync.job=districtRepresentativeLocationJob`
  */
 @Configuration
 @Profile(BATCH_PROFILE)
-class SigunguRepresentativeLocationJobConfig(
+class DistrictRepresentativeLocationJobConfig(
     private val jobRepository: JobRepository,
     private val transactionManager: PlatformTransactionManager,
-    private val updatePort: SigunguRepresentativeUpdatePort,
-    private val properties: SigunguRepresentativeProperties,
+    private val updatePort: DistrictRepresentativeUpdatePort,
+    private val properties: DistrictRepresentativeProperties,
 ) {
 
     @Bean
-    fun sigunguRepresentativeLocationJob(): Job {
+    fun districtRepresentativeLocationJob(): Job {
         val step: Step = StepBuilder("${JOB_NAME}Step", jobRepository)
             .tasklet(
-                SigunguRepresentativeLocationTasklet(
+                DistrictRepresentativeLocationTasklet(
                     updatePort = updatePort,
                     cellSizeDegrees = properties.cellSizeDegrees,
                     minSpotCount = properties.minSpotCount,
@@ -48,6 +48,6 @@ class SigunguRepresentativeLocationJobConfig(
     }
 
     companion object {
-        const val JOB_NAME = "sigunguRepresentativeLocationJob"
+        const val JOB_NAME = "districtRepresentativeLocationJob"
     }
 }

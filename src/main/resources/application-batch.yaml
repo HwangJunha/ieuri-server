@@ -55,11 +55,11 @@ ieuri:
       # 덮도록 넉넉히 잡았다. 스펙 §4.6의 "4일 지연"은 실측과 다르다.
       visitor-backfill-days: 90
 
-  # 시군구 대표 위치 선정(SPEC-0015 · V46). 잡 이름은 sigunguRepresentativeLocationJob.
+  # 시군구 대표 위치 선정(SPEC-0015 · V46). 잡 이름은 districtRepresentativeLocationJob.
   #
   # **spot 동기화 이후에 스케줄해야 한다** — spot 테이블을 읽어 산출하므로 순서가 뒤집히면
   # 전날 데이터로 계산한다. 예: spot 04:00 → 이 잡 06:00.
-  sigungu-representative:
+  district-representative:
     # 밀집 격자 한 칸(도). 0.02 ≈ 2km — 도보권 "한 동네" 단위.
     cell-size-degrees: 0.02
     # 가장 밀집한 격자의 최소 spot 수. 미달이면 NULL로 두어 추천에서 뺀다(갈 곳이 없는 지역).
