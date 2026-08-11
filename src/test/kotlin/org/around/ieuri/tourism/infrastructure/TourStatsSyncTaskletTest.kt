@@ -7,6 +7,7 @@ import org.around.ieuri.tourism.application.port.out.client.TourStatsSyncPage
 import org.around.ieuri.tourism.application.port.out.persistence.SigunguCodeQueryPort
 import org.around.ieuri.tourism.application.port.out.persistence.SigunguRegion
 import org.around.ieuri.tourism.infrastructure.batch.RUN_DATE_PARAMETER
+import org.around.ieuri.tourism.infrastructure.batch.SyncContext
 import org.around.ieuri.tourism.infrastructure.batch.TourStatsSyncTasklet
 import org.springframework.batch.core.job.JobExecution
 import org.springframework.batch.core.job.JobInstance
@@ -21,7 +22,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * KTO 빅데이터 Step의 지역·페이지 루프와 관측값(SPEC-0015 R4~R6 · R8 · R9).
+ * KTO 빅데이터 Step의 순회·페이지 루프와 관측값(SPEC-0015 R4~R6 · R8 · R9).
  *
  * `FestivalSyncTaskletTest`와 같은 방식이다 — Spring 컨텍스트를 띄우지 않고 StepExecution만
  * 직접 만든다. 검증 대상이 프레임워크 배선이 아니라 **어떤 순서로 무엇을 호출하고 어디서
@@ -54,11 +55,11 @@ class TourStatsSyncTaskletTest {
         )
     }
 
-    private fun run(tasklet: TourStatsSyncTasklet<Row>, execution: StepExecution): RepeatStatus? =
+    private fun <R : Any> run(tasklet: TourStatsSyncTasklet<Row, R>, execution: StepExecution): RepeatStatus? =
         tasklet.execute(StepContribution(execution), ChunkContext(StepContext(execution)))
 
-    /** 끝날 때까지 돌린다 — 지역 순회가 여러 번의 execute로 나뉘므로 루프가 필요하다. */
-    private fun runToCompletion(tasklet: TourStatsSyncTasklet<Row>, execution: StepExecution): Int {
+    /** 끝날 때까지 돌린다 — 순회가 여러 번의 execute로 나뉘므로 루프가 필요하다. */
+    private fun <R : Any> runToCompletion(tasklet: TourStatsSyncTasklet<Row, R>, execution: StepExecution): Int {
         var calls = 0
         while (run(tasklet, execution) == RepeatStatus.CONTINUABLE) {
             calls++
@@ -69,9 +70,9 @@ class TourStatsSyncTaskletTest {
 
     private fun tasklet(
         pageSize: Int = 100,
-        fetchPage: (LocalDate, SigunguRegion, Int) -> TourStatsSyncPage<Row>,
+        fetchPage: (SyncContext, SigunguRegion, Int) -> TourStatsSyncPage<Row>,
         upsert: (List<Row>) -> Int = { it.size },
-        regionsOf: (SigunguCodeQueryPort) -> List<SigunguRegion> = { regions },
+        targetsOf: (SigunguCodeQueryPort) -> List<SigunguRegion> = { regions },
     ) = TourStatsSyncTasklet(
         datasetName = "test",
         pageSize = pageSize,
@@ -79,15 +80,15 @@ class TourStatsSyncTaskletTest {
         fetchPage = fetchPage,
         sigunguCodeOf = Row::code,
         upsert = upsert,
-        regionsOf = regionsOf,
+        targetsOf = targetsOf,
     )
 
-    // ---------- 지역 순회 ----------
+    // ---------- 순회 단위 ----------
 
     @Test
-    fun `지역마다 시도 코드와 시군구 코드를 함께 넘겨 호출한다`() {
-        // 실측(2026-08-11): areaCd·signguCd가 둘 다 필수라 하나만 보내면 업스트림이
-        // NO_MANDATORY_REQUEST_PARAMETERS_ERROR1을 준다.
+    fun `집중률은 지역마다 시도 코드와 시군구 코드를 함께 넘겨 호출한다`() {
+        // 실측(2026-08-11): 집중률만 signguCd가 필수라 하나만 보내면 업스트림이
+        // NO_MANDATORY_REQUEST_PARAMETERS_ERROR1(signguCd)을 준다.
         every { sigunguCodePort.findAllCodes() } returns regions.map { it.code }.toSet()
         val seen = mutableListOf<Pair<String, String>>()
 
@@ -99,6 +100,61 @@ class TourStatsSyncTaskletTest {
         runToCompletion(tasklet, stepExecution())
 
         assertEquals(listOf("11" to "11110", "11" to "11140", "26" to "26410"), seen)
+    }
+
+    @Test
+    fun `강도는 시도 코드만 순회해 시군구 수보다 적게 호출한다`() {
+        // 실측(2026-08-11): areaCd만 주면 그 시도의 시군구 전체가 한 응답에 온다.
+        // 252 시군구가 아니라 17 시도만 돈다 — 여기서는 3 시군구 → 2 시도.
+        every { sigunguCodePort.findAllCodes() } returns regions.map { it.code }.toSet()
+        val provinces = listOf("11", "26")
+        val seen = mutableListOf<String>()
+
+        val tasklet = TourStatsSyncTasklet<Row, String>(
+            datasetName = "stayIntensity",
+            pageSize = 100,
+            sigunguCodePort = sigunguCodePort,
+            fetchPage = { _, areaCd, _ ->
+                seen += areaCd
+                // 한 시도 응답에 그 시도의 시군구가 모두 실려 온다.
+                page(regions.filter { it.provinceCode == areaCd }.map { Row(it.code) }, totalCount = 2)
+            },
+            sigunguCodeOf = Row::code,
+            upsert = { it.size },
+            targetsOf = { provinces },
+        )
+
+        val execution = stepExecution()
+        runToCompletion(tasklet, execution)
+
+        assertEquals(provinces, seen)
+        assertEquals(3, execution.executionContext.getInt(TourStatsSyncTasklet.KEY_WRITTEN))
+    }
+
+    @Test
+    fun `시도 응답에 섞인 시도 집계 행은 R9 필터가 걸러낸다`() {
+        // 서울이 25개 구인데 26행이 온다 — 시도 단위 집계 행으로 보인다. 2자리 시도 코드는
+        // 5자리 시군구 코드 집합에 결코 없으므로 별도 분기 없이 R9 필터에 걸린다.
+        every { sigunguCodePort.findAllCodes() } returns setOf("11110", "11140")
+        val upserted = mutableListOf<List<Row>>()
+
+        val tasklet = TourStatsSyncTasklet<Row, String>(
+            datasetName = "stayIntensity",
+            pageSize = 100,
+            sigunguCodePort = sigunguCodePort,
+            fetchPage = { _, areaCd, _ ->
+                page(listOf(Row("11110"), Row("11140"), Row(areaCd)), totalCount = 3)
+            },
+            sigunguCodeOf = Row::code,
+            upsert = { upserted += it; it.size },
+            targetsOf = { listOf("11") },
+        )
+
+        val execution = stepExecution()
+        runToCompletion(tasklet, execution)
+
+        assertEquals(listOf(listOf(Row("11110"), Row("11140"))), upserted)
+        assertEquals(1, execution.executionContext.getInt(TourStatsSyncTasklet.KEY_SKIPPED_UNKNOWN_CODE))
     }
 
     @Test
@@ -122,17 +178,22 @@ class TourStatsSyncTaskletTest {
     }
 
     @Test
-    fun `지역이 하나뿐이면 지역 순회 없이 페이지만 돈다`() {
-        // 방문자수는 지역 필터가 없어 ALL_REGIONS 한 건으로 돈다.
+    fun `순회 대상이 하나뿐이면 순회 없이 페이지만 돈다`() {
+        // 방문자수는 지역 필터가 없어 NO_REGION 한 건으로 돈다.
         every { sigunguCodePort.findAllCodes() } returns setOf("11110")
         val pages = mutableListOf<Int>()
 
-        val tasklet = tasklet(
+        val tasklet = TourStatsSyncTasklet<Row, Unit>(
+            datasetName = "visitorCount",
+            pageSize = 100,
+            sigunguCodePort = sigunguCodePort,
             fetchPage = { _, _, pageNo ->
                 pages += pageNo
                 page(listOf(Row("11110")), totalCount = 150)
             },
-            regionsOf = { TourStatsSyncTasklet.ALL_REGIONS },
+            sigunguCodeOf = Row::code,
+            upsert = { it.size },
+            targetsOf = { TourStatsSyncTasklet.NO_REGION },
         )
 
         runToCompletion(tasklet, stepExecution())
@@ -194,11 +255,26 @@ class TourStatsSyncTaskletTest {
         assertEquals(RepeatStatus.FINISHED, run(tasklet, execution))
     }
 
+    @Test
+    fun `기준일은 잡 파라미터에서 오며 fetchPage에 그대로 전달된다`() {
+        every { sigunguCodePort.findAllCodes() } returns regions.map { it.code }.toSet()
+        val seen = mutableListOf<LocalDate>()
+
+        val tasklet = tasklet(fetchPage = { context, _, _ ->
+            seen += context.runDate
+            page(emptyList(), totalCount = 0)
+        })
+
+        runToCompletion(tasklet, stepExecution())
+
+        assertEquals(List(3) { runDate }, seen)
+    }
+
     // ---------- 빈 응답 (R8) ----------
 
     @Test
     fun `한 지역이 빈 응답이어도 예외 없이 다음 지역으로 넘어간다`() {
-        // 실측: 체류·소비 강도는 모든 지역·월에서 totalCount 0으로 온다. 부재는 장애가 아니다.
+        // 부재는 장애가 아니다 — 데이터가 없는 지역·월이 실제로 존재한다.
         every { sigunguCodePort.findAllCodes() } returns regions.map { it.code }.toSet()
         val seen = mutableListOf<String>()
 
@@ -223,7 +299,7 @@ class TourStatsSyncTaskletTest {
         val upserted = mutableListOf<List<Row>>()
 
         val tasklet = tasklet(
-            fetchPage = { _, region, _ ->
+            fetchPage = { _, _, _ ->
                 page(listOf(Row("11110"), Row("99999")), totalCount = 1, dropped = 2)
             },
             upsert = { upserted += it; it.size },
@@ -258,7 +334,7 @@ class TourStatsSyncTaskletTest {
         // sigungu 테이블이 아직 비어 있는 상태. 인덱스 접근이 터지면 안 된다.
         val tasklet = tasklet(
             fetchPage = { _, _, _ -> error("호출되면 안 됩니다") },
-            regionsOf = { emptyList() },
+            targetsOf = { emptyList() },
         )
 
         assertEquals(RepeatStatus.FINISHED, run(tasklet, stepExecution()))

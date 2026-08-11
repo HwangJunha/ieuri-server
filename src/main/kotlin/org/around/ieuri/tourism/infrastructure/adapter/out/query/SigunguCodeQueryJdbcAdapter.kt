@@ -30,4 +30,12 @@ class SigunguCodeQueryJdbcAdapter(
         jdbcTemplate.query("SELECT code, province_code FROM sigungu ORDER BY code") { rs, _ ->
             SigunguRegion(code = rs.getString("code"), provinceCode = rs.getString("province_code"))
         }
+
+    /** 17행. DISTINCT는 DB에 맡긴다 — 252행을 올려 앱에서 추리는 것보다 싸다. */
+    @Transactional(readOnly = true)
+    override fun findAllProvinceCodes(): List<String> =
+        jdbcTemplate.queryForList(
+            "SELECT DISTINCT province_code FROM sigungu ORDER BY province_code",
+            String::class.java,
+        ).filterNotNull()
 }

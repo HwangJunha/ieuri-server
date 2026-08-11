@@ -11,8 +11,9 @@ import java.time.YearMonth
  *
  * **호출 단위가 종마다 다르다**(2026-08-11 실측):
  *  - 방문자수만 지역 필터가 없어 날짜만 주면 전 지역이 온다(spec §4.3).
- *  - 나머지 3종은 `areaCd`(시도) · `signguCd`(시군구)가 **둘 다 필수**다. 빠지면 업스트림이
- *    `NO_MANDATORY_REQUEST_PARAMETERS_ERROR1`을 준다. 따라서 252개 시군구를 순회해야 한다.
+ *  - 강도 2종은 `areaCd`(시도)만으로 그 시도의 시군구 전체가 온다. 따라서 17개 시도만 순회한다.
+ *  - 집중률만 `signguCd`가 **추가로 필수**다. 빠지면 `NO_MANDATORY_REQUEST_PARAMETERS_ERROR1`이
+ *    오므로 252개 시군구를 순회해야 한다.
  *
  * **업스트림 장애는 도메인 오류로 변환되어 던져진다**(R8) —
  * [org.around.ieuri.tourism.application.exception.UpstreamUnavailableException] ·
@@ -51,22 +52,25 @@ interface TourStatsSyncPort {
         numOfRows: Int,
     ): TourStatsSyncPage<SyncConcentrationRateCommand>
 
-    /** [areaCd] · [signguCd]의 [baseMonth] 체류 강도. 월 인자는 `baseYm` 하나다(구간 아님). */
+    /**
+     * [areaCd] 시도의 [baseMonth] 체류 강도. 월 인자는 `baseYm` 하나다(구간 아님).
+     *
+     * **`signguCd`를 받지 않는다**(2026-08-11 실측) — `areaCd`만 주면 그 시도의 시군구 전체가
+     * 한 응답에 온다(서울 26행). 행마다 `signguCd`가 실려 오므로 구분은 응답에서 한다.
+     */
     fun fetchStayIntensities(
         areaCd: String,
-        signguCd: String,
         baseMonth: YearMonth,
         pageNo: Int,
         numOfRows: Int,
     ): TourStatsSyncPage<SyncDemandIntensityCommand>
 
     /**
-     * [areaCd] · [signguCd]의 [baseMonth] 소비 강도. 외지인 소비이며 외국인 소비 지표는
-     * 없다(spec §4.7).
+     * [areaCd] 시도의 [baseMonth] 소비 강도. 외지인 소비이며 외국인 소비 지표는 없다(spec §4.7).
+     * 체류 강도와 같이 `signguCd` 없이 시도 단위로 온다.
      */
     fun fetchSpendingIntensities(
         areaCd: String,
-        signguCd: String,
         baseMonth: YearMonth,
         pageNo: Int,
         numOfRows: Int,

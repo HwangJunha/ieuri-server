@@ -35,9 +35,9 @@ import java.time.format.DateTimeFormatter
  * **예외를 변환한다 — 기존 [org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi.TourApiClient]의
  * 결함을 물려받지 않는다**(§5 · R8). 변환 규칙은 [translate] 참조.
  *
- * **호출량 주의** — 방문자수를 뺀 3종은 `areaCd`·`signguCd`가 필수라 252개 시군구를 순회한다.
- * 집중률은 1회 실행이 252 호출이다 — page-size 10,000이면 지역별 최대(제주시 7,320행)도
- * 1페이지에 들어간다. page-size를 낮추면 호출이 배가되어 일 한도 1,000건에 걸린다.
+ * **호출량 주의** — 집중률만 `signguCd`가 필수라 252개 시군구를 순회한다(1회 실행 252 호출).
+ * 강도 2종은 `areaCd`만으로 시도 전체가 와서 17 호출이다. page-size를 낮추면 호출이 배가되어
+ * 일 한도 1,000건에 걸린다 — 10,000이면 지역별 최대(제주시 7,320행)도 1페이지에 들어간다.
  *
  * serviceKey는 로그에 남기지 않는다. URI를 통째로 로깅하지 않는 것도 같은 이유다.
  */
@@ -83,7 +83,6 @@ class TourStatsClient(
 
     override fun fetchStayIntensities(
         areaCd: String,
-        signguCd: String,
         baseMonth: YearMonth,
         pageNo: Int,
         numOfRows: Int,
@@ -93,7 +92,6 @@ class TourStatsClient(
             PARAM_STAY_INDEX_CODE,
             properties.stayIndexCode,
             areaCd,
-            signguCd,
             baseMonth,
             pageNo,
             numOfRows,
@@ -101,7 +99,6 @@ class TourStatsClient(
 
     override fun fetchSpendingIntensities(
         areaCd: String,
-        signguCd: String,
         baseMonth: YearMonth,
         pageNo: Int,
         numOfRows: Int,
@@ -111,7 +108,6 @@ class TourStatsClient(
             PARAM_SPENDING_INDEX_CODE,
             properties.spendingIndexCode,
             areaCd,
-            signguCd,
             baseMonth,
             pageNo,
             numOfRows,
@@ -120,25 +116,25 @@ class TourStatsClient(
     /**
      * 체류·소비 강도는 같은 서비스의 다른 오퍼레이션이다.
      *
+     * **`signguCd`를 보내지 않는다**(실측 2026-08-11) — `areaCd`만 주면 그 시도의 시군구 전체가
+     * 한 응답에 온다. 시도 단위 집계 행이 섞여 올 수 있으며 그 행은 R9 필터가 걸러낸다.
+     *
      * **월 인자는 `baseYm` 하나다** — `startYm`/`endYm` 구간이 아니다.
      *
-     * **지표 코드가 필수다**(실측 2026-08-11). 빼면 오류 없이 `totalCount:0`이 와서 "데이터가
-     * 없다"로 오해하기 쉽다 — 실제로는 요청이 불완전한 것이다. 파라미터명도 오퍼레이션마다
-     * 다르다(`tarSjrnDsIxCd` / `tarExpDsIxCd`).
+     * **지표 코드가 필수다**. 빼면 오류 없이 `totalCount:0`이 와서 "데이터가 없다"로 오해하기
+     * 쉽다 — 실제로는 요청이 불완전한 것이다. 파라미터명도 오퍼레이션마다 다르다.
      */
     private fun fetchDemandIntensity(
         operation: String,
         indexParamName: String,
         indexCode: String,
         areaCd: String,
-        signguCd: String,
         baseMonth: YearMonth,
         pageNo: Int,
         numOfRows: Int,
     ): TourStatsSyncPage<SyncDemandIntensityCommand> {
         val uri = uriFor(TourStatsProperties.SERVICE_AREA_TAR_DEM_DS, operation, pageNo, numOfRows) {
             queryParam("areaCd", areaCd)
-            queryParam("signguCd", signguCd)
             queryParam("baseYm", baseMonth.format(MONTH_FORMAT))
             queryParam(indexParamName, indexCode)
         }

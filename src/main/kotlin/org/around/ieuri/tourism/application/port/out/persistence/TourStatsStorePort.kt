@@ -32,19 +32,27 @@ interface SigunguCodeQueryPort {
     fun findAllCodes(): Set<String>
 
     /**
-     * 순회 대상 시군구 전체. 집중률·강도 2종이 시군구마다 호출해야 해서 필요하다.
+     * 순회 대상 시군구 전체. **집중률만** 시군구마다 호출해야 해서 필요하다.
      *
      * **코드 오름차순으로 고정한다** — 배치가 ExecutionContext에 진행 위치를 인덱스로 저장하므로,
      * 순서가 실행마다 바뀌면 재실행이 엉뚱한 지역에서 이어진다.
      */
     fun findAllRegions(): List<SigunguRegion>
+
+    /**
+     * 순회 대상 시도 코드 전체(중복 없음, 17건). 강도 2종이 `areaCd`만으로 시도의 시군구
+     * 전체를 받아오므로 252가 아니라 이 목록을 돈다(2026-08-11 실측).
+     *
+     * **오름차순으로 고정한다** — [findAllRegions]와 같은 이유(재개 인덱스).
+     */
+    fun findAllProvinceCodes(): List<String>
 }
 
 /**
  * 순회용 시군구 한 건.
  *
- * @param code 시군구 코드 5자리. 업스트림의 `signguCd`로 나간다.
- * @param provinceCode 상위 시도 코드 2자리. 업스트림의 `areaCd`로 나간다 — **둘 다 필수라**
+ * @param code 시군구 코드 5자리. 집중률 요청의 `signguCd`로 나간다.
+ * @param provinceCode 상위 시도 코드 2자리. 요청의 `areaCd`로 나간다 — **집중률은 둘 다 필수라**
  *   하나만 보내면 `NO_MANDATORY_REQUEST_PARAMETERS_ERROR1`이 온다.
  */
 data class SigunguRegion(
