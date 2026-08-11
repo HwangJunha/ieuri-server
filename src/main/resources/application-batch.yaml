@@ -34,10 +34,10 @@ ieuri:
       # 상한이 실측되지 않았다 — 업스트림이 거부하면 이 값만 낮춘다.
       page-size: ${IEURI_TOUR_FESTIVAL_PAGE_SIZE:1000}
 
-  # KTO 빅데이터 4종(SPEC-0015). 갱신 주기가 갈려 잡을 나눴다 — 묶으면 월 단위가 매일 헛돈다.
-  #   ktoVisitorCountSyncJob · ktoConcentrationRateSyncJob        매일
-  #   ktoStayIntensitySyncJob · ktoSpendingIntensitySyncJob       매월 17일 이후
-  kto-bigdata:
+  # 한국관광공사 관광통계 4종(SPEC-0015). 갱신 주기가 갈려 잡을 나눴다 — 묶으면 월 단위가 매일 헛돈다.
+  #   tourStatsVisitorCountSyncJob · tourStatsConcentrationRateSyncJob        매일
+  #   tourStatsStayIntensitySyncJob · tourStatsSpendingIntensitySyncJob       매월 17일 이후
+  tour-stats:
     sync:
       # 월 지표는 매월 16일 발표라 이번 달을 요청하면 빈 응답이다.
       # (방문자수는 구간으로 받아 소급이 필요 없다 — 없는 날짜는 행이 안 올 뿐이다.)

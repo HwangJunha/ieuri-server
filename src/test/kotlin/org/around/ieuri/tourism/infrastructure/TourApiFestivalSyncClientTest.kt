@@ -2,8 +2,8 @@ package org.around.ieuri.tourism.infrastructure
 
 import io.mockk.mockk
 import org.around.ieuri.tourism.domain.vo.DomainLocale
-import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.TourApiFestivalResponse
-import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.TourApiFestivalSyncClient
+import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi.TourApiFestivalResponse
+import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi.TourApiFestivalSyncClient
 import org.around.ieuri.tourism.infrastructure.config.TourApiProperties
 import org.springframework.web.client.RestClient
 import java.time.LocalDate

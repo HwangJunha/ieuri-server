@@ -3,8 +3,8 @@ package org.around.ieuri.tourism.infrastructure
 import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
-import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.TourApiResponse
-import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.TourApiSyncClient
+import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi.TourApiResponse
+import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi.TourApiSyncClient
 import org.around.ieuri.tourism.infrastructure.config.TourApiProperties
 import org.springframework.web.client.RestClient
 import kotlin.test.Test

@@ -2,12 +2,12 @@ package org.around.ieuri.tourism.infrastructure.config
 
 import org.around.ieuri.tourism.application.policy.MapViewportPolicy
 import org.around.ieuri.tourism.application.policy.RegionRecommendationPolicy
-import org.around.ieuri.tourism.application.policy.SeoulCitydataPolicy
+import org.around.ieuri.tourism.application.policy.SeoulOpenDataPolicy
 import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
 import org.around.ieuri.tourism.domain.vo.DistanceScoring
 import org.around.ieuri.tourism.domain.vo.RegionScoreWeights
 import org.around.ieuri.tourism.infrastructure.batch.FestivalSyncProperties
-import org.around.ieuri.tourism.infrastructure.batch.KtoBigDataSyncProperties
+import org.around.ieuri.tourism.infrastructure.batch.TourStatsSyncProperties
 import org.around.ieuri.tourism.infrastructure.batch.SpotSyncProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -26,10 +26,10 @@ import java.time.Duration
     TourApiProperties::class,
     SpotSyncProperties::class,
     FestivalSyncProperties::class,
-    SeoulCitydataProperties::class,
+    SeoulOpenDataProperties::class,
     MapViewportProperties::class,
-    KtoBigDataProperties::class,
-    KtoBigDataSyncProperties::class,
+    TourStatsProperties::class,
+    TourStatsSyncProperties::class,
     SigunguRepresentativeProperties::class,
 )
 class TourismConfig {
@@ -73,8 +73,8 @@ class TourismConfig {
         )
 
     @Bean
-    fun seoulCitydataPolicy(properties: SeoulCitydataProperties): SeoulCitydataPolicy =
-        SeoulCitydataPolicy(
+    fun seoulOpenDataPolicy(properties: SeoulOpenDataProperties): SeoulOpenDataPolicy =
+        SeoulOpenDataPolicy(
             minRefetchInterval = properties.minRefetchInterval,
             maxAreaIds = properties.maxAreaIds,
         )
@@ -86,7 +86,7 @@ class TourismConfig {
      * 않겠다"로 해석하지 않는다.
      */
     @Bean
-    fun regionRecommendationPolicy(properties: KtoBigDataProperties): RegionRecommendationPolicy =
+    fun regionRecommendationPolicy(properties: TourStatsProperties): RegionRecommendationPolicy =
         RegionRecommendationPolicy(
             weights = if (properties.scoreWeights.isEmpty()) {
                 RegionScoreWeights.uniform()
@@ -106,7 +106,7 @@ class TourismConfig {
      * base-url은 서비스별로 달라 여기서 고정하지 않고 어댑터가 매 호출 절대 URI로 넘긴다.
      */
     @Bean
-    fun ktoBigDataRestClient(builder: RestClient.Builder, properties: KtoBigDataProperties): RestClient {
+    fun ktoBigDataRestClient(builder: RestClient.Builder, properties: TourStatsProperties): RestClient {
         val requestFactory = SimpleClientHttpRequestFactory().apply {
             setConnectTimeout(Duration.ofMillis(properties.connectTimeoutMillis))
             setReadTimeout(Duration.ofMillis(properties.readTimeoutMillis))
@@ -120,9 +120,9 @@ class TourismConfig {
      * 캐시를 주는 편이 낫다.
      */
     @Bean
-    fun seoulCitydataRestClient(
+    fun seoulOpenDataRestClient(
         builder: RestClient.Builder,
-        properties: SeoulCitydataProperties,
+        properties: SeoulOpenDataProperties,
     ): RestClient {
         val requestFactory = SimpleClientHttpRequestFactory().apply {
             setConnectTimeout(Duration.ofMillis(properties.connectTimeoutMillis))

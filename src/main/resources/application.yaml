@@ -187,7 +187,7 @@ ieuri:
   # 서울시 실시간 도시데이터(SPEC-0014). 인증키는 환경변수로만 주입한다.
   # **키가 비어 있어도 기동에 실패하지 않는다** — 혼잡도 레이어만 degraded로 응답하고
   # 지도의 나머지는 정상 동작한다. 로컬에서 키 없이 지도를 띄울 수 있어야 한다.
-  seoul-citydata:
+  seoul-open-data:
     api-key: ${IEURI_SEOUL_CITYDATA_API_KEY:}
     base-url: ${IEURI_SEOUL_CITYDATA_BASE_URL:http://openapi.seoul.go.kr:8088}
     # 같은 구역 재호출 최소 간격. 데이터가 약 30분 지연되어 도착하므로 5분 경계 TTL은
@@ -202,7 +202,7 @@ ieuri:
     read-timeout-millis: 10000
   # 한국관광공사 빅데이터 4종(SPEC-0015). 인증키는 4종 공용 단일 키이며 환경변수로만 주입한다.
   # **키가 비어 있어도 기동에 실패하지 않는다** — 배치 경로에서만 쓰므로 API 서버는 영향이 없다.
-  kto-bigdata:
+  tour-stats:
     # TourAPI와 같은 data.go.kr 계정 키다(둘 다 B551011). 별도 키를 발급하면 여기만 바꾼다.
     service-key: ${IEURI_KTO_BIGDATA_API_KEY:${IEURI_TOUR_API_KEY_ENCODING:}}
     # 서비스 경로가 셋으로 갈린다(§4.7). tourapi의 언어별 base-url과 성격이 달라 블록을 나눴다.
