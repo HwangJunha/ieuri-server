@@ -27,8 +27,12 @@ data class TourStatsProperties(
     val baseUrls: Map<String, String> = emptyMap(),
     val connectTimeoutMillis: Long = 5_000,
     val readTimeoutMillis: Long = 30_000,
-    /** 페이지당 행 수. 1일 방문자수가 시군구 740행이라 1,000이면 대부분 1페이지에 끝난다. */
-    val pageSize: Int = 1_000,
+    /**
+     * 페이지당 행 수. **호출 수를 좌우한다** — 집중률은 시군구마다 호출해야 해서(252회) 페이지가
+     * 갈리면 호출이 배가된다. 실측(2026-08-11) 지역별 최대가 제주시 7,320행이라 10,000이면
+     * 전 지역이 1페이지에 끝나 252회다. 상한이 문서화된 값은 아니므로 페이징은 살려 둔다.
+     */
+    val pageSize: Int = 10_000,
 
     // --- 이하 잠정값(§7.7 실측 전) ---
 
