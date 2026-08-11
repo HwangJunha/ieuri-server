@@ -86,12 +86,19 @@ class RegionMetricQueryAdapter(
                    st.stay_value, st.stay_month,
                    sp.spending_value, sp.spending_month
             FROM sigungu s
+            -- **오늘에 가장 가까운 예측일을 쓴다.** 집중률은 향후 30일치가 함께 오는데,
+            -- 사용자는 "지금 어디 갈까"를 묻지 30일 뒤를 묻지 않는다. 가장 먼 날을 고르면
+            -- 성수기 해수욕장이 "한산한 곳"으로 뒤집힌다(실측: 속초 오늘 67.4 → 30일 뒤 28.6).
+            --
+            -- 오늘 이전 행은 제외한다 — 지난 예측은 이미 의미가 없다. 오늘 행이 없으면
+            -- 그중 가장 이른 미래를 쓰고, 그마저 없으면 이 지역의 집중률은 결측이다(R14).
             LEFT JOIN LATERAL (
                 SELECT AVG(k.cnctr_rate) AS cnctr_rate, k.target_date AS cnctr_date
                 FROM kto_concentration_rate k
                 WHERE k.sigungu_code = s.code
+                  AND k.target_date >= CURRENT_DATE
                 GROUP BY k.target_date
-                ORDER BY k.target_date DESC
+                ORDER BY k.target_date ASC
                 LIMIT 1
             ) c ON TRUE
             LEFT JOIN LATERAL (

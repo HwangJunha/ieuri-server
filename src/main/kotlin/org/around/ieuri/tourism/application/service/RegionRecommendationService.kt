@@ -71,13 +71,17 @@ class RegionRecommendationService(
     }
 
     /**
-     * 실제로 **쓰인** 데이터의 기준 시점(R20). 값이 있는 지표의 기준일 중 가장 최근이며,
-     * 값이 하나도 없으면 null이다.
+     * 실제로 **쓰인** 데이터의 기준 시점(R20). 값이 하나도 없으면 null이다.
+     *
+     * **가장 최근이 아니라 가장 오래된 기준일이다.** 지표마다 신선도가 크게 다르다(실측:
+     * 집중률은 오늘, 방문자수는 30일 전, 월 지표는 2개월 전). 최신값을 표기하면 "오늘 측정한
+     * 데이터"로 읽혀 실시간이라는 오해를 준다 — R24가 금지하는 바로 그 표기다. 가장 오래된
+     * 것을 쓰면 "적어도 이 시점까지의 데이터"라는 보수적이고 참인 진술이 된다.
      *
      * 월 단위 지표는 해당 월 1일로 정규화돼 있어 일 단위와 같은 축에서 비교된다(V44).
      */
     private fun resolveDataBasisAt(rows: List<RegionMetricRow>): LocalDateTime? =
-        rows.flatMap(RegionMetricRow::basisDates).maxOrNull()?.atStartOfDay()
+        rows.flatMap(RegionMetricRow::basisDates).minOrNull()?.atStartOfDay()
 
     /**
      * 항목별 정규화 구간을 **적재된 집합에서** 뽑는다(§3.3).
