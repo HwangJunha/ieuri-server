@@ -12,6 +12,20 @@ package org.around.ieuri.tourism.application.port.out.persistence
 interface DistrictRepresentativeUpdatePort {
 
     fun refreshRepresentativeLocations(cellSizeDegrees: Double, minSpotCount: Int): DistrictRepresentativeRefreshResult
+
+    /**
+     * 시군구별 카테고리 구성비를 다시 집계한다(SPEC-0015 · V50).
+     *
+     * 대표 위치와 **같은 포트에 있는 이유**: 둘 다 `spot`을 시군구 경계로 공간 조인해 산출하며
+     * 같은 시점의 데이터로 계산되어야 한다. 갱신 시점이 갈리면 "대표 위치는 있는데 카테고리
+     * 집계는 어제 것"인 시군구가 생긴다.
+     *
+     * 경계 안에 KO spot이 하나도 없는 시군구는 **NULL로 되돌린다 — 0으로 채우지 않는다**
+     * (POL-043: 없는 데이터와 0건은 다르다).
+     *
+     * @return 집계가 갱신된 시군구 수.
+     */
+    fun refreshCategoryMix(): Int
 }
 
 /**

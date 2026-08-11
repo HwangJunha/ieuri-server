@@ -11,6 +11,7 @@ import org.around.ieuri.tourism.domain.vo.DistanceScoring
 import org.around.ieuri.tourism.domain.vo.FreshnessDecay
 import org.around.ieuri.tourism.domain.vo.RegionScoreWeights
 import org.around.ieuri.tourism.infrastructure.batch.FestivalSyncProperties
+import org.around.ieuri.tourism.infrastructure.batch.PetFriendlySyncProperties
 import org.around.ieuri.tourism.infrastructure.batch.TourStatsSyncProperties
 import org.around.ieuri.tourism.infrastructure.batch.SpotSyncProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
@@ -31,11 +32,13 @@ import java.time.Duration
     TourApiProperties::class,
     SpotSyncProperties::class,
     FestivalSyncProperties::class,
+    PetFriendlySyncProperties::class,
     SeoulOpenDataProperties::class,
     MapViewportProperties::class,
     TourStatsProperties::class,
     TourStatsSyncProperties::class,
     DistrictRepresentativeProperties::class,
+    ClimateIndexProperties::class,
 )
 class TourismConfig {
 

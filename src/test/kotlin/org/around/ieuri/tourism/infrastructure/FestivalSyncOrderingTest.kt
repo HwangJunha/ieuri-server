@@ -2,11 +2,14 @@ package org.around.ieuri.tourism.infrastructure
 
 import io.mockk.mockk
 import org.around.ieuri.tourism.application.port.out.client.FestivalSyncPort
+import org.around.ieuri.tourism.application.port.out.client.PetFriendlySyncPort
 import org.around.ieuri.tourism.application.port.out.client.SpotSyncPort
 import org.around.ieuri.tourism.application.port.out.persistence.FestivalStorePort
+import org.around.ieuri.tourism.application.port.out.persistence.PetFriendlyStorePort
 import org.around.ieuri.tourism.application.port.out.persistence.SpotStorePort
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.infrastructure.batch.FestivalSyncProperties
+import org.around.ieuri.tourism.infrastructure.batch.PetFriendlySyncProperties
 import org.around.ieuri.tourism.infrastructure.batch.SpotSyncJobConfig
 import org.around.ieuri.tourism.infrastructure.batch.SpotSyncProperties
 import org.springframework.batch.core.job.SimpleJob
@@ -35,6 +38,9 @@ class FestivalSyncOrderingTest {
         festivalSyncPort = mockk<FestivalSyncPort>(),
         festivalStorePort = mockk<FestivalStorePort>(),
         festivalProperties = FestivalSyncProperties(),
+        petFriendlySyncPort = mockk<PetFriendlySyncPort>(),
+        petFriendlyStorePort = mockk<PetFriendlyStorePort>(),
+        petFriendlyProperties = PetFriendlySyncProperties(),
     )
 
     private val stepNames: List<String>
@@ -63,6 +69,27 @@ class FestivalSyncOrderingTest {
         // 스펙 §선행 조사·§비범위. 별도 잡이면 두 잡의 정리가 서로의 행을 지우고, 관광지 수집이
         // 종료 축제를 되살린다 — R-9가 성립하려면 한 잡 안에서 순서가 보장되어야 한다.
         assertEquals(SpotSyncJobConfig.JOB_NAME, config.spotSyncJob().name)
-        assertEquals(8, stepNames.size)
+        // 관광지 4 + 축제 4 + 반려동물 1.
+        assertEquals(9, stepNames.size)
+    }
+
+    @Test
+    fun `반려동물 Step이 마지막에 하나만 있다 — 국문 전용이라 언어 분기가 없다`() {
+        // SPEC-0015 · V48. detailPetTour2는 KorService2에만 있어 4개 언어로 늘지 않는다.
+        val petSteps = stepNames.filter { it.startsWith("petFriendlySyncStep") }
+
+        assertEquals(listOf("petFriendlySyncStep"), petSteps)
+        assertEquals(stepNames.size - 1, stepNames.indexOf("petFriendlySyncStep"))
+    }
+
+    @Test
+    fun `반려동물 Step은 관광지 Step 뒤에 온다 — content_id로 spot을 참조한다`() {
+        // FK가 없어 터지지는 않지만, 앞서면 그날 신규 spot이 집계에서 빠진다.
+        val lastSpot = stepNames.indexOfLast { it.startsWith("syncLanguageStep-") }
+
+        assertTrue(
+            stepNames.indexOf("petFriendlySyncStep") > lastSpot,
+            "반려동물 Step이 관광지 Step보다 먼저 온다: $stepNames",
+        )
     }
 }

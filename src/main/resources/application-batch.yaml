@@ -34,6 +34,12 @@ ieuri:
       # 상한이 실측되지 않았다 — 업스트림이 거부하면 이 값만 낮춘다.
       page-size: ${IEURI_TOUR_FESTIVAL_PAGE_SIZE:1000}
 
+    # 반려동물 동반 가능 관광지(detailPetTour2 · SPEC-0015 · V48). spotSyncJob의 마지막 Step이다.
+    # **국문 서비스 전용 오퍼레이션이다** — EN/JA/ZH는 NO_OPENAPI_SERVICE_ERROR를 준다.
+    pet-friendly-sync:
+      # 실측 총계 9,701건(2026-08-11) — 1000이면 10페이지다.
+      page-size: ${IEURI_TOUR_PET_FRIENDLY_PAGE_SIZE:1000}
+
   # 한국관광공사 관광통계 4종(SPEC-0015). 갱신 주기가 갈려 잡을 나눴다 — 묶으면 월 단위가 매일 헛돈다.
   #   tourStatsVisitorCountSyncJob · tourStatsConcentrationRateSyncJob        매일
   #   tourStatsStayIntensitySyncJob · tourStatsSpendingIntensitySyncJob       매월 17일 이후
