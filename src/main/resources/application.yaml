@@ -85,6 +85,8 @@ ieuri:
     password: ${IEURI_SEARCH_DB_PASSWORD}
   mail:
     from: ${MAIL_FROM:}
+  password:
+    pepper: ${IEURI_PASSWORD_PEPPER}
   verification:
     ttl-minutes: 10
     max-attempts: 5
