@@ -6,11 +6,11 @@ import org.around.ieuri.tourism.application.exception.CongestionAreaNotFoundExce
 import org.around.ieuri.tourism.application.exception.InvalidZoomException
 import org.around.ieuri.tourism.application.exception.TooManyAreaIdsException
 import org.around.ieuri.tourism.application.policy.MapViewportPolicy
-import org.around.ieuri.tourism.application.policy.SeoulCitydataPolicy
+import org.around.ieuri.tourism.application.policy.SeoulOpenDataPolicy
 import org.around.ieuri.tourism.application.port.`in`.query.MapQueryUseCase
-import org.around.ieuri.tourism.application.port.out.cache.SeoulCitydataCachePort
-import org.around.ieuri.tourism.application.port.out.client.SeoulCitydataPort
-import org.around.ieuri.tourism.application.port.out.client.SeoulCitydataSnapshot
+import org.around.ieuri.tourism.application.port.out.cache.SeoulOpenDataCachePort
+import org.around.ieuri.tourism.application.port.out.client.SeoulOpenDataPort
+import org.around.ieuri.tourism.application.port.out.client.SeoulOpenDataSnapshot
 import org.around.ieuri.tourism.application.port.out.query.CongestionAreaQueryPort
 import org.around.ieuri.tourism.application.port.out.query.MapQueryPort
 import org.around.ieuri.tourism.application.port.out.query.MapViewportSearch
@@ -44,10 +44,10 @@ import java.time.LocalDateTime
 class MapQueryService(
     private val mapQueryPort: MapQueryPort,
     private val congestionAreaQueryPort: CongestionAreaQueryPort,
-    private val seoulCitydataPort: SeoulCitydataPort,
-    private val cachePort: SeoulCitydataCachePort,
+    private val seoulOpenDataPort: SeoulOpenDataPort,
+    private val cachePort: SeoulOpenDataCachePort,
     private val viewportPolicy: MapViewportPolicy,
-    private val citydataPolicy: SeoulCitydataPolicy,
+    private val openDataPolicy: SeoulOpenDataPolicy,
     private val clock: Clock,
 ) : MapQueryUseCase {
 
@@ -149,9 +149,9 @@ class MapQueryService(
         bounds: MapBounds?,
     ): Pair<List<String>, Map<String, AreaName>> {
         if (areaIds != null) {
-            if (areaIds.size > citydataPolicy.maxAreaIds) {
+            if (areaIds.size > openDataPolicy.maxAreaIds) {
                 throw TooManyAreaIdsException(
-                    "한 번에 조회할 수 있는 구역은 ${citydataPolicy.maxAreaIds}곳까지입니다.",
+                    "한 번에 조회할 수 있는 구역은 ${openDataPolicy.maxAreaIds}곳까지입니다.",
                 )
             }
             val distinct = areaIds.distinct()
@@ -167,7 +167,7 @@ class MapQueryService(
         }
         if (bounds != null) {
             val codes = congestionAreaQueryPort.findAreaCodesWithin(bounds)
-                .take(citydataPolicy.maxAreaIds)
+                .take(openDataPolicy.maxAreaIds)
             if (codes.isEmpty()) return emptyList<String>() to emptyMap()
             return codes to congestionAreaQueryPort.findNamesByCodes(codes)
         }
@@ -188,12 +188,12 @@ class MapQueryService(
 
         if (cached != null) {
             val age = Duration.between(cached.storedAt, now)
-            if (age < citydataPolicy.minRefetchInterval) {
+            if (age < openDataPolicy.minRefetchInterval) {
                 return ResolvedSnapshot(cached.snapshot, degraded = false, stale = false)
             }
         }
 
-        val fetched = seoulCitydataPort.fetch(areaCode, areaName)
+        val fetched = seoulOpenDataPort.fetch(areaCode, areaName)
         if (fetched == null) {
             // 업스트림 실패. 캐시가 있으면 낡은 값이라도 주고, 없으면 그 구역은 빠진다.
             return ResolvedSnapshot(cached?.snapshot, degraded = true, stale = cached != null)
@@ -208,7 +208,7 @@ class MapQueryService(
      * 움직일 때마다 행사 때문에 쿼터를 태우면 혼잡도를 볼 호출이 남지 않는다.
      *
      * 캐시가 비어 있으면 행사도 비어 있다. 혼잡도를 한 번이라도 조회한 구역은 같은 호출로
-     * 행사까지 받아 두므로(citydata 1콜에 세 블록) 실사용에서는 대개 채워진다.
+     * 행사까지 받아 두므로(seoulOpenData 1콜에 세 블록) 실사용에서는 대개 채워진다.
      */
     private fun cachedEventsWithin(bounds: MapBounds): List<CulturalEventView> =
         congestionAreaQueryPort.findAreaCodesWithin(bounds)
@@ -218,7 +218,7 @@ class MapQueryService(
 
     /** 캐시·업스트림 해소 결과. [stale]은 만료된 캐시를 돌려주는 중이라는 뜻이다. */
     private data class ResolvedSnapshot(
-        val snapshot: SeoulCitydataSnapshot?,
+        val snapshot: SeoulOpenDataSnapshot?,
         val degraded: Boolean,
         val stale: Boolean,
     )

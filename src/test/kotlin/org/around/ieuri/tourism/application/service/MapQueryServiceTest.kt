@@ -10,11 +10,11 @@ import org.around.ieuri.tourism.application.exception.CongestionAreaNotFoundExce
 import org.around.ieuri.tourism.application.exception.InvalidZoomException
 import org.around.ieuri.tourism.application.exception.TooManyAreaIdsException
 import org.around.ieuri.tourism.application.policy.MapViewportPolicy
-import org.around.ieuri.tourism.application.policy.SeoulCitydataPolicy
-import org.around.ieuri.tourism.application.port.out.cache.CachedCitydata
-import org.around.ieuri.tourism.application.port.out.cache.SeoulCitydataCachePort
-import org.around.ieuri.tourism.application.port.out.client.SeoulCitydataPort
-import org.around.ieuri.tourism.application.port.out.client.SeoulCitydataSnapshot
+import org.around.ieuri.tourism.application.policy.SeoulOpenDataPolicy
+import org.around.ieuri.tourism.application.port.out.cache.CachedSeoulOpenData
+import org.around.ieuri.tourism.application.port.out.cache.SeoulOpenDataCachePort
+import org.around.ieuri.tourism.application.port.out.client.SeoulOpenDataPort
+import org.around.ieuri.tourism.application.port.out.client.SeoulOpenDataSnapshot
 import org.around.ieuri.tourism.application.port.out.query.CongestionAreaQueryPort
 import org.around.ieuri.tourism.application.port.out.query.MapQueryPort
 import org.around.ieuri.tourism.application.port.out.query.MapViewportSearch
@@ -52,8 +52,8 @@ class MapQueryServiceTest {
 
     private val mapQueryPort = mockk<MapQueryPort>()
     private val congestionAreaQueryPort = mockk<CongestionAreaQueryPort>()
-    private val seoulCitydataPort = mockk<SeoulCitydataPort>()
-    private val cachePort = mockk<SeoulCitydataCachePort>(relaxUnitFun = true)
+    private val seoulOpenDataPort = mockk<SeoulOpenDataPort>()
+    private val cachePort = mockk<SeoulOpenDataCachePort>(relaxUnitFun = true)
 
     /** 캐시 신선도 판정(R13)의 경계를 고정하기 위해 '지금'을 못 박는다. */
     private val now = Instant.parse("2026-08-10T06:00:00Z")
@@ -66,7 +66,7 @@ class MapQueryServiceTest {
         maxSpotMarkers = 3,
         maxEventMarkers = 2,
     )
-    private val citydataPolicy = SeoulCitydataPolicy(
+    private val openDataPolicy = SeoulOpenDataPolicy(
         minRefetchInterval = Duration.ofMinutes(5),
         maxAreaIds = 3,
     )
@@ -74,10 +74,10 @@ class MapQueryServiceTest {
     private val service = MapQueryService(
         mapQueryPort = mapQueryPort,
         congestionAreaQueryPort = congestionAreaQueryPort,
-        seoulCitydataPort = seoulCitydataPort,
+        seoulOpenDataPort = seoulOpenDataPort,
         cachePort = cachePort,
         viewportPolicy = viewportPolicy,
-        citydataPolicy = citydataPolicy,
+        openDataPolicy = openDataPolicy,
         clock = clock,
     )
 
@@ -92,7 +92,7 @@ class MapQueryServiceTest {
         lat = 37.5,
     )
 
-    private fun snapshot(areaCode: String, observedAt: LocalDateTime) = SeoulCitydataSnapshot(
+    private fun snapshot(areaCode: String, observedAt: LocalDateTime) = SeoulOpenDataSnapshot(
         areaCode = areaCode,
         congestion = CongestionSnapshot(
             level = CongestionLevel.RELAXED,
@@ -182,7 +182,7 @@ class MapQueryServiceTest {
         // AC R12. 지도를 움직일 때마다 행사 때문에 쿼터를 태우면 혼잡도를 볼 호출이 남지 않는다.
         val event = CulturalEventView("e1", "축제", "광장", "2026-08-01~2026-08-10", 127.0, 37.5, null)
         every { congestionAreaQueryPort.findAreaCodesWithin(seoulBounds) } returns listOf("POI009")
-        every { cachePort.get("POI009") } returns CachedCitydata(
+        every { cachePort.get("POI009") } returns CachedSeoulOpenData(
             snapshot = snapshot("POI009", LocalDateTime.parse("2026-08-10T05:45")).copy(events = listOf(event)),
             storedAt = now,
         )
@@ -194,7 +194,7 @@ class MapQueryServiceTest {
         )
 
         assertEquals(listOf(event), result.events)
-        verify(exactly = 0) { seoulCitydataPort.fetch(any(), any()) }
+        verify(exactly = 0) { seoulOpenDataPort.fetch(any(), any()) }
     }
 
     // ---------- seoulCongestion ----------
@@ -234,7 +234,7 @@ class MapQueryServiceTest {
         // AC R6. bbox는 무시되므로 bbox 경로가 호출되지 않아야 한다.
         val names = mapOf("POI009" to AreaName("광화문", "Gwanghwamun", null, null))
         every { congestionAreaQueryPort.findNamesByCodes(listOf("POI009")) } returns names
-        every { cachePort.get("POI009") } returns CachedCitydata(
+        every { cachePort.get("POI009") } returns CachedSeoulOpenData(
             snapshot("POI009", LocalDateTime.parse("2026-08-10T05:45")),
             storedAt = now,
         )
@@ -265,7 +265,7 @@ class MapQueryServiceTest {
         // AC R13. 저장 시각 기준으로 판정한다 — 데이터가 30분 지연 도착하므로 5분 경계 TTL은
         // 같은 데이터를 반복 호출한다.
         stubArea("POI009")
-        every { cachePort.get("POI009") } returns CachedCitydata(
+        every { cachePort.get("POI009") } returns CachedSeoulOpenData(
             snapshot("POI009", LocalDateTime.parse("2026-08-10T05:45")),
             storedAt = now.minus(Duration.ofMinutes(3)),
         )
@@ -274,19 +274,19 @@ class MapQueryServiceTest {
 
         assertEquals(1, result.areas.size)
         assertFalse(result.degraded)
-        verify(exactly = 0) { seoulCitydataPort.fetch(any(), any()) }
+        verify(exactly = 0) { seoulOpenDataPort.fetch(any(), any()) }
     }
 
     @Test
     fun `최소 재호출 간격이 지나면 업스트림을 다시 부른다`() {
         // AC R13.
         stubArea("POI009")
-        every { cachePort.get("POI009") } returns CachedCitydata(
+        every { cachePort.get("POI009") } returns CachedSeoulOpenData(
             snapshot("POI009", LocalDateTime.parse("2026-08-10T05:15")),
             storedAt = now.minus(Duration.ofMinutes(10)),
         )
         val fresh = snapshot("POI009", LocalDateTime.parse("2026-08-10T05:45"))
-        every { seoulCitydataPort.fetch("POI009", "광화문") } returns fresh
+        every { seoulOpenDataPort.fetch("POI009", "광화문") } returns fresh
 
         val result = service.seoulCongestion(listOf("POI009"), null, DomainLocale.KO)
 
@@ -299,11 +299,11 @@ class MapQueryServiceTest {
         // AC R11. 만료된 캐시라도 돌려주고 그 시점을 staleSince에 담는다.
         stubArea("POI009")
         val staleAt = LocalDateTime.parse("2026-08-10T04:30")
-        every { cachePort.get("POI009") } returns CachedCitydata(
+        every { cachePort.get("POI009") } returns CachedSeoulOpenData(
             snapshot("POI009", staleAt),
             storedAt = now.minus(Duration.ofHours(1)),
         )
-        every { seoulCitydataPort.fetch("POI009", "광화문") } returns null
+        every { seoulOpenDataPort.fetch("POI009", "광화문") } returns null
 
         val result = service.seoulCongestion(listOf("POI009"), null, DomainLocale.KO)
 
@@ -317,7 +317,7 @@ class MapQueryServiceTest {
         // AC R11. 예외로 던지지 않는다 — 지도 전체가 실패한 것처럼 다뤄지지 않게.
         stubArea("POI009")
         every { cachePort.get("POI009") } returns null
-        every { seoulCitydataPort.fetch("POI009", "광화문") } returns null
+        every { seoulOpenDataPort.fetch("POI009", "광화문") } returns null
 
         val result = service.seoulCongestion(listOf("POI009"), null, DomainLocale.KO)
 
@@ -330,7 +330,7 @@ class MapQueryServiceTest {
     fun `예보 부재는 오류가 아니라 null이다`() {
         // AC R9.
         stubArea("POI009")
-        every { cachePort.get("POI009") } returns CachedCitydata(
+        every { cachePort.get("POI009") } returns CachedSeoulOpenData(
             snapshot("POI009", LocalDateTime.parse("2026-08-10T05:45")),
             storedAt = now,
         )
@@ -353,7 +353,7 @@ class MapQueryServiceTest {
                 populationMax = 200,
             )
         }
-        every { cachePort.get("POI009") } returns CachedCitydata(
+        every { cachePort.get("POI009") } returns CachedSeoulOpenData(
             snapshot("POI009", LocalDateTime.parse("2026-08-10T05:45")).copy(forecast = forecast),
             storedAt = now,
         )
@@ -372,7 +372,7 @@ class MapQueryServiceTest {
             isDefaulted = true,
             observedAt = LocalDateTime.parse("2026-08-10T06:00"),
         )
-        every { cachePort.get("POI009") } returns CachedCitydata(
+        every { cachePort.get("POI009") } returns CachedSeoulOpenData(
             snapshot("POI009", LocalDateTime.parse("2026-08-10T05:45")).copy(commercial = defaulted),
             storedAt = now,
         )
@@ -388,7 +388,7 @@ class MapQueryServiceTest {
         // AC R31. 서비스가 AreaName.resolve를 거쳐 담는다.
         every { congestionAreaQueryPort.findNamesByCodes(listOf("POI009")) } returns
             mapOf("POI009" to AreaName("광화문", "Gwanghwamun", "光化門", null))
-        every { cachePort.get("POI009") } returns CachedCitydata(
+        every { cachePort.get("POI009") } returns CachedSeoulOpenData(
             snapshot("POI009", LocalDateTime.parse("2026-08-10T05:45")),
             storedAt = now,
         )
@@ -404,12 +404,12 @@ class MapQueryServiceTest {
         every { congestionAreaQueryPort.findNamesByCodes(listOf("POI009")) } returns
             mapOf("POI009" to AreaName("광화문", "Gwanghwamun", "光化門", null))
         every { cachePort.get("POI009") } returns null
-        every { seoulCitydataPort.fetch("POI009", "광화문") } returns
+        every { seoulOpenDataPort.fetch("POI009", "광화문") } returns
             snapshot("POI009", LocalDateTime.parse("2026-08-10T05:45"))
 
         service.seoulCongestion(listOf("POI009"), null, DomainLocale.JA)
 
-        verify { seoulCitydataPort.fetch("POI009", "광화문") }
+        verify { seoulOpenDataPort.fetch("POI009", "광화문") }
     }
 
     private fun stubArea(code: String) {

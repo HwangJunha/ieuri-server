@@ -3,11 +3,11 @@ package org.around.ieuri.tourism.infrastructure
 import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
-import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.TourApiClient
-import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.TourApiDetailCommonResponse
-import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.TourApiDetailImageResponse
-import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.TourApiDetailInfoResponse
-import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.TourApiDetailIntroResponse
+import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi.TourApiClient
+import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi.TourApiDetailCommonResponse
+import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi.TourApiDetailImageResponse
+import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi.TourApiDetailInfoResponse
+import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi.TourApiDetailIntroResponse
 import org.around.ieuri.tourism.infrastructure.config.TourApiProperties
 import org.springframework.web.client.RestClient
 import tools.jackson.module.kotlin.jacksonObjectMapper

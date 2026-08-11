@@ -3,11 +3,11 @@ package org.around.ieuri.tourism.infrastructure.mapper
 import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
-import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.TourApiFestivalResponse
-import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.TourApiResponse
-import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.mapper.toNearbySpotDataOrNull
-import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.mapper.toSyncFestivalCommandOrNull
-import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.mapper.toSyncSpotCommandOrNull
+import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi.TourApiFestivalResponse
+import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi.TourApiResponse
+import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi.mapper.toNearbySpotDataOrNull
+import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi.mapper.toSyncFestivalCommandOrNull
+import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi.mapper.toSyncSpotCommandOrNull
 import java.time.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
