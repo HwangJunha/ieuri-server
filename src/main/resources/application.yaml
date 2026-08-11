@@ -14,14 +14,8 @@ spring:
     password: ${IEURI_DB_PASSWORD}
     hikari:
       keepalive-time: 120000
-      # 기동 시 첫 커넥션 확보를 30초까지 재시도한다(기본 1초 → 즉시 실패).
-      #
-      # 로컬은 `kubectl port-forward`로 DB에 붙는데, 이 터널은 커넥션이 닫힐 때마다
-      # 끊겼다 다시 뜬다. Flyway가 마이그레이션을 마치고 커넥션을 반납하는 순간이 정확히
-      # 그 지점이라, 곧바로 붙는 Hibernate가 1초 안에 실패해 기동이 깨졌다(실측).
-      #
-      # 운영에서도 손해가 없다 — DB가 정말 죽었으면 30초 뒤 같은 오류로 실패한다.
-      # 잠깐의 네트워크 흔들림에 기동이 깨지지 않게 하는 것이 요지다.
+      # 첫 커넥션 확보를 30초까지 재시도(기본 1초는 즉시 실패). 로컬 port-forward 터널이
+      # Flyway 반납 직후 재연결되는 구간에서 기동이 깨졌다.
       initialization-fail-timeout: 30000
   jpa:
     hibernate:
@@ -30,22 +24,12 @@ spring:
     open-in-view: false
   batch:
     job:
-      # **부팅 시 잡을 자동 실행하지 않는다.** 실행 시점과 대상은 SpotSyncLauncher가 소유한다
-      # (k8s CronJob이 트리거). 이걸 끄지 않으면 Boot의 BatchJobLauncherAutoConfiguration이
-      # 등록된 잡을 부팅 즉시 돌린다 — 재배포마다 전량 동기화가 도는 사고가 된다.
-      # (잡이 둘 이상이면 아예 "Job name must be specified in case of multiple jobs"로
-      #  기동이 실패한다.)
-      #
-      # 이 키는 Boot 4에도 살아 있다 — BatchProperties에는 name 필드밖에 없지만,
-      # BatchJobLauncherAutoConfiguration이
-      # @ConditionalOnBooleanProperty(name="spring.batch.job.enabled", matchIfMissing=true)로
-      # 직접 읽는다. 기본값이 true이므로 명시적으로 꺼야 한다.
+      # **부팅 시 잡을 자동 실행하지 않는다** — 끄지 않으면 재배포마다 전량 동기화가 돈다.
+      # 기본값이 true라 명시적으로 꺼야 한다(Boot 4에서도 이 키가 읽힌다).
       enabled: false
 
-  # spring.batch.jdbc.*는 두지 않는다 — **Boot 4에 존재하지 않는 키다.** initialize-schema: never가
-  # 조용히 무시되는 줄 모른 채 "메타 스키마는 Flyway가 소유한다"고 믿고 있었고, 실제 저장소는
-  # 인메모리였다. 메타데이터 저장소는 이제 BatchInfrastructureConfig가
-  # @EnableJdbcJobRepository로 명시한다. 스키마는 여전히 Flyway 소유다(V14).
+  # spring.batch.jdbc.*는 두지 않는다 — Boot 4에 없는 키라 조용히 무시된다. 메타데이터
+  # 저장소는 BatchInfrastructureConfig의 @EnableJdbcJobRepository가, 스키마는 Flyway가 소유한다(V14).
   flyway:
     enabled: true
     # Java 마이그레이션(V39)은 여기 없어도 된다 — Boot가 JavaMigration 빈을 주입해 등록한다.
@@ -86,26 +70,15 @@ server:
   shutdown: graceful
 
 ieuri:
-  # 검색 전용 노드(SPEC-0013). 메인과 **다른 DB 인스턴스**다 — pg_search 커뮤니티 에디션이
-  # 물리 복제를 막아, BM25 인덱스를 논리 복제 구독자로 분리했다
-  # (problem/SPEC-0013-manifest-pg-search.md).
+  # 검색 전용 노드(SPEC-0013). 메인과 **다른 DB 인스턴스**이고 **읽기 전용이다** — spot이
+  # 논리 복제로 들어오므로 앱이 쓰면 복제와 충돌한다. DDL만 Flyway가 만든다.
   #
-  # **읽기 전용으로 쓴다.** spot 데이터는 논리 복제로 들어오므로 앱이 직접 쓰면 복제와
-  # 충돌한다. 스키마(DDL)만 Flyway가 만들고 이후 쿼리는 SELECT뿐이다.
-  #
-  # 로컬 기본값은 포트만 다른 같은 호스트다(포트포워딩 전제). 운영은 환경변수로 주입한다.
-  # **빈을 조건부로 만들지 않는다** — 검색 어댑터·서비스·리졸버까지 조건이 번져 계층마다
-  # @ConditionalOnProperty가 붙는다. 연결 실패는 그 쿼리에서 드러나는 편이 낫다.
-  # **비밀번호가 메인과 다르다.** CNPG가 클러스터마다 앱 계정 시크릿을 새로 만든다
-  # (`ieuri-search-app`). 계정명은 같은 `ieuri`지만 비밀번호를 물려받으면 인증이 실패한다.
+  # **비밀번호가 메인과 다르다** — CNPG가 클러스터마다 앱 계정 시크릿을 새로 만든다:
   #   kubectl get secret -n ieuri-db ieuri-search-app -o jsonpath='{.data.password}' | base64 -d
-  # **`prepareThreshold=0`이 필수다(pg_search 0.25.1 버그 우회).** JDBC는 같은 구문을 5번
-  # 실행한 뒤 6번째부터 서버 측 generic plan을 쓰는데, 그러면 질의어가 Const가 아닌 Param으로
-  # 남아 pg_search가 `@@@` 분류(플랜 타임 상수 폴딩)에 실패한다:
-  #   `internal error: unreachable code: pdb::Query::UnclassifiedString cannot be
-  #    converted into a TantivyQuery`
-  # 6번째 호출부터 터지므로 **간헐적으로 보인다** — psql에서 몇 번 돌려보면 재현되지 않는다.
-  # ParadeDB #5779이며 0.25.2에서 고쳐진다. 확장을 올릴 때 이 파라미터를 걷어낼 것.
+  #
+  # **`prepareThreshold=0`을 빼면 안 된다**(pg_search 0.25.1 버그, ParadeDB #5779). 같은 구문
+  # 6번째 실행부터 generic plan으로 바뀌며 질의어가 Param이 되어 `@@@` 분류가 깨진다 —
+  # 간헐적으로 보여 재현이 어렵다. 0.25.2로 올릴 때 걷어낸다.
   search-datasource:
     url: ${IEURI_SEARCH_DB_URL:jdbc:postgresql://localhost:5433/ieuri?prepareThreshold=0}
     username: ${IEURI_SEARCH_DB_USERNAME:ieuri}
@@ -130,15 +103,9 @@ ieuri:
     secret: ${IEURI_JWT_SECRET}
     access-ttl: 5m
     refresh-ttl: 30d
-  # Cloudflare R2(S3 호환) 오브젝트 스토리지. 사진은 클라이언트가 presigned URL로 직접 PUT하며
-  # 서버는 이미지 바이트를 중계하지 않는다.
-  #
-  # 자격증명은 환경변수로만 주입한다(응답·로그 어디에도 노출 금지). 값이 없으면 부팅은 되지만
-  # 발급 시점에 실패한다 — TourAPI serviceKey와 같은 취급이다.
-  #
-  # 쓰기는 인증된 s3-endpoint로만 간다. **조회용 공개 도메인(cdn.ieuri.co.kr)은 여기 없다** —
-  # 서버가 그 URL을 만들 일이 없기 때문이다. DB에는 object key만 저장하고 클라이언트가
-  # 자기 설정의 공개 베이스와 조합해 쓴다(그래서 CDN이 바뀌어도 서버 배포가 필요 없다).
+  # Cloudflare R2(S3 호환). 사진은 클라이언트가 presigned URL로 직접 PUT하고 서버는 중계하지 않는다.
+  # 자격증명은 환경변수로만 주입한다 — 없어도 부팅은 되고 발급 시점에 실패한다.
+  # DB에는 object key만 저장하므로 조회용 공개 도메인은 서버가 알 필요가 없다.
   r2:
     s3-endpoint: ${IERUI_R2_ENDPOINT:}
     access-key: ${IEURI_R2_ACCESS_KEY:}
