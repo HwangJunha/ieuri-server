@@ -35,6 +35,10 @@ import java.time.format.DateTimeFormatter
  * **예외를 변환한다 — 기존 [org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi.TourApiClient]의
  * 결함을 물려받지 않는다**(§5 · R8). 변환 규칙은 [translate] 참조.
  *
+ * **호출량 주의** — 방문자수를 뺀 3종은 `areaCd`·`signguCd`가 필수라 252개 시군구를 순회한다.
+ * 집중률만 해도 1회 실행이 252 × 페이지수(종로구 3,390행 기준 약 4) ≈ 1,000 호출이며,
+ * 개발 계정의 일 한도 1,000건을 넘길 수 있다. 스로틀링은 두지 않았다.
+ *
  * serviceKey는 로그에 남기지 않는다. URI를 통째로 로깅하지 않는 것도 같은 이유다.
  */
 @Component
@@ -59,43 +63,60 @@ class TourStatsClient(
         return fetchPage(uri, VISITOR_COUNT_TYPE) { it.toSyncCommandOrNull() }
     }
 
+    /**
+     * **날짜 파라미터를 보내지 않는다**(2026-08-11 실측). `baseYmd` · `startYmd` · `baseYm` 어느
+     * 것을 보내도 `INVALID_REQUEST_PARAMETER_ERROR`가 온다. 시군구 하나를 요청하면 향후 예측일이
+     * 전부 오며(종로구 3,390행) 대상일은 행의 `baseYmd`에 실린다.
+     */
     override fun fetchConcentrationRates(
-        baseDate: LocalDate,
+        areaCd: String,
+        signguCd: String,
         pageNo: Int,
         numOfRows: Int,
     ): TourStatsSyncPage<SyncConcentrationRateCommand> {
         val uri = uriFor(TourStatsProperties.SERVICE_TATS_CNCTR_RATE, OP_CONCENTRATION_RATE, pageNo, numOfRows) {
-            // 이 오퍼레이션은 발표 기준일 하나를 받고 향후 30일 예측을 함께 돌려준다(R5) —
-            // 대상일은 응답 행마다 다르며 우리가 날짜별로 나눠 부르지 않는다.
-            queryParam("baseYmd", baseDate.format(DATE_FORMAT))
+            queryParam("areaCd", areaCd)
+            queryParam("signguCd", signguCd)
         }
         return fetchPage(uri, CONCENTRATION_RATE_TYPE) { it.toSyncCommandOrNull() }
     }
 
     override fun fetchStayIntensities(
+        areaCd: String,
+        signguCd: String,
         baseMonth: YearMonth,
         pageNo: Int,
         numOfRows: Int,
     ): TourStatsSyncPage<SyncDemandIntensityCommand> =
-        fetchDemandIntensity(OP_STAY_INTENSITY, baseMonth, pageNo, numOfRows)
+        fetchDemandIntensity(OP_STAY_INTENSITY, areaCd, signguCd, baseMonth, pageNo, numOfRows)
 
     override fun fetchSpendingIntensities(
+        areaCd: String,
+        signguCd: String,
         baseMonth: YearMonth,
         pageNo: Int,
         numOfRows: Int,
     ): TourStatsSyncPage<SyncDemandIntensityCommand> =
-        fetchDemandIntensity(OP_SPENDING_INTENSITY, baseMonth, pageNo, numOfRows)
+        fetchDemandIntensity(OP_SPENDING_INTENSITY, areaCd, signguCd, baseMonth, pageNo, numOfRows)
 
-    /** 체류·소비 강도는 같은 서비스의 다른 오퍼레이션이며 응답 모양도 같다. */
+    /**
+     * 체류·소비 강도는 같은 서비스의 다른 오퍼레이션이며 응답 모양도 같다.
+     *
+     * **월 인자는 `baseYm` 하나다** — `startYm`/`endYm` 구간이 아니다(실측:
+     * `NO_MANDATORY_REQUEST_PARAMETERS_ERROR1(baseYm)`).
+     */
     private fun fetchDemandIntensity(
         operation: String,
+        areaCd: String,
+        signguCd: String,
         baseMonth: YearMonth,
         pageNo: Int,
         numOfRows: Int,
     ): TourStatsSyncPage<SyncDemandIntensityCommand> {
         val uri = uriFor(TourStatsProperties.SERVICE_AREA_TAR_DEM_DS, operation, pageNo, numOfRows) {
-            queryParam("startYm", baseMonth.format(MONTH_FORMAT))
-            queryParam("endYm", baseMonth.format(MONTH_FORMAT))
+            queryParam("areaCd", areaCd)
+            queryParam("signguCd", signguCd)
+            queryParam("baseYm", baseMonth.format(MONTH_FORMAT))
         }
         return fetchPage(uri, DEMAND_INTENSITY_TYPE) { it.toSyncCommandOrNull() }
     }

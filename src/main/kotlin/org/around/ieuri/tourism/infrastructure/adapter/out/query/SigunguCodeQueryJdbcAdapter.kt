@@ -1,6 +1,7 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.query
 
 import org.around.ieuri.tourism.application.port.out.persistence.SigunguCodeQueryPort
+import org.around.ieuri.tourism.application.port.out.persistence.SigunguRegion
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -22,4 +23,11 @@ class SigunguCodeQueryJdbcAdapter(
     @Transactional(readOnly = true)
     override fun findAllCodes(): Set<String> =
         jdbcTemplate.queryForList("SELECT code FROM sigungu", String::class.java).filterNotNull().toSet()
+
+    /** ORDER BY code — 배치가 인덱스로 진행 위치를 기억하므로 순서가 안정적이어야 한다. */
+    @Transactional(readOnly = true)
+    override fun findAllRegions(): List<SigunguRegion> =
+        jdbcTemplate.query("SELECT code, province_code FROM sigungu ORDER BY code") { rs, _ ->
+            SigunguRegion(code = rs.getString("code"), provinceCode = rs.getString("province_code"))
+        }
 }

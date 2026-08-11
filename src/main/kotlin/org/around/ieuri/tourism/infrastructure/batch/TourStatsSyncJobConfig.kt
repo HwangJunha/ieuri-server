@@ -29,8 +29,12 @@ import java.time.YearMonth
  * **잡을 4개로 나눈다** — 갱신 주기가 일/월로 갈려 하나로 묶으면 월 단위 종이 매일 헛돈다.
  * 실행 시점은 k8s CronJob이 소유하며 런처가 `ieuri.tourapi.sync.job`으로 하나를 고른다.
  *
- * **지역별로 나눠 호출하지 않는다** — 방문자수 API에 지역 필터가 없어(spec §4.3) 날짜를 주면
- * 전 지역이 한 번에 온다. 페이지네이션만 처리하면 된다.
+ * **방문자수만 지역을 나눠 부르지 않는다** — 이 API에만 지역 필터가 없어(spec §4.3) 날짜를 주면
+ * 전 지역이 온다. 나머지 3종은 `areaCd`·`signguCd`가 필수라 252개 시군구를 순회한다.
+ *
+ * **호출량 주의**: 집중률 1회 실행이 약 1,000 호출(252지역 × 평균 4페이지)이라 개발 계정의
+ * 일 한도 1,000건에 근접한다. 스로틀링은 두지 않았다 — 한도 초과는 `UPSTREAM_RATE_LIMITED`로
+ * 표면화되고 재실행이 중단 지점에서 이어진다.
  *
  * 조회 기준일은 잡 파라미터 `runDate`에서 파생하되 **업스트림 지연만큼 소급한다** —
  * 방문자수는 4일, 월 단위는 1개월(§4.6). 소급하지 않으면 매 실행이 빈 응답을 받는다.
@@ -54,7 +58,8 @@ class TourStatsSyncJobConfig(
             datasetName = "visitorCount",
             pageSize = properties.pageSize,
             sigunguCodePort = sigunguCodePort,
-            fetchPage = { runDate, pageNo ->
+            // 지역 순회 없음 — 이 API만 지역 필터가 없어 region 인자를 쓰지 않는다.
+            fetchPage = { runDate, _, pageNo ->
                 // 최근 구간을 매번 통째로 다시 받는다 — upsert라 행이 늘지 않고(R7) 며칠 실패해도
                 // 다음 성공 실행이 구멍을 메운다. 끝을 오늘로 두는 이유는 원천 지연(4일)만큼
                 // 당길 필요가 없어서다 — 아직 없는 날짜는 행이 안 올 뿐이고, 지연이 짧아지면
@@ -71,7 +76,10 @@ class TourStatsSyncJobConfig(
         ),
     )
 
-    /** 집중률은 소급하지 않는다 — 발표 기준일 하나로 향후 30일 예측이 함께 온다(R5). */
+    /**
+     * 집중률은 날짜를 보내지 않는다 — 오퍼레이션이 날짜 파라미터를 받지 않으며, 시군구 하나를
+     * 요청하면 향후 예측일이 전부 온다(실측 2026-08-11). 대상일은 행마다 다르다(R5).
+     */
     @Bean
     fun tourStatsConcentrationRateSyncJob(): Job = singleStepJob(
         JOB_CONCENTRATION_RATE,
@@ -79,11 +87,17 @@ class TourStatsSyncJobConfig(
             datasetName = "concentrationRate",
             pageSize = properties.pageSize,
             sigunguCodePort = sigunguCodePort,
-            fetchPage = { runDate, pageNo ->
-                syncPort.fetchConcentrationRates(runDate, pageNo, properties.pageSize)
+            fetchPage = { _, region, pageNo ->
+                syncPort.fetchConcentrationRates(
+                    region.provinceCode,
+                    region.code,
+                    pageNo,
+                    properties.pageSize,
+                )
             },
             sigunguCodeOf = { it.sigunguCode },
             upsert = storePort::upsertConcentrationRates,
+            regionsOf = SigunguCodeQueryPort::findAllRegions,
         ),
     )
 
@@ -94,11 +108,18 @@ class TourStatsSyncJobConfig(
             datasetName = "stayIntensity",
             pageSize = properties.pageSize,
             sigunguCodePort = sigunguCodePort,
-            fetchPage = { runDate, pageNo ->
-                syncPort.fetchStayIntensities(baseMonthOf(runDate), pageNo, properties.pageSize)
+            fetchPage = { runDate, region, pageNo ->
+                syncPort.fetchStayIntensities(
+                    region.provinceCode,
+                    region.code,
+                    baseMonthOf(runDate),
+                    pageNo,
+                    properties.pageSize,
+                )
             },
             sigunguCodeOf = { it.sigunguCode },
             upsert = storePort::upsertStayIntensities,
+            regionsOf = SigunguCodeQueryPort::findAllRegions,
         ),
     )
 
@@ -109,18 +130,25 @@ class TourStatsSyncJobConfig(
             datasetName = "spendingIntensity",
             pageSize = properties.pageSize,
             sigunguCodePort = sigunguCodePort,
-            fetchPage = { runDate, pageNo ->
-                syncPort.fetchSpendingIntensities(baseMonthOf(runDate), pageNo, properties.pageSize)
+            fetchPage = { runDate, region, pageNo ->
+                syncPort.fetchSpendingIntensities(
+                    region.provinceCode,
+                    region.code,
+                    baseMonthOf(runDate),
+                    pageNo,
+                    properties.pageSize,
+                )
             },
             sigunguCodeOf = { it.sigunguCode },
             upsert = storePort::upsertSpendingIntensities,
+            regionsOf = SigunguCodeQueryPort::findAllRegions,
         ),
     )
 
     private fun baseMonthOf(runDate: java.time.LocalDate): YearMonth =
         YearMonth.from(runDate).minusMonths(syncProperties.monthlyLagMonths)
 
-    /** 종마다 Step 하나뿐이다 — 언어별로 갈리지 않고(전 지역 일괄 응답) 정리 단계도 없다. */
+    /** 종마다 Step 하나뿐이다 — 지역 순회는 Step 안의 루프이며 언어 분기도 정리 단계도 없다. */
     private fun singleStepJob(name: String, tasklet: Tasklet): Job {
         val step: Step = StepBuilder("${name}Step", jobRepository)
             .tasklet(tasklet, transactionManager)

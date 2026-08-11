@@ -9,8 +9,10 @@ import java.time.YearMonth
 /**
  * KTO 빅데이터 4종 수집 아웃바운드 포트(SPEC-0015 R4~R6). 배치가 쓰는 수집 경로다.
  *
- * **지역별로 나눠 호출할 수 없다** — 방문자수 API에 지역 필터 파라미터가 없어(spec §4.3)
- * 날짜를 주면 전 지역이 한 번에 온다. 따라서 인자는 기간과 페이지뿐이다.
+ * **호출 단위가 종마다 다르다**(2026-08-11 실측):
+ *  - 방문자수만 지역 필터가 없어 날짜만 주면 전 지역이 온다(spec §4.3).
+ *  - 나머지 3종은 `areaCd`(시도) · `signguCd`(시군구)가 **둘 다 필수**다. 빠지면 업스트림이
+ *    `NO_MANDATORY_REQUEST_PARAMETERS_ERROR1`을 준다. 따라서 252개 시군구를 순회해야 한다.
  *
  * **업스트림 장애는 도메인 오류로 변환되어 던져진다**(R8) —
  * [org.around.ieuri.tourism.application.exception.UpstreamUnavailableException] ·
@@ -21,6 +23,8 @@ interface TourStatsSyncPort {
 
     /**
      * [startDate]~[endDate] 구간의 시군구 방문자수(양끝 포함).
+     *
+     * **이 종만 지역 인자가 없다** — API에 지역 필터가 없어 날짜만 주면 전 지역이 온다.
      *
      * **하루씩 부르지 않고 구간으로 받는다** — API가 날짜 범위를 지원하므로 30일치가 호출
      * 1건이다. 매 실행이 최근 구간을 통째로 다시 받아 upsert하면, 배치가 며칠 실패해도
@@ -33,18 +37,36 @@ interface TourStatsSyncPort {
         numOfRows: Int,
     ): TourStatsSyncPage<SyncVisitorCountCommand>
 
-    /** [baseDate] 기준으로 발표된 향후 30일 집중률 예측(R5). 행마다 대상일이 다르다. */
+    /**
+     * [areaCd] 시도 · [signguCd] 시군구의 집중률 예측(R5).
+     *
+     * **날짜 인자가 없다** — 이 오퍼레이션은 어떤 날짜 파라미터도 받지 않으며(`baseYmd` ·
+     * `startYmd` · `baseYm` 모두 `INVALID_REQUEST_PARAMETER_ERROR`), 한 시군구를 요청하면
+     * 향후 예측일이 전부 온다. 대상일은 응답 행의 `baseYmd`에 실려 행마다 다르다.
+     */
     fun fetchConcentrationRates(
-        baseDate: LocalDate,
+        areaCd: String,
+        signguCd: String,
         pageNo: Int,
         numOfRows: Int,
     ): TourStatsSyncPage<SyncConcentrationRateCommand>
 
-    /** [baseMonth]의 체류 강도. */
-    fun fetchStayIntensities(baseMonth: YearMonth, pageNo: Int, numOfRows: Int): TourStatsSyncPage<SyncDemandIntensityCommand>
+    /** [areaCd] · [signguCd]의 [baseMonth] 체류 강도. 월 인자는 `baseYm` 하나다(구간 아님). */
+    fun fetchStayIntensities(
+        areaCd: String,
+        signguCd: String,
+        baseMonth: YearMonth,
+        pageNo: Int,
+        numOfRows: Int,
+    ): TourStatsSyncPage<SyncDemandIntensityCommand>
 
-    /** [baseMonth]의 소비 강도. 외지인 소비이며 외국인 소비 지표는 없다(spec §4.7). */
+    /**
+     * [areaCd] · [signguCd]의 [baseMonth] 소비 강도. 외지인 소비이며 외국인 소비 지표는
+     * 없다(spec §4.7).
+     */
     fun fetchSpendingIntensities(
+        areaCd: String,
+        signguCd: String,
         baseMonth: YearMonth,
         pageNo: Int,
         numOfRows: Int,
