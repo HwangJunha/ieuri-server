@@ -55,8 +55,13 @@ class KtoBigDataSyncJobConfig(
             pageSize = properties.pageSize,
             sigunguCodePort = sigunguCodePort,
             fetchPage = { runDate, pageNo ->
+                // 최근 구간을 매번 통째로 다시 받는다 — 자연키 upsert라 행이 늘지 않고(R7),
+                // 배치가 며칠 실패해도 다음 성공 실행이 그 구멍을 메운다. 하루치만 받으면
+                // 실패한 날의 데이터가 영구히 비는데, 아무도 모르는 종류의 결손이다.
+                val endDate = runDate.minusDays(syncProperties.visitorLagDays)
                 syncPort.fetchVisitorCounts(
-                    runDate.minusDays(syncProperties.visitorLagDays),
+                    endDate.minusDays(syncProperties.visitorBackfillDays - 1L),
+                    endDate,
                     pageNo,
                     properties.pageSize,
                 )

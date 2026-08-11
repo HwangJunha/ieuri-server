@@ -76,6 +76,14 @@ ieuri:
       # 월 단위 지표의 소급 개월. 매월 16일 발표라 이번 달을 요청하면 대부분 빈 응답이다.
       monthly-lag-months: 1
 
+      # 매 실행이 다시 받아올 방문자수 구간(일). **하루치만 받으면 배치가 실패한 날의
+      # 데이터가 영구히 빈다** — 다음 실행은 그 다음날치를 가져갈 뿐이고, 배치는 매일
+      # 성공하는데 데이터에만 구멍이 남아 아무도 모른다.
+      #
+      # 자연키 upsert라(R7) 재수집해도 행이 늘지 않고 바뀐 값만 갱신된다. API가 날짜 범위를
+      # 지원해 30일치가 호출 1건이다(1일 = 시군구 740행, 페이지 크기 1,000).
+      visitor-backfill-days: ${IEURI_KTO_VISITOR_BACKFILL_DAYS:30}
+
   # 시군구 대표 위치 선정(SPEC-0015 · V46). 잡 이름은 sigunguRepresentativeLocationJob이며
   # 위 ieuri.tourapi.sync.job으로 고른다.
   #

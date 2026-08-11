@@ -19,8 +19,19 @@ import java.time.YearMonth
  */
 interface KtoBigDataSyncPort {
 
-    /** [baseDate] 하루치 시군구 방문자수. */
-    fun fetchVisitorCounts(baseDate: LocalDate, pageNo: Int, numOfRows: Int): KtoSyncPage<SyncVisitorCountCommand>
+    /**
+     * [startDate]~[endDate] 구간의 시군구 방문자수(양끝 포함).
+     *
+     * **하루씩 부르지 않고 구간으로 받는다** — API가 날짜 범위를 지원하므로 30일치가 호출
+     * 1건이다. 매 실행이 최근 구간을 통째로 다시 받아 upsert하면, 배치가 며칠 실패해도
+     * 다음 성공 실행이 구멍을 메운다.
+     */
+    fun fetchVisitorCounts(
+        startDate: LocalDate,
+        endDate: LocalDate,
+        pageNo: Int,
+        numOfRows: Int,
+    ): KtoSyncPage<SyncVisitorCountCommand>
 
     /** [baseDate] 기준으로 발표된 향후 30일 집중률 예측(R5). 행마다 대상일이 다르다. */
     fun fetchConcentrationRates(

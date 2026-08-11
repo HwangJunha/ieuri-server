@@ -46,14 +46,15 @@ class KtoBigDataClient(
     private val log = LoggerFactory.getLogger(javaClass)
 
     override fun fetchVisitorCounts(
-        baseDate: LocalDate,
+        startDate: LocalDate,
+        endDate: LocalDate,
         pageNo: Int,
         numOfRows: Int,
     ): KtoSyncPage<SyncVisitorCountCommand> {
         val uri = uriFor(KtoBigDataProperties.SERVICE_DATA_LAB, OP_VISITOR_COUNT, pageNo, numOfRows) {
-            // 시작일·종료일을 같은 날로 준다 — 하루치만 받는다. 지역 필터 파라미터는 없다(§4.3).
-            queryParam("startYmd", baseDate.format(DATE_FORMAT))
-            queryParam("endYmd", baseDate.format(DATE_FORMAT))
+            // 구간을 통째로 받는다 — 지역 필터 파라미터가 없어 날짜만 주면 전 지역이 온다(§4.3).
+            queryParam("startYmd", startDate.format(DATE_FORMAT))
+            queryParam("endYmd", endDate.format(DATE_FORMAT))
         }
         return fetchPage(uri, VISITOR_COUNT_TYPE) { it.toSyncCommandOrNull() }
     }
