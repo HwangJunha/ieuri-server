@@ -90,6 +90,6 @@ class SeoulOpenDataClient(
 
     private companion object {
         /** 인구·상권·문화행사 세 블록을 한 번에 주는 오퍼레이션. */
-        const val SERVICE = "seoulOpenData"
+        const val SERVICE = "citydata"
     }
 }
