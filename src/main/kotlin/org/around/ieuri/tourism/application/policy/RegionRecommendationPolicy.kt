@@ -7,18 +7,14 @@ import org.around.ieuri.tourism.domain.vo.RegionScoreWeights
 /**
  * 지역 추천 정책값(SPEC-0015 R19·R30, 설정에서 주입).
  *
- * 여기 담긴 계수는 전부 **실측 전 잠정값**이다(§3.3 · POL-044) — 코드 상수로 박지 않고 설정으로
- * 뺀 이유가 그것이다. 값이 바뀌어도 코드는 바뀌지 않는다.
- *
  * @param weights 항목별 가중치. 미지정 항목은 균등 가중이다.
  * @param distanceScoring 거리 감쇠. 반감 거리에서 거리 점수가 50점이 된다.
- * @param freshnessDecay 오래된 지표의 점수 감쇠. **방문자수에만 적용한다**(§신선도).
- * @param minFactorCount 추천 대상이 되기 위한 최소 산출 항목 수(R30). **경계값은 포함되고,
- *   거리도 한 항목으로 세어진다** — origin이 필수라 항상 산출되므로 지표 4종은 5항목이다.
- * @param minDistrictsPerProvince 시도가 후보로 남기 위한 최소 시군구 수. **경계값은 포함된다.**
- *   선택지가 이보다 적은 시도는 "근처 다른 곳"이 성립하지 않아 통째로 빠진다.
+ * @param freshnessDecay 오래된 지표의 점수 감쇠. **방문자수에만 적용한다.**
+ * @param minFactorCount 최소 산출 항목 수(R30). **경계값은 포함되고, 거리도 한 항목으로
+ *   세어진다** — 지표 4종은 5항목이다.
+ * @param minDistrictsPerProvince 시도가 후보로 남기 위한 최소 시군구 수. 경계값은 포함된다.
  * @param defaultLimit limit 미지정 시 개수.
- * @param maxLimit 개수 상한(POL-018). **초과는 거절이 아니라 클램프**이며, 0 이하만 거절이다(R29).
+ * @param maxLimit 개수 상한(POL-018). **초과는 클램프**이며, 0 이하만 거절이다(R29).
  */
 data class RegionRecommendationPolicy(
     val weights: RegionScoreWeights,

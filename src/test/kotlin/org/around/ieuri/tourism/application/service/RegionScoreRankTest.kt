@@ -13,7 +13,6 @@ import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.FreshnessDecay
 import org.around.ieuri.tourism.domain.vo.RegionScoreFactor
 import org.around.ieuri.tourism.domain.vo.RegionScoreWeights
-import java.time.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -26,8 +25,6 @@ import kotlin.test.assertTrue
  * 라고 말할 수 없게 된다.
  */
 class RegionScoreRankTest {
-
-    private val today = LocalDate.of(2026, 8, 11)
 
     /** 관심사는 순위뿐이라 최소 항목 수·시도 규모 필터를 무력화한다. */
     private fun policy(minFactorCount: Int = 1) = RegionRecommendationPolicy(
@@ -66,7 +63,7 @@ class RegionScoreRankTest {
             provinceName = AreaName(ko = "서울특별시", en = "Seoul", ja = null, zh = null),
             center = Coordinates(latitude = 37.5, longitude = 127.05),
         ),
-        metrics = metrics.mapValues { (_, value) -> RegionMetric(value, today) },
+        metrics = metrics.mapValues { (_, value) -> RegionMetric(value) },
     )
 
     private fun query(limit: Int = 10) =
@@ -210,7 +207,7 @@ class RegionScoreRankTest {
                 provinceName = AreaName(ko = "서울특별시", en = "Seoul", ja = null, zh = null),
                 center = Coordinates(latitude = latitude, longitude = 127.05),
             ),
-            metrics = mapOf(RegionScoreFactor.STAY_INTENSITY to RegionMetric(50.0, today)),
+            metrics = mapOf(RegionScoreFactor.STAY_INTENSITY to RegionMetric(50.0)),
         )
 
         val service = service(listOf(at("11110", 37.90), at("11170", 37.50), at("11200", 37.70)))

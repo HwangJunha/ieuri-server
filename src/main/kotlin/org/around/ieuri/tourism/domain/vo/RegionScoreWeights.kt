@@ -1,10 +1,10 @@
 package org.around.ieuri.tourism.domain.vo
 
 /**
- * 항목별 가중치(SPEC-0015 R12). 실측 근거가 없어 설정에서 주입되는 미결값이다(POL-044 · §3.3).
+ * 항목별 가중치(SPEC-0015 R12).
  *
- * 누락된 항목의 가중치는 [DEFAULT_WEIGHT]다 — 가중치 부재는 "그 항목을 쓰지 않겠다"가 아니라
- * 설정이 덜 채워졌다는 뜻이므로, 항목을 조용히 죽이는 0보다 균등 가중이 안전하다.
+ * **누락된 항목의 가중치는 0이 아니라 [DEFAULT_WEIGHT]다** — 설정이 덜 채워진 것을 항목을
+ * 죽이는 것으로 해석하지 않는다.
  */
 data class RegionScoreWeights(
     private val weights: Map<RegionScoreFactor, Double>,
@@ -18,7 +18,7 @@ data class RegionScoreWeights(
     companion object {
         const val DEFAULT_WEIGHT = 1.0
 
-        /** 다섯 항목 균등 가중. 설정이 확정되기 전의 출발점이며 상수 정책이 아니다. */
+        /** 다섯 항목 균등 가중. */
         fun uniform(): RegionScoreWeights =
             RegionScoreWeights(RegionScoreFactor.entries.associateWith { DEFAULT_WEIGHT })
     }

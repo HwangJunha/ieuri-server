@@ -12,14 +12,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties
  * [serviceKey]는 4종 공용 단일 키이며 **환경변수로만 주입한다**(응답·로그·GraphQL 어디에도 노출
  * 금지). 사전 인코딩된 상태로 보관될 수 있어 URI 빌드 시 재인코딩하지 않는다.
  *
- * **아래 점수 계수는 전부 잠정값이다(§7.7 · POL-044).** 실측 근거가 없어 코드 상수로 박지 않고
- * 설정으로 뺐으나, 값이 없어도 앱이 기동해야 하므로 기본값을 둔다. 데이터가 쌓인 뒤 확정한다.
+ * 점수 계수는 값이 없어도 앱이 기동하도록 기본값을 둔다.
  *
  * @param baseUrls 서비스 키([SERVICE_DATA_LAB] 등)→base-url.
- * @param scoreWeights 항목별 가중치. 미지정 항목은 [org.around.ieuri.tourism.domain.vo.RegionScoreWeights.DEFAULT_WEIGHT].
- * @param distanceHalfLifeMeters 거리 감쇠 반감 거리(m). 이 거리에서 거리 점수가 50점이다.
- * @param freshnessPlateauDays / @param freshnessHalfLifeDays 지표 신선도 감쇠(방문자수 전용).
- * @param minFactorCount 추천 대상이 되기 위한 최소 산출 항목 수(R30). 경계값은 포함된다.
+ * @param minFactorCount 최소 산출 항목 수(R30). 경계값은 포함된다.
  * @param minDistrictsPerProvince 시도가 후보로 남기 위한 최소 시군구 수. 경계값은 포함된다.
  * @param defaultLimit / @param maxLimit 추천 결과 기본 개수와 상한(R19 · POL-018). 초과는 클램프.
  */
@@ -44,48 +40,30 @@ data class TourStatsProperties(
     val stayIndexCode: String = "21",
     val spendingIndexCode: String = "22",
 
-    // --- 이하 잠정값(§7.7 실측 전) ---
-
-    /**
-     * 항목별 가중치. 사용자 판단이며 실측값이 아니다 — 균등 1.0 잠정값을 대체한다.
-     * 집중률(예측이라 신뢰도가 높음)과 체류·소비 강도(높을수록 좋은 관광지)를 올렸다.
-     */
+    /** 항목별 가중치. 미지정 항목은 균등 가중이다. */
     val scoreWeights: Map<RegionScoreFactor, Double> = emptyMap(),
 
-    /**
-     * 신선도 감쇠 유예 일수. 이 일수까지는 감쇠하지 않는다(계수 1.0).
-     * 기본 7 — 방문자수가 주 단위로 들어와 일주일 지연은 정상 주기다.
-     */
+    /** 신선도 감쇠 유예 일수. 이 일수까지는 감쇠하지 않는다(계수 1.0). */
     val freshnessPlateauDays: Long = 7,
 
-    /**
-     * 신선도 반감기(일). 유예 이후 이 일수마다 계수가 절반이 된다.
-     * 기본 23 — 유예 7일과 합쳐 30일 경과 시 정확히 0.5가 된다(사용자 지정 목표).
-     */
+    /** 신선도 반감기(일). 유예 이후 이 일수마다 계수가 절반이 된다. */
     val freshnessHalfLifeDays: Double = 23.0,
 
-    /**
-     * 잠정: 30km. SPEC-0013 검색의 5km를 그대로 쓰지 않는다 — 그것은 spot 단위 실측값이고
-     * 여기는 시군구 단위라 규모가 다르다(§3.3). 시군구 하나의 지름이 대략 이 규모다.
-     */
-    val distanceHalfLifeMeters: Double = 30_000.0,
+    /** 거리 감쇠 반감 거리(m). 이 거리에서 거리 점수가 50점이다. */
+    val distanceHalfLifeMeters: Double = 8_000.0,
 
     /**
-     * 5. 지표 4종이 모두 있는 지역만 추천한다 — **거리가 항상 한 항목으로 세어지므로**
-     * (origin이 필수 인자다) 지표 4종은 5항목이다. 4로 두면 지표 3종짜리가 통과한다
-     * (실측: 화성시가 체류·소비 결측인데도 7위).
+     * 최소 산출 항목 수. **거리가 항상 한 항목으로 세어지므로** 지표 4종이 모두 있는 지역만
+     * 남기려면 5다.
      */
     val minFactorCount: Int = 5,
 
     /**
      * 시도가 추천 후보가 되기 위한 최소 시군구 수. 이보다 적은 시도는 통째로 빠진다.
-     *
-     * 기본 3 — 세종(1)·제주(2)는 "여기 말고 근처 저기"가 성립하지 않는다. 행정구역은 바뀌므로
-     * 코드에 시도 목록을 박지 않고 데이터에서 센다.
+     * 행정구역은 바뀌므로 시도 목록을 코드에 박지 않고 데이터에서 센다.
      */
     val minDistrictsPerProvince: Int = 3,
 
-    /** 잠정: 10 / 50. 목록 화면 한 스크롤 분량을 기준으로 잡았다. */
     val defaultLimit: Int = 10,
     val maxLimit: Int = 50,
 ) {

@@ -22,19 +22,12 @@ import org.springframework.stereotype.Service
 /**
  * 지역 추천 조회 유스케이스 구현(SPEC-0015, CQRS 읽기).
  *
- * 순서가 곧 설계다: **origin의 시도 판정** → 그 시도만 적재 → 후보 선별([selectCandidates])
- * → **남은 후보 집합에서 정규화 구간 산출**(§3.3) → 신선도 감쇠 → 거리 항목 가산 → 가중합
- * (R30 미만은 탈락) → **항목별 순위 산출**([rankByFactor]) → 총점 내림차순 정렬(R16) → 개수 제한.
+ * 순서가 곧 설계다: **origin의 시도 판정** → 그 시도만 적재 → 후보 선별 → **남은 후보
+ * 집합에서 정규화 구간 산출** → 신선도 감쇠 → 거리 항목 가산 → 가중합(R30 미만은 탈락) →
+ * **항목별 순위 산출** → 총점 내림차순 정렬(R16) → 개수 제한.
  *
- * **시도 판정이 맨 앞이다.** 추천 대상이 origin의 시도로 한정되므로(R21) 그 밖은 읽지 않는다.
- * 척도도 실제로 비교 가능한 집합에서 나와야 한다 — 전국에서 뽑은 구간을 한 시도에 적용하면
- * 그 시도 안의 차이가 눌린다.
- *
- * 정규화 구간도 순위도 후보 집합 전체에서 나오기 때문에 **한 지역만 따로 계산할 수 없다.**
- * 상한을 먼저 적용하면 둘 다 달라지므로 자르기는 마지막이다.
- *
- * **총점은 응답에 나가지 않는다** — 정렬 키로만 쓴다. 가중평균이라 값이 늘 항목 점수들
- * 사이에 놓여, 1위 지역조차 낮은 점수로 보인다.
+ * 정규화 구간도 순위도 후보 집합 전체에서 나오므로 **한 지역만 따로 계산할 수 없고**,
+ * 상한을 먼저 적용하면 둘 다 달라지므로 **자르기는 마지막이다.**
  */
 @Service
 class RegionRecommendationService(
@@ -46,15 +39,12 @@ class RegionRecommendationService(
         query: RecommendedRegionQuery,
         locale: DomainLocale,
     ): RecommendedRegionView {
-        // 어느 시군구에도 걸리지 않는 좌표(바다·해외)는 빈 목록이다 — 오류도, 전국 폴백도
-        // 아니다. 좁힐 시도를 모르면 "근처의 다른 곳"이라는 질문 자체가 성립하지 않는다.
+        // 어느 시군구에도 걸리지 않는 좌표(바다·해외)는 빈 목록이다 — 오류도, 전국 폴백도 아니다.
         val originDistrict = regionMetricQueryPort.findDistrictAt(query.origin)
             ?: return RecommendedRegionView(regions = emptyList())
 
         val loaded = loadMetricRows(originDistrict.provinceCode)
-        // 선택지가 [RegionRecommendationPolicy.minDistrictsPerProvince] 미만인 시도(세종·제주)
-        // 에서는 추천이 성립하지 않는다. 자기 지역을 뺀 나머지가 아니라 시도 전체를 센다 —
-        // 기준은 "이 시도가 고를 만한 곳인가"다.
+        // 자기 지역을 뺀 나머지가 아니라 시도 전체를 센다 — 기준은 "이 시도가 고를 만한 곳인가"다.
         if (loaded.size < policy.minDistrictsPerProvince) {
             return RecommendedRegionView(regions = emptyList())
         }
@@ -69,19 +59,15 @@ class RegionRecommendationService(
             ScoredRegion(row, factors, totalScore)
         }
 
-        // **순위는 자르기 전에 매긴다** — 정규화가 그런 것과 같은 이유다(§3.3). 상한을 먼저
-        // 적용하면 모수가 반환 건수로 줄어, 클라이언트가 보는 순위가 요청한 개수에 따라 달라진다.
+        // **순위는 take(limit) 전에 매긴다** — 뒤로 미루면 모수가 반환 건수로 줄어 순위가
+        // 요청 개수에 따라 달라진다.
         val ranks = rankByFactor(scored)
         val regions = scored
-            // **총점 단일 기준이다**(R16). 총점은 계약에 없지만 정렬 키로는 그대로 쓴다.
-            // 항목 수를 섞으면 "덜 알려진 지역이 무조건 밀린다"는 다른 편향이 생긴다.
-            // 동점은 코드 오름차순으로 안정화한다.
+            // 총점 단일 기준이다(R16). 동점은 코드 오름차순으로 안정화한다.
             .sortedWith(compareByDescending<ScoredRegion> { it.totalScore.total }.thenBy { it.code })
             .take(query.limit)
             .map { it.toView(locale, ranks) }
 
-        // 적재된 데이터가 없으면 전 지역이 최소 항목 수(R30)에 걸려 빈 목록이 된다 —
-        // 별도 분기가 필요 없다. 기준 시점은 항목별로 각 점수에 실린다(R20).
         return RecommendedRegionView(regions = regions)
     }
 
@@ -89,8 +75,8 @@ class RegionRecommendationService(
     /**
      * 항목별 순위를 **후보 전체에서** 매긴다 — 반환 건수와 무관한 값이어야 한다.
      *
-     * 기준은 [RegionScore.value] 내림차순 하나뿐이다. 혼잡도의 "덜 붐빌수록 좋다"는 이미
-     * 정규화에서 뒤집혀 값에 반영돼 있어(ScoreNormalization.normalize) 항목별 분기가 없다.
+     * 기준은 [RegionScore.value] 내림차순 하나뿐이다 — 혼잡도의 방향 반전은 이미 정규화에서
+     * 값에 반영돼 있어 여기에 항목별 분기가 없다.
      *
      * 동점은 **같은 순위를 받고 다음 순위를 건너뛴다**(표준 경쟁 순위: 1, 2, 2, 4). 모수는
      * 그 항목이 산출된 지역뿐이라 항목마다 다르다.
@@ -125,7 +111,6 @@ class RegionRecommendationService(
         scores = factors.map { factor ->
             RegionScoreView(
                 score = factor.score,
-                basisAt = factor.basisAt,
                 // 점수를 만든 그 집합에서 매긴 순위라 키가 반드시 있다.
                 rank = ranks.getValue(FactorRankKey(code, factor.score.factor)),
             )
@@ -135,11 +120,8 @@ class RegionRecommendationService(
     )
 
     /**
-     * 추천 후보 선별 — 자기 지역만 뺀다. 추천은 "여기 말고 근처 저기"라 origin이 들어앉은
-     * 시군구는 추천이 아니라 현재 위치 확인이다.
-     *
-     * 같은 시도로 좁히는 일과 소규모 시도 제외는 여기 없다. 앞의 둘은 각각 질의 조건과
-     * 호출부 가드로 옮겼다 — 226건을 읽어 202건을 버리던 자리다.
+     * 추천 후보 선별 — 자기 지역만 뺀다. 같은 시도로 좁히는 일은 질의 조건이, 소규모 시도
+     * 제외는 호출부 가드가 이미 했다.
      */
     private fun selectCandidates(
         rows: List<RegionMetricRow>,
@@ -148,9 +130,6 @@ class RegionRecommendationService(
 
     /**
      * 한 시도의 지역 목록과 지표 4종을 각각 읽어 **코드로 합친다**.
-     *
-     * 지표마다 집계 단위가 달라 질의를 나눴다(포트 참조). 결합 규칙이 SQL이 아니라 여기
-     * 있으므로, 지표가 늘거나 규칙이 바뀌어도 읽을 곳은 이 함수 하나다.
      *
      * 값이 없는 지표는 맵에 키가 없어 그대로 빠진다 — 0으로 채우지 않는다(POL-043).
      */
@@ -194,39 +173,31 @@ class RegionRecommendationService(
     /**
      * 값이 있고 구간도 있는 항목만 점수가 된다. 결측은 목록에서 빠진다(R14).
      *
-     * **신선도 감쇠는 방문자수에만 건다**([DECAYING_FACTORS]). 나머지 셋은 성격상 나이가
-     * 다르게 취급된다 — 집중률은 애초에 오늘 것만 쓰고, 월 지표는 원래 월 단위라 수십 일
-     * 지난 것이 정상이다. 감쇠는 정규화된 **점수**에 곱한다: 가중치를 깎으면 분모도 함께
-     * 줄어 총점이 그대로다.
+     * **신선도 감쇠는 방문자수에만 건다**([DECAYING_FACTORS]). 감쇠는 가중치가 아니라
+     * 정규화된 **점수**에 곱한다 — 가중치를 깎으면 분모도 함께 줄어 총점이 그대로다.
      */
     private fun RegionMetricRow.normalizedScores(
         normalizations: Map<RegionScoreFactor, ScoreNormalization>,
     ): List<ScoredFactor> = metrics.entries.mapNotNull { (factor, metric) ->
         val normalization = normalizations[factor] ?: return@mapNotNull null
         val score = normalization.normalize(factor, metric.rawValue)
-        // 나이는 DB가 한국 날짜로 계산해 넘긴다 — 앱이 `오늘`을 따로 정하지 않는다.
         val age = metric.ageDays
         val decayed = if (factor in DECAYING_FACTORS && age != null) {
             policy.freshnessDecay.apply(score, age)
         } else {
             score
         }
-        ScoredFactor(score = decayed, basisAt = metric.basisDate)
+        ScoredFactor(score = decayed)
     }
 
-    /**
-     * 거리 항목은 origin이 필수라 항상 붙는다(R21).
-     *
-     * 기준일이 없다 — 적재된 값이 아니라 요청 시점에 계산되기 때문이다.
-     */
+    /** 거리 항목은 origin이 필수라 항상 붙는다(R21). */
     private fun RegionMetricRow.distanceScore(origin: Coordinates): ScoredFactor =
-        ScoredFactor(policy.distanceScoring.score(origin, center), basisAt = null)
+        ScoredFactor(policy.distanceScoring.score(origin, center))
 
     /**
      * 총점까지 산출된 후보 1건 — 순위를 매기고 자르기 전의 중간 상태다.
      *
-     * [totalScore]는 정렬에만 쓰고 응답에는 나가지 않는다. 값이 항상 항목 점수들 사이에
-     * 놓이는 가중평균이라 절대 점수로 보여주면 1위가 낮아 보인다.
+     * [totalScore]는 정렬에만 쓰고 응답에는 나가지 않는다.
      */
     private data class ScoredRegion(
         val row: RegionMetricRow,
@@ -243,12 +214,7 @@ class RegionRecommendationService(
     )
 
     private companion object {
-        /**
-         * 신선도 감쇠를 적용하는 항목.
-         *
-         * 방문자수만 넣는다 — 적재 지연이 실제로 관측된 유일한 항목이다(실측: 최신 기준일이
-         * 약 30일 전). 다른 항목에 같은 감쇠를 걸면 월 지표가 정상 주기만으로 반값이 된다.
-         */
+        /** 신선도 감쇠를 적용하는 항목. 월 지표에 걸면 정상 주기만으로 반값이 된다. */
         val DECAYING_FACTORS = setOf(RegionScoreFactor.VISITOR_VOLUME)
     }
 }

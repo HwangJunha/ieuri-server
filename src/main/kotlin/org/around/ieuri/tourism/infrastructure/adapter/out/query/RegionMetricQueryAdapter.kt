@@ -12,18 +12,15 @@ import org.springframework.transaction.annotation.Transactional
 import java.sql.ResultSet
 
 /**
- * 시군구 추천 지표 조회 어댑터(SPEC-0015 R14·R20·R21).
+ * 시군구 추천 지표 조회 어댑터(SPEC-0015 R14·R21).
  *
- * `district`의 geography 컬럼들이 **JPA 엔티티에 매핑되어 있지 않다** — 매핑하면
- * `ddl-auto: validate`가 기동 시 실패한다. 그래서 이 질의는 생 SQL로 남는다
- * (`CongestionAreaQueryAdapter`·`SpotSpatialQueryAdapter`와 같은 선례).
+ * `district`의 geography 컬럼이 **JPA 엔티티에 매핑되어 있지 않아** 생 SQL로 남는다 —
+ * 매핑하면 `ddl-auto: validate`가 기동 시 실패한다.
  *
- * **지표마다 질의를 나눈다.** 집계 단위가 서로 달라 하나로 묶으면 LATERAL 네 겹이 되고,
- * 지역과 지표를 잇는 규칙이 SQL 안에 숨는다. 결합은 서비스가 코드로 한다.
+ * **지표마다 질의를 나눈다** — 집계 단위가 서로 다르다. 지역과 지표의 결합은 서비스가 한다.
  *
- * **다섯 질의가 전부 시도로 좁혀 읽는다.** KTO 테이블에는 시도 코드가 없어 `district`와
- * 조인해 거른다. 시군구 코드 앞 2자리로 `LIKE`를 거는 편법을 쓰지 않는다 — 그 관계는
- * 코드 체계의 우연이고, `district.province_code`가 그것을 명시하는 컬럼이다.
+ * KTO 테이블에는 시도 코드가 없어 `district`와 조인해 거른다 — 시군구 코드 앞 2자리로
+ * `LIKE`를 걸지 않는다.
  */
 @Component
 class RegionMetricQueryAdapter(
@@ -34,10 +31,8 @@ class RegionMetricQueryAdapter(
      * origin 좌표를 품은 시군구 1건. 경계 안에 없으면 null이다(바다·해외).
      *
      * **`ST_MakePoint`는 (경도, 위도) 순서다** — 뒤집으면 예외 없이 조용히 0건이 된다.
-     * `boundary`가 geography라 인자도 geography로 캐스팅해야 `idx_district_boundary`를 탄다.
-     *
-     * 경계는 겹치지 않지만 부동소수점 경계선에 정확히 걸린 좌표가 2건을 낼 수 있어 `LIMIT 1`을
-     * 둔다 — 어느 쪽이든 인접 시군구라 추천 결과가 실질적으로 달라지지 않는다.
+     * geography로 캐스팅해야 `idx_district_boundary`를 탄다. 경계선에 정확히 걸린 좌표가
+     * 2건을 낼 수 있어 `LIMIT 1`을 둔다.
      */
     @Transactional(readOnly = true)
     override fun findDistrictAt(origin: Coordinates): OriginDistrict? =
@@ -61,12 +56,11 @@ class RegionMetricQueryAdapter(
     /**
      * 한 시도의 추천 후보 시군구 전건.
      *
-     * **좌표는 `center`가 아니라 `representative_location`이다.** `center`는 경계에서 산출한
-     * 기하학적 중심이라 산속처럼 spot이 없는 곳일 수 있다. 추천 결과의 좌표는 실제로 갈 곳이
-     * 있는 지점이어야 하므로 배치가 골라 둔 대표 위치를 내려보낸다(V46).
+     * **좌표는 `center`가 아니라 `representative_location`이다** — `center`는 기하학적
+     * 중심이라 spot이 없는 곳일 수 있다.
      *
-     * **`ST_X`/`ST_Y`는 geometry만 받으므로 `::geometry` 캐스팅이 필요하다.** `ST_X`가 경도,
-     * `ST_Y`가 위도다 — 뒤집으면 조용히 틀린다.
+     * **`ST_X`가 경도, `ST_Y`가 위도다** — 뒤집으면 조용히 틀린다. 둘 다 geometry만 받아
+     * `::geometry` 캐스팅이 필요하다.
      */
     @Transactional(readOnly = true)
     override fun findRegions(provinceCode: String): List<RegionRow> =
@@ -102,23 +96,21 @@ class RegionMetricQueryAdapter(
     /**
      * 그 시도 시군구별 **오늘 예측** 집중률의 평균.
      *
-     * 집중률은 향후 30일치가 함께 오는데, 사용자는 "지금 어디 갈까"를 묻지 30일 뒤를 묻지
-     * 않는다. 먼 날을 고르면 성수기 해수욕장이 "한산한 곳"으로 뒤집힌다(실측: 속초 오늘
-     * 67.4 → 30일 뒤 28.6). 오늘 행이 없으면 미래로 밀지 않고 **결측이다**(R14) — 다른 날의
-     * 예측을 오늘의 혼잡도로 내놓는 것은 조용히 틀린 값이다.
+     * 집중률은 향후 30일치가 함께 오지만 오늘 행만 쓴다. **오늘 행이 없으면 미래로 밀지 않고
+     * 결측이다**(R14) — 다른 날의 예측을 오늘의 혼잡도로 내놓으면 조용히 틀린 값이 된다.
      *
-     * 값이 관광지 단위로 오므로 시군구 점수로 쓰려면 평균으로 묶는다(설계 §3.2).
+     * 값이 관광지 단위로 오므로 시군구 점수로 쓰려면 평균으로 묶는다.
      */
     @Transactional(readOnly = true)
     override fun findConcentrationRates(provinceCode: String): Map<String, RegionMetric> =
         jdbcTemplate.query(
             """
-            SELECT k.district_code, AVG(k.cnctr_rate) AS value, k.target_date AS basis_date
+            SELECT k.district_code, AVG(k.cnctr_rate) AS value
             FROM kto_concentration_rate k
             JOIN district d ON d.code = k.district_code
             WHERE d.province_code = ?
               AND k.target_date = (now() AT TIME ZONE 'Asia/Seoul')::date
-            GROUP BY k.district_code, k.target_date
+            GROUP BY k.district_code
             """.trimIndent(),
             { rs, _ -> rs.getString("district_code") to rs.metric() },
             provinceCode,
@@ -127,16 +119,12 @@ class RegionMetricQueryAdapter(
     /**
      * 그 시도 시군구별 **최근 7일 평균 방문자수(외지인+외국인)**.
      *
-     * 하루에 방문객 구분별로 3행이 있어 한 행만 읽으면 한 구분만 보게 된다. 현지인(1)은
-     * 주민의 일상 이동이라 관광 수요가 아니다 — 포함하면 "사람이 사는 곳"이 추천된다
-     * (실측: 제주시 현지인 487,659 vs 외지인 146,084).
+     * 하루에 방문객 구분별로 3행이 있다 — 현지인(`1`)은 주민의 일상 이동이라 관광 수요가
+     * 아니어서 뺀다. 요일 변동이 커 하루가 아니라 7일을 평균하며, 최신 기준일이 지역마다
+     * 달라 **지역별 최댓값**에서 되짚는다.
      *
-     * 하루만 보면 요일에 따라 40%씩 흔들린다(실측: 강남구 금 1,312,557 vs 일 939,745). 그래서
-     * 그 지역의 최신 기준일부터 7일을 평균한다. 기준일은 지역마다 달라 전역 최댓값이 아니라
-     * **지역별 최댓값**에서 되짚는다.
-     *
-     * 나이(일)는 **DB가 한국 날짜로 계산한다** — 앱에서 재면 앱 시계와 이 질의의 `오늘`이
-     * 서로 다른 날을 가리킬 수 있다(DB가 UTC라 한국 00~09시 구간에서 하루가 어긋난다).
+     * 나이(일)는 **DB가 한국 날짜로 계산한다** — 앱 시계로 재면 DB가 UTC라 한국 00~09시
+     * 구간에서 하루가 어긋난다.
      */
     @Transactional(readOnly = true)
     override fun findVisitorCounts(provinceCode: String): Map<String, RegionMetric> =
@@ -157,7 +145,6 @@ class RegionMetricQueryAdapter(
             )
             SELECT district_code,
                    AVG(day_total) AS value,
-                   MAX(base_date) AS basis_date,
                    ((now() AT TIME ZONE 'Asia/Seoul')::date - MAX(base_date)) AS age_days
             FROM daily
             GROUP BY district_code
@@ -166,7 +153,7 @@ class RegionMetricQueryAdapter(
             provinceCode,
         ).toMap()
 
-    /** 그 시도 시군구별 **최신 월** 체류 강도. 월 단위라 수십 일 지난 값이 정상이며 감쇠하지 않는다. */
+    /** 그 시도 시군구별 **최신 월** 체류 강도. 월 단위라 수십 일 지난 값이 정상이다. */
     @Transactional(readOnly = true)
     override fun findStayIntensities(provinceCode: String): Map<String, RegionMetric> =
         findLatestMonthly("kto_stay_intensity", provinceCode)
@@ -179,14 +166,14 @@ class RegionMetricQueryAdapter(
     /**
      * 월 지표 공통 형태 — 그 시도의 지역마다 자기 최신 월 1행.
      *
-     * [table]은 호출부에서만 오는 상수라 바인딩 대상이 아니다. 외부 입력을 여기 넘기면 안 된다.
-     * [provinceCode]는 반대로 사용자 입력에서 파생되므로 반드시 바인딩한다.
+     * **[table]에 외부 입력을 넘기면 안 된다** — 문자열 결합이라 호출부 상수만 온다.
+     * [provinceCode]는 사용자 입력에서 파생되므로 반드시 바인딩한다.
      */
     private fun findLatestMonthly(table: String, provinceCode: String): Map<String, RegionMetric> =
         jdbcTemplate.query(
             """
             SELECT DISTINCT ON (k.district_code)
-                   k.district_code, k.indicator_value AS value, k.base_month AS basis_date
+                   k.district_code, k.indicator_value AS value
             FROM $table k
             JOIN district d ON d.code = k.district_code
             WHERE d.province_code = ?
@@ -198,7 +185,6 @@ class RegionMetricQueryAdapter(
 
     private fun ResultSet.metric(ageColumn: String? = null) = RegionMetric(
         rawValue = getDouble("value"),
-        basisDate = getDate("basis_date")?.toLocalDate(),
         ageDays = ageColumn?.let { getLong(it).takeIf { _ -> !wasNull() } },
     )
 

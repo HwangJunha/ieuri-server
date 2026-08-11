@@ -12,7 +12,6 @@ import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.FreshnessDecay
 import org.around.ieuri.tourism.domain.vo.RegionScoreFactor
 import org.around.ieuri.tourism.domain.vo.RegionScoreWeights
-import java.time.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -27,8 +26,6 @@ import kotlin.test.assertTrue
  * 어느 쪽도 오류가 아니고 전국으로 되돌아가지도 않는다.
  */
 class RegionCandidateSelectionTest {
-
-    private val today = LocalDate.of(2026, 8, 11)
 
     /**
      * 기본 최소 항목 수가 5인 이유: origin이 필수가 되면서 **거리도 항상 산출되는 한 항목**이라
@@ -69,7 +66,7 @@ class RegionCandidateSelectionTest {
             provinceName = AreaName(ko = "시도$provinceCode", en = "Province $provinceCode", ja = null, zh = null),
             center = Coordinates(latitude = 37.5, longitude = 127.05),
         ),
-        metrics = factors.associateWith { RegionMetric(value, today) },
+        metrics = factors.associateWith { RegionMetric(value) },
     )
 
     private fun query(origin: Coordinates = GANGNAM) =
