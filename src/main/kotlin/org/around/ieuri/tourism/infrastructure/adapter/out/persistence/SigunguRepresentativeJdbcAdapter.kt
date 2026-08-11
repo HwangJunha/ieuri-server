@@ -25,12 +25,16 @@ class SigunguRepresentativeJdbcAdapter(
     ): SigunguRepresentativeRefreshResult {
         // 순서가 중요하다 — 먼저 채우고 나서, 이번에 채워지지 않은 것을 지운다.
         // 정리 문장이 선정 조건을 다시 계산하는 이유는 CLEAR_SQL 주석 참조.
-        val selected = jdbcTemplate.update(SELECT_SQL, cellSizeDegrees, cellSizeDegrees, minSpotCount)
+        //
+        // 두 문장 모두 인자가 (격자 크기, 최소 개수) 둘뿐이다 — SQL의 `?` 개수와 반드시
+        // 맞아야 하며, 어긋나면 실행 시점에야 "column index is out of range"로 드러난다.
+        val selected = jdbcTemplate.update(SELECT_SQL, cellSizeDegrees, minSpotCount)
         val cleared = jdbcTemplate.update(CLEAR_SQL, cellSizeDegrees, minSpotCount)
         return SigunguRepresentativeRefreshResult(selected = selected, cleared = cleared)
     }
 
-    private companion object {
+    /** SQL의 `?` 개수와 인자 개수가 어긋나면 실행 시점에야 드러나므로 테스트가 여기 접근한다. */
+    internal companion object {
         /**
          * 시군구별로 spot이 가장 밀집한 격자를 찾아 **그 격자 안의 실제 spot 좌표**를 대표 위치로 넣는다.
          *
