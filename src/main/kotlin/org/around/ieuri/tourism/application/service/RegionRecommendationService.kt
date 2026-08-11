@@ -37,7 +37,7 @@ class RegionRecommendationService(
         query: RecommendedRegionQuery,
         locale: DomainLocale,
     ): RecommendedRegionView {
-        val rows = regionMetricQueryPort.findLatestMetrics()
+        val rows = loadMetricRows()
         val dataBasisAt = resolveDataBasisAt(rows)
         // 적재된 데이터가 하나도 없으면 기준 시점이 null이고 결과도 비어 있다(R20).
         if (dataBasisAt == null) {
@@ -69,6 +69,34 @@ class RegionRecommendationService(
         // 여기서 regions가 비어 있어도 dataBasisAt은 채워진 채로 나간다 — "데이터는 있으나
         // 조건을 만족한 지역이 없음"과 "아무것도 적재되지 않음"은 다른 상태다(R20).
         return RecommendedRegionView(regions = regions, dataBasisAt = dataBasisAt)
+    }
+
+    /**
+     * 지역 전건과 지표 4종을 각각 읽어 **코드로 결합한다**(설계 §3.2).
+     *
+     * 지표마다 집계 단위가 다르므로(오늘 예측 평균 / 7일 평균 / 최신 월) 질의를 나눠 두고
+     * 여기서 붙인다. 지역에 없는 지표는 맵에 키가 없어 그대로 빠진다 — 0으로 채우지 않는다
+     * (POL-043). 지표가 하나도 없는 지역도 행으로 남으며 최소 항목 수(R30)에서 걸러진다.
+     */
+    private fun loadMetricRows(): List<RegionMetricRow> {
+        val regions = regionMetricQueryPort.findRegions()
+        val byFactor = mapOf(
+            RegionScoreFactor.CONGESTION to regionMetricQueryPort.findConcentrationRates(),
+            RegionScoreFactor.VISITOR_VOLUME to regionMetricQueryPort.findVisitorCounts(),
+            RegionScoreFactor.STAY_INTENSITY to regionMetricQueryPort.findStayIntensities(),
+            RegionScoreFactor.SPENDING_INTENSITY to regionMetricQueryPort.findSpendingIntensities(),
+        )
+
+        return regions.map { region ->
+            RegionMetricRow(
+                region = region,
+                metrics = buildMap {
+                    for ((factor, metrics) in byFactor) {
+                        metrics[region.code]?.let { put(factor, it) }
+                    }
+                },
+            )
+        }
     }
 
     /**
@@ -114,7 +142,7 @@ class RegionRecommendationService(
         val normalization = normalizations[factor] ?: return@mapNotNull null
         val score = normalization.normalize(factor, metric.rawValue)
         // 나이는 DB가 한국 날짜로 계산해 넘긴다 — 앱이 `오늘`을 따로 정하지 않는다.
-        val age = visitorAgeDays
+        val age = metric.ageDays
         val decayed = if (factor in DECAYING_FACTORS && age != null) {
             policy.freshnessDecay.apply(score, age)
         } else {

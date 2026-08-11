@@ -17,6 +17,13 @@ import kotlin.test.assertTrue
  */
 class RegionMetricRowTest {
 
+    private val region = RegionRow(
+        code = "11680",
+        name = AreaName(ko = "강남구", en = "Gangnam-gu", ja = null, zh = null),
+        provinceName = AreaName(ko = "서울특별시", en = "Seoul", ja = null, zh = null),
+        center = Coordinates(latitude = 37.5, longitude = 127.05),
+    )
+
     private fun row(
         concentrationRate: Double? = null,
         concentrationBasisDate: LocalDate? = null,
@@ -27,18 +34,22 @@ class RegionMetricRowTest {
         spendingIntensity: Double? = null,
         spendingBasisMonth: LocalDate? = null,
     ) = RegionMetricRow(
-        code = "11680",
-        name = AreaName(ko = "강남구", en = "Gangnam-gu", ja = null, zh = null),
-        provinceName = AreaName(ko = "서울특별시", en = "Seoul", ja = null, zh = null),
-        center = Coordinates(latitude = 37.5, longitude = 127.05),
-        concentrationRate = concentrationRate,
-        concentrationBasisDate = concentrationBasisDate,
-        visitorCount = visitorCount,
-        visitorBasisDate = visitorBasisDate,
-        stayIntensity = stayIntensity,
-        stayBasisMonth = stayBasisMonth,
-        spendingIntensity = spendingIntensity,
-        spendingBasisMonth = spendingBasisMonth,
+        region = region,
+        // 결측 지표는 맵에 키 자체가 없다 — 질의가 그 지역을 돌려주지 않은 상태다.
+        metrics = buildMap {
+            concentrationRate?.let {
+                put(RegionScoreFactor.CONGESTION, RegionMetric(it, concentrationBasisDate))
+            }
+            visitorCount?.let {
+                put(RegionScoreFactor.VISITOR_VOLUME, RegionMetric(it, visitorBasisDate))
+            }
+            stayIntensity?.let {
+                put(RegionScoreFactor.STAY_INTENSITY, RegionMetric(it, stayBasisMonth))
+            }
+            spendingIntensity?.let {
+                put(RegionScoreFactor.SPENDING_INTENSITY, RegionMetric(it, spendingBasisMonth))
+            }
+        },
     )
 
     @Test
@@ -120,5 +131,17 @@ class RegionMetricRowTest {
         assertEquals(633_341.0, row.metrics.getValue(RegionScoreFactor.VISITOR_VOLUME).rawValue)
         assertNull(row.metrics.getValue(RegionScoreFactor.VISITOR_VOLUME).basisDate)
         assertTrue(row.basisDates.isEmpty())
+    }
+
+    @Test
+    fun `지역 정보는 결합된 지역 행에서 그대로 읽힌다`() {
+        // 결합 결과가 어느 지역의 것인지 잃지 않는다 — 코드가 어긋나면 점수가 남의 지역에 실린다.
+        val row = row(concentrationRate = 67.4, concentrationBasisDate = LocalDate.of(2026, 8, 11))
+
+        assertEquals("11680", row.code)
+        assertEquals("강남구", row.name.ko)
+        assertEquals("서울특별시", row.provinceName.ko)
+        assertEquals(37.5, row.center.latitude)
+        assertEquals(127.05, row.center.longitude)
     }
 }

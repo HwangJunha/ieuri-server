@@ -61,64 +61,44 @@ data class RegionScoreView(
 )
 
 /**
- * 한 시군구의 원본 지표 행(R14 · POL-043). 아웃바운드 질의 포트가 돌려주는 정규화 이전의 값이다.
+ * 추천 후보 시군구 1건. 지표는 여기 없다 — 지표별 질의가 코드로 따로 붙인다.
  *
- * **네 지표가 전부 nullable이며 null은 결측이다.** 0으로 채우지 않는다 — 데이터 부재가 낮은
- * 평가로 둔갑해 신규·소규모 시군구가 부당하게 밀린다. 각 지표의 기준일이 함께 오는 것은
- * 응답의 `dataBasisAt`(R20)과 항목별 `basisAt`이 **실제로 쓰인 데이터**의 시점이어야 하기
- * 때문이다.
- *
- * [visitorCount]는 하루치가 아니라 **최근 7일 평균이며 외지인+외국인만 합산한 값이다.**
- * 하루만 보면 요일에 따라 40%씩 흔들리고(실측: 강남구 금 1,312,557 vs 일 939,745), 현지인을
- * 포함하면 "사람이 사는 곳"이 추천된다(실측: 제주시 현지인 487,659 vs 외지인 146,084).
- * [visitorBasisDate]는 그 7일 중 가장 최근 기준일이다 — 신선도 감쇠가 이 날짜를 쓴다.
+ * [center]는 기하학적 중심이 아니라 배치가 골라 둔 **대표 위치**다(설계 §11). 대표 위치가
+ * 없는 시군구는 애초에 후보에서 빠지므로 이 값은 항상 존재한다.
  */
-data class RegionMetricRow(
+data class RegionRow(
     val code: String,
     val name: AreaName,
     val provinceName: AreaName,
     val center: Coordinates,
-    val concentrationRate: Double?,
-    val concentrationBasisDate: LocalDate?,
-    val visitorCount: Double?,
-    val visitorBasisDate: LocalDate?,
-    /**
-     * 방문자수 기준일로부터 오늘까지의 일수. **DB가 한국 날짜로 계산해 넘긴다** — 앱에서 재면
-     * 앱 시계와 질의의 `오늘`이 서로 다른 날을 가리킬 수 있다(DB가 UTC라 한국 00~09시 구간에서
-     * 하루가 어긋난다). 신선도 감쇠가 이 값을 쓴다.
-     */
-    val visitorAgeDays: Long? = null,
-    val stayIntensity: Double?,
-    val stayBasisMonth: LocalDate?,
-    val spendingIntensity: Double?,
-    val spendingBasisMonth: LocalDate?,
-) {
-    /** 이 행에 실제로 값이 있는 지표의 기준일들. 하나도 없으면 비어 있다. */
-    val basisDates: List<LocalDate>
-        get() = metrics.mapNotNull { (_, metric) -> metric.basisDate }
+)
 
+/**
+ * 한 시군구와 그 지역에서 **실제로 값이 있었던** 지표들(R14 · POL-043).
+ *
+ * 지역 전건과 지표별 맵을 코드에서 결합한 결과다. 결측 지표는 [metrics]에 **키 자체가 없다** —
+ * 0으로 채우지 않는다. 0으로 채우면 데이터 부재가 낮은 평가로 둔갑해 신규·소규모 시군구가
+ * 부당하게 밀린다. 기준일이 지표마다 따로 실리는 것은 응답의 `dataBasisAt`(R20)과 항목별
+ * `basisAt`이 **실제로 쓰인 데이터**의 시점이어야 하기 때문이다.
+ */
+data class RegionMetricRow(
+    val region: RegionRow,
     /**
      * 항목 → (원본 값, 기준일). **값이 있는 항목만** 들어간다(R14).
      *
-     * 정규화 구간 산출·점수 산출·기준일 표기가 전부 이 하나를 보게 묶어 둔다 — 목록이 갈리면
-     * 한쪽에만 추가된 항목이 조용히 사라진다. 거리는 여기 없다: 적재된 값이 아니라 요청
-     * 시점에 계산되기 때문이다.
+     * 정규화 구간 산출·점수 산출·기준일 표기가 전부 이 하나를 본다 — 목록이 갈리면 한쪽에만
+     * 추가된 항목이 조용히 사라진다. 거리는 여기 없다: 적재된 값이 아니라 요청 시점 계산이다.
      */
-    val metrics: Map<RegionScoreFactor, RegionMetric>
-        get() = buildMap {
-            putMetric(RegionScoreFactor.CONGESTION, concentrationRate, concentrationBasisDate)
-            putMetric(RegionScoreFactor.VISITOR_VOLUME, visitorCount, visitorBasisDate)
-            putMetric(RegionScoreFactor.STAY_INTENSITY, stayIntensity, stayBasisMonth)
-            putMetric(RegionScoreFactor.SPENDING_INTENSITY, spendingIntensity, spendingBasisMonth)
-        }
+    val metrics: Map<RegionScoreFactor, RegionMetric>,
+) {
+    val code: String get() = region.code
+    val name: AreaName get() = region.name
+    val provinceName: AreaName get() = region.provinceName
+    val center: Coordinates get() = region.center
 
-    private fun MutableMap<RegionScoreFactor, RegionMetric>.putMetric(
-        factor: RegionScoreFactor,
-        value: Double?,
-        basisDate: LocalDate?,
-    ) {
-        if (value != null) put(factor, RegionMetric(value, basisDate))
-    }
+    /** 이 행에 실제로 값이 있는 지표의 기준일들. 하나도 없으면 비어 있다. */
+    val basisDates: List<LocalDate>
+        get() = metrics.mapNotNull { (_, metric) -> metric.basisDate }
 }
 
 /**
@@ -126,8 +106,13 @@ data class RegionMetricRow(
  *
  * [basisDate]의 null은 값은 있는데 기준일을 모른다는 뜻이다 — 이때 신선도 감쇠는 적용하지
  * 않는다(나이를 알 수 없어 임의로 깎을 근거가 없다).
+ *
+ * [ageDays]는 기준일로부터 오늘까지의 일수이며 **DB가 한국 날짜로 계산해 넘긴다** — 앱에서
+ * 재면 앱 시계와 질의의 `오늘`이 서로 다른 날을 가리킬 수 있다(DB가 UTC라 한국 00~09시
+ * 구간에서 하루가 어긋난다). 신선도 감쇠를 쓰는 방문자수만 채우고 나머지는 null이다.
  */
 data class RegionMetric(
     val rawValue: Double,
     val basisDate: LocalDate?,
+    val ageDays: Long? = null,
 )
