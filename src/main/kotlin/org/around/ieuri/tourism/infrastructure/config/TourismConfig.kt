@@ -30,6 +30,7 @@ import java.time.Duration
     MapViewportProperties::class,
     KtoBigDataProperties::class,
     KtoBigDataSyncProperties::class,
+    SigunguRepresentativeProperties::class,
 )
 class TourismConfig {
 

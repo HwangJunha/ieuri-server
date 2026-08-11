@@ -13,9 +13,13 @@ import java.time.LocalDate
 /**
  * 시군구 추천 지표 조회 어댑터(SPEC-0015 R14·R20).
  *
- * `sigungu.center`가 `geography(Point,4326)`이라 **JPA 엔티티에 매핑되어 있지 않다** — 매핑하면
+ * `sigungu`의 geography 컬럼들이 **JPA 엔티티에 매핑되어 있지 않다** — 매핑하면
  * `ddl-auto: validate`가 기동 시 실패한다. 그래서 이 질의는 생 SQL로 남는다
  * (`CongestionAreaQueryAdapter`·`SpotSpatialQueryAdapter`와 같은 선례).
+ *
+ * **좌표는 `center`가 아니라 `representative_location`을 쓴다.** `center`는 경계에서 산출한
+ * 기하학적 중심이라 산속처럼 spot이 없는 곳일 수 있다. 추천 결과의 좌표는 실제로 갈 곳이
+ * 있는 지점이어야 하므로 배치가 골라 둔 대표 위치를 내려보낸다(V46).
  *
  * **`ST_X`/`ST_Y`는 geometry만 받으므로 `::geometry` 캐스팅이 필요하다.** 캐스팅 없이 부르면
  * 함수를 찾지 못해 실패한다. `ST_X`가 경도, `ST_Y`가 위도다 — 뒤집으면 조용히 틀린다.
@@ -75,8 +79,8 @@ class RegionMetricQueryAdapter(
             SELECT s.code,
                    s.name_ko, s.name_en, s.name_ja, s.name_zh,
                    s.province_name_ko, s.province_name_en, s.province_name_ja, s.province_name_zh,
-                   ST_Y(s.center::geometry) AS center_lat,
-                   ST_X(s.center::geometry) AS center_lng,
+                   ST_Y(s.representative_location::geometry) AS center_lat,
+                   ST_X(s.representative_location::geometry) AS center_lng,
                    c.cnctr_rate, c.cnctr_date,
                    v.tou_num, v.visitor_date,
                    st.stay_value, st.stay_month,
@@ -111,6 +115,9 @@ class RegionMetricQueryAdapter(
                 ORDER BY k.base_month DESC
                 LIMIT 1
             ) sp ON TRUE
+            -- 대표 위치가 없는 시군구는 후보에서 아예 뺀다. 추천해 놓고 그 지역에 갈 곳이
+            -- 없으면 추천이 성립하지 않는다. NULL은 배치가 선정에 실패했다는 뜻이다.
+            WHERE s.representative_location IS NOT NULL
             ORDER BY s.code
         """.trimIndent()
     }

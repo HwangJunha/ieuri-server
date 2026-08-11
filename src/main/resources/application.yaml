@@ -234,7 +234,7 @@ ieuri:
   # 한국관광공사 빅데이터 4종(SPEC-0015). 인증키는 4종 공용 단일 키이며 환경변수로만 주입한다.
   # **키가 비어 있어도 기동에 실패하지 않는다** — 배치 경로에서만 쓰므로 API 서버는 영향이 없다.
   kto-bigdata:
-    service-key: ${IEURI_KTO_BIGDATA_API_KEY:}
+    service-key: ${IEURI_TOUR_API_KEY_ENCODING:}
     # 서비스 경로가 셋으로 갈린다(spec §4.7). tourapi의 언어별 base-url과 성격이 달라
     # 같은 블록에 두지 않는다 — 관광지 조회와 빅데이터의 변경 영향이 서로 번지지 않게.
     base-urls:
