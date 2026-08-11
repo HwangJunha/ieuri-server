@@ -14,17 +14,17 @@ import org.around.ieuri.tourism.domain.vo.RegionScoreWeights
 import java.time.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * `dataBasisAt` 산출(SPEC-0015 R20 · R24).
+ * 항목별 기준일 표기(SPEC-0015 R20 · R24).
  *
- * 지표마다 신선도가 크게 다르다 — 집중률은 오늘(향후 예측), 방문자수는 약 30일 전, 월 지표는
- * 약 2개월 전이다. **가장 최근을 표기하면 "오늘 측정한 데이터"로 읽혀** 실시간이라는 오해를
- * 준다(R24가 금지). 그래서 가장 오래된 기준일을 쓴다.
+ * **응답 전체에 날짜 하나를 두지 않는다.** 지표마다 신선도가 크게 달라(집중률은 오늘 예측,
+ * 방문자수는 수십 일 전, 월 지표는 해당 월 1일) 하나로 압축하면 어느 값을 골라도 나머지
+ * 항목에 대해 틀린 표기가 된다. 기준일은 각 점수에 실린다.
  */
-class RegionDataBasisAtTest {
+class RegionFactorBasisAtTest {
 
     private val policy = RegionRecommendationPolicy(
         weights = RegionScoreWeights.uniform(),
@@ -67,7 +67,7 @@ class RegionDataBasisAtTest {
     private fun query() = RecommendedRegionQuery(origin = null, limit = 10)
 
     @Test
-    fun `기준 시점은 가장 오래된 기준일이다 — 최신을 쓰면 실시간으로 오해된다`() {
+    fun `기준일은 항목마다 자기 값이 실린다 — 하나로 뭉뚱그리지 않는다`() {
         val service = service(
             fixture(
                 code = "11110",
@@ -79,11 +79,14 @@ class RegionDataBasisAtTest {
 
         val view = service.recommendedRegions(query(), DomainLocale.KO)
 
-        assertEquals(LocalDate.of(2026, 6, 1).atStartOfDay(), view.dataBasisAt)
+        val byFactor = view.regions.single().scores.associate { it.score.factor to it.basisAt }
+        assertEquals(LocalDate.of(2026, 8, 11), byFactor[RegionScoreFactor.CONGESTION])
+        assertEquals(LocalDate.of(2026, 7, 12), byFactor[RegionScoreFactor.VISITOR_VOLUME])
+        assertEquals(LocalDate.of(2026, 6, 1), byFactor[RegionScoreFactor.STAY_INTENSITY])
     }
 
     @Test
-    fun `값이 없는 지표의 기준일은 세지 않는다`() {
+    fun `값이 없는 지표는 점수 목록에 아예 없다`() {
         // 월 지표가 결측이면 그 기준일도 후보가 아니다 — 남은 것 중 가장 오래된 날이다.
         val service = service(
             fixture(
@@ -96,18 +99,19 @@ class RegionDataBasisAtTest {
 
         val view = service.recommendedRegions(query(), DomainLocale.KO)
 
-        assertEquals(LocalDate.of(2026, 7, 12).atStartOfDay(), view.dataBasisAt)
+        val factors = view.regions.single().scores.map { it.score.factor }
+        assertFalse(RegionScoreFactor.STAY_INTENSITY in factors)
+        assertFalse(RegionScoreFactor.SPENDING_INTENSITY in factors)
     }
 
     @Test
-    fun `적재된 데이터가 하나도 없으면 기준 시점이 null이고 결과도 비어 있다`() {
+    fun `적재된 데이터가 하나도 없으면 결과가 비어 있다 — 오류가 아니다`() {
         val service = service(
             fixture(code = "11110", concentrationDate = null, visitorDate = null, monthDate = null),
         )
 
         val view = service.recommendedRegions(query(), DomainLocale.KO)
 
-        assertNull(view.dataBasisAt)
         assertTrue(view.regions.isEmpty())
     }
 }

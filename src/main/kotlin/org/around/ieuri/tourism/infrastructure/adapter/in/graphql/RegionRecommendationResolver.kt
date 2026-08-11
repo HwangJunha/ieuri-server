@@ -74,7 +74,6 @@ class RegionRecommendationResolver(
 
     private fun RecommendedRegionView.toGql() = GqlRecommendedRegionResult(
         regions = regions.map { it.toGql() },
-        dataBasisAt = dataBasisAt?.toString(),
     )
 
     private fun RecommendedRegionItemView.toGql() = GqlRecommendedRegion(

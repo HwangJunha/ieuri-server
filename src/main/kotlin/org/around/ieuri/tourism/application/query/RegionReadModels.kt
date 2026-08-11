@@ -5,7 +5,6 @@ import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.domain.vo.RegionScore
 import org.around.ieuri.tourism.domain.vo.RegionScoreFactor
 import java.time.LocalDate
-import java.time.LocalDateTime
 
 /**
  * recommendedRegions 쿼리 입력(SPEC-0015 R19·R21). 언어는 인자가 아니라 Accept-Language에서 온다.
@@ -21,13 +20,9 @@ data class RecommendedRegionQuery(
 /**
  * recommendedRegions 응답(R16·R20).
  *
- * [dataBasisAt]의 **null은 "적재된 데이터가 하나도 없다"** 는 뜻이며, 이때 [regions]도 반드시
- * 비어 있다. 데이터는 적재됐으나 추천 조건(최소 항목 수)을 만족한 지역이 없으면 [regions]가
- * 비어 있어도 [dataBasisAt]은 채워진다 — 두 상태는 다르다.
  */
 data class RecommendedRegionView(
     val regions: List<RecommendedRegionItemView>,
-    val dataBasisAt: LocalDateTime?,
 )
 
 /**
@@ -78,7 +73,7 @@ data class RegionRow(
  *
  * 지역 전건과 지표별 맵을 코드에서 결합한 결과다. 결측 지표는 [metrics]에 **키 자체가 없다** —
  * 0으로 채우지 않는다. 0으로 채우면 데이터 부재가 낮은 평가로 둔갑해 신규·소규모 시군구가
- * 부당하게 밀린다. 기준일이 지표마다 따로 실리는 것은 응답의 `dataBasisAt`(R20)과 항목별
+ * 부당하게 밀린다. 기준일이 지표마다 따로 실리는 것은 항목별
  * `basisAt`이 **실제로 쓰인 데이터**의 시점이어야 하기 때문이다.
  */
 data class RegionMetricRow(

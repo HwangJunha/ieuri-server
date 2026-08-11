@@ -113,7 +113,7 @@ class RegionMetricRowTest {
 
     @Test
     fun `값 없이 기준일만 있는 지표는 항목이 되지 않는다`() {
-        // 결측 지표의 기준일이 dataBasisAt을 오래된 쪽으로 끌어내리면 안 된다.
+        // 값이 없는 지표의 기준일은 어디에도 실리지 않는다 — 항목 자체가 빠지기 때문이다.
         val row = row(
             concentrationRate = 67.4,
             concentrationBasisDate = LocalDate.of(2026, 8, 11),

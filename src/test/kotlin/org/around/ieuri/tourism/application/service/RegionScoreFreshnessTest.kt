@@ -92,7 +92,7 @@ class RegionScoreFreshnessTest {
     }
 
     @Test
-    fun `전체 기준 시점은 항목별 기준일 중 가장 오래된 것이다`() {
+    fun `가장 오래된 항목은 월 지표다 — 항목마다 신선도가 다르다`() {
         val service = service(
             fixture(code = "11680", visitorCount = 633_341.0, visitorDate = LocalDate.of(2026, 7, 12)),
         )
@@ -101,7 +101,6 @@ class RegionScoreFreshnessTest {
 
         val oldest = view.regions.single().scores.mapNotNull { it.basisAt }.min()
         assertEquals(LocalDate.of(2026, 6, 1), oldest)
-        assertEquals(oldest.atStartOfDay(), view.dataBasisAt)
     }
 
     @Test

@@ -15,7 +15,6 @@ import org.around.ieuri.tourism.domain.vo.RegionScoreFactor
 import org.around.ieuri.tourism.domain.vo.ScoreNormalization
 import org.springframework.stereotype.Service
 import java.time.LocalDate
-import java.time.LocalDateTime
 
 /**
  * 지역 추천 조회 유스케이스 구현(SPEC-0015, CQRS 읽기).
@@ -38,11 +37,6 @@ class RegionRecommendationService(
         locale: DomainLocale,
     ): RecommendedRegionView {
         val rows = loadMetricRows()
-        val dataBasisAt = resolveDataBasisAt(rows)
-        // 적재된 데이터가 하나도 없으면 기준 시점이 null이고 결과도 비어 있다(R20).
-        if (dataBasisAt == null) {
-            return RecommendedRegionView(regions = emptyList(), dataBasisAt = null)
-        }
 
         val normalizations = buildNormalizations(rows)
         val calculator = RegionScoreCalculator(policy.weights, policy.minFactorCount)
@@ -66,17 +60,19 @@ class RegionRecommendationService(
             .sortedWith(compareByDescending<RecommendedRegionItemView> { it.totalScore }.thenBy { it.code })
             .take(query.limit)
 
-        // 여기서 regions가 비어 있어도 dataBasisAt은 채워진 채로 나간다 — "데이터는 있으나
-        // 조건을 만족한 지역이 없음"과 "아무것도 적재되지 않음"은 다른 상태다(R20).
-        return RecommendedRegionView(regions = regions, dataBasisAt = dataBasisAt)
+        // 적재된 데이터가 없으면 전 지역이 최소 항목 수(R30)에 걸려 빈 목록이 된다 —
+        // 별도 분기가 필요 없다. 기준 시점은 항목별로 각 점수에 실린다(R20).
+        return RecommendedRegionView(regions = regions)
     }
 
+
     /**
-     * 지역 전건과 지표 4종을 각각 읽어 **코드로 결합한다**(설계 §3.2).
+     * 지역 목록과 지표 4종을 각각 읽어 **코드로 합친다**.
      *
-     * 지표마다 집계 단위가 다르므로(오늘 예측 평균 / 7일 평균 / 최신 월) 질의를 나눠 두고
-     * 여기서 붙인다. 지역에 없는 지표는 맵에 키가 없어 그대로 빠진다 — 0으로 채우지 않는다
-     * (POL-043). 지표가 하나도 없는 지역도 행으로 남으며 최소 항목 수(R30)에서 걸러진다.
+     * 지표마다 집계 단위가 달라 질의를 나눴다(포트 참조). 결합 규칙이 SQL이 아니라 여기
+     * 있으므로, 지표가 늘거나 규칙이 바뀌어도 읽을 곳은 이 함수 하나다.
+     *
+     * 값이 없는 지표는 맵에 키가 없어 그대로 빠진다 — 0으로 채우지 않는다(POL-043).
      */
     private fun loadMetricRows(): List<RegionMetricRow> {
         val regions = regionMetricQueryPort.findRegions()
@@ -98,19 +94,6 @@ class RegionRecommendationService(
             )
         }
     }
-
-    /**
-     * 실제로 **쓰인** 데이터의 기준 시점(R20). 값이 하나도 없으면 null이다.
-     *
-     * **가장 최근이 아니라 가장 오래된 기준일이다.** 지표마다 신선도가 크게 다르다(실측:
-     * 집중률은 오늘, 방문자수는 30일 전, 월 지표는 2개월 전). 최신값을 표기하면 "오늘 측정한
-     * 데이터"로 읽혀 실시간이라는 오해를 준다 — R24가 금지하는 바로 그 표기다. 가장 오래된
-     * 것을 쓰면 "적어도 이 시점까지의 데이터"라는 보수적이고 참인 진술이 된다.
-     *
-     * 항목마다 다른 기준일은 각 점수의 `basisAt`에 따로 실린다 — 이 값은 그 최솟값이다.
-     */
-    private fun resolveDataBasisAt(rows: List<RegionMetricRow>): LocalDateTime? =
-        rows.flatMap(RegionMetricRow::basisDates).minOrNull()?.atStartOfDay()
 
     /**
      * 항목별 정규화 구간을 **적재된 집합에서** 뽑는다(§3.3).
