@@ -31,24 +31,24 @@ interface TourStatsSyncPort {
         endDate: LocalDate,
         pageNo: Int,
         numOfRows: Int,
-    ): KtoSyncPage<SyncVisitorCountCommand>
+    ): TourStatsSyncPage<SyncVisitorCountCommand>
 
     /** [baseDate] 기준으로 발표된 향후 30일 집중률 예측(R5). 행마다 대상일이 다르다. */
     fun fetchConcentrationRates(
         baseDate: LocalDate,
         pageNo: Int,
         numOfRows: Int,
-    ): KtoSyncPage<SyncConcentrationRateCommand>
+    ): TourStatsSyncPage<SyncConcentrationRateCommand>
 
     /** [baseMonth]의 체류 강도. */
-    fun fetchStayIntensities(baseMonth: YearMonth, pageNo: Int, numOfRows: Int): KtoSyncPage<SyncDemandIntensityCommand>
+    fun fetchStayIntensities(baseMonth: YearMonth, pageNo: Int, numOfRows: Int): TourStatsSyncPage<SyncDemandIntensityCommand>
 
     /** [baseMonth]의 소비 강도. 외지인 소비이며 외국인 소비 지표는 없다(spec §4.7). */
     fun fetchSpendingIntensities(
         baseMonth: YearMonth,
         pageNo: Int,
         numOfRows: Int,
-    ): KtoSyncPage<SyncDemandIntensityCommand>
+    ): TourStatsSyncPage<SyncDemandIntensityCommand>
 }
 
 /**
@@ -57,7 +57,7 @@ interface TourStatsSyncPort {
  * [droppedCount]는 필수 필드 누락·숫자 파싱 실패로 어댑터가 버린 행 수다(관측용). 응답 스키마가
  * 문서로 확정되지 않아, 이 값이 크면 데이터가 아니라 **우리 DTO의 필드명이 틀렸다는 신호다.**
  */
-data class KtoSyncPage<T>(
+data class TourStatsSyncPage<T>(
     val records: List<T>,
     val totalCount: Int,
     val droppedCount: Int,

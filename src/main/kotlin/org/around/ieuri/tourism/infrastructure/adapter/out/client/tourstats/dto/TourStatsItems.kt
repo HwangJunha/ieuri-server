@@ -14,7 +14,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties
  * 역직렬화가 실패하거나 값이 조용히 반올림된다(spec §4.7 · R4).
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-data class KtoVisitorCountItem(
+data class TourStatsVisitorCountItem(
     /** 시군구 코드. **이 API만 `signguCode`다.** */
     val signguCode: String? = null,
     val signguNm: String? = null,
@@ -32,7 +32,7 @@ data class KtoVisitorCountItem(
  * (설계 §3.2). [cnctrRate]는 가장 붐비는 시기를 100으로 둔 상대값이다.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-data class KtoConcentrationRateItem(
+data class TourStatsConcentrationRateItem(
     /** 시군구 코드. 방문자수의 `signguCode`와 표기가 다르다. */
     val signguCd: String? = null,
     val signguNm: String? = null,
@@ -51,7 +51,7 @@ data class KtoConcentrationRateItem(
  * [baseYm]은 `yyyyMM`이고 적재 시 해당 월 1일 `date`로 정규화한다(V44 주석).
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-data class KtoDemandIntensityItem(
+data class TourStatsDemandIntensityItem(
     val signguCd: String? = null,
     val signguNm: String? = null,
     val areaCd: String? = null,

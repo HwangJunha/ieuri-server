@@ -1,6 +1,6 @@
 package org.around.ieuri.tourism.infrastructure.batch
 
-import org.around.ieuri.tourism.application.port.out.client.KtoSyncPage
+import org.around.ieuri.tourism.application.port.out.client.TourStatsSyncPage
 import org.around.ieuri.tourism.application.port.out.persistence.SigunguCodeQueryPort
 import org.slf4j.LoggerFactory
 import org.springframework.batch.core.scope.context.ChunkContext
@@ -30,7 +30,7 @@ class TourStatsSyncTasklet<T>(
     private val datasetName: String,
     private val pageSize: Int,
     private val sigunguCodePort: SigunguCodeQueryPort,
-    private val fetchPage: (LocalDate, Int) -> KtoSyncPage<T>,
+    private val fetchPage: (LocalDate, Int) -> TourStatsSyncPage<T>,
     private val sigunguCodeOf: (T) -> String,
     private val upsert: (List<T>) -> Int,
 ) : Tasklet {

@@ -30,16 +30,18 @@ data class TourStatsResponse<T>(
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     data class Body<T>(
-        val items: Items<T> = Items(),
+        /**
+         * **결과가 없으면 객체가 아니라 빈 문자열 `""`이 온다**(실측 2026-08-11). 고정 타입으로
+         * 받으면 결과 없는 날짜마다 역직렬화가 깨져 **부재가 `UPSTREAM_UNAVAILABLE` 장애로
+         * 둔갑한다**(R8 위반). `ACCEPT_EMPTY_STRING_AS_NULL_OBJECT`가 그 빈 문자열을 null로
+         * 흡수하고, [TourStatsResponse.items]가 null을 빈 목록으로 바꾼다.
+         */
+        val items: Items<T>? = null,
         val numOfRows: Int = 0,
         val pageNo: Int = 0,
         val totalCount: Int = 0,
     )
 
-    /**
-     * 결과가 없을 때 업스트림이 `"items": ""`(빈 문자열)를 주는 경우가 있어 [item]에 기본값을 둔다.
-     * **결과 없음은 장애가 아니다** — 빈 리스트로 흡수하고 예외로 만들지 않는다(R8).
-     */
     @JsonIgnoreProperties(ignoreUnknown = true)
     data class Items<T>(
         val item: List<T> = emptyList(),
@@ -55,7 +57,7 @@ data class TourStatsResponse<T>(
 
     val resultCode: String get() = response.header.resultCode
     val resultMessage: String get() = response.header.resultMsg
-    val items: List<T> get() = response.body.items.item
+    val items: List<T> get() = response.body.items?.item ?: emptyList()
     val totalCount: Int get() = response.body.totalCount
 
     companion object {

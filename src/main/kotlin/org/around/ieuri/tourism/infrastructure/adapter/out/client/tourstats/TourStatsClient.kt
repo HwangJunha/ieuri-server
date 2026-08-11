@@ -6,11 +6,11 @@ import org.around.ieuri.tourism.application.command.SyncVisitorCountCommand
 import org.around.ieuri.tourism.application.exception.UpstreamRateLimitedException
 import org.around.ieuri.tourism.application.exception.UpstreamUnavailableException
 import org.around.ieuri.tourism.application.port.out.client.TourStatsSyncPort
-import org.around.ieuri.tourism.application.port.out.client.KtoSyncPage
+import org.around.ieuri.tourism.application.port.out.client.TourStatsSyncPage
 import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourstats.dto.TourStatsResponse
-import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourstats.dto.KtoConcentrationRateItem
-import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourstats.dto.KtoDemandIntensityItem
-import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourstats.dto.KtoVisitorCountItem
+import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourstats.dto.TourStatsConcentrationRateItem
+import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourstats.dto.TourStatsDemandIntensityItem
+import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourstats.dto.TourStatsVisitorCountItem
 import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourstats.mapper.toSyncCommandOrNull
 import org.around.ieuri.tourism.infrastructure.config.TourStatsProperties
 import org.slf4j.LoggerFactory
@@ -50,7 +50,7 @@ class TourStatsClient(
         endDate: LocalDate,
         pageNo: Int,
         numOfRows: Int,
-    ): KtoSyncPage<SyncVisitorCountCommand> {
+    ): TourStatsSyncPage<SyncVisitorCountCommand> {
         val uri = uriFor(TourStatsProperties.SERVICE_DATA_LAB, OP_VISITOR_COUNT, pageNo, numOfRows) {
             // 구간을 통째로 받는다 — 지역 필터 파라미터가 없어 날짜만 주면 전 지역이 온다(§4.3).
             queryParam("startYmd", startDate.format(DATE_FORMAT))
@@ -63,7 +63,7 @@ class TourStatsClient(
         baseDate: LocalDate,
         pageNo: Int,
         numOfRows: Int,
-    ): KtoSyncPage<SyncConcentrationRateCommand> {
+    ): TourStatsSyncPage<SyncConcentrationRateCommand> {
         val uri = uriFor(TourStatsProperties.SERVICE_TATS_CNCTR_RATE, OP_CONCENTRATION_RATE, pageNo, numOfRows) {
             // 이 오퍼레이션은 발표 기준일 하나를 받고 향후 30일 예측을 함께 돌려준다(R5) —
             // 대상일은 응답 행마다 다르며 우리가 날짜별로 나눠 부르지 않는다.
@@ -76,14 +76,14 @@ class TourStatsClient(
         baseMonth: YearMonth,
         pageNo: Int,
         numOfRows: Int,
-    ): KtoSyncPage<SyncDemandIntensityCommand> =
+    ): TourStatsSyncPage<SyncDemandIntensityCommand> =
         fetchDemandIntensity(OP_STAY_INTENSITY, baseMonth, pageNo, numOfRows)
 
     override fun fetchSpendingIntensities(
         baseMonth: YearMonth,
         pageNo: Int,
         numOfRows: Int,
-    ): KtoSyncPage<SyncDemandIntensityCommand> =
+    ): TourStatsSyncPage<SyncDemandIntensityCommand> =
         fetchDemandIntensity(OP_SPENDING_INTENSITY, baseMonth, pageNo, numOfRows)
 
     /** 체류·소비 강도는 같은 서비스의 다른 오퍼레이션이며 응답 모양도 같다. */
@@ -92,7 +92,7 @@ class TourStatsClient(
         baseMonth: YearMonth,
         pageNo: Int,
         numOfRows: Int,
-    ): KtoSyncPage<SyncDemandIntensityCommand> {
+    ): TourStatsSyncPage<SyncDemandIntensityCommand> {
         val uri = uriFor(TourStatsProperties.SERVICE_AREA_TAR_DEM_DS, operation, pageNo, numOfRows) {
             queryParam("startYm", baseMonth.format(MONTH_FORMAT))
             queryParam("endYm", baseMonth.format(MONTH_FORMAT))
@@ -104,17 +104,17 @@ class TourStatsClient(
      * 한 페이지를 받아 적재 명령으로 옮긴다. 매핑 실패 행은 드랍하고 건수만 센다 — 한 행의
      * 결손이 페이지 전체를 실패시키지 않는다.
      *
-     * **빈 응답은 정상이다** — 빈 [KtoSyncPage]로 돌아가며 예외가 되지 않는다(R8 · §5).
+     * **빈 응답은 정상이다** — 빈 [TourStatsSyncPage]로 돌아가며 예외가 되지 않는다(R8 · §5).
      */
     private fun <I : Any, R : Any> fetchPage(
         uri: URI,
         type: ParameterizedTypeReference<TourStatsResponse<I>>,
         map: (I) -> R?,
-    ): KtoSyncPage<R> {
+    ): TourStatsSyncPage<R> {
         val response = call(uri, type)
         val items = response.items
         val records = items.mapNotNull(map)
-        return KtoSyncPage(
+        return TourStatsSyncPage(
             records = records,
             totalCount = response.totalCount,
             droppedCount = items.size - records.size,
@@ -162,9 +162,16 @@ class TourStatsClient(
         if (status == HTTP_TOO_MANY_REQUESTS) {
             return UpstreamRateLimitedException("KTO 빅데이터 호출 한도를 초과했습니다.", e)
         }
-        // 예외 메시지에 URI가 들어갈 수 있어 그대로 싣지 않는다 — serviceKey가 로그로 샌다.
-        log.warn("KTO 빅데이터 호출 실패: {} status={}", e.javaClass.simpleName, status)
-        return UpstreamUnavailableException("KTO 빅데이터 호출에 실패했습니다.", e)
+        // **URI는 절대 싣지 않는다** — serviceKey가 로그로 샌다. 대신 원인 예외의 클래스명까지
+        // 남긴다: 역직렬화 실패와 네트워크 실패가 여기서 같은 메시지로 합쳐지면 원인을 가릴 수
+        // 없다(실측: `"items": ""` 역직렬화 실패가 네트워크 장애처럼 보였다).
+        log.warn(
+            "관광통계 호출 실패: {} status={} cause={}",
+            e.javaClass.simpleName,
+            status,
+            e.cause?.javaClass?.simpleName ?: "-",
+        )
+        return UpstreamUnavailableException("관광통계 호출에 실패했습니다(${e.javaClass.simpleName}).", e)
     }
 
     /**
@@ -209,10 +216,10 @@ class TourStatsClient(
 
         /** 제네릭 응답 봉투는 타입 소거 때문에 [ParameterizedTypeReference]로 실체화해야 한다. */
         val VISITOR_COUNT_TYPE =
-            object : ParameterizedTypeReference<TourStatsResponse<KtoVisitorCountItem>>() {}
+            object : ParameterizedTypeReference<TourStatsResponse<TourStatsVisitorCountItem>>() {}
         val CONCENTRATION_RATE_TYPE =
-            object : ParameterizedTypeReference<TourStatsResponse<KtoConcentrationRateItem>>() {}
+            object : ParameterizedTypeReference<TourStatsResponse<TourStatsConcentrationRateItem>>() {}
         val DEMAND_INTENSITY_TYPE =
-            object : ParameterizedTypeReference<TourStatsResponse<KtoDemandIntensityItem>>() {}
+            object : ParameterizedTypeReference<TourStatsResponse<TourStatsDemandIntensityItem>>() {}
     }
 }

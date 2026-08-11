@@ -21,7 +21,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 @ConfigurationProperties(prefix = "ieuri.tour-stats.sync")
 data class TourStatsSyncProperties(
     val monthlyLagMonths: Long = 1,
-    val visitorBackfillDays: Long = 30,
+    val visitorBackfillDays: Long = 90,
 ) {
     init {
         require(visitorBackfillDays >= 1) { "visitorBackfillDays는 1 이상이어야 합니다: $visitorBackfillDays" }

@@ -3,9 +3,9 @@ package org.around.ieuri.tourism.infrastructure.adapter.out.client.tourstats.map
 import org.around.ieuri.tourism.application.command.SyncConcentrationRateCommand
 import org.around.ieuri.tourism.application.command.SyncDemandIntensityCommand
 import org.around.ieuri.tourism.application.command.SyncVisitorCountCommand
-import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourstats.dto.KtoConcentrationRateItem
-import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourstats.dto.KtoDemandIntensityItem
-import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourstats.dto.KtoVisitorCountItem
+import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourstats.dto.TourStatsConcentrationRateItem
+import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourstats.dto.TourStatsDemandIntensityItem
+import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourstats.dto.TourStatsVisitorCountItem
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -29,7 +29,7 @@ private val DATE_FORMAT = DateTimeFormatter.ofPattern("uuuuMMdd")
 /** `yyyyMM`. */
 private val MONTH_FORMAT = DateTimeFormatter.ofPattern("uuuuMM")
 
-fun KtoVisitorCountItem.toSyncCommandOrNull(): SyncVisitorCountCommand? {
+fun TourStatsVisitorCountItem.toSyncCommandOrNull(): SyncVisitorCountCommand? {
     val code = signguCode?.trim()?.takeIf { it.isNotEmpty() } ?: return null
     val baseDate = baseYmd.toLocalDateOrNull() ?: return null
     // 구분 코드가 있으면 코드를, 없으면 명칭을 쓴다 — 컬럼은 varchar(32)이고 CHECK이 없어
@@ -46,7 +46,7 @@ fun KtoVisitorCountItem.toSyncCommandOrNull(): SyncVisitorCountCommand? {
     )
 }
 
-fun KtoConcentrationRateItem.toSyncCommandOrNull(): SyncConcentrationRateCommand? {
+fun TourStatsConcentrationRateItem.toSyncCommandOrNull(): SyncConcentrationRateCommand? {
     val code = signguCd?.trim()?.takeIf { it.isNotEmpty() } ?: return null
     val spotName = tAtsNm?.trim()?.takeIf { it.isNotEmpty() } ?: return null
     // 예측 대상일이다. 각 행의 날짜가 서로 다르며 그대로 보존해야 한다(R5).
@@ -62,7 +62,7 @@ fun KtoConcentrationRateItem.toSyncCommandOrNull(): SyncConcentrationRateCommand
 }
 
 /** 체류·소비 강도 공용. 응답 모양이 같아 적재 테이블만 호출자가 고른다. */
-fun KtoDemandIntensityItem.toSyncCommandOrNull(): SyncDemandIntensityCommand? {
+fun TourStatsDemandIntensityItem.toSyncCommandOrNull(): SyncDemandIntensityCommand? {
     val code = signguCd?.trim()?.takeIf { it.isNotEmpty() } ?: return null
     val month = baseYm.toBaseMonthOrNull() ?: return null
     val indicator = cateCd?.trim()?.takeIf { it.isNotEmpty() } ?: return null
