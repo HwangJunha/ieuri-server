@@ -14,10 +14,8 @@ import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.FreshnessDecay
 import org.around.ieuri.tourism.domain.vo.RegionScoreFactor
 import org.around.ieuri.tourism.domain.vo.RegionScoreWeights
-import java.time.Clock
-import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneOffset
+import java.time.temporal.ChronoUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -47,13 +45,13 @@ class RegionScoreFreshnessTest {
             defaultLimit = 10,
             maxLimit = 50,
         ),
-        clock = Clock.fixed(Instant.parse("2026-08-11T00:30:00Z"), ZoneOffset.UTC),
     )
 
     private fun row(
         code: String,
         visitorCount: Double?,
         visitorDate: LocalDate?,
+        visitorAgeDays: Long? = visitorDate?.let { ChronoUnit.DAYS.between(it, today) },
         concentrationRate: Double? = 50.0,
         stayIntensity: Double? = 70.0,
     ) = RegionMetricRow(
@@ -65,6 +63,7 @@ class RegionScoreFreshnessTest {
         concentrationBasisDate = concentrationRate?.let { today },
         visitorCount = visitorCount,
         visitorBasisDate = visitorDate,
+        visitorAgeDays = visitorAgeDays,
         stayIntensity = stayIntensity,
         stayBasisMonth = stayIntensity?.let { LocalDate.of(2026, 6, 1) },
         spendingIntensity = null,

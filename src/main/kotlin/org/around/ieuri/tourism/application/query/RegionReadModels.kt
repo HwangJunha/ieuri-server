@@ -82,6 +82,12 @@ data class RegionMetricRow(
     val concentrationBasisDate: LocalDate?,
     val visitorCount: Double?,
     val visitorBasisDate: LocalDate?,
+    /**
+     * 방문자수 기준일로부터 오늘까지의 일수. **DB가 한국 날짜로 계산해 넘긴다** — 앱에서 재면
+     * 앱 시계와 질의의 `오늘`이 서로 다른 날을 가리킬 수 있다(DB가 UTC라 한국 00~09시 구간에서
+     * 하루가 어긋난다). 신선도 감쇠가 이 값을 쓴다.
+     */
+    val visitorAgeDays: Long? = null,
     val stayIntensity: Double?,
     val stayBasisMonth: LocalDate?,
     val spendingIntensity: Double?,

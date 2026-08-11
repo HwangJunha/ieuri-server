@@ -61,6 +61,7 @@ class RegionMetricQueryAdapter(
         concentrationBasisDate = nullableDate("cnctr_date"),
         visitorCount = nullableDouble("tou_num"),
         visitorBasisDate = nullableDate("visitor_date"),
+        visitorAgeDays = nullableLong("visitor_age_days"),
         stayIntensity = nullableDouble("stay_value"),
         stayBasisMonth = nullableDate("stay_month"),
         spendingIntensity = nullableDouble("spending_value"),
@@ -74,6 +75,9 @@ class RegionMetricQueryAdapter(
     private fun ResultSet.nullableDate(column: String): LocalDate? =
         getDate(column)?.toLocalDate()
 
+    private fun ResultSet.nullableLong(column: String): Long? =
+        getLong(column).takeIf { !wasNull() }
+
     private companion object {
         val SQL = """
             SELECT s.code,
@@ -83,6 +87,10 @@ class RegionMetricQueryAdapter(
                    ST_X(s.representative_location::geometry) AS center_lng,
                    c.cnctr_rate, c.cnctr_date,
                    v.tou_num, v.visitor_date,
+                   -- 지표 나이(일). **한국 날짜 기준으로 DB가 계산한다** — 앱에서 재면
+                   -- 앱 시계와 이 질의의 `오늘`이 서로 다른 날을 가리킬 수 있다(DB가 UTC라
+                   -- 한국 00~09시 구간에서 하루가 어긋난다).
+                   ((now() AT TIME ZONE 'Asia/Seoul')::date - v.visitor_date) AS visitor_age_days,
                    st.stay_value, st.stay_month,
                    sp.spending_value, sp.spending_month
             FROM sigungu s
@@ -96,7 +104,7 @@ class RegionMetricQueryAdapter(
                 SELECT AVG(k.cnctr_rate) AS cnctr_rate, k.target_date AS cnctr_date
                 FROM kto_concentration_rate k
                 WHERE k.sigungu_code = s.code
-                  AND k.target_date = CURRENT_DATE
+                  AND k.target_date = (now() AT TIME ZONE 'Asia/Seoul')::date
                 GROUP BY k.target_date
             ) c ON TRUE
             -- **최근 7일 평균이며 외지인(2)+외국인(3)만 합산한다.**

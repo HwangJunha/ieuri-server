@@ -14,11 +14,8 @@ import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.RegionScoreFactor
 import org.around.ieuri.tourism.domain.vo.ScoreNormalization
 import org.springframework.stereotype.Service
-import java.time.Clock
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.time.ZoneId
-import java.time.temporal.ChronoUnit
 
 /**
  * 지역 추천 조회 유스케이스 구현(SPEC-0015, CQRS 읽기).
@@ -34,7 +31,6 @@ import java.time.temporal.ChronoUnit
 class RegionRecommendationService(
     private val regionMetricQueryPort: RegionMetricQueryPort,
     private val policy: RegionRecommendationPolicy,
-    private val clock: Clock,
 ) : RegionRecommendationUseCase {
 
     override fun recommendedRegions(
@@ -50,10 +46,8 @@ class RegionRecommendationService(
 
         val normalizations = buildNormalizations(rows)
         val calculator = RegionScoreCalculator(policy.weights, policy.minFactorCount)
-        val today = LocalDate.ofInstant(clock.instant(), METRIC_ZONE)
-
         val regions = rows.mapNotNull { row ->
-            val scoreViews = row.normalizedScores(normalizations, today) + row.distanceScore(query.origin)
+            val scoreViews = row.normalizedScores(normalizations) + row.distanceScore(query.origin)
             // 항목 수가 최소 개수 미만이면 null — 추천 대상이 아니다(R30).
             val totalScore = calculator.calculate(scoreViews.map { it.score }) ?: return@mapNotNull null
 
@@ -116,12 +110,13 @@ class RegionRecommendationService(
      */
     private fun RegionMetricRow.normalizedScores(
         normalizations: Map<RegionScoreFactor, ScoreNormalization>,
-        today: LocalDate,
     ): List<RegionScoreView> = metrics.entries.mapNotNull { (factor, metric) ->
         val normalization = normalizations[factor] ?: return@mapNotNull null
         val score = normalization.normalize(factor, metric.rawValue)
-        val decayed = if (factor in DECAYING_FACTORS && metric.basisDate != null) {
-            policy.freshnessDecay.apply(score, ChronoUnit.DAYS.between(metric.basisDate, today))
+        // 나이는 DB가 한국 날짜로 계산해 넘긴다 — 앱이 `오늘`을 따로 정하지 않는다.
+        val age = visitorAgeDays
+        val decayed = if (factor in DECAYING_FACTORS && age != null) {
+            policy.freshnessDecay.apply(score, age)
         } else {
             score
         }
@@ -145,11 +140,5 @@ class RegionRecommendationService(
          * 약 30일 전). 다른 항목에 같은 감쇠를 걸면 월 지표가 정상 주기만으로 반값이 된다.
          */
         val DECAYING_FACTORS = setOf(RegionScoreFactor.VISITOR_VOLUME)
-
-        /**
-         * 지표 나이를 재는 기준 시간대. KTO 데이터의 기준일이 한국 날짜이고, 집중률 질의의
-         * `CURRENT_DATE`도 같은 날짜를 뜻해야 한다. 공용 시계가 UTC라 여기서 명시한다.
-         */
-        val METRIC_ZONE: ZoneId = ZoneId.of("Asia/Seoul")
     }
 }
