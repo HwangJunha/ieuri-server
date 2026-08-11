@@ -1,6 +1,7 @@
 package org.around.ieuri.tourism.application.service
 
 import org.around.ieuri.tourism.application.policy.RegionRecommendationPolicy
+import org.around.ieuri.tourism.application.query.OriginDistrict
 import org.around.ieuri.tourism.application.query.RecommendedRegionItemView
 import org.around.ieuri.tourism.application.query.RecommendedRegionQuery
 import org.around.ieuri.tourism.application.query.RegionMetric
@@ -43,8 +44,17 @@ class RegionScoreFreshnessTest {
         maxLimit = 50,
     )
 
-    private fun service(vararg fixtures: RegionFixture) =
-        RegionRecommendationService(RegionMetricQueryPortStub(fixtures.toList()), policy)
+    /**
+     * origin은 필수 인자다. 경계 판정 결과를 서울(11)로 고정하되 그 시군구 코드는 픽스처에
+     * 없는 값으로 둬 자기 지역 제외가 픽스처를 건드리지 않게 한다 — 관심사는 감쇠다.
+     */
+    private fun service(vararg fixtures: RegionFixture) = RegionRecommendationService(
+        RegionMetricQueryPortStub(
+            fixtures.toList(),
+            OriginDistrict(code = "11999", provinceCode = "11"),
+        ),
+        policy,
+    )
 
     private fun fixture(
         code: String,
@@ -77,7 +87,12 @@ class RegionScoreFreshnessTest {
         },
     )
 
-    private fun query(origin: Coordinates? = null) = RecommendedRegionQuery(origin = origin, limit = 10)
+    /**
+     * 기본 좌표는 픽스처의 대표 좌표와 같다 — 지역이 전부 같은 좌표라 거리 점수가 동일해지고,
+     * 총점 비교에 남는 차이는 오직 감쇠에서 온다.
+     */
+    private fun query(origin: Coordinates = Coordinates(latitude = 37.5, longitude = 127.05)) =
+        RecommendedRegionQuery(origin = origin, limit = 10)
 
     private fun RecommendedRegionItemView.score(factor: RegionScoreFactor) =
         scores.single { it.score.factor == factor }

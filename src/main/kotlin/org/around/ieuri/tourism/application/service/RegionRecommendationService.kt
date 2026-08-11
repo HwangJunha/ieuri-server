@@ -3,6 +3,7 @@ package org.around.ieuri.tourism.application.service
 import org.around.ieuri.tourism.application.policy.RegionRecommendationPolicy
 import org.around.ieuri.tourism.application.port.`in`.query.RegionRecommendationUseCase
 import org.around.ieuri.tourism.application.port.out.query.RegionMetricQueryPort
+import org.around.ieuri.tourism.application.query.OriginDistrict
 import org.around.ieuri.tourism.application.query.RecommendedRegionItemView
 import org.around.ieuri.tourism.application.query.RecommendedRegionQuery
 import org.around.ieuri.tourism.application.query.RecommendedRegionView
@@ -14,17 +15,17 @@ import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.RegionScoreFactor
 import org.around.ieuri.tourism.domain.vo.ScoreNormalization
 import org.springframework.stereotype.Service
-import java.time.LocalDate
 
 /**
  * 지역 추천 조회 유스케이스 구현(SPEC-0015, CQRS 읽기).
  *
- * 순서가 곧 설계다: 원본 적재 → **후보 선별**([selectCandidates]) → **남은 후보 집합에서
- * 정규화 구간 산출**(§3.3) → 신선도 감쇠 → 거리 항목 가산(origin이 있을 때만, R21) → 가중합
+ * 순서가 곧 설계다: **origin의 시도 판정** → 그 시도만 적재 → 후보 선별([selectCandidates])
+ * → **남은 후보 집합에서 정규화 구간 산출**(§3.3) → 신선도 감쇠 → 거리 항목 가산 → 가중합
  * (R30 미만은 탈락) → 총점 내림차순 정렬(R16) → 개수 제한.
  *
- * **선별이 정규화보다 먼저다.** 척도는 실제로 비교 가능한 집합에서 나와야 한다 — 전국에서
- * 뽑은 구간을 한 시도에 적용하면 그 시도 안의 차이가 눌린다.
+ * **시도 판정이 맨 앞이다.** 추천 대상이 origin의 시도로 한정되므로(R21) 그 밖은 읽지 않는다.
+ * 척도도 실제로 비교 가능한 집합에서 나와야 한다 — 전국에서 뽑은 구간을 한 시도에 적용하면
+ * 그 시도 안의 차이가 눌린다.
  *
  * 정규화 구간을 집합 전체에서 뽑기 때문에 **한 지역만 따로 계산할 수 없다** — 척도가 이웃
  * 지역들에 의존한다. 상한을 먼저 적용하면 척도가 바뀌므로 자르기는 마지막이다.
@@ -39,7 +40,19 @@ class RegionRecommendationService(
         query: RecommendedRegionQuery,
         locale: DomainLocale,
     ): RecommendedRegionView {
-        val rows = selectCandidates(loadMetricRows(), query.origin)
+        // 어느 시군구에도 걸리지 않는 좌표(바다·해외)는 빈 목록이다 — 오류도, 전국 폴백도
+        // 아니다. 좁힐 시도를 모르면 "근처의 다른 곳"이라는 질문 자체가 성립하지 않는다.
+        val originDistrict = regionMetricQueryPort.findDistrictAt(query.origin)
+            ?: return RecommendedRegionView(regions = emptyList())
+
+        val loaded = loadMetricRows(originDistrict.provinceCode)
+        // 선택지가 [RegionRecommendationPolicy.minDistrictsPerProvince] 미만인 시도(세종·제주)
+        // 에서는 추천이 성립하지 않는다. 자기 지역을 뺀 나머지가 아니라 시도 전체를 센다 —
+        // 기준은 "이 시도가 고를 만한 곳인가"다.
+        if (loaded.size < policy.minDistrictsPerProvince) {
+            return RecommendedRegionView(regions = emptyList())
+        }
+        val rows = selectCandidates(loaded, originDistrict)
 
         val normalizations = buildNormalizations(rows)
         val calculator = RegionScoreCalculator(policy.weights, policy.minFactorCount)
@@ -70,48 +83,32 @@ class RegionRecommendationService(
 
 
     /**
-     * 추천 후보 선별. 추천은 "여기 말고 **근처** 저기"라서, 비교 대상이 아닌 지역을 먼저 뺀다.
+     * 추천 후보 선별 — 자기 지역만 뺀다. 추천은 "여기 말고 근처 저기"라 origin이 들어앉은
+     * 시군구는 추천이 아니라 현재 위치 확인이다.
      *
-     * 1. **선택지가 적은 시도 제외** — 시군구가 [RegionRecommendationPolicy.minDistrictsPerProvince]
-     *    미만인 시도는 통째로 빠진다. 시도 목록을 박지 않고 적재된 데이터에서 센다.
-     * 2. **자기 지역 제외** — origin이 들어앉은 시군구는 추천이 아니라 현재 위치 확인이다.
-     * 3. **같은 시도만** — 다른 시도는 "근처"가 아니다.
-     *
-     * 2·3은 origin이 있고 그 좌표가 실제 시군구에 걸릴 때만 적용된다. origin이 없거나
-     * 바다·해외라 걸리는 지역이 없으면 **오류가 아니라 전국 대상**이며, 1은 그대로 적용된다.
+     * 같은 시도로 좁히는 일과 소규모 시도 제외는 여기 없다. 앞의 둘은 각각 질의 조건과
+     * 호출부 가드로 옮겼다 — 226건을 읽어 202건을 버리던 자리다.
      */
     private fun selectCandidates(
         rows: List<RegionMetricRow>,
-        origin: Coordinates?,
-    ): List<RegionMetricRow> {
-        val eligibleProvinces = rows.groupingBy { it.provinceCode }.eachCount()
-            .filterValues { it >= policy.minDistrictsPerProvince }
-            .keys
-        val inLargeProvince = rows.filter { it.provinceCode in eligibleProvinces }
-
-        val originDistrict = origin?.let { regionMetricQueryPort.findDistrictAt(it) }
-            ?: return inLargeProvince
-
-        return inLargeProvince.filter {
-            it.code != originDistrict.code && it.provinceCode == originDistrict.provinceCode
-        }
-    }
+        originDistrict: OriginDistrict,
+    ): List<RegionMetricRow> = rows.filter { it.code != originDistrict.code }
 
     /**
-     * 지역 목록과 지표 4종을 각각 읽어 **코드로 합친다**.
+     * 한 시도의 지역 목록과 지표 4종을 각각 읽어 **코드로 합친다**.
      *
      * 지표마다 집계 단위가 달라 질의를 나눴다(포트 참조). 결합 규칙이 SQL이 아니라 여기
      * 있으므로, 지표가 늘거나 규칙이 바뀌어도 읽을 곳은 이 함수 하나다.
      *
      * 값이 없는 지표는 맵에 키가 없어 그대로 빠진다 — 0으로 채우지 않는다(POL-043).
      */
-    private fun loadMetricRows(): List<RegionMetricRow> {
-        val regions = regionMetricQueryPort.findRegions()
+    private fun loadMetricRows(provinceCode: String): List<RegionMetricRow> {
+        val regions = regionMetricQueryPort.findRegions(provinceCode)
         val byFactor = mapOf(
-            RegionScoreFactor.CONGESTION to regionMetricQueryPort.findConcentrationRates(),
-            RegionScoreFactor.VISITOR_VOLUME to regionMetricQueryPort.findVisitorCounts(),
-            RegionScoreFactor.STAY_INTENSITY to regionMetricQueryPort.findStayIntensities(),
-            RegionScoreFactor.SPENDING_INTENSITY to regionMetricQueryPort.findSpendingIntensities(),
+            RegionScoreFactor.CONGESTION to regionMetricQueryPort.findConcentrationRates(provinceCode),
+            RegionScoreFactor.VISITOR_VOLUME to regionMetricQueryPort.findVisitorCounts(provinceCode),
+            RegionScoreFactor.STAY_INTENSITY to regionMetricQueryPort.findStayIntensities(provinceCode),
+            RegionScoreFactor.SPENDING_INTENSITY to regionMetricQueryPort.findSpendingIntensities(provinceCode),
         )
 
         return regions.map { region ->
@@ -166,13 +163,12 @@ class RegionRecommendationService(
     }
 
     /**
-     * 거리 항목은 origin이 있을 때만 붙는다(R21). 부재는 예외가 아니라 빈 목록이다.
+     * 거리 항목은 origin이 필수라 항상 붙는다(R21).
      *
      * 기준일이 없다 — 적재된 값이 아니라 요청 시점에 계산되기 때문이다.
      */
-    private fun RegionMetricRow.distanceScore(origin: Coordinates?): List<RegionScoreView> =
-        origin?.let { listOf(RegionScoreView(policy.distanceScoring.score(it, center), basisAt = null)) }
-            ?: emptyList()
+    private fun RegionMetricRow.distanceScore(origin: Coordinates): RegionScoreView =
+        RegionScoreView(policy.distanceScoring.score(origin, center), basisAt = null)
 
     private companion object {
         /**

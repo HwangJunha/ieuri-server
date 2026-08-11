@@ -45,12 +45,12 @@ class RegionRecommendationResolver(
      */
     @DgsQuery
     fun recommendedRegions(
-        @InputArgument origin: GqlCoordinatesInput?,
+        @InputArgument origin: GqlCoordinatesInput,
         @InputArgument limit: Int?,
     ): GqlRecommendedRegionResult =
         regionRecommendationUseCase.recommendedRegions(
             RecommendedRegionQuery(
-                origin = origin?.toDomain(),
+                origin = origin.toDomain(),
                 limit = resolveLimit(limit),
             ),
             locale = localeContext.locale,

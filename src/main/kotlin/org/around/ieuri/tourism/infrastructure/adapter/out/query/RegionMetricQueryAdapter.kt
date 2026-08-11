@@ -12,7 +12,7 @@ import org.springframework.transaction.annotation.Transactional
 import java.sql.ResultSet
 
 /**
- * 시군구 추천 지표 조회 어댑터(SPEC-0015 R14·R20).
+ * 시군구 추천 지표 조회 어댑터(SPEC-0015 R14·R20·R21).
  *
  * `district`의 geography 컬럼들이 **JPA 엔티티에 매핑되어 있지 않다** — 매핑하면
  * `ddl-auto: validate`가 기동 시 실패한다. 그래서 이 질의는 생 SQL로 남는다
@@ -20,49 +20,15 @@ import java.sql.ResultSet
  *
  * **지표마다 질의를 나눈다.** 집계 단위가 서로 달라 하나로 묶으면 LATERAL 네 겹이 되고,
  * 지역과 지표를 잇는 규칙이 SQL 안에 숨는다. 결합은 서비스가 코드로 한다.
+ *
+ * **다섯 질의가 전부 시도로 좁혀 읽는다.** KTO 테이블에는 시도 코드가 없어 `district`와
+ * 조인해 거른다. 시군구 코드 앞 2자리로 `LIKE`를 거는 편법을 쓰지 않는다 — 그 관계는
+ * 코드 체계의 우연이고, `district.province_code`가 그것을 명시하는 컬럼이다.
  */
 @Component
 class RegionMetricQueryAdapter(
     private val jdbcTemplate: JdbcTemplate,
 ) : RegionMetricQueryPort {
-
-    /**
-     * 추천 후보 시군구 전건.
-     *
-     * **좌표는 `center`가 아니라 `representative_location`이다.** `center`는 경계에서 산출한
-     * 기하학적 중심이라 산속처럼 spot이 없는 곳일 수 있다. 추천 결과의 좌표는 실제로 갈 곳이
-     * 있는 지점이어야 하므로 배치가 골라 둔 대표 위치를 내려보낸다(V46).
-     *
-     * **`ST_X`/`ST_Y`는 geometry만 받으므로 `::geometry` 캐스팅이 필요하다.** `ST_X`가 경도,
-     * `ST_Y`가 위도다 — 뒤집으면 조용히 틀린다.
-     */
-    @Transactional(readOnly = true)
-    override fun findRegions(): List<RegionRow> =
-        jdbcTemplate.query(
-            """
-            SELECT code, province_code,
-                   name_ko, name_en, name_ja, name_zh,
-                   province_name_ko, province_name_en, province_name_ja, province_name_zh,
-                   ST_Y(representative_location::geometry) AS center_lat,
-                   ST_X(representative_location::geometry) AS center_lng
-            FROM district
-            -- 대표 위치가 없는 시군구는 후보에서 아예 뺀다. 추천해 놓고 그 지역에 갈 곳이
-            -- 없으면 추천이 성립하지 않는다. NULL은 배치가 선정에 실패했다는 뜻이다.
-            WHERE representative_location IS NOT NULL
-            ORDER BY code
-            """.trimIndent(),
-        ) { rs, _ ->
-            RegionRow(
-                code = rs.getString("code"),
-                provinceCode = rs.getString("province_code"),
-                name = rs.areaName(""),
-                provinceName = rs.areaName("province_"),
-                center = Coordinates(
-                    latitude = rs.getDouble("center_lat"),
-                    longitude = rs.getDouble("center_lng"),
-                ),
-            )
-        }
 
     /**
      * origin 좌표를 품은 시군구 1건. 경계 안에 없으면 null이다(바다·해외).
@@ -93,7 +59,48 @@ class RegionMetricQueryAdapter(
         ).firstOrNull()
 
     /**
-     * 시군구별 **오늘 예측** 집중률의 평균.
+     * 한 시도의 추천 후보 시군구 전건.
+     *
+     * **좌표는 `center`가 아니라 `representative_location`이다.** `center`는 경계에서 산출한
+     * 기하학적 중심이라 산속처럼 spot이 없는 곳일 수 있다. 추천 결과의 좌표는 실제로 갈 곳이
+     * 있는 지점이어야 하므로 배치가 골라 둔 대표 위치를 내려보낸다(V46).
+     *
+     * **`ST_X`/`ST_Y`는 geometry만 받으므로 `::geometry` 캐스팅이 필요하다.** `ST_X`가 경도,
+     * `ST_Y`가 위도다 — 뒤집으면 조용히 틀린다.
+     */
+    @Transactional(readOnly = true)
+    override fun findRegions(provinceCode: String): List<RegionRow> =
+        jdbcTemplate.query(
+            """
+            SELECT code, province_code,
+                   name_ko, name_en, name_ja, name_zh,
+                   province_name_ko, province_name_en, province_name_ja, province_name_zh,
+                   ST_Y(representative_location::geometry) AS center_lat,
+                   ST_X(representative_location::geometry) AS center_lng
+            FROM district
+            WHERE province_code = ?
+            -- 대표 위치가 없는 시군구는 후보에서 아예 뺀다. 추천해 놓고 그 지역에 갈 곳이
+            -- 없으면 추천이 성립하지 않는다. NULL은 배치가 선정에 실패했다는 뜻이다.
+              AND representative_location IS NOT NULL
+            ORDER BY code
+            """.trimIndent(),
+            { rs, _ ->
+                RegionRow(
+                    code = rs.getString("code"),
+                    provinceCode = rs.getString("province_code"),
+                    name = rs.areaName(""),
+                    provinceName = rs.areaName("province_"),
+                    center = Coordinates(
+                        latitude = rs.getDouble("center_lat"),
+                        longitude = rs.getDouble("center_lng"),
+                    ),
+                )
+            },
+            provinceCode,
+        )
+
+    /**
+     * 그 시도 시군구별 **오늘 예측** 집중률의 평균.
      *
      * 집중률은 향후 30일치가 함께 오는데, 사용자는 "지금 어디 갈까"를 묻지 30일 뒤를 묻지
      * 않는다. 먼 날을 고르면 성수기 해수욕장이 "한산한 곳"으로 뒤집힌다(실측: 속초 오늘
@@ -103,18 +110,22 @@ class RegionMetricQueryAdapter(
      * 값이 관광지 단위로 오므로 시군구 점수로 쓰려면 평균으로 묶는다(설계 §3.2).
      */
     @Transactional(readOnly = true)
-    override fun findConcentrationRates(): Map<String, RegionMetric> =
+    override fun findConcentrationRates(provinceCode: String): Map<String, RegionMetric> =
         jdbcTemplate.query(
             """
-            SELECT district_code, AVG(cnctr_rate) AS value, target_date AS basis_date
-            FROM kto_concentration_rate
-            WHERE target_date = (now() AT TIME ZONE 'Asia/Seoul')::date
-            GROUP BY district_code, target_date
+            SELECT k.district_code, AVG(k.cnctr_rate) AS value, k.target_date AS basis_date
+            FROM kto_concentration_rate k
+            JOIN district d ON d.code = k.district_code
+            WHERE d.province_code = ?
+              AND k.target_date = (now() AT TIME ZONE 'Asia/Seoul')::date
+            GROUP BY k.district_code, k.target_date
             """.trimIndent(),
-        ) { rs, _ -> rs.getString("district_code") to rs.metric() }.toMap()
+            { rs, _ -> rs.getString("district_code") to rs.metric() },
+            provinceCode,
+        ).toMap()
 
     /**
-     * 시군구별 **최근 7일 평균 방문자수(외지인+외국인)**.
+     * 그 시도 시군구별 **최근 7일 평균 방문자수(외지인+외국인)**.
      *
      * 하루에 방문객 구분별로 3행이 있어 한 행만 읽으면 한 구분만 보게 된다. 현지인(1)은
      * 주민의 일상 이동이라 관광 수요가 아니다 — 포함하면 "사람이 사는 곳"이 추천된다
@@ -128,13 +139,15 @@ class RegionMetricQueryAdapter(
      * 서로 다른 날을 가리킬 수 있다(DB가 UTC라 한국 00~09시 구간에서 하루가 어긋난다).
      */
     @Transactional(readOnly = true)
-    override fun findVisitorCounts(): Map<String, RegionMetric> =
+    override fun findVisitorCounts(provinceCode: String): Map<String, RegionMetric> =
         jdbcTemplate.query(
             """
             WITH daily AS (
                 SELECT k.district_code, k.base_date, SUM(k.tou_num) AS day_total
                 FROM kto_visitor_count k
-                WHERE k.visitor_type IN ('2', '3')
+                JOIN district d ON d.code = k.district_code
+                WHERE d.province_code = ?
+                  AND k.visitor_type IN ('2', '3')
                   AND k.base_date > (
                       SELECT MAX(m.base_date) - INTERVAL '7 days'
                       FROM kto_visitor_count m
@@ -149,32 +162,39 @@ class RegionMetricQueryAdapter(
             FROM daily
             GROUP BY district_code
             """.trimIndent(),
-        ) { rs, _ -> rs.getString("district_code") to rs.metric(ageColumn = "age_days") }.toMap()
+            { rs, _ -> rs.getString("district_code") to rs.metric(ageColumn = "age_days") },
+            provinceCode,
+        ).toMap()
 
-    /** 시군구별 **최신 월** 체류 강도. 월 단위라 수십 일 지난 값이 정상이며 감쇠하지 않는다. */
+    /** 그 시도 시군구별 **최신 월** 체류 강도. 월 단위라 수십 일 지난 값이 정상이며 감쇠하지 않는다. */
     @Transactional(readOnly = true)
-    override fun findStayIntensities(): Map<String, RegionMetric> =
-        findLatestMonthly("kto_stay_intensity")
+    override fun findStayIntensities(provinceCode: String): Map<String, RegionMetric> =
+        findLatestMonthly("kto_stay_intensity", provinceCode)
 
-    /** 시군구별 **최신 월** 소비 강도. 외지인 소비 기준이며 외국인 소비는 포함하지 않는다. */
+    /** 그 시도 시군구별 **최신 월** 소비 강도. 외지인 소비 기준이며 외국인 소비는 포함하지 않는다. */
     @Transactional(readOnly = true)
-    override fun findSpendingIntensities(): Map<String, RegionMetric> =
-        findLatestMonthly("kto_spending_intensity")
+    override fun findSpendingIntensities(provinceCode: String): Map<String, RegionMetric> =
+        findLatestMonthly("kto_spending_intensity", provinceCode)
 
     /**
-     * 월 지표 공통 형태 — 지역마다 자기 최신 월 1행.
+     * 월 지표 공통 형태 — 그 시도의 지역마다 자기 최신 월 1행.
      *
      * [table]은 호출부에서만 오는 상수라 바인딩 대상이 아니다. 외부 입력을 여기 넘기면 안 된다.
+     * [provinceCode]는 반대로 사용자 입력에서 파생되므로 반드시 바인딩한다.
      */
-    private fun findLatestMonthly(table: String): Map<String, RegionMetric> =
+    private fun findLatestMonthly(table: String, provinceCode: String): Map<String, RegionMetric> =
         jdbcTemplate.query(
             """
-            SELECT DISTINCT ON (district_code)
-                   district_code, indicator_value AS value, base_month AS basis_date
-            FROM $table
-            ORDER BY district_code, base_month DESC
+            SELECT DISTINCT ON (k.district_code)
+                   k.district_code, k.indicator_value AS value, k.base_month AS basis_date
+            FROM $table k
+            JOIN district d ON d.code = k.district_code
+            WHERE d.province_code = ?
+            ORDER BY k.district_code, k.base_month DESC
             """.trimIndent(),
-        ) { rs, _ -> rs.getString("district_code") to rs.metric() }.toMap()
+            { rs, _ -> rs.getString("district_code") to rs.metric() },
+            provinceCode,
+        ).toMap()
 
     private fun ResultSet.metric(ageColumn: String? = null) = RegionMetric(
         rawValue = getDouble("value"),

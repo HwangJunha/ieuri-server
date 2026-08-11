@@ -12,10 +12,11 @@ import org.around.ieuri.tourism.domain.vo.DomainLocale
  */
 interface RegionRecommendationUseCase {
     /**
-     * 총점 내림차순 추천 목록(R16).
+     * 총점 내림차순 추천 목록(R16). 대상은 [RecommendedRegionQuery.origin]이 속한 시도이며
+     * origin의 시군구 자신은 빠진다(R21).
      *
-     * [RecommendedRegionQuery.origin]이 null이면 거리 항목 없이 산출한다 — 정상 경로이며
-     * 오류가 아니다(R21).
+     * **빈 목록이 정상인 경우가 있다** — origin이 어느 시군구에도 속하지 않거나(바다·해외),
+     * 그 시도의 후보가 최소 시군구 수에 못 미칠 때(세종·제주)다. 어느 쪽도 오류가 아니다.
      */
     fun recommendedRegions(query: RecommendedRegionQuery, locale: DomainLocale): RecommendedRegionView
 }

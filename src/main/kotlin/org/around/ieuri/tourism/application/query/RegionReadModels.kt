@@ -9,11 +9,11 @@ import java.time.LocalDate
 /**
  * recommendedRegions 쿼리 입력(SPEC-0015 R19·R21). 언어는 인자가 아니라 Accept-Language에서 온다.
  *
- * [origin]의 null은 정상 경로다 — 거리 항목 없이 나머지로 산출한다(R21). [limit]은 어댑터가
- * 이미 검증·클램프한 값이므로 여기서는 양수 상한 이하임이 보장된다.
+ * [origin]은 **필수다**(R21) — 위치 없이는 "여기 말고 근처의 다른 곳"이 성립하지 않는다.
+ * [limit]은 어댑터가 이미 검증·클램프한 값이라 여기서는 양수 상한 이하임이 보장된다.
  */
 data class RecommendedRegionQuery(
-    val origin: Coordinates?,
+    val origin: Coordinates,
     val limit: Int,
 )
 
@@ -73,10 +73,10 @@ data class RegionRow(
 )
 
 /**
- * origin 좌표가 실제로 들어앉은 시군구. 경계 안에 있는 지역이 없으면 이 값 자체가 null이다
- * (바다·해외).
+ * origin 좌표가 실제로 들어앉은 시군구. 경계 안에 있는 지역이 없으면 이 값 자체가 null이며
+ * (바다·해외) 그때 추천 결과는 빈 목록이다 — 오류가 아니다.
  *
- * 추천에서 이 지역은 빠지고([code]), 후보는 같은 시도로 좁혀진다([provinceCode]).
+ * 추천에서 이 지역은 빠지고([code]), 조회 자체가 이 시도로 좁혀진다([provinceCode]).
  */
 data class OriginDistrict(
     val code: String,

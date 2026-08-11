@@ -13,7 +13,8 @@ import org.around.ieuri.tourism.domain.vo.RegionScoreWeights
  * @param weights 항목별 가중치. 미지정 항목은 균등 가중이다.
  * @param distanceScoring 거리 감쇠. 반감 거리에서 거리 점수가 50점이 된다.
  * @param freshnessDecay 오래된 지표의 점수 감쇠. **방문자수에만 적용한다**(§신선도).
- * @param minFactorCount 추천 대상이 되기 위한 최소 산출 항목 수(R30). **경계값은 포함된다.**
+ * @param minFactorCount 추천 대상이 되기 위한 최소 산출 항목 수(R30). **경계값은 포함되고,
+ *   거리도 한 항목으로 세어진다** — origin이 필수라 항상 산출되므로 지표 4종은 5항목이다.
  * @param minDistrictsPerProvince 시도가 후보로 남기 위한 최소 시군구 수. **경계값은 포함된다.**
  *   선택지가 이보다 적은 시도는 "근처 다른 곳"이 성립하지 않아 통째로 빠진다.
  * @param defaultLimit limit 미지정 시 개수.

@@ -1,6 +1,7 @@
 package org.around.ieuri.tourism.application.service
 
 import org.around.ieuri.tourism.application.policy.RegionRecommendationPolicy
+import org.around.ieuri.tourism.application.query.OriginDistrict
 import org.around.ieuri.tourism.application.query.RecommendedRegionQuery
 import org.around.ieuri.tourism.application.query.RegionMetric
 import org.around.ieuri.tourism.application.query.RegionRow
@@ -26,6 +27,9 @@ import kotlin.test.assertTrue
  */
 class RegionFactorBasisAtTest {
 
+    /** 서울시청 좌표. 경계 판정은 스텁이 대신하므로 값 자체는 표식일 뿐이다. */
+    private val origin = Coordinates(latitude = 37.5665, longitude = 126.9780)
+
     private val policy = RegionRecommendationPolicy(
         weights = RegionScoreWeights.uniform(),
         distanceScoring = DistanceScoring(30_000.0),
@@ -37,8 +41,17 @@ class RegionFactorBasisAtTest {
         maxLimit = 50,
     )
 
-    private fun service(vararg fixtures: RegionFixture) =
-        RegionRecommendationService(RegionMetricQueryPortStub(fixtures.toList()), policy)
+    /**
+     * origin은 필수 인자다. 경계 판정 결과를 서울(11)로 고정하되 그 시군구 코드는 픽스처에
+     * 없는 값으로 둬 자기 지역 제외가 픽스처를 건드리지 않게 한다 — 관심사는 기준일 표기다.
+     */
+    private fun service(vararg fixtures: RegionFixture) = RegionRecommendationService(
+        RegionMetricQueryPortStub(
+            fixtures.toList(),
+            OriginDistrict(code = "11999", provinceCode = "11"),
+        ),
+        policy,
+    )
 
     private fun fixture(
         code: String,
@@ -67,7 +80,7 @@ class RegionFactorBasisAtTest {
         },
     )
 
-    private fun query() = RecommendedRegionQuery(origin = null, limit = 10)
+    private fun query() = RecommendedRegionQuery(origin = origin, limit = 10)
 
     @Test
     fun `기준일은 항목마다 자기 값이 실린다 — 하나로 뭉뚱그리지 않는다`() {
