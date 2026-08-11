@@ -10,8 +10,8 @@ import org.around.ieuri.tourism.application.port.`in`.query.RegionRecommendation
 import org.around.ieuri.tourism.application.query.RecommendedRegionItemView
 import org.around.ieuri.tourism.application.query.RecommendedRegionQuery
 import org.around.ieuri.tourism.application.query.RecommendedRegionView
+import org.around.ieuri.tourism.application.query.RegionScoreView
 import org.around.ieuri.tourism.domain.vo.Coordinates
-import org.around.ieuri.tourism.domain.vo.RegionScore
 import org.around.ieuri.tourism.infrastructure.locale.LocaleContext
 import org.around.ieuri.common.graphql.generated.types.Coordinates as GqlCoordinates
 import org.around.ieuri.common.graphql.generated.types.CoordinatesInput as GqlCoordinatesInput
@@ -87,9 +87,11 @@ class RegionRecommendationResolver(
         center = center.toGql(),
     )
 
-    private fun RegionScore.toGql() = GqlRegionScore(
-        factor = GqlRegionScoreFactor.valueOf(factor.name),
-        value = value,
+    /** 항목별 기준일은 여기서 문자열이 된다 — DISTANCE처럼 기준일이 없는 항목은 null이다. */
+    private fun RegionScoreView.toGql() = GqlRegionScore(
+        factor = GqlRegionScoreFactor.valueOf(score.factor.name),
+        value = score.value,
+        basisAt = basisAt?.toString(),
     )
 
     private fun Coordinates.toGql() = GqlCoordinates(lat = latitude, lng = longitude)

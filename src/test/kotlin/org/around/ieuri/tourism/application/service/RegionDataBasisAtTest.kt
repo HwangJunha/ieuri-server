@@ -10,8 +10,12 @@ import org.around.ieuri.tourism.domain.vo.AreaName
 import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.domain.vo.DistanceScoring
 import org.around.ieuri.tourism.domain.vo.DomainLocale
+import org.around.ieuri.tourism.domain.vo.FreshnessDecay
 import org.around.ieuri.tourism.domain.vo.RegionScoreWeights
+import java.time.Clock
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -33,10 +37,12 @@ class RegionDataBasisAtTest {
         policy = RegionRecommendationPolicy(
             weights = RegionScoreWeights.uniform(),
             distanceScoring = DistanceScoring(30_000.0),
+            freshnessDecay = FreshnessDecay(plateauDays = 7, halfLifeDays = 23.0),
             minFactorCount = 2,
             defaultLimit = 10,
             maxLimit = 50,
         ),
+        clock = Clock.fixed(Instant.parse("2026-08-11T00:00:00Z"), ZoneOffset.UTC),
     )
 
     private fun row(

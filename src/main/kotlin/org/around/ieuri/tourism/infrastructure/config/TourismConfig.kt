@@ -8,6 +8,7 @@ import org.around.ieuri.tourism.application.policy.RegionRecommendationPolicy
 import org.around.ieuri.tourism.application.policy.SeoulOpenDataPolicy
 import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
 import org.around.ieuri.tourism.domain.vo.DistanceScoring
+import org.around.ieuri.tourism.domain.vo.FreshnessDecay
 import org.around.ieuri.tourism.domain.vo.RegionScoreWeights
 import org.around.ieuri.tourism.infrastructure.batch.FestivalSyncProperties
 import org.around.ieuri.tourism.infrastructure.batch.TourStatsSyncProperties
@@ -98,6 +99,10 @@ class TourismConfig {
                 RegionScoreWeights(properties.scoreWeights)
             },
             distanceScoring = DistanceScoring(properties.distanceHalfLifeMeters),
+            freshnessDecay = FreshnessDecay(
+                plateauDays = properties.freshnessPlateauDays,
+                halfLifeDays = properties.freshnessHalfLifeDays,
+            ),
             minFactorCount = properties.minFactorCount,
             defaultLimit = properties.defaultLimit,
             maxLimit = properties.maxLimit,

@@ -7,20 +7,25 @@ import org.around.ieuri.tourism.application.query.RecommendedRegionItemView
 import org.around.ieuri.tourism.application.query.RecommendedRegionQuery
 import org.around.ieuri.tourism.application.query.RecommendedRegionView
 import org.around.ieuri.tourism.application.query.RegionMetricRow
+import org.around.ieuri.tourism.application.query.RegionScoreView
 import org.around.ieuri.tourism.domain.strategy.RegionScoreCalculator
 import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.domain.vo.DomainLocale
-import org.around.ieuri.tourism.domain.vo.RegionScore
 import org.around.ieuri.tourism.domain.vo.RegionScoreFactor
 import org.around.ieuri.tourism.domain.vo.ScoreNormalization
 import org.springframework.stereotype.Service
+import java.time.Clock
+import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 
 /**
  * 지역 추천 조회 유스케이스 구현(SPEC-0015, CQRS 읽기).
  *
- * 순서가 곧 설계다: 원본 적재 → **적재된 집합에서 정규화 구간 산출**(§3.3) → 거리 항목 가산
- * (origin이 있을 때만, R21) → 가중합(R30 미만은 탈락) → 총점 내림차순 정렬(R16) → 개수 제한.
+ * 순서가 곧 설계다: 원본 적재 → **적재된 집합에서 정규화 구간 산출**(§3.3) → 신선도 감쇠 →
+ * 거리 항목 가산(origin이 있을 때만, R21) → 가중합(R30 미만은 탈락) → 총점 내림차순 정렬
+ * (R16) → 개수 제한.
  *
  * 정규화 구간을 전체 집합에서 뽑기 때문에 **한 지역만 따로 계산할 수 없다** — 척도가 이웃
  * 지역들에 의존한다. 상한을 먼저 적용하면 척도가 바뀌므로 자르기는 마지막이다.
@@ -29,6 +34,7 @@ import java.time.LocalDateTime
 class RegionRecommendationService(
     private val regionMetricQueryPort: RegionMetricQueryPort,
     private val policy: RegionRecommendationPolicy,
+    private val clock: Clock,
 ) : RegionRecommendationUseCase {
 
     override fun recommendedRegions(
@@ -44,18 +50,19 @@ class RegionRecommendationService(
 
         val normalizations = buildNormalizations(rows)
         val calculator = RegionScoreCalculator(policy.weights, policy.minFactorCount)
+        val today = LocalDate.ofInstant(clock.instant(), METRIC_ZONE)
 
         val regions = rows.mapNotNull { row ->
-            val factorScores = row.normalizedScores(normalizations) + row.distanceScore(query.origin)
+            val scoreViews = row.normalizedScores(normalizations, today) + row.distanceScore(query.origin)
             // 항목 수가 최소 개수 미만이면 null — 추천 대상이 아니다(R30).
-            val totalScore = calculator.calculate(factorScores) ?: return@mapNotNull null
+            val totalScore = calculator.calculate(scoreViews.map { it.score }) ?: return@mapNotNull null
 
             RecommendedRegionItemView(
                 code = row.code,
                 name = row.name.resolve(locale),
                 provinceName = row.provinceName.resolve(locale),
                 totalScore = totalScore.total,
-                scores = totalScore.factorScores,
+                scores = scoreViews,
                 scoreFactorCount = totalScore.scoreFactorCount,
                 center = row.center,
             )
@@ -78,7 +85,7 @@ class RegionRecommendationService(
      * 데이터"로 읽혀 실시간이라는 오해를 준다 — R24가 금지하는 바로 그 표기다. 가장 오래된
      * 것을 쓰면 "적어도 이 시점까지의 데이터"라는 보수적이고 참인 진술이 된다.
      *
-     * 월 단위 지표는 해당 월 1일로 정규화돼 있어 일 단위와 같은 축에서 비교된다(V44).
+     * 항목마다 다른 기준일은 각 점수의 `basisAt`에 따로 실린다 — 이 값은 그 최솟값이다.
      */
     private fun resolveDataBasisAt(rows: List<RegionMetricRow>): LocalDateTime? =
         rows.flatMap(RegionMetricRow::basisDates).minOrNull()?.atStartOfDay()
@@ -92,37 +99,57 @@ class RegionRecommendationService(
     private fun buildNormalizations(
         rows: List<RegionMetricRow>,
     ): Map<RegionScoreFactor, ScoreNormalization> = buildMap {
-        for ((factor, extractor) in RAW_EXTRACTORS) {
-            val values = rows.mapNotNull(extractor)
+        val byFactor = rows.flatMap { it.metrics.entries }.groupBy({ it.key }, { it.value.rawValue })
+        for ((factor, values) in byFactor) {
             if (values.isEmpty()) continue
             put(factor, ScoreNormalization(min = values.min(), max = values.max()))
         }
     }
 
-    /** 값이 있고 구간도 있는 항목만 점수가 된다. 결측은 목록에서 빠진다(R14). */
+    /**
+     * 값이 있고 구간도 있는 항목만 점수가 된다. 결측은 목록에서 빠진다(R14).
+     *
+     * **신선도 감쇠는 방문자수에만 건다**([DECAYING_FACTORS]). 나머지 셋은 성격상 나이가
+     * 다르게 취급된다 — 집중률은 애초에 오늘 것만 쓰고, 월 지표는 원래 월 단위라 수십 일
+     * 지난 것이 정상이다. 감쇠는 정규화된 **점수**에 곱한다: 가중치를 깎으면 분모도 함께
+     * 줄어 총점이 그대로다.
+     */
     private fun RegionMetricRow.normalizedScores(
         normalizations: Map<RegionScoreFactor, ScoreNormalization>,
-    ): List<RegionScore> = RAW_EXTRACTORS.mapNotNull { (factor, extractor) ->
-        val raw = extractor(this) ?: return@mapNotNull null
-        normalizations[factor]?.normalize(factor, raw)
+        today: LocalDate,
+    ): List<RegionScoreView> = metrics.entries.mapNotNull { (factor, metric) ->
+        val normalization = normalizations[factor] ?: return@mapNotNull null
+        val score = normalization.normalize(factor, metric.rawValue)
+        val decayed = if (factor in DECAYING_FACTORS && metric.basisDate != null) {
+            policy.freshnessDecay.apply(score, ChronoUnit.DAYS.between(metric.basisDate, today))
+        } else {
+            score
+        }
+        RegionScoreView(score = decayed, basisAt = metric.basisDate)
     }
 
-    /** 거리 항목은 origin이 있을 때만 붙는다(R21). 부재는 예외가 아니라 빈 목록이다. */
-    private fun RegionMetricRow.distanceScore(origin: Coordinates?): List<RegionScore> =
-        origin?.let { listOf(policy.distanceScoring.score(it, center)) } ?: emptyList()
+    /**
+     * 거리 항목은 origin이 있을 때만 붙는다(R21). 부재는 예외가 아니라 빈 목록이다.
+     *
+     * 기준일이 없다 — 적재된 값이 아니라 요청 시점에 계산되기 때문이다.
+     */
+    private fun RegionMetricRow.distanceScore(origin: Coordinates?): List<RegionScoreView> =
+        origin?.let { listOf(RegionScoreView(policy.distanceScoring.score(it, center), basisAt = null)) }
+            ?: emptyList()
 
     private companion object {
         /**
-         * 항목 → 원본 값 추출. 정규화 구간 산출과 점수 산출이 **같은 목록을 보게** 묶어 둔다 —
-         * 한쪽에만 항목을 추가하면 구간 없는 항목이 조용히 사라진다.
+         * 신선도 감쇠를 적용하는 항목.
          *
-         * 거리는 여기 없다 — 적재된 값이 아니라 요청 시점에 계산되기 때문이다.
+         * 방문자수만 넣는다 — 적재 지연이 실제로 관측된 유일한 항목이다(실측: 최신 기준일이
+         * 약 30일 전). 다른 항목에 같은 감쇠를 걸면 월 지표가 정상 주기만으로 반값이 된다.
          */
-        val RAW_EXTRACTORS: List<Pair<RegionScoreFactor, (RegionMetricRow) -> Double?>> = listOf(
-            RegionScoreFactor.CONGESTION to RegionMetricRow::concentrationRate,
-            RegionScoreFactor.VISITOR_VOLUME to RegionMetricRow::visitorCount,
-            RegionScoreFactor.STAY_INTENSITY to RegionMetricRow::stayIntensity,
-            RegionScoreFactor.SPENDING_INTENSITY to RegionMetricRow::spendingIntensity,
-        )
+        val DECAYING_FACTORS = setOf(RegionScoreFactor.VISITOR_VOLUME)
+
+        /**
+         * 지표 나이를 재는 기준 시간대. KTO 데이터의 기준일이 한국 날짜이고, 집중률 질의의
+         * `CURRENT_DATE`도 같은 날짜를 뜻해야 한다. 공용 시계가 UTC라 여기서 명시한다.
+         */
+        val METRIC_ZONE: ZoneId = ZoneId.of("Asia/Seoul")
     }
 }

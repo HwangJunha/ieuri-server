@@ -18,6 +18,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties
  * @param baseUrls 서비스 키([SERVICE_DATA_LAB] 등)→base-url.
  * @param scoreWeights 항목별 가중치. 미지정 항목은 [org.around.ieuri.tourism.domain.vo.RegionScoreWeights.DEFAULT_WEIGHT].
  * @param distanceHalfLifeMeters 거리 감쇠 반감 거리(m). 이 거리에서 거리 점수가 50점이다.
+ * @param freshnessPlateauDays / @param freshnessHalfLifeDays 지표 신선도 감쇠(방문자수 전용).
  * @param minFactorCount 추천 대상이 되기 위한 최소 산출 항목 수(R30). 경계값은 포함된다.
  * @param defaultLimit / @param maxLimit 추천 결과 기본 개수와 상한(R19 · POL-018). 초과는 클램프.
  */
@@ -44,8 +45,23 @@ data class TourStatsProperties(
 
     // --- 이하 잠정값(§7.7 실측 전) ---
 
-    /** 잠정: 다섯 항목 균등 가중. 변별력을 모르는 상태에서 특정 항목을 편애할 근거가 없다. */
+    /**
+     * 항목별 가중치. 사용자 판단이며 실측값이 아니다 — 균등 1.0 잠정값을 대체한다.
+     * 집중률(예측이라 신뢰도가 높음)과 체류·소비 강도(높을수록 좋은 관광지)를 올렸다.
+     */
     val scoreWeights: Map<RegionScoreFactor, Double> = emptyMap(),
+
+    /**
+     * 신선도 감쇠 유예 일수. 이 일수까지는 감쇠하지 않는다(계수 1.0).
+     * 기본 7 — 방문자수가 주 단위로 들어와 일주일 지연은 정상 주기다.
+     */
+    val freshnessPlateauDays: Long = 7,
+
+    /**
+     * 신선도 반감기(일). 유예 이후 이 일수마다 계수가 절반이 된다.
+     * 기본 23 — 유예 7일과 합쳐 30일 경과 시 정확히 0.5가 된다(사용자 지정 목표).
+     */
+    val freshnessHalfLifeDays: Double = 23.0,
 
     /**
      * 잠정: 30km. SPEC-0013 검색의 5km를 그대로 쓰지 않는다 — 그것은 spot 단위 실측값이고

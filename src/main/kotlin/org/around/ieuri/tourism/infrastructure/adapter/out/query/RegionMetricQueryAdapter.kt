@@ -30,13 +30,13 @@ class RegionMetricQueryAdapter(
 ) : RegionMetricQueryPort {
 
     /**
-     * 시군구 전건과 각 KTO 테이블의 **최신 1행**.
+     * 시군구 전건과 각 KTO 지표.
      *
-     * 네 개의 `LATERAL` 서브쿼리가 각각 `(sigungu_code, 날짜 DESC)` 인덱스를 타 시군구당
-     * 인덱스 선두 1행만 읽는다(V44). 지표가 없는 시군구는 `LEFT JOIN`이라 값이 null로 오며
-     * **0으로 채우지 않는다**(POL-043).
+     * 지표마다 집계 단위가 다르다 — 집중률은 **오늘 예측**의 시군구 평균(관광지 단위 값이라
+     * 묶는다, 설계 §3.2), 방문자수는 **최근 7일 평균(외지인+외국인)**, 월 지표는 최신 1개월이다.
      *
-     * 집중률만 관광지 단위 값이라 대상일 기준으로 시군구 평균을 낸다(설계 §3.2).
+     * 지표가 없는 시군구는 `LEFT JOIN`이라 값이 null로 오며 **0으로 채우지 않는다**(POL-043).
+     * 집계만 있는 LATERAL은 행이 없어도 NULL 1행을 돌려주므로 결측이 그대로 null이 된다.
      */
     @Transactional(readOnly = true)
     override fun findLatestMetrics(): List<RegionMetricRow> =
@@ -86,27 +86,42 @@ class RegionMetricQueryAdapter(
                    st.stay_value, st.stay_month,
                    sp.spending_value, sp.spending_month
             FROM sigungu s
-            -- **오늘에 가장 가까운 예측일을 쓴다.** 집중률은 향후 30일치가 함께 오는데,
-            -- 사용자는 "지금 어디 갈까"를 묻지 30일 뒤를 묻지 않는다. 가장 먼 날을 고르면
-            -- 성수기 해수욕장이 "한산한 곳"으로 뒤집힌다(실측: 속초 오늘 67.4 → 30일 뒤 28.6).
+            -- **오늘 예측만 쓴다.** 집중률은 향후 30일치가 함께 오는데, 사용자는 "지금 어디
+            -- 갈까"를 묻지 30일 뒤를 묻지 않는다. 먼 날을 고르면 성수기 해수욕장이 "한산한
+            -- 곳"으로 뒤집힌다(실측: 속초 오늘 67.4 → 30일 뒤 28.6).
             --
-            -- 오늘 이전 행은 제외한다 — 지난 예측은 이미 의미가 없다. 오늘 행이 없으면
-            -- 그중 가장 이른 미래를 쓰고, 그마저 없으면 이 지역의 집중률은 결측이다(R14).
+            -- 오늘 행이 없으면 미래로 밀지 않고 **결측이다**(R14) — 다른 날의 예측을 오늘의
+            -- 혼잡도로 내놓는 것은 조용히 틀린 값이다. 결측 항목은 그 지역 점수에서 빠진다.
             LEFT JOIN LATERAL (
                 SELECT AVG(k.cnctr_rate) AS cnctr_rate, k.target_date AS cnctr_date
                 FROM kto_concentration_rate k
                 WHERE k.sigungu_code = s.code
-                  AND k.target_date >= CURRENT_DATE
+                  AND k.target_date = CURRENT_DATE
                 GROUP BY k.target_date
-                ORDER BY k.target_date ASC
-                LIMIT 1
             ) c ON TRUE
+            -- **최근 7일 평균이며 외지인(2)+외국인(3)만 합산한다.**
+            --
+            -- 하루에 방문객 구분별로 3행이 있어 한 행만 읽으면 한 구분만 보게 된다. 현지인(1)은
+            -- 주민의 일상 이동이라 관광 수요가 아니다 — 포함하면 "사람이 사는 곳"이 추천된다
+            -- (실측: 제주시 현지인 487,659 vs 외지인 146,084).
+            --
+            -- 하루만 보면 요일에 따라 40%씩 흔들린다(실측: 강남구 금 1,312,557 vs 일 939,745).
+            -- 그래서 그 지역의 최신 기준일부터 7일을 평균한다. 기준일은 지역마다 다를 수 있어
+            -- 전역 최댓값이 아니라 **지역별 최댓값**에서 되짚는다.
             LEFT JOIN LATERAL (
-                SELECT k.tou_num, k.base_date AS visitor_date
-                FROM kto_visitor_count k
-                WHERE k.sigungu_code = s.code
-                ORDER BY k.base_date DESC
-                LIMIT 1
+                SELECT AVG(d.day_total) AS tou_num, MAX(d.base_date) AS visitor_date
+                FROM (
+                    SELECT k.base_date, SUM(k.tou_num) AS day_total
+                    FROM kto_visitor_count k
+                    WHERE k.sigungu_code = s.code
+                      AND k.visitor_type IN ('2', '3')
+                      AND k.base_date > (
+                          SELECT MAX(m.base_date) - INTERVAL '7 days'
+                          FROM kto_visitor_count m
+                          WHERE m.sigungu_code = s.code
+                      )
+                    GROUP BY k.base_date
+                ) d
             ) v ON TRUE
             LEFT JOIN LATERAL (
                 SELECT k.indicator_value AS stay_value, k.base_month AS stay_month
