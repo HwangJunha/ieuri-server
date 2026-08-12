@@ -1,6 +1,7 @@
 package org.around.ieuri.community.infrastructure
 
 import org.around.ieuri.common.graphql.generated.types.CreateFeedItemInput
+import org.around.ieuri.common.graphql.generated.types.MarkConversationReadInput
 import org.around.ieuri.common.graphql.generated.types.ReportMessagesInput
 import org.around.ieuri.common.graphql.generated.types.SendMessageInput
 import org.around.ieuri.community.domain.vo.ReportReason
@@ -80,5 +81,29 @@ class FeedInputMapperTest {
             val command = ReportMessagesInput(listOf(10L), reason, "상세").toCommand()
             assertEquals(reason.name, command.reason.name)
         }
+    }
+
+    /**
+     * 두 필드 다 ID(String→Long)라 **뒤바뀌어도 컴파일된다** — 대화 id로 읽음 지점을 잡으면
+     * 엉뚱한 메시지까지 읽음 처리된다. 그래서 값을 서로 다르게 준다.
+     */
+    @Test
+    fun `읽음 처리 입력이 커맨드로 변환된다`() {
+        val command = MarkConversationReadInput(
+            conversationId = 11L,
+            upToMessageId = 22L,
+        ).toCommand()
+
+        assertEquals(11L, command.conversationId)
+        assertEquals(22L, command.upToMessageId)
+    }
+
+    /** upToMessageId는 선택이다 — 생략하면 "마지막까지"를 뜻하는 null이 그대로 실려야 한다. */
+    @Test
+    fun `읽을 지점이 없으면 null로 변환된다`() {
+        val command = MarkConversationReadInput(conversationId = 11L, upToMessageId = null).toCommand()
+
+        assertEquals(11L, command.conversationId)
+        assertNull(command.upToMessageId)
     }
 }

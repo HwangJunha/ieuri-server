@@ -17,9 +17,24 @@ class Conversation private constructor(
     val memberHigh: Long,
     lastMessageAt: Instant,
     val createdAt: Instant?,
+    lastReadMessageIdLow: Long?,
+    lastReadMessageIdHigh: Long?,
 ) {
     /** 정렬 키(최근 활동순). 메시지가 없으면 생성 시각이다. */
     var lastMessageAt: Instant = lastMessageAt
+        private set
+
+    /**
+     * 각 참여자가 마지막으로 읽은 메시지 id. **null은 "아직 아무것도 읽지 않았다"이며 0이
+     * 아니다** — 0으로 두면 "id 0까지 읽었다"와 구분되지 않는다.
+     *
+     * 시각이 아니라 id를 쓰는 이유는 경계를 하나로 정하기 위해서다. 같은 밀리초에 도착한
+     * 메시지가 여럿이면 시각으로는 어디까지 읽은 것인지 정할 수 없다.
+     */
+    var lastReadMessageIdLow: Long? = lastReadMessageIdLow
+        private set
+
+    var lastReadMessageIdHigh: Long? = lastReadMessageIdHigh
         private set
 
     /** 메시지가 오갈 때마다 목록의 맨 위로 올린다. */
@@ -28,6 +43,31 @@ class Conversation private constructor(
     }
 
     fun hasParticipant(memberId: Long): Boolean = memberId == memberLow || memberId == memberHigh
+
+    /** [memberId]가 마지막으로 읽은 메시지 id. 아직 읽지 않았으면 null이다. */
+    fun lastReadMessageIdOf(memberId: Long): Long? {
+        require(hasParticipant(memberId)) { "대화의 참여자가 아닙니다." }
+        return if (memberId == memberLow) lastReadMessageIdLow else lastReadMessageIdHigh
+    }
+
+    /**
+     * [memberId]의 읽음 지점을 [messageId]까지 올린다.
+     *
+     * **뒤로 가지 않는다.** 클라이언트가 과거 메시지를 다시 열거나 요청이 순서를 바꿔
+     * 도착해도 이미 읽은 것이 안 읽음으로 되돌아가면 안 된다 — 사용자에게는 뱃지가
+     * 되살아나는 것으로 보인다.
+     */
+    fun markRead(memberId: Long, messageId: Long) {
+        require(hasParticipant(memberId)) { "대화의 참여자가 아닙니다." }
+        val current = lastReadMessageIdOf(memberId)
+        if (current != null && current >= messageId) return
+
+        if (memberId == memberLow) {
+            lastReadMessageIdLow = messageId
+        } else {
+            lastReadMessageIdHigh = messageId
+        }
+    }
 
     /**
      * [memberId]의 상대방. **참여자가 아닌 id로 부르면 안 된다** — 호출 전에
@@ -58,6 +98,8 @@ class Conversation private constructor(
                 memberHigh = maxOf(memberId, counterpartId),
                 lastMessageAt = now,
                 createdAt = null,
+                lastReadMessageIdLow = null,
+                lastReadMessageIdHigh = null,
             )
         }
 
@@ -68,12 +110,16 @@ class Conversation private constructor(
             memberHigh: Long,
             lastMessageAt: Instant,
             createdAt: Instant,
+            lastReadMessageIdLow: Long? = null,
+            lastReadMessageIdHigh: Long? = null,
         ): Conversation = Conversation(
             id = id,
             memberLow = memberLow,
             memberHigh = memberHigh,
             lastMessageAt = lastMessageAt,
             createdAt = createdAt,
+            lastReadMessageIdLow = lastReadMessageIdLow,
+            lastReadMessageIdHigh = lastReadMessageIdHigh,
         )
     }
 }

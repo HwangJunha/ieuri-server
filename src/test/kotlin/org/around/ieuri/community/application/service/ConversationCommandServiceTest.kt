@@ -1,9 +1,11 @@
 package org.around.ieuri.community.application.service
 
 import io.mockk.every
+import io.mockk.slot
 import io.mockk.mockk
 import io.mockk.verify
 import org.around.ieuri.community.application.command.NotifyTypingCommand
+import org.around.ieuri.community.application.command.MarkConversationReadCommand
 import org.around.ieuri.community.application.command.SendMessageCommand
 import org.around.ieuri.community.application.command.StartConversationCommand
 import org.around.ieuri.community.application.exception.BlockedException
@@ -20,6 +22,7 @@ import org.around.ieuri.community.application.port.out.persistence.ConversationR
 import org.around.ieuri.community.application.port.out.persistence.FeedItemRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.MessageRepositoryPort
 import org.around.ieuri.community.application.port.out.query.CommunityQueryPort
+import org.around.ieuri.community.application.port.out.query.ConversationQueryPort
 import org.around.ieuri.community.domain.aggregate.Conversation
 import org.around.ieuri.community.domain.aggregate.FeedItem
 import org.around.ieuri.community.domain.aggregate.Message
@@ -45,6 +48,7 @@ class ConversationCommandServiceTest {
     private val communityQueryPort = mockk<CommunityQueryPort>()
     private val conversationEventPort = mockk<ConversationEventPort>(relaxed = true)
     private val eventPublisher = mockk<CommunityEventPublisherPort>(relaxed = true)
+    private val conversationQueryPort = mockk<ConversationQueryPort>(relaxed = true)
     private val storage = mockk<ObjectStoragePort> { every { findSize(any()) } returns 1_024L }
     private val clock = mockk<ClockPort> { every { now() } returns now }
 
@@ -54,6 +58,7 @@ class ConversationCommandServiceTest {
         feedItemRepository,
         communityQueryPort,
         conversationEventPort,
+        conversationQueryPort,
         eventPublisher,
         storage,
         clock,
@@ -200,6 +205,60 @@ class ConversationCommandServiceTest {
         }
 
         verify(exactly = 0) { eventPublisher.publish(any()) }
+    }
+
+    /**
+     * **upToMessageId를 생략하면 마지막 메시지까지**로 본다 — 클라이언트가 "모두 읽음"을
+     * 표현하는 방법이며, 마지막 id를 몰라도 부를 수 있어야 한다.
+     */
+    @Test
+    fun `읽을 지점을 주지 않으면 마지막 메시지까지 읽은 것으로 본다`() {
+        every { conversationRepository.findById(conversationId) } returns conversation()
+        every { conversationQueryPort.findLastMessageId(conversationId) } returns 700L
+        every { conversationQueryPort.countUnreadOf(listOf(conversationId), memberId) } returns emptyMap()
+
+        val remaining = service.markConversationRead(MarkConversationReadCommand(conversationId), memberId)
+
+        val saved = slot<Conversation>()
+        verify { conversationRepository.updateReadState(capture(saved)) }
+        assertEquals(700L, saved.captured.lastReadMessageIdOf(memberId))
+        assertEquals(0, remaining)
+    }
+
+    /** 메시지가 하나도 없으면 읽을 것이 없다 — 저장도 하지 않는다. */
+    @Test
+    fun `메시지가 없는 대화는 읽음 처리하지 않는다`() {
+        every { conversationRepository.findById(conversationId) } returns conversation()
+        every { conversationQueryPort.findLastMessageId(conversationId) } returns null
+
+        val remaining = service.markConversationRead(MarkConversationReadCommand(conversationId), memberId)
+
+        assertEquals(0, remaining)
+        verify(exactly = 0) { conversationRepository.updateReadState(any()) }
+    }
+
+    /** 처리 후 남은 수를 돌려준다 — 클라이언트가 뱃지를 다시 조회하지 않아도 되도록. */
+    @Test
+    fun `읽음 처리 후 남은 안 읽은 수를 돌려준다`() {
+        every { conversationRepository.findById(conversationId) } returns conversation()
+        every { conversationQueryPort.countUnreadOf(listOf(conversationId), memberId) } returns
+            mapOf(conversationId to 3)
+
+        val remaining = service.markConversationRead(
+            MarkConversationReadCommand(conversationId, upToMessageId = 500L),
+            memberId,
+        )
+
+        assertEquals(3, remaining)
+    }
+
+    @Test
+    fun `참여자가 아니면 읽음 처리할 수 없다`() {
+        every { conversationRepository.findById(conversationId) } returns conversation()
+
+        assertFailsWith<NotConversationParticipantException> {
+            service.markConversationRead(MarkConversationReadCommand(conversationId), 999L)
+        }
     }
 
     /** AC9-4 — 참여자가 아닌 **기존** 대화에는 전송할 수 없다. */

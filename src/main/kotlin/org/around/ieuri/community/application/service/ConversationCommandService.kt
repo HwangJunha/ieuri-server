@@ -1,5 +1,6 @@
 package org.around.ieuri.community.application.service
 
+import org.around.ieuri.community.application.command.MarkConversationReadCommand
 import org.around.ieuri.community.application.command.NotifyTypingCommand
 import org.around.ieuri.community.application.command.SendMessageCommand
 import org.around.ieuri.community.application.command.StartConversationCommand
@@ -19,6 +20,7 @@ import org.around.ieuri.community.application.port.out.persistence.ConversationR
 import org.around.ieuri.community.application.port.out.persistence.FeedItemRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.MessageRepositoryPort
 import org.around.ieuri.community.application.port.out.query.CommunityQueryPort
+import org.around.ieuri.community.application.port.out.query.ConversationQueryPort
 import org.around.ieuri.community.application.query.TypingEventView
 import org.around.ieuri.community.domain.aggregate.Conversation
 import org.around.ieuri.community.domain.aggregate.Message
@@ -44,6 +46,7 @@ class ConversationCommandService(
     private val feedItemRepositoryPort: FeedItemRepositoryPort,
     private val communityQueryPort: CommunityQueryPort,
     private val conversationEventPort: ConversationEventPort,
+    private val conversationQueryPort: ConversationQueryPort,
     private val eventPublisher: CommunityEventPublisherPort,
     private val objectStoragePort: ObjectStoragePort,
     private val clockPort: ClockPort,
@@ -115,6 +118,29 @@ class ConversationCommandService(
         // id만 싣는다: 본문을 브로커에 흘리지 않기 위함이다(POL-013).
         eventPublisher.publish(NewMessageStored(command.conversationId, messageId))
         return messageId
+    }
+
+    /**
+     * 읽음 처리. **읽음 지점은 뒤로 가지 않으므로**(도메인이 판정) 같은 요청을 여러 번 보내도
+     * 안전하다 — 재시도·중복 호출이 흔한 경로다.
+     *
+     * upToMessageId가 null이면 마지막 메시지까지 읽은 것으로 본다. 메시지가 하나도 없는
+     * 대화면 읽을 것이 없으므로 그대로 0을 돌려준다.
+     */
+    @Transactional
+    override fun markConversationRead(command: MarkConversationReadCommand, memberId: Long): Int {
+        val conversation = requireParticipatingConversation(command.conversationId, memberId)
+
+        val upTo = command.upToMessageId
+            ?: conversationQueryPort.findLastMessageId(command.conversationId)
+            ?: return 0
+
+        conversation.markRead(memberId, upTo)
+        conversationRepositoryPort.updateReadState(conversation)
+
+        return conversationQueryPort
+            .countUnreadOf(listOf(command.conversationId), memberId)[command.conversationId]
+            ?: 0
     }
 
     /**

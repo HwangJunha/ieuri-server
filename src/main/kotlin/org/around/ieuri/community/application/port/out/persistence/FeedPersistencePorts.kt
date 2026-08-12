@@ -65,6 +65,12 @@ interface ConversationRepositoryPort {
 
     /** 최근 활동 시각 갱신. 메시지 전송이 목록의 정렬을 바꾼다(AC9-1). */
     fun touch(conversationId: Long, at: Instant)
+
+    /**
+     * 읽음 지점을 저장한다. 트랜잭션 안에서 관리 엔티티에 적용하고 더티 체킹에 맡긴다 —
+     * 분리된 엔티티를 새로 만들어 저장하면 다른 컬럼을 덮어쓴다.
+     */
+    fun updateReadState(conversation: Conversation)
 }
 
 /**

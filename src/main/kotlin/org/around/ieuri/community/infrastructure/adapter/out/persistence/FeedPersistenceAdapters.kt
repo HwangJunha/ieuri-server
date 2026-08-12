@@ -207,6 +207,18 @@ class ConversationPersistenceAdapter(
     override fun touch(conversationId: Long, at: Instant) {
         repository.findById(conversationId).orElse(null)?.lastMessageAt = at
     }
+
+    /**
+     * 읽음 지점 갱신. **관리 엔티티에 얹는다** — 도메인을 새 엔티티로 만들어 save()하면
+     * lastMessageAt 등 이 트랜잭션이 건드리지 않은 컬럼까지 덮어쓴다.
+     */
+    @Transactional
+    override fun updateReadState(conversation: Conversation) {
+        val id = requireNotNull(conversation.id) { "저장된 대화만 읽음 지점을 갱신할 수 있다." }
+        val entity = repository.findById(id).orElse(null) ?: return
+        entity.lastReadMessageIdLow = conversation.lastReadMessageIdLow
+        entity.lastReadMessageIdHigh = conversation.lastReadMessageIdHigh
+    }
 }
 
 /**

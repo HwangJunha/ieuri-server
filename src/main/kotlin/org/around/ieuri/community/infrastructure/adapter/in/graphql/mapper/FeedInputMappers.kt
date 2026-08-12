@@ -1,9 +1,11 @@
 package org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper
 
 import org.around.ieuri.common.graphql.generated.types.CreateFeedItemInput
+import org.around.ieuri.common.graphql.generated.types.MarkConversationReadInput
 import org.around.ieuri.common.graphql.generated.types.ReportMessagesInput
 import org.around.ieuri.common.graphql.generated.types.SendMessageInput
 import org.around.ieuri.community.application.command.CreateFeedItemCommand
+import org.around.ieuri.community.application.command.MarkConversationReadCommand
 import org.around.ieuri.community.application.command.ReportMessagesCommand
 import org.around.ieuri.community.application.command.SendMessageCommand
 import org.around.ieuri.community.domain.vo.ReportReason
@@ -28,6 +30,11 @@ fun SendMessageInput.toCommand(): SendMessageCommand = SendMessageCommand(
     body = body,
     feedItemId = feedItemId,
     photoKey = photoKey,
+)
+
+fun MarkConversationReadInput.toCommand(): MarkConversationReadCommand = MarkConversationReadCommand(
+    conversationId = conversationId,
+    upToMessageId = upToMessageId,
 )
 
 fun ReportMessagesInput.toCommand(): ReportMessagesCommand = ReportMessagesCommand(

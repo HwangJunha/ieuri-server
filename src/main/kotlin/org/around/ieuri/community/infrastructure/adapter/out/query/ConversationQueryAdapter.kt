@@ -2,6 +2,7 @@ package org.around.ieuri.community.infrastructure.adapter.out.query
 
 import com.querydsl.core.types.dsl.BooleanExpression
 import com.querydsl.core.types.dsl.DateTimePath
+import com.querydsl.core.types.dsl.Expressions
 import com.querydsl.core.types.dsl.NumberPath
 import com.querydsl.jpa.JPAExpressions
 import com.querydsl.jpa.impl.JPAQueryFactory
@@ -59,14 +60,21 @@ class ConversationQueryAdapter(
         val pageRows = if (hasNextPage) rows.take(search.first) else rows
         // 목록에 실을 마지막 메시지를 **한 번에** 읽는다 — 대화마다 물으면 20건에 조회가
         // 20번 붙는다(N+1).
-        val lastMessages = findLastMessagesOf(pageRows.mapNotNull { it.id }, search.memberId)
+        val pageIds = pageRows.mapNotNull { it.id }
+        val lastMessages = findLastMessagesOf(pageIds, search.memberId)
+        // 안 읽은 수도 **한 번에** 센다 — 대화마다 물으면 여기서 N+1이 된다.
+        val unreadCounts = countUnreadOf(pageIds, search.memberId)
 
         val edges = pageRows.map { entity ->
             val lastMessageAt = requireNotNull(entity.lastMessageAt)
             val id = requireNotNull(entity.id)
             CursorEdge(
                 cursor = encodeCursor(lastMessageAt, id),
-                node = entity.toConversationView(search.memberId, lastMessages[id]),
+                node = entity.toConversationView(
+                    search.memberId,
+                    lastMessages[id],
+                    unreadCounts[id] ?: 0,
+                ),
             )
         }
         return cursorPageOf(edges, hasNextPage = hasNextPage, hasPreviousPage = cursor != null)
@@ -110,7 +118,11 @@ class ConversationQueryAdapter(
             .fetchOne() ?: return null
 
         val id = requireNotNull(entity.id)
-        return entity.toConversationView(memberId, findLastMessagesOf(listOf(id), memberId)[id])
+        return entity.toConversationView(
+            memberId,
+            findLastMessagesOf(listOf(id), memberId)[id],
+            countUnreadOf(listOf(id), memberId)[id] ?: 0,
+        )
     }
 
     @Transactional(readOnly = true)
@@ -120,6 +132,50 @@ class ConversationQueryAdapter(
             .where(message.id.eq(messageId))
             .fetchOne()
             ?.toMessageView(memberId)
+
+    /**
+     * 대화별 안 읽은 메시지 수를 **한 번에** 센다 — 대화마다 물으면 20건에 조회가 20번 붙는다.
+     *
+     * "내가 읽은 지점 이후 + 내가 보내지 않은" 메시지를 센다. 읽음 지점이 null이면
+     * (아직 아무것도 안 읽음) 상대가 보낸 전부가 대상이다.
+     *
+     * 읽음 지점이 내 위치(low/high)에 따라 다른 컬럼이라 CASE로 고른다 — 참여자가 둘로
+     * 고정된 구조의 대가이며, 그룹 대화가 생기면 이 질의도 함께 재설계된다.
+     */
+    @Transactional(readOnly = true)
+    override fun countUnreadOf(conversationIds: List<Long>, memberId: Long): Map<Long, Int> {
+        if (conversationIds.isEmpty()) return emptyMap()
+
+        val myLastRead = Expressions.cases()
+            .`when`(conversation.memberLow.eq(memberId)).then(conversation.lastReadMessageIdLow)
+            .otherwise(conversation.lastReadMessageIdHigh)
+
+        return queryFactory
+            .select(message.conversationId, message.count())
+            .from(message)
+            .join(conversation).on(conversation.id.eq(message.conversationId))
+            .where(
+                message.conversationId.`in`(conversationIds),
+                // 내가 보낸 것은 세지 않는다.
+                message.senderId.ne(memberId),
+                // 읽음 지점이 없으면 전부가 안 읽은 것이다.
+                myLastRead.isNull.or(message.id.gt(myLastRead)),
+            )
+            .groupBy(message.conversationId)
+            .fetch()
+            .associate { row ->
+                requireNotNull(row.get(message.conversationId)) to
+                    (row.get(message.count()) ?: 0L).toInt()
+            }
+    }
+
+    @Transactional(readOnly = true)
+    override fun findLastMessageId(conversationId: Long): Long? =
+        queryFactory
+            .select(message.id.max())
+            .from(message)
+            .where(message.conversationId.eq(conversationId))
+            .fetchOne()
 
     /**
      * 대화별 마지막 메시지를 한 번에 읽는다.
@@ -167,19 +223,15 @@ class ConversationQueryAdapter(
         timePath.lt(cursor.createdAt)
             .or(timePath.eq(cursor.createdAt).and(idPath.lt(cursor.id)))
 
-    /**
-     * **[unreadCount]는 항상 0이다.** 읽음 확인(read receipt)이 비범위라 마지막 읽은 지점을
-     * 기록하는 곳이 없다 — 계약이 필드를 요구하므로 자리는 두되, 없는 근거로 숫자를 지어내지
-     * 않는다. 읽음 상태를 도입할 때 이 값이 채워진다.
-     */
     private fun ConversationEntity.toConversationView(
         memberId: Long,
         lastMessage: MessageView?,
+        unreadCount: Int,
     ) = ConversationView(
         id = requireNotNull(id) { "조회된 대화에는 id가 있어야 한다." },
         counterpartId = if (memberLow == memberId) memberHigh else memberLow,
         lastMessage = lastMessage,
-        unreadCount = 0,
+        unreadCount = unreadCount,
         updatedAt = requireNotNull(lastMessageAt) { "조회된 대화에는 lastMessageAt이 있어야 한다." },
     )
 

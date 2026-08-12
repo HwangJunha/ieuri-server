@@ -2,6 +2,7 @@ package org.around.ieuri.community.application.port.`in`.command
 
 import org.around.ieuri.community.application.command.CreateFeedItemCommand
 import org.around.ieuri.community.application.command.LikeFeedItemCommand
+import org.around.ieuri.community.application.command.MarkConversationReadCommand
 import org.around.ieuri.community.application.command.NotifyTypingCommand
 import org.around.ieuri.community.application.command.ReportMessagesCommand
 import org.around.ieuri.community.application.command.SendMessageCommand
@@ -42,6 +43,17 @@ interface ConversationCommandUseCase {
      * 실패가 아니다. 영속화하지 않으며 전달 보장이 없다.
      */
     fun notifyTyping(command: NotifyTypingCommand, memberId: Long)
+
+    /**
+     * 대화를 [messageId]까지 읽은 것으로 표시하고, 남은 안 읽은 수를 돌려준다.
+     *
+     * **읽음 시점은 클라이언트가 정한다** — 채팅방 진입·스크롤 하단 도달·포그라운드 복귀 등
+     * 어디서 부를지는 UX 판단이라 서버가 조회를 읽음으로 간주하지 않는다.
+     *
+     * [messageId]가 null이면 **그 대화의 마지막 메시지까지** 읽은 것으로 본다(모두 읽음).
+     * 읽음 지점은 뒤로 가지 않으므로 같은 요청을 여러 번 보내도 안전하다.
+     */
+    fun markConversationRead(command: MarkConversationReadCommand, memberId: Long): Int
 }
 
 /**

@@ -65,12 +65,16 @@ fun ConversationEntity.toDomain(): Conversation = Conversation.restore(
     memberHigh = memberHigh,
     lastMessageAt = requireNotNull(lastMessageAt) { "적재된 대화에는 lastMessageAt이 있어야 한다." },
     createdAt = requireNotNull(createdAt) { "적재된 대화에는 createdAt이 있어야 한다." },
+    lastReadMessageIdLow = lastReadMessageIdLow,
+    lastReadMessageIdHigh = lastReadMessageIdHigh,
 )
 
 fun Conversation.toNewEntity(): ConversationEntity = ConversationEntity(
     memberLow = memberLow,
     memberHigh = memberHigh,
     lastMessageAt = lastMessageAt,
+    lastReadMessageIdLow = lastReadMessageIdLow,
+    lastReadMessageIdHigh = lastReadMessageIdHigh,
 )
 
 /**

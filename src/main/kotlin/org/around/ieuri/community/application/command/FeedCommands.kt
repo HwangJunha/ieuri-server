@@ -62,6 +62,20 @@ data class NotifyTypingCommand(val conversationId: Long) {
     }
 }
 
+/**
+ * 대화 읽음 처리. [upToMessageId]가 null이면 그 대화의 마지막 메시지까지 읽은 것으로 본다 —
+ * 클라이언트가 "모두 읽음"을 표현하는 방법이며, 마지막 id를 몰라도 부를 수 있다.
+ */
+data class MarkConversationReadCommand(
+    val conversationId: Long,
+    val upToMessageId: Long? = null,
+) {
+    init {
+        require(conversationId > 0) { "conversationId는 양수여야 합니다." }
+        require(upToMessageId == null || upToMessageId > 0) { "upToMessageId는 양수여야 합니다." }
+    }
+}
+
 /** 메시지 다건 신고(R15). 빈 목록·대화 혼재 판정은 서비스가 저장소를 물어서 한다. */
 data class ReportMessagesCommand(
     val messageIds: List<Long>,

@@ -141,6 +141,16 @@ class ConversationEntity(
 
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant? = null,
+
+    /**
+     * 각 참여자가 마지막으로 읽은 메시지 id. **null은 "아직 아무것도 읽지 않았다"이며 0이
+     * 아니다** — 0으로 두면 "id 0까지 읽었다"와 구분되지 않는다.
+     */
+    @Column(name = "last_read_message_id_low")
+    var lastReadMessageIdLow: Long? = null,
+
+    @Column(name = "last_read_message_id_high")
+    var lastReadMessageIdHigh: Long? = null,
 ) {
     @PrePersist
     fun onCreate() {

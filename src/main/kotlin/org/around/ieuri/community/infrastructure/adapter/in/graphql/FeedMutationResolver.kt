@@ -7,6 +7,8 @@ import org.around.ieuri.common.graphql.generated.types.CreateFeedItemInput
 import org.around.ieuri.common.graphql.generated.types.CreateFeedItemPayload
 import org.around.ieuri.common.graphql.generated.types.LikeFeedItemInput
 import org.around.ieuri.common.graphql.generated.types.LikeFeedItemPayload
+import org.around.ieuri.common.graphql.generated.types.MarkConversationReadInput
+import org.around.ieuri.common.graphql.generated.types.MarkConversationReadPayload
 import org.around.ieuri.common.graphql.generated.types.NotifyTypingInput
 import org.around.ieuri.common.graphql.generated.types.NotifyTypingPayload
 import org.around.ieuri.common.graphql.generated.types.ReportMessagesInput
@@ -126,6 +128,26 @@ class FeedMutationResolver(
                 memberId,
             )
             NotifyTypingPayload(success = true, userErrors = emptyList())
+        }
+
+    /**
+     * 읽음 처리. **조회가 아니라 명시적 호출로만 읽음이 된다** — 목록 미리보기나 알림에서
+     * 스쳐 본 것이 읽음으로 처리되면 사용자가 메시지를 놓친다.
+     */
+    @DgsMutation
+    fun markConversationRead(
+        @InputArgument input: MarkConversationReadInput,
+    ): MarkConversationReadPayload =
+        withCommunityUserErrors(
+            onError = { MarkConversationReadPayload(success = false, userErrors = it, unreadCount = 0) },
+        ) {
+            val memberId = currentMemberProvider.requireMemberId()
+            val remaining = conversationCommandUseCase.markConversationRead(input.toCommand(), memberId)
+            MarkConversationReadPayload(
+                success = true,
+                userErrors = emptyList(),
+                unreadCount = remaining,
+            )
         }
 
     @DgsMutation
