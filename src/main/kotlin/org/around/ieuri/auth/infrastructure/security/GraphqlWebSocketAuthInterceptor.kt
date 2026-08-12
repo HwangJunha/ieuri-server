@@ -47,7 +47,7 @@ class GraphqlWebSocketAuthInterceptor(
     ): Mono<Any> {
         // **연결 수립이 실패하면 리졸버까지 가지 않아 아무 로그도 남지 않는다.**
         // 페이로드 키 이름만 남긴다 — 값에는 토큰이 들어 있어 기록하지 않는다(POL-013).
-        log.info(
+        log.debug(
             "WS connection_init: payloadKeys={} headerNames={}",
             connectionInitPayload.keys,
             sessionInfo.headers.headerNames(),
@@ -77,7 +77,7 @@ class GraphqlWebSocketAuthInterceptor(
             val claims = tokenProvider.parseAccessToken(raw)
             sessionInfo.attributes[MEMBER_ID] = claims.memberId
             sessionInfo.attributes[PERMISSIONS] = claims.permissions.toList()
-            log.info("WS connection_init 성공: memberId={}", claims.memberId)
+            log.debug("WS connection_init 성공: memberId={}", claims.memberId)
             Mono.empty()
         } catch (e: InvalidTokenException) {
             log.warn("WS connection_init 거부: 토큰이 유효하지 않다 ({})", e.message)
@@ -117,8 +117,6 @@ class GraphqlWebSocketAuthInterceptor(
     ): Mono<WebGraphQlResponse> {
         if (request !is WebSocketGraphQlRequest) return chain.next(request)
 
-        val memberId = request.sessionInfo.attributes[MEMBER_ID]
-        log.info("WS 요청: memberId={} operation={}", memberId, request.operationName)
         applyToSecurityContext(request.sessionInfo.attributes)
         return try {
             chain.next(request)

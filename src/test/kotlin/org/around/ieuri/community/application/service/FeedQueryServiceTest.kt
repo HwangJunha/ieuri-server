@@ -6,7 +6,6 @@ import io.mockk.slot
 import org.around.ieuri.common.pagination.cursorPageOf
 import org.around.ieuri.common.security.ForbiddenException
 import org.around.ieuri.community.application.policy.CommunityPolicy
-import org.around.ieuri.community.application.port.`in`.query.ConversationSubscription
 import org.around.ieuri.community.application.port.out.event.ConversationEventPort
 import org.around.ieuri.community.application.port.out.query.ConversationMessagesSearch
 import org.around.ieuri.community.application.port.out.query.ConversationQueryPort
@@ -16,10 +15,12 @@ import org.around.ieuri.community.application.port.out.query.FeedQueryPort
 import org.around.ieuri.community.application.port.out.query.FeedSearch
 import org.around.ieuri.community.application.query.ConversationView
 import org.around.ieuri.community.application.query.MessageView
+import org.around.ieuri.community.application.query.TypingEventView
 import java.time.Duration
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import reactor.core.publisher.Flux
 import kotlin.test.assertFailsWith
 
 /** 피드·대화 조회(SPEC-0017 R4·R8·R11). */
@@ -229,20 +230,18 @@ class FeedQueryServiceTest {
     @Test
     fun `새 메시지 구독은 이벤트의 id로 DB에서 메시지를 읽어 내려준다`() {
         every { conversationQueryPort.findConversation(conversationId, memberId) } returns conversationView()
-        val source = RecordingSubscription<Long>()
-        every { conversationEventPort.subscribeNewMessage(conversationId) } returns source
+        every { conversationEventPort.subscribeNewMessage(conversationId) } returns Flux.just(500L)
         val stored = MessageView(
             id = 500L,
             body = "안녕",
             senderId = 9L,
             ownedByViewer = false,
+            viewerId = memberId,
             createdAt = Instant.EPOCH,
         )
         every { conversationQueryPort.findMessage(500L, memberId) } returns stored
 
-        val received = mutableListOf<MessageView>()
-        conversationService.newMessage(conversationId, memberId).onEvent { received += it }
-        source.emit(500L)
+        val received = conversationService.newMessage(conversationId, memberId).collectList().block()
 
         assertEquals(listOf(stored), received)
     }
@@ -251,15 +250,50 @@ class FeedQueryServiceTest {
     @Test
     fun `사라진 메시지의 이벤트는 흘려보낸다`() {
         every { conversationQueryPort.findConversation(conversationId, memberId) } returns conversationView()
-        val source = RecordingSubscription<Long>()
-        every { conversationEventPort.subscribeNewMessage(conversationId) } returns source
+        every { conversationEventPort.subscribeNewMessage(conversationId) } returns Flux.just(500L)
         every { conversationQueryPort.findMessage(500L, memberId) } returns null
 
-        val received = mutableListOf<MessageView>()
-        conversationService.newMessage(conversationId, memberId).onEvent { received += it }
-        source.emit(500L)
+        val received = conversationService.newMessage(conversationId, memberId).collectList().block()
 
         assertEquals(emptyList(), received)
+    }
+
+    /**
+     * **구독자마다 자기 기준의 값을 받아야 한다.** 채널 스트림은 공유되지만 조회자별 매핑은
+     * 각 구독 체인에 따로 붙는다 — 이게 새면 A의 화면에서 B의 말풍선이 자기 것으로 정렬된다.
+     */
+    @Test
+    fun `두 구독자가 각자의 조회자 기준으로 메시지를 받는다`() {
+        val other = 99L
+        every { conversationQueryPort.findConversation(conversationId, memberId) } returns conversationView()
+        every { conversationQueryPort.findConversation(conversationId, other) } returns conversationView()
+        every { conversationEventPort.subscribeNewMessage(conversationId) } returns Flux.just(500L)
+        every { conversationQueryPort.findMessage(500L, memberId) } returns
+            MessageView(500L, "안녕", memberId, ownedByViewer = true, viewerId = memberId, createdAt = Instant.EPOCH)
+        every { conversationQueryPort.findMessage(500L, other) } returns
+            MessageView(500L, "안녕", memberId, ownedByViewer = false, viewerId = other, createdAt = Instant.EPOCH)
+
+        val mine = conversationService.newMessage(conversationId, memberId).collectList().block()!!.single()
+        val theirs = conversationService.newMessage(conversationId, other).collectList().block()!!.single()
+
+        assertEquals(true, mine.ownedByViewer)
+        assertEquals(memberId, mine.viewerId)
+        assertEquals(false, theirs.ownedByViewer)
+        assertEquals(other, theirs.viewerId)
+    }
+
+    /** 자기 타이핑은 자기 화면에 뜨면 안 된다 — 계약상 이 스트림은 "상대가 입력 중"이다. */
+    @Test
+    fun `자기가 보낸 타이핑 이벤트는 걸러진다`() {
+        every { conversationQueryPort.findConversation(conversationId, memberId) } returns conversationView()
+        every { conversationEventPort.subscribeTyping(conversationId) } returns Flux.just(
+            TypingEventView(conversationId = conversationId, senderId = memberId, emittedAt = Instant.EPOCH),
+            TypingEventView(conversationId = conversationId, senderId = 99L, emittedAt = Instant.EPOCH),
+        )
+
+        val received = conversationService.typingIndicator(conversationId, memberId).collectList().block()!!
+
+        assertEquals(listOf(99L), received.map { it.senderId })
     }
 
     @Test
@@ -274,19 +308,4 @@ class FeedQueryServiceTest {
 
 private typealias CapturingSlot<T> = io.mockk.CapturingSlot<T>
 
-/** 이벤트를 손으로 흘려보내는 스텁 구독. 브로커 없이 매핑 동작만 확인한다. */
-private class RecordingSubscription<T> : ConversationSubscription<T> {
-    private var listener: ((T) -> Unit)? = null
 
-    override fun onEvent(listener: (T) -> Unit) {
-        this.listener = listener
-    }
-
-    override fun cancel() {
-        listener = null
-    }
-
-    fun emit(event: T) {
-        listener?.invoke(event)
-    }
-}

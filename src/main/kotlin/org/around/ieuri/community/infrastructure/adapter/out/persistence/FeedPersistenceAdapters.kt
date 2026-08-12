@@ -273,16 +273,17 @@ class MessageReportPersistenceAdapter(
  */
 @Component
 class MessagePurgeAdapter(
-    private val repository: MessageJpaRepository,
+    private val rowPurger: ExpiredMessageRowPurger,
     private val objectStoragePort: ObjectStoragePort,
 ) : MessagePurgePort {
 
-    @Transactional
+    /**
+     * **오브젝트 삭제는 트랜잭션 밖이다.** 회차당 최대 limit건의 R2 왕복이 트랜잭션 안에 있으면
+     * DB 커넥션 보유 시간이 원격 레이턴시에 묶여, 1000건이면 한 커넥션을 수십 초 잡는다.
+     */
     override fun deleteCreatedBefore(cutoff: Instant, limit: Int): Int {
-        val targets = repository.findByCreatedAtBefore(cutoff, Limit.of(limit))
-        if (targets.isEmpty()) return 0
-
-        val deleted = repository.deleteByIdIn(targets.mapNotNull { it.id }).toInt()
+        val (deleted, photoKeys) = rowPurger.deleteRows(cutoff, limit)
+        if (deleted == 0) return 0
 
         // **첨부 사진도 함께 지운다.** 행만 지우고 오브젝트를 남기면 "6개월 뒤 삭제"가
         // 사진에 대해서는 거짓이 된다 — 보관 기간을 정한 의미가 없어진다.
@@ -293,7 +294,7 @@ class MessagePurgeAdapter(
         // 개별 실패를 삼키는 이유는 한 장의 삭제 실패로 회차 전체를 되돌릴 이유가 없어서다 —
         // 스토리지에 이미 없는 키도 정상 경로다(멱등).
         var photoFailures = 0
-        targets.mapNotNull { it.photoObjectKey }.forEach { key ->
+        photoKeys.forEach { key ->
             runCatching { objectStoragePort.delete(key) }.onFailure { photoFailures += 1 }
         }
         // 키에 memberId 구간이 있어 로그에 싣지 않는다(POL-013) — 건수만 남긴다.
@@ -303,5 +304,28 @@ class MessagePurgeAdapter(
 
     private companion object {
         private val log = LoggerFactory.getLogger(MessagePurgeAdapter::class.java)
+    }
+}
+
+/**
+ * 만료 메시지의 **행 삭제만** 담당한다.
+ *
+ * [MessagePurgeAdapter]와 별도 빈인 이유는 프록시 때문이다 — 같은 클래스 안의 메서드를
+ * 자기호출하면 프록시를 거치지 않아 `@Transactional`이 조용히 무시된다. 트랜잭션을 원격
+ * 호출에서 떼어내려면 경계가 빈 밖에 있어야 한다.
+ */
+@Component
+class ExpiredMessageRowPurger(
+    private val repository: MessageJpaRepository,
+) {
+    /** 삭제 건수와, 뒤이어 스토리지에서 지워야 할 오브젝트 키를 함께 돌려준다. */
+    @Transactional
+    fun deleteRows(cutoff: Instant, limit: Int): Pair<Int, List<String>> {
+        val targets = repository.findByCreatedAtBefore(cutoff, Limit.of(limit))
+        if (targets.isEmpty()) return 0 to emptyList()
+
+        val photoKeys = targets.mapNotNull { it.photoObjectKey }
+        val deleted = repository.deleteByIdIn(targets.mapNotNull { it.id }).toInt()
+        return deleted to photoKeys
     }
 }

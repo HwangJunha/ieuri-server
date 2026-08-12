@@ -50,6 +50,11 @@ data class MessageView(
     val body: String,
     val senderId: Long,
     val ownedByViewer: Boolean,
+    /**
+     * 이 값을 만들 때 기준이 된 조회자. **구독 경로에서 필수다** — 이벤트마다 도는 실행에는
+     * SecurityContext(ThreadLocal)가 없어서, 필드 리졸버가 조회자를 여기서 받아야 한다.
+     */
+    val viewerId: Long,
     val createdAt: Instant,
     /** 인용한 피드. 피드가 지워졌으면 null이며 메시지는 남는다. */
     val feedItemId: Long? = null,

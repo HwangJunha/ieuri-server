@@ -5,6 +5,7 @@ import org.around.ieuri.community.application.query.ConversationView
 import org.around.ieuri.community.application.query.FeedItemView
 import org.around.ieuri.community.application.query.MessageView
 import org.around.ieuri.community.application.query.TypingEventView
+import reactor.core.publisher.Flux
 
 /**
  * 피드 조회 유스케이스(SPEC-0017 R4). 모든 조회가 인증을 전제한다.
@@ -45,10 +46,11 @@ interface ConversationQueryUseCase {
      * 타이핑 구독(R10). **구독 시작 시점에 참여자 검사를 한다** — 연결이 살아 있다는 것이
      * 특정 대화를 볼 자격의 증명은 아니다(POL-048). 참여자가 아니면 여기서 예외가 난다.
      *
-     * 스트림 타입을 노출하지 않고 [ConversationSubscription]을 돌려주는 이유는 application이
-     * 리액티브 라이브러리를 알지 않게 하기 위함이다 — 구독 표현은 인프라의 선택이다.
+     * **`Flux`를 그대로 돌려준다.** 구독 표현을 감싸 추상화하려 했으나, 그 래퍼가 채널당
+     * 하나여야 할 스트림을 구독마다 새로 만들게 유도해 이벤트 유실을 낳았다. GraphQL 구독은
+     * 계약상 Publisher이므로 여기서 Flux를 노출하는 편이 정직하다.
      */
-    fun typingIndicator(conversationId: Long, memberId: Long): ConversationSubscription<TypingEventView>
+    fun typingIndicator(conversationId: Long, memberId: Long): Flux<TypingEventView>
 
     /**
      * 새 메시지 구독(R9). 참여자 검사는 타이핑과 같다.
@@ -59,17 +61,6 @@ interface ConversationQueryUseCase {
      *
      * 이벤트마다 저장된 메시지를 읽어 내려주므로 **본문은 항상 DB의 값**이다.
      */
-    fun newMessage(conversationId: Long, memberId: Long): ConversationSubscription<MessageView>
+    fun newMessage(conversationId: Long, memberId: Long): Flux<MessageView>
 }
 
-/**
- * 구독 한 건. [onEvent]로 넘긴 콜백이 이벤트마다 불리고, [cancel]로 끊는다.
- *
- * 타이핑은 **유실 허용이 계약이고**(AC14-2), 새 메시지는 유실되면 안 되므로 재연결 시
- * 조회로 메꾼다 — 어느 쪽이든 이 인터페이스는 "이 파드에 붙은 구독자 하나"만 표현한다.
- */
-interface ConversationSubscription<T> {
-    fun onEvent(listener: (T) -> Unit)
-
-    fun cancel()
-}

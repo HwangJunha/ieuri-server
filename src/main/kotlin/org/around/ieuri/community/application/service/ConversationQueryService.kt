@@ -4,7 +4,6 @@ import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.security.ForbiddenException
 import org.around.ieuri.community.application.policy.CommunityPolicy
 import org.around.ieuri.community.application.port.`in`.query.ConversationQueryUseCase
-import org.around.ieuri.community.application.port.`in`.query.ConversationSubscription
 import org.around.ieuri.community.application.port.out.event.ConversationEventPort
 import org.around.ieuri.community.application.port.out.query.ConversationMessagesSearch
 import org.around.ieuri.community.application.port.out.query.ConversationQueryPort
@@ -13,6 +12,7 @@ import org.around.ieuri.community.application.query.ConversationView
 import org.around.ieuri.community.application.query.MessageView
 import org.around.ieuri.community.application.query.TypingEventView
 import org.springframework.stereotype.Service
+import reactor.core.publisher.Flux
 
 /**
  * 대화·메시지 조회와 타이핑 구독(SPEC-0017 R8·R10).
@@ -67,12 +67,12 @@ class ConversationQueryService(
      * **구독 시작 시점에 참여자를 검사한다**(POL-048) — 연결이 살아 있다는 것이 특정 대화를
      * 볼 자격의 증명은 아니다. 연결 수립 시의 인증과 별개 판정이다.
      */
-    override fun typingIndicator(
-        conversationId: Long,
-        memberId: Long,
-    ): ConversationSubscription<TypingEventView> {
+    override fun typingIndicator(conversationId: Long, memberId: Long): Flux<TypingEventView> {
         requireParticipant(conversationId, memberId)
+        // **자기 타이핑은 걸러낸다.** 채널은 대화 단위라 발신자에게도 되돌아오는데,
+        // 계약상 이 스트림은 "상대가 입력 중"이다 — 자기 화면에 자기 표시가 뜨면 안 된다.
         return conversationEventPort.subscribeTyping(conversationId)
+            .filter { it.senderId != memberId }
     }
 
     /**
@@ -82,14 +82,12 @@ class ConversationQueryService(
      * 읽는 사이에 보관 만료·탈퇴로 사라진 메시지는 **조용히 건너뛴다** — 구독자에게 빈
      * 말풍선을 내려보내는 것보다 낫다.
      */
-    override fun newMessage(
-        conversationId: Long,
-        memberId: Long,
-    ): ConversationSubscription<MessageView> {
+    override fun newMessage(conversationId: Long, memberId: Long): Flux<MessageView> {
         requireParticipant(conversationId, memberId)
-        return MappedSubscription(conversationEventPort.subscribeNewMessage(conversationId)) {
-            conversationQueryPort.findMessage(it, memberId)
-        }
+        return conversationEventPort.subscribeNewMessage(conversationId)
+            // 이벤트에는 id만 실려 오므로 DB에서 다시 읽는다. 읽는 사이에 사라진 메시지는
+            // mapNotNull이 건너뛴다 — 빈 말풍선을 내려보내지 않는다.
+            .mapNotNull { conversationQueryPort.findMessage(it, memberId) }
     }
 
     /**
@@ -113,21 +111,3 @@ class ConversationQueryService(
     }
 }
 
-/**
- * 구독 이벤트를 다른 값으로 옮기는 래퍼. 새 메시지 구독이 **id를 받아 DB의 메시지로** 바꾸는
- * 데 쓴다.
- *
- * [transform]이 null을 돌려주면 그 이벤트를 흘려보낸다 — 읽는 사이에 사라진 메시지에
- * 빈 말풍선을 내려보내지 않기 위함이다.
- */
-private class MappedSubscription<S, T>(
-    private val source: ConversationSubscription<S>,
-    private val transform: (S) -> T?,
-) : ConversationSubscription<T> {
-
-    override fun onEvent(listener: (T) -> Unit) {
-        source.onEvent { raw -> transform(raw)?.let(listener) }
-    }
-
-    override fun cancel() = source.cancel()
-}

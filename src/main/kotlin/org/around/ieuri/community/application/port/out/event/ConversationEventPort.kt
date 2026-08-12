@@ -1,7 +1,7 @@
 package org.around.ieuri.community.application.port.out.event
 
-import org.around.ieuri.community.application.port.`in`.query.ConversationSubscription
 import org.around.ieuri.community.application.query.TypingEventView
+import reactor.core.publisher.Flux
 
 /**
  * 대화 실시간 이벤트의 발행·구독(SPEC-0017 R10·R14, POL-048).
@@ -36,9 +36,12 @@ interface ConversationEventPort {
      */
     fun publishNewMessage(conversationId: Long, messageId: Long)
 
-    /** 이 파드에 연결된 구독자 한 명분의 타이핑 구독을 연다. */
-    fun subscribeTyping(conversationId: Long): ConversationSubscription<TypingEventView>
+    /**
+     * 이 대화의 타이핑 이벤트 스트림. **채널당 하나를 공유한다** — 구독마다 새로 만들면
+     * 같은 채널에 리스너가 여러 개 붙어 이벤트가 엉뚱한 쪽으로 흘러간다.
+     */
+    fun subscribeTyping(conversationId: Long): Flux<TypingEventView>
 
-    /** 이 파드에 연결된 구독자 한 명분의 새 메시지 구독을 연다. */
-    fun subscribeNewMessage(conversationId: Long): ConversationSubscription<Long>
+    /** 이 대화의 새 메시지 스트림. 채널당 하나를 공유한다. */
+    fun subscribeNewMessage(conversationId: Long): Flux<Long>
 }

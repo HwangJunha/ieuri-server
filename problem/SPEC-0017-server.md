@@ -367,8 +367,7 @@ CHECK 제약이 V28에서 `POST`·`COMMENT`·`MEMBER`로 고정돼 있어 **피�
 | | 타이핑 | 새 메시지 |
 |---|---|---|
 | 유실 허용 | 허용 | **불가** |
-| 브로커 페이로드 | `senderId\|epochMillis` | messageId만 |
-| 백프레셔 | LATEST(최신만) | BUFFER(쌓는다) |
+| 브로커 페이로드 | JSON(`senderId`, `emittedAtEpochMilli`) | JSON(`messageId`) |
 | 끊긴 동안 | 버린다 | 재연결 후 조회로 메꾼다 |
 
 **구독은 "새 메시지가 있다"는 신호이지 전달 보장 수단이 아니다.** 이벤트에는 id만 싣고
@@ -378,6 +377,27 @@ CHECK 제약이 V28에서 `POST`·`COMMENT`·`MEMBER`로 고정돼 있어 **피�
 
 채널을 둘로 나눈 이유는 한 채널에 섞으면 타이핑만 필요한 구독자도 메시지 이벤트를 받아
 걸러내야 하고 페이로드에 종류 판별자가 붙기 때문이다.
+
+#### 구독 배선을 리액티브 컨테이너로 바꿨다 (2026-08-12)
+
+처음에는 `ConversationSubscription`이라는 자체 콜백 인터페이스를 두고, 구독 요청마다
+`RedisMessageListenerContainer`에 리스너를 붙였다. **이벤트가 일부만 도착하는 결함이 났다**
+(실측: 5건 발행에 1·3번째만 도착). 원인은 구독마다 리스너를 새로 붙여 같은 채널에 리스너가
+여러 개 걸린 것이었고, 발행 하나가 그중 한 곳에만 도착해 GraphQL이 읽는 쪽이 아니면 사라졌다.
+
+`ReactiveRedisMessageListenerContainer.receive()`로 바꿨다. 채널 구독의 생명주기(마지막 구독
+취소 시 UNSUBSCRIBE 포함)를 컨테이너가 관리하므로 채널당 싱크 캐시와 해제 경로를 직접 만들
+필요가 없다. 자체 래퍼(`ConversationSubscription`)도 걷어내고 포트가 `Flux`를 그대로 노출한다 —
+GraphQL Subscription의 계약이 이미 `Publisher`라 한 겹 더 감쌀 이유가 없었고, 그 래퍼가 오히려
+"구독마다 스트림을 새로 만든다"는 잘못된 형태를 유도했다.
+
+같이 정리한 것:
+- 블로킹 조회를 위한 스레드 전환(`publishOn`)은 **어댑터가 결정한다** — 이벤트가 어느
+  스레드에서 올라오는지는 어댑터만 아는 사실이라 application이 알 이유가 없다.
+- 구독 경로의 필드 리졸버는 **SecurityContext를 읽을 수 없다**(이벤트마다 도는 실행에는
+  ThreadLocal이 없다). 조회자를 `MessageView.viewerId`로 실어 넘긴다.
+- 타이핑은 발신자 본인에게도 되돌아오므로 조회자 기준으로 걸러낸다 — 계약상 이 스트림은
+  "상대가 입력 중"이다.
 
 ### 검증하지 못한 것
 

@@ -1,17 +1,16 @@
 package org.around.ieuri.community.infrastructure.adapter.out.event
 
-import org.around.ieuri.community.application.port.`in`.query.ConversationSubscription
 import org.around.ieuri.community.application.port.out.event.ConversationEventPort
 import org.around.ieuri.community.application.query.TypingEventView
 import org.around.ieuri.community.infrastructure.adapter.out.event.mapper.NewMessagePayload
 import org.around.ieuri.community.infrastructure.adapter.out.event.mapper.TypingEventPayload
 import org.slf4j.LoggerFactory
-import org.springframework.data.redis.connection.Message
-import org.springframework.data.redis.connection.MessageListener
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.listener.ChannelTopic
-import org.springframework.data.redis.listener.RedisMessageListenerContainer
+import org.springframework.data.redis.listener.ReactiveRedisMessageListenerContainer
 import org.springframework.stereotype.Component
+import reactor.core.publisher.Flux
+import reactor.core.scheduler.Schedulers
 import tools.jackson.databind.ObjectMapper
 
 /**
@@ -34,7 +33,7 @@ import tools.jackson.databind.ObjectMapper
 @Component
 class ValkeyConversationEventAdapter(
     private val redis: StringRedisTemplate,
-    private val listenerContainer: RedisMessageListenerContainer,
+    private val listenerContainer: ReactiveRedisMessageListenerContainer,
     private val objectMapper: ObjectMapper,
 ) : ConversationEventPort {
 
@@ -62,17 +61,33 @@ class ValkeyConversationEventAdapter(
         )
     }
 
-    override fun subscribeTyping(
-        conversationId: Long,
-    ): ConversationSubscription<TypingEventView> =
-        ValkeySubscription(listenerContainer, typingTopic(conversationId)) { payload ->
+    /**
+     * **구독 생명주기를 컨테이너에 맡긴다.** 리스너를 직접 붙이면 뗄 책임이 이쪽으로 넘어오고,
+     * 그것을 빠뜨리면 파드가 사는 동안 브로커 구독이 단조 증가한다. `receive()`의 Flux는
+     * 구독이 취소될 때 UNSUBSCRIBE까지 처리한다.
+     *
+     * 스트림은 컨테이너의 이벤트 루프에서 방출되므로 **블로킹해도 안전한 스레드로 옮겨서**
+     * 넘긴다 — 구독자가 DB를 읽어도 다른 대화의 전달이 멈추지 않는다. 어느 스레드에서
+     * 올라오는지는 이 어댑터만 아는 사실이라 결정도 여기서 한다.
+     */
+    override fun subscribeTyping(conversationId: Long): Flux<TypingEventView> =
+        receive(typingTopic(conversationId)) { payload ->
             read(payload, TypingEventPayload::class.java)?.toView(conversationId)
         }
 
-    override fun subscribeNewMessage(conversationId: Long): ConversationSubscription<Long> =
-        ValkeySubscription(listenerContainer, messageTopic(conversationId)) { payload ->
+    override fun subscribeNewMessage(conversationId: Long): Flux<Long> =
+        receive(messageTopic(conversationId)) { payload ->
             read(payload, NewMessagePayload::class.java)?.messageId
         }
+
+    /**
+     * 채널 하나를 구독해 페이로드를 [parse]로 옮긴다. [parse]가 null이면 그 이벤트는 조용히
+     * 버린다 — 형식이 어긋난 페이로드를 구독자에게 전달할 방법이 없다.
+     */
+    private fun <T : Any> receive(channel: String, parse: (String) -> T?): Flux<T> =
+        listenerContainer.receive(ChannelTopic(channel))
+            .publishOn(Schedulers.boundedElastic())
+            .mapNotNull<T> { parse(it.message) }
 
     /**
      * 깨진 페이로드는 **조용히 버린다**(null 반환) — 구독자에게 전달할 방법이 없는데 예외를
@@ -94,7 +109,7 @@ class ValkeyConversationEventAdapter(
             // **받은 구독자 수를 함께 남긴다.** 0이면 발행은 됐으나 아무도 안 듣는 것이라
             // 발행 실패와 구분된다 — 이 둘을 못 나누면 원인을 좁힐 수 없다.
             val receivers = redis.convertAndSend(topic, payload)
-            log.info("대화 이벤트 발행: topic={} 수신자={}", topic, receivers)
+            log.debug("대화 이벤트 발행: topic={} 수신자={}", topic, receivers)
         } catch (e: RuntimeException) {
             // 대화 id만 남긴다 — 본문도 수신자도 로그 대상이 아니다(POL-013).
             log.warn("failed to publish conversation event for conversation {}", conversationId, e)
@@ -114,43 +129,3 @@ class ValkeyConversationEventAdapter(
     }
 }
 
-/**
- * 구독 한 건. 이 파드에 연결된 구독자에게만 전달하며, 발행은 브로커로 나간다.
- *
- * [cancel]에서 리스너를 반드시 떼야 한다 — 떼지 않으면 연결이 끊긴 뒤에도 컨테이너가 리스너를
- * 들고 있어 구독이 쌓인다.
- *
- * [parse]가 null을 돌려주면 그 이벤트는 **조용히 버린다** — 형식이 어긋난 페이로드에 예외를
- * 던져 봐야 구독자에게 전달할 방법이 없다.
- */
-private class ValkeySubscription<T>(
-    private val container: RedisMessageListenerContainer,
-    channel: String,
-    private val parse: (String) -> T?,
-) : ConversationSubscription<T> {
-
-    private val topic = ChannelTopic(channel)
-
-    @Volatile
-    private var listener: MessageListener? = null
-
-    override fun onEvent(listener: (T) -> Unit) {
-        val adapter = MessageListener { message: Message, _ ->
-            log.info("대화 이벤트 수신: topic={}", topic.topic)
-            parse(String(message.body))?.let(listener)
-        }
-        this.listener = adapter
-        container.addMessageListener(adapter, topic)
-        log.info("대화 이벤트 구독 시작: topic={}", topic.topic)
-    }
-
-    override fun cancel() {
-        listener?.let { container.removeMessageListener(it, topic) }
-        listener = null
-        log.info("대화 이벤트 구독 해제: topic={}", topic.topic)
-    }
-
-    private companion object {
-        private val log = LoggerFactory.getLogger(ValkeySubscription::class.java)
-    }
-}

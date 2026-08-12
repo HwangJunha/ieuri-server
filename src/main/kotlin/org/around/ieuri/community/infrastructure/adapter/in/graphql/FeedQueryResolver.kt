@@ -138,11 +138,16 @@ class FeedQueryResolver(
      *
      * 인용이 없거나 그 피드가 삭제·차단으로 안 보이면 null이고, 메시지 자체는 남는다.
      * **요청된 경우에만** 조회한다 — 목록만 그리는 화면에는 조회가 붙지 않는다.
+     *
+     * **조회자를 SecurityContext가 아니라 소스에서 받는다.** 구독은 이벤트마다 실행이 새로
+     * 도는데 그 스레드에는 SecurityContext(ThreadLocal)가 없어서, 여기서 읽으면 인용이 달린
+     * 메시지마다 인증 오류가 난다 — 인용 없는 메시지에서는 조기 반환해 드러나지도 않는다.
      */
     @DgsData(parentType = "Message", field = "feedItem")
     fun messageFeedItem(dfe: DgsDataFetchingEnvironment): FeedItemView? {
-        val feedItemId = dfe.messageSource().feedItemId ?: return null
-        return feedQueryUseCase.feedItem(feedItemId, currentMemberProvider.requireMemberId())
+        val source = dfe.messageSource()
+        val feedItemId = source.feedItemId ?: return null
+        return feedQueryUseCase.feedItem(feedItemId, source.viewerId)
     }
 
     /**

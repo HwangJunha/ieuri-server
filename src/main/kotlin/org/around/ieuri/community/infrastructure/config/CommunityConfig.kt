@@ -4,8 +4,8 @@ import org.around.ieuri.community.application.policy.CommunityPolicy
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.data.redis.connection.RedisConnectionFactory
-import org.springframework.data.redis.listener.RedisMessageListenerContainer
+import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory
+import org.springframework.data.redis.listener.ReactiveRedisMessageListenerContainer
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
 import software.amazon.awssdk.regions.Region
@@ -27,20 +27,21 @@ import java.net.URI
 class CommunityConfig {
 
     /**
-     * 타이핑 이벤트 구독용 pub/sub 컨테이너(SPEC-0017 R14).
+     * 대화 실시간 이벤트 구독용 pub/sub 컨테이너(SPEC-0017 R10·R14).
      *
      * Spring Boot는 이 컨테이너를 자동구성하지 않는다 — 발행(convertAndSend)만 쓰는 기존
      * 코드에는 필요 없었고, 구독은 이 스펙이 처음 도입한다.
      *
-     * 컨테이너가 리스너별로 스레드를 쓰므로, 구독이 끝나면 반드시 리스너를 떼야 한다
-     * (ValkeyTypingSubscription.cancel).
+     * **명령형 컨테이너가 아니라 리액티브 쪽을 쓴다.** 명령형은 리스너를 직접 붙이고 떼야 해서
+     * 채널당 싱크 캐시와 해제 경로를 손으로 만들게 되는데, 그 해제를 빠뜨리면 파드가 사는 동안
+     * 브로커 구독이 단조 증가한다. `receive()`가 돌려주는 Flux는 **마지막 구독이 취소될 때
+     * 컨테이너가 UNSUBSCRIBE까지 처리**하므로 그 책임이 통째로 사라진다.
      */
     @Bean
-    fun redisMessageListenerContainer(
-        connectionFactory: RedisConnectionFactory,
-    ): RedisMessageListenerContainer = RedisMessageListenerContainer().apply {
-        setConnectionFactory(connectionFactory)
-    }
+    fun reactiveRedisMessageListenerContainer(
+        connectionFactory: ReactiveRedisConnectionFactory,
+    ): ReactiveRedisMessageListenerContainer =
+        ReactiveRedisMessageListenerContainer(connectionFactory)
 
     @Bean
     fun communityPolicy(

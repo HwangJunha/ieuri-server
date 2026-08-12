@@ -192,6 +192,7 @@ class ConversationQueryAdapter(
         body = if (bodyEncrypted.isEmpty()) "" else cipher.decrypt(bodyEncrypted),
         senderId = senderId,
         ownedByViewer = senderId == memberId,
+        viewerId = memberId,
         createdAt = requireNotNull(createdAt) { "조회된 메시지에는 createdAt이 있어야 한다." },
         feedItemId = feedItemId,
         photoKey = photoObjectKey,
