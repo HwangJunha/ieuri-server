@@ -77,7 +77,14 @@ class ConversationSubscriptionResolver(
             val result = sink.tryEmitNext(event)
             if (result.isFailure) log.warn("구독 이벤트를 방출하지 못했다: {}", result)
         }
-        return sink.asFlux().doFinally { cancel() }
+        return sink.asFlux()
+            // **요청 흐름을 직접 관측한다.** 전송 계층이 첫 건 뒤에 request(1)을 다시 보내는지가
+            // 남은 미지수다 — 보낸다면 우리 쪽 문제이고, 안 보낸다면 전송 계층에서 멎은 것이다.
+            .doOnRequest { log.info("구독 수요 요청: {}건", it) }
+            .doOnNext { log.info("구독 이벤트 전달 시작") }
+            .doOnCancel { log.info("구독 취소됨") }
+            .doOnError { log.warn("구독 스트림 오류", it) }
+            .doFinally { log.info("구독 종료: {}", it); cancel() }
     }
 
     private companion object {
