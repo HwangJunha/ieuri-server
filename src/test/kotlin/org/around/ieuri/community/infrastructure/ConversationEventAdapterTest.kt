@@ -11,6 +11,7 @@ import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.listener.ChannelTopic
 import org.springframework.data.redis.listener.ReactiveRedisMessageListenerContainer
 import reactor.core.publisher.Flux
+import reactor.core.scheduler.Schedulers
 import tools.jackson.databind.ObjectMapper
 import tools.jackson.module.kotlin.jacksonObjectMapper
 import java.time.Instant
@@ -42,7 +43,9 @@ class ConversationEventAdapterTest {
             override fun getMessage() = payload
         }
 
-    private fun adapter() = ValkeyConversationEventAdapter(redis, container, objectMapper)
+    // 테스트는 스레드를 바꾸지 않는다 — 바꾸면 검증이 비동기가 되어 불안정해진다.
+    private fun adapter() =
+        ValkeyConversationEventAdapter(redis, container, objectMapper, Schedulers.immediate())
 
     /** **이것이 원래 깨져 있던 동작이다.** 새 메시지는 유실 허용이 아니다. */
     @Test

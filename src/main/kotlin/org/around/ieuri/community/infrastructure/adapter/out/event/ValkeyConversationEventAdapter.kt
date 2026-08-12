@@ -10,7 +10,7 @@ import org.springframework.data.redis.listener.ChannelTopic
 import org.springframework.data.redis.listener.ReactiveRedisMessageListenerContainer
 import org.springframework.stereotype.Component
 import reactor.core.publisher.Flux
-import reactor.core.scheduler.Schedulers
+import reactor.core.scheduler.Scheduler
 import tools.jackson.databind.ObjectMapper
 
 /**
@@ -35,6 +35,7 @@ class ValkeyConversationEventAdapter(
     private val redis: StringRedisTemplate,
     private val listenerContainer: ReactiveRedisMessageListenerContainer,
     private val objectMapper: ObjectMapper,
+    private val eventScheduler: Scheduler,
 ) : ConversationEventPort {
 
     /**
@@ -66,9 +67,10 @@ class ValkeyConversationEventAdapter(
      * 그것을 빠뜨리면 파드가 사는 동안 브로커 구독이 단조 증가한다. `receive()`의 Flux는
      * 구독이 취소될 때 UNSUBSCRIBE까지 처리한다.
      *
-     * 스트림은 컨테이너의 이벤트 루프에서 방출되므로 **블로킹해도 안전한 스레드로 옮겨서**
-     * 넘긴다 — 구독자가 DB를 읽어도 다른 대화의 전달이 멈추지 않는다. 어느 스레드에서
-     * 올라오는지는 이 어댑터만 아는 사실이라 결정도 여기서 한다.
+     * 스트림은 컨테이너의 **이벤트 루프에서 방출된다** — 그 스레드 하나가 이 연결의 모든
+     * 채널을 나르므로 거기서 블로킹하면 무관한 대화까지 함께 멎는다. 그래서 블로킹해도 안전한
+     * 전용 스케줄러로 옮겨서 넘긴다. 어느 스레드에서 올라오는지는 이 어댑터만 아는 사실이라
+     * 결정도 여기서 한다.
      */
     override fun subscribeTyping(conversationId: Long): Flux<TypingEventView> =
         receive(typingTopic(conversationId)) { payload ->
@@ -86,7 +88,7 @@ class ValkeyConversationEventAdapter(
      */
     private fun <T : Any> receive(channel: String, parse: (String) -> T?): Flux<T> =
         listenerContainer.receive(ChannelTopic(channel))
-            .publishOn(Schedulers.boundedElastic())
+            .publishOn(eventScheduler)
             .mapNotNull<T> { parse(it.message) }
 
     /**

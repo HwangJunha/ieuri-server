@@ -282,6 +282,23 @@ class FeedQueryServiceTest {
         assertEquals(other, theirs.viewerId)
     }
 
+    /**
+     * **조회 실패가 구독을 끊으면 안 된다.** 커넥션 고갈 같은 일시적 실패로 Flux가 종료되면
+     * 그 사용자의 채팅이 재접속 전까지 조용히 멎는다 — 한 건을 건너뛰는 편이 낫다.
+     */
+    @Test
+    fun `조회가 실패한 이벤트는 건너뛰고 구독은 계속된다`() {
+        every { conversationQueryPort.findConversation(conversationId, memberId) } returns conversationView()
+        every { conversationEventPort.subscribeNewMessage(conversationId) } returns Flux.just(1L, 2L)
+        every { conversationQueryPort.findMessage(1L, memberId) } throws RuntimeException("커넥션 없음")
+        val survivor = MessageView(2L, "안녕", 9L, ownedByViewer = false, viewerId = memberId, createdAt = Instant.EPOCH)
+        every { conversationQueryPort.findMessage(2L, memberId) } returns survivor
+
+        val received = conversationService.newMessage(conversationId, memberId).collectList().block()
+
+        assertEquals(listOf(survivor), received)
+    }
+
     /** 자기 타이핑은 자기 화면에 뜨면 안 된다 — 계약상 이 스트림은 "상대가 입력 중"이다. */
     @Test
     fun `자기가 보낸 타이핑 이벤트는 걸러진다`() {
