@@ -35,3 +35,18 @@ data class CommunityProperties(
     val maxRadiusMeters: Int = 100_000,
     /** 지역 피드가 한 번에 다룰 spot 수 상한. 넘으면 잘린다. */
 )
+
+/**
+ * DM 메시지 보관 배치 설정(SPEC-0017 R16).
+ *
+ * **회차 상한을 설정으로 뺀다**(POL-044) — 실측 전까지 확정값이 아니므로 근거 없는 계수를
+ * 코드에 박지 않는다. 한 회차가 끝나면 다음 회차가 이어지며, 상한보다 적게 지운 회차가
+ * 나오면 지울 것이 없다는 뜻이라 멈춘다.
+ */
+@ConfigurationProperties(prefix = "ieuri.community.message-retention")
+data class MessageRetentionProperties(
+    /** 한 회차에 지울 최대 건수. 트랜잭션이 회차 단위로 끊겨 락과 WAL이 커지지 않는다. */
+    val batchSize: Int = 1_000,
+    /** 한 번의 잡 실행에서 돌 최대 회차 수. 무한 루프를 막는 상한이다. */
+    val maxBatchesPerRun: Int = 100,
+)

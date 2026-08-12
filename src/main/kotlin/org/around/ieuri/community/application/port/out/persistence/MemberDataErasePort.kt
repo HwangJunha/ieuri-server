@@ -22,4 +22,16 @@ interface MemberDataErasePort {
 
     /** 회원이 걸었거나 회원을 향한 차단. 양쪽 모두 지운다. */
     fun deleteBlocksInvolving(memberId: Long): Long
+
+    /** 회원이 쓴 피드. 사진·좋아요는 FK cascade가 따라 지운다(SPEC-0017 R17). */
+    fun deleteFeedItemsByAuthor(memberId: Long): Long
+
+    /**
+     * 회원이 보낸 DM 메시지(SPEC-0017 R17). **탈퇴만 이 경로를 탄다** — 정지는 해제될 수
+     * 있으므로 되돌릴 수 없는 삭제를 하지 않는다.
+     *
+     * 대화 자체는 지우지 않는다. 상대방 화면에서 남은 자기 메시지가 보여야 하고, 조회가
+     * 실패하면 안 된다(AC17-2).
+     */
+    fun deleteMessagesBySender(memberId: Long): Long
 }

@@ -34,11 +34,17 @@ class MemberDataEraseService(
         val likes = erasePort.deleteLikesByMember(memberId)
         val hides = erasePort.deleteHidesByMember(memberId)
         val blocks = erasePort.deleteBlocksInvolving(memberId)
+        val feedItems = erasePort.deleteFeedItemsByAuthor(memberId)
+        // 대화는 남기고 메시지만 지운다(SPEC-0017 R17) — 상대의 남은 메시지는 정상
+        // 표시되어야 하고, 조회 자체가 실패하면 안 된다(AC17-2).
+        val messages = erasePort.deleteMessagesBySender(memberId)
 
         // 개인정보를 담지 않는다(POL-013) — 식별자와 건수만 남긴다.
+        // DM 본문·수신자는 애초에 기록 대상이 아니다.
         log.info(
-            "community data erased for withdrawn member {}: posts={} comments={} likes={} hides={} blocks={}",
-            memberId, posts, comments, likes, hides, blocks,
+            "community data erased for withdrawn member {}: posts={} comments={} likes={} hides={} " +
+                "blocks={} feedItems={} messages={}",
+            memberId, posts, comments, likes, hides, blocks, feedItems, messages,
         )
     }
 

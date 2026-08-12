@@ -31,6 +31,38 @@ class MemberDataEraseServiceTest {
         verify { erasePort.deleteBlocksInvolving(memberId) }
     }
 
+    /**
+     * SPEC-0017 AC17-1 — 탈퇴하면 피드와 그가 보낸 DM 메시지도 지워진다.
+     *
+     * **대화 자체는 지우지 않는다**(AC17-2) — 상대방 화면에서 남은 자기 메시지가 보여야 하고
+     * 조회가 실패하면 안 된다.
+     */
+    @Test
+    fun `탈퇴하면 피드와 보낸 메시지도 지운다`() {
+        service.eraseMemberData(memberId)
+
+        verify { erasePort.deleteFeedItemsByAuthor(memberId) }
+        verify { erasePort.deleteMessagesBySender(memberId) }
+    }
+
+    /**
+     * AC17-3 — 메시지 삭제는 **탈퇴 경로에서만** 일어난다. 정지는 해제될 수 있어 되돌릴 수
+     * 없는 삭제를 하지 않으며, 이 유스케이스는 `MemberWithdrawn`에만 연결되어 있다
+     * (CommunityMemberWithdrawnListener). 정지 이벤트에는 구독자가 없다.
+     *
+     * 이 유스케이스를 정지 경로에서도 부르게 되면 그 순간 R17이 깨지므로, 여기서는 "한 번의
+     * 호출이 삭제만 하고 다른 상태를 건드리지 않는다"만 고정한다.
+     */
+    @Test
+    fun `메시지 삭제는 한 번만 일어난다`() {
+        service.eraseMemberData(memberId)
+
+        // 정지 경로가 이 유스케이스를 재사용하면 같은 회원의 메시지가 다시 지워진다 —
+        // 삭제는 탈퇴 1회로 끝나야 한다.
+        verify(exactly = 1) { erasePort.deleteMessagesBySender(memberId) }
+        verify(exactly = 1) { erasePort.deleteFeedItemsByAuthor(memberId) }
+    }
+
     @Test
     fun `글을 댓글보다 먼저 지운다`() {
         service.eraseMemberData(memberId)

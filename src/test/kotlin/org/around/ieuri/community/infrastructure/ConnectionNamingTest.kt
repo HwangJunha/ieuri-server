@@ -3,6 +3,7 @@ package org.around.ieuri.community.infrastructure
 import com.netflix.graphql.dgs.DgsData
 import com.netflix.graphql.dgs.DgsQuery
 import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.CommunityQueryResolver
+import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.FeedQueryResolver
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -28,17 +29,33 @@ class ConnectionNamingTest {
         "blockedUsers",
     )
 
+    /** 피드·DM 커넥션(SPEC-0017). 리졸버가 달라 목록을 나눠 둔다. */
+    private val feedConnectionReturningFields = setOf(
+        "feed",
+        "conversations",
+        "conversationMessages",
+    )
+
     @Test
     fun `커넥션을 반환하는 리졸버의 반환 타입은 이름이 Connection으로 끝난다`() {
-        val checked = CommunityQueryResolver::class.java.declaredMethods
-            .filter { it.name in connectionReturningFields }
+        assertConnectionNaming(CommunityQueryResolver::class.java, connectionReturningFields)
+    }
+
+    @Test
+    fun `피드와 대화 커넥션의 반환 타입도 이름이 Connection으로 끝난다`() {
+        assertConnectionNaming(FeedQueryResolver::class.java, feedConnectionReturningFields)
+    }
+
+    private fun assertConnectionNaming(resolver: Class<*>, fields: Set<String>) {
+        val checked = resolver.declaredMethods
+            .filter { it.name in fields }
             .filter { it.isAnnotationPresent(DgsQuery::class.java) || it.isAnnotationPresent(DgsData::class.java) }
 
         // 메서드 이름이 바뀌었는데 위 목록만 남으면 아무것도 검사하지 않는 테스트가 된다.
         assertTrue(
-            checked.size == connectionReturningFields.size,
-            "커넥션 반환 리졸버를 ${connectionReturningFields.size}개 기대했으나 ${checked.size}개를 찾았다. " +
-                "메서드 이름이 바뀌었다면 connectionReturningFields도 함께 고칠 것.",
+            checked.size == fields.size,
+            "${resolver.simpleName}에서 커넥션 반환 리졸버를 ${fields.size}개 기대했으나 ${checked.size}개를 찾았다. " +
+                "메서드 이름이 바뀌었다면 목록도 함께 고칠 것.",
         )
 
         checked.forEach { method ->

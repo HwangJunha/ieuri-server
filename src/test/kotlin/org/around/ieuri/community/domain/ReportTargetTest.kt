@@ -21,6 +21,24 @@ class ReportTargetTest {
         assertTrue(ReportTargetType.COMMENT.autoHideable)
     }
 
+    /** AC12-4 — 피드는 공개 콘텐츠라 글과 같은 규칙이 적용된다(POL-041 3항). */
+    @Test
+    fun `피드는 자동 숨김 대상이다`() {
+        assertTrue(ReportTargetType.FEED_ITEM.autoHideable)
+        assertFalse(Report.reachesAutoHideThreshold(ReportTargetType.FEED_ITEM, 4))
+        assertTrue(Report.reachesAutoHideThreshold(ReportTargetType.FEED_ITEM, 5))
+    }
+
+    /**
+     * AC12-4 — **DM 메시지에는 이 규칙이 적용되지 않는다**(POL-049). 1:1 대화에는 서로 다른
+     * 신고자 5명이라는 개념이 성립하지 않으므로 열거값 자체를 두지 않았다 — 메시지 신고는
+     * MessageReport라는 별도 애그리게이트이며 자동 숨김 경로가 없다.
+     */
+    @Test
+    fun `DM 메시지는 이 열거형의 대상이 아니다`() {
+        assertFalse(ReportTargetType.entries.any { it.name == "MESSAGE" })
+    }
+
     @Test
     fun `사용자는 자동 숨김 대상이 아니다`() {
         // 이 값이 true가 되면 신고 5건으로 아무나 침묵시킬 수 있다.

@@ -1,12 +1,12 @@
 package org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql
 
-import com.netflix.graphql.dgs.exceptions.DefaultDataFetcherExceptionHandler
 import graphql.GraphQLError
 import graphql.execution.DataFetcherExceptionHandler
 import graphql.execution.DataFetcherExceptionHandlerParameters
 import graphql.execution.DataFetcherExceptionHandlerResult
 import graphql.execution.ResultPath
 import graphql.language.SourceLocation
+import org.around.ieuri.common.security.SecurityGraphqlExceptionHandler
 import org.around.ieuri.tourism.application.exception.SpotQueryException
 import org.springframework.stereotype.Component
 import java.util.concurrent.CompletableFuture
@@ -21,7 +21,9 @@ import java.util.concurrent.CompletableFuture
  */
 @Component
 class TourismQueryExceptionHandler(
-    private val delegate: DefaultDataFetcherExceptionHandler = DefaultDataFetcherExceptionHandler(),
+    // 인증·권한 실패를 코드와 함께 내리는 공용 핸들러를 먼저 태운다 — 없으면 DGS 기본
+    // 핸들러가 그 둘을 "Unknown GraphQL error"로 삼킨다(구독 디버깅이 불가능해진다).
+    private val delegate: DataFetcherExceptionHandler = SecurityGraphqlExceptionHandler(),
 ) : DataFetcherExceptionHandler {
 
     override fun handleException(

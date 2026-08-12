@@ -1,0 +1,146 @@
+package org.around.ieuri.community.infrastructure.adapter.out.event
+
+import org.around.ieuri.community.application.port.`in`.query.ConversationSubscription
+import org.around.ieuri.community.application.port.out.event.ConversationEventPort
+import org.around.ieuri.community.application.query.TypingEventView
+import org.around.ieuri.community.infrastructure.adapter.out.event.mapper.NewMessagePayload
+import org.around.ieuri.community.infrastructure.adapter.out.event.mapper.TypingEventPayload
+import org.slf4j.LoggerFactory
+import org.springframework.data.redis.connection.Message
+import org.springframework.data.redis.connection.MessageListener
+import org.springframework.data.redis.core.StringRedisTemplate
+import org.springframework.data.redis.listener.ChannelTopic
+import org.springframework.data.redis.listener.RedisMessageListenerContainer
+import org.springframework.stereotype.Component
+import tools.jackson.databind.ObjectMapper
+
+/**
+ * 대화 실시간 이벤트를 Valkey pub/sub으로 주고받는다(SPEC-0017 R9·R10·R14, POL-048).
+ *
+ * **공유 브로커를 거치는 것이 핵심이다.** 서비스는 k3s에서 여러 파드로 운영되므로 in-process
+ * 이벤트로는 발신자와 수신자가 다른 파드에 있을 때 전달되지 않는다. 그 실패는 조용해서 단일
+ * 인스턴스 개발 환경에서는 완벽히 동작하고 운영에서만 "가끔 되는 기능"이 된다.
+ *
+ * Valkey는 이미 토큰 저장소로 스택에 있어 새 인프라를 들이지 않는다. **Kafka는 쓰지 않는다** —
+ * 두 이벤트 모두 브로커에 영속 로그를 요구하지 않는다. 타이핑은 유실 허용이고, 메시지는
+ * **DB가 원본이라** 브로커가 보관할 이유가 없다.
+ *
+ * **채널을 둘로 나눈다.** 한 채널에 섞으면 타이핑만 필요한 구독자도 메시지 이벤트를 받아
+ * 걸러내야 하고, 페이로드에 종류 판별자가 붙는다.
+ *
+ * **페이로드는 JSON이고 본문이 실리지 않는다**(POL-013). 새 메시지는 id만 보내고 구독
+ * 시점에 DB에서 읽으므로 값의 원본이 DB 하나로 유지된다.
+ */
+@Component
+class ValkeyConversationEventAdapter(
+    private val redis: StringRedisTemplate,
+    private val listenerContainer: RedisMessageListenerContainer,
+    private val objectMapper: ObjectMapper,
+) : ConversationEventPort {
+
+    /**
+     * **발행 실패를 삼킨다.** 타이핑 표시를 살리자고 다른 기능까지 실패시키지 않는다 —
+     * 유실 허용 이벤트이므로 이것이 정상 동작이다(AC14-2).
+     */
+    override fun publishTyping(event: TypingEventView) {
+        publishQuietly(
+            typingTopic(event.conversationId),
+            objectMapper.writeValueAsString(TypingEventPayload.from(event)),
+            event.conversationId,
+        )
+    }
+
+    /**
+     * **메시지는 이미 저장된 뒤 발행된다.** 발행이 실패해도 메시지는 DB에 남아 있으므로
+     * 전송 자체를 실패시키지 않는다 — 수신자는 재조회로 그 메시지를 보게 된다.
+     */
+    override fun publishNewMessage(conversationId: Long, messageId: Long) {
+        publishQuietly(
+            messageTopic(conversationId),
+            objectMapper.writeValueAsString(NewMessagePayload(messageId)),
+            conversationId,
+        )
+    }
+
+    override fun subscribeTyping(
+        conversationId: Long,
+    ): ConversationSubscription<TypingEventView> =
+        ValkeySubscription(listenerContainer, typingTopic(conversationId)) { payload ->
+            read(payload, TypingEventPayload::class.java)?.toView(conversationId)
+        }
+
+    override fun subscribeNewMessage(conversationId: Long): ConversationSubscription<Long> =
+        ValkeySubscription(listenerContainer, messageTopic(conversationId)) { payload ->
+            read(payload, NewMessagePayload::class.java)?.messageId
+        }
+
+    /**
+     * 깨진 페이로드는 **조용히 버린다**(null 반환) — 구독자에게 전달할 방법이 없는데 예외를
+     * 던지면 리스너 스레드가 죽어 그 파드의 구독이 통째로 멎는다. 형식 오류는 배포 스큐나
+     * 외부 발행자를 뜻하므로 건수만 로그로 남긴다.
+     *
+     * 대상 타입을 인자로 받는다 — 호출부에서 `::class.java`를 반복하지만 그 편이 명시적이다.
+     */
+    private fun <T> read(payload: String, type: Class<T>): T? =
+        try {
+            objectMapper.readValue(payload, type)
+        } catch (e: RuntimeException) {
+            log.warn("대화 이벤트 페이로드를 해석할 수 없다: {}", e.message)
+            null
+        }
+
+    private fun publishQuietly(topic: String, payload: String, conversationId: Long) {
+        try {
+            redis.convertAndSend(topic, payload)
+        } catch (e: RuntimeException) {
+            // 대화 id만 남긴다 — 본문도 수신자도 로그 대상이 아니다(POL-013).
+            log.warn("failed to publish conversation event for conversation {}", conversationId, e)
+        }
+    }
+
+    private companion object {
+        private val log = LoggerFactory.getLogger(ValkeyConversationEventAdapter::class.java)
+
+        /**
+         * 발행과 구독이 **반드시 같은 채널 이름을 써야 한다** — 한쪽만 바뀌면 조용히 아무것도
+         * 전달되지 않으므로 한 곳에서만 만든다.
+         */
+        fun typingTopic(conversationId: Long) = "ieuri:community:typing:$conversationId"
+
+        fun messageTopic(conversationId: Long) = "ieuri:community:message:$conversationId"
+    }
+}
+
+/**
+ * 구독 한 건. 이 파드에 연결된 구독자에게만 전달하며, 발행은 브로커로 나간다.
+ *
+ * [cancel]에서 리스너를 반드시 떼야 한다 — 떼지 않으면 연결이 끊긴 뒤에도 컨테이너가 리스너를
+ * 들고 있어 구독이 쌓인다.
+ *
+ * [parse]가 null을 돌려주면 그 이벤트는 **조용히 버린다** — 형식이 어긋난 페이로드에 예외를
+ * 던져 봐야 구독자에게 전달할 방법이 없다.
+ */
+private class ValkeySubscription<T>(
+    private val container: RedisMessageListenerContainer,
+    channel: String,
+    private val parse: (String) -> T?,
+) : ConversationSubscription<T> {
+
+    private val topic = ChannelTopic(channel)
+
+    @Volatile
+    private var listener: MessageListener? = null
+
+    override fun onEvent(listener: (T) -> Unit) {
+        val adapter = MessageListener { message: Message, _ ->
+            parse(String(message.body))?.let(listener)
+        }
+        this.listener = adapter
+        container.addMessageListener(adapter, topic)
+    }
+
+    override fun cancel() {
+        listener?.let { container.removeMessageListener(it, topic) }
+        listener = null
+    }
+}

@@ -4,6 +4,8 @@ import org.around.ieuri.community.application.policy.CommunityPolicy
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.data.redis.connection.RedisConnectionFactory
+import org.springframework.data.redis.listener.RedisMessageListenerContainer
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
 import software.amazon.awssdk.regions.Region
@@ -17,8 +19,28 @@ import java.net.URI
  * @EnableConfigurationProperties 한다(프로젝트 관례).
  */
 @Configuration
-@EnableConfigurationProperties(R2Properties::class, CommunityProperties::class)
+@EnableConfigurationProperties(
+    R2Properties::class,
+    CommunityProperties::class,
+    MessageRetentionProperties::class,
+)
 class CommunityConfig {
+
+    /**
+     * 타이핑 이벤트 구독용 pub/sub 컨테이너(SPEC-0017 R14).
+     *
+     * Spring Boot는 이 컨테이너를 자동구성하지 않는다 — 발행(convertAndSend)만 쓰는 기존
+     * 코드에는 필요 없었고, 구독은 이 스펙이 처음 도입한다.
+     *
+     * 컨테이너가 리스너별로 스레드를 쓰므로, 구독이 끝나면 반드시 리스너를 떼야 한다
+     * (ValkeyTypingSubscription.cancel).
+     */
+    @Bean
+    fun redisMessageListenerContainer(
+        connectionFactory: RedisConnectionFactory,
+    ): RedisMessageListenerContainer = RedisMessageListenerContainer().apply {
+        setConnectionFactory(connectionFactory)
+    }
 
     @Bean
     fun communityPolicy(
