@@ -86,14 +86,8 @@ class ValkeyConversationEventAdapter(
      */
     private fun <T : Any> receive(channel: String, parse: (String) -> T?): Flux<T> =
         listenerContainer.receive(ChannelTopic(channel))
-            .doOnSubscribe { log.info("[진단] 채널 구독 시작: {}", channel) }
-            .doOnNext { log.info("[진단] 브로커 수신: topic={} payload={}", channel, it.message) }
-            .doOnCancel { log.info("[진단] 채널 구독 취소: {}", channel) }
-            .doOnError { log.warn("[진단] 채널 스트림 오류: {}", channel, it) }
-            .doOnComplete { log.info("[진단] 채널 스트림 종료: {}", channel) }
             .publishOn(Schedulers.boundedElastic())
             .mapNotNull<T> { parse(it.message) }
-            .doOnNext { log.info("[진단] 변환 완료 → 유스케이스로: topic={}", channel) }
 
     /**
      * 깨진 페이로드는 **조용히 버린다**(null 반환) — 구독자에게 전달할 방법이 없는데 예외를
@@ -115,7 +109,7 @@ class ValkeyConversationEventAdapter(
             // **받은 구독자 수를 함께 남긴다.** 0이면 발행은 됐으나 아무도 안 듣는 것이라
             // 발행 실패와 구분된다 — 이 둘을 못 나누면 원인을 좁힐 수 없다.
             val receivers = redis.convertAndSend(topic, payload)
-            log.info("[진단] 발행: topic={} 수신자={}", topic, receivers)
+            log.debug("대화 이벤트 발행: topic={} 수신자={}", topic, receivers)
         } catch (e: RuntimeException) {
             // 대화 id만 남긴다 — 본문도 수신자도 로그 대상이 아니다(POL-013).
             log.warn("failed to publish conversation event for conversation {}", conversationId, e)

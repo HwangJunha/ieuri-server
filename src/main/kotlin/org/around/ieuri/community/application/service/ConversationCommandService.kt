@@ -12,6 +12,8 @@ import org.around.ieuri.community.application.exception.PhotoNotConfirmedExcepti
 import org.around.ieuri.community.application.port.`in`.command.ConversationCommandUseCase
 import org.around.ieuri.community.application.port.out.client.ClockPort
 import org.around.ieuri.community.application.port.out.client.ObjectStoragePort
+import org.around.ieuri.community.application.event.NewMessageStored
+import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
 import org.around.ieuri.community.application.port.out.event.ConversationEventPort
 import org.around.ieuri.community.application.port.out.persistence.ConversationRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.FeedItemRepositoryPort
@@ -42,6 +44,7 @@ class ConversationCommandService(
     private val feedItemRepositoryPort: FeedItemRepositoryPort,
     private val communityQueryPort: CommunityQueryPort,
     private val conversationEventPort: ConversationEventPort,
+    private val eventPublisher: CommunityEventPublisherPort,
     private val objectStoragePort: ObjectStoragePort,
     private val clockPort: ClockPort,
 ) : ConversationCommandUseCase {
@@ -106,10 +109,11 @@ class ConversationCommandService(
         )
         val messageId = requireNotNull(saved.id) { "저장된 메시지에는 id가 있어야 한다." }
 
-        // **저장 뒤에 알린다.** 구독자가 이 신호로 화면을 갱신하며, 발행이 실패해도 메시지는
-        // DB에 남아 있으므로 전송이 실패하지 않는다 — 수신자는 재조회로 그 메시지를 본다.
+        // **커밋된 뒤에 알린다**(NewMessageBroadcastListener). 여기서 브로커로 바로 발행하면
+        // 구독자가 그 id로 DB를 읽는 시점에 아직 커밋 전이라 행이 보이지 않고, 이벤트가 조용히
+        // 버려진다 — 커밋과 조회의 경합이라 유실이 무작위로 나타난다.
         // id만 싣는다: 본문을 브로커에 흘리지 않기 위함이다(POL-013).
-        conversationEventPort.publishNewMessage(command.conversationId, messageId)
+        eventPublisher.publish(NewMessageStored(command.conversationId, messageId))
         return messageId
     }
 

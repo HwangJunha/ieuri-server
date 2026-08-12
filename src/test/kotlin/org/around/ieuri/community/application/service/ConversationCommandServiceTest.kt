@@ -13,6 +13,8 @@ import org.around.ieuri.community.application.exception.NotConversationParticipa
 import org.around.ieuri.community.application.exception.NotFeedAuthorException
 import org.around.ieuri.community.application.port.out.client.ClockPort
 import org.around.ieuri.community.application.port.out.client.ObjectStoragePort
+import org.around.ieuri.community.application.event.NewMessageStored
+import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
 import org.around.ieuri.community.application.port.out.event.ConversationEventPort
 import org.around.ieuri.community.application.port.out.persistence.ConversationRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.FeedItemRepositoryPort
@@ -42,6 +44,7 @@ class ConversationCommandServiceTest {
     private val feedItemRepository = mockk<FeedItemRepositoryPort>()
     private val communityQueryPort = mockk<CommunityQueryPort>()
     private val conversationEventPort = mockk<ConversationEventPort>(relaxed = true)
+    private val eventPublisher = mockk<CommunityEventPublisherPort>(relaxed = true)
     private val storage = mockk<ObjectStoragePort> { every { findSize(any()) } returns 1_024L }
     private val clock = mockk<ClockPort> { every { now() } returns now }
 
@@ -51,6 +54,7 @@ class ConversationCommandServiceTest {
         feedItemRepository,
         communityQueryPort,
         conversationEventPort,
+        eventPublisher,
         storage,
         clock,
     )
@@ -179,7 +183,10 @@ class ConversationCommandServiceTest {
 
         service.sendMessage(SendMessageCommand(conversationId, "안녕"), memberId)
 
-        verify { conversationEventPort.publishNewMessage(conversationId, 500L) }
+        // **브로커로 직접 발행하지 않는다** — 커밋 전에 발행하면 구독자가 그 id로 DB를 읽을 때
+        // 아직 행이 없어 이벤트가 조용히 버려진다. 커밋 뒤 발행은 리스너의 몫이다.
+        verify { eventPublisher.publish(NewMessageStored(conversationId, 500L)) }
+        verify(exactly = 0) { conversationEventPort.publishNewMessage(any(), any()) }
     }
 
     /** 전송이 실패하면 알릴 것도 없다 — 저장 전에 거부되면 이벤트가 나가지 않는다. */
@@ -192,7 +199,7 @@ class ConversationCommandServiceTest {
             service.sendMessage(SendMessageCommand(conversationId, "안녕"), memberId)
         }
 
-        verify(exactly = 0) { conversationEventPort.publishNewMessage(any(), any()) }
+        verify(exactly = 0) { eventPublisher.publish(any()) }
     }
 
     /** AC9-4 — 참여자가 아닌 **기존** 대화에는 전송할 수 없다. */
