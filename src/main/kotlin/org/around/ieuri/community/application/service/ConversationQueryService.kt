@@ -85,9 +85,16 @@ class ConversationQueryService(
     override fun newMessage(conversationId: Long, memberId: Long): Flux<MessageView> {
         requireParticipant(conversationId, memberId)
         return conversationEventPort.subscribeNewMessage(conversationId)
+            .doOnNext { log.info("[진단] 유스케이스 수신: messageId={}", it) }
             // 이벤트에는 id만 실려 오므로 DB에서 다시 읽는다. 읽는 사이에 사라진 메시지는
             // mapNotNull이 건너뛴다 — 빈 말풍선을 내려보내지 않는다.
-            .mapNotNull { conversationQueryPort.findMessage(it, memberId) }
+            .mapNotNull<MessageView> { id ->
+                conversationQueryPort.findMessage(id, memberId)
+                    .also { log.info("[진단] DB 조회 결과: messageId={} 찾음={}", id, it != null) }
+            }
+            .doOnRequest { log.info("[진단] 다운스트림 수요 요청: {}건", it) }
+            .doOnCancel { log.info("[진단] 구독 취소됨(newMessage)") }
+            .doOnError { log.warn("[진단] newMessage 스트림 오류", it) }
     }
 
     /**
@@ -106,6 +113,7 @@ class ConversationQueryService(
         (first ?: default).coerceIn(1, policy.maxPageSize)
 
     private companion object {
+        private val log = org.slf4j.LoggerFactory.getLogger(ConversationQueryService::class.java)
         const val DEFAULT_CONVERSATIONS_PAGE_SIZE = 20
         const val DEFAULT_MESSAGES_PAGE_SIZE = 30
     }
