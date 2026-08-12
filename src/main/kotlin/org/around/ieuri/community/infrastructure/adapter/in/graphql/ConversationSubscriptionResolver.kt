@@ -34,34 +34,50 @@ class ConversationSubscriptionResolver(
 ) {
 
     /**
-     * 타이핑 표시. **유실 허용이 계약이다** — 버퍼가 차면 최신 이벤트만 남긴다. 밀린 타이핑을
-     * 나중에 몰아 보내 봐야 의미가 없고, 쌓아 두면 메모리만 는다.
+     * 타이핑 표시. **유실 허용이 계약이다** — 밀리면 최신 것만 남긴다. 지난 타이핑을 나중에
+     * 몰아 보내 봐야 의미가 없고, 쌓아 두면 메모리만 는다.
      */
     @DgsSubscription
     fun typingIndicator(@InputArgument conversationId: Long): Publisher<TypingEventView> =
         conversationQueryUseCase
             .typingIndicator(conversationId, currentMemberProvider.requireMemberId())
-            .toFlux(FluxSink.OverflowStrategy.LATEST)
+            .toFlux()
+            .onBackpressureLatest()
 
     /**
-     * 새 메시지. **타이핑과 달리 버리지 않는다** — 버퍼가 차면 밀린 것을 쌓아 두고, 그래도
-     * 넘치면 에러로 끊어 클라이언트가 재연결 후 조회로 메꾸게 한다. 조용히 버리면 대화에
-     * 구멍이 뚫린 채로 남는다.
+     * 새 메시지. **타이핑과 달리 버리지 않는다** — 밀린 것을 버퍼에 쌓는다.
+     *
+     * 상한을 넘기면 에러로 끊어 클라이언트가 재연결 후 조회로 메꾸게 한다(계약에 명시). 조용히
+     * 버리면 대화에 구멍이 뚫린 채로 남아 사용자가 알아챌 방법이 없다. 한 대화의 사람이 둘뿐이라
+     * 이 상한에 닿는 것은 정상 상황이 아니다.
      */
     @DgsSubscription
     fun newMessage(@InputArgument conversationId: Long): Publisher<MessageView> =
         conversationQueryUseCase
             .newMessage(conversationId, currentMemberProvider.requireMemberId())
-            .toFlux(FluxSink.OverflowStrategy.BUFFER)
+            .toFlux()
+            .onBackpressureBuffer(MESSAGE_BUFFER_SIZE)
 
     /**
      * 구독을 `Flux`로 옮긴다. **연결이 끊기면 브로커 구독을 반드시 뗀다** — 떼지 않으면
      * 리스너가 컨테이너에 쌓인다.
+     *
+     * **오버플로 전략을 여기서 정하지 않는다.** `Flux.create`에 BUFFER를 주면 구독자가 요청한
+     * 만큼만 나가고 나머지는 버퍼에 갇히는데, 전송 계층이 하나씩 당겨가는 구조에서는 첫 건이
+     * 나간 뒤 멈춘 것처럼 보인다(실측: 발행·수신 로그는 남는데 이후 조회가 없었다).
+     * 백프레셔는 호출부가 `onBackpressure*` 연산자로 명시한다.
      */
-    private fun <T : Any> ConversationSubscription<T>.toFlux(
-        overflow: FluxSink.OverflowStrategy,
-    ): Publisher<T> = Flux.create<T>({ sink: FluxSink<T> ->
-        onEvent { sink.next(it) }
-        sink.onDispose { cancel() }
-    }, overflow)
+    private fun <T : Any> ConversationSubscription<T>.toFlux(): Flux<T> =
+        Flux.create({ sink: FluxSink<T> ->
+            onEvent { sink.next(it) }
+            sink.onDispose { cancel() }
+        }, FluxSink.OverflowStrategy.IGNORE)
+
+    private companion object {
+        /**
+         * 새 메시지 버퍼 상한. 1:1 대화라 정상 상황에서는 닿지 않는다 — 닿았다면 클라이언트가
+         * 소비하지 못하는 상태이므로 끊고 재연결시키는 편이 낫다.
+         */
+        const val MESSAGE_BUFFER_SIZE = 256
+    }
 }
