@@ -91,7 +91,10 @@ class ValkeyConversationEventAdapter(
 
     private fun publishQuietly(topic: String, payload: String, conversationId: Long) {
         try {
-            redis.convertAndSend(topic, payload)
+            // **받은 구독자 수를 함께 남긴다.** 0이면 발행은 됐으나 아무도 안 듣는 것이라
+            // 발행 실패와 구분된다 — 이 둘을 못 나누면 원인을 좁힐 수 없다.
+            val receivers = redis.convertAndSend(topic, payload)
+            log.info("대화 이벤트 발행: topic={} 수신자={}", topic, receivers)
         } catch (e: RuntimeException) {
             // 대화 id만 남긴다 — 본문도 수신자도 로그 대상이 아니다(POL-013).
             log.warn("failed to publish conversation event for conversation {}", conversationId, e)
@@ -133,14 +136,21 @@ private class ValkeySubscription<T>(
 
     override fun onEvent(listener: (T) -> Unit) {
         val adapter = MessageListener { message: Message, _ ->
+            log.info("대화 이벤트 수신: topic={}", topic.topic)
             parse(String(message.body))?.let(listener)
         }
         this.listener = adapter
         container.addMessageListener(adapter, topic)
+        log.info("대화 이벤트 구독 시작: topic={}", topic.topic)
     }
 
     override fun cancel() {
         listener?.let { container.removeMessageListener(it, topic) }
         listener = null
+        log.info("대화 이벤트 구독 해제: topic={}", topic.topic)
+    }
+
+    private companion object {
+        private val log = LoggerFactory.getLogger(ValkeySubscription::class.java)
     }
 }
