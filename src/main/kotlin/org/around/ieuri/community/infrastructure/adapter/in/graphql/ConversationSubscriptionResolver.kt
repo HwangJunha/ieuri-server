@@ -13,7 +13,6 @@ import org.springframework.stereotype.Component
 import org.slf4j.LoggerFactory
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Sinks
-import java.util.concurrent.ArrayBlockingQueue
 
 /**
  * 대화 실시간 구독 리졸버(SPEC-0017 R9·R10·R14). **플랫폼 최초의 Subscription이다.**
@@ -61,17 +60,22 @@ class ConversationSubscriptionResolver(
      * 부르는 것을 전제하지 않아 이벤트가 **불규칙하게 유실된다**(실측: 8건 중 1·3·6·7번만
      * 도착). 한 개만 오는 것도, 전부 오는 것도 아닌 이 무작위성이 경쟁 상태의 신호였다.
      *
-     * `Sinks.many().unicast()`의 `tryEmitNext`는 멀티스레드 발행을 명시적으로 다루며,
-     * 실패를 반환값으로 알려 준다 — 조용히 사라지지 않는다.
+     * `Sinks.many()`의 `tryEmitNext`는 멀티스레드 발행을 명시적으로 다루며, 실패를 반환값으로
+     * 알려 준다 — 조용히 사라지지 않는다.
      *
      * 버퍼는 무제한이 아니라 상한을 둔 큐다. 전송 계층이 `request(1)`씩만 당겨가므로 요청이
      * 없는 사이의 이벤트를 쌓아 둬야 하지만, 무한정 쌓으면 소비하지 못하는 구독이 메모리를
      * 잠식한다.
      */
     private fun <T : Any> ConversationSubscription<T>.toFlux(): Flux<T> {
-        val sink = Sinks.many().unicast().onBackpressureBuffer<T>(
-            ArrayBlockingQueue(EVENT_BUFFER_SIZE),
-        )
+        // **unicast가 아니라 multicast다.** unicast는 구독자를 하나만 허용하는데,
+        // graphql-java의 SubscriptionExecutionStrategy가 원본 스트림을 각 이벤트의 실행
+        // 결과로 매핑하는 과정에서 재구독이 일어나면 두 번째를 **조용히 거부한다** —
+        // 수요는 256건 들어와 있는데 첫 건 뒤로 흐르지 않던 것이 그 증상이었다.
+        //
+        // autoCancel=false: 다운스트림이 잠시 떨어져도 싱크를 닫지 않는다. 닫히면 그 뒤
+        // 이벤트가 전부 사라진다.
+        val sink = Sinks.many().multicast().onBackpressureBuffer<T>(EVENT_BUFFER_SIZE, false)
         onEvent { event ->
             // 실패를 삼키지 않는다 — 버퍼 초과·구독 종료가 조용히 유실로 보이면 안 된다.
             val result = sink.tryEmitNext(event)
