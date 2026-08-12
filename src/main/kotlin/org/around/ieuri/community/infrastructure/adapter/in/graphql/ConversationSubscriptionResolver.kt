@@ -12,6 +12,8 @@ import org.reactivestreams.Publisher
 import org.springframework.stereotype.Component
 import reactor.core.publisher.Flux
 import reactor.core.publisher.FluxSink
+import reactor.core.scheduler.Scheduler
+import reactor.core.scheduler.Schedulers
 
 /**
  * 대화 실시간 구독 리졸버(SPEC-0017 R9·R10·R14). **플랫폼 최초의 Subscription이다.**
@@ -43,6 +45,7 @@ class ConversationSubscriptionResolver(
             .typingIndicator(conversationId, currentMemberProvider.requireMemberId())
             .toFlux()
             .onBackpressureLatest()
+            .publishOn(EVENT_SCHEDULER)
 
     /**
      * 새 메시지. **타이핑과 달리 버리지 않는다** — 밀린 것을 버퍼에 쌓는다.
@@ -57,6 +60,7 @@ class ConversationSubscriptionResolver(
             .newMessage(conversationId, currentMemberProvider.requireMemberId())
             .toFlux()
             .onBackpressureBuffer(MESSAGE_BUFFER_SIZE)
+            .publishOn(EVENT_SCHEDULER)
 
     /**
      * 구독을 `Flux`로 옮긴다. **연결이 끊기면 브로커 구독을 반드시 뗀다** — 떼지 않으면
@@ -79,5 +83,22 @@ class ConversationSubscriptionResolver(
          * 소비하지 못하는 상태이므로 끊고 재연결시키는 편이 낫다.
          */
         const val MESSAGE_BUFFER_SIZE = 256
+
+        /**
+         * 이벤트 방출 스레드. **브로커 리스너 스레드에서 그대로 흘리면 안 된다.**
+         *
+         * MVC 전송 계층(GraphQlWebSocketHandler.SendMessageSubscriber)은 `hookOnNext`에서
+         * `WebSocketSession.sendMessage`를 **블로킹으로** 호출하고, 성공했을 때만 다음 하나를
+         * 요청한다(`request(1)`). 그런데 `sendMessage`는 스레드 안전하지 않아 호출이 겹치면
+         * IOException이 나고, 그 경로는 요청을 잇지 않고 `cancel()`로 구독을 끊는다.
+         *
+         * Valkey 이벤트는 매번 다른 리스너 스레드(enerContainer-N)에서 올라오므로 이 조건에
+         * 그대로 걸린다 — 첫 건만 나가고 이후가 멎는 증상이 정확히 그것이었다.
+         *
+         * 단일 스레드로 옮겨 전송을 직렬화한다. 전송은 짧고 구독 수가 많아도 이벤트 자체가
+         * 드물어 한 스레드로 충분하다.
+         */
+        private val EVENT_SCHEDULER: Scheduler =
+            Schedulers.newSingle("community-subscription", true)
     }
 }
