@@ -45,7 +45,7 @@ class ConversationSubscriptionResolver(
             .typingIndicator(conversationId, currentMemberProvider.requireMemberId())
             .toFlux()
             .onBackpressureLatest()
-            .publishOn(EVENT_SCHEDULER)
+            .publishOn(EVENT_SCHEDULER, 1)
 
     /**
      * 새 메시지. **타이핑과 달리 버리지 않는다** — 밀린 것을 버퍼에 쌓는다.
@@ -60,7 +60,7 @@ class ConversationSubscriptionResolver(
             .newMessage(conversationId, currentMemberProvider.requireMemberId())
             .toFlux()
             .onBackpressureBuffer(MESSAGE_BUFFER_SIZE)
-            .publishOn(EVENT_SCHEDULER)
+            .publishOn(EVENT_SCHEDULER, 1)
 
     /**
      * 구독을 `Flux`로 옮긴다. **연결이 끊기면 브로커 구독을 반드시 뗀다** — 떼지 않으면
@@ -97,6 +97,10 @@ class ConversationSubscriptionResolver(
          *
          * 단일 스레드로 옮겨 전송을 직렬화한다. 전송은 짧고 구독 수가 많아도 이벤트 자체가
          * 드물어 한 스레드로 충분하다.
+         *
+         * **prefetch를 1로 둔다.** 기본값(256)이면 publishOn이 상위에 256개를 미리 요청해
+         * 자기 큐에 쌓아 두는데, 하위 전송은 `request(1)`씩만 당겨가므로 큐에 갇힌 이벤트가
+         * 나가지 못한다(실측: 5건 발행에 2건만 전달). 1로 맞추면 요청이 그대로 이어진다.
          */
         private val EVENT_SCHEDULER: Scheduler =
             Schedulers.newSingle("community-subscription", true)
