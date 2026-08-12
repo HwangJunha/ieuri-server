@@ -6,7 +6,7 @@ ieuri:
   search-datasource:
     url: ${IEURI_SEARCH_DB_URL:jdbc:postgresql://localhost:5433/ieuri?prepareThreshold=0&sslmode=disable}
   mail:
-    from: no-reply-dev@ieuri.local
+    from: noreply@ieuri.co.kr
 spring:
   # 로컬은 `kubectl port-forward` 터널로 DB에 붙는데, **그 위에서 SSL 핸드셰이크가 깨진다.**
   # 서버는 `ssl = on`이라 JDBC가 기본으로 SSL을 시도하고, 터널을 통과하는 순간
