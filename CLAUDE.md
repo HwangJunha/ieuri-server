@@ -7,8 +7,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Write to the user in Korean.** All questions, summaries, and explanations are in Korean. Code, identifiers, commit messages, and code comments follow their existing conventions (comments in this repo are Korean; commit subjects are Korean with conventional-commit prefixes).
 
 - **End every turn with a summary and anything needing confirmation.** After finishing work, close with two things:
-    1. **요약** — what changed and why, in a few lines. Not a file list; the reasoning that matters.
-    2. **확인할 것** — decisions made under assumption, things the user must verify or run, risks accepted, and work deliberately left out. **If there is genuinely nothing to confirm, say so and move on** — do not manufacture items.
+    1. **요약** (Summary) — what changed and why, in a few lines. Not a file list; the reasoning that matters.
+    2. **확인할 것** (To confirm) — decisions made under assumption, things the user must verify or run, risks accepted, and work deliberately left out. **If there is genuinely nothing to confirm, say so and move on** — do not manufacture items.
 
   Report faithfully: if something was skipped, blocked, or only partially verified, say it plainly here rather than burying it.
 
@@ -33,7 +33,7 @@ Uses the Gradle wrapper (`./gradlew`); Gradle 9.5.1, Java toolchain 25.
 
 ## Architecture & conventions
 
-- **Simple is Best — do not force-fit a pattern the data or upstream doesn't support.** The hexagonal/CQRS structure itself is deliberate and stays; this rule is about everything built *inside* it. Prefer the simplest implementation that satisfies the acceptance criteria, and let real capabilities — not the shape of a contract or a convention — drive the design. Signs you are over-building: emulating a capability an upstream/library doesn't natively provide (e.g. synthesizing an opaque cursor over an API that only offers `pageNo` offset paging, then re-fetching/merging pages every request to fake stability); adding config knobs, retry/backfill loops, or defensive branches for cases you have not actually observed; hand-rolling parsing/serialization a library already does. When a proposed contract (e.g. a planner's `contract.graphql`) implies such machinery, change the contract here instead — the repo owns the final schema (see [Contract](#contract)) — and record it on the issue. Deleting code that doesn't earn its keep is a feature, not a regression. (Precedent: SPEC-0002 dropped a faked Relay cursor because TourAPI is offset-only.) Run `simplify-review` after a slice to catch these.
+- **Simple is Best — do not force-fit a pattern the data or upstream doesn't support.** The hexagonal/CQRS structure itself is deliberate and stays; this rule is about everything built *inside* it. Prefer the simplest implementation that satisfies the acceptance criteria, and let real capabilities — not the shape of a contract or a convention — drive the design. Signs you are over-building: emulating a capability an upstream/library doesn't natively provide (e.g. synthesizing an opaque cursor over an API that only offers `pageNo` offset paging, then re-fetching/merging pages every request to fake stability); adding config knobs, retry/backfill loops, or defensive branches for cases you have not actually observed; hand-rolling parsing/serialization a library already does. When a proposed contract (e.g. a planner's `contract.graphql`) implies such machinery, change the contract here instead — the repo owns the final schema (see [Contract](#contract)) — and record it on the issue. Deleting code that doesn't earn its keep is a feature, not a regression. (Precedent: SPEC-0002 dropped a faked Relay cursor because TourAPI is offset-only.) Run `simplify-review` before the PR to catch these.
 
   **When the complexity comes from a constraint, suspect the constraint first.** These three are signs you are keeping some constraint fixed and faking the result around it — if any appears, stop and ask *why that constraint is there* before writing more code. Changing it usually deletes the awkward code rather than tidying it.
     - Generated SQL or config **grows with the input count** (an N-branch `CASE WHEN`, an `IN` clause of thousands).
@@ -51,20 +51,22 @@ Uses the Gradle wrapper (`./gradlew`); Gradle 9.5.1, Java toolchain 25.
     - **Unit tests for domain and business logic** — pure JUnit5, no Spring context. Aggregates, value objects, specifications, and use-case services (with mocked ports).
     - **Architecture tests with ArchUnit** — dependency direction, domain purity, `@Entity` confinement, cross-domain isolation.
 
-  **Do not write infrastructure tests.** No tests that boot a Spring context to prove wiring, no tests that hit a real database or Valkey, no tests that assert thread names, executor behavior, shutdown timing, or queue saturation. Those verify the framework rather than our logic, and they are slow and brittle. If an infrastructure concern seems to need pinning, that is a signal to use a well-trodden Spring idiom (see the rule above) whose behavior does not need re-proving. Verify infrastructure by running it, not by encoding it in the suite.
+  **Do not write infrastructure tests.** No tests that boot a Spring context to prove wiring, no tests that hit a real database or Valkey, no tests that assert thread names, executor behavior, shutdown timing, or queue saturation. Those verify the framework rather than our logic, they are slow, and they drag in external dependencies. If an infrastructure concern seems to need pinning, that is a signal to use a well-trodden Spring idiom (see the rule above) whose behavior does not need re-proving. Verify infrastructure by running it, not by encoding it in the suite.
 
-- **테스트는 "작업 완료" 시점에 쓴다 — 그 전에는 쓰지 않는다.** 작업 중에는 요건이 계속
-  바뀌어, 먼저 쓴 테스트를 요건이 바뀔 때마다 다시 쓰게 된다. 그 비용이 조기 검증의 이득보다
-  크다. 작업 중에는 **컴파일만 통과**시키고(`./gradlew compileKotlin compileTestKotlin`),
-  전체 테스트는 돌리지 않는다.
+  **The one exception is conversion, and there it is mandatory — every conversion, both directions.** GraphQL input/response ↔ domain model or `Command`; domain model ↔ JPA entity; external API response ↔ domain model. A conversion is a pure function with no external dependency, so it is cheap to test, and it hides a bug the compiler cannot see: a **swapped mapping between two same-typed fields** (`mapy → longitude`). Assert **field by field with a distinct value per field** — a single whole-object `assertEquals` cannot say which field is wrong, and shared fixture values let a swap pass. Include an all-nulls case.
 
-  사용자가 **"작업 완료"**라고 하면 그때:
-    1. `.claude/finalizing` 플래그 파일을 만든다(훅이 이 파일로 완료 단계를 판정한다).
-    2. 이번 작업이 만든 도메인·애플리케이션 로직의 테스트를 쓴다.
-    3. `./gradlew test`가 통과해야 마무리할 수 있다(Stop 훅이 막는다).
-    4. 정책 변경이 있으면 `ieuri-recorder/problem/`에 요청 문서를 남긴다.
+  A conversion written inline inside a resolver method cannot be called on its own, so it cannot be tested without standing up the resolver. When a slice adds one with enough fields to swap, **extract it as an extension function on the source type** and test that. Conversions predating this rule are untested; that is the accepted current state, and the rule binds what a slice adds or changes.
 
-  플래그는 작업이 끝나면 지운다 — 남아 있으면 다음 작업의 첫 편집부터 전체 테스트가 돈다.
+- **Tests are written once, right before the PR — not during the work, and not run during it.**
+  Requirements keep moving while a slice is built. Not following the planner's document exactly is
+  normal, which is why policy judgment and code decisions belong to this server harness. Tests
+  written early get rewritten every time a requirement moves, and that cost exceeds the feedback
+  gained. While working, **keep it compiling** (`./gradlew compileKotlin compileTestKotlin`) and
+  nothing more.
+
+  **Immediately before opening the PR**, write the tests for the domain and application logic this
+  slice added, and make `./gradlew test` pass. The `test-strategy` skill has the required shape.
+  If a policy changed, leave a request document in `ieuri-recorder/problem/`.
 
 - **Design by domain, for future extraction.** Keep domain logic at the core and independent of delivery/persistence adapters, following hexagonal ports-and-adapters. All domains share this one application today, so structure each domain so it can be lifted out into its own application later without rewriting the core.
 
@@ -74,7 +76,7 @@ Uses the Gradle wrapper (`./gradlew`); Gradle 9.5.1, Java toolchain 25.
     - Declare as an extension on the **source** type and return the **domain model**: `fun SpotEntity.toDomain(): Spot`, `fun TourApiDetailCommonResponse.Item.toSpotDetail(...): SpotDetail`. Never return a JPA entity or a codegen type across the boundary.
     - **Keep side-effecting concerns out.** Encryption, category-code resolution, and anything needing config are passed *in* as parameters (`fun MemberEntity.toDomain(profile, decryptedEmail: String)`) — the mapper stays a pure function.
     - Mappers translate shape only. No business logic, no I/O.
-    - Every mapper gets a pure unit test asserting **field by field**, with a distinct value per field so a swapped mapping fails. A single whole-object `assertEquals` does not satisfy this — it cannot tell you *which* field is wrong. Include a case where all nullable fields are null.
+    - Every conversion gets a pure unit test asserting **field by field**, with a distinct value per field so a swapped mapping fails. A single whole-object `assertEquals` does not satisfy this — it cannot tell you *which* field is wrong. Include a case where all nullable fields are null. This covers the GraphQL boundary too: a resolver's input → `Command` conversion is extracted as an extension function (`fun CreatePostInput.toCommand(...)`) when it has enough fields to swap, so that it is callable — and therefore testable — without the resolver.
 
 - **Comments summarize what a thing does; rationale lives in the spec (POL-033).** Design rationale, policy justification, rejected alternatives, and SPEC history do not belong in code — link the spec instead. **KDoc blocks stay under 15 lines.** Two things must survive the trimming, though: (1) *operational warnings* a maintainer needs at the call site — "an empty surviving set deletes everything", "`ST_MakePoint` takes (lon, lat)", step ordering that a FK depends on; and (2) *behavioral facts that exist only in the comment* — clamp-vs-error at a limit, null vs empty-array meaning, empty-string normalization, sort guarantees. Those are contract, not rationale. Compress them to one line; do not delete them. The same rule governs GraphQL schema descriptions — see the schema bullet below.
 
@@ -82,12 +84,18 @@ Uses the Gradle wrapper (`./gradlew`); Gradle 9.5.1, Java toolchain 25.
 
 - **Schema descriptions are written for the client, not the server (POL-033).** A description carries what a client needs to *use* the field: its meaning, unit and format, what null means, pagination defaults and caps including **what happens past the cap** (clamp or error — POL-018), and sort guarantees (POL-019). It does not carry server-side implementation: cache strategy, upstream operation names or call counts, batch behavior, or SPEC ids. When shortening a description, diff it for *behavioral facts stated nowhere else* — null vs empty array, empty-string normalization, who sanitizes HTML — and keep every one. Losing those silently breaks clients that branch on them.
 
+- **A new root query/mutation is the last resort — look for the field first.** Before adding a root, find the existing type in the same domain this belongs to as a field. Ask: *would a client ever call this without the thing it hangs off?* If not, it is a field, not a root. Adding `spotLikeCount(spotId:)` beside an existing `spotDetail` costs the client a second round trip and re-sends an id the server already resolved — `likeCount` belongs on `SpotDetail`. Every new root flattens the graph, and a flat graph is a REST API with extra syntax. We chose GraphQL for the flexibility; a new root is correct only when nothing existing can carry it.
+
 - **Don't write REST in GraphQL clothing — resolve per field, not per endpoint.** A root resolver must fetch only what its *own* fields need. Anything with a separate cost — another upstream call, another table, an aggregate count — belongs in a `@DgsData` field resolver so it runs **only when the client selects that field**. If field selection doesn't change which I/O happens, you've built a REST endpoint behind a GraphQL schema and thrown away the one thing GraphQL buys you. Corollaries:
     - **Arguments belong to the field that needs them, not the root.** If only `intro` requires `category`, it's `intro(category:)` — don't force every caller to pass it to the root.
     - **Cache per operation, not per response.** A single blob keyed by the root can't express "body cached, gallery not," so it silently defeats lazy fields. Key each upstream operation separately.
     - **Distinguish a cache miss from a cached null.** A field that legitimately resolves to null (`intro`) will hammer upstream on every request if absence is treated as a miss. Wrap the value.
     - **Generated types are output shape, not the resolution carrier.** DGS codegen makes non-null fields required constructor args, so a generated type can't be built with lazy fields left empty. Return the read DTO from the root and let field resolvers read it via `getSource`.
     - Lazy resolution is a *runtime* property — compilation proves nothing. Pin it at the **service level**: assert with mocked ports that selecting only the body triggers no gallery/intro/info calls. That is business logic (which I/O a use case performs) and belongs in a unit test; do not boot a DGS/Spring context to prove it. Worked example: SPEC-0003 `spotDetail` — `{ id title overview }` costs 1 upstream call; selecting `gallery`/`intro`/`infoItems`/`likeCount` adds one each.
+
+- **JPA relations follow the textbook — no `@OneToMany`; a child-side `@ManyToOne` only, when one is needed at all.** Unless a service requirement genuinely demands otherwise, follow the well-proven default. `@OneToMany` fires a query the moment a mapper touches the collection — even when reading a single row — and its size cannot be bounded. A unidirectional child→parent `@ManyToOne` is better on both performance and longevity. Reads are the job of the repositories and QueryDSL projections.
+
+  But **across aggregates, not even `@ManyToOne`** — references between aggregates are id columns (see "Reference across aggregates by id" above). A relation is only ever a candidate *within* one aggregate. That is why the codebase currently has no relations at all, only id references, and that is correct.
 
 - **JPA entities need the Kotlin all-open treatment, which is already configured.** The `kotlin("plugin.jpa")` and `allOpen` block in `build.gradle.kts` automatically open classes annotated with `@Entity`, `@MappedSuperclass`, and `@Embeddable` (JPA/Hibernate require non-final classes). Do not manually mark entities `open`. These constraints are exactly why entities stay out of `domain/`.
 
@@ -110,6 +118,33 @@ Uses the Gradle wrapper (`./gradlew`); Gradle 9.5.1, Java toolchain 25.
   The reason is that we do not serve mainland China at all. The app cannot ship there — Play Store and App Store are unavailable, and the domestic Android stores each impose their own approval process we are not taking on. So the actual `ZH` audience is Taiwan and Hong Kong, where Traditional is the correct script. Writing Simplified would be wrong for every user who will ever read it.
 
   Practical consequences when filling `name_zh`-style columns: use `鍾路區`, not `钟路区`; `廣域市`, not `广域市`; `濟州市`, not `济州市`; `上黨區`, not `上党区`. Do not mix scripts within a dataset — a single Simplified row among Traditional ones is a defect, not a variant. Note that Japanese (`JA`) is a *separate* script convention (shinjitai: `東莱区`), so `JA` and `ZH` legitimately differ and neither should be copied into the other.
+
+## Review — skills and the reviewer
+
+This document is the authority on the rules. The skills cover **only what ArchUnit cannot catch** —
+code that compiles, passes the suite, and is still designed wrong. The eight boundary violations are
+enforced by `LayeredArchitectureTest`, so no skill re-checks them.
+
+- `architecture-review` — CQRS rails, mapper placement and purity, framework leaking below
+  infrastructure, domain independence, `common/` bloat, required values weakened to nullable.
+- `jpa-review` — relations (no `@OneToMany`), dirty-checking, raw-SQL containment, query choice,
+  migrations.
+- `graphql-review` — a new root where a field belonged, per-field resolution, N+1, description bloat.
+- `security-review` — authorization on every mutation and member-scoped query, personal data in
+  logs and errors, credential handling.
+- `concurrency-review` — transaction boundaries and proxy self-invocation, event semantics,
+  `@Async` and per-domain executors, hand-rolled infrastructure.
+- `simplify-review` — forced-fit implementations and needless abstraction.
+- `test-strategy` — the shape tests must take when written before the PR.
+
+**When a slice is finished, hand it to the `reviewer` subagent.** It reads the `dev...HEAD` diff and
+applies the six review skills. An implementer treats the decisions they just made as correct, so
+they miss the same things in their own code repeatedly. The reviewer never saw those decisions being
+made — only the diff — so the bias does not carry over. This is why human code review works.
+
+The reviewer reads only the domains the diff touches, plus `common/`. Narrowing what must be read is
+the practical payoff of the DDD split; if a change genuinely required reading another domain, that
+is itself a finding.
 
 ## Layout
 
@@ -174,6 +209,13 @@ There is no per-domain `utils` package. Domain-specific helpers become domain se
 
 - Format/shape validation at the inbound adapter or at `Command` construction. Business invariants only inside `domain`. No duplication across layers.
 
+- **A value the client always sends is never accepted as nullable.** If the app cannot run without
+  location consent (k-trip-spot cannot), coordinates are **required**. Opening them to null forces
+  the server to write a branch for the missing case, and that branch does not merely return less
+  data — it becomes **a path that returns wrong data**. An error beats silently substituting a
+  default. Keep it required in all three places: the `.graphqls` field, the `Command`, and the DB
+  constraint. One of them left open is the path it will arrive through.
+
 ### Cross-domain rules (keeps extraction cheap)
 
 - A domain never imports another domain's `domain`/`application` internals. Cross-domain interaction goes through the other domain's `port/in` or via published domain events.
@@ -194,15 +236,15 @@ Schema is owned by **Flyway migrations**, never by Hibernate. The domain-model �
 
 ## Git strategy
 
-**커밋은 사람이 한다.** `git commit`은 권한 설정에서 막혀 있다. Claude는 코드를 쓰고,
-커밋 단위와 메시지는 사용자가 정한다 — 무엇을 하나의 변경으로 묶을지는 저장소의 이력을
-읽을 사람의 판단이기 때문이다.
+**Commits are the human's job.** `git commit` is blocked in the permission settings. Claude writes
+the code; the user decides the commit units and messages — how to group a set of changes is a
+judgment call for whoever will read the repository history.
 
-그래서 턴을 마칠 때 **커밋되지 않은 변경을 남기는 것이 정상이다.** 무엇을 바꿨는지
-요약으로 알리고, 커밋을 대신하려 들지 않는다. push와 PR은 사용자가 커밋한 뒤 요청하면
-할 수 있다(권한이 ask).
+So **leaving uncommitted changes at the end of a turn is normal and correct.** Report what changed
+in the summary and do not try to commit on the user's behalf. Push and PR are available once the
+user has committed and asks for them (permission is `ask`).
 
-**Work in a git worktree by default.** Several slices run concurrently, so each unit of work gets its own worktree instead of sharing the checkout — otherwise parallel sessions collide on the working tree, the Gradle build directory, and `.claude/last-test-status`. `worktree.bgIsolation` is set to `worktree` in `.claude/settings.local.json`; when a task starts in an existing session, call `EnterWorktree` rather than branching in place. One worktree per branch, named after it.
+**Work in a git worktree by default.** Several slices run concurrently, so each unit of work gets its own worktree instead of sharing the checkout — otherwise parallel sessions collide on the working tree and the Gradle build directory. `worktree.bgIsolation` is set to `worktree` in `.claude/settings.local.json`; when a task starts in an existing session, call `EnterWorktree` rather than branching in place. One worktree per branch, named after it.
 
 > `worktree.baseRef` is `origin/dev`, so a fresh worktree branches from `dev` — matching the rule that features cut from `dev`. It does **not** branch from your current HEAD, so uncommitted work in the shared checkout does not carry over.
 
@@ -237,8 +279,9 @@ Two documents, two jobs:
 criteria in the linked spec are what the tests must satisfy. A slice that satisfies the design
 but not the acceptance criteria is not done.
 
-`problem/SPEC-*.md` files are produced by the planner. Do not edit them — a hook blocks it.
-Other files under `problem/` are yours.
+`problem/SPEC-*.md` files are produced by the planner, but **when a requirement changes, the
+implementer edits them directly** (see "When the spec is wrong" below). Record the history and the
+reason alongside the edit. Other files under `problem/` are yours to write freely.
 
 ### Issues and branches
 
@@ -252,32 +295,36 @@ there — it stops meaning anything the moment the plan changes.
 
 ### When the spec is wrong — fix the spec, not just the code
 
-요건은 작업하면서 바뀐다. 바뀐 요건을 코드에만 반영하고 스펙을 그대로 두면 스펙이 세 기능
-만에 무의미해진다. 그래서 **스펙과 설계 문서는 구현자가 직접 고친다.**
+Requirements change while the work happens. Reflecting a changed requirement only in the code and
+leaving the spec alone makes the spec meaningless within three features. So **the implementer edits
+the spec and the design document directly.**
 
-스펙이 다루지 않은 경우, 기술적으로 불가능한 요구, 계약 변경이 필요할 때:
+When the spec does not cover a case, demands something technically impossible, or the contract needs
+to change:
 
-1. `Specs/SPEC-XXXX/spec.md`(볼트)와 `problem/SPEC-XXXX-server.md`를 고친다.
-2. **변경 이력에 날짜·무엇을·왜를 남긴다.** 이력 없는 수정은 드리프트와 구분되지 않는다.
-3. 이슈에도 한 줄 남긴다 — 플래너가 다음 스펙을 쓸 때 이 결정을 본다.
+1. Edit `Specs/SPEC-XXXX/spec.md` (the vault) and `problem/SPEC-XXXX-server.md`.
+2. **Record the date, what changed, and why in the change history.** An edit without history is
+   indistinguishable from drift.
+3. Leave a line on the issue too — the planner sees this decision when writing the next spec.
 
-고친 내용은 턴 마무리의 **확인할 것**에 반드시 적는다. 스펙을 조용히 바꾸는 것은 코드를
-조용히 다르게 구현하는 것과 같은 문제다.
+Always list what you edited under **확인할 것** (To confirm) at the end of the turn. Quietly changing
+a spec is the same failure as quietly implementing something different from it.
 
-### 정책은 recorder 소유다 — 직접 고치지 않는다
+### Policies are recorder-owned — never edited here
 
-`Specs/policies.md`는 **여러 스펙이 함께 전제하는 문서**다. 한 구현자가 고치면 다른 스펙의
-전제가 조용히 무너지므로, 훅이 쓰기를 막는다.
+`Specs/policies.md` is **a document several specs depend on at once.** If one implementer edits it,
+the premises of other specs collapse silently, so do not edit it directly.
 
-정책을 새로 올리거나 기존 정책을 개정해야 하면 **사용자가 "작업 완료"라고 한 시점에**
-요청 문서를 남긴다:
+To promote a new policy or revise an existing one, leave a request document **at the point the user
+says the work is done**:
 
 ```
-/Users/junha/git/ieuri/ieuri-recorder/problem/<주제>.md
+/Users/junha/git/ieuri/ieuri-recorder/problem/SPEC-XXXX-POLICY-<topic>.md
 ```
 
-무엇을·왜 바꿔야 하는지와 **구현이 실제로 확정한 내용**을 적는다. 스펙의 정책 후보 문구와
-구현 결과가 다르면 그 차이를 명시한다 — recorder는 스펙이 아니라 이 문서를 보고 승격한다.
+State what must change and why, plus **what the implementation actually settled on**. Where the
+spec's candidate wording and the implementation result differ, spell out the difference — the
+recorder promotes from this document, not from the spec.
 
 ### Contract
 
@@ -286,7 +333,7 @@ repository owns the final schema.
 
 Where the proposal is wrong, change it here and say so in the issue — that is a normal outcome,
 not an amendment. Where you accept it, the `.graphqls` under `src/main/resources/schema/` must
-end up matching it; a `contract-drift` hook compares them and blocks on divergence.
+end up matching it — check it against the contract before the PR.
 
 ### Status
 

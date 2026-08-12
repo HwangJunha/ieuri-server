@@ -1,84 +1,113 @@
 ---
 name: test-strategy
-description: Generate and review tests for the ieuri codebase — pure JUnit5 unit tests for domain and business logic, plus ArchUnit architecture tests. Use when the user asks to add tests for a slice, review test coverage, or decide how to test a class. Enforces "unit-test the domain, never test the framework."
+description: Write the tests for a finished slice, right before the PR. Pure JUnit5 for domain and application logic, ArchUnit for boundaries, field-by-field tests for every conversion (GraphQL, JPA, external response) — and nothing else in infrastructure. Use when work is done and the PR is next, or when reviewing existing tests for the wrong shape.
 license: MIT
 metadata:
   author: junha
-  version: "1.0"
-# --- Claude Code extensions (ignored by other agents) ---
-allowed-tools: Read, Glob, Grep, Write, Edit   # generates test files, so Write/Edit are allowed
+  version: "2.0"
+allowed-tools: Read, Glob, Grep, Write, Edit, Bash
 argument-hint: "<slice path or class>"
 ---
 
 # test-strategy
 
-Generates unit tests for domain and business logic in `ieuri`, and reviews existing tests for the wrong kind (the most common waste: booting Spring to test what a plain unit test — or nothing at all — should cover).
+**Tests are written once, at the end — right before the PR.** Requirements move while a slice is
+being built, and tests written early get rewritten every time they move. That cost is real and it
+is larger than the feedback gained. During the work: keep it compiling and nothing more.
 
-Read the repository `CLAUDE.md` first for the layer definitions.
+Read `CLAUDE.md` first for the layer definitions.
 
 ## Iron rule
 
-**Test our logic, not the framework.** The suite contains exactly two kinds of test:
+**Test our logic, not the framework.** The suite holds exactly two kinds of test:
 
-1. **Unit tests** for domain and business logic — pure JUnit 5, no Spring context.
+1. **Unit tests** for domain and application logic — pure JUnit 5, no Spring context.
 2. **ArchUnit tests** for architectural boundaries.
 
-**Nothing else.** No `@SpringBootTest`, no `@DataJpaTest`, no Testcontainers, no DGS query-execution tests, no tests asserting thread names, executor behavior, shutdown timing, or queue saturation. Those verify Spring rather than us, and they are slow and brittle.
+**Nothing else.** No `@SpringBootTest`, `@DataJpaTest`, Testcontainers, or DGS query-execution tests.
+No assertions on thread names, executor behavior, or shutdown timing. Those re-prove Spring, and
+they are slow and brittle. If an infrastructure concern seems to need pinning, that is a signal to
+use a well-trodden Spring idiom instead. **Verify infrastructure by running it, not by encoding it.**
 
-If an infrastructure concern feels like it needs pinning, that is a signal to use a well-trodden Spring idiom (see CLAUDE.md "Infrastructure: follow convention") whose behavior does not need re-proving. Verify infrastructure by **running it**, not by encoding it in the suite.
+## What to write, per layer
 
-## Per-layer test shape
+- **`domain/`** → pure JUnit 5. Instantiate the aggregate directly; assert invariants, state
+  transitions, and thrown domain exceptions. The majority of the suite; must run in milliseconds.
 
-- **`domain/` (aggregate, entity, vo, specification, strategy)** → pure **JUnit 5** unit tests, no Spring, no DB, no mocks of infrastructure. Instantiate the aggregate directly and assert invariants, state transitions, and thrown domain exceptions. These are the majority of tests and must run in milliseconds.
+- **`application/` services** → JUnit 5 with **outbound ports mocked** (MockK). Verify orchestration:
+  the right aggregate method, the right port interaction, the right result. No DB.
+  This is also where **field-level laziness** is pinned — which I/O a use case performs is business
+  logic: `verify(exactly = 0) { tourInfoPort.findGallery(any()) }`. Never boot DGS to prove it.
 
-- **`application/` command & query handlers** → plain JUnit 5 with the **outbound ports mocked** (MockK). No Spring context. Verify orchestration: correct aggregate method called, correct port interaction, correct result. Do not hit a real DB here.
+- **`infrastructure/` adapters** → **no tests.** They are slow to run and heavy on external
+  dependencies — a database, an HTTP upstream, a Spring context — and what they would prove is
+  Spring's behaviour, not ours. SQL is verified against a real database by hand.
 
-- **`infrastructure/` adapters (persistence, query, client, graphql, batch, event)** → **no tests.** SQL is verified against a real database by hand. A test that boots a context to prove Spring wires beans tells us nothing about our logic.
+  **The one exception is conversion.** Adapters are where types cross a boundary, and a conversion
+  is a pure function with no external dependency, so it costs nothing to test and catches a bug the
+  compiler cannot see: a **swapped mapping between two same-typed fields** (`mapy → longitude`,
+  `nameKo → nameEn`). Everything else in the adapter is skipped; the conversion is always tested.
 
-- **`infrastructure/**/mapper/` → always tested**, and this is not an exception to the iron rule: mappers are pure functions with no framework dependency, so they are unit tests in the ordinary sense. The compiler does *not* catch a swapped mapping between two same-typed fields (`mapy → longitude`), which is exactly the bug these catch. Required shape (POL-033):
-    - **Assert field by field**, with a **distinct value per field** in the fixture. A single whole-object `assertEquals` does not satisfy this — when it fails it cannot tell you which field is wrong.
-    - Assert **inside value objects** too (`Email.value`, `Coordinates.latitude`/`.longitude`, `FestivalPeriod.start`/`.end`), not just that the VO is non-null.
-    - Include a case where **every nullable field is null** — it must not throw.
-    - No Spring, no DB, no HTTP. Call the extension function directly.
-    - Before writing one, check whether an existing test already covers that conversion through a caller (e.g. `TourApiDetailMappingTest`). Extend or supersede it — do not duplicate coverage.
+## Every conversion is tested
 
-- **Architecture (`ArchUnit`)** → dependency direction (`infrastructure → application → domain`), domain purity (no JPA/Spring/DGS/QueryDSL under `domain/`), `@Entity` confined to persistence adapters, no DGS types in `application`, cross-domain isolation. These live in `LayeredArchitectureTest`.
+All three boundaries count, in both directions:
 
-### Field-level laziness
+| Boundary | Where it lives |
+|---|---|
+| GraphQL input/response ↔ domain model or `Command` | `adapter/in/graphql` |
+| domain model ↔ JPA entity | `adapter/out/persistence/mapper/` |
+| external API response ↔ domain model | `adapter/out/client/**/mapper/` |
 
-Pin it at the **service level**, not through DGS. Selecting only the body must not trigger gallery/intro/info I/O — that is business logic (which I/O a use case performs), so assert it with mocked ports:
+**Required shape** — the same for all three:
 
-```kotlin
-service.spotDetail("100", KO)
-verify(exactly = 0) { tourInfoPort.findGallery(any()) }
-```
+- **Field by field, with a distinct value per field.** One whole-object `assertEquals` does not
+  satisfy this: when it fails it cannot say *which* field is wrong, and two fields sharing a
+  fixture value let a swap between them pass silently.
+- Assert **inside value objects** (`Coordinates.latitude`/`.longitude`, `Email.value`), not just
+  that the VO is non-null.
+- Include a case where **every nullable field is null** — it must not throw.
+- No Spring, no DB, no HTTP. Call the function directly.
+- Check for existing coverage through a caller first; extend rather than duplicate.
 
-Do not boot a DGS context to re-prove that GraphQL only calls selected resolvers — that is the framework's job.
+**A conversion that cannot be called on its own cannot be tested.** GraphQL conversion is often
+written inline in the resolver method (`CreatePostCommand(input.title, …)`), which is only reachable
+by standing up the resolver — exactly the test we do not write. When a slice adds one, extract it as
+an extension function on the source type (`fun CreatePostInput.toCommand(memberId: Long)`) and test
+that. If an inline conversion is trivial and total — one field passed straight through — leave it;
+extraction is for conversions with enough fields to swap.
 
-## Generating tests for a slice
+**Existing gaps are accepted.** Several conversions predate this rule and are untested; that is the
+current state, not a defect to fix in an unrelated slice. The rule binds what a slice **adds or
+changes**.
 
-Given a slice from `domain-slice-generator`, produce:
-1. Domain unit tests for every new invariant/branch (pure JUnit5).
-2. Service test with mocked ports — orchestration, fallback order, which I/O runs for which input.
-3. A mapper test for every conversion the slice adds — field by field, distinct values, all-nulls case.
-4. Nothing for the adapters themselves.
+## Architecture (ArchUnit)
 
-Cover edge cases and failure paths, not just the happy path. Prefer table/parameterized tests for VO validation.
+Dependency direction, domain purity, `@Entity` confinement, no DGS types in `application`,
+cross-domain isolation, `AFTER_COMMIT`/`REQUIRES_NEW`. These live in `LayeredArchitectureTest` and
+are what actually *proves* the architecture holds — keep them green.
 
-**Prove each new test can fail.** Break the code it covers — invert the condition, drop the guard — and confirm *that* test goes red. A test written against already-correct code often asserts nothing; you only learn which when the assertion is the thing standing between you and a regression. Restore the code and re-run the whole suite before moving on.
+## At PR time
+
+1. Write the tests for the domain and application logic this slice added.
+2. Write a test for **every conversion** the slice added or changed, in all three boundaries above.
+3. **Prove each new test can fail** — invert the condition or drop the guard it covers and confirm
+   that test goes red. A test written against already-correct code often asserts nothing. Restore.
+4. `./gradlew test` must pass before the PR goes up.
 
 ## Reviewing existing tests — flag these
 
-- Any `@SpringBootTest` / `@DataJpaTest` / Testcontainers / DGS query-execution test. **Delete it.**
-- Tests asserting thread names, executor saturation, shutdown timing, or other framework behavior.
-- Domain logic tested through a Spring context (should be pure JUnit5). **Critical waste.**
-- Handler tests hitting a real DB instead of mocked ports.
-- Resolver tests re-asserting domain invariants already covered downstream.
-- Missing failure-path coverage for aggregate invariants.
+- Any `@SpringBootTest` / `@DataJpaTest` / Testcontainers / DGS execution test. **Delete it.**
+- Domain logic tested through a Spring context. Critical waste — should be pure JUnit5.
+- Service tests hitting a real DB instead of mocked ports.
+- **Conversion tests using one whole-object `assertEquals`**, or a fixture where several fields
+  share a value (a swap between them passes silently).
+- A conversion added by this slice with **no test at all** — including GraphQL input → `Command`.
 - Assertions on JPA entities instead of the domain model in write tests.
-- **Mapper tests using one whole-object `assertEquals`** instead of field-by-field assertions, or a fixture where several fields share the same value (a swap between them then passes silently).
-- **Tests whose fixture makes them non-deterministic** — e.g. tampering with a token by appending a fixed string that the original may already end with. If a test can pass or fail on the same input, fix the fixture; don't delete the coverage.
+- Missing failure-path coverage for aggregate invariants.
+- Non-deterministic fixtures — if a test can pass or fail on the same input, fix the fixture rather
+  than deleting the coverage.
 
-## Output format
+## Output
 
-For generation: emit each test file with full path, using JUnit 5 + MockK. **No DB, no Spring context.** For review: `path — [severity] wrong shape — why — the correct shape (or: delete it)`.
+For generation: each test file with full path, JUnit 5 + MockK, no DB, no Spring context.
+For review: `path — [severity] wrong shape — why — the correct shape (or: delete it)`.
