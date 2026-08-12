@@ -9,6 +9,7 @@ import org.around.ieuri.common.pagination.CursorPageInfo
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.community.application.port.`in`.query.ConversationQueryUseCase
 import org.around.ieuri.community.application.port.`in`.query.FeedQueryUseCase
+import org.around.ieuri.community.application.port.out.client.MemberLookupPort
 import org.around.ieuri.community.application.query.ConversationView
 import org.around.ieuri.community.application.query.FeedItemView
 import org.around.ieuri.community.application.query.MessageView
@@ -38,6 +39,7 @@ import org.around.ieuri.common.graphql.generated.types.TargetCategory as GqlTarg
 class FeedQueryResolver(
     private val feedQueryUseCase: FeedQueryUseCase,
     private val conversationQueryUseCase: ConversationQueryUseCase,
+    private val memberLookupPort: MemberLookupPort,
     private val currentMemberProvider: CurrentMemberProvider,
 ) {
 
@@ -143,16 +145,29 @@ class FeedQueryResolver(
         return feedQueryUseCase.feedItem(feedItemId, currentMemberProvider.requireMemberId())
     }
 
+    /**
+     * 메시지 발신자. **DataLoader를 쓰지 않고 직접 읽는다.**
+     *
+     * DataLoader는 **한 번의 GraphQL 실행에 묶인다.** 구독은 이벤트마다 실행이 새로 도는데
+     * 레지스트리는 구독이 열릴 때 만들어진 것을 계속 쓰므로, 첫 실행에서 배치가 소진된 뒤에는
+     * 두 번째 이벤트의 `load()`가 영영 완료되지 않는다 — 이벤트는 도착하고 메시지 조회까지
+     * 되는데 응답만 나가지 않는 형태로 멈춘다(실측: 2번째부터 member 조회가 없었다).
+     *
+     * 배치가 필요하지도 않다 — 이벤트 하나에 발신자는 한 명뿐이라 모을 것이 없다.
+     * 회원이 없어도(탈퇴 등) 메시지는 남으므로 대체 표기로 채운다.
+     */
     @DgsData(parentType = "Message", field = "sender")
-    fun messageSender(dfe: DgsDataFetchingEnvironment): CompletableFuture<GqlPostAuthor> =
-        dfe.loadAuthor(dfe.messageSource().senderId)
+    fun messageSender(dfe: DgsDataFetchingEnvironment): GqlPostAuthor {
+        val senderId = dfe.messageSource().senderId
+        return memberLookupPort.findAuthor(senderId).toGqlOrPlaceholder(senderId)
+    }
 
-    /** 타이핑 중인 상대방. 구독 이벤트에는 senderId만 실려 오므로 여기서 회원을 읽는다. */
+    /** 타이핑 중인 상대방. DataLoader를 쓰지 않는 이유는 [messageSender]와 같다. */
     @DgsData(parentType = "TypingEvent", field = "sender")
-    fun typingEventSender(dfe: DgsDataFetchingEnvironment): CompletableFuture<GqlPostAuthor> {
+    fun typingEventSender(dfe: DgsDataFetchingEnvironment): GqlPostAuthor {
         val source = dfe.getSource<TypingEventView>()
             ?: error("TypingEvent 필드 리졸버는 부모가 반환한 TypingEventView를 소스로 받아야 한다.")
-        return dfe.loadAuthor(source.senderId)
+        return memberLookupPort.findAuthor(source.senderId).toGqlOrPlaceholder(source.senderId)
     }
 
     // ── 공통 헬퍼 ────────────────────────────────────────────────────
