@@ -70,14 +70,19 @@ spring:
       timeout: 2s
       client-name: ieuri
   mail:
-    # 개발/임시: Gmail SMTP. 자격증명이 없어도 컨텍스트는 로드된다(발송 시에만 필요).
-    host: ${MAIL_HOST:smtp.gmail.com}
-    port: ${MAIL_PORT:587}
-    username: ${MAIL_USERNAME:}
-    password: ${MAIL_APP_PASSWORD:}
+    # OCI Email Delivery(도쿄 리전). 자격증명은 환경변수로만 주입하며 리터럴 기본값을 두지 않는다.
+    # 빈 문자열 기본값은 미주입 시 부팅을 깨뜨리지 않기 위한 것이다 — 자격증명이 없으면
+    # 기동은 되고 발송만 실패한다(SPEC-0016 R4). 암호화 키와 달리 실패 범위가 메일에 한정된다.
+    host: smtp.email.ap-tokyo-1.oci.oraclecloud.com
+    port: 587
+    username: ${OCI_SMTP_USER:}
+    password: ${OCI_SMTP_PASS:}
     properties:
       mail.smtp.auth: true
+      # required까지 켜야 한다. enable만으로는 서버가 STARTTLS를 제공하지 않을 때 평문으로
+      # 강등되어 인증 코드가 그대로 나간다.
       mail.smtp.starttls.enable: true
+      mail.smtp.starttls.required: true
 
 server:
   port: 8888
@@ -111,7 +116,8 @@ ieuri:
     username: ${IEURI_SEARCH_DB_USERNAME:ieuri}
     password: ${IEURI_SEARCH_DB_PASSWORD}
   mail:
-    from: ${MAIL_FROM:}
+    # 빈 문자열이면 From 헤더를 설정하지 않는다(SMTP 서버 기본 발신자에 위임).
+    from: ${MAIL_FROM:noreply@ieuri.co.kr}
   verification:
     ttl-minutes: 10
     max-attempts: 5
