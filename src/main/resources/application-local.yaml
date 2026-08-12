@@ -5,21 +5,8 @@ ieuri:
   # (아래 spring.datasource 주석 참조).
   search-datasource:
     url: ${IEURI_SEARCH_DB_URL:jdbc:postgresql://localhost:5433/ieuri?prepareThreshold=0&sslmode=disable}
-  encryption:
-    # 개발 전용 AES-256 키(base64 32바이트) — 운영에서는 절대 사용 금지, 환경변수로 교체.
-    key: aWV1cmlfbG9jYWxfZGV2X2FlczI1Nl9rZXlfMzJieXQ=
-    pepper: aWV1cmktbG9jYWwtZGV2LXBlcHBlcg==
-    # 로그인 식별자 보호(HMAC)용. 한번 정하면 사실상 교체 불가라 검증 코드용과 분리한다.
-    identifier-pepper: aWV1cmktbG9jYWwtZGV2LWlkZW50aWZpZXItcGVwcGVy
   mail:
     from: no-reply-dev@ieuri.local
-  jwt:
-    # 개발 전용 HS256 서명 키(base64 32바이트) — 운영에서는 절대 사용 금지, 환경변수로 교체.
-    secret: aWV1cmlfbG9jYWxfZGV2X2p3dF9oczI1Nl9zZWNyZXQ=
-  password:
-    # 비밀번호 해시용 pepper(BCrypt 앞단 HMAC 키). 로컬 개발 전용 생성값.
-    # 운영은 IEURI_PASSWORD_PEPPER 환경변수로 주입한다.
-    pepper: ${IEURI_PASSWORD_PEPPER:IJPEbgPT4Bq9BO4/10GuzlDHpY2hHErWSuTaQHvwd8s=}
 spring:
   # 로컬은 `kubectl port-forward` 터널로 DB에 붙는데, **그 위에서 SSL 핸드셰이크가 깨진다.**
   # 서버는 `ssl = on`이라 JDBC가 기본으로 SSL을 시도하고, 터널을 통과하는 순간

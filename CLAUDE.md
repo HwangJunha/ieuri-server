@@ -105,6 +105,12 @@ Uses the Gradle wrapper (`./gradlew`); Gradle 9.5.1, Java toolchain 25.
 
 - **Security is on the classpath.** `spring-boot-starter-security` is included, so once beans exist, endpoints are locked down by default. Add a security configuration to open up GraphQL / introspection as needed.
 
+- **`ZH` is always Traditional Chinese (번체/正體) — never Simplified.** This applies everywhere `ZH` appears: DB name columns, seed data, GraphQL responses, and any content we author or generate.
+
+  The reason is that we do not serve mainland China at all. The app cannot ship there — Play Store and App Store are unavailable, and the domestic Android stores each impose their own approval process we are not taking on. So the actual `ZH` audience is Taiwan and Hong Kong, where Traditional is the correct script. Writing Simplified would be wrong for every user who will ever read it.
+
+  Practical consequences when filling `name_zh`-style columns: use `鍾路區`, not `钟路区`; `廣域市`, not `广域市`; `濟州市`, not `济州市`; `上黨區`, not `上党区`. Do not mix scripts within a dataset — a single Simplified row among Traditional ones is a defect, not a variant. Note that Japanese (`JA`) is a *separate* script convention (shinjitai: `東莱区`), so `JA` and `ZH` legitimately differ and neither should be copied into the other.
+
 ## Layout
 
 Package root: `org.around.ieuri`. Organized **by domain first, then hexagonal layer**, with a **CQRS split** in the application layer. Dependencies point inward only: `infrastructure → application → domain`. `domain` imports nothing external (no Spring/JPA/DGS); `application` depends only on `domain`; `infrastructure` implements `application` ports.

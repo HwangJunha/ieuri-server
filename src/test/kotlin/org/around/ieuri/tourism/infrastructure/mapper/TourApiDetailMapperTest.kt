@@ -2,12 +2,12 @@ package org.around.ieuri.tourism.infrastructure.mapper
 
 import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.SpotCategory
-import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.TourApiDetailCommonResponse
-import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.TourApiDetailImageResponse
-import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.TourApiDetailIntroResponse
-import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.mapper.toSpotDetail
-import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.mapper.toSpotImage
-import org.around.ieuri.tourism.infrastructure.adapter.out.tourapi.mapper.toSpotIntroOrNull
+import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi.TourApiDetailCommonResponse
+import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi.TourApiDetailImageResponse
+import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi.TourApiDetailIntroResponse
+import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi.mapper.toSpotDetail
+import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi.mapper.toSpotImage
+import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi.mapper.toSpotIntroOrNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

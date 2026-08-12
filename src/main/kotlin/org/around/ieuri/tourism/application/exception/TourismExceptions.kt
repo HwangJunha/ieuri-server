@@ -99,3 +99,15 @@ class CongestionAreaNotFoundException(message: String = "해당 구역을 찾을
 /** 구역 id 개수가 상한 초과(R6). 쿼터 보호가 목적이라 클램프가 아니라 거절이다. */
 class TooManyAreaIdsException(message: String = "한 번에 조회할 수 있는 구역 수를 초과했습니다.") :
     SpotQueryException("TOO_MANY_AREA_IDS", Classification.BAD_REQUEST, message)
+
+/**
+ * 지역 추천 조회의 개수가 0 이하(SPEC-0015 R29).
+ *
+ * **상한 초과는 이 예외가 아니다** — 상한을 넘는 값은 클램프한다(POL-018). 0 이하만 거절하는
+ * 이유는 "0건을 달라"가 의도로 성립하지 않기 때문이며, 조용히 기본값으로 바꾸면 클라이언트의
+ * 계산 오류가 드러나지 않는다.
+ *
+ * 좌표 범위 위반은 기존 [InvalidCoordinatesException]을 그대로 쓴다.
+ */
+class InvalidLimitException(message: String = "요청 개수가 올바르지 않습니다.") :
+    SpotQueryException("INVALID_LIMIT", Classification.BAD_REQUEST, message)
