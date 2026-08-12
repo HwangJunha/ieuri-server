@@ -1,6 +1,12 @@
 spring:
   application:
     name: ieuri
+  threads:
+    virtual:
+      # 요청 처리와 데이터페처를 가상 스레드로 돌린다(Java 21+). 블로킹 I/O가 캐리어 스레드를
+      # 반납하므로 스레드 수가 동시 처리량의 상한이 아니게 된다.
+      # DGS 키(dgs.graphql.virtualthreads.enabled)도 이 값을 따라 켜진다.
+      enabled: true
   lifecycle:
     # graceful shutdown 단계별 최대 대기. write-behind 큐도 이 안에서 정리된다
     # (큐 자체는 @PreDestroy에서 별도로 유한 대기한다).

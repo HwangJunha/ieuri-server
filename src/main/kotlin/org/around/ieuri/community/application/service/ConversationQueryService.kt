@@ -11,10 +11,8 @@ import org.around.ieuri.community.application.port.out.query.ConversationsSearch
 import org.around.ieuri.community.application.query.ConversationView
 import org.around.ieuri.community.application.query.MessageView
 import org.around.ieuri.community.application.query.TypingEventView
-import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import reactor.core.publisher.Flux
-import reactor.core.publisher.Mono
 
 /**
  * 대화·메시지 조회와 타이핑 구독(SPEC-0017 R8·R10).
@@ -87,19 +85,7 @@ class ConversationQueryService(
     override fun newMessage(conversationId: Long, memberId: Long): Flux<MessageView> {
         requireParticipant(conversationId, memberId)
         return conversationEventPort.subscribeNewMessage(conversationId)
-            // 이벤트에는 id만 실려 오므로 DB에서 다시 읽는다. 읽는 사이에 사라진 메시지는
-            // mapNotNull이 건너뛴다 — 빈 말풍선을 내려보내지 않는다.
-            //
-            // **조회 실패가 구독을 끊지 않게 한다.** 커넥션 고갈처럼 일시적인 실패로 예외가
-            // 올라오면 Flux가 종료되어 그 사용자의 채팅이 조용히 멎는다 — 재접속 전까지
-            // 회복되지 않는다. 한 건을 건너뛰는 편이 낫고, 놓친 메시지는 재조회로 메꿔진다.
-            .flatMapSequential { messageId ->
-                Mono.fromCallable { conversationQueryPort.findMessage(messageId, memberId) }
-                    .onErrorResume {
-                        log.warn("구독 중 메시지 조회에 실패해 건너뛴다: messageId={}", messageId, it)
-                        Mono.empty()
-                    }
-            }
+            .mapNotNull { conversationQueryPort.findMessage(it, memberId) }
     }
 
     /**
@@ -118,8 +104,6 @@ class ConversationQueryService(
         (first ?: default).coerceIn(1, policy.maxPageSize)
 
     private companion object {
-        private val log = LoggerFactory.getLogger(ConversationQueryService::class.java)
-
         const val DEFAULT_CONVERSATIONS_PAGE_SIZE = 20
         const val DEFAULT_MESSAGES_PAGE_SIZE = 30
     }
