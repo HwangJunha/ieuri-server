@@ -32,8 +32,6 @@ ieuri:
       job: ${IEURI_TOUR_SYNC_JOB:spotSyncJob}
       # 수집용 numOfRows. 조회 경로의 max-page-size(100)와 별개다. 업스트림이 거부하면 낮춘다.
       page-size: ${IEURI_TOUR_SYNC_PAGE_SIZE:1000}
-      # 급감 게이트 — 수집 건수가 기존 적재의 이 비율 미만이면 정리를 건너뛴다(대량 오삭제 방지).
-      cleanup-min-ratio: ${IEURI_TOUR_SYNC_CLEANUP_MIN_RATIO:0.5}
       # runDate의 시간대. "하루"의 경계이자 중복 실행 방지의 기준이다.
       zone: Asia/Seoul
 

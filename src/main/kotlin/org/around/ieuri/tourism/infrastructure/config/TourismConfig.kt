@@ -9,6 +9,7 @@ import org.around.ieuri.tourism.application.policy.SeoulOpenDataPolicy
 import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
 import org.around.ieuri.tourism.domain.vo.DistanceScoring
 import org.around.ieuri.tourism.domain.vo.FreshnessDecay
+import org.around.ieuri.tourism.domain.specification.SpotExclusionRule
 import org.around.ieuri.tourism.domain.vo.RegionScoreWeights
 import org.around.ieuri.tourism.infrastructure.batch.FestivalSyncProperties
 import org.around.ieuri.tourism.infrastructure.batch.TourStatsSyncProperties
@@ -36,8 +37,20 @@ import java.time.Duration
     TourStatsProperties::class,
     TourStatsSyncProperties::class,
     DistrictRepresentativeProperties::class,
+    SpotExclusionProperties::class,
 )
 class TourismConfig {
+
+    /**
+     * 비관광 spot 제외 규칙(SPEC-0018). 키워드는 설정에서 오고 규칙 자체는 도메인의 순수
+     * 함수다 — 도메인은 설정 메커니즘을 알지 않는다.
+     */
+    @Bean
+    fun spotExclusionRule(properties: SpotExclusionProperties): SpotExclusionRule =
+        SpotExclusionRule(
+            keywords = properties.keywords,
+            branchNamePatterns = properties.branchNamePatterns,
+        )
 
     @Bean
     fun spotQueryPolicy(properties: TourApiProperties): SpotQueryPolicy =

@@ -65,7 +65,6 @@ class SpotSyncJobConfig(
                     syncPort = syncPort,
                     storePort = storePort,
                     pageSize = properties.pageSize,
-                    cleanupMinRatio = properties.cleanupMinRatio,
                     // 조회를 Step 실행 시점으로 미룬다 — 람다를 벗기면 부팅 때 잡은 낡은 집합으로
                     // 걸러 종료 축제가 되살아난다.
                     endedFestivalIds = { runDate -> festivalStorePort.findEndedContentIds(language, runDate) },
@@ -73,6 +72,7 @@ class SpotSyncJobConfig(
                 transactionManager,
             )
             .build()
+
 
     /**
      * 언어 1개의 축제 정보를 수집·적재하고 정리하는 Step. Step이 분리되어 있어 한 언어의 실패가

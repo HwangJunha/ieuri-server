@@ -16,9 +16,6 @@ interface SpotStorePort {
      */
     fun upsertAll(spots: List<SyncSpotCommand>, syncedAt: Instant): Int
 
-    /** [language]에 적재된 전체 행 수. 정리 단계의 급감 감지 게이트와 실행 이력에 쓴다. */
-    fun countByLanguage(language: DomainLocale): Long
-
     /**
      * [language]에서 [survivingContentIds]에 **없는** 행을 삭제한다.
      *

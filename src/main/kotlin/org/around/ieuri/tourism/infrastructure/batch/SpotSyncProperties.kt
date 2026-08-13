@@ -11,8 +11,6 @@ const val BATCH_PROFILE = "batch"
  *
  * @param pageSize areaBasedSyncList2의 numOfRows. 조회 경로의 `maxPageSize`와 별개다.
  * @param job 실행할 잡 이름. 외부에서 지정한다(`--ieuri.tourapi.sync.job=...`).
- * @param cleanupMinRatio 사라진 항목 정리의 급감 게이트. 이번 수집 건수가 기존 적재 건수의 이 비율
- *   미만이면 정리를 건너뛴다. 낮추면 업스트림 이상 시 대량 오삭제로 이어진다.
  * @param zone `runDate` 잡 파라미터를 만들 때 쓰는 시간대. 이 값이 "하루"의 경계를 정하므로
  *   중복 실행 방지의 기준이기도 하다.
  */
@@ -20,6 +18,5 @@ const val BATCH_PROFILE = "batch"
 data class SpotSyncProperties(
     val pageSize: Int = 1_000,
     val job: String = "spotSyncJob",
-    val cleanupMinRatio: Double = 0.5,
     val zone: String = "Asia/Seoul",
 )
