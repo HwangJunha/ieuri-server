@@ -49,13 +49,7 @@ class FeedQueryResolver(
         @InputArgument first: Int?,
         @InputArgument after: String?,
     ): FeedConnection {
-        val viewerId = currentMemberProvider.requireMemberId()
-        val page = feedQueryUseCase.feed(first, after, viewerId)
-        org.slf4j.LoggerFactory.getLogger(FeedQueryResolver::class.java).info(
-            "[진단] feed: viewerId={} rows={}",
-            viewerId,
-            page.edges.map { "id=${it.node.id},author=${it.node.authorId},owned=${it.node.ownedByViewer}" },
-        )
+        val page = feedQueryUseCase.feed(first, after, currentMemberProvider.requireMemberId())
         return FeedConnection(
             edges = page.edges.map { FeedItemEdge(cursor = it.cursor, node = it.node) },
             pageInfo = page.pageInfo.toGql(),
