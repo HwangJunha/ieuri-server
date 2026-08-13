@@ -56,7 +56,14 @@ interface ConversationQueryPort {
      *
      * [memberId]는 ownedByViewer 판정에 쓴다. 참여자 검사는 구독 시작 시점에 이미 끝났다.
      */
-    fun findMessage(messageId: Long, memberId: Long): MessageView?
+    /**
+     * 구독 스트림이 이벤트의 id로 메시지를 다시 읽는다.
+     *
+     * **대화 id로도 범위를 좁힌다** — 이벤트는 브로커에서 오는데 Valkey는 신뢰 경계가 아니다.
+     * 채널 이름만 믿으면, 그 채널에 발행할 수 있는 무엇이든 임의의 메시지 id를 실어 남의 대화를
+     * 복호화해 내려보내게 만들 수 있다.
+     */
+    fun findMessage(conversationId: Long, messageId: Long, memberId: Long): MessageView?
 
     /**
      * 대화별 안 읽은 메시지 수. **여러 대화를 한 번에 센다** — 목록을 그리며 대화마다 물으면

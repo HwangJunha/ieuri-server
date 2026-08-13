@@ -126,10 +126,11 @@ class ConversationQueryAdapter(
     }
 
     @Transactional(readOnly = true)
-    override fun findMessage(messageId: Long, memberId: Long): MessageView? =
+    override fun findMessage(conversationId: Long, messageId: Long, memberId: Long): MessageView? =
         queryFactory
             .selectFrom(message)
-            .where(message.id.eq(messageId))
+            // **대화로도 좁힌다** — 채널 이름이 인가의 근거가 되지 않게 한다.
+            .where(message.id.eq(messageId), message.conversationId.eq(conversationId))
             .fetchOne()
             ?.toMessageView(memberId)
 

@@ -22,10 +22,6 @@ enum class DomainLocale {
         val FALLBACK: DomainLocale = EN
 
         /**
-         * BCP-47/ISO 언어 태그(예: "ko-KR", "ja", "zh-Hant")를 도메인 언어로 정규화한다.
-         * 지원 밖이면 폴백(EN). 중국어는 번체(ChtService2)만 지원하므로 zh 계열은 ZH로 수렴한다.
-         */
-        /**
          * `Accept-Language` 헤더를 도메인 언어로 정규화한다(RFC 9110 언어 협상).
          *
          * **첫 항목만 본다** — 세밀한 q-값 협상 대신, 클라이언트가 세션당 단일 언어를 설정하는
@@ -39,6 +35,10 @@ enum class DomainLocale {
                     ?.trim(),
             )
 
+        /**
+         * BCP-47/ISO 언어 태그(예: "ko-KR", "ja", "zh-Hant")를 도메인 언어로 정규화한다.
+         * 지원 밖이면 폴백(EN). 중국어는 번체(ChtService2)만 지원하므로 zh 계열은 ZH로 수렴한다.
+         */
         fun fromLanguageTag(tag: String?): DomainLocale {
             val primary = tag?.trim()?.substringBefore('-')?.lowercase() ?: return FALLBACK
             return when (primary) {

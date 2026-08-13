@@ -239,7 +239,7 @@ class FeedQueryServiceTest {
             viewerId = memberId,
             createdAt = Instant.EPOCH,
         )
-        every { conversationQueryPort.findMessage(500L, memberId) } returns stored
+        every { conversationQueryPort.findMessage(conversationId, 500L, memberId) } returns stored
 
         val received = conversationService.newMessage(conversationId, memberId).collectList().block()
 
@@ -251,7 +251,7 @@ class FeedQueryServiceTest {
     fun `사라진 메시지의 이벤트는 흘려보낸다`() {
         every { conversationQueryPort.findConversation(conversationId, memberId) } returns conversationView()
         every { conversationEventPort.subscribeNewMessage(conversationId) } returns Flux.just(500L)
-        every { conversationQueryPort.findMessage(500L, memberId) } returns null
+        every { conversationQueryPort.findMessage(conversationId, 500L, memberId) } returns null
 
         val received = conversationService.newMessage(conversationId, memberId).collectList().block()
 
@@ -268,9 +268,9 @@ class FeedQueryServiceTest {
         every { conversationQueryPort.findConversation(conversationId, memberId) } returns conversationView()
         every { conversationQueryPort.findConversation(conversationId, other) } returns conversationView()
         every { conversationEventPort.subscribeNewMessage(conversationId) } returns Flux.just(500L)
-        every { conversationQueryPort.findMessage(500L, memberId) } returns
+        every { conversationQueryPort.findMessage(conversationId, 500L, memberId) } returns
             MessageView(500L, "안녕", memberId, ownedByViewer = true, viewerId = memberId, createdAt = Instant.EPOCH)
-        every { conversationQueryPort.findMessage(500L, other) } returns
+        every { conversationQueryPort.findMessage(conversationId, 500L, other) } returns
             MessageView(500L, "안녕", memberId, ownedByViewer = false, viewerId = other, createdAt = Instant.EPOCH)
 
         val mine = conversationService.newMessage(conversationId, memberId).collectList().block()!!.single()

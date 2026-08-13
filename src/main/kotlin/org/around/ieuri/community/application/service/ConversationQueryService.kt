@@ -85,7 +85,7 @@ class ConversationQueryService(
     override fun newMessage(conversationId: Long, memberId: Long): Flux<MessageView> {
         requireParticipant(conversationId, memberId)
         return conversationEventPort.subscribeNewMessage(conversationId)
-            .mapNotNull { conversationQueryPort.findMessage(it, memberId) }
+            .mapNotNull { conversationQueryPort.findMessage(conversationId, it, memberId) }
     }
 
     /**

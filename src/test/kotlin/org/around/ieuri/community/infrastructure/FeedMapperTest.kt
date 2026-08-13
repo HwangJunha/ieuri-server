@@ -146,6 +146,10 @@ class FeedMapperTest {
             memberHigh = 77L,
             lastMessageAt = lastMessageAt,
             createdAt = createdAt,
+            // **두 읽음 지점에 서로 다른 값을 준다** — 둘 다 Long?이라 뒤바뀌어도 컴파일되고,
+            // 뒤바뀌면 A의 읽음이 B의 자리에 저장되어 양쪽 뱃지가 조용히 틀린다.
+            lastReadMessageIdLow = 111L,
+            lastReadMessageIdHigh = 222L,
         )
 
         val domain = entity.toDomain()
@@ -155,6 +159,25 @@ class FeedMapperTest {
         assertEquals(77L, domain.memberHigh)
         assertEquals(lastMessageAt, domain.lastMessageAt)
         assertEquals(createdAt, domain.createdAt)
+        assertEquals(111L, domain.lastReadMessageIdLow)
+        assertEquals(222L, domain.lastReadMessageIdHigh)
+    }
+
+    /** 아직 아무도 읽지 않은 대화 — null이 그대로 실려야 한다(0이 아니다). */
+    @Test
+    fun `읽음 지점이 없는 대화가 도메인으로 변환된다`() {
+        val entity = ConversationEntity(
+            id = 55L,
+            memberLow = 66L,
+            memberHigh = 77L,
+            lastMessageAt = Instant.parse("2026-08-12T05:06:07Z"),
+            createdAt = createdAt,
+        )
+
+        val domain = entity.toDomain()
+
+        assertNull(domain.lastReadMessageIdLow)
+        assertNull(domain.lastReadMessageIdHigh)
     }
 
     @Test
@@ -173,6 +196,28 @@ class FeedMapperTest {
         assertEquals(99L, entity.memberHigh)
         assertEquals(now, entity.lastMessageAt)
         assertNull(entity.id)
+        // 새 대화는 아무도 읽지 않은 상태다.
+        assertNull(entity.lastReadMessageIdLow)
+        assertNull(entity.lastReadMessageIdHigh)
+    }
+
+    /** 읽음 지점이 채워진 대화도 **각자의 자리 그대로** 엔티티에 실려야 한다. */
+    @Test
+    fun `읽음 지점이 있는 도메인 대화가 엔티티로 변환된다`() {
+        val domain = Conversation.restore(
+            id = 55L,
+            memberLow = 66L,
+            memberHigh = 77L,
+            lastMessageAt = Instant.parse("2026-08-12T05:06:07Z"),
+            createdAt = createdAt,
+            lastReadMessageIdLow = 333L,
+            lastReadMessageIdHigh = 444L,
+        )
+
+        val entity = domain.toNewEntity()
+
+        assertEquals(333L, entity.lastReadMessageIdLow)
+        assertEquals(444L, entity.lastReadMessageIdHigh)
     }
 
     // ── Message ─────────────────────────────────────────────────────

@@ -8,7 +8,7 @@ import org.around.ieuri.tourism.domain.vo.DomainLocale
  * 지역(시군구) 추천 조회 유스케이스(SPEC-0015 R16~R21·R30·R31).
  *
  * 언어는 인자가 아니라 요청 스코프에서 결정돼 명시 파라미터로 전달된다 — 리졸버가
- * `LocaleContext`에서 읽어 넘기며 application은 서블릿·헤더를 모른다(POL-039).
+ * Accept-Language 헤더에서 읽어 넘기며 application은 서블릿·헤더를 모른다(POL-039).
  */
 interface RegionRecommendationUseCase {
     /**

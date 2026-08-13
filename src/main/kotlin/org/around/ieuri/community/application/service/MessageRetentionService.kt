@@ -5,7 +5,6 @@ import org.around.ieuri.community.application.port.out.client.ClockPort
 import org.around.ieuri.community.application.port.out.persistence.MessagePurgePort
 import org.around.ieuri.community.domain.aggregate.Message
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 
 /**
  * 보관 기간이 지난 메시지 삭제(SPEC-0017 R16, POL-050).
@@ -26,7 +25,11 @@ class MessageRetentionService(
     private val clockPort: ClockPort,
 ) : MessageRetentionUseCase {
 
-    @Transactional
+    /**
+     * **트랜잭션을 여기서 열지 않는다.** 회차의 트랜잭션 경계는 어댑터의 행 삭제에만 있다
+     * (`ExpiredMessageRowPurger`) — 여기서 열면 그 안에 합류해, 첨부 사진을 지우는 R2 왕복
+     * 최대 limit건이 트랜잭션 안에서 돌아 커넥션을 수십 초 잡는다. 경계를 나눈 의미가 사라진다.
+     */
     override fun purgeExpiredBatch(limit: Int): Int {
         require(limit > 0) { "limit은 양수여야 합니다." }
         val cutoff = Message.retentionCutoff(clockPort.now())

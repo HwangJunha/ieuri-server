@@ -110,6 +110,11 @@ class GraphqlWebSocketAuthInterceptor(
      *
      * 리졸버가 스트림을 만들 때까지만 필요하다 — 구독이 열린 뒤 흘러오는 이벤트는 참여자
      * 검사를 이미 통과한 것이라 그 시점의 SecurityContext를 요구하지 않는다.
+     *
+     * **`Mono.defer`로 감싸는 것이 핵심이다.** `chain.next()`는 콜드 Mono를 돌려주므로 그냥
+     * try/finally로 감싸면 finally가 **조립 시점에** 돌아, 정작 리졸버가 실행되는 구독 시점에는
+     * 컨텍스트가 이미 비어 있다. 세우기와 지우기를 둘 다 리액티브 생명주기 안으로 넣어야
+     * 실행 구간을 정확히 감싼다.
      */
     override fun intercept(
         request: WebGraphQlRequest,
@@ -117,11 +122,11 @@ class GraphqlWebSocketAuthInterceptor(
     ): Mono<WebGraphQlResponse> {
         if (request !is WebSocketGraphQlRequest) return chain.next(request)
 
-        applyToSecurityContext(request.sessionInfo.attributes)
-        return try {
+        return Mono.defer {
+            applyToSecurityContext(request.sessionInfo.attributes)
             chain.next(request)
-        } finally {
-            // 예외로 빠져나가도 반드시 지운다 — 남기면 다음 요청이 남의 신원을 물려받는다.
+        }.doFinally {
+            // 취소·오류로 끝나도 반드시 지운다 — 남기면 다음 요청이 남의 신원을 물려받는다.
             SecurityContextHolder.clearContext()
         }
     }

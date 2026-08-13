@@ -138,6 +138,8 @@ class ConversationCommandService(
         conversation.markRead(memberId, upTo)
         conversationRepositoryPort.updateReadState(conversation)
 
+        // 아직 커밋 전이지만 이 질의가 community_conversation을 조인하므로 Hibernate가
+        // 먼저 flush한다 — 조인을 빼면 갱신 전 값이 조용히 나간다.
         return conversationQueryPort
             .countUnreadOf(listOf(command.conversationId), memberId)[command.conversationId]
             ?: 0

@@ -35,7 +35,7 @@ import org.around.ieuri.common.graphql.generated.types.SpotCategory as GqlSpotCa
 
 /**
  * 지도 조회 GraphQL 리졸버(인바운드 어댑터, CQRS 읽기, SPEC-0014). 언어는 요청 스코프
- * `LocaleContext`에서 읽어 유스케이스에 넘긴다(GraphQL 인자 아님, Accept-Language 기반).
+ * Accept-Language 헤더에서 읽어 유스케이스에 넘긴다(GraphQL 인자 아님, Accept-Language 기반).
  *
  * **지연 필드(@DgsData)가 없다.** 세 쿼리 모두 자기 필드를 채우는 데 필요한 I/O가 하나로
  * 묶여 있어, 필드를 나눠도 호출 수가 줄지 않는다:
