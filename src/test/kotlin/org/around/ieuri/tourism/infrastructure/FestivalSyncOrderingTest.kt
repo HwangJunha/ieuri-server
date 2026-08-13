@@ -1,12 +1,14 @@
 package org.around.ieuri.tourism.infrastructure
 
 import io.mockk.mockk
+import org.around.ieuri.tourism.application.port.`in`.command.SpotActivationUseCase
 import org.around.ieuri.tourism.application.port.out.client.FestivalSyncPort
 import org.around.ieuri.tourism.application.port.out.client.SpotSyncPort
 import org.around.ieuri.tourism.application.port.out.persistence.FestivalStorePort
 import org.around.ieuri.tourism.application.port.out.persistence.SpotStorePort
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.infrastructure.batch.FestivalSyncProperties
+import org.around.ieuri.tourism.infrastructure.batch.SpotExclusionTasklet
 import org.around.ieuri.tourism.infrastructure.batch.SpotSyncJobConfig
 import org.around.ieuri.tourism.infrastructure.batch.SpotSyncProperties
 import org.springframework.batch.core.job.SimpleJob
@@ -35,6 +37,7 @@ class FestivalSyncOrderingTest {
         festivalSyncPort = mockk<FestivalSyncPort>(),
         festivalStorePort = mockk<FestivalStorePort>(),
         festivalProperties = FestivalSyncProperties(),
+        activationUseCase = mockk<SpotActivationUseCase>(),
     )
 
     private val stepNames: List<String>
@@ -47,6 +50,23 @@ class FestivalSyncOrderingTest {
         val firstFestival = stepNames.indexOfFirst { it.startsWith("festivalSyncStep-") }
 
         assertTrue(firstFestival > lastSpot, "축제 Step이 관광지 Step보다 먼저 온다: $stepNames")
+    }
+
+    @Test
+    fun `비관광 판정 Step이 적재·정리 Step 뒤에 온다`() {
+        // SPEC-0018. 삭제될 행에 판정을 적용하는 것은 낭비이고, 순서가 반대면 판정 건수와
+        // 실제 비활성 행 수가 어긋난다.
+        val judgement = stepNames.indexOf(SpotExclusionTasklet.STEP_NAME)
+        val lastSpot = stepNames.indexOfLast { it.startsWith("syncLanguageStep-") }
+
+        assertTrue(judgement > lastSpot, "판정 Step이 관광지 Step보다 먼저 온다: $stepNames")
+    }
+
+    @Test
+    fun `비관광 판정 Step은 언어마다 생기지 않는다`() {
+        // 판정 대상이 언어를 가르지 않는 전량이라 하나뿐이어야 한다 — 언어마다 돌면 같은 일을
+        // 네 번 하고, 언어 간 전파(R8)가 전 언어 적재 이전에 돌아 무너진다.
+        assertEquals(1, stepNames.count { it == SpotExclusionTasklet.STEP_NAME })
     }
 
     @Test
@@ -63,6 +83,8 @@ class FestivalSyncOrderingTest {
         // 스펙 §선행 조사·§비범위. 별도 잡이면 두 잡의 정리가 서로의 행을 지우고, 관광지 수집이
         // 종료 축제를 되살린다 — R-9가 성립하려면 한 잡 안에서 순서가 보장되어야 한다.
         assertEquals(SpotSyncJobConfig.JOB_NAME, config.spotSyncJob().name)
-        assertEquals(8, stepNames.size)
+        // 언어 4 + 축제 4 + 비관광 판정 1(SPEC-0018). 판정도 이 잡 안에 있어야 한다 —
+        // 따로 떼면 적재·정리와의 순서 보장이 사라진다.
+        assertEquals(9, stepNames.size)
     }
 }

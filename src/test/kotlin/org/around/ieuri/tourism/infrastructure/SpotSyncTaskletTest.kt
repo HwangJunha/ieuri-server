@@ -74,14 +74,12 @@ class SpotSyncTaskletTest {
 
     private fun tasklet(
         pageSize: Int = 1_000,
-        cleanupMinRatio: Double = 0.5,
         endedFestivalIds: Set<String> = emptySet(),
     ) = SpotSyncTasklet(
         language = DomainLocale.KO,
         syncPort = syncPort,
         storePort = storePort,
         pageSize = pageSize,
-        cleanupMinRatio = cleanupMinRatio,
         endedFestivalIds = { endedFestivalIds },
     )
 
@@ -189,7 +187,6 @@ class SpotSyncTaskletTest {
         every { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) } returns
             page(listOf(record("a"), record("b")), totalCount = 2)
         every { storePort.upsertAll(any(), any()) } returns 2
-        every { storePort.countByLanguage(DomainLocale.KO) } returns 3L
         every { storePort.deleteMissing(any(), any()) } returns 1
 
         run(tasklet(), stepExecution())
@@ -203,7 +200,6 @@ class SpotSyncTaskletTest {
         // 업스트림 일시 오류로 빈 목록을 받았을 때 전량 삭제되면 안 된다.
         every { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) } returns page(emptyList(), totalCount = 0)
         every { storePort.upsertAll(any(), any()) } returns 0
-        every { storePort.countByLanguage(DomainLocale.KO) } returns 5_000L
 
         val execution = stepExecution()
         run(tasklet(), execution)
@@ -213,29 +209,11 @@ class SpotSyncTaskletTest {
     }
 
     @Test
-    fun `수집 건수가 기존 대비 급감하면 정리를 건너뛴다`() {
-        // 정렬 이동으로 몇 건 누락되는 것은 정상이지만, 절반 아래로 빠지면 업스트림 이상이다.
-        every { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) } returns
-            page(listOf(record("a")), totalCount = 1)
-        every { storePort.upsertAll(any(), any()) } returns 1
-        every { storePort.countByLanguage(DomainLocale.KO) } returns 1_000L
-
-        val execution = stepExecution()
-        run(tasklet(), execution)
-
-        verify(exactly = 0) { storePort.deleteMissing(any(), any()) }
-        assertTrue(
-            execution.executionContext.getString(SpotSyncTasklet.KEY_CLEANUP_SKIPPED).contains("50%"),
-        )
-    }
-
-    @Test
     fun `재개 실행이면 집합이 불완전하므로 정리를 건너뛴다`() {
         // 3페이지부터 재개하면 1·2페이지 항목이 집합에 없어, 그대로 지우면 대량 오삭제가 된다.
         every { syncPort.fetchPage(DomainLocale.KO, 3, 1_000) } returns
             page(listOf(record("c")), totalCount = 3_000)
         every { storePort.upsertAll(any(), any()) } returns 1
-        every { storePort.countByLanguage(DomainLocale.KO) } returns 3_000L
 
         val execution = stepExecution()
         execution.executionContext.putInt(SpotSyncTasklet.KEY_NEXT_PAGE, 3)
@@ -255,7 +233,6 @@ class SpotSyncTaskletTest {
         every { syncPort.fetchPage(DomainLocale.KO, any(), 1_000) } returns
             page(listOf(record("a")), totalCount = 3_000)
         every { storePort.upsertAll(any(), any()) } returns 1
-        every { storePort.countByLanguage(any()) } returns 1L
         every { storePort.deleteMissing(any(), any()) } returns 0
 
         val execution = stepExecution()
@@ -272,7 +249,6 @@ class SpotSyncTaskletTest {
         every { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) } returns
             page(listOf(record("ended"), record("alive")), totalCount = 2)
         every { storePort.upsertAll(any(), any()) } returns 1
-        every { storePort.countByLanguage(DomainLocale.KO) } returns 2L
         every { storePort.deleteMissing(any(), any()) } returns 0
 
         run(tasklet(endedFestivalIds = setOf("ended")), stepExecution())
@@ -287,7 +263,6 @@ class SpotSyncTaskletTest {
         every { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) } returns
             page(listOf(record("spot-1"), record("spot-2")), totalCount = 2)
         every { storePort.upsertAll(any(), any()) } returns 2
-        every { storePort.countByLanguage(DomainLocale.KO) } returns 2L
         every { storePort.deleteMissing(any(), any()) } returns 0
 
         run(tasklet(endedFestivalIds = setOf("ended-festival")), stepExecution())
@@ -297,13 +272,11 @@ class SpotSyncTaskletTest {
 
     @Test
     fun `제외된 항목도 수집 집합에는 포함되어 이중 삭제되지 않는다`() {
-        // AC-34. collectedIds는 deleteMissing의 생존 집합이자 급감 게이트의 분자다. 제외분이 빠지면
-        // (1) 수집량이 실제보다 작아져 정리가 부당하게 스킵될 수 있고, (2) 제외분이 "사라진 항목"으로
-        // 삭제 대상에 들어가 삭제 건수가 이중으로 잡힌다.
+        // AC-34. collectedIds는 deleteMissing의 생존 집합이다. 제외분이 빠지면 그것이 "사라진
+        // 항목"으로 삭제 대상에 들어가 삭제 건수가 이중으로 잡힌다.
         every { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) } returns
             page(listOf(record("ended"), record("alive")), totalCount = 2)
         every { storePort.upsertAll(any(), any()) } returns 1
-        every { storePort.countByLanguage(DomainLocale.KO) } returns 2L
         every { storePort.deleteMissing(any(), any()) } returns 0
 
         val execution = stepExecution()
@@ -327,7 +300,6 @@ class SpotSyncTaskletTest {
             syncPort = syncPort,
             storePort = storePort,
             pageSize = 1_000,
-            cleanupMinRatio = 0.5,
             endedFestivalIds = { lookups++; emptySet() },
         )
 

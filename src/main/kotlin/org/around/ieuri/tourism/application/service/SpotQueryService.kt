@@ -19,6 +19,7 @@ import org.around.ieuri.tourism.application.event.SpotIntroFetched
 import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
 import org.around.ieuri.tourism.application.port.out.query.LikedSpotsSearch
 import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch
+import org.around.ieuri.tourism.application.port.out.query.SpotBasics
 import org.around.ieuri.tourism.application.port.out.query.SpotIdentity
 import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
 import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
@@ -253,16 +254,22 @@ class SpotQueryService(
      * 호출자가 그것을 "유효하지 않은 spotId"로 해석한다.
      */
     override fun spotSummaries(spotIds: List<Long>): Map<Long, SpotSummaryView> =
-        spotQueryPort.findSpotBasicsIn(spotIds).mapValues { (spotId, basics) ->
-            SpotSummaryView(
-                id = spotId,
-                title = basics.title,
-                thumbnailImageUrl = basics.thumbnailImageUrl,
-                categoryCode = basics.category.name,
-                longitude = basics.longitude,
-                latitude = basics.latitude,
-            )
-        }
+        spotQueryPort.findSpotBasicsIn(spotIds).mapValues { (spotId, basics) -> basics.toSummary(spotId) }
+
+    override fun spotSummariesIncludingInactive(spotIds: List<Long>): Map<Long, SpotSummaryView> =
+        spotQueryPort.findSpotBasicsInIncludingInactive(spotIds)
+            .mapValues { (spotId, basics) -> basics.toSummary(spotId) }
+
+    /** 두 진입점이 같은 모양을 만들도록 한 곳에 둔다 — 갈리면 목록과 수정 화면의 카드가 어긋난다. */
+    private fun SpotBasics.toSummary(spotId: Long): SpotSummaryView =
+        SpotSummaryView(
+            id = spotId,
+            title = title,
+            thumbnailImageUrl = thumbnailImageUrl,
+            categoryCode = category.name,
+            longitude = longitude,
+            latitude = latitude,
+        )
 
     override fun spotIdsWithin(
         longitude: Double,
@@ -274,16 +281,10 @@ class SpotQueryService(
         spotQueryPort.findSpotIdsWithin(longitude, latitude, radiusMeters, limit, categoryCode)
 
     override fun spotSummary(spotId: Long): SpotSummaryView? =
-        spotQueryPort.findSpotBasics(spotId)?.let {
-            SpotSummaryView(
-                id = spotId,
-                title = it.title,
-                thumbnailImageUrl = it.thumbnailImageUrl,
-                categoryCode = it.category.name,
-                longitude = it.longitude,
-                latitude = it.latitude,
-            )
-        }
+        spotQueryPort.findSpotBasics(spotId)?.toSummary(spotId)
+
+    override fun spotSummaryIncludingInactive(spotId: Long): SpotSummaryView? =
+        spotQueryPort.findSpotBasicsIncludingInactive(spotId)?.toSummary(spotId)
 
     /**
      * 좋아요 목록(SPEC-0008 R-15~R-17). LIKE만·본인 것만·요청 언어만 — 세 조건 모두 조회 포트가

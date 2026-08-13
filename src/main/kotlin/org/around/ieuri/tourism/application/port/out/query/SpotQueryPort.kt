@@ -27,6 +27,9 @@ interface SpotQueryPort {
     /**
      * 이 `spot.id`에 대한 LIKE 반응 수. DISLIKE는 세지 않으며, 반응이 없으면 0.
      * **언어 조건이 없다** — spotId가 이미 언어별이라 언어를 다시 거르면 중복이다.
+     *
+     * **비관광으로 분류된 spot은 반응이 남아 있어도 0이다**(SPEC-0018 R13~R14). 커뮤니티
+     * 글 카드는 그런 spot도 그리므로(R15), 카드 옆의 좋아요 수가 0으로 보이는 조합이 생긴다.
      */
     fun countLikes(spotId: Long): Long
 
@@ -42,8 +45,23 @@ interface SpotQueryPort {
      */
     fun findSpotBasics(spotId: Long): SpotBasics?
 
+    /**
+     * [findSpotBasics]와 같되 **비활성 spot도 돌려준다**(SPEC-0018 R15·R16).
+     * 이미 참조가 걸려 있는 spot에만 쓴다.
+     */
+    fun findSpotBasicsIncludingInactive(spotId: Long): SpotBasics?
+
     /** 여러 spot의 기본 정보를 **IN 절 한 번**으로. 없는 id는 결과에 키가 없다. */
     fun findSpotBasicsIn(spotIds: List<Long>): Map<Long, SpotBasics>
+
+    /**
+     * [findSpotBasicsIn]과 같되 **비활성 spot도 포함한다**(SPEC-0018 R15·R16).
+     *
+     * 이미 참조가 걸려 있는 spot을 그리거나 검증할 때만 쓴다 — 옛 글에 붙은 장소가 나중에
+     * 비활성이 되었다고 해서 그 글의 카드가 사라지거나 수정이 막혀서는 안 된다.
+     * **새로 고르는 경로에는 쓰지 말 것** — 그러면 비활성 spot을 다시 붙일 수 있게 된다.
+     */
+    fun findSpotBasicsInIncludingInactive(spotIds: List<Long>): Map<Long, SpotBasics>
 
     /** 회원이 좋아요(LIKE)한 spot 한 페이지. DISLIKE는 제외하고 요청 언어로 한정한다. */
     fun findLikedSpots(query: LikedSpotsSearch): CursorPage<LikedSpotView>

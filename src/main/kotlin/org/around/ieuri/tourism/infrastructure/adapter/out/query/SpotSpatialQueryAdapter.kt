@@ -105,7 +105,8 @@ class SpotSpatialQueryAdapter(
         return jdbcTemplate.query(
             """
             SELECT id FROM spot
-            WHERE ST_DWithin(location, $CENTER, ?)
+            WHERE $ACTIVE_ONLY
+              AND ST_DWithin(location, $CENTER, ?)
               $categoryCondition
             ORDER BY location <-> $CENTER, id
             LIMIT ?
@@ -124,7 +125,8 @@ class SpotSpatialQueryAdapter(
      */
     private fun whereClause(query: NearbySpotSearch): Pair<String, List<Any>> {
         // 파라미터 순서: CTE의 center(경도, 위도)가 먼저 오고, 그다음 WHERE 조건 순서다.
-        val conditions = mutableListOf("language = ?", "ST_DWithin(location, c.center, ?)")
+        // `active`는 파라미터가 아니라 상수 조건이라 순서에 끼어들지 않는다(SPEC-0018 R2).
+        val conditions = mutableListOf(ACTIVE_ONLY, "language = ?", "ST_DWithin(location, c.center, ?)")
         val params = mutableListOf<Any>(
             query.center.longitude, query.center.latitude,
             query.language.name,
@@ -146,5 +148,8 @@ class SpotSpatialQueryAdapter(
     private companion object {
         /** 요청 좌표를 geography 점으로. ST_MakePoint는 (경도, 위도) 순서다 — 뒤집으면 조용히 틀린다. */
         const val CENTER = "ST_MakePoint(?, ?)::geography"
+
+        /** 비관광 spot 제외(SPEC-0018 R2). 모든 조회 경로가 이 조건을 함께 건다. */
+        const val ACTIVE_ONLY = "active = TRUE"
     }
 }

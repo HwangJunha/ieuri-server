@@ -37,7 +37,7 @@ class FeedItemCommandServiceTest {
     private fun pendingKey(owner: Long = memberId) = "pending/community/$owner/${UUID.randomUUID()}"
 
     private fun givenValidSpot() {
-        every { spotLookup.findSummary(spotId) } returns PostSpotView(
+        every { spotLookup.findSelectableSummary(spotId) } returns PostSpotView(
             id = spotId,
             title = "경복궁",
             thumbnailImageUrl = "https://img/1.jpg",
@@ -105,7 +105,7 @@ class FeedItemCommandServiceTest {
     /** AC1-3 — 없는 장소에 묶인 피드가 만들어지지 않는다. */
     @Test
     fun `존재하지 않는 spot이면 거부된다`() {
-        every { spotLookup.findSummary(spotId) } returns null
+        every { spotLookup.findSelectableSummary(spotId) } returns null
 
         assertFailsWith<SpotNotFoundException> { service.createFeedItem(command(), memberId) }
 

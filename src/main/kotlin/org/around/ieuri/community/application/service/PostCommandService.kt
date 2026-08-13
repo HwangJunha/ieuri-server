@@ -62,7 +62,7 @@ class PostCommandService(
         // 좌표를 여기서 함께 받아 글에 복사한다 — 지역 피드가 tourism에 spot 목록을
         // 되묻지 않게 하는 값이며, 그래야 목록 상한이 피드의 한계가 되지 않는다.
         val spotPoint = command.spotId?.let { spotId ->
-            val summary = spotLookupPort.findSummary(spotId) ?: throw SpotNotFoundException()
+            val summary = spotLookupPort.findSelectableSummary(spotId) ?: throw SpotNotFoundException()
             SpotPoint(longitude = summary.longitude, latitude = summary.latitude)
         }
 
@@ -118,15 +118,27 @@ class PostCommandService(
         }
         if (tags != null && tags.size > PostTag.MAX_PER_POST) throw TooManyTagsException()
 
+        val post = postRepositoryPort.findById(command.postId) ?: throw PostNotFoundException()
+        if (post.authorId != memberId) throw NotPostOwnerException()
+
         // 장소를 바꾼다면 좌표를 함께 받아 둔다 — 좌표 없이 장소만 바꾸면 그 글이 지역
         // 피드의 거리순에서 조용히 사라진다.
+        //
+        // **이미 붙어 있던 spot과 새로 붙이는 spot을 가른다**(SPEC-0018 R16·R17). 같은 spot을
+        // 그대로 두는 수정은 검증 대상이 아니다 — 그 장소가 나중에 비관광으로 분류되었다는
+        // 이유로 옛 글의 제목·본문 수정이 막혀서는 안 된다. 반대로 새로 고르는 장소는
+        // 목록에서 숨겨진 것을 붙일 수 없어야 한다.
+        //
+        // 글을 먼저 읽어야 이 구분이 선다 — 순서를 되돌리면 무엇이 새로 붙는지 알 수 없다.
         val newSpotPoint = command.spotId?.let { spotId ->
-            val summary = spotLookupPort.findSummary(spotId) ?: throw SpotNotFoundException()
+            val summary = if (spotId == post.spotId) {
+                spotLookupPort.findAttachedSummary(spotId)
+            } else {
+                spotLookupPort.findSelectableSummary(spotId)
+            } ?: throw SpotNotFoundException()
             SpotPoint(longitude = summary.longitude, latitude = summary.latitude)
         }
 
-        val post = postRepositoryPort.findById(command.postId) ?: throw PostNotFoundException()
-        if (post.authorId != memberId) throw NotPostOwnerException()
         if (!post.editBy(memberId, title, body)) throw HiddenPostNotEditableException()
         photoKeys?.let { post.replacePhotos(it) }
         command.category?.let { post.changeCategory(it) }

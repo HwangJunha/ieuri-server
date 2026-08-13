@@ -99,7 +99,9 @@ class PopularSpotQueryJdbcAdapter(
      * JOIN 조건의 reaction, 그다음이 WHERE 순서다 — HAVING의 하한은 호출자가 이어 붙인다.
      */
     private fun whereClause(query: PopularSpotSearch): Pair<String, List<Any>> {
-        val conditions = mutableListOf("s.language = ?", "ST_DWithin(s.location, c.center, ?)")
+        // `active`는 파라미터가 아니라 상수 조건이라 순서에 끼어들지 않는다(SPEC-0018 R2).
+        // **집계 전에 걸린다** — HAVING이 아니라 WHERE라 비활성 spot은 순위에 아예 오르지 않는다.
+        val conditions = mutableListOf(ACTIVE_ONLY, "s.language = ?", "ST_DWithin(s.location, c.center, ?)")
         val params = mutableListOf<Any>(
             query.center.longitude, query.center.latitude, // CTE의 center
             ReactionType.LIKE.name,                        // JOIN 조건
@@ -117,5 +119,8 @@ class PopularSpotQueryJdbcAdapter(
     private companion object {
         /** ST_MakePoint는 (경도, 위도) 순서다 — 뒤집으면 조용히 틀린다. */
         const val CENTER = "ST_MakePoint(?, ?)::geography"
+
+        /** 비관광 spot 제외(SPEC-0018 R2·R13). 인기 순위에도 오르지 않는다. */
+        const val ACTIVE_ONLY = "s.active = TRUE"
     }
 }

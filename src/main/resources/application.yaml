@@ -294,6 +294,56 @@ ieuri:
     max-area-square-degrees: 4.0
     max-spot-markers: 500
     max-event-markers: 200
+
+  tourism:
+    # 비관광 spot 제외 판정(SPEC-0018). **출발 값이지 확정값이 아니다** — 오탐은 사후에
+    # 드러나는 성격이라, 배포 없이 고칠 수 있도록 설정에 둔다(POL-044).
+    #
+    # 판정 방식:
+    #   - 영문 키워드는 단어 경계(\b)로 감싼다. **가장 위험한 항목이 `CU`다** — 경계 없이 쓰면
+    #     실측 표본에서 52건이 아니라 262건이 걸리고, 늘어난 210건은 전부 오탐이다
+    #     (인사동 문화의 거리, 문화역 서울 284, 판문점 Joint Se*cu*rity Area).
+    #   - 한글 키워드는 경계를 두지 않는다 — 교착어라 `명동명약국`처럼 접사 없이 붙는다.
+    #   - 대소문자를 구분하지 않는다(`emart24`·`E-Mart 24` 표기 혼재).
+    #   - TOURIST_SPOT·CULTURAL_FACILITY는 키워드에 걸려도 제외하지 않는다(코드가 소유).
+    #
+    # **목록을 고친 뒤에는 전환 건수의 급변을 확인한다** — 급증은 키워드가 넓어졌다는 신호다.
+    # `Pharm` 같은 짧은 어간은 넣지 않는다: `Pharmaceutical` 같은 정상 상호를 건다.
+    spot-exclusion:
+      keywords:
+        # 약국
+        - 약국
+        - Pharmacy
+        # 편의점
+        - CU
+        - 씨유
+        - GS25
+        - 세븐일레븐
+        - 7-Eleven
+        - 이마트24
+        - emart24
+        - E-Mart 24
+        - 미니스톱
+        - MINISTOP
+        - 스토리웨이
+        # 의원·병원
+        - 의원
+        - 한의원
+        - Clinic
+        - Dermatology
+        - 병원
+        - Hospital
+        - 치과
+        - Dental
+      # 병원·의원에 입점한 소매점을 되살린다 — 실측 3건이 전부 화장품 매장이었다
+      # (올리브영 제주대학병원점, 탠저비 한라병원점).
+      branch-name-patterns:
+        - 병원점
+        - 병원 지점
+        - Hospital Branch
+        - 의원점
+        - 약국점
+        - Clinic Branch
   sns:
     google:
       # id_token의 aud는 플랫폼별로 다르다: iOS→iOS 클라이언트 ID, Android/Web→웹 클라이언트 ID.

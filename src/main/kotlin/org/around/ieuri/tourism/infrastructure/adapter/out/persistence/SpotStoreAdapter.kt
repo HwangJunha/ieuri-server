@@ -63,14 +63,6 @@ class SpotStoreAdapter(
         }
     }
 
-    @Transactional(readOnly = true)
-    override fun countByLanguage(language: DomainLocale): Long =
-        queryFactory
-            .select(spot.count())
-            .from(spot)
-            .where(spot.language.eq(language))
-            .fetchOne() ?: 0L
-
     private companion object {
         /** 삭제 `IN` 절 하나에 넣을 최대 id 수. 드라이버 파라미터 한도를 넘지 않기 위한 분할 단위다. */
         const val DELETE_CHUNK_SIZE = 1_000

@@ -126,7 +126,8 @@ class SpotSearchJdbcAdapter(
             """
             SELECT s.id, s.title, s.category
             FROM spot s
-            WHERE s.language = ?
+            WHERE $ACTIVE_ONLY
+              AND s.language = ?
               AND ${titleField(language)} @@@ ?::pdb.fuzzy(0, t)
               AND ST_DWithin(s.location, $CENTER, ?)
             ORDER BY s.title ASC, s.id ASC
@@ -154,6 +155,9 @@ class SpotSearchJdbcAdapter(
     private fun whereClause(query: SpotSearchQuery, fuzzyOnly: Boolean = false): Pair<String, List<Any>> {
         val titleField = titleField(query.language)
         val conditions = mutableListOf(
+            // 비관광 spot 제외(SPEC-0018 R2). 파라미터가 아니라 상수 조건이라 `?` 순서에
+            // 끼어들지 않는다. **[suggest]는 이 빌더를 쓰지 않으므로 따로 걸어야 한다.**
+            ACTIVE_ONLY,
             // **언어 격리는 이 조건이 전담한다.** BM25 인덱스가 하나뿐이라 언어를 가르지
             // 못하므로, 빠뜨리면 다른 언어 행이 결과에 섞인다(AC-2.3).
             "s.language = ?",
@@ -269,6 +273,13 @@ class SpotSearchJdbcAdapter(
 
         /** 요청 좌표를 geography 점으로. ST_MakePoint는 (경도, 위도) 순서다 — 뒤집으면 조용히 틀린다. */
         const val CENTER = "ST_MakePoint(?, ?)::geography"
+
+        /**
+         * 비관광 spot 제외(SPEC-0018 R2). **두 곳에 각각 걸려 있다** — [whereClause]가
+         * 검색·카운트를 덮고, [suggest]는 자체 WHERE라 따로 건다. 커뮤니티의 spot 피커도
+         * 이 두 경로가 공급하므로 비활성 spot은 여기서 자동으로 숨겨진다(R17).
+         */
+        const val ACTIVE_ONLY = "s.active = TRUE"
 
         /** 이 길이 미만의 질의는 주소 절을 빼고 제목만 본다 — [matchClause] 참조. */
         const val MIN_FUZZY_LENGTH = 3

@@ -26,7 +26,6 @@ class SpotSyncTasklet(
     private val syncPort: SpotSyncPort,
     private val storePort: SpotStorePort,
     private val pageSize: Int,
-    private val cleanupMinRatio: Double,
     private val endedFestivalIds: (LocalDate) -> Set<String> = { emptySet() },
 ) : Tasklet {
 
@@ -97,15 +96,13 @@ class SpotSyncTasklet(
     /**
      * 사라진 항목 정리 — 수집 집합의 여집합을 지운다.
      *
-     * 삭제 전 세 겹의 게이트를 통과해야 한다. **어느 하나를 빼면 대량 오삭제가 된다:**
+     * 삭제 전 두 겹의 게이트를 통과해야 한다. **어느 하나를 빼면 대량 오삭제가 된다:**
      *  1. **재개 실행 아님** — 재시작하면 앞 페이지를 다시 읽지 않아 집합이 불완전하다.
      *  2. **0건 아님** — 업스트림 일시 오류로 빈 목록을 받으면 전량 삭제된다.
-     *  3. **급감 아님** — 기존 대비 [cleanupMinRatio] 미만이면 업스트림 이상이다.
      *
      * 게이트에 걸리면 삭제를 건너뛰고 사유를 실행 이력에 남긴다.
      */
     private fun cleanup(executionContext: ExecutionContext, lastPageNo: Int) {
-        val existing = storePort.countByLanguage(language)
         val collected = collectedIds.size
 
         val skipReason = when {
@@ -113,8 +110,6 @@ class SpotSyncTasklet(
             executionContext.getInt(KEY_RESUMED_FROM, 1) > 1 ->
                 "resumed run (incomplete id set)"
             collected == 0 -> "collected 0 items"
-            existing > 0 && collected < existing * cleanupMinRatio ->
-                "collected $collected < ${"%.0f".format(cleanupMinRatio * 100)}% of existing $existing"
             else -> null
         }
 
