@@ -42,7 +42,7 @@ class FeedItemCommandService(
 
         // **spot은 필수다.** 존재하지 않으면 없는 장소에 묶인 피드가 만들어진다(AC1-3).
         // 도메인은 다른 애그리게이트의 존재를 스스로 확인하지 않으므로 여기서 묻는다.
-        spotLookupPort.findSelectableSummary(command.spotId) ?: throw SpotNotFoundException()
+        spotLookupPort.findSummary(command.spotId) ?: throw SpotNotFoundException()
 
         // 하나라도 어긋나면 피드 전체를 생성하지 않는다 — 부분 생성은 없다.
         val photoKeys = command.photoKeys.map { verifiedPhotoKey(it, memberId) }

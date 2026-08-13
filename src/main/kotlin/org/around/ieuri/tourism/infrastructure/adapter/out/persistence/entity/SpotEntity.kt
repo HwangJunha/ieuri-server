@@ -77,13 +77,6 @@ class SpotEntity(
     @Column(name = "last_synced_at", nullable = false)
     var lastSyncedAt: Instant = Instant.now(),
 
-    /**
-     * 조회 노출 여부(SPEC-0018 R1). 비관광 spot(약국·편의점·의원)이 false다.
-     * **적재가 아니라 배치의 판정 단계만 쓴다** — upsert가 건드리면 매일 비활성이 되돌아간다(R3).
-     */
-    @Column(name = "active", nullable = false)
-    var active: Boolean = true,
-
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant? = null,
 

@@ -95,8 +95,6 @@ class FestivalQueryJdbcAdapter(
      */
     private fun whereClause(query: OngoingFestivalSearch): Pair<String, List<Any>> {
         val conditions = listOf(
-            // 파라미터가 아니라 상수 조건이라 순서에 끼어들지 않는다(SPEC-0018 R2).
-            ACTIVE_ONLY,
             "s.language = ?",
             "f.event_start_date <= ?",
             "f.event_end_date >= ?",
@@ -115,8 +113,5 @@ class FestivalQueryJdbcAdapter(
     private companion object {
         /** ST_MakePoint는 (경도, 위도) 순서다 — 뒤집으면 조용히 틀린다. */
         const val CENTER = "ST_MakePoint(?, ?)::geography"
-
-        /** 비관광 spot 제외(SPEC-0018 R2). 축제 행도 spot을 통해 노출되므로 함께 건다. */
-        const val ACTIVE_ONLY = "s.active = TRUE"
     }
 }

@@ -59,25 +59,8 @@ interface SpotQueryUseCase {
      */
     fun spotSummary(spotId: Long): SpotSummaryView?
 
-    /**
-     * [spotSummary]와 같되 **비관광으로 분류된 spot도 돌려준다**(SPEC-0018 R15·R16).
-     * 이미 그 spot을 참조하고 있는 쪽만 쓴다 — 새로 고르는 경로는 [spotSummary]다.
-     */
-    fun spotSummaryIncludingInactive(spotId: Long): SpotSummaryView?
-
     /** 여러 spot 요약을 **한 번에**. 목록을 그리는 호출자가 행마다 묻지 않게 한다. */
     fun spotSummaries(spotIds: List<Long>): Map<Long, SpotSummaryView>
-
-    /**
-     * [spotSummaries]와 같되 **비관광으로 분류된 spot도 돌려준다**(SPEC-0018 R15·R16).
-     *
-     * 이미 그 spot을 참조하고 있는 쪽을 위한 진입점이다 — 옛 글에 붙은 장소가 나중에 비관광으로
-     * 분류되었다고 해서 그 글의 카드가 사라지거나 수정이 막혀서는 안 된다.
-     *
-     * **장소를 새로 고르는 경로에는 [spotSummaries]를 쓴다.** 이 메서드를 쓰면 목록에서 숨겨진
-     * 장소를 다시 붙일 수 있게 된다.
-     */
-    fun spotSummariesIncludingInactive(spotIds: List<Long>): Map<Long, SpotSummaryView>
 
     /**
      * 좌표 반경 안에 있는 spot의 id. 다른 도메인이 "이 반경의 spot들"을 조건으로 쓸 때의 진입점이며,

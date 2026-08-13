@@ -62,19 +62,23 @@ class SpotSyncTasklet(
         val toStore = if (excluded.isEmpty()) page.records else page.records.filterNot { it.contentId in excluded }
         val written = storePort.upsertAll(toStore, syncedAt)
 
-        // toStore가 아니라 page.records다 — 제외분까지 넣어야 한다. 이 집합은 deleteMissing의 생존
-        // 집합이자 급감 게이트의 분자라, 제외분이 빠지면 정리가 부당하게 스킵되거나 삭제 건수가
-        // 이중으로 잡힌다.
+        // toStore가 아니라 page.records다 — 종료 축제 제외분까지 넣어야 한다. 이 집합은
+        // deleteMissing의 생존 집합이라, 빠지면 그 항목이 "사라진 항목"으로 삭제된다.
+        //
+        // **비관광 제외분(SPEC-0018)은 반대로 여기 없어야 한다** — 어댑터가 page.records에서
+        // 이미 뺐고, 그래야 이전에 적재됐던 행이 정리 단계에서 지워진다. 그것이 이 방식의 요점이다.
         page.records.forEach { collectedIds += it.contentId }
 
         val totalWritten = executionContext.getInt(KEY_WRITTEN, 0) + written
         val totalDropped = executionContext.getInt(KEY_DROPPED, 0) + page.droppedCount
         val totalFallback = executionContext.getInt(KEY_CATEGORY_FALLBACK, 0) + page.categoryFallbackCount
+        val totalExcluded = executionContext.getInt(KEY_EXCLUDED, 0) + page.excludedCount
 
         executionContext.putString(KEY_SYNCED_AT, syncedAt.toString())
         executionContext.putInt(KEY_WRITTEN, totalWritten)
         executionContext.putInt(KEY_DROPPED, totalDropped)
         executionContext.putInt(KEY_CATEGORY_FALLBACK, totalFallback)
+        executionContext.putInt(KEY_EXCLUDED, totalExcluded)
         contribution.incrementWriteCount(written.toLong())
 
         val hasMore = page.hasMore(pageNo, pageSize)
@@ -82,9 +86,10 @@ class SpotSyncTasklet(
 
         if (!hasMore) {
             // 폴백 건수가 크면 데이터가 아니라 categoryCodes 설정이 잘못됐다는 신호다.
+            // 제외(excluded) 건수도 마찬가지로 키워드 설정 오류의 신호다(SPEC-0018).
             log.info(
-                "spot sync completed: language={} written={} dropped={} categoryFallback={}",
-                language, totalWritten, totalDropped, totalFallback,
+                "spot sync completed: language={} written={} dropped={} categoryFallback={} excluded={}",
+                language, totalWritten, totalDropped, totalFallback, totalExcluded,
             )
             executionContext.putInt(KEY_COLLECTED, collectedIds.size)
             cleanup(executionContext, pageNo)
@@ -133,6 +138,7 @@ class SpotSyncTasklet(
         const val KEY_WRITTEN = "written"
         const val KEY_DROPPED = "dropped"
         const val KEY_CATEGORY_FALLBACK = "categoryFallback"
+        const val KEY_EXCLUDED = "excluded"
         const val KEY_COLLECTED = "collected"
     }
 }

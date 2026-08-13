@@ -61,27 +61,18 @@ class SpotQueryAdapter(
             .where(
                 reaction.memberId.eq(memberId),
                 spot.language.eq(language),
-                spot.active.isTrue,
             )
             .fetch()
             .toSet()
 
-    /**
-     * LIKE 반응 수. `spotId`가 이미 언어별이라 언어 조건은 두지 않는다.
-     *
-     * **`spot`을 조인해 활성 여부를 함께 본다**(SPEC-0018 R13~R14). 조인하지 않으면 이 경로만
-     * 비활성 spot의 좋아요를 계속 세어, 다른 조회에서 사라진 장소의 좋아요 수가 남는다.
-     * 비활성이면 0이다.
-     */
+    /** LIKE 반응 수. `spotId`가 이미 언어별이라 언어 조건은 두지 않는다. */
     override fun countLikes(spotId: Long): Long =
         queryFactory
             .select(reaction.count())
             .from(reaction)
-            .join(spot).on(spot.id.eq(reaction.spotId))
             .where(
                 reaction.spotId.eq(spotId),
                 reaction.reaction.eq(ReactionType.LIKE),
-                spot.active.isTrue,
             )
             .fetchOne() ?: 0L
 
@@ -90,7 +81,7 @@ class SpotQueryAdapter(
         queryFactory
             .select(spot.contentId, spot.language)
             .from(spot)
-            .where(spot.id.eq(spotId), spot.active.isTrue)
+            .where(spot.id.eq(spotId))
             .fetchFirst()
             ?.let {
                 SpotIdentity(
@@ -100,20 +91,14 @@ class SpotQueryAdapter(
             }
 
     /** 상세 본문이 부재할 때 응답을 구성할 `spot` 행의 값. */
-    override fun findSpotBasics(spotId: Long): SpotBasics? = spotBasics(spotId, activeOnly = true)
-
-    override fun findSpotBasicsIncludingInactive(spotId: Long): SpotBasics? =
-        spotBasics(spotId, activeOnly = false)
-
-    /** 두 진입점의 공통 본체 — 활성 조건 유무만 다르다. */
-    private fun spotBasics(spotId: Long, activeOnly: Boolean): SpotBasics? =
+    override fun findSpotBasics(spotId: Long): SpotBasics? =
         queryFactory
             .select(
                 spot.title, spot.address, spot.thumbnailImageUrl,
                 spot.category, spot.copyright, spot.mapX, spot.mapY,
             )
             .from(spot)
-            .where(spot.id.eq(spotId), if (activeOnly) spot.active.isTrue else null)
+            .where(spot.id.eq(spotId))
             .fetchFirst()
             ?.let {
                 SpotBasics(
@@ -139,18 +124,7 @@ class SpotQueryAdapter(
      * 피드 한 페이지에 20번, 지역 피드에서는 수천 번이 될 수 있다.
      */
     @Transactional(readOnly = true)
-    override fun findSpotBasicsIn(spotIds: List<Long>): Map<Long, SpotBasics> =
-        spotBasicsIn(spotIds, activeOnly = true)
-
-    @Transactional(readOnly = true)
-    override fun findSpotBasicsInIncludingInactive(spotIds: List<Long>): Map<Long, SpotBasics> =
-        spotBasicsIn(spotIds, activeOnly = false)
-
-    /**
-     * 두 진입점의 공통 본체. **활성 조건 유무만 다르다** — 같은 프로젝션을 두 번 쓰면
-     * 한쪽만 컬럼이 늘어 조용히 갈린다.
-     */
-    private fun spotBasicsIn(spotIds: List<Long>, activeOnly: Boolean): Map<Long, SpotBasics> {
+    override fun findSpotBasicsIn(spotIds: List<Long>): Map<Long, SpotBasics> {
         if (spotIds.isEmpty()) return emptyMap()
 
         return queryFactory
@@ -159,10 +133,7 @@ class SpotQueryAdapter(
                 spot.category, spot.copyright, spot.mapX, spot.mapY,
             )
             .from(spot)
-            .where(
-                spot.id.`in`(spotIds),
-                if (activeOnly) spot.active.isTrue else null,
-            )
+            .where(spot.id.`in`(spotIds))
             .fetch()
             .associate { row ->
                 requireNotNull(row.get(spot.id)) to SpotBasics(
@@ -191,7 +162,6 @@ class SpotQueryAdapter(
                 reaction.memberId.eq(query.memberId),
                 reaction.reaction.eq(ReactionType.LIKE),
                 spot.language.eq(query.language),
-                spot.active.isTrue,
                 query.category?.let { spot.category.eq(it) },
                 // 정렬이 (updated_at DESC, spot_id DESC)이므로 다음 페이지는 그 튜플보다 "작은" 행이다.
                 // 총계에는 붙이지 않는다 — 커서는 페이지 경계일 뿐 집합의 조건이 아니다.

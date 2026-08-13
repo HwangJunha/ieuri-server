@@ -42,7 +42,6 @@ class MapSpatialQueryAdapter(
             SELECT id, title, thumbnail_image_url, category, map_x, map_y
             FROM spot
             WHERE $BBOX_PREDICATE
-              AND $ACTIVE_ONLY
               AND language = ?
               $categoryCondition
             ORDER BY id
@@ -81,8 +80,5 @@ class MapSpatialQueryAdapter(
          */
         const val BBOX_PREDICATE =
             "location && ST_MakeEnvelope(?, ?, ?, ?, 4326)::geography"
-
-        /** 비관광 spot 제외(SPEC-0018 R2). 지도 마커에도 약국·편의점이 뜨지 않아야 한다. */
-        const val ACTIVE_ONLY = "active = TRUE"
     }
 }

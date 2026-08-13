@@ -48,10 +48,6 @@ class DistrictRepresentativeJdbcAdapter(
          * 거르지 않으면 번역이 잘 된 지역일수록 밀집도가 부풀어 문턱을 쉽게 넘는다. 대표 위치는
          * "번역이 많은 곳"이 아니라 "갈 곳이 많은 곳"이어야 하므로 KO 행만으로 장소 수를 센다.
          * KO는 전 지역에 존재한다(실측: 252개 시군구 전부).
-         *
-         * **`active = TRUE`도 함께 건다**(SPEC-0018). 약국·편의점이 밀집도를 부풀리면 "갈 곳이
-         * 많은 곳"이 아니라 "상점이 많은 곳"이 뽑히고, 스냅 대상이 조회되지 않는 spot이 될 수도
-         * 있다. [CLEAR_SQL]에도 같은 조건이 있어야 한다.
          */
         val SELECT_SQL = """
             WITH gridded AS (
@@ -61,7 +57,6 @@ class DistrictRepresentativeJdbcAdapter(
                   FROM district sg
                   JOIN spot sp ON ST_Intersects(sg.boundary, sp.location)
                  WHERE sp.language = 'KO'
-                   AND sp.active = TRUE
             ),
             cells AS (
                 SELECT code,
@@ -116,13 +111,12 @@ class DistrictRepresentativeJdbcAdapter(
                 representative_updated_at = now()
             WHERE representative_location IS NOT NULL
               AND code NOT IN (
-                    -- 선정 조건과 **정확히 같은 기준**이어야 한다(KO·활성 한정 · 같은 격자 · 같은 문턱).
+                    -- 선정 조건과 **정확히 같은 기준**이어야 한다(KO 한정 · 같은 격자 · 같은 문턱).
                     -- 한쪽만 바뀌면 매 실행마다 넣었다 지웠다를 반복한다.
                     SELECT sg.code
                       FROM district sg
                       JOIN spot sp ON ST_Intersects(sg.boundary, sp.location)
                      WHERE sp.language = 'KO'
-                   AND sp.active = TRUE
                      GROUP BY sg.code, ST_SnapToGrid(sp.location::geometry, ?)
                     HAVING count(*) >= ?
               )

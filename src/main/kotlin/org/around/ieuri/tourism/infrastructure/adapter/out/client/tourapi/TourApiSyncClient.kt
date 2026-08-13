@@ -2,6 +2,7 @@ package org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi
 
 import org.around.ieuri.tourism.application.port.out.client.SpotSyncPage
 import org.around.ieuri.tourism.application.port.out.client.SpotSyncPort
+import org.around.ieuri.tourism.domain.specification.SpotExclusionRule
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi.mapper.toSyncSpotCommandOrNull
@@ -26,6 +27,7 @@ import org.springframework.web.util.UriComponentsBuilder
 class TourApiSyncClient(
     private val properties: TourApiProperties,
     private val tourApiRestClient: RestClient,
+    private val exclusionRule: SpotExclusionRule,
 ) : SpotSyncPort {
 
     override fun fetchPage(language: DomainLocale, pageNo: Int, numOfRows: Int): SpotSyncPage {
@@ -49,20 +51,31 @@ class TourApiSyncClient(
     fun mapPage(response: TourApiResponse, language: DomainLocale): SpotSyncPage {
         val body = response.response.body
         var fallbacks = 0
+        var excluded = 0
 
         val records = body.items.item.mapNotNull { item ->
             val resolved = resolveCategory(item.contenttypeid, language)
             if (resolved.isFallback) fallbacks++
             // 비관광 항목 제외(lclsSystm2). 설정이 빈 목록이면 아무것도 걸러내지 않는다.
             if (item.lclsSystm2 != null && item.lclsSystm2 in properties.excludeLclssystm2) return@mapNotNull null
+            // 제목 키워드 기반 제외(SPEC-0018). 약국·편의점·의원처럼 관광 목적이 아닌 항목이며,
+            // lclsSystm2가 없는 행까지 덮는다. **카테고리 해석 이후에 판정한다** — 규칙이
+            // 관광 카테고리를 보호하므로 카테고리가 정해져 있어야 한다.
+            if (item.title != null && exclusionRule.isExcluded(item.title, resolved.category)) {
+                excluded++
+                return@mapNotNull null
+            }
             item.toSyncSpotCommandOrNull(language, resolved.category)
         }
 
         return SpotSyncPage(
             records = records,
             totalCount = body.totalCount,
-            droppedCount = body.items.item.size - records.size,
+            // 제외분은 dropped와 따로 센다 — 필드 결손(dropped)과 의도된 제외는 성격이 다르고,
+            // 제외 건수가 갑자기 늘면 키워드 설정이 잘못됐다는 신호다.
+            droppedCount = body.items.item.size - records.size - excluded,
             categoryFallbackCount = fallbacks,
+            excludedCount = excluded,
         )
     }
 

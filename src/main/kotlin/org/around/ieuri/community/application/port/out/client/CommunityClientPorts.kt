@@ -46,23 +46,10 @@ interface ObjectStoragePort {
  * 고르는 계층을 두지 않는다 — 쓰지 않는 분기는 읽는 사람에게 비용이다.
  */
 interface SpotLookupPort {
-    /**
-     * **새로 붙일 spot의 요약.** 존재하지 않거나 목록에서 숨겨진 장소면 null이며, 그것이
-     * 대상 유효성 판정이다 — 고를 수 없는 장소를 붙일 수는 없다(SPEC-0018 R17).
-     */
-    fun findSelectableSummary(spotId: Long): PostSpotView?
+    /** 피드 카드용 요약. 존재하지 않으면 null이며 그것이 대상 유효성 판정이다. */
+    fun findSummary(spotId: Long): PostSpotView?
 
-    /**
-     * **이미 붙어 있는 spot의 요약.** 숨겨진 장소도 돌려준다 — 옛 글에 붙은 장소가 나중에
-     * 비관광으로 분류되었다고 해서 그 글의 카드가 사라지거나 수정이 막혀서는 안 된다
-     * (SPEC-0018 R15·R16).
-     */
-    fun findAttachedSummary(spotId: Long): PostSpotView?
-
-    /**
-     * 여러 spot의 요약을 한 번에. 카테고리 칩 필터가 쓴다 — 행마다 물으면 조회가 20번 붙는다.
-     * 카드를 그리는 경로라 [findAttachedSummary]와 같이 **숨겨진 장소도 포함한다**(R15).
-     */
+    /** 여러 spot의 요약을 한 번에. 카테고리 칩 필터가 쓴다 — 행마다 물으면 조회가 20번 붙는다. */
     fun findSummaries(spotIds: List<Long>): Map<Long, PostSpotView>
 }
 

@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.infrastructure
 
+import org.around.ieuri.tourism.domain.specification.SpotExclusionRule
 import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
@@ -29,7 +30,13 @@ class TourApiSyncClientTest {
         ),
         excludeLclssystm2 = listOf("EX999"),
     )
-    private val client = TourApiSyncClient(properties, RestClient.create())
+
+    /** 실제 설정에 들어가는 목록의 축약. 규칙 자체는 SpotExclusionRuleTest가 전량 검사한다. */
+    private val exclusionRule = SpotExclusionRule(
+        keywords = listOf("약국", "Pharmacy", "CU", "의원"),
+        branchNamePatterns = listOf("병원점"),
+    )
+    private val client = TourApiSyncClient(properties, RestClient.create(), exclusionRule)
 
     private fun item(
         contentId: String? = "100",
@@ -182,5 +189,80 @@ class TourApiSyncClientTest {
         assertTrue(page.hasMore(pageNo = 2, numOfRows = 1_000))
         // 3페이지까지면 3000 >= 2500이라 소진.
         assertTrue(!page.hasMore(pageNo = 3, numOfRows = 1_000))
+    }
+
+    // ---------- 비관광 항목 제외 (SPEC-0018) ----------
+
+    @Test
+    fun `비관광 키워드에 걸린 항목은 적재하지 않는다`() {
+        // 적재하지 않으므로 collectedIds에도 들어가지 않고, 이전에 적재됐던 행은 정리 단계가 지운다.
+        val page = client.mapPage(
+            response(listOf(item(contentId = "300", title = "명동명약국", contentTypeId = "38"))),
+            DomainLocale.KO,
+        )
+
+        assertTrue(page.records.isEmpty())
+        assertEquals(1, page.excludedCount)
+    }
+
+    @Test
+    fun `제외 건수는 dropped와 따로 센다`() {
+        // 필드 결손(dropped)과 의도된 제외는 성격이 다르다 — 섞으면 키워드 오류가 결손에 묻힌다.
+        val page = client.mapPage(
+            response(
+                listOf(
+                    item(contentId = "301", title = "명동명약국", contentTypeId = "38"),
+                    item(contentId = "302", image = null),
+                    item(contentId = "303", title = "경복궁"),
+                ),
+            ),
+            DomainLocale.KO,
+        )
+
+        assertEquals(1, page.records.size)
+        assertEquals("303", page.records.first().contentId)
+        assertEquals(1, page.excludedCount)
+        assertEquals(1, page.droppedCount)
+    }
+
+    @Test
+    fun `관광 카테고리는 키워드에 걸려도 적재한다`() {
+        // 카테고리 해석 이후에 판정하므로 보호 규칙이 성립한다 — 서울 대한의원은 사적이다.
+        val page = client.mapPage(
+            response(listOf(item(contentId = "304", title = "서울 대한의원", contentTypeId = "12"))),
+            DomainLocale.KO,
+        )
+
+        assertEquals(1, page.records.size)
+        assertEquals(0, page.excludedCount)
+    }
+
+    @Test
+    fun `단어 안에 든 cu는 제외되지 않는다`() {
+        // 경계 없이 CU를 걸면 문화·security까지 잡힌다.
+        val page = client.mapPage(
+            response(listOf(item(contentId = "305", title = "인사동 문화의 거리", contentTypeId = "38"))),
+            DomainLocale.KO,
+        )
+
+        assertEquals(1, page.records.size)
+        assertEquals(0, page.excludedCount)
+    }
+
+    @Test
+    fun `키워드 목록이 비면 아무것도 제외하지 않는다`() {
+        val permissive = TourApiSyncClient(
+            properties,
+            RestClient.create(),
+            SpotExclusionRule(keywords = emptyList(), branchNamePatterns = emptyList()),
+        )
+
+        val page = permissive.mapPage(
+            response(listOf(item(contentId = "306", title = "명동명약국", contentTypeId = "38"))),
+            DomainLocale.KO,
+        )
+
+        assertEquals(1, page.records.size)
+        assertEquals(0, page.excludedCount)
     }
 }

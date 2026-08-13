@@ -51,7 +51,7 @@ class PostCommandServiceTest {
     private fun confirmedKey(owner: Long = memberId) = "images/community/$owner/${UUID.randomUUID()}"
 
     private fun givenValidSpotAndAuthor() {
-        every { spotLookup.findSelectableSummary(spotId) } returns
+        every { spotLookup.findSummary(spotId) } returns
             PostSpotView(
                 id = spotId,
                 title = "경복궁",
@@ -119,7 +119,7 @@ class PostCommandServiceTest {
     @Test
     fun `제목 검증이 대상 조회보다 먼저다 - 잘못된 입력에 외부 조회를 하지 않는다`() {
         assertFailsWith<PostTitleRequiredException> { create(title = "") }
-        verify(exactly = 0) { spotLookup.findSelectableSummary(any()) }
+        verify(exactly = 0) { spotLookup.findSummary(any()) }
     }
 
     @Test
@@ -142,7 +142,7 @@ class PostCommandServiceTest {
 
     @Test
     fun `존재하지 않는 대상이면 SPOT_NOT_FOUND이고 글은 생성되지 않는다`() {
-        every { spotLookup.findSelectableSummary(spotId) } returns null
+        every { spotLookup.findSummary(spotId) } returns null
 
         assertFailsWith<SpotNotFoundException> { create() }
         verify(exactly = 0) { postRepository.save(any()) }
@@ -293,7 +293,7 @@ class PostCommandServiceTest {
         val post = storedPost()
         every { postRepository.findById(1L) } returns post
         every { postRepository.save(any()) } returns post
-        every { spotLookup.findSelectableSummary(99L) } returns PostSpotView(
+        every { spotLookup.findSummary(99L) } returns PostSpotView(
             id = 99L, title = "새 장소", thumbnailImageUrl = "url", category = null,
             longitude = 128.5, latitude = 35.5,
         )
@@ -325,9 +325,7 @@ class PostCommandServiceTest {
 
     @Test
     fun `없는 장소로 바꾸면 SPOT_NOT_FOUND다`() {
-        // 글을 먼저 읽어야 "새로 붙는 장소"인지 가릴 수 있어(SPEC-0018 R16) 조회를 함께 둔다.
-        every { postRepository.findById(1L) } returns storedPost()
-        every { spotLookup.findSelectableSummary(99L) } returns null
+        every { spotLookup.findSummary(99L) } returns null
 
         assertFailsWith<SpotNotFoundException> {
             service.editPost(
@@ -336,70 +334,6 @@ class PostCommandServiceTest {
             )
         }
         verify(exactly = 0) { postRepository.save(any()) }
-    }
-
-    // ---------- 비관광 spot과 수정 경로 (SPEC-0018 R16·R17) ----------
-
-    @Test
-    fun `이미 붙어 있던 장소는 목록에서 숨겨져도 수정을 막지 않는다`() {
-        // R16. 옛 글이 참조하는 장소가 나중에 비관광으로 분류되었다고 해서 제목·본문 수정이
-        // 실패해서는 안 된다 — 그래서 활성 조건을 보지 않는 조회를 쓴다.
-        val post = storedPost()
-        every { postRepository.findById(1L) } returns post
-        every { postRepository.save(any()) } returns post
-        every { spotLookup.findAttachedSummary(spotId) } returns PostSpotView(
-            id = spotId, title = "명동명약국", thumbnailImageUrl = "url", category = null,
-            longitude = 127.0, latitude = 37.5,
-        )
-
-        service.editPost(
-            EditPostCommand(1L, "새 제목", "새 본문", null, changeSpot = true, spotId = spotId),
-            memberId,
-        )
-
-        assertEquals("새 제목", post.title)
-        assertEquals(spotId, post.spotId)
-        // 새로 고르는 경로가 아니므로 활성 검증 조회는 부르지 않는다.
-        verify(exactly = 0) { spotLookup.findSelectableSummary(any()) }
-    }
-
-    @Test
-    fun `새로 붙이는 장소는 활성 검증을 받는다`() {
-        // R17. 목록에서 숨겨진 장소를 새로 고를 수는 없다 — 그 조회가 null을 주면 거부다.
-        val post = storedPost()
-        every { postRepository.findById(1L) } returns post
-        every { spotLookup.findSelectableSummary(99L) } returns null
-
-        assertFailsWith<SpotNotFoundException> {
-            service.editPost(
-                EditPostCommand(1L, "제목", "본문", null, changeSpot = true, spotId = 99L),
-                memberId,
-            )
-        }
-        // 이미 붙어 있던 것이 아니므로 무검증 조회로 새어 나가서는 안 된다.
-        verify(exactly = 0) { spotLookup.findAttachedSummary(any()) }
-        verify(exactly = 0) { postRepository.save(any()) }
-    }
-
-    @Test
-    fun `글 작성 시 장소는 활성 검증을 받는다`() {
-        // R17. 생성에는 "이미 붙어 있던 것"이 없으므로 언제나 활성 검증이다.
-        every { spotLookup.findSelectableSummary(spotId) } returns null
-
-        assertFailsWith<SpotNotFoundException> {
-            service.createPost(
-                CreatePostCommand(
-                    category = TargetCategory.TOURIST_SPOT,
-                    spotId = spotId,
-                    tags = emptyList(),
-                    title = "제목",
-                    body = "본문",
-                    photoKeys = emptyList(),
-                ),
-                memberId,
-            )
-        }
-        verify(exactly = 0) { spotLookup.findAttachedSummary(any()) }
     }
 
     @Test
