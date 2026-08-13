@@ -334,9 +334,11 @@ CHECK 제약이 V28에서 `POST`·`COMMENT`·`MEMBER`로 고정돼 있어 **피�
 `application-batch.yaml`에 적었다. 도메인 중립 이름으로 옮기는 것은 기존 CronJob 설정을 함께
 바꿔야 해 별도 작업으로 둔다.
 
-**남은 지적(NOTE).** `Conversation.originFeedItem`이 DataLoader 없이 대화마다 조회해 N+1이다
-(`conversations(first:20){ originFeedItem }` → 쿼리 40회). 즉시 막을 문제는 아니라 두었고,
-필요해지면 `ViewerContext`를 받는 로더를 추가한다.
+**남은 지적(NOTE).** ~~`Conversation.originFeedItem`이 DataLoader 없이 대화마다 조회해 N+1이다.~~
+→ **해소됨(2026-08-12).** 아래 "시안 확인 후 변경"에서 그 필드를 없애고 인용을 메시지로 옮겼다.
+같은 성질의 N+1이 `Message.feedItem`에 남아 있으나, 구독 경로에서는 DataLoader 레지스트리가
+실행 단위로 묶여 쓸 수 없다(`FeedQueryResolver.messageSender` 주석 참고). 목록 조회에서
+필요해지면 그때 로더를 붙인다.
 
 ### 시안 확인 후 변경 (2026-08-12) — **스펙 변경**
 
