@@ -78,3 +78,52 @@ class AlreadyReportedException(message: String = "이미 신고한 대상입니�
 /** 상세 사유는 로그·에러 메시지에 싣지 않는다(POL-013) — 이 메시지에도 담기지 않는다. */
 class ReportDetailRequiredException(message: String = "상세 사유를 입력해 주세요.") :
     CommunityUserException("REPORT_DETAIL_REQUIRED", message)
+
+// ── 피드·DM(SPEC-0017) ───────────────────────────────────────────────
+
+/** 피드는 spot 연결이 필수다(R1) — 글과 달리 선택이 아니다. */
+class SpotRequiredException(message: String = "장소를 선택해 주세요.") :
+    CommunityUserException("SPOT_REQUIRED", message)
+
+/** 피드는 사진이 최소 1장 필요하다(R2) — 글과 달리 사진 없는 피드는 존재할 수 없다. */
+class PhotoRequiredException(message: String = "사진을 1장 이상 첨부해 주세요.") :
+    CommunityUserException("PHOTO_REQUIRED", message)
+
+/**
+ * 확정되지 않았거나 이미 다른 피드·글에 실린 사진 키. **두 경우를 같은 코드로 다룬다** —
+ * 구분해 알려 주면 남의 오브젝트 키가 존재하는지 캐내는 수단이 된다(AC3-2·AC3-3).
+ */
+class PhotoNotConfirmedException(message: String = "업로드가 확정되지 않은 사진입니다.") :
+    CommunityUserException("PHOTO_NOT_CONFIRMED", message)
+
+class FeedItemNotFoundException(message: String = "해당 피드를 찾을 수 없습니다.") :
+    CommunityUserException("FEED_ITEM_NOT_FOUND", message)
+
+/** 자기 자신의 피드로는 대화를 시작할 수 없다(AC7-4). */
+class NotFeedAuthorException(message: String = "본인의 피드로는 대화를 시작할 수 없습니다.") :
+    CommunityUserException("NOT_FEED_AUTHOR", message)
+
+/** 차단 관계에서는 대화 시작도 메시지 전송도 거부된다(AC11-3·11-4). */
+class BlockedException(message: String = "차단된 상대와는 대화할 수 없습니다.") :
+    CommunityUserException("BLOCKED", message)
+
+/**
+ * 없는 대화. **권한 없는 대화([NotConversationParticipantException])와 다른 코드다** —
+ * 뭉뚱그리면 클라이언트가 "사라진 대화"와 "볼 수 없는 대화"를 구분하지 못한다(AC9-5·10-5).
+ */
+class ConversationNotFoundException(message: String = "해당 대화를 찾을 수 없습니다.") :
+    CommunityUserException("CONVERSATION_NOT_FOUND", message)
+
+/**
+ * 뮤테이션에서 참여자가 아님. **조회·구독은 이 예외가 아니라 최상위 errors[]의 FORBIDDEN**이다 —
+ * 조회는 볼 자격 자체가 없어 부분 성공이 성립하지 않는다(spec.md "권한 실패의 표면화 위치").
+ */
+class NotConversationParticipantException(message: String = "대화의 참여자가 아닙니다.") :
+    CommunityUserException("NOT_CONVERSATION_PARTICIPANT", message)
+
+/**
+ * 신고 입력이 성립하지 않음. 네 경우를 덮는다 — 빈 목록, 여러 대화가 섞인 목록,
+ * 자기 메시지 포함, 존재하지 않는 메시지 포함(AC15-3~15-5).
+ */
+class InvalidInputException(message: String = "잘못된 입력입니다.") :
+    CommunityUserException("INVALID_INPUT", message)

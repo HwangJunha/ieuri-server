@@ -1,6 +1,7 @@
 package org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql
 
 import com.netflix.graphql.dgs.DgsComponent
+import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.tourism.application.exception.InvalidBboxException
@@ -17,7 +18,7 @@ import org.around.ieuri.tourism.domain.vo.CongestionForecast
 import org.around.ieuri.tourism.domain.vo.CongestionSnapshot
 import org.around.ieuri.tourism.domain.vo.MapBounds
 import org.around.ieuri.tourism.domain.vo.SpotCategory
-import org.around.ieuri.tourism.infrastructure.locale.LocaleContext
+import org.around.ieuri.tourism.infrastructure.locale.domainLocale
 import org.around.ieuri.common.graphql.generated.types.CommercialActivityLevel as GqlCommercialActivityLevel
 import org.around.ieuri.common.graphql.generated.types.CommercialStatus as GqlCommercialStatus
 import org.around.ieuri.common.graphql.generated.types.CongestionArea as GqlCongestionArea
@@ -34,7 +35,7 @@ import org.around.ieuri.common.graphql.generated.types.SpotCategory as GqlSpotCa
 
 /**
  * 지도 조회 GraphQL 리졸버(인바운드 어댑터, CQRS 읽기, SPEC-0014). 언어는 요청 스코프
- * `LocaleContext`에서 읽어 유스케이스에 넘긴다(GraphQL 인자 아님, Accept-Language 기반).
+ * Accept-Language 헤더에서 읽어 유스케이스에 넘긴다(GraphQL 인자 아님, Accept-Language 기반).
  *
  * **지연 필드(@DgsData)가 없다.** 세 쿼리 모두 자기 필드를 채우는 데 필요한 I/O가 하나로
  * 묶여 있어, 필드를 나눠도 호출 수가 줄지 않는다:
@@ -49,11 +50,11 @@ import org.around.ieuri.common.graphql.generated.types.SpotCategory as GqlSpotCa
 @DgsComponent
 class MapQueryResolver(
     private val mapQueryUseCase: MapQueryUseCase,
-    private val localeContext: LocaleContext,
 ) {
 
     @DgsQuery
     fun mapViewport(
+        dfe: DgsDataFetchingEnvironment,
         @InputArgument bbox: GqlMapBoundsInput,
         @InputArgument zoom: Int,
         @InputArgument category: GqlSpotCategory?,
@@ -64,23 +65,24 @@ class MapQueryResolver(
                 zoom = zoom,
                 category = category?.let { SpotCategory.valueOf(it.name) },
             ),
-            locale = localeContext.locale,
+            locale = dfe.domainLocale(),
         ).toGql()
 
     @DgsQuery
     fun seoulCongestion(
+        dfe: DgsDataFetchingEnvironment,
         @InputArgument areaIds: List<String>?,
         @InputArgument bbox: GqlMapBoundsInput?,
     ): GqlSeoulCongestionResult =
         mapQueryUseCase.seoulCongestion(
             areaIds = areaIds,
             bounds = bbox?.toDomain(),
-            locale = localeContext.locale,
+            locale = dfe.domainLocale(),
         ).toGql()
 
     @DgsQuery
-    fun seoulCongestionAreas(): List<GqlCongestionAreaBoundary> =
-        mapQueryUseCase.seoulCongestionAreas(localeContext.locale).map { it.toGql() }
+    fun seoulCongestionAreas(dfe: DgsDataFetchingEnvironment): List<GqlCongestionAreaBoundary> =
+        mapQueryUseCase.seoulCongestionAreas(dfe.domainLocale()).map { it.toGql() }
 
     /**
      * 입력 bbox → 도메인 VO. 좌표 범위·뒤집힘 검증이 여기서 일어나며, 실패는

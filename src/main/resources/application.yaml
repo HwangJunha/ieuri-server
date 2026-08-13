@@ -1,6 +1,16 @@
 spring:
   application:
     name: ieuri
+  threads:
+    virtual:
+      # 요청 처리와 데이터페처를 가상 스레드로 돌린다(Java 21+). 블로킹 I/O가 캐리어 스레드를
+      # 반납하므로 스레드 수가 동시 처리량의 상한이 아니게 된다.
+      # DGS 키(dgs.graphql.virtualthreads.enabled)도 이 값을 따라 켜진다.
+      #
+      # **요청별 값을 ThreadLocal에 담지 않는 것이 전제다.** 데이터페처가 다른 스레드에서
+      # 돌기 때문에, 요청 스코프 빈(RequestContextHolder 기반)을 쓰면 그 순간 사라진다.
+      # 언어·앱키는 DataFetchingEnvironment에서 읽는다(공유 커널의 acceptLanguage).
+      enabled: true
   lifecycle:
     # graceful shutdown 단계별 최대 대기. write-behind 큐도 이 안에서 정리된다
     # (큐 자체는 @PreDestroy에서 별도로 유한 대기한다).
@@ -43,6 +53,14 @@ spring:
     # 막는다. 시드용 R__은 의도적으로 지울 수 있으므로(R__seed_test_account를 시드더로 옮겼다)
     # 그 경우만 무시한다. 버전 마이그레이션(V__)의 누락·체크섬 변경은 그대로 잡힌다.
     ignore-migration-patterns: "repeatable:missing"
+  graphql:
+    websocket:
+      # 구독(Subscription) 전송 경로. **명시하지 않으면 WebSocket 핸들러가 등록되지 않아
+      # 구독이 아예 붙지 않는다** — HTTP 엔드포인트만 열려 있고 조용히 실패한다.
+      # 인증은 connection_init에서 1회 수행한다(GraphqlWebSocketAuthInterceptor, POL-048).
+      path: /graphql
+      # 연결 수립(connection_init)을 기다리는 상한. 넘기면 연결을 닫는다.
+      connection-init-timeout: 60s
   data:
     redis:
       # refresh 토큰 저장소(Valkey, Redis 프로토콜 호환). 값은 전부 환경변수 외부화.
@@ -140,6 +158,14 @@ ieuri:
     # 지역 피드 반경 상한. 초과 요청은 상한으로 절삭된다.
     # (기본 반경 20000은 GraphQL 스키마의 기본값이라 여기 두지 않는다 — 두 곳에 두면 갈린다.)
     max-radius-meters: 100000
+    # DM 메시지 보관 기간(6개월) 만료 삭제 배치(SPEC-0017 R16).
+    # **실측 전까지 확정값이 아니다**(POL-044) — 회차 크기는 락·WAL 관측 후 조정한다.
+    # 보관 기간 자체는 정책이라 도메인(Message.RETENTION)이 소유하며 설정으로 빼지 않는다.
+    message-retention:
+      # 한 회차에 지울 최대 건수. 트랜잭션이 회차 단위로 끊긴다.
+      batch-size: 1000
+      # 한 번의 잡 실행에서 돌 최대 회차 수. 남은 것은 다음 실행이 이어 지운다.
+      max-batches-per-run: 100
 
   # SNS id_token 검증. aud로 검증할 클라이언트 ID/앱 키는 공개 식별자라 env 오버라이드
   # 가능한 기본값으로 둔다. jwks-uri/issuer는 provider 고정값. 모든 환경에서 실검증한다.

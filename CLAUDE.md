@@ -119,6 +119,34 @@ Uses the Gradle wrapper (`./gradlew`); Gradle 9.5.1, Java toolchain 25.
 
   Practical consequences when filling `name_zh`-style columns: use `鍾路區`, not `钟路区`; `廣域市`, not `广域市`; `濟州市`, not `济州市`; `上黨區`, not `上党区`. Do not mix scripts within a dataset — a single Simplified row among Traditional ones is a defect, not a variant. Note that Japanese (`JA`) is a *separate* script convention (shinjitai: `東莱区`), so `JA` and `ZH` legitimately differ and neither should be copied into the other.
 
+## Personal style
+
+These are the repository owner's preferences, not correctness rules. Code that breaks them is not
+wrong — it is just not how this codebase is written. They are recorded here so the reasoning does
+not have to be repeated, and so tooling and other sessions follow the same shape.
+
+- **No `inline fun <reified T>`. Pass the target type as an explicit `Class<T>` parameter,** even
+  though callers then repeat `::class.java`.
+
+  The principle is *avoid the construct rather than use it carefully* — what you do not use cannot
+  go wrong. `reified` buys exactly one thing: not repeating `::class.java` at the call site. Its
+  required companion `inline` brings real footguns along — the body is copied into every call site
+  (binary bloat when the function grows), and a `public inline` function cannot touch private
+  members. Repetition is the cheaper price.
+
+  ```kotlin
+  // Prefer
+  private fun <T> read(payload: String, type: Class<T>): T? = mapper.readValue(payload, type)
+  read(payload, TypingEventPayload::class.java)
+
+  // Avoid
+  private inline fun <reified T> read(payload: String): T? = mapper.readValue(payload, T::class.java)
+  read<TypingEventPayload>(payload)
+  ```
+
+  This says nothing about `inline` on lambda-taking functions (the stdlib `let`/`map` shape) — that
+  case has not come up. If `reified` looks unavoidable, ask rather than reaching for it.
+
 ## Review — skills and the reviewer
 
 This document is the authority on the rules. The skills cover **only what ArchUnit cannot catch** —

@@ -9,7 +9,7 @@ import org.around.ieuri.tourism.domain.vo.MapBounds
 
 /**
  * 지도 화면 조회 유스케이스(SPEC-0014). 언어는 요청 스코프에서 결정돼 명시 파라미터로
- * 전달된다 — 리졸버가 `LocaleContext`에서 읽어 넘기며 application은 서블릿·헤더를 모른다.
+ * 전달된다 — 리졸버가 Accept-Language 헤더에서 읽어 넘기며 application은 서블릿·헤더를 모른다.
  *
  * 세 메서드가 **별개 최상위 필드**에 대응한다. 한쪽의 실패가 다른 쪽에 전파되지 않게
  * 하려는 설계이며(R11), 특히 [seoulCongestion]의 업스트림 장애가 [mapViewport]를

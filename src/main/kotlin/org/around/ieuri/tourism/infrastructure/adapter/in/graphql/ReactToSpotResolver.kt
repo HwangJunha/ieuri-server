@@ -12,7 +12,7 @@ import org.around.ieuri.common.graphql.generated.types.ReactToSpotPayload
 import org.around.ieuri.common.graphql.generated.types.UserError
 
 /**
- * 좋아요/싫어요 기록 GraphQL 뮤테이션 리졸버(인바운드 어댑터, 쓰기). 언어는 LocaleContext(Accept-Language)에서,
+ * 좋아요/싫어요 기록 GraphQL 뮤테이션 리졸버(인바운드 어댑터, 쓰기). 언어는 Accept-Language 헤더에서,
  * memberId는 SecurityContext에서 온다. 비로그인은 requireMemberId()가 던지는 UnauthorizedException이
  * 최상위 errors[]로 전파된다(SPEC-0005 R15) — 클라이언트의 자동 토큰 갱신이 최상위 errors[]에서만
  * 트리거되므로 인증 실패는 payload에 담지 않는다.

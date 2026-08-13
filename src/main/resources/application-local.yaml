@@ -22,3 +22,17 @@ spring:
     url: ${IEURI_DB_URL:jdbc:postgresql://localhost:5432/ieuri?sslmode=disable}
   jpa:
     show-sql: true
+
+# 구독(WebSocket) 디버깅용. **로컬 전용이다.**
+#
+# 연결 수립이 실패하면 리졸버까지 가지 않아 애플리케이션 로그가 한 줄도 안 남는다 —
+# 클라이언트에는 "Unknown GraphQL error"만 뜨고 서버는 조용해서 원인을 좁힐 수 없다.
+# 아래 둘을 켜면 핸드셰이크·connection_init·subscribe가 각각 보인다.
+logging:
+  level:
+    # 핸드셰이크가 실제로 도달했는지, 어떤 서브프로토콜로 붙었는지.
+    org.springframework.web.socket: DEBUG
+    # connection_init / subscribe / complete 프레임과 구독 생명주기.
+    org.springframework.graphql: DEBUG
+    # 우리 인터셉터의 판정 로그(INFO면 충분하나 함께 올려 둔다).
+    org.around.ieuri.auth.infrastructure.security: DEBUG

@@ -12,6 +12,7 @@ import org.around.ieuri.community.application.exception.PostNotFoundException
 import org.around.ieuri.community.application.exception.ReportDetailRequiredException
 import org.around.ieuri.community.application.port.out.client.MemberLookupPort
 import org.around.ieuri.community.application.port.out.persistence.CommentRepositoryPort
+import org.around.ieuri.community.application.port.out.persistence.FeedItemModerationPort
 import org.around.ieuri.community.application.port.out.persistence.PostCounterPort
 import org.around.ieuri.community.application.port.out.persistence.PostModerationPort
 import org.around.ieuri.community.application.port.out.persistence.ReportRepositoryPort
@@ -41,9 +42,11 @@ class ReportCommandServiceTest {
     private val moderationPort = mockk<PostModerationPort>()
     private val commentRepository = mockk<CommentRepositoryPort>()
     private val memberLookup = mockk<MemberLookupPort>()
+    private val feedItemModerationPort = mockk<FeedItemModerationPort>(relaxed = true)
 
     private val service = ReportCommandService(
         reportRepository, counterPort, moderationPort, commentRepository, memberLookup,
+        feedItemModerationPort,
     )
 
     private fun comment(id: Long = targetCommentId, postId: Long = targetPostId, hidden: Boolean = false) =
