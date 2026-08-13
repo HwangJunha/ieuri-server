@@ -72,6 +72,13 @@ data class SpotBasics(
     val longitude: Double,
     /** 위도. */
     val latitude: Double,
+    /**
+     * 소속 카탈로그(SPEC-0019). **다른 도메인이 장소를 가리킬 때 쓰는 축이다** — 커뮤니티 글이
+     * 이 값을 저장해 언어와 무관하게 같은 장소의 글을 한 피드에 모은다.
+     *
+     * 배정되지 않은 행은 null이다.
+     */
+    val catalogId: Long?,
 )
 
 /**

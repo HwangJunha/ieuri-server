@@ -13,7 +13,11 @@ import org.around.ieuri.tourism.domain.specification.SpotExclusionRule
 import org.around.ieuri.tourism.domain.vo.RegionScoreWeights
 import org.around.ieuri.tourism.infrastructure.batch.FestivalSyncProperties
 import org.around.ieuri.tourism.infrastructure.batch.TourStatsSyncProperties
+import org.around.ieuri.tourism.infrastructure.batch.SpotCatalogProperties
 import org.around.ieuri.tourism.infrastructure.batch.SpotSyncProperties
+import org.around.ieuri.tourism.application.port.out.client.SpotTitleTranslationPort
+import org.around.ieuri.tourism.infrastructure.adapter.out.client.NoOpSpotTitleTranslationAdapter
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -38,6 +42,7 @@ import java.time.Duration
     TourStatsSyncProperties::class,
     DistrictRepresentativeProperties::class,
     SpotExclusionProperties::class,
+    SpotCatalogProperties::class,
 )
 class TourismConfig {
 
@@ -51,6 +56,16 @@ class TourismConfig {
             keywords = properties.keywords,
             branchNamePatterns = properties.branchNamePatterns,
         )
+
+    /**
+     * 제목 번역 포트의 기본 구현(SPEC-0019). **번역 엔진이 아직 정해지지 않아 아무것도 하지
+     * 않는다** — 초기 34,622건은 planner 시드가 적재하므로 목표 데이터는 이것 없이도 채워진다.
+     *
+     * 실제 어댑터가 빈으로 등록되면 이 빈은 물러난다.
+     */
+    @Bean
+    @ConditionalOnMissingBean(SpotTitleTranslationPort::class)
+    fun spotTitleTranslationPort(): SpotTitleTranslationPort = NoOpSpotTitleTranslationAdapter()
 
     @Bean
     fun spotQueryPolicy(properties: TourApiProperties): SpotQueryPolicy =

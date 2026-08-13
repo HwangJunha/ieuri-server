@@ -51,7 +51,11 @@ interface CommunityQueryPort {
     /** 카테고리는 모든 글에 있다 — 키가 없으면 연결이 깨진 것이다. */
     fun findCategoriesOf(postIds: List<Long>): Map<Long, TargetCategory>
 
-    /** 장소는 선택이라 **없는 글이 정상이다.** 그 글은 결과에 키가 없다. */
+    /**
+     * 장소는 선택이라 **없는 글이 정상이다.** 그 글은 결과에 키가 없다.
+     *
+     * 돌려주는 값은 글을 쓴 화면의 `spot.id`다 — 칩을 그릴 때 요약 조회의 입력이 된다.
+     */
     fun findSpotIdsOf(postIds: List<Long>): Map<Long, Long>
 
     /**
@@ -153,8 +157,13 @@ data class ViewerContext(
  * 글 조회에 직접 건다.
  */
 data class PostsSearch(
-    /** 이 장소에 붙은 글만. null이면 장소 하나로 좁히지 않는다. */
-    val spotId: Long?,
+    /**
+     * 이 장소에 붙은 글만. null이면 장소 하나로 좁히지 않는다.
+     *
+     * **`spot.id`가 아니라 카탈로그 id다**(SPEC-0019 R-12) — 클라이언트가 준 spotId를 서비스가
+     * 카탈로그로 해석해 넘긴다. 그래야 언어가 달라도 같은 장소의 글이 한 피드에 모인다.
+     */
+    val catalogId: Long?,
     /** 좌표 반경. null이면 반경으로 좁히지 않는다. */
     val area: PostsArea?,
     /** 상단 칩. null이면 카테고리로 좁히지 않는다. */

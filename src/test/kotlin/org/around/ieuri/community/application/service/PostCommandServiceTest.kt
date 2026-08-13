@@ -39,6 +39,7 @@ class PostCommandServiceTest {
 
     private val memberId = 7L
     private val spotId = 42L
+    private val catalogId = 420L
     private val now = Instant.parse("2026-08-05T00:00:00Z")
 
     private val postRepository = mockk<PostRepositoryPort>()
@@ -59,6 +60,7 @@ class PostCommandServiceTest {
                 category = null,
         longitude = 127.0,
         latitude = 37.5,
+                catalogId = catalogId,
             )
     }
 
@@ -69,6 +71,7 @@ class PostCommandServiceTest {
                 id = 1L,
                 category = p.category,
                 spotId = p.spotId,
+                catalogId = p.catalogId,
                 authorId = p.authorId,
                 tags = p.tags,
                 title = p.title,
@@ -210,7 +213,7 @@ class PostCommandServiceTest {
     fun `작성자는 자신의 글을 삭제할 수 있다`() {
         val post = Post.restore(
             id = 1L, category = TargetCategory.TOURIST_SPOT,
-            spotId = spotId, authorId = memberId, tags = emptyList(),
+            spotId = spotId, catalogId = catalogId, authorId = memberId, tags = emptyList(),
             title = "제목", body = "본문", photoKeys = emptyList(), likeCount = 0, commentCount = 0,
             hidden = false, deletedAt = null, createdAt = now,
         )
@@ -226,7 +229,7 @@ class PostCommandServiceTest {
     fun `타인의 글 삭제는 NOT_POST_OWNER이고 글은 삭제되지 않는다`() {
         val post = Post.restore(
             id = 1L, category = TargetCategory.TOURIST_SPOT,
-            spotId = spotId, authorId = memberId, tags = emptyList(),
+            spotId = spotId, catalogId = catalogId, authorId = memberId, tags = emptyList(),
             title = "제목", body = "본문", photoKeys = emptyList(), likeCount = 0, commentCount = 0,
             hidden = false, deletedAt = null, createdAt = now,
         )
@@ -239,7 +242,7 @@ class PostCommandServiceTest {
 
     private fun storedPost(hidden: Boolean = false, authorId: Long = memberId) = Post.restore(
         id = 1L, category = TargetCategory.TOURIST_SPOT,
-        spotId = spotId, authorId = authorId, tags = emptyList(),
+        spotId = spotId, catalogId = catalogId, authorId = authorId, tags = emptyList(),
         // 저장소가 좌표까지 복원한다 — 빠뜨리면 장소를 안 바꾼 수정에서도 연결이 지워진다.
         spotPoint = SpotPoint(127.0, 37.5),
         title = "원래 제목", body = "원래 본문", photoKeys = emptyList(),
@@ -295,7 +298,7 @@ class PostCommandServiceTest {
         every { postRepository.save(any()) } returns post
         every { spotLookup.findSummary(99L) } returns PostSpotView(
             id = 99L, title = "새 장소", thumbnailImageUrl = "url", category = null,
-            longitude = 128.5, latitude = 35.5,
+            longitude = 128.5, latitude = 35.5, catalogId = 990L,
         )
 
         service.editPost(
@@ -304,6 +307,7 @@ class PostCommandServiceTest {
         )
 
         assertEquals(99L, post.spotId)
+        assertEquals(990L, post.catalogId)
         assertEquals(SpotPoint(128.5, 35.5), post.spotPoint)
     }
 
@@ -355,7 +359,7 @@ class PostCommandServiceTest {
     fun `빈 배열을 주면 태그를 전부 뗀다`() {
         val post = Post.restore(
             id = 1L, category = TargetCategory.TOURIST_SPOT,
-            spotId = spotId, authorId = memberId,
+            spotId = spotId, catalogId = catalogId, authorId = memberId,
             spotPoint = SpotPoint(127.0, 37.5),
             tags = listOf(PostTag.restore("야경", "야경")),
             title = "제목", body = "본문", photoKeys = emptyList(),

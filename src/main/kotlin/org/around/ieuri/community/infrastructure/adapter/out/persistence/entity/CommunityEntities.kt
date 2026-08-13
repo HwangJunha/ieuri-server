@@ -376,8 +376,27 @@ class PostSpotEntity(
     @Column(name = "post_id")
     var postId: Long,
 
+    /**
+     * 글을 쓴 화면의 `spot.id`. **더 이상 조회 축이 아니다**(SPEC-0019 R-12) — 어느 언어에서
+     * 붙였는지의 기록이며, 이관이 잘못됐을 때 되돌릴 원본으로 남긴다.
+     */
     @Column(name = "spot_id", nullable = false)
     var spotId: Long,
+
+    /**
+     * 글이 가리키는 장소(SPEC-0019 R-12). **이것이 조회 축이다.**
+     *
+     * `spot_id`는 언어별이라 일본어로 쓴 글은 JA 행을 가리켰다. 카탈로그로 옮기면 언어와
+     * 무관하게 같은 장소의 글이 한 피드에 모인다.
+     *
+     * tourism의 `spot_catalog`를 가리키지만 **도메인 간이라 물리 FK를 두지 않는다**(V31의 관례).
+     *
+     * **`nullable = false`는 이전이 끝난 뒤의 상태를 가리킨다.** 전환 중(V55 적용 후,
+     * phase2/V56 적용 전)에는 DB 컬럼이 nullable이다 — 새로 쓰는 글은 항상 카탈로그를
+     * 해석해 넣으므로(없으면 SPOT_NOT_FOUND) 이 구간에도 null이 새로 생기지는 않는다.
+     */
+    @Column(name = "catalog_id", nullable = false)
+    var catalogId: Long,
 
     /**
      * 글이 붙은 장소의 좌표. **geography 컬럼은 매핑하지 않는다** — 트리거가 이 둘에서

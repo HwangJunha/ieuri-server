@@ -261,6 +261,7 @@ class SpotQueryService(
                 categoryCode = basics.category.name,
                 longitude = basics.longitude,
                 latitude = basics.latitude,
+                catalogId = basics.catalogId,
             )
         }
 
@@ -282,6 +283,7 @@ class SpotQueryService(
                 categoryCode = it.category.name,
                 longitude = it.longitude,
                 latitude = it.latitude,
+                catalogId = it.catalogId,
             )
         }
 

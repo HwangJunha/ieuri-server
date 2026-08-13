@@ -85,6 +85,13 @@ data class SpotSummaryView(
      */
     val longitude: Double,
     val latitude: Double,
+    /**
+     * 소속 카탈로그(SPEC-0019). **다른 도메인이 장소를 가리킬 때 저장하는 값이다** — 커뮤니티
+     * 글이 이것을 들고 있어야 언어와 무관하게 같은 장소의 글이 한 피드에 모인다.
+     *
+     * 아직 배정되지 않은 spot은 null이며, 그런 spot에는 글을 붙일 수 없다.
+     */
+    val catalogId: Long?,
 )
 
 /** 운영 정보 read DTO. 카테고리별 TourAPI 필드를 공통 이름으로 정규화한 결과(어댑터가 수행). */
@@ -141,6 +148,11 @@ data class LikedSpotView(
     val copyright: CopyrightType,
     val attributionText: String,
     val likedAt: Instant,
+    /**
+     * 소속 카탈로그. **커서의 정렬 키다**(SPEC-0019 §4.3) — 좋아요가 카탈로그 단위로 기록되므로
+     * `spot.id`로는 페이지 경계를 만들 수 없다. 응답에는 나가지 않는다.
+     */
+    val catalogId: Long,
 )
 
 /**

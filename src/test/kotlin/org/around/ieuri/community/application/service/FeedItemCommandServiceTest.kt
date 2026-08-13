@@ -44,6 +44,7 @@ class FeedItemCommandServiceTest {
             category = null,
             longitude = 127.0,
             latitude = 37.5,
+            catalogId = 420L,
         )
     }
 

@@ -60,6 +60,7 @@ class CommunityMapperTest {
         val domain = entity.toDomain(
             category = TargetCategory.TOURIST_SPOT,
             spotId = 9L,
+            catalogId = 90L,
             spotPoint = SpotPoint(127.0, 37.5),
             tags = listOf(tag),
             photoKeys = listOf(key),
@@ -68,6 +69,7 @@ class CommunityMapperTest {
         assertEquals(1L, domain.id)
         assertEquals(TargetCategory.TOURIST_SPOT, domain.category)
         assertEquals(9L, domain.spotId)
+        assertEquals(90L, domain.catalogId)
         assertEquals(listOf(tag), domain.tags)
         assertEquals(listOf(key), domain.photoKeys)
         assertEquals("제목", domain.title)
@@ -86,7 +88,7 @@ class CommunityMapperTest {
         val keyB = PhotoObjectKey.issue(3L, UUID.randomUUID()).toConfirmed()
         val domain = Post.create(
             category = TargetCategory.TOURIST_SPOT,
-            spotId = 2L, spotPoint = SpotPoint(127.0, 37.5), authorId = 3L, tags = emptyList(),
+            spotId = 2L, catalogId = 20L, spotPoint = SpotPoint(127.0, 37.5), authorId = 3L, tags = emptyList(),
             title = "제목", body = "본문", photoKeys = listOf(keyA, keyB),
         )
 
@@ -128,6 +130,7 @@ class CommunityMapperTest {
         val domain = entity.toDomain(
             category = TargetCategory.TOURIST_SPOT,
             spotId = null,
+            catalogId = null,
             spotPoint = null,
             tags = emptyList(),
             photoKeys = emptyList(),
@@ -136,6 +139,7 @@ class CommunityMapperTest {
         assertNull(domain.deletedAt)
         // 장소는 선택이라 없는 것이 정상이다.
         assertNull(domain.spotId)
+        assertNull(domain.catalogId)
         assertTrue(domain.photoKeys.isEmpty())
         assertTrue(domain.tags.isEmpty())
     }
@@ -146,7 +150,7 @@ class CommunityMapperTest {
         val keyB = PhotoObjectKey.issue(3L, UUID.randomUUID()).toConfirmed()
         val domain = Post.create(
             category = TargetCategory.TOURIST_SPOT,
-        spotId = 2L, spotPoint = SpotPoint(127.0, 37.5), authorId = 3L, tags = emptyList(),
+        spotId = 2L, catalogId = 20L, spotPoint = SpotPoint(127.0, 37.5), authorId = 3L, tags = emptyList(),
             title = "제목", body = "본문", photoKeys = listOf(keyA, keyB),
         )
 

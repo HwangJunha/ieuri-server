@@ -10,8 +10,10 @@ import org.around.ieuri.tourism.application.port.out.query.SpotBasics
 import org.around.ieuri.tourism.application.port.out.query.SpotIdentity
 import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
 import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
+import org.around.ieuri.tourism.application.exception.InvalidCursorException
 import org.around.ieuri.tourism.application.query.LikedSpotView
 import org.around.ieuri.tourism.domain.vo.DomainLocale
+import org.around.ieuri.tourism.domain.vo.LikedSpotCursor
 import org.around.ieuri.tourism.domain.vo.ReactionType
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotReactionEntity
@@ -52,26 +54,35 @@ class SpotQueryAdapter(
     ): List<Long> =
         spatialQueryAdapter.findIdsWithin(longitude, latitude, radiusMeters, limit, categoryCode)
 
-    /** 그 회원이 해당 언어에서 이미 반응한 관광지 id. 언어는 `spot` 조인으로 판정한다. */
+    /**
+     * 그 회원이 해당 언어에서 이미 반응한 관광지 id.
+     *
+     * 반응은 카탈로그 단위지만 **호출자가 기대하는 것은 요청 언어의 `spot.id`다**(카드 필터링에
+     * 쓴다). 조인에 `language`를 포함해 카탈로그당 정확히 1행으로 되돌린다.
+     */
     override fun findReactedSpotIds(memberId: Long, language: DomainLocale): Set<Long> =
         queryFactory
-            .select(reaction.spotId)
+            .select(spot.id)
             .from(reaction)
-            .join(spot).on(spot.id.eq(reaction.spotId))
-            .where(
-                reaction.memberId.eq(memberId),
-                spot.language.eq(language),
-            )
+            .join(spot).on(spot.catalogId.eq(reaction.catalogId), spot.language.eq(language))
+            .where(reaction.memberId.eq(memberId))
             .fetch()
             .toSet()
 
-    /** LIKE 반응 수. `spotId`가 이미 언어별이라 언어 조건은 두지 않는다. */
+    /**
+     * LIKE 반응 수. **카탈로그 단위 집계다**(SPEC-0019 R-10) — 같은 장소의 언어별 좋아요가
+     * 합산되어 **응답값이 커진다.** 의도된 교정이며, 지금까지 장소당 좋아요 수를 실제보다
+     * 작게 보고하고 있었던 것이다.
+     *
+     * 인자는 여전히 `spot.id`다(계약 불변) — 그 행의 카탈로그로 해석해 센다.
+     */
     override fun countLikes(spotId: Long): Long =
         queryFactory
             .select(reaction.count())
             .from(reaction)
+            .join(spot).on(spot.catalogId.eq(reaction.catalogId))
             .where(
-                reaction.spotId.eq(spotId),
+                spot.id.eq(spotId),
                 reaction.reaction.eq(ReactionType.LIKE),
             )
             .fetchOne() ?: 0L
@@ -95,7 +106,7 @@ class SpotQueryAdapter(
         queryFactory
             .select(
                 spot.title, spot.address, spot.thumbnailImageUrl,
-                spot.category, spot.copyright, spot.mapX, spot.mapY,
+                spot.category, spot.copyright, spot.mapX, spot.mapY, spot.catalogId,
             )
             .from(spot)
             .where(spot.id.eq(spotId))
@@ -109,6 +120,7 @@ class SpotQueryAdapter(
                     copyright = requireNotNull(it.get(spot.copyright)),
                     longitude = requireNotNull(it.get(spot.mapX)),
                     latitude = requireNotNull(it.get(spot.mapY)),
+                    catalogId = it.get(spot.catalogId),
                 )
             }
 
@@ -130,7 +142,7 @@ class SpotQueryAdapter(
         return queryFactory
             .select(
                 spot.id, spot.title, spot.address, spot.thumbnailImageUrl,
-                spot.category, spot.copyright, spot.mapX, spot.mapY,
+                spot.category, spot.copyright, spot.mapX, spot.mapY, spot.catalogId,
             )
             .from(spot)
             .where(spot.id.`in`(spotIds))
@@ -144,38 +156,52 @@ class SpotQueryAdapter(
                     copyright = requireNotNull(row.get(spot.copyright)),
                     longitude = requireNotNull(row.get(spot.mapX)),
                     latitude = requireNotNull(row.get(spot.mapY)),
+                    catalogId = row.get(spot.catalogId),
                 )
             }
     }
 
     override fun findLikedSpots(query: LikedSpotsSearch): CursorPage<LikedSpotView> {
-        val cursor = query.after?.let { decodeCursor(it) }
+        val cursor = query.after?.let {
+            // 구 커서(v2 접두사 없음)는 형식 단계에서 거부된다 — 형식이 같아 그냥 두면
+            // 조용히 다른 페이지를 반환한다(SPEC-0019 §4.3).
+            try {
+                LikedSpotCursor.decode(it)
+            } catch (e: IllegalArgumentException) {
+                throw InvalidCursorException(cause = e)
+            }
+        }
 
         val rows = queryFactory
             .select(
                 spot.id, spot.title, spot.thumbnailImageUrl, spot.address,
-                spot.category, spot.copyright, reaction.updatedAt,
+                spot.category, spot.copyright, reaction.updatedAt, reaction.catalogId,
             )
             .from(reaction)
-            .join(spot).on(spot.id.eq(reaction.spotId))
+            // **조인 조건에 language가 있어야 한다** — 한 카탈로그에 언어별 spot이 최대 4행
+            // 매달리므로 catalog_id 단독으로 조인하면 같은 좋아요가 4번 나온다.
+            //
+            // 요청 언어의 spot 행이 없으면 결과에서 빠진다 — 사용자가 읽을 수 없는 항목을
+            // 목록에 넣지 않는다는 R-9와 자연히 일치한다.
+            .join(spot).on(spot.catalogId.eq(reaction.catalogId), spot.language.eq(query.language))
             .where(
                 reaction.memberId.eq(query.memberId),
                 reaction.reaction.eq(ReactionType.LIKE),
-                spot.language.eq(query.language),
                 query.category?.let { spot.category.eq(it) },
-                // 정렬이 (updated_at DESC, spot_id DESC)이므로 다음 페이지는 그 튜플보다 "작은" 행이다.
+                // 정렬이 (updated_at DESC, catalog_id DESC)이므로 다음 페이지는 그 튜플보다 "작은" 행이다.
                 // 총계에는 붙이지 않는다 — 커서는 페이지 경계일 뿐 집합의 조건이 아니다.
                 cursor?.let {
                     reaction.updatedAt.lt(it.updatedAt)
-                        .or(reaction.updatedAt.eq(it.updatedAt).and(reaction.spotId.lt(it.spotId)))
+                        .or(reaction.updatedAt.eq(it.updatedAt).and(reaction.catalogId.lt(it.catalogId)))
                 },
             )
-            .orderBy(reaction.updatedAt.desc(), reaction.spotId.desc())
+            .orderBy(reaction.updatedAt.desc(), reaction.catalogId.desc())
             .limit((query.first + 1).toLong())
             .fetch()
             .map {
                 val copyright = requireNotNull(it.get(spot.copyright))
                 LikedSpotView(
+                    // 클라이언트에 나가는 것은 요청 언어의 spot.id다(계약 불변).
                     id = requireNotNull(it.get(spot.id)),
                     title = requireNotNull(it.get(spot.title)),
                     thumbnailImageUrl = requireNotNull(it.get(spot.thumbnailImageUrl)),
@@ -185,12 +211,16 @@ class SpotQueryAdapter(
                     // copyright에서 도출되는 값이라 적재하지 않는다(둘이 어긋날 여지를 없앤다).
                     attributionText = copyright.attributionText,
                     likedAt = requireNotNull(it.get(reaction.updatedAt)),
+                    // 커서에 실린다. 정렬 키가 catalog_id이므로 spot.id로는 페이지 경계를 만들 수 없다.
+                    catalogId = requireNotNull(it.get(reaction.catalogId)),
                 )
             }
 
         val hasNextPage = rows.size > query.first
         val pageRows = if (hasNextPage) rows.take(query.first) else rows
-        val edges = pageRows.map { CursorEdge(cursor = encodeCursor(it.likedAt, it.id), node = it) }
+        val edges = pageRows.map {
+            CursorEdge(cursor = LikedSpotCursor(it.likedAt, it.catalogId).encode(), node = it)
+        }
 
         return CursorPage(
             edges = edges,

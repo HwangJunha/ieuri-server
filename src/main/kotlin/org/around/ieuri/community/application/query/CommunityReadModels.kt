@@ -24,6 +24,13 @@ data class PostSpotView(
      */
     val longitude: Double,
     val latitude: Double,
+    /**
+     * 그 spot이 속한 장소(SPEC-0019 R-12). **글은 이 값을 저장한다** — `id`는 언어별이라
+     * 그대로 두면 일본어로 쓴 글이 JA 행만 가리켜 언어별로 피드가 갈린다.
+     *
+     * 아직 배정되지 않은 spot은 null이며, 그런 spot에는 글을 붙일 수 없다.
+     */
+    val catalogId: Long?,
 )
 
 /** 글·댓글에 실리는 최소 작성자 정보. 커뮤니티 표면에는 이메일·권한·상태가 필요 없다. */

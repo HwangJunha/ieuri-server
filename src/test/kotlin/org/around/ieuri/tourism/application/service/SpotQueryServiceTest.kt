@@ -127,6 +127,7 @@ class SpotQueryServiceTest {
         copyright = CopyrightType.TYPE1,
         longitude = 127.0,
         latitude = 37.5,
+        catalogId = 900L,
     )
 
     /** 적재된 본문(존재). */
@@ -847,6 +848,7 @@ class SpotQueryServiceTest {
             copyright = CopyrightType.TYPE1,
             attributionText = CopyrightType.TYPE1.attributionText,
             likedAt = likedAt,
+            catalogId = id * 10,
         )
 
     private fun likedPage(vararg nodes: LikedSpotView) = CursorPage(

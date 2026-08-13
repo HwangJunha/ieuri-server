@@ -118,10 +118,12 @@ class CommunityQueryServiceTest {
     fun `장소를 주면 그 장소 하나로 좁힌다`() {
         givenBlocked()
         val search = captureSearch()
+        // 클라이언트가 준 spot.id는 조회 축인 카탈로그로 해석해 넘어간다(SPEC-0019 R-12).
+        every { spotLookup.findSummary(42L) } returns summary(spotId = 42L, catalogId = 420L)
 
         service.posts(query(spotId = 42L), memberId)
 
-        assertEquals(42L, search.captured.spotId)
+        assertEquals(420L, search.captured.catalogId)
         assertNull(search.captured.area)
     }
 
@@ -132,7 +134,7 @@ class CommunityQueryServiceTest {
 
         service.posts(query(), memberId)
 
-        assertNull(search.captured.spotId)
+        assertNull(search.captured.catalogId)
         assertNull(search.captured.area)
     }
 
@@ -164,11 +166,12 @@ class CommunityQueryServiceTest {
     fun `장소와 좌표를 함께 주면 둘 다 조건이 된다`() {
         givenBlocked()
         val search = captureSearch()
+        every { spotLookup.findSummary(42L) } returns summary(spotId = 42L, catalogId = 420L)
 
         service.posts(query(spotId = 42L, latitude = 37.5, longitude = 127.0), memberId)
 
         // 서로 배타적이지 않다 — 둘 다 걸면 그 장소이면서 반경 안인 글이 나온다.
-        assertEquals(42L, search.captured.spotId)
+        assertEquals(420L, search.captured.catalogId)
         assertEquals(127.0, search.captured.area?.longitude)
     }
 
@@ -587,12 +590,17 @@ class CommunityQueryServiceTest {
         createdAt = Instant.parse("2026-08-05T00:00:00Z"),
     )
 
-    private fun summary(spotId: Long, category: TargetCategory?) = PostSpotView(
+    private fun summary(
+        spotId: Long,
+        catalogId: Long?,
+        category: TargetCategory? = null,
+    ) = PostSpotView(
         id = spotId,
         title = "대상",
         thumbnailImageUrl = "url",
         category = category,
         longitude = 127.0,
         latitude = 37.5,
+        catalogId = catalogId,
     )
 }

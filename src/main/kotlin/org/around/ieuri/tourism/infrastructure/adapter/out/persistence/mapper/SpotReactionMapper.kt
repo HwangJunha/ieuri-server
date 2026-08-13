@@ -7,6 +7,7 @@ import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.Sp
 fun SpotReactionEntity.toDomain(): SpotReaction =
     SpotReaction.record(
         memberId = memberId,
+        catalogId = catalogId,
         spotId = spotId,
         reaction = reaction,
     )
@@ -15,6 +16,7 @@ fun SpotReactionEntity.toDomain(): SpotReaction =
 fun SpotReaction.toNewEntity(): SpotReactionEntity =
     SpotReactionEntity(
         memberId = memberId,
+        catalogId = catalogId,
         spotId = spotId,
         reaction = reaction,
     )

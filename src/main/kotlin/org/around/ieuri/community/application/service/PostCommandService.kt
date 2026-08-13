@@ -61,9 +61,12 @@ class PostCommandService(
         // **장소는 선택이다.** 준 경우에만 존재를 확인한다 — 부재가 곧 유효성 판정이다.
         // 좌표를 여기서 함께 받아 글에 복사한다 — 지역 피드가 tourism에 spot 목록을
         // 되묻지 않게 하는 값이며, 그래야 목록 상한이 피드의 한계가 되지 않는다.
-        val spotPoint = command.spotId?.let { spotId ->
+        // 카탈로그가 없는 spot에는 글을 붙일 수 없다 — 조회 축이 카탈로그라, 붙이면 그 글은
+        // 어느 장소 피드에도 나타나지 않는다. 아직 배정되지 않았거나 사라진 행이다.
+        val spotLink = command.spotId?.let { spotId ->
             val summary = spotLookupPort.findSummary(spotId) ?: throw SpotNotFoundException()
-            SpotPoint(longitude = summary.longitude, latitude = summary.latitude)
+            val catalogId = summary.catalogId ?: throw SpotNotFoundException()
+            catalogId to SpotPoint(longitude = summary.longitude, latitude = summary.latitude)
         }
 
         // 형식이 어긋난 태그는 조용히 버리지 않고 거부한다 — 유저가 입력한 것이 사라지면
@@ -78,7 +81,8 @@ class PostCommandService(
         val post = Post.create(
             category = command.category,
             spotId = command.spotId,
-            spotPoint = spotPoint,
+            catalogId = spotLink?.first,
+            spotPoint = spotLink?.second,
             authorId = memberId,
             tags = tags,
             title = title,
@@ -120,9 +124,10 @@ class PostCommandService(
 
         // 장소를 바꾼다면 좌표를 함께 받아 둔다 — 좌표 없이 장소만 바꾸면 그 글이 지역
         // 피드의 거리순에서 조용히 사라진다.
-        val newSpotPoint = command.spotId?.let { spotId ->
+        val newSpotLink = command.spotId?.let { spotId ->
             val summary = spotLookupPort.findSummary(spotId) ?: throw SpotNotFoundException()
-            SpotPoint(longitude = summary.longitude, latitude = summary.latitude)
+            val catalogId = summary.catalogId ?: throw SpotNotFoundException()
+            catalogId to SpotPoint(longitude = summary.longitude, latitude = summary.latitude)
         }
 
         val post = postRepositoryPort.findById(command.postId) ?: throw PostNotFoundException()
@@ -131,7 +136,7 @@ class PostCommandService(
         photoKeys?.let { post.replacePhotos(it) }
         command.category?.let { post.changeCategory(it) }
         // spotId가 null이어도 changeSpot이면 장소를 떼는 것이다 — null 하나로는 구분되지 않는다.
-        if (command.changeSpot) post.changeSpot(command.spotId, newSpotPoint)
+        if (command.changeSpot) post.changeSpot(command.spotId, newSpotLink?.first, newSpotLink?.second)
         tags?.let { post.replaceTags(it) }
         postRepositoryPort.save(post)
     }

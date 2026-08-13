@@ -75,8 +75,9 @@ class PostSpatialQueryAdapter(
             conditions += "p.author_id NOT IN (${placeholders(search.viewer.blockedMemberIds.size)})"
             params.addAll(search.viewer.blockedMemberIds)
         }
-        search.spotId?.let {
-            conditions += "ps.spot_id = ?"
+        // 장소 필터는 카탈로그로 건다(SPEC-0019 R-12) — spot_id로 걸면 언어별로 피드가 갈린다.
+        search.catalogId?.let {
+            conditions += "ps.catalog_id = ?"
             params += it
         }
         search.category?.let {

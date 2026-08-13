@@ -22,6 +22,7 @@ class SpotSummaryMapperTest {
             categoryCode = "TOURIST_SPOT",
             longitude = 126.9770,
             latitude = 37.5796,
+            catalogId = 990L,
         ).toPostSpotView()
 
         assertEquals(11094L, view.id)
@@ -31,6 +32,8 @@ class SpotSummaryMapperTest {
         // 좌표는 글 적재 시 복사돼 지역 피드의 반경 조건이 된다 — 빠지면 그 글이 조용히 사라진다.
         assertEquals(126.9770, view.longitude)
         assertEquals(37.5796, view.latitude)
+        // 카탈로그가 글 피드의 조회 축이다 — 빠지면 그 장소에 글을 붙일 수 없다.
+        assertEquals(990L, view.catalogId)
     }
 
     @Test
@@ -71,5 +74,6 @@ class SpotSummaryMapperTest {
         categoryCode = categoryCode,
         longitude = 127.0,
         latitude = 37.5,
+        catalogId = 10L,
     )
 }

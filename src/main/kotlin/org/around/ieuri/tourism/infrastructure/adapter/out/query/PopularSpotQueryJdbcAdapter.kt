@@ -24,7 +24,11 @@ import org.springframework.transaction.annotation.Transactional
  * 방금 누른 좋아요가 인기 순위에 즉시 반영되지 않을 수 있다. 순위는 누적 총합이라 한두 건의
  * 지연이 순서를 뒤집지 않는다.
  *
- * `idx_spot_reaction_spot_reaction (spot_id, reaction)`이 이 집계를 받친다.
+ * `idx_spot_reaction_catalog_reaction (catalog_id, reaction)`이 이 집계를 받친다.
+ *
+ * **SPEC-0019로 집계 단위가 카탈로그(장소)가 되면서 값이 커졌다** — 같은 장소의 언어별
+ * 좋아요가 합산된다. `minLikeCount` 하한의 의미가 달라지므로, 하한을 그대로 두면 통과하는
+ * spot이 늘어난다. 배포 전 현재 값과 새 분포를 대조해 조정할 것.
  */
 @Component
 class PopularSpotQueryJdbcAdapter(
@@ -62,7 +66,12 @@ class PopularSpotQueryJdbcAdapter(
                        ST_Distance(s.location, c.center) AS distance_meters,
                        COUNT(r.id) AS like_count
                 FROM spot s
-                JOIN spot_reaction r ON r.spot_id = s.id AND r.reaction = ?
+                -- **카탈로그 축으로 집계한다**(SPEC-0019 R-10). 같은 장소의 언어별 좋아요가
+                -- 합산되어 값이 커진다 — 의도된 교정이다.
+                --
+                -- s는 이미 `s.language = ?`로 좁혀져 있어 카탈로그당 1행이다. 그 조건이 없으면
+                -- 같은 카탈로그의 4개 언어 행이 각각 같은 집계를 받아 결과가 4배로 늘어난다.
+                JOIN spot_reaction r ON r.catalog_id = s.catalog_id AND r.reaction = ?
                 CROSS JOIN c
                 WHERE $where
                 GROUP BY s.id, c.center
