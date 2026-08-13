@@ -1,6 +1,7 @@
 package org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql
 
 import com.netflix.graphql.dgs.DgsComponent
+import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.tourism.application.exception.InvalidCoordinatesException
@@ -12,7 +13,7 @@ import org.around.ieuri.tourism.application.query.RecommendedRegionQuery
 import org.around.ieuri.tourism.application.query.RecommendedRegionView
 import org.around.ieuri.tourism.application.query.RegionScoreView
 import org.around.ieuri.tourism.domain.vo.Coordinates
-import org.around.ieuri.tourism.infrastructure.locale.LocaleContext
+import org.around.ieuri.tourism.infrastructure.locale.domainLocale
 import org.around.ieuri.common.graphql.generated.types.Coordinates as GqlCoordinates
 import org.around.ieuri.common.graphql.generated.types.CoordinatesInput as GqlCoordinatesInput
 import org.around.ieuri.common.graphql.generated.types.RecommendedRegion as GqlRecommendedRegion
@@ -22,7 +23,7 @@ import org.around.ieuri.common.graphql.generated.types.RegionScoreFactor as GqlR
 
 /**
  * 지역 추천 GraphQL 리졸버(인바운드 어댑터, CQRS 읽기, SPEC-0015). 언어는 GraphQL 인자가
- * 아니라 요청 스코프 `LocaleContext`(Accept-Language)에서 온다.
+ * 아니라 Accept-Language 헤더에서 온다.
  *
  * **지연 필드(@DgsData)를 두지 않는다.** 응답의 모든 필드가 한 번의 지표 조회와 그 위의 단일
  * 점수 산출 패스에서 나와, 필드를 나눠도 줄어드는 I/O가 없다.
@@ -33,7 +34,6 @@ import org.around.ieuri.common.graphql.generated.types.RegionScoreFactor as GqlR
 class RegionRecommendationResolver(
     private val regionRecommendationUseCase: RegionRecommendationUseCase,
     private val policy: RegionRecommendationPolicy,
-    private val localeContext: LocaleContext,
 ) {
 
     /**
@@ -42,6 +42,7 @@ class RegionRecommendationResolver(
      */
     @DgsQuery
     fun recommendedRegions(
+        dfe: DgsDataFetchingEnvironment,
         @InputArgument origin: GqlCoordinatesInput,
         @InputArgument limit: Int?,
     ): GqlRecommendedRegionResult =
@@ -50,7 +51,7 @@ class RegionRecommendationResolver(
                 origin = origin.toDomain(),
                 limit = resolveLimit(limit),
             ),
-            locale = localeContext.locale,
+            locale = dfe.domainLocale(),
         ).toGql()
 
     /**

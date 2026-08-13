@@ -53,4 +53,23 @@ class ContentLanguageTest {
     fun `폴백은 외국어다 - 외국인 방문객이 기본 대상이다`() {
         assertEquals(ContentLanguage.EN, ContentLanguage.FALLBACK)
     }
+
+    /**
+     * **`Accept-Language` 파싱이 도메인으로 들어왔다** — 이전에는 서블릿 필터 두 곳이 각자
+     * 같은 문자열을 잘랐다. 헤더 형식(q-값·다중 항목)을 여기서 한 번만 다룬다.
+     */
+    @Test
+    fun `Accept-Language 헤더의 첫 언어를 쓴다`() {
+        assertEquals(ContentLanguage.KO, ContentLanguage.fromAcceptLanguage("ko-KR,ko;q=0.9,en;q=0.8"))
+        assertEquals(ContentLanguage.JA, ContentLanguage.fromAcceptLanguage("ja"))
+        assertEquals(ContentLanguage.ZH, ContentLanguage.fromAcceptLanguage("zh-Hant;q=1.0"))
+    }
+
+    /** 헤더가 없거나 지원하지 않는 언어면 폴백이다 — 오류가 아니다. */
+    @Test
+    fun `헤더가 없거나 미지원이면 폴백이다`() {
+        assertEquals(ContentLanguage.FALLBACK, ContentLanguage.fromAcceptLanguage(null))
+        assertEquals(ContentLanguage.FALLBACK, ContentLanguage.fromAcceptLanguage(""))
+        assertEquals(ContentLanguage.FALLBACK, ContentLanguage.fromAcceptLanguage("fr-FR"))
+    }
 }

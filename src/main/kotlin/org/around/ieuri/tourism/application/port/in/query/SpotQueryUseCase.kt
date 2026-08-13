@@ -15,7 +15,7 @@ import org.around.ieuri.tourism.domain.vo.SpotCategory
 
 /**
  * 관광지 조회 인바운드 포트(CQRS 읽기). 언어는 요청 스코프에서 결정돼 명시 파라미터로 전달된다
- * (리졸버가 LocaleContext에서 읽어 넘긴다 — application은 서블릿/헤더를 모른다).
+ * (리졸버가 Accept-Language 헤더에서 읽어 넘긴다 — application은 서블릿/헤더를 모른다).
  */
 interface SpotQueryUseCase {
     /**

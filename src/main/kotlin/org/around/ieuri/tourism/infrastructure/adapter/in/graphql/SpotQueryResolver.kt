@@ -15,8 +15,8 @@ import org.around.ieuri.tourism.application.query.SpotImageView
 import org.around.ieuri.tourism.application.query.SpotPageView
 import org.around.ieuri.tourism.application.query.SpotView
 import org.around.ieuri.tourism.application.query.SpotsQuery
+import org.around.ieuri.tourism.infrastructure.locale.domainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
-import org.around.ieuri.tourism.infrastructure.locale.LocaleContext
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
 import org.around.ieuri.common.graphql.generated.types.LikedSpot as GqlLikedSpot
@@ -32,18 +32,18 @@ import org.around.ieuri.common.graphql.generated.types.SpotIntro as GqlSpotIntro
 import org.around.ieuri.common.graphql.generated.types.SpotPage as GqlSpotPage
 
 /**
- * 관광지 조회 GraphQL 쿼리 리졸버(인바운드 어댑터, CQRS 읽기). 언어는 요청 스코프 LocaleContext에서 읽어
- * 유스케이스에 넘긴다(GraphQL 인자 아님, Accept-Language 기반). read DTO를 GraphQL 응답 타입으로 매핑한다.
+ * 관광지 조회 GraphQL 쿼리 리졸버(인바운드 어댑터, CQRS 읽기). 언어는 Accept-Language 헤더를
+ * 실행 컨텍스트에서 읽어 유스케이스에 넘긴다(GraphQL 인자 아님). read DTO를 GraphQL 응답 타입으로 매핑한다.
  * 쿼리 도메인 오류는 TourismQueryExceptionHandler가 최상위 errors[]로 분류한다(payload 컨벤션 없음).
  */
 @DgsComponent
 class SpotQueryResolver(
     private val spotQueryUseCase: SpotQueryUseCase,
-    private val localeContext: LocaleContext,
     private val currentMemberProvider: CurrentMemberProvider,
 ) {
     @DgsQuery
     fun spots(
+        dfe: DgsDataFetchingEnvironment,
         @InputArgument latitude: Double,
         @InputArgument longitude: Double,
         @InputArgument radiusMeters: Int?,
@@ -60,7 +60,7 @@ class SpotQueryResolver(
                 page = page ?: DEFAULT_PAGE,
                 size = size ?: DEFAULT_SIZE,
             ),
-            locale = localeContext.locale,
+            locale = dfe.domainLocale(),
             // 비로그인 허용 쿼리 — memberId가 있으면 이미 반응한 항목을 제외한다(requireMemberId 아님).
             memberId = currentMemberProvider.currentMemberId(),
         )
@@ -68,8 +68,8 @@ class SpotQueryResolver(
     }
 
     @DgsQuery
-    fun availableSpotCategories(): List<GqlSpotCategory> =
-        spotQueryUseCase.availableCategories(localeContext.locale)
+    fun availableSpotCategories(dfe: DgsDataFetchingEnvironment): List<GqlSpotCategory> =
+        spotQueryUseCase.availableCategories(dfe.domainLocale())
             .map { GqlSpotCategory.valueOf(it.name) }
 
     /**
@@ -80,8 +80,11 @@ class SpotQueryResolver(
      * 요구해서 지연 필드를 비워 둘 수 없다. 지연 필드의 소스로는 read DTO가 맞다(각 필드 리졸버가 여기서 id를 읽는다).
      */
     @DgsQuery
-    fun spotDetail(@InputArgument id: Long): SpotDetailView =
-        spotQueryUseCase.spotDetail(spotId = id, locale = localeContext.locale)
+    fun spotDetail(
+        dfe: DgsDataFetchingEnvironment,
+        @InputArgument id: Long,
+    ): SpotDetailView =
+        spotQueryUseCase.spotDetail(spotId = id, locale = dfe.domainLocale())
 
     /**
      * 갤러리(SPEC-0008 R-5). **nullable이다** — 이 필드의 조회가 실패하면 DGS가 실패를 이 필드에
@@ -94,7 +97,7 @@ class SpotQueryResolver(
      */
     @DgsData(parentType = "SpotDetail", field = "gallery")
     fun gallery(dfe: DgsDataFetchingEnvironment): List<GqlSpotImage>? =
-        spotQueryUseCase.spotGallery(dfe.spotId(), localeContext.locale)
+        spotQueryUseCase.spotGallery(dfe.spotId(), dfe.domainLocale())
             .map { it.toGql() }
 
     @DgsData(parentType = "SpotDetail", field = "intro")
@@ -105,7 +108,7 @@ class SpotQueryResolver(
         spotQueryUseCase.spotIntro(
             spotId = dfe.spotId(),
             category = SpotCategory.valueOf(category.name),
-            locale = localeContext.locale,
+            locale = dfe.domainLocale(),
         )?.toGql()
 
     /** 이용안내(nullable — SPEC-0006 R10). 실패 전파 규약은 [gallery]와 동일하다. */
@@ -117,7 +120,7 @@ class SpotQueryResolver(
         spotQueryUseCase.spotInfoItems(
             spotId = dfe.spotId(),
             category = SpotCategory.valueOf(category.name),
-            locale = localeContext.locale,
+            locale = dfe.domainLocale(),
         ).map { GqlSpotInfoItem(name = it.name, text = it.text) }
 
     @DgsData(parentType = "SpotDetail", field = "likeCount")
@@ -135,6 +138,7 @@ class SpotQueryResolver(
      */
     @DgsQuery
     fun likedSpots(
+        dfe: DgsDataFetchingEnvironment,
         @InputArgument category: GqlSpotCategory?,
         @InputArgument first: Int?,
         @InputArgument after: String?,
@@ -146,7 +150,7 @@ class SpotQueryResolver(
                 first = first ?: DEFAULT_LIKED_PAGE_SIZE,
                 after = after,
             ),
-            locale = localeContext.locale,
+            locale = dfe.domainLocale(),
             memberId = memberId,
         )
         return GqlLikedSpotConnection(

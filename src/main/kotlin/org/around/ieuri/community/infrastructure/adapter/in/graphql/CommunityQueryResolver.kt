@@ -21,8 +21,8 @@ import org.around.ieuri.community.application.query.MyPostsQuery
 import org.around.ieuri.community.application.query.PostsQuery
 import org.around.ieuri.community.domain.vo.PostSortOrder
 import org.around.ieuri.community.domain.vo.TargetCategory
-import org.around.ieuri.community.infrastructure.app.AppKeyContext
-import org.around.ieuri.community.infrastructure.locale.CommunityLocaleContext
+import org.around.ieuri.community.infrastructure.locale.appKey
+import org.around.ieuri.community.infrastructure.locale.contentLanguage
 import org.springframework.stereotype.Component
 import org.around.ieuri.common.graphql.generated.types.BlockedUserConnection as GqlBlockedUserConnection
 import org.around.ieuri.common.graphql.generated.types.BlockedUserEdge as GqlBlockedUserEdge
@@ -50,8 +50,6 @@ class CommunityQueryResolver(
     private val communityQueryUseCase: CommunityQueryUseCase,
     private val memberLookupPort: MemberLookupPort,
     private val currentMemberProvider: CurrentMemberProvider,
-    private val appKeyContext: AppKeyContext,
-    private val localeContext: CommunityLocaleContext,
 ) {
 
     /**
@@ -169,8 +167,8 @@ class CommunityQueryResolver(
      * 클라이언트가 고르는 값이 아니라 요청의 속성이기 때문이다(Accept-Language와 같은 이유).
      */
     @DgsQuery
-    fun communityChips(): List<GqlCommunityChip> =
-        communityQueryUseCase.communityChips(appKeyContext.appKey, localeContext.language).map {
+    fun communityChips(dfe: DgsDataFetchingEnvironment): List<GqlCommunityChip> =
+        communityQueryUseCase.communityChips(dfe.appKey(), dfe.contentLanguage()).map {
             GqlCommunityChip(
                 category = GqlTargetCategory.valueOf(it.category.name),
                 position = it.position,

@@ -1,17 +1,16 @@
 spring:
   application:
     name: ieuri
-  # **가상 스레드를 켜지 않는다.** 켜면 DGS가 데이터페처를 별도 가상 스레드로 옮겨 실행하는데
-  # (dgs.graphql.virtualthreads.enabled가 이 값을 따라 켜진다), @RequestScope 빈이
-  # ThreadLocal 기반이라 그 스레드에서 보이지 않는다 — LocaleContext·AppKeyContext·
-  # CommunityLocaleContext를 쓰는 리졸버가 전부 ScopeNotActiveException으로 죽는다(실측).
-  #
-  # 켜려면 세 컨텍스트를 요청 스코프에서 걷어내야 하며(인자로 넘기거나 GraphQLContext로),
-  # 그건 이 스펙의 범위가 아니다. 구독 경로의 블로킹 조회는 CommunityConfig가 전용
-  # 가상 스레드 스케줄러를 직접 만들어 해결하므로 이 플래그가 필요하지 않다.
   threads:
     virtual:
-      enabled: false
+      # 요청 처리와 데이터페처를 가상 스레드로 돌린다(Java 21+). 블로킹 I/O가 캐리어 스레드를
+      # 반납하므로 스레드 수가 동시 처리량의 상한이 아니게 된다.
+      # DGS 키(dgs.graphql.virtualthreads.enabled)도 이 값을 따라 켜진다.
+      #
+      # **요청별 값을 ThreadLocal에 담지 않는 것이 전제다.** 데이터페처가 다른 스레드에서
+      # 돌기 때문에, 요청 스코프 빈(RequestContextHolder 기반)을 쓰면 그 순간 사라진다.
+      # 언어·앱키는 DataFetchingEnvironment에서 읽는다(공유 커널의 acceptLanguage).
+      enabled: true
   lifecycle:
     # graceful shutdown 단계별 최대 대기. write-behind 큐도 이 안에서 정리된다
     # (큐 자체는 @PreDestroy에서 별도로 유한 대기한다).

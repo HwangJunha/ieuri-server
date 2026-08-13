@@ -1,6 +1,7 @@
 package org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql
 
 import com.netflix.graphql.dgs.DgsComponent
+import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.common.pagination.CursorPage
@@ -11,7 +12,7 @@ import org.around.ieuri.tourism.application.query.PopularSpotsQuery
 import org.around.ieuri.tourism.application.query.SearchSpotsQuery
 import org.around.ieuri.tourism.application.query.SpotView
 import org.around.ieuri.tourism.domain.vo.SpotCategory
-import org.around.ieuri.tourism.infrastructure.locale.LocaleContext
+import org.around.ieuri.tourism.infrastructure.locale.domainLocale
 import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
 import org.around.ieuri.common.graphql.generated.types.Festival as GqlFestival
 import org.around.ieuri.common.graphql.generated.types.FestivalConnection as GqlFestivalConnection
@@ -27,7 +28,7 @@ import org.around.ieuri.common.graphql.generated.types.SpotSuggestion as GqlSpot
 import org.around.ieuri.common.graphql.generated.types.UserError as GqlUserError
 
 /**
- * spot 발견 조회 리졸버(SPEC-0013). 언어는 요청 스코프 LocaleContext에서 읽어 유스케이스에 넘긴다
+ * spot 발견 조회 리졸버(SPEC-0013). 언어는 Accept-Language 헤더에서 읽어 유스케이스에 넘긴다
  * (GraphQL 인자가 아니다). read DTO를 GraphQL 응답 타입으로 매핑한다 — application은 DGS 무의존이다.
  *
  * 네 쿼리 모두 비로그인 허용이다. 좌표·반경·카테고리 오류는 TourismQueryExceptionHandler가
@@ -40,10 +41,10 @@ import org.around.ieuri.common.graphql.generated.types.UserError as GqlUserError
 @DgsComponent
 class SpotDiscoveryResolver(
     private val spotDiscoveryUseCase: SpotDiscoveryUseCase,
-    private val localeContext: LocaleContext,
 ) {
     @DgsQuery
     fun searchSpots(
+        dfe: DgsDataFetchingEnvironment,
         @InputArgument query: String,
         @InputArgument latitude: Double,
         @InputArgument longitude: Double,
@@ -62,7 +63,7 @@ class SpotDiscoveryResolver(
                 page = page ?: DEFAULT_PAGE,
                 size = size ?: DEFAULT_PAGE_SIZE,
             ),
-            locale = localeContext.locale,
+            locale = dfe.domainLocale(),
         )
 
         return GqlSpotSearchPayload(
@@ -82,6 +83,7 @@ class SpotDiscoveryResolver(
 
     @DgsQuery
     fun spotSearchSuggestions(
+        dfe: DgsDataFetchingEnvironment,
         @InputArgument query: String,
         @InputArgument latitude: Double,
         @InputArgument longitude: Double,
@@ -94,7 +96,7 @@ class SpotDiscoveryResolver(
             longitude = longitude,
             radiusMeters = radiusMeters ?: DEFAULT_RADIUS_METERS,
             limit = limit ?: DEFAULT_SUGGESTION_LIMIT,
-            locale = localeContext.locale,
+            locale = dfe.domainLocale(),
         ).map {
             GqlSpotSuggestion(
                 id = it.id,
@@ -105,6 +107,7 @@ class SpotDiscoveryResolver(
 
     @DgsQuery
     fun ongoingFestivals(
+        dfe: DgsDataFetchingEnvironment,
         @InputArgument latitude: Double,
         @InputArgument longitude: Double,
         @InputArgument radiusMeters: Int?,
@@ -119,7 +122,7 @@ class SpotDiscoveryResolver(
                 first = first ?: DEFAULT_PAGE_SIZE,
                 after = after,
             ),
-            locale = localeContext.locale,
+            locale = dfe.domainLocale(),
         )
         return GqlFestivalConnection(
             edges = page.edges.map { GqlFestivalEdge(cursor = it.cursor, node = it.node.toGql()) },
@@ -129,6 +132,7 @@ class SpotDiscoveryResolver(
 
     @DgsQuery
     fun popularSpots(
+        dfe: DgsDataFetchingEnvironment,
         @InputArgument latitude: Double,
         @InputArgument longitude: Double,
         @InputArgument radiusMeters: Int?,
@@ -145,7 +149,7 @@ class SpotDiscoveryResolver(
                 first = first ?: DEFAULT_PAGE_SIZE,
                 after = after,
             ),
-            locale = localeContext.locale,
+            locale = dfe.domainLocale(),
         )
         return GqlPopularSpotConnection(
             edges = page.edges.map {
