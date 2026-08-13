@@ -13,21 +13,27 @@
 
 ALTER TABLE community_post_spot ADD COLUMN catalog_id BIGINT;
 
--- spot을 경유해 백필한다. 배정 배치가 spot.catalog_id를 이미 채워 둔 상태를 전제한다.
+-- spot을 경유해 백필한다. 배정이 끝난 환경에서 재적용하면 이 한 줄로 이관이 끝난다.
 UPDATE community_post_spot ps
 SET catalog_id = s.catalog_id
 FROM spot s
 WHERE s.id = ps.spot_id;
 
--- **`NOT NULL`은 여기서 걸지 않는다.** 이 마이그레이션이 도는 시점에는 배정 배치가 아직
--- 돌지 않아 `spot.catalog_id`가 전부 null이고, 따라서 위 백필도 전부 null을 넣는다.
--- 조이는 단계는 배치 완주 후 `db/migration-phase2`가 맡는다(그 폴더의 README 참조).
+-- 백필되지 못한 연결을 지운다. **글은 남고 연결만 없어진다** — V31이 이미 "spot이 사라져도
+-- 글은 남으며, 조회 시 요약이 없으면 칩을 그리지 않는다"고 정해 둔 동작과 같다.
+--
+-- 이 마이그레이션이 도는 시점에는 배정 배치 전이라 `spot.catalog_id`가 전부 null이므로
+-- 실질적으로 기존 연결이 모두 끊긴다. 운영 데이터가 없는 지금이라 가능한 선택이며
+-- (사용자 확인 2026-08-14), 데이터가 생긴 뒤였다면 배포를 두 번에 나눠야 한다.
+DELETE FROM community_post_spot WHERE catalog_id IS NULL;
+
+-- 좌표 없는 연결 행이 생기면 그 글은 거리순에서 조용히 사라지므로, 카탈로그도 같은 기준으로
+-- 조인다 — 조회 축이 비어 있는 연결은 어떤 장소 피드에도 나타나지 못한다.
+ALTER TABLE community_post_spot ALTER COLUMN catalog_id SET NOT NULL;
 
 -- spot 상세 화면의 피드가 타는 인덱스. 조회 축이 바뀌었으므로 함께 교체한다.
---
--- 기존 인덱스는 **남긴다** — 배정 전까지 catalog_id가 null이라 새 인덱스로는 아무것도
--- 찾지 못하고, 그 구간에도 기존 경로가 살아 있어야 한다. 정리는 phase2가 한다.
+DROP INDEX IF EXISTS idx_community_post_spot_spot;
 CREATE INDEX idx_community_post_spot_catalog ON community_post_spot (catalog_id, post_id);
 
--- spot_id 컬럼은 **남긴다.** 어느 언어 화면에서 붙였는지의 기록이고, 이관이 잘못됐을 때
--- 되돌릴 원본이다. 조회 조건으로는 더 이상 쓰지 않는다.
+-- spot_id 컬럼은 **남긴다.** 어느 언어 화면에서 붙였는지의 기록이다.
+-- 조회 조건으로는 더 이상 쓰지 않는다.
