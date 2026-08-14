@@ -264,13 +264,15 @@ Schema is owned by **Flyway migrations**, never by Hibernate. The domain-model �
 
 ## Git strategy
 
-**Commits are the human's job.** `git commit` is blocked in the permission settings. Claude writes
-the code; the user decides the commit units and messages — how to group a set of changes is a
-judgment call for whoever will read the repository history.
+**Claude commits when the work is done.** Group changes into commits that read well in history —
+one logical change per commit, not one giant dump. Korean subjects with conventional-commit
+prefixes, matching the existing log.
 
-So **leaving uncommitted changes at the end of a turn is normal and correct.** Report what changed
-in the summary and do not try to commit on the user's behalf. Push and PR are available once the
-user has committed and asks for them (permission is `ask`).
+Push and PR follow the same rule: do them when the slice is finished, without asking each time.
+Never push to `master`, never force-push.
+
+**Still report what changed in the summary.** A commit is not a substitute for telling the user
+what you did and why.
 
 **Work in a git worktree by default.** Several slices run concurrently, so each unit of work gets its own worktree instead of sharing the checkout — otherwise parallel sessions collide on the working tree and the Gradle build directory. `worktree.bgIsolation` is set to `worktree` in `.claude/settings.local.json`; when a task starts in an existing session, call `EnterWorktree` rather than branching in place. One worktree per branch, named after it.
 
