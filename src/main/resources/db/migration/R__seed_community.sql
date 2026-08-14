@@ -142,8 +142,12 @@ JOIN (VALUES
 --      좌표는 spot에서 복사한다(location은 트리거가 파생시킨다).
 --
 --      VALUES에 적힌 것은 언어별 `spot.id`이므로 spot을 경유해 카탈로그로 바꿔 넣는다
---      (SPEC-0019 R-12). **카탈로그 배정 전에는 catalog_id가 null이라 이 시드가 한 행도
---      넣지 못한다** — 배정 배치를 먼저 돌려야 한다.
+--      (SPEC-0019 R-12).
+--
+--      > **첫 기동에서는 이 블록이 0행을 넣는다.** 카탈로그 배정은 배치가 하고 배치는 앱이
+--      > 뜬 뒤에 돌므로, 기동 시점의 `spot.catalog_id`는 전부 null이다. 배정을 한 번 돌린
+--      > 다음 이 파일의 체크섬을 건드려야(공백 한 줄이면 된다) 재실행되어 채워진다.
+--      > 로컬에서 커뮤니티 장소 칩이 비어 보이면 원인은 대개 이것이다.
 INSERT INTO community_post_spot (post_id, catalog_id, map_x, map_y)
 SELECT p.id, s.catalog_id, s.map_x, s.map_y
 FROM community_post p

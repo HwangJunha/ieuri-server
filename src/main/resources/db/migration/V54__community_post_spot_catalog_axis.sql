@@ -11,43 +11,33 @@
 -- 도메인 간 FK 금지 규칙이 그대로 적용된다(V31 주석). 참조 대상이 spot에서 spot_catalog로
 -- 바뀔 뿐이다.
 --
--- **`spot_id` 컬럼을 지운다.** spot_reaction과 같은 판단이다 — 쓰이지 않는 컬럼을 남기면
--- 부채가 되고, 운영 데이터가 없어 되돌릴 원본을 남길 이유도 없다.
+-- > 장소 칩과 피드는 설계를 다시 볼 대상으로 남아 있다(사용자 판단 2026-08-14). 여기서는
+-- > **참조 축만 옮기고 구조는 손대지 않는다** — 재설계 때 함께 정리한다.
 
-ALTER TABLE community_post_spot ADD COLUMN catalog_id BIGINT;
+-- ── community_post_spot ────────────────────────────────────────────────────
+-- IF EXISTS를 쓰는 이유는 이 파일이 재작성되었기 때문이다 — 이전 버전이 이미 일부를
+-- 적용한 환경에서도 같은 결과가 되어야 한다.
+DROP INDEX IF EXISTS idx_community_post_spot_spot;
+DROP INDEX IF EXISTS idx_community_post_spot_catalog;
 
--- spot을 경유해 백필한다. 배정이 끝난 환경에서 재적용하면 이 한 줄로 이관이 끝난다.
-UPDATE community_post_spot ps
-SET catalog_id = s.catalog_id
-FROM spot s
-WHERE s.id = ps.spot_id;
+-- **기존 연결을 지운다.** 백필할 원본(spot_id)이 방금 사라졌으므로 남은 행은 가리킬 장소가
+-- 없다. 글 자체는 남고 연결만 없어지며, 이는 V31이 이미 정해 둔 동작이다("spot이 사라져도
+-- 글은 남으며, 요약이 없으면 칩을 그리지 않는다"). 이 DELETE가 없으면 행이 있는 환경에서
+-- 아래 NOT NULL 추가가 실패해 기동이 막힌다.
+DELETE FROM community_post_spot;
 
--- 백필되지 못한 연결을 지운다. **글은 남고 연결만 없어진다** — V31이 이미 "spot이 사라져도
--- 글은 남으며, 조회 시 요약이 없으면 칩을 그리지 않는다"고 정해 둔 동작과 같다.
-DELETE FROM community_post_spot WHERE catalog_id IS NULL;
-
--- 조회 축이 비어 있는 연결은 어떤 장소 피드에도 나타나지 못한다. 좌표와 같은 기준으로 조인다.
-ALTER TABLE community_post_spot ALTER COLUMN catalog_id SET NOT NULL;
+ALTER TABLE community_post_spot DROP COLUMN IF EXISTS spot_id;
+ALTER TABLE community_post_spot ADD COLUMN catalog_id BIGINT NOT NULL;
 
 -- spot 상세 화면의 피드가 타는 인덱스. 조회 축이 바뀌었으므로 함께 교체한다.
-DROP INDEX IF EXISTS idx_community_post_spot_spot;
 CREATE INDEX idx_community_post_spot_catalog ON community_post_spot (catalog_id, post_id);
 
-ALTER TABLE community_post_spot DROP COLUMN spot_id;
+-- ── community_feed_item ────────────────────────────────────────────────────
+-- 피드도 같은 축으로 옮긴다. 피드는 spot 연결이 필수라(V48) 두 표면이 같은 장소를 가리키는데
+-- 축이 갈리면, 같은 장소의 글과 피드가 서로 다른 id로 조회된다.
+-- 글과 달리 **피드 자체를 지운다** — 피드에서 spot은 장식이 아니라 여행지로 들어가는
+-- 입구이고(V48), 연결만 떼면 입구 없는 피드가 남아 "spot 1곳 필수"가 깨진다.
+DELETE FROM community_feed_item;
 
--- community_feed_item도 같은 축으로 옮긴다. 피드는 spot 연결이 필수라(V48) 두 표면이 같은
--- 장소를 가리키는데 축이 갈리면, 같은 장소의 글과 피드가 서로 다른 id로 조회된다.
-ALTER TABLE community_feed_item ADD COLUMN catalog_id BIGINT;
-
-UPDATE community_feed_item fi
-SET catalog_id = s.catalog_id
-FROM spot s
-WHERE s.id = fi.spot_id;
-
--- 글과 달리 **피드 자체를 지운다** — 피드에서 spot은 장식이 아니라 여행지로 들어가는 입구이고
--- (V48), 연결만 떼면 입구 없는 피드가 남아 R1의 "spot 1곳 필수"가 깨진다.
-DELETE FROM community_feed_item WHERE catalog_id IS NULL;
-
-ALTER TABLE community_feed_item ALTER COLUMN catalog_id SET NOT NULL;
-
-ALTER TABLE community_feed_item DROP COLUMN spot_id;
+ALTER TABLE community_feed_item DROP COLUMN IF EXISTS spot_id;
+ALTER TABLE community_feed_item ADD COLUMN catalog_id BIGINT NOT NULL;
