@@ -148,7 +148,7 @@ class SpotQueryService(
         if (fetched == null) {
             // 부재 확정. `spot` 행의 값으로 응답을 구성하고(R-2) 부재 사실을 적재한다(R-3).
             // 재조회 결과가 여전히 부재여도 적재 시각이 갱신되어 다음 신선도 창이 새로 시작된다(AC-15).
-            val fallback = fallbackDetail(catalogId)
+            val fallback = fallbackDetail(catalogId, locale)
             spotCachePort.putDetailAbsence(spotId, fallback)
             eventPublisher.publish(SpotDetailAbsent(spotId, fallback))
             return fallback.toView(catalogId)
@@ -176,9 +176,10 @@ class SpotQueryService(
      *
      * [resolve]가 이미 통과한 뒤이므로 행은 존재한다 — 그 사이 사라졌다면 부재가 아니라 미해석이다.
      */
-    private fun fallbackDetail(catalogId: Long): SpotDetail {
+    private fun fallbackDetail(catalogId: Long, language: DomainLocale): SpotDetail {
         // **카탈로그 id로 묻는다** — findSpotBasics는 `spot_catalog`를 조회한다.
-        val basics = spotQueryPort.findSpotBasics(catalogId) ?: throw SpotDetailNotFoundException()
+        // 요청 언어의 번역을 읽으므로 제목·주소가 응답 언어와 어긋나지 않는다.
+        val basics = spotQueryPort.findSpotBasics(catalogId, language) ?: throw SpotDetailNotFoundException()
         return SpotDetail(
             title = basics.title,
             category = basics.category,
@@ -261,9 +262,13 @@ class SpotQueryService(
     /**
      * 카탈로그 한 행만 읽는다 — 캐시도 upstream도 타지 않는다. 부재는 예외가 아니라 null이며,
      * 호출자가 그것을 "유효하지 않은 장소 id"로 해석한다.
+     *
+     * **언어가 KO로 고정돼 있다.** 유일한 호출자인 커뮤니티 장소 칩이 언어를 전달하지 않는
+     * 구조이고, 그 표면은 재설계 대상으로 남아 있다(사용자 판단 2026-08-14). 지금 임의로
+     * 시그니처를 바꾸면 재설계 때 다시 손대야 하므로 종전 동작을 그대로 둔다.
      */
     override fun spotSummaries(catalogIds: List<Long>): Map<Long, SpotSummaryView> =
-        spotQueryPort.findSpotBasicsIn(catalogIds).mapValues { (catalogId, basics) ->
+        spotQueryPort.findSpotBasicsIn(catalogIds, DomainLocale.KO).mapValues { (catalogId, basics) ->
             SpotSummaryView(
                 id = catalogId,
                 title = basics.title,
@@ -284,7 +289,7 @@ class SpotQueryService(
         spotQueryPort.findSpotIdsWithin(longitude, latitude, radiusMeters, limit, categoryCode)
 
     override fun spotSummary(catalogId: Long): SpotSummaryView? =
-        spotQueryPort.findSpotBasics(catalogId)?.let {
+        spotQueryPort.findSpotBasics(catalogId, DomainLocale.KO)?.let {
             SpotSummaryView(
                 id = catalogId,
                 title = it.title,

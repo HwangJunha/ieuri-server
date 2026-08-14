@@ -1,13 +1,13 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.query
 
 import com.querydsl.jpa.impl.JPAQueryFactory
+import org.around.ieuri.tourism.application.port.out.query.CatalogCandidate
 import org.around.ieuri.tourism.application.port.out.query.SpotCatalogQueryPort
 import org.around.ieuri.tourism.application.port.out.query.UnassignedSpot
-import org.around.ieuri.tourism.application.port.out.query.UnresolvedSpotReport
 import org.around.ieuri.tourism.application.port.out.query.UntranslatedCatalog
-import org.around.ieuri.tourism.domain.aggregate.CatalogTranslation
+import org.around.ieuri.tourism.domain.aggregate.CatalogStandardValues
+import org.around.ieuri.tourism.domain.specification.SpotTitleNormalizer
 import org.around.ieuri.tourism.domain.vo.DomainLocale
-import org.around.ieuri.tourism.domain.vo.TranslationSource
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotCatalogEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotCatalogTranslationEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotEntity
@@ -15,15 +15,11 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 /**
- * 카탈로그 배정·번역·보고의 읽기 포트 구현(SPEC-0019, CQRS 읽기).
- *
- * 미해결 보고만 [SpotCatalogUnresolvedQueryJdbcAdapter]에 위임한다 — `BIGINT[]` 컬럼을
- * JPA가 표현하지 못해 그 조회는 생 SQL이다.
+ * 카탈로그 배정·번역의 읽기 포트 구현(SPEC-0019, CQRS 읽기).
  */
 @Component
 class SpotCatalogQueryAdapter(
     private val queryFactory: JPAQueryFactory,
-    private val unresolvedAdapter: SpotCatalogUnresolvedQueryJdbcAdapter,
 ) : SpotCatalogQueryPort {
 
     private val spot = QSpotEntity.spotEntity
@@ -31,31 +27,35 @@ class SpotCatalogQueryAdapter(
     private val translation = QSpotCatalogTranslationEntity.spotCatalogTranslationEntity
 
     /**
-     * 배정 대상 — `catalog_id`가 null인 행. 배정된 행은 다시 판정하지 않으므로 **이 조건
-     * 하나가 곧 증분 처리다**(설계 문서 §3.3).
+     * 배정 대상 — `catalog_id`가 null이고 좌표가 유효한 행. 배정된 행은 다시 판정하지 않으므로
+     * **미배정 조건 하나가 곧 증분 처리다**(설계 문서 §3.3).
      *
-     * **KO를 먼저 돌려준다** — KO 행이 카탈로그를 만들고 나머지 언어가 거기 붙으므로, 순서가
-     * 뒤집히면 KO가 있는 장소인데도 파생 카탈로그가 생긴다. `language` 오름차순으로는 EN이
-     * 앞서므로 정렬 식을 따로 만든다.
+     * **좌표 필터가 여기 있다.** (0,0)이거나 한국 밖인 행은 깨진 데이터이며(실측 317건)
+     * 카탈로그를 내주면 지도·반경 조회에서 빠지는 "존재하지만 안 보이는" 데이터가 된다.
      */
     @Transactional(readOnly = true)
-    override fun findUnassigned(limit: Int): List<UnassignedSpot> =
+    override fun findUnassigned(language: DomainLocale, afterSpotId: Long, limit: Int): List<UnassignedSpot> =
         queryFactory
             .select(
                 spot.id, spot.language, spot.title, spot.address,
                 spot.thumbnailImageUrl, spot.mapX, spot.mapY,
+                spot.category, spot.copyright,
             )
             .from(spot)
-            .where(spot.catalogId.isNull)
-            .orderBy(
-                // KO가 먼저. CASE 식이라 인덱스를 타지 않지만 대상 집합이 이미 좁다(미배정 행뿐).
-                com.querydsl.core.types.dsl.Expressions
-                    .cases()
-                    .`when`(spot.language.eq(DomainLocale.KO)).then(0)
-                    .otherwise(1)
-                    .asc(),
-                spot.id.asc(),
+            .where(
+                spot.catalogId.isNull,
+                spot.language.eq(language),
+                spot.id.gt(afterSpotId),
+                spot.mapX.between(
+                    CatalogStandardValues.KOREA_LON_RANGE.start,
+                    CatalogStandardValues.KOREA_LON_RANGE.endInclusive,
+                ),
+                spot.mapY.between(
+                    CatalogStandardValues.KOREA_LAT_RANGE.start,
+                    CatalogStandardValues.KOREA_LAT_RANGE.endInclusive,
+                ),
             )
+            .orderBy(spot.id.asc())
             .limit(limit.toLong())
             .fetch()
             .map {
@@ -67,34 +67,61 @@ class SpotCatalogQueryAdapter(
                     thumbnailImageUrl = requireNotNull(it.get(spot.thumbnailImageUrl)),
                     mapX = requireNotNull(it.get(spot.mapX)),
                     mapY = requireNotNull(it.get(spot.mapY)),
+                    category = requireNotNull(it.get(spot.category)),
+                    copyright = requireNotNull(it.get(spot.copyright)),
                 )
             }
 
     /**
-     * 같은 썸네일을 쓰는 비한국어 행들의 표시값. 파생 대표명을 EN→JA→ZH 순으로 고르는 입력이다.
+     * KO 카탈로그의 제목 키 → 후보 맵. 배정 회차마다 한 번 읽어 메모리에서 대조한다.
      *
-     * 한 언어에 여러 행이 걸리면 첫 행을 쓴다 — 대표명 후보로서 어느 쪽이든 같은 괄호값을 갖는다.
+     * **정규화를 SQL로 하지 않는다** — 규칙은 도메인([SpotTitleNormalizer])이 소유하며, DB
+     * 함수로 옮기면 규칙이 두 곳에 생겨 반드시 어긋난다. 제목을 그대로 읽어 와 여기서 키를
+     * 만들기 때문에 저장 컬럼도 인덱스도 필요 없다.
      *
-     * **출처는 `OFFICIAL`로 고정한다** — TourAPI가 그 언어로 발급한 원본 행이므로 파생
-     * 카탈로그의 번역이 되어도 공식 표기이며, 기계 번역이 나중에 덮지 못한다(R-4).
+     * KO 카탈로그 수만큼(실측 56,413) 메모리를 쓴다 — 키가 평균 수십 바이트라 수 MB 수준이다.
      */
     @Transactional(readOnly = true)
-    override fun findForeignCardsByThumbnail(thumbnailImageUrl: String): Map<DomainLocale, CatalogTranslation> =
+    override fun loadKoreanTitleIndex(): Map<String, List<CatalogCandidate>> =
         queryFactory
-            .select(spot.language, spot.title, spot.address)
+            .select(catalog.id, catalog.mapX, catalog.mapY, translation.title)
+            .from(translation)
+            .join(catalog).on(catalog.id.eq(translation.catalogId))
+            .where(translation.language.eq(DomainLocale.KO))
+            .fetch()
+            .mapNotNull { row ->
+                // **배정 쪽과 같은 함수여야 한다** — 규칙이 갈리면 맵의 키와 조회 키가 어긋난다.
+                val key = SpotTitleNormalizer.lookupKey(requireNotNull(row.get(translation.title)))
+                    ?: return@mapNotNull null
+                key to CatalogCandidate(
+                    catalogId = requireNotNull(row.get(catalog.id)),
+                    mapX = requireNotNull(row.get(catalog.mapX)),
+                    mapY = requireNotNull(row.get(catalog.mapY)),
+                )
+            }
+            .groupBy({ it.first }) { it.second }
+
+    /**
+     * 썸네일 URL → KO 카탈로그 id. **KO spot이 정확히 하나인 URL만 담는다.**
+     *
+     * `HAVING count = 1`이 이 조회의 전부다 — 여럿이 공유하는 URL은 같은 장소라는 근거가
+     * 되지 못하므로 애초에 후보에서 뺀다.
+     */
+    @Transactional(readOnly = true)
+    override fun loadKoreanThumbnailIndex(): Map<String, Long> =
+        queryFactory
+            .select(spot.thumbnailImageUrl, spot.catalogId.min())
             .from(spot)
             .where(
-                spot.thumbnailImageUrl.eq(thumbnailImageUrl),
-                spot.language.ne(DomainLocale.KO),
+                spot.language.eq(DomainLocale.KO),
+                spot.catalogId.isNotNull,
+                spot.thumbnailImageUrl.isNotEmpty,
             )
+            .groupBy(spot.thumbnailImageUrl)
+            .having(spot.id.count().eq(1L))
             .fetch()
             .associate {
-                requireNotNull(it.get(spot.language)) to
-                    CatalogTranslation(
-                        title = requireNotNull(it.get(spot.title)),
-                        address = it.get(spot.address),
-                        source = TranslationSource.OFFICIAL,
-                    )
+                requireNotNull(it.get(spot.thumbnailImageUrl)) to requireNotNull(it.get(spot.catalogId.min()))
             }
 
     /**
@@ -102,6 +129,9 @@ class SpotCatalogQueryAdapter(
      *
      * 카탈로그별로 **이미 가진 언어**를 모아 요청 언어에서 빼는 방식이다. "없는 것"을 SQL로
      * 직접 구하려면 언어 수만큼 NOT EXISTS가 붙어 조건이 입력 개수에 비례해 늘어난다.
+     *
+     * **KO 번역이 있는 카탈로그만 대상이다** — 번역 원문이 KO이므로, 외국어에만 있는 장소는
+     * 번역할 원문 자체가 없다. 그 장소는 자기 언어 사용자에게만 보이며 그것이 올바른 동작이다.
      */
     @Transactional(readOnly = true)
     override fun findCatalogsMissingTranslation(
@@ -110,10 +140,14 @@ class SpotCatalogQueryAdapter(
     ): List<UntranslatedCatalog> {
         if (languages.isEmpty()) return emptyList()
 
+        val koTranslation = QSpotCatalogTranslationEntity("koTranslation")
+
         // 요청 언어를 전부 가진 카탈로그는 애초에 제외한다 — 그래야 limit이 실제 대상으로 채워진다.
         val candidateIds = queryFactory
             .select(catalog.id)
             .from(catalog)
+            .join(koTranslation)
+            .on(koTranslation.catalogId.eq(catalog.id), koTranslation.language.eq(DomainLocale.KO))
             .leftJoin(translation)
             .on(translation.catalogId.eq(catalog.id), translation.language.`in`(languages))
             .groupBy(catalog.id)
@@ -124,18 +158,15 @@ class SpotCatalogQueryAdapter(
 
         if (candidateIds.isEmpty()) return emptyList()
 
-        // 번역 원문은 KO 카드다 — 제목은 대표명, 주소는 KO 번역 행의 주소다(R-4).
-        val koTranslation = QSpotCatalogTranslationEntity("koTranslation")
-        val names = queryFactory
-            .select(catalog.id, catalog.representativeNameKo, koTranslation.address)
-            .from(catalog)
-            .leftJoin(koTranslation)
-            .on(koTranslation.catalogId.eq(catalog.id), koTranslation.language.eq(DomainLocale.KO))
-            .where(catalog.id.`in`(candidateIds))
+        // 번역 원문은 KO 행의 제목과 주소다(R-4).
+        val originals = queryFactory
+            .select(koTranslation.catalogId, koTranslation.title, koTranslation.address)
+            .from(koTranslation)
+            .where(koTranslation.catalogId.`in`(candidateIds), koTranslation.language.eq(DomainLocale.KO))
             .fetch()
             .associate {
-                requireNotNull(it.get(catalog.id)) to
-                    (requireNotNull(it.get(catalog.representativeNameKo)) to it.get(koTranslation.address))
+                requireNotNull(it.get(koTranslation.catalogId)) to
+                    (requireNotNull(it.get(koTranslation.title)) to it.get(koTranslation.address))
             }
 
         val existingByCatalog = queryFactory
@@ -149,16 +180,13 @@ class SpotCatalogQueryAdapter(
             val missing = languages - existingByCatalog[catalogId].orEmpty().toSet()
             if (missing.isEmpty()) return@mapNotNull null
 
-            val (nameKo, addressKo) = names[catalogId] ?: return@mapNotNull null
+            val (title, address) = originals[catalogId] ?: return@mapNotNull null
             UntranslatedCatalog(
                 catalogId = catalogId,
-                representativeNameKo = nameKo,
-                representativeAddressKo = addressKo,
+                koreanTitle = title,
+                koreanAddress = address,
                 missingLanguages = missing,
             )
         }
     }
-
-    @Transactional(readOnly = true)
-    override fun findUnresolved(): List<UnresolvedSpotReport> = unresolvedAdapter.findUnresolved()
 }

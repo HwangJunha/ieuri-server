@@ -43,17 +43,19 @@ interface SpotQueryPort {
     fun findIdentity(catalogId: Long, language: DomainLocale): SpotIdentity?
 
     /**
-     * 카탈로그가 보유한 상세 표시 값. 상세 본문이 부재할 때 응답을 구성하고 부재 행의 NOT NULL
-     * 컬럼을 채우는 재료다. 없으면 null(= 존재하지 않는 카탈로그, 또는 분류·좌표가 없어 카드를
-     * 구성할 수 없는 카탈로그).
+     * 카탈로그가 [language]로 보유한 상세 표시 값. 상세 본문이 부재할 때 응답을 구성하고 부재
+     * 행의 NOT NULL 컬럼을 채우는 재료다.
      *
-     * **[TODO: 언어 미결]** 인자에 언어가 없어 번역을 고를 수 없다 — 지금은 대표 한국어명을
-     * 임시로 쓰고 주소는 null이다. 시그니처에 언어를 더할지는 스펙 결정 사항이다.
+     * **그 언어 번역이 없으면 null이다** — 존재하지 않는 카탈로그와 같게 다룬다. 외국어에만
+     * 있는 장소를 한국어로 조회하면 이 경우이며, 보이지 않는 것이 올바른 동작이다.
      */
-    fun findSpotBasics(catalogId: Long): SpotBasics?
+    fun findSpotBasics(catalogId: Long, language: DomainLocale): SpotBasics?
 
-    /** 여러 카탈로그의 기본 정보를 **IN 절 한 번**으로. 없는 id는 결과에 키가 없다. */
-    fun findSpotBasicsIn(catalogIds: List<Long>): Map<Long, SpotBasics>
+    /**
+     * 여러 카탈로그의 기본 정보를 **IN 절 한 번**으로. 없는 id와 [language] 번역이 없는
+     * 카탈로그는 결과에 키가 없다.
+     */
+    fun findSpotBasicsIn(catalogIds: List<Long>, language: DomainLocale): Map<Long, SpotBasics>
 
     /** 회원이 좋아요(LIKE)한 spot 한 페이지. DISLIKE는 제외하고 요청 언어로 한정한다. */
     fun findLikedSpots(query: LikedSpotsSearch): CursorPage<LikedSpotView>

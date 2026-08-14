@@ -5,9 +5,7 @@ import org.around.ieuri.tourism.application.port.`in`.command.SpotCatalogUseCase
 import org.around.ieuri.tourism.application.port.out.client.FestivalSyncPort
 import org.around.ieuri.tourism.application.port.out.client.SpotSyncPort
 import org.around.ieuri.tourism.application.port.out.persistence.FestivalStorePort
-import org.around.ieuri.tourism.application.port.out.persistence.SpotCatalogSeedPort
 import org.around.ieuri.tourism.application.port.out.persistence.SpotStorePort
-import org.around.ieuri.tourism.application.port.out.query.SpotCatalogQueryPort
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.springframework.batch.core.job.Job
 import org.springframework.batch.core.job.builder.JobBuilder
@@ -18,7 +16,6 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Profile
 import org.springframework.transaction.PlatformTransactionManager
-import java.nio.file.Path
 
 /**
  * 관광지·축제 동기화 잡 구성.
@@ -28,9 +25,7 @@ import java.nio.file.Path
  * ├── syncLanguageStep       ×4 (KO → EN → JA → ZH, 순차)
  * ├── festivalSyncStep       ×4 (KO → EN → JA → ZH, 순차)
  * ├── catalogAssignmentStep  카탈로그 배정 (SPEC-0019)
- * ├── translationSeedStep    초기 번역 시드 적재 (일회성)
- * ├── catalogTranslationStep 신규분 번역
- * └── unresolvedReportStep   미해결 CSV
+ * └── catalogTranslationStep 신규분 번역
  * ```
  *
  * **축제 Step이 관광지 Step 뒤에 와야 한다** — `spot_festival`이 `spot`에 FK를 걸므로 부모 행이
@@ -38,9 +33,6 @@ import java.nio.file.Path
  *
  * **카탈로그 Step은 적재 뒤에 온다**(SPEC-0019 R-7) — 적재되지 않은 행은 배정할 것이 없다.
  * 비관광 spot은 적재 시점에 이미 빠져 있다(SPEC-0018).
- *
- * **시드 Step이 번역 Step보다 앞선다** — 시드가 채운 쌍은 번역 대상에서 빠져야 외부 호출을
- * 34,622번 낭비하지 않는다.
  *
  * **순차 실행이어야 한다** — serviceKey가 4개 언어 공용 단일 키라 병렬화하면 호출 한도를 4배
  * 속도로 소모한다.
@@ -57,8 +49,6 @@ class SpotSyncJobConfig(
     private val festivalStorePort: FestivalStorePort,
     private val festivalProperties: FestivalSyncProperties,
     private val catalogUseCase: SpotCatalogUseCase,
-    private val catalogQueryPort: SpotCatalogQueryPort,
-    private val catalogSeedPort: SpotCatalogSeedPort,
     private val catalogProperties: SpotCatalogProperties,
     private val objectMapper: ObjectMapper,
 ) {
@@ -70,7 +60,7 @@ class SpotSyncJobConfig(
         // 카탈로그 배정·번역·보고는 그 뒤다(SPEC-0019 R-7).
         val steps = order.map(::syncStep) +
             order.map(::festivalStep) +
-            listOf(catalogAssignmentStep(), translationSeedStep(), catalogTranslationStep(), unresolvedReportStep())
+            listOf(catalogAssignmentStep(), catalogTranslationStep())
         return steps.drop(1)
             .fold(JobBuilder(JOB_NAME, jobRepository).start(steps.first())) { acc, step -> acc.next(step) }
             .build()
@@ -82,32 +72,12 @@ class SpotSyncJobConfig(
             .tasklet(SpotCatalogAssignmentTasklet(catalogUseCase), transactionManager)
             .build()
 
-    /**
-     * 초기 번역 시드 적재. **일회성이다** — 적재가 끝나면 매번 0건으로 끝난다.
-     * 경로가 비었거나 파일이 없으면 건너뛴다.
-     */
-    private fun translationSeedStep(): Step =
-        StepBuilder("translationSeedStep", jobRepository)
-            .tasklet(
-                TranslationSeedTasklet(catalogSeedPort, objectMapper, catalogProperties.translationSeedPath),
-                transactionManager,
-            )
-            .build()
 
     /** 번역이 비어 있는 (카탈로그, 언어) 쌍을 채운다. 재번역 경로는 없다(R-7). */
     private fun catalogTranslationStep(): Step =
         StepBuilder("catalogTranslationStep", jobRepository)
             .tasklet(
                 SpotCatalogTranslationTasklet(catalogUseCase, catalogProperties.translationBatchSize),
-                transactionManager,
-            )
-            .build()
-
-    /** 미해결 건 CSV. **실패해도 잡을 실패시키지 않는다** — 배정은 이미 끝났고 보고는 부수적이다. */
-    private fun unresolvedReportStep(): Step =
-        StepBuilder("unresolvedReportStep", jobRepository)
-            .tasklet(
-                UnresolvedCatalogReportTasklet(catalogQueryPort, Path.of(catalogProperties.unresolvedReportPath)),
                 transactionManager,
             )
             .build()

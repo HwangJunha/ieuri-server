@@ -10,49 +10,43 @@ import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.Sp
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.SpotCatalogTranslationEntity
 
 /**
- * 카탈로그 엔티티를 도메인 [SpotCatalog]으로 옮긴다.
+ * 카탈로그 엔티티 ↔ 도메인 변환(POL-033).
  *
- * 번역과 축제 기간은 **파라미터로 받는다** — 엔티티에 연관을 걸지 않았으므로 조회는 호출자의
- * 책임이고, 매퍼는 순수 함수로 남는다.
+ * 번역과 축제는 별도 테이블이라 [toDomain]이 밖에서 받는다 — 엔티티에 연관을 두지 않는
+ * 프로젝트 규칙 때문이며, 조회 시점에 필요한 것만 읽어 오기 위해서다.
  */
 fun SpotCatalogEntity.toDomain(
-    translations: List<SpotCatalogTranslationEntity>,
+    translations: Map<DomainLocale, CatalogTranslation> = emptyMap(),
     festival: SpotCatalogFestivalEntity? = null,
 ): SpotCatalog =
     SpotCatalog.restore(
-        id = requireNotNull(id) { "저장된 카탈로그는 id를 갖는다." },
-        representativeNameKo = representativeNameKo,
-        nameSource = nameSource,
-        standard = toStandardValues(),
-        translations = translations.associate { it.language to it.toDomain() },
+        id = requireNotNull(id) { "저장된 카탈로그에는 id가 있어야 합니다." },
+        standard = CatalogStandardValues(
+            mapX = mapX,
+            mapY = mapY,
+            thumbnailImageUrl = thumbnailImageUrl,
+            category = category,
+            copyright = copyright,
+        ),
+        translations = translations,
         festivalPeriod = festival?.toDomain(),
     )
 
-/** 엔티티의 언어 무관 컬럼을 표준값으로 묶는다. */
-fun SpotCatalogEntity.toStandardValues(): CatalogStandardValues =
-    CatalogStandardValues(
-        mapX = mapX,
-        mapY = mapY,
-        thumbnailImageUrl = thumbnailImageUrl,
-        category = category,
-        copyright = copyright,
-    )
-
-/** 번역 엔티티를 도메인 값으로. */
+/** 번역 엔티티 하나를 도메인 값으로. */
 fun SpotCatalogTranslationEntity.toDomain(): CatalogTranslation =
-    CatalogTranslation(title = title, address = address, source = source)
+    CatalogTranslation(title = title, address = address)
 
-/** 축제 엔티티를 도메인 값으로. */
+/** 축제 기간 엔티티를 도메인 값으로. */
 fun SpotCatalogFestivalEntity.toDomain(): CatalogFestivalPeriod =
     CatalogFestivalPeriod(startDate = eventStartDate, endDate = eventEndDate)
 
-/** 도메인 카탈로그를 새 엔티티로. id는 DB가 채운다. */
+/**
+ * 도메인 카탈로그를 새 엔티티로. id는 DB가 채우므로 넘기지 않는다.
+ *
+ * 번역과 축제는 별도 엔티티라 여기서 만들지 않는다 — [toNewTranslationEntities]가 담당한다.
+ */
 fun SpotCatalog.toNewEntity(): SpotCatalogEntity =
     SpotCatalogEntity(
-        representativeNameKo = representativeNameKo,
-        nameSource = nameSource,
-        // 대표명에서 파생되는 값이라 도메인이 계산한다 — 저장은 인덱스를 위해서다.
-        nameKey = nameKey,
         mapX = standard.mapX,
         mapY = standard.mapY,
         thumbnailImageUrl = standard.thumbnailImageUrl,
@@ -65,18 +59,29 @@ fun SpotCatalog.toNewEntity(): SpotCatalogEntity =
  *
  * [catalogId]를 받는 이유는 신규 카탈로그의 id가 저장 이후에야 정해지기 때문이다 —
  * 부모를 먼저 persist한 뒤 그 id로 자식을 만든다.
+ *
+ * **카탈로그의 좌표를 번역 행에 함께 심는다.** 검색은 평면 질의라 조인을 받지 못해
+ * 이 사본만 보며, 비면 그 카탈로그는 검색에서 사라진다.
  */
 fun SpotCatalog.toNewTranslationEntities(catalogId: Long): List<SpotCatalogTranslationEntity> =
-    translations.map { (language, translation) -> translation.toNewEntity(catalogId, language) }
+    translations.map { (language, translation) ->
+        translation.toNewEntity(catalogId, language, standard.mapX, standard.mapY)
+    }
 
-/** 번역 값 하나를 새 엔티티로. */
-fun CatalogTranslation.toNewEntity(catalogId: Long, language: DomainLocale): SpotCatalogTranslationEntity =
+/** 번역 값 하나를 새 엔티티로. 좌표는 카탈로그 표준값의 사본이라 밖에서 받는다. */
+fun CatalogTranslation.toNewEntity(
+    catalogId: Long,
+    language: DomainLocale,
+    mapX: Double,
+    mapY: Double,
+): SpotCatalogTranslationEntity =
     SpotCatalogTranslationEntity(
         catalogId = catalogId,
         language = language,
         title = title,
         address = address,
-        source = source,
+        mapX = mapX,
+        mapY = mapY,
     )
 
 /** 축제 기간을 새 엔티티로. PK가 catalogId라 upsert 단위이기도 하다. */

@@ -5,9 +5,7 @@ import org.around.ieuri.tourism.application.port.`in`.command.SpotCatalogUseCase
 import org.around.ieuri.tourism.application.port.out.client.FestivalSyncPort
 import org.around.ieuri.tourism.application.port.out.client.SpotSyncPort
 import org.around.ieuri.tourism.application.port.out.persistence.FestivalStorePort
-import org.around.ieuri.tourism.application.port.out.persistence.SpotCatalogSeedPort
 import org.around.ieuri.tourism.application.port.out.persistence.SpotStorePort
-import org.around.ieuri.tourism.application.port.out.query.SpotCatalogQueryPort
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.infrastructure.batch.FestivalSyncProperties
 import org.around.ieuri.tourism.infrastructure.batch.SpotCatalogProperties
@@ -41,8 +39,6 @@ class FestivalSyncOrderingTest {
         festivalStorePort = mockk<FestivalStorePort>(),
         festivalProperties = FestivalSyncProperties(),
         catalogUseCase = mockk<SpotCatalogUseCase>(),
-        catalogQueryPort = mockk<SpotCatalogQueryPort>(),
-        catalogSeedPort = mockk<SpotCatalogSeedPort>(),
         catalogProperties = SpotCatalogProperties(),
         objectMapper = mockk<ObjectMapper>(),
     )
@@ -73,7 +69,7 @@ class FestivalSyncOrderingTest {
         // 스펙 §선행 조사·§비범위. 별도 잡이면 두 잡의 정리가 서로의 행을 지우고, 관광지 수집이
         // 종료 축제를 되살린다 — R-9가 성립하려면 한 잡 안에서 순서가 보장되어야 한다.
         assertEquals(SpotSyncJobConfig.JOB_NAME, config.spotSyncJob().name)
-        // 관광지 4 + 축제 4 + 카탈로그 배정·시드·번역·보고 4(SPEC-0019).
-        assertEquals(12, stepNames.size)
+        // 관광지 4 + 축제 4 + 카탈로그 배정·번역대상조회 2(SPEC-0019).
+        assertEquals(10, stepNames.size)
     }
 }

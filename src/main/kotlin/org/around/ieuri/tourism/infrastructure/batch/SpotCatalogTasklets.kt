@@ -1,14 +1,12 @@
 package org.around.ieuri.tourism.infrastructure.batch
 
 import org.around.ieuri.tourism.application.port.`in`.command.SpotCatalogUseCase
-import org.around.ieuri.tourism.application.port.out.query.SpotCatalogQueryPort
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.slf4j.LoggerFactory
 import org.springframework.batch.core.scope.context.ChunkContext
 import org.springframework.batch.core.step.StepContribution
 import org.springframework.batch.core.step.tasklet.Tasklet
 import org.springframework.batch.infrastructure.repeat.RepeatStatus
-import java.nio.file.Path
 
 /**
  * 카탈로그 배정 Step 본체(SPEC-0019 §3).
@@ -16,8 +14,11 @@ import java.nio.file.Path
  * **동기화·필터 Step 뒤에 온다** — 적재되지 않은 행은 배정할 것이 없고, 비관광 spot은
  * 적재 시점에 이미 빠져 있다(SPEC-0018).
  *
- * 한 번 실행에 [SpotCatalogUseCase.assignCatalogs]가 정한 상한만큼 처리하고, 남은 것이
- * 있으면 `CONTINUABLE`로 다시 돈다. 최초 실행은 115,217행 전량이 대상이라 여러 번 나뉜다.
+ * **언어 순서를 지킨다.** KO를 전량 소진한 뒤 EN·JA·ZH로 넘어간다 — KO가 카탈로그를 만들고
+ * 나머지 언어가 거기 붙으므로, 순서가 뒤집히면 KO가 있는 장소인데도 외국어가 자기 카탈로그를
+ * 만들어 같은 장소가 둘로 갈린다.
+ *
+ * 한 회차에 정해진 상한만큼 처리하고 남으면 `CONTINUABLE`로 다시 돈다.
  */
 class SpotCatalogAssignmentTasklet(
     private val useCase: SpotCatalogUseCase,
@@ -28,32 +29,55 @@ class SpotCatalogAssignmentTasklet(
     override fun execute(contribution: StepContribution, chunkContext: ChunkContext): RepeatStatus {
         val executionContext = chunkContext.stepContext.stepExecution.executionContext
 
-        val result = useCase.assignCatalogs()
-
-        val totalAssigned = executionContext.getInt(KEY_ASSIGNED, 0) + result.assigned
-        val totalCreated = executionContext.getInt(KEY_CREATED, 0) + result.catalogsCreated
-        val totalUnresolved = executionContext.getInt(KEY_UNRESOLVED, 0) + result.unresolved
-
-        executionContext.putInt(KEY_ASSIGNED, totalAssigned)
-        executionContext.putInt(KEY_CREATED, totalCreated)
-        executionContext.putInt(KEY_UNRESOLVED, totalUnresolved)
-        contribution.incrementWriteCount(result.assigned.toLong())
-
-        // 이번 회차에 아무것도 배정하지 못했으면 대상이 소진된 것이다.
-        if (result.assigned == 0) {
+        // 진행 중인 언어를 실행 컨텍스트에 남긴다 — 중단 후 재개해도 같은 지점에서 이어진다.
+        val languageIndex = executionContext.getInt(KEY_LANGUAGE_INDEX, 0)
+        if (languageIndex >= ASSIGNMENT_ORDER.size) {
             log.info(
-                "catalog assignment finished: assigned={} created={} unresolved={}",
-                totalAssigned, totalCreated, totalUnresolved,
+                "catalog assignment finished: joined={} created={} skipped={}",
+                executionContext.getInt(KEY_JOINED, 0),
+                executionContext.getInt(KEY_CREATED, 0),
+                executionContext.getInt(KEY_SKIPPED, 0),
             )
             return RepeatStatus.FINISHED
+        }
+
+        val language = ASSIGNMENT_ORDER[languageIndex]
+        // **키셋 커서.** 배정하지 못하고 건너뛴 행은 catalog_id가 null로 남으므로, 커서 없이
+        // 재조회하면 같은 200건을 무한히 다시 읽는다.
+        val cursor = executionContext.getLong(KEY_CURSOR, 0L)
+        val result = useCase.assignCatalogs(language, cursor)
+
+        executionContext.putInt(KEY_JOINED, executionContext.getInt(KEY_JOINED, 0) + result.joined)
+        executionContext.putInt(KEY_CREATED, executionContext.getInt(KEY_CREATED, 0) + result.catalogsCreated)
+        executionContext.putInt(KEY_SKIPPED, executionContext.getInt(KEY_SKIPPED, 0) + result.skipped)
+        executionContext.putLong(KEY_CURSOR, result.lastSpotId)
+        contribution.incrementWriteCount(result.assigned.toLong())
+
+        // **`processed`로 판정한다** — `assigned`만 보면 한 회차가 전부 skip일 때 소진으로
+        // 오판해 그 언어의 나머지를 통째로 건너뛴다.
+        if (result.processed == 0) {
+            log.info(
+                "catalog assignment: language={} exhausted (skipped={})",
+                language, executionContext.getInt(KEY_SKIPPED, 0),
+            )
+            executionContext.putInt(KEY_LANGUAGE_INDEX, languageIndex + 1)
+            // 다음 언어는 처음부터 읽는다.
+            executionContext.putLong(KEY_CURSOR, 0L)
         }
         return RepeatStatus.CONTINUABLE
     }
 
     companion object {
-        const val KEY_ASSIGNED = "assigned"
+        const val KEY_JOINED = "joined"
         const val KEY_CREATED = "catalogsCreated"
-        const val KEY_UNRESOLVED = "unresolved"
+        const val KEY_LANGUAGE_INDEX = "languageIndex"
+        const val KEY_SKIPPED = "skipped"
+
+        /** 이 언어에서 마지막으로 읽은 spot id. 언어가 바뀌면 0으로 되돌린다. */
+        const val KEY_CURSOR = "cursor"
+
+        /** KO가 먼저다. 나머지 순서는 서로 독립이라 의미가 없다. */
+        val ASSIGNMENT_ORDER = listOf(DomainLocale.KO, DomainLocale.EN, DomainLocale.JA, DomainLocale.ZH)
     }
 }
 
@@ -90,36 +114,5 @@ class SpotCatalogTranslationTasklet(
 
         /** 번역은 KO → EN/JA/ZH 단방향이다. KO는 원문이므로 대상이 아니다(R-4). */
         val TARGET_LANGUAGES = setOf(DomainLocale.EN, DomainLocale.JA, DomainLocale.ZH)
-    }
-}
-
-/**
- * 미해결 CSV Step 본체(SPEC-0019 R-8).
- *
- * **파일 생성 실패가 배치를 실패시키지 않는다** — 카탈로그 배정은 이미 끝난 상태이고 보고는
- * 부수적이다. 여기서 예외를 올리면 성공한 배정까지 실패로 기록된다.
- */
-class UnresolvedCatalogReportTasklet(
-    private val queryPort: SpotCatalogQueryPort,
-    private val outputPath: Path,
-) : Tasklet {
-
-    private val log = LoggerFactory.getLogger(javaClass)
-
-    override fun execute(contribution: StepContribution, chunkContext: ChunkContext): RepeatStatus {
-        try {
-            val reports = queryPort.findUnresolved()
-            UnresolvedCatalogCsvWriter.write(reports, outputPath)
-            log.info("unresolved catalog report written: count={} path={}", reports.size, outputPath)
-            chunkContext.stepContext.stepExecution.executionContext.putInt(KEY_REPORTED, reports.size)
-        } catch (e: Exception) {
-            // 보고 실패는 로그로만 남긴다. 배정 결과를 되돌릴 이유가 없다.
-            log.error("unresolved catalog report failed: path={}", outputPath, e)
-        }
-        return RepeatStatus.FINISHED
-    }
-
-    companion object {
-        const val KEY_REPORTED = "reported"
     }
 }

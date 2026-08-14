@@ -1,38 +1,55 @@
 package org.around.ieuri.tourism.application.port.out.query
 
-import org.around.ieuri.tourism.domain.aggregate.CatalogTranslation
+import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 
 /**
- * 카탈로그 배정·번역·보고가 쓰는 읽기 포트(SPEC-0019).
+ * 카탈로그 배정·번역이 쓰는 읽기 포트(SPEC-0019).
  */
 interface SpotCatalogQueryPort {
 
     /**
-     * 배정 대상 spot — `catalog_id`가 null인 행. **KO를 먼저 돌려준다** — KO 행이 카탈로그를
-     * 만들고 나머지 언어가 거기 붙으므로, 순서가 뒤집히면 KO가 있는 장소인데도 파생
-     * 카탈로그가 생긴다.
+     * 배정 대상 spot — `catalog_id`가 null이고 **좌표가 유효한** 행.
      *
-     * **이것이 곧 증분 처리다**(설계 문서 §3.3) — 배정된 행은 다시 판정하지 않는다.
-     * 적재가 새 행을 넣거나 정리가 참조를 끊으면 그 행만 자연히 대상이 된다.
+     * 좌표가 (0,0)이거나 한국 밖인 행은 여기서 빠진다. 위치를 모르는 장소가 아니라 깨진
+     * 행이며(실측 317건), 카탈로그를 내주면 지도·반경 조회에서 빠지는 "존재하지만 아무 데도
+     * 안 나오는" 데이터가 된다.
+     *
+     * [language]로 좁혀 읽는다 — 배치가 KO를 먼저 전량 처리해 카탈로그를 만든 뒤, 나머지
+     * 언어를 그 위에 붙이기 때문이다.
+     *
+     * **[afterSpotId] 이후만 읽는다(키셋).** 배정하지 못하고 건너뛴 행은 `catalog_id`가 그대로
+     * null이라, 커서가 없으면 다음 회차가 같은 행을 다시 읽어 앞으로 나아가지 못한다.
      */
-    fun findUnassigned(limit: Int): List<UnassignedSpot>
+    fun findUnassigned(language: DomainLocale, afterSpotId: Long, limit: Int): List<UnassignedSpot>
 
     /**
-     * 같은 장소로 묶인 비한국어 spot들의 표시값. 파생 카탈로그의 대표명을 EN→JA→ZH 순으로
-     * 고르기 위한 입력이다(R-3).
+     * 매칭 맵. **KO 카탈로그의 정규화 제목 키 → 카탈로그 id.**
      *
-     * **출처는 항상 `OFFICIAL`이다** — TourAPI가 그 언어로 발급한 원본 행에서 읽으므로
-     * 파생 카탈로그의 번역이 되는 순간 이미 공식 표기이며 번역 대상이 아니다.
+     * 비한국어 spot이 제목 괄호에서 뽑은 한국어로 이 맵을 조회한다. 배치가 시작할 때 한 번
+     * 읽어 메모리에 들고 있으므로 **spot 한 행마다 DB를 왕복하지 않는다** — 그래서 이 키에
+     * 인덱스도, 저장 컬럼도 필요 없다.
+     *
+     * 같은 키에 카탈로그가 여럿이면(동명이인) 좌표로 가른다. 그래서 값이 후보 목록이다.
      */
-    fun findForeignCardsByThumbnail(thumbnailImageUrl: String): Map<DomainLocale, CatalogTranslation>
+    fun loadKoreanTitleIndex(): Map<String, List<CatalogCandidate>>
+
+    /**
+     * 썸네일 URL → KO 카탈로그 id. **그 URL을 쓰는 KO spot이 정확히 하나일 때만 담는다.**
+     *
+     * 제목 키로 못 찾은 비한국어 spot의 폴백이다. TourAPI가 같은 장소의 언어별 제목을 다르게
+     * 주는 경우가 실재하고(`한화리조트 용인 베잔송` vs `한화리조트 / 용인`), 그때도 썸네일은
+     * 같다 — 실측 2,738건이 이 경로로 붙는다.
+     *
+     * **여럿이 공유하는 URL은 제외한다.** 여행 코스가 개별 명소의 대표 사진을 재사용하므로
+     * 공유 URL은 같은 장소라는 근거가 되지 못한다. 유일한 경우로 좁히면 카테고리 일치율이
+     * 97%다(실측).
+     */
+    fun loadKoreanThumbnailIndex(): Map<String, Long>
 
     /** 번역이 비어 있는 (카탈로그, 언어) 쌍. */
     fun findCatalogsMissingTranslation(languages: Set<DomainLocale>, limit: Int): List<UntranslatedCatalog>
-
-    /** 미해결 건 전량. CSV 보고의 입력이다(R-8). */
-    fun findUnresolved(): List<UnresolvedSpotReport>
 }
 
 /**
@@ -51,46 +68,27 @@ data class UnassignedSpot(
     val thumbnailImageUrl: String,
     val mapX: Double,
     val mapY: Double,
-)
-
-/** 번역이 필요한 카탈로그. [representativeNameKo]가 번역 원문이다. */
-data class UntranslatedCatalog(
-    val catalogId: Long,
-    val representativeNameKo: String,
-    /** 번역 원문이 되는 KO 주소. 원문에 주소가 없으면 null이다(R-4). */
-    val representativeAddressKo: String?,
-    val missingLanguages: Set<DomainLocale>,
+    val category: SpotCategory,
+    val copyright: CopyrightType,
 )
 
 /**
- * 미해결 건 한 줄. CSV에 그대로 실린다.
+ * 매칭 맵의 값 하나 — 같은 제목 키를 가진 카탈로그 후보.
  *
- * [candidates]는 사람이 판정하려면 "무엇과 헷갈렸는가"를 알아야 하기 때문에 후보별 좌표·
- * 카테고리까지 담는다.
+ * 좌표를 담는 이유는 동명이인을 가르기 위해서다. `롯데마트`처럼 전국에 같은 이름이 여럿이면
+ * 제목만으로는 정할 수 없다.
  */
-data class UnresolvedSpotReport(
-    val spotId: Long,
-    val language: DomainLocale,
-    val title: String,
-    val category: SpotCategory,
+data class CatalogCandidate(
+    val catalogId: Long,
     val mapX: Double,
     val mapY: Double,
-    val reason: String,
-    val extractedKey: String?,
-    val thumbnailImageUrl: String,
-    val candidates: List<UnresolvedCandidate>,
 )
 
-/**
- * 미해결 건이 헷갈린 카탈로그 후보 하나.
- *
- * 좌표·분류가 nullable인 이유는 **카탈로그의 표준값이 결손일 수 있기 때문이다** — 원본 좌표가
- * 전부 무효인 카탈로그는 좌표 없이 존재한다. CSV는 그 자리를 비워 내보낸다.
- */
-data class UnresolvedCandidate(
+/** 번역이 필요한 카탈로그. KO 번역 행이 번역 원문이다. */
+data class UntranslatedCatalog(
     val catalogId: Long,
-    val representativeNameKo: String,
-    val category: SpotCategory?,
-    val mapX: Double?,
-    val mapY: Double?,
+    val koreanTitle: String,
+    /** 번역 원문이 되는 KO 주소. 원문에 주소가 없으면 null이다(R-4). */
+    val koreanAddress: String?,
+    val missingLanguages: Set<DomainLocale>,
 )

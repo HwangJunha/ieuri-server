@@ -95,7 +95,7 @@ class SpotQueryServiceTest {
         every { spotCachePort.putDetail(any(), any()) } returns Unit
         every { spotCachePort.putDetailAbsence(any(), any()) } returns Unit
         // 부재 응답 구성용 spot 값(R-2). 부재를 다루지 않는 테스트에도 있어야 무해하다.
-        every { spotQueryPort.findSpotBasics(any()) } answers { basics() }
+        every { spotQueryPort.findSpotBasics(any(), any()) } answers { basics() }
         every { spotCachePort.getGallery(any()) } returns null
         every { spotCachePort.putGallery(any(), any()) } returns Unit
         every { spotCachePort.getIntro(any(), any()) } returns null
@@ -708,7 +708,7 @@ class SpotQueryServiceTest {
 
     @Test
     fun `AC-8 - spot의 address가 null이어도 부재 조회는 성공한다`() {
-        every { spotQueryPort.findSpotBasics(any()) } returns basics(address = null)
+        every { spotQueryPort.findSpotBasics(any(), any()) } returns basics(address = null)
         every { tourInfoPort.findDetail(any()) } returns null
 
         val view = service.spotDetail(100L, DomainLocale.KO)

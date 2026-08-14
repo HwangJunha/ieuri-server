@@ -1,18 +1,15 @@
 package org.around.ieuri.tourism.application.service
 
-import org.around.ieuri.tourism.application.port.out.client.SpotTitleTranslationPort
-import org.around.ieuri.tourism.application.port.out.client.TranslatedCard
+import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
 import org.around.ieuri.tourism.application.port.out.persistence.SpotCatalogStorePort
+import org.around.ieuri.tourism.application.port.out.query.CatalogCandidate
 import org.around.ieuri.tourism.application.port.out.query.SpotCatalogQueryPort
 import org.around.ieuri.tourism.application.port.out.query.UnassignedSpot
-import org.around.ieuri.tourism.application.port.out.query.UnresolvedSpotReport
 import org.around.ieuri.tourism.application.port.out.query.UntranslatedCatalog
-import org.around.ieuri.tourism.domain.aggregate.CatalogTranslation
 import org.around.ieuri.tourism.domain.aggregate.SpotCatalog
+import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
-import org.around.ieuri.tourism.domain.vo.CatalogCandidate
-import org.around.ieuri.tourism.domain.vo.TranslationSource
-import org.around.ieuri.tourism.domain.vo.UnresolvedReason
+import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
@@ -21,21 +18,20 @@ import org.junit.jupiter.api.Test
 /**
  * 카탈로그 배정(SPEC-0019 R-1·R-2).
  *
- * **이 테스트가 존재하는 이유는 조회 키를 규칙 단위 테스트가 볼 수 없기 때문이다.**
- * `CatalogMatchRuleTest`는 후보 목록을 직접 넘겨받으므로, 서비스가 **어떤 키로** 후보를
- * 찾았는지는 검사하지 못한다. 제목 전체 키(`MarineCity(마린시티)`)로 찾으면 KO의
- * `마린시티`와 결코 일치하지 않아 매칭이 전량 실패하는데, 규칙 테스트는 전부 통과한다.
+ * 매칭은 **메모리 맵 대조**다 — KO 제목 키 맵을 한 번 읽고 비한국어가 괄호에서 뽑은 한국어로
+ * 조회한다. 이 테스트가 고정하는 것은 *어떤 키로 무엇을 찾는가*와 *언제 붙이고 언제 새로
+ * 만드는가*이다.
  */
 class SpotCatalogAssignmentServiceTest {
 
-    private val mapX = 129.1234567
-    private val mapY = 35.7654321
+    private val mapX = 129.1234
+    private val mapY = 35.5678
 
-    private fun foreignSpot(
-        spotId: Long = 21,
+    private fun spot(
+        spotId: Long = 11,
         language: DomainLocale = DomainLocale.EN,
         title: String = "Marine City (마린시티)",
-        address: String? = "Busan Haeundae-gu",
+        address: String? = "Busan",
         mapX: Double = this.mapX,
         mapY: Double = this.mapY,
     ) = UnassignedSpot(
@@ -46,212 +42,305 @@ class SpotCatalogAssignmentServiceTest {
         thumbnailImageUrl = "https://img/1.jpg",
         mapX = mapX,
         mapY = mapY,
+        category = SpotCategory.TOURIST_SPOT,
+        copyright = CopyrightType.TYPE1,
     )
 
-    private fun koreanSpot(
-        spotId: Long = 11,
-        title: String = "마린시티",
-        address: String? = "부산광역시 해운대구",
-        mapX: Double = this.mapX,
-        mapY: Double = this.mapY,
-    ) = UnassignedSpot(
-        spotId = spotId,
-        language = DomainLocale.KO,
-        title = title,
-        address = address,
-        thumbnailImageUrl = "https://img/1.jpg",
-        mapX = mapX,
-        mapY = mapY,
-    )
+    private fun koreanSpot(spotId: Long = 12, title: String = "마린시티", mapX: Double = this.mapX) =
+        spot(spotId = spotId, language = DomainLocale.KO, title = title, address = "부산", mapX = mapX)
+
+    private fun service(query: StubQueryPort, store: RecordingStorePort) =
+        SpotCatalogService(query, store, NoEvents)
 
     @Test
-    @DisplayName("비한국어 행은 괄호에서 뽑은 한국어로 KO 후보를 찾는다")
-    fun `looks up candidates by the extracted korean key`() {
-        val store = RecordingStorePort(
-            candidatesByKey = mapOf(
-                "마린시티" to listOf(CatalogCandidate(catalogId = 900, mapX = mapX, mapY = mapY)),
-            ),
+    @DisplayName("비한국어는 괄호에서 뽑은 한국어로 KO 카탈로그를 찾는다")
+    fun `foreign row looks up by the extracted korean key`() {
+        // **회귀 방어의 핵심.** 제목 전체를 정규화한 `MarineCity(마린시티)`로 찾으면 KO의
+        // `마린시티`와 결코 일치하지 않아 매칭이 전량 실패한다.
+        val store = RecordingStorePort()
+        val query = StubQueryPort(
+            unassigned = listOf(spot()),
+            koreanIndex = mapOf("마린시티" to listOf(CatalogCandidate(900, mapX, mapY))),
         )
-        val service = SpotCatalogService(StubQueryPort(listOf(foreignSpot())), store, NoTranslation)
 
-        val result = service.assignCatalogs()
+        val result = service(query, store).assignCatalogs(DomainLocale.EN)
 
-        // 제목 전체 키로 찾았다면 후보가 비어 미해결로 떨어졌을 것이다.
-        assertEquals(listOf("마린시티"), store.requestedKeys)
-        assertEquals(listOf(21L to 900L), store.assignments)
-        assertEquals(0, result.unresolved)
+        assertEquals(listOf(11L to 900L), store.assignments)
+        assertEquals(1, result.joined)
         assertEquals(0, result.catalogsCreated)
     }
 
     @Test
-    @DisplayName("전각 괄호 제목도 같은 키로 찾는다")
-    fun `fullwidth parens produce the same lookup key`() {
-        val store = RecordingStorePort(
-            candidatesByKey = mapOf(
-                "마린시티" to listOf(CatalogCandidate(catalogId = 900, mapX = mapX, mapY = mapY)),
-            ),
+    @DisplayName("제목이 달라도 썸네일이 같으면 KO에 붙는다")
+    fun `thumbnail fallback links rows whose titles differ`() {
+        // 회귀: TourAPI가 같은 장소의 언어별 제목을 다르게 준다 —
+        // `한화리조트 용인 베잔송`(KO) vs `한화리조트 / 용인`(ZH). 좌표·썸네일은 같다.
+        val store = RecordingStorePort()
+        val query = StubQueryPort(
+            unassigned = listOf(spot(title = "韓華渡假村/龍仁(한화리조트 / 용인)")),
+            thumbnailIndex = mapOf("https://img/1.jpg" to 900L),
         )
-        val spot = foreignSpot(language = DomainLocale.JA, title = "マリンシティ（마린시티）")
-        val service = SpotCatalogService(StubQueryPort(listOf(spot)), store, NoTranslation)
 
-        service.assignCatalogs()
+        val result = service(query, store).assignCatalogs(DomainLocale.EN)
 
-        assertEquals(listOf("마린시티"), store.requestedKeys)
-        assertEquals(listOf(21L to 900L), store.assignments)
+        assertEquals(listOf(11L to 900L), store.assignments)
+        assertEquals(0, result.catalogsCreated)
     }
 
     @Test
-    @DisplayName("합류한 언어의 제목은 OFFICIAL로 심는다")
-    fun `joined language title is stored as official`() {
-        val store = RecordingStorePort(
-            candidatesByKey = mapOf(
-                "마린시티" to listOf(CatalogCandidate(catalogId = 900, mapX = mapX, mapY = mapY)),
-            ),
+    @DisplayName("제목으로 찾으면 썸네일을 보지 않는다")
+    fun `title match wins over thumbnail`() {
+        // 제목이 더 강한 신호다. 썸네일은 제목이 실패했을 때의 폴백이다.
+        val store = RecordingStorePort()
+        val query = StubQueryPort(
+            unassigned = listOf(spot()),
+            koreanIndex = mapOf("마린시티" to listOf(CatalogCandidate(900, mapX, mapY))),
+            thumbnailIndex = mapOf("https://img/1.jpg" to 777L),
         )
-        val service = SpotCatalogService(StubQueryPort(listOf(foreignSpot())), store, NoTranslation)
 
-        service.assignCatalogs()
+        service(query, store).assignCatalogs(DomainLocale.EN)
 
-        // 나중에 번역 대상이 되지 않으려면 지금 심어야 한다(R-4).
-        assertEquals(
-            listOf(Triple(900L, DomainLocale.EN, TranslationSource.OFFICIAL)),
-            store.translations,
-        )
-        // **주소도 함께 심어야 한다**(R-4) — 빠지면 그 언어 사용자가 장소를 찾아갈 수 없다.
-        assertEquals(listOf("Busan Haeundae-gu"), store.addresses)
+        assertEquals(listOf(11L to 900L), store.assignments)
     }
 
     @Test
-    @DisplayName("한국어를 못 뽑으면 썸네일로 판정한다")
-    fun `falls back to thumbnail when no korean key`() {
-        val store = RecordingStorePort(
-            candidatesByThumbnail = listOf(
-                CatalogCandidate(catalogId = 950, mapX = mapX, mapY = mapY),
-            ),
-        )
-        val spot = foreignSpot(title = "SM Entertainment")
-        val service = SpotCatalogService(StubQueryPort(listOf(spot)), store, NoTranslation)
+    @DisplayName("KO 짝이 없으면 자기 언어만 가진 카탈로그를 만든다")
+    fun `foreign row without a korean counterpart creates its own catalog`() {
+        // 한국어명을 지어내지 않는다 — 원본에 없는 이름을 만들면 정합성이 깨진다.
+        val store = RecordingStorePort()
+        val query = StubQueryPort(unassigned = listOf(spot(title = "SM Entertainment")))
 
-        service.assignCatalogs()
-
-        // 키가 없으므로 키 조회 자체를 하지 않는다.
-        assertTrue(store.requestedKeys.isEmpty())
-        assertEquals(listOf(21L to 950L), store.assignments)
-    }
-
-    @Test
-    @DisplayName("KO 행은 제목 키와 좌표가 모두 같으면 기존 카탈로그에 접힌다")
-    fun `korean rows fold on identical key and coordinates`() {
-        // spec R-2의 KO 자체 클러스터링. 51,992행 → 51,907 클러스터(자체 중복 85행).
-        val store = RecordingStorePort(
-            candidatesByKey = mapOf(
-                "마린시티" to listOf(CatalogCandidate(catalogId = 900, mapX = mapX, mapY = mapY)),
-            ),
-        )
-        val service = SpotCatalogService(StubQueryPort(listOf(koreanSpot(spotId = 12))), store, NoTranslation)
-
-        val result = service.assignCatalogs()
-
-        assertEquals(listOf(12L to 900L), store.assignments)
-        assertEquals(0, result.catalogsCreated, "기존 카탈로그에 접혔으므로 새로 만들지 않는다")
-    }
-
-    @Test
-    @DisplayName("KO 행은 좌표가 다르면 접히지 않는다")
-    fun `korean rows do not fold when coordinates differ`() {
-        // 같은 제목이 전국에 흔하다 — `만두집`. 좌표까지 같아야 같은 장소다.
-        val store = RecordingStorePort(
-            candidatesByKey = mapOf(
-                "마린시티" to listOf(CatalogCandidate(catalogId = 900, mapX = 127.0, mapY = 37.0)),
-            ),
-        )
-        val service = SpotCatalogService(StubQueryPort(listOf(koreanSpot(spotId = 12))), store, NoTranslation)
-
-        val result = service.assignCatalogs()
+        val result = service(query, store).assignCatalogs(DomainLocale.EN)
 
         assertEquals(1, result.catalogsCreated)
-        assertEquals(listOf(12L to RecordingStorePort.NEW_CATALOG_ID), store.assignments)
+        assertEquals(listOf(11L to RecordingStorePort.NEW_CATALOG_ID), store.assignments)
+        val saved = store.saved.single()
+        assertEquals("SM Entertainment", saved.translations[DomainLocale.EN]?.title)
+        assertTrue(saved.needsTranslation(DomainLocale.KO), "KO는 비어 있어야 번역 대상이 된다")
     }
 
     @Test
-    @DisplayName("매칭 실패한 비한국어 행도 카탈로그를 갖고 미해결로 기록된다")
-    fun `unmatched foreign row still gets a catalog`() {
-        // R-1: 매칭은 여러 행을 접는 작업이지 자격 심사가 아니다.
+    @DisplayName("병기된 한국어 괄호는 표시 제목에서 떼어낸다")
+    fun `korean parenthetical is stripped from the stored title`() {
+        // 괄호 한국어는 매칭 단서일 뿐이다. 남기면 일본어 사용자에게 한글이 그대로 노출된다.
         val store = RecordingStorePort()
-        val spot = foreignSpot(title = "Phil hotel")
-        val service = SpotCatalogService(StubQueryPort(listOf(spot)), store, NoTranslation)
+        val query = StubQueryPort(
+            unassigned = listOf(spot()),
+            koreanIndex = mapOf("마린시티" to listOf(CatalogCandidate(900, mapX, mapY))),
+        )
 
-        val result = service.assignCatalogs()
+        service(query, store).assignCatalogs(DomainLocale.EN)
 
-        assertEquals(1, result.unresolved)
-        assertEquals(listOf(21L to RecordingStorePort.NEW_CATALOG_ID), store.assignments)
-        assertEquals(listOf(21L to UnresolvedReason.NO_KOREAN_KEY), store.unresolved)
+        assertEquals(listOf(Triple(900L, DomainLocale.EN, "Marine City")), store.translations)
     }
 
-    private object NoTranslation : SpotTitleTranslationPort {
-        override fun translate(
-            koreanTitle: String,
-            koreanAddress: String?,
-            targets: Set<DomainLocale>,
-        ): Map<DomainLocale, TranslatedCard> = emptyMap()
+    @Test
+    @DisplayName("KO 제목은 그대로 저장한다")
+    fun `korean title is stored as is`() {
+        val store = RecordingStorePort()
+        val query = StubQueryPort(unassigned = listOf(koreanSpot()))
+
+        service(query, store).assignCatalogs(DomainLocale.KO)
+
+        assertEquals("마린시티", store.saved.single().translations[DomainLocale.KO]?.title)
     }
+
+    @Test
+    @DisplayName("같은 이름의 카탈로그가 여럿이면 좌표가 일치하는 것에 붙인다")
+    fun `ambiguous name is resolved by exact coordinates`() {
+        // `롯데마트`처럼 같은 이름이 전국에 여럿이라 제목만으로는 정할 수 없다.
+        val store = RecordingStorePort()
+        val query = StubQueryPort(
+            unassigned = listOf(spot()),
+            koreanIndex = mapOf(
+                "마린시티" to listOf(
+                    CatalogCandidate(900, 127.0, 37.5),
+                    CatalogCandidate(901, mapX, mapY),
+                ),
+            ),
+        )
+
+        service(query, store).assignCatalogs(DomainLocale.EN)
+
+        assertEquals(listOf(11L to 901L), store.assignments)
+    }
+
+    @Test
+    @DisplayName("좌표로도 가릴 수 없으면 붙이지 않고 새로 만든다")
+    fun `unresolvable ambiguity creates a new catalog`() {
+        // 잘못 붙이면 좋아요가 다른 장소로 딸려 간다. 새로 만드는 편이 안전하다.
+        val store = RecordingStorePort()
+        val query = StubQueryPort(
+            unassigned = listOf(spot()),
+            koreanIndex = mapOf(
+                "마린시티" to listOf(
+                    CatalogCandidate(900, 127.0, 37.5),
+                    CatalogCandidate(901, 128.0, 36.5),
+                ),
+            ),
+        )
+
+        val result = service(query, store).assignCatalogs(DomainLocale.EN)
+
+        assertEquals(1, result.catalogsCreated)
+        assertEquals(listOf(11L to RecordingStorePort.NEW_CATALOG_ID), store.assignments)
+    }
+
+    @Test
+    @DisplayName("KO끼리는 같은 키·같은 좌표면 한 카탈로그로 접힌다")
+    fun `korean rows fold within the same batch`() {
+        // 같은 장소가 KO 안에서만 둘로 갈리면 좋아요가 따로 쌓인다 — 이 스펙이 없애려는 결함이다.
+        val store = RecordingStorePort()
+        val query = StubQueryPort(unassigned = listOf(koreanSpot(spotId = 12), koreanSpot(spotId = 13)))
+
+        val result = service(query, store).assignCatalogs(DomainLocale.KO)
+
+        assertEquals(1, result.catalogsCreated)
+        assertEquals(1, result.joined)
+    }
+
+    @Test
+    @DisplayName("KO끼리도 좌표가 다르면 접지 않는다")
+    fun `korean rows do not fold when coordinates differ`() {
+        val store = RecordingStorePort()
+        val query = StubQueryPort(
+            unassigned = listOf(koreanSpot(spotId = 12), koreanSpot(spotId = 13, mapX = 127.0)),
+        )
+
+        val result = service(query, store).assignCatalogs(DomainLocale.KO)
+
+        assertEquals(2, result.catalogsCreated)
+    }
+
+    @Test
+    @DisplayName("새 카탈로그는 원본의 좌표·분류·저작권을 그대로 갖는다")
+    fun `new catalog carries the source standard values`() {
+        // mapX·mapY가 둘 다 Double이라 서로 뒤바뀌어도 컴파일된다 — 뒤바뀌면 전 국토가
+        // 지도 밖으로 나간다. 값을 다르게 주고 개별로 단언한다.
+        val store = RecordingStorePort()
+        val query = StubQueryPort(unassigned = listOf(koreanSpot()))
+
+        service(query, store).assignCatalogs(DomainLocale.KO)
+
+        val standard = store.saved.single().standard
+        assertEquals(129.1234, standard.mapX)
+        assertEquals(35.5678, standard.mapY)
+        assertEquals("https://img/1.jpg", standard.thumbnailImageUrl)
+        assertEquals(SpotCategory.TOURIST_SPOT, standard.category)
+        assertEquals(CopyrightType.TYPE1, standard.copyright)
+    }
+
+    @Test
+    @DisplayName("새 카탈로그에는 축제 기간을 심는다")
+    fun `newly created catalog gets its festival period planted`() {
+        // 축제 기간은 저장한 행이 아니라 spot_festival에서 온다. 여기서 빠뜨리면 영영 비어 있다.
+        val store = RecordingStorePort()
+        val query = StubQueryPort(unassigned = listOf(koreanSpot()))
+
+        service(query, store).assignCatalogs(DomainLocale.KO)
+
+        assertEquals(listOf(RecordingStorePort.NEW_CATALOG_ID), store.festivalRefreshed)
+    }
+
+    @Test
+    @DisplayName("KO도 회차를 넘는 중복을 접는다")
+    fun `korean folds across chunk boundaries`() {
+        // 회귀: 회차가 200건씩 끊기므로 경계를 사이에 둔 같은 장소는 회차 한정 맵으로는
+        // 못 접고 카탈로그가 둘로 갈린다. KO도 DB 맵을 읽어야 한다.
+        val store = RecordingStorePort()
+        val query = StubQueryPort(
+            unassigned = listOf(koreanSpot(spotId = 12)),
+            koreanIndex = mapOf("마린시티" to listOf(CatalogCandidate(900, mapX, mapY))),
+        )
+
+        val result = service(query, store).assignCatalogs(DomainLocale.KO)
+
+        assertEquals(listOf(12L to 900L), store.assignments)
+        assertEquals(0, result.catalogsCreated, "이전 회차가 만든 카탈로그에 접혀야 한다")
+    }
+
+    @Test
+    @DisplayName("건너뛴 행도 커서를 전진시킨다")
+    fun `skipped rows still advance the cursor`() {
+        // 회귀: 건너뛴 행은 catalog_id가 null로 남는다. 커서가 안 움직이면 다음 회차가
+        // 같은 행을 다시 읽어 영원히 제자리다.
+        val store = RecordingStorePort()
+        val query = StubQueryPort(unassigned = listOf(spot(spotId = 42, title = "초려공방")))
+
+        val result = service(query, store).assignCatalogs(DomainLocale.EN)
+
+        assertEquals(1, result.skipped)
+        assertEquals(0, result.assigned)
+        assertEquals(1, result.processed, "processed가 0이면 언어를 소진한 것으로 오판한다")
+        assertEquals(42L, result.lastSpotId, "커서가 전진해야 다음 회차가 앞으로 나아간다")
+        assertTrue(store.assignments.isEmpty(), "제목이 없는 행은 배정하지 않는다")
+    }
+
+    @Test
+    @DisplayName("대상이 없으면 커서를 그대로 둔다")
+    fun `empty result keeps the cursor`() {
+        val store = RecordingStorePort()
+        val query = StubQueryPort(unassigned = emptyList())
+
+        val result = service(query, store).assignCatalogs(DomainLocale.EN, afterSpotId = 77L)
+
+        assertEquals(0, result.processed)
+        assertEquals(77L, result.lastSpotId)
+    }
+
+    @Test
+    @DisplayName("대상이 없으면 아무것도 하지 않는다")
+    fun `empty target set does nothing`() {
+        val store = RecordingStorePort()
+        val query = StubQueryPort(unassigned = emptyList())
+
+        val result = service(query, store).assignCatalogs(DomainLocale.EN)
+
+        assertEquals(0, result.assigned)
+        assertEquals(0, query.indexLoads, "대상이 없으면 맵도 읽지 않는다")
+    }
+
+    // ── 스텁 ────────────────────────────────────────────────────────────────
 
     private class StubQueryPort(
-        private val unassigned: List<UnassignedSpot>,
+        private val unassigned: List<UnassignedSpot> = emptyList(),
+        private val koreanIndex: Map<String, List<CatalogCandidate>> = emptyMap(),
+        private val thumbnailIndex: Map<String, Long> = emptyMap(),
     ) : SpotCatalogQueryPort {
-        override fun findUnassigned(limit: Int): List<UnassignedSpot> = unassigned
+        var indexLoads = 0
+            private set
 
-        override fun findForeignCardsByThumbnail(
-            thumbnailImageUrl: String,
-        ): Map<DomainLocale, CatalogTranslation> = emptyMap()
+        override fun findUnassigned(language: DomainLocale, afterSpotId: Long, limit: Int): List<UnassignedSpot> =
+            unassigned.filter { it.language == language && it.spotId > afterSpotId }.take(limit)
+
+        override fun loadKoreanTitleIndex(): Map<String, List<CatalogCandidate>> {
+            indexLoads++
+            return koreanIndex
+        }
+
+        override fun loadKoreanThumbnailIndex(): Map<String, Long> = thumbnailIndex
 
         override fun findCatalogsMissingTranslation(
             languages: Set<DomainLocale>,
             limit: Int,
         ): List<UntranslatedCatalog> = emptyList()
-
-        override fun findUnresolved(): List<UnresolvedSpotReport> = emptyList()
     }
 
-    /** 어떤 키로 후보를 찾았는지까지 기록하는 스텁 — 그것이 이 테스트의 핵심 관측 대상이다. */
-    private class RecordingStorePort(
-        private val candidatesByKey: Map<String, List<CatalogCandidate>> = emptyMap(),
-        private val candidatesByThumbnail: List<CatalogCandidate> = emptyList(),
-    ) : SpotCatalogStorePort {
-        val requestedKeys = mutableListOf<String>()
+    private class RecordingStorePort : SpotCatalogStorePort {
+        val saved = mutableListOf<SpotCatalog>()
         val assignments = mutableListOf<Pair<Long, Long>>()
-        val translations = mutableListOf<Triple<Long, DomainLocale, TranslationSource>>()
-        /** 저장된 주소. 제목만 흐르고 주소가 빠지는 회귀를 잡는다(R-4). */
-        val addresses = mutableListOf<String?>()
-        val unresolved = mutableListOf<Pair<Long, UnresolvedReason>>()
-        /** 표준값을 다시 확정한 카탈로그. 배정할 때마다 불려야 한다(R-1). */
-        val refreshedCatalogIds = mutableListOf<Long>()
+        val translations = mutableListOf<Triple<Long, DomainLocale, String>>()
+        val festivalRefreshed = mutableListOf<Long>()
 
-        override fun save(catalog: SpotCatalog): Long = NEW_CATALOG_ID
+        private var nextId = NEW_CATALOG_ID
+
+        override fun save(catalog: SpotCatalog): Long {
+            saved += catalog
+            return nextId++
+        }
 
         override fun assign(spotId: Long, catalogId: Long) {
             assignments += spotId to catalogId
-        }
-
-        override fun findCatalogCandidatesByNameKey(nameKey: String): List<CatalogCandidate> {
-            requestedKeys += nameKey
-            return candidatesByKey[nameKey].orEmpty()
-        }
-
-        override fun findCatalogCandidatesByThumbnail(thumbnailImageUrl: String): List<CatalogCandidate> =
-            candidatesByThumbnail
-
-        override fun refreshStandardValues(catalogId: Long) {
-            refreshedCatalogIds += catalogId
-        }
-
-        override fun recordUnresolved(
-            spotId: Long,
-            reason: UnresolvedReason,
-            extractedKey: String?,
-            candidateCatalogIds: List<Long>,
-        ) {
-            unresolved += spotId to reason
         }
 
         override fun upsertTranslation(
@@ -259,14 +348,20 @@ class SpotCatalogAssignmentServiceTest {
             language: DomainLocale,
             title: String,
             address: String?,
-            source: TranslationSource,
         ) {
-            translations += Triple(catalogId, language, source)
-            addresses += address
+            translations += Triple(catalogId, language, title)
+        }
+
+        override fun refreshFestivalPeriod(catalogId: Long) {
+            festivalRefreshed += catalogId
         }
 
         companion object {
             const val NEW_CATALOG_ID = 7777L
         }
+    }
+
+    private object NoEvents : TourismEventPublisherPort {
+        override fun publish(event: Any) = Unit
     }
 }

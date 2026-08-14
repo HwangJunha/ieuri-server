@@ -3,19 +3,17 @@ package org.around.ieuri.tourism.application.service
 import org.around.ieuri.tourism.application.port.`in`.command.CatalogAssignmentResult
 import org.around.ieuri.tourism.application.port.`in`.command.SpotCatalogUseCase
 import org.around.ieuri.tourism.application.port.`in`.command.TranslationResult
-import org.around.ieuri.tourism.application.port.out.client.SpotTitleTranslationPort
+import org.around.ieuri.tourism.application.event.TranslationTarget
+import org.around.ieuri.tourism.application.event.TranslationTargetsFound
+import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
 import org.around.ieuri.tourism.application.port.out.persistence.SpotCatalogStorePort
+import org.around.ieuri.tourism.application.port.out.query.CatalogCandidate
 import org.around.ieuri.tourism.application.port.out.query.SpotCatalogQueryPort
 import org.around.ieuri.tourism.application.port.out.query.UnassignedSpot
-import org.around.ieuri.tourism.domain.aggregate.CatalogTranslation
+import org.around.ieuri.tourism.domain.aggregate.CatalogStandardValues
 import org.around.ieuri.tourism.domain.aggregate.SpotCatalog
-import org.around.ieuri.tourism.domain.specification.CatalogMatchRule
-import org.around.ieuri.tourism.domain.specification.SpotPoint
 import org.around.ieuri.tourism.domain.specification.SpotTitleNormalizer
-import org.around.ieuri.tourism.domain.vo.CatalogMatch
 import org.around.ieuri.tourism.domain.vo.DomainLocale
-import org.around.ieuri.tourism.domain.vo.TranslationSource
-import org.around.ieuri.tourism.domain.vo.UnresolvedReason
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -23,222 +21,203 @@ import org.springframework.transaction.annotation.Transactional
 /**
  * 카탈로그 배정·번역 유스케이스 구현(SPEC-0019).
  *
- * 배정은 두 가지를 한다:
- *  1. 이 spot이 **어느 장소인가** 판정해 카탈로그에 붙인다(R-2)
- *  2. 카탈로그의 **표준값을 확정한다** — 좌표·썸네일·분류·축제기간. 전부 KO 우선이다
+ * **KO를 먼저 전량 처리해 카탈로그를 만든 뒤, 나머지 언어를 그 위에 붙인다.** 배치 Step이
+ * 언어 순서를 지키며 이 서비스를 호출한다.
  *
- * 판정 규칙은 도메인이 소유한다([CatalogMatchRule]) — 이 서비스는 후보를 모아 규칙에 넘기고
- * 결과를 저장하는 순서만 담당한다.
+ * 매칭은 **메모리 맵 대조**다. KO 제목 키 → 카탈로그 맵을 회차 시작 때 한 번 읽고, 비한국어
+ * spot이 제목 괄호에서 뽑은 한국어로 그 맵을 조회한다. spot 한 행마다 DB를 왕복하지 않으므로
+ * 매칭용 인덱스도 저장 컬럼도 필요 없다.
+ *
+ * KO에 짝이 없는 외국어 spot은 **자기 언어만 가진 카탈로그**가 된다. 한국어명을 지어내지
+ * 않는다 — 원본에 없는 이름을 만들면 정합성이 깨진다.
  */
 @Service
 class SpotCatalogService(
     private val queryPort: SpotCatalogQueryPort,
     private val storePort: SpotCatalogStorePort,
-    private val translationPort: SpotTitleTranslationPort,
+    private val eventPublisher: TourismEventPublisherPort,
 ) : SpotCatalogUseCase {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
     @Transactional
-    override fun assignCatalogs(): CatalogAssignmentResult {
-        val targets = queryPort.findUnassigned(ASSIGNMENT_BATCH_SIZE)
+    override fun assignCatalogs(language: DomainLocale, afterSpotId: Long): CatalogAssignmentResult {
+        val targets = queryPort.findUnassigned(language, afterSpotId, ASSIGNMENT_BATCH_SIZE)
+        if (targets.isEmpty()) return CatalogAssignmentResult(joined = 0, catalogsCreated = 0, lastSpotId = afterSpotId)
 
-        var assigned = 0
+        // **KO도 이 맵을 읽는다.** 회차가 200건씩 끊기므로 경계를 사이에 둔 같은 장소는
+        // localIndex(회차 한정)로는 못 접고 카탈로그가 둘로 갈린다.
+        val koreanIndex = queryPort.loadKoreanTitleIndex()
+        // 썸네일 폴백은 비한국어 전용이다 — KO끼리는 제목과 좌표로 충분하고, 썸네일로 접으면
+        // 같은 사진을 쓰는 다른 장소가 뭉친다.
+        val thumbnailIndex = if (language.isKorean) emptyMap() else queryPort.loadKoreanThumbnailIndex()
+
+        // **이 회차에서 만든 카탈로그도 다음 행의 후보다.** 같은 배치 안에 같은 장소가 여러 번
+        // 나오면(KO 자체 중복, 같은 이름의 외국어 행) 맵에 없으므로 여기 모아 함께 본다.
+        val localIndex = mutableMapOf<String, MutableList<CatalogCandidate>>()
+
+        var joined = 0
         var created = 0
-        var unresolved = 0
 
-        // KO가 먼저 온다(포트 계약) — KO가 카탈로그를 만들고 나머지 언어가 거기 붙는다.
-        targets.forEach { spot ->
-            when (val outcome = assignOne(spot)) {
-                is Outcome.Joined -> assigned++
-                is Outcome.Created -> {
-                    assigned++
-                    created++
-                }
-                is Outcome.CreatedUnresolved -> {
-                    assigned++
-                    created++
-                    unresolved++
-                    storePort.recordUnresolved(
-                        spotId = spot.spotId,
-                        reason = outcome.reason,
-                        extractedKey = outcome.extractedKey,
-                        candidateCatalogIds = outcome.candidateCatalogIds,
-                    )
-                }
-            }
-        }
-
-        log.info(
-            "catalog assignment completed: assigned={} created={} unresolved={}",
-            assigned, created, unresolved,
-        )
-        return CatalogAssignmentResult(assigned = assigned, catalogsCreated = created, unresolved = unresolved)
-    }
-
-    /**
-     * spot 한 행을 배정한다. **어떤 경로로 끝나든 카탈로그를 갖는다**(R-1) — 매칭은 여러 행을
-     * 접는 작업이지 자격 심사가 아니다.
-     */
-    private fun assignOne(spot: UnassignedSpot): Outcome {
-        if (spot.language.isKorean) return assignKorean(spot)
-
-        // **조회 키는 제목 전체가 아니라 괄호에서 뽑은 한국어다.** `MarineCity(마린시티)`로
-        // 찾으면 카탈로그의 `마린시티`와 결코 일치하지 않아 매칭이 전량 실패한다.
-        val match = CatalogMatchRule.match(
-            title = spot.title,
-            coordinates = SpotPoint(spot.mapX, spot.mapY),
-            candidatesByKey = SpotTitleNormalizer.lookupKey(spot.title)
-                ?.let { storePort.findCatalogCandidatesByNameKey(it) }
-                ?: emptyList(),
-            candidatesByThumbnail = storePort.findCatalogCandidatesByThumbnail(spot.thumbnailImageUrl),
-        )
-
-        return when (match) {
-            is CatalogMatch.Matched -> {
-                storePort.assign(spot.spotId, match.catalogId)
-                // 이 언어의 값은 TourAPI가 발급한 공식 표기다 — 나중에 번역 대상이 되지 않게 지금 심는다.
-                storePort.upsertTranslation(
-                    match.catalogId, spot.language, spot.title, spot.address, TranslationSource.OFFICIAL,
-                )
-                // 표준값을 다시 확정한다 — 이 행이 KO보다 나은 값을 가질 수 있다
-                // (KO 좌표가 (0,0)인데 이 행은 유효한 경우).
-                storePort.refreshStandardValues(match.catalogId)
-                Outcome.Joined
-            }
-            is CatalogMatch.Unresolved -> createStandaloneCatalog(spot, match)
-        }
-    }
-
-    /**
-     * KO 행의 배정. **KO끼리도 접는다**(R-2) — 제목 정규화 키와 좌표가 **둘 다 완전히 일치**할
-     * 때만 한 클러스터로 본다. 실측 51,992행이 51,907개 클러스터가 되며 접히는 85행이 이 경로다.
-     *
-     * 접지 않으면 같은 장소가 KO 안에서만 둘로 갈려 좋아요가 따로 쌓인다 — 이 스펙이 없애려는
-     * 결함과 같은 종류다.
-     */
-    private fun assignKorean(spot: UnassignedSpot): Outcome {
-        // **firstOrNull이다.** singleOrNull이면 같은 키·같은 좌표의 후보가 둘 이상일 때 null이
-        // 되어 새 카탈로그가 생긴다 — 접으려던 중복이 오히려 갈라진다. 한 좌표에 207행이
-        // 매달린 사례가 실재하므로(롯데프리미엄아울렛) 이 경우가 드물지 않다.
-        // 후보 순서는 id 오름차순이라 재실행해도 같은 카탈로그를 고른다.
-        val existing = SpotTitleNormalizer.matchKey(spot.title)
-            ?.let { storePort.findCatalogCandidatesByNameKey(it) }
-            ?.firstOrNull { it.mapX == spot.mapX && it.mapY == spot.mapY }
-
-        if (existing != null) {
-            storePort.assign(spot.spotId, existing.catalogId)
-            storePort.refreshStandardValues(existing.catalogId)
-            return Outcome.Joined
-        }
-
-        val catalogId = storePort.save(SpotCatalog.fromKoreanSpot(spot.title, spot.address))
-        storePort.assign(spot.spotId, catalogId)
-        storePort.refreshStandardValues(catalogId)
-        return Outcome.Created
-    }
-
-    /**
-     * 매칭되지 않은 비한국어 spot의 독립 카탈로그.
-     *
-     * 괄호에서 한국어를 뽑을 수 있으면 파생 카탈로그이고(R-3), 뽑을 수 없으면 미해결이다.
-     * **미해결이어도 카탈로그는 만든다** — 감추면 `SM Entertainment` 같은 유효한 spot이 사라진다.
-     */
-    private fun createStandaloneCatalog(spot: UnassignedSpot, match: CatalogMatch.Unresolved): Outcome {
-        // 같은 썸네일을 쓰는 다른 언어 행들을 함께 본다 — EN→JA→ZH 순으로 대표명을 고르려면
-        // 이 그룹 전체의 값이 필요하다(R-3). 자기 값만 보면 ZH만 있는 장소에서 ZH가 채택된다.
-        val siblings = queryPort.findForeignCardsByThumbnail(spot.thumbnailImageUrl)
-            .ifEmpty {
-                mapOf(spot.language to CatalogTranslation(spot.title, spot.address, TranslationSource.OFFICIAL))
-            }
-
-        val derived = SpotCatalog.deriveFromForeign(siblings)
-
-        if (derived == null) {
-            // 어느 언어에서도 한국어를 못 뽑았다. 대표명이 없으면 카탈로그를 만들 수 없으므로
-            // 원문 제목을 대표명 자리에 둔다 — 사람이 CSV를 보고 고칠 값이다.
-            val catalogId = storePort.save(SpotCatalog.fromKoreanSpot(spot.title, spot.address))
-            storePort.assign(spot.spotId, catalogId)
-            storePort.upsertTranslation(
-                catalogId, spot.language, spot.title, spot.address, TranslationSource.OFFICIAL,
-            )
-            storePort.refreshStandardValues(catalogId)
-            return Outcome.CreatedUnresolved(
-                UnresolvedReason.NO_KOREAN_KEY, match.extractedKey, match.candidateCatalogIds,
-            )
-        }
-
-        val catalogId = storePort.save(derived)
-        storePort.assign(spot.spotId, catalogId)
-        storePort.refreshStandardValues(catalogId)
-        return Outcome.CreatedUnresolved(match.reason, match.extractedKey, match.candidateCatalogIds)
-    }
-
-    /**
-     * **번역이 비어 있는 (카탈로그, 언어) 쌍만** 대상이다(R-4).
-     *
-     * 제목 해시 컬럼도, 변경 감지도 두지 않는다 — 재번역 경로가 존재하지 않으므로 필요 없다(R-7).
-     * 기존 `content_id`의 값이 상류에서 바뀌어도 번역은 그대로 둔다. 의도된 동작이다.
-     */
-    @Transactional
-    override fun translateMissing(languages: Set<DomainLocale>, limit: Int): TranslationResult {
-        val targets = queryPort.findCatalogsMissingTranslation(languages, limit)
-
-        var translated = 0
         var skipped = 0
 
-        targets.forEach { catalog ->
-            val wanted = catalog.missingLanguages intersect languages
-            if (wanted.isEmpty()) {
+        targets.forEach { spot ->
+            // **표시할 제목이 없으면 배정하지 않는다.** TourAPI가 그 언어 제목 자리에 한국어를
+            // 넣은 경우이며(`초려공방`), 저장하면 영어 사용자가 한글을 보게 되고 행이 있으니
+            // 번역 대상에서도 빠져 영영 고쳐지지 않는다. 미배정으로 남겨 두면 상류가 제대로 된
+            // 제목을 주는 날 자연히 배정된다.
+            val displayTitle = spot.displayTitle()
+            if (displayTitle == null) {
                 skipped++
                 return@forEach
             }
 
-            val results = translationPort.translate(
-                catalog.representativeNameKo, catalog.representativeAddressKo, wanted,
-            )
-            results.forEach { (language, card) ->
-                // MACHINE은 기존 값을 덮지 않는다 — 포트 계약이 그것을 보장한다.
-                storePort.upsertTranslation(
-                    catalog.catalogId, language, card.title, card.address, TranslationSource.MACHINE,
-                )
-                translated++
+            val key = spot.matchKey()
+            val candidates = key?.let { koreanIndex[it].orEmpty() + localIndex[it].orEmpty() }.orEmpty()
+
+            // 제목으로 못 찾으면 썸네일로 내려간다. **TourAPI가 같은 장소의 언어별 제목을
+            // 다르게 주는 경우가 실재한다** — `한화리조트 용인 베잔송`(KO)과
+            // `한화리조트 / 용인`(ZH)은 좌표·썸네일이 같은데 이름만 다르다. 그때 남는 신호가
+            // 썸네일이며, KO가 유일한 URL만 담긴 맵이라 오판 위험이 낮다(카테고리 일치율 97%).
+            val matched = candidates.pickFor(spot) ?: thumbnailIndex[spot.thumbnailImageUrl]
+            if (matched != null) {
+                storePort.assign(spot.spotId, matched)
+                // 이 언어의 값은 TourAPI 원문이다 — 번역 대상이 되지 않게 지금 심는다.
+                storePort.upsertTranslation(matched, spot.language, displayTitle, spot.address)
+                joined++
+                return@forEach
             }
-            // 번역기가 돌려주지 않은 언어는 다음 실행이 다시 대상으로 삼는다.
-            skipped += wanted.size - results.size
+
+            val catalogId = storePort.save(
+                SpotCatalog.from(
+                    language = spot.language,
+                    title = displayTitle,
+                    address = spot.address,
+                    standard = spot.toStandardValues(),
+                ),
+            )
+            storePort.assign(spot.spotId, catalogId)
+            // **축제 기간은 저장한 행이 아니라 spot_festival에서 온다.** 여기서 빠뜨리면
+            // 그 축제는 기간을 영영 갖지 못한다.
+            storePort.refreshFestivalPeriod(catalogId)
+            created++
+
+            // KO만 자기들끼리 접는다. 비한국어는 KO에 붙거나 독립하며, 서로 뭉치면 한국어
+            // 이름이 없는 카탈로그가 여러 언어를 갖게 되어 어느 것이 대표인지 정할 수 없다.
+            if (language.isKorean && key != null) {
+                localIndex.getOrPut(key) { mutableListOf() } +=
+                    CatalogCandidate(catalogId, spot.mapX, spot.mapY)
+            }
         }
 
-        log.info("catalog translation completed: translated={} skipped={}", translated, skipped)
-        return TranslationResult(translated = translated, skipped = skipped)
+        log.info(
+            "catalog assignment: language={} joined={} created={} skipped={}",
+            language, joined, created, skipped,
+        )
+        return CatalogAssignmentResult(
+            joined = joined,
+            catalogsCreated = created,
+            skipped = skipped,
+            lastSpotId = targets.last().spotId,
+        )
     }
 
-    /** 배정 한 건의 결말. 카운터를 세는 것 외의 의미는 없다. */
-    private sealed interface Outcome {
-        /** 기존 카탈로그에 합류. */
-        data object Joined : Outcome
+    /**
+     * 이 spot이 매칭 맵을 조회할 키. **언어를 가리지 않는다** — 제목에서 한글만 남기므로
+     * `Marine City (마린시티)`와 `마린시티`가 같은 키가 된다.
+     */
+    private fun UnassignedSpot.matchKey(): String? = SpotTitleNormalizer.lookupKey(title)
 
-        /** 새 카탈로그 생성(KO 행 또는 파생). */
-        data object Created : Outcome
+    /**
+     * 표시용 제목. 비한국어는 한글을 걷어낸다 — 매칭 단서였을 뿐 표시할 값이 아니다.
+     *
+     * **null이면 그 언어의 제목이 아니다** — 한글만 남는 제목은 TourAPI가 번역을 주지 않고
+     * 원문을 그대로 넣은 것이며, 호출자가 그 spot을 미배정으로 남긴다.
+     */
+    private fun UnassignedSpot.displayTitle(): String? =
+        if (language.isKorean) title else SpotTitleNormalizer.displayTitle(title)
 
-        /** 새 카탈로그 생성 + 미해결 기록. */
-        data class CreatedUnresolved(
-            val reason: UnresolvedReason,
-            val extractedKey: String?,
-            val candidateCatalogIds: List<Long>,
-        ) : Outcome
+    /**
+     * 후보 중 이 spot의 카탈로그를 고른다. 좌표 일치가 없거나 둘 이상이면 붙이지 않고 새
+     * 카탈로그를 만든다 — 잘못 붙이면 좋아요가 다른 장소로 딸려 간다.
+     *
+     * **KO와 비한국어의 기준이 다르다.**
+     *  - KO끼리는 **항상 좌표까지 같아야** 접는다. 같은 이름이 전국에 여럿이므로(`만두집`,
+     *    `롯데마트`) 제목만으로 접으면 무관한 가게가 한 장소가 된다.
+     *  - 비한국어는 후보가 유일하면 좌표를 묻지 않는다. 괄호 한국어가 이미 그 장소를
+     *    지목하고 있고, 언어별로 좌표가 미세하게 다른 경우가 실재한다.
+     *
+     * **근사 비교를 하지 않는다.** 좌표가 미세하게 다른 두 spot이 실제로 다른 가게인 경우와
+     * 같은 가게의 좌표가 갱신된 경우를 거리로는 구분할 수 없다.
+     */
+    private fun List<CatalogCandidate>.pickFor(spot: UnassignedSpot): Long? {
+        if (isEmpty()) return null
+        if (!spot.language.isKorean) singleOrNull()?.let { return it.catalogId }
+        return singleOrNull { it.mapX == spot.mapX && it.mapY == spot.mapY }?.catalogId
+    }
+
+    /**
+     * 카탈로그의 표준값. **좌표 유효성은 조회 포트가 이미 걸렀다** — 여기 온 행은 전부 유효하다.
+     */
+    private fun UnassignedSpot.toStandardValues(): CatalogStandardValues =
+        CatalogStandardValues(
+            mapX = mapX,
+            mapY = mapY,
+            thumbnailImageUrl = thumbnailImageUrl,
+            category = category,
+            copyright = copyright,
+        )
+
+    /**
+     * **번역이 비어 있는 (카탈로그, 언어) 쌍을 찾아 알린다**(R-4).
+     *
+     * 이 도메인은 번역하지 않고 **대상만 찾아 이벤트로 넘긴다** — 번역을 누가 어떻게 하는지는
+     * tourism의 관심사가 아니다. 구독자가 그 목록을 받아 처리한다.
+     *
+     * 제목 해시 컬럼도, 변경 감지도 두지 않는다 — 재번역 경로가 존재하지 않으므로 필요 없다(R-7).
+     * 기존 `content_id`의 값이 상류에서 바뀌어도 번역은 그대로 둔다. 의도된 동작이다.
+     *
+     * **KO 번역이 없는 카탈로그는 대상이 아니다**(포트가 제외한다) — 외국어에만 있는 장소이고,
+     * 번역할 원문이 없다. 그 장소는 자기 언어 사용자에게만 보이며 그것이 올바른 동작이다.
+     */
+    @Transactional(readOnly = true)
+    override fun translateMissing(languages: Set<DomainLocale>, limit: Int): TranslationResult {
+        val candidates = queryPort.findCatalogsMissingTranslation(languages, limit)
+
+        val targets = candidates.mapNotNull { catalog ->
+            val wanted = catalog.missingLanguages intersect languages
+            wanted.takeIf { it.isNotEmpty() }?.let {
+                TranslationTarget(
+                    catalogId = catalog.catalogId,
+                    koreanTitle = catalog.koreanTitle,
+                    koreanAddress = catalog.koreanAddress,
+                    missingLanguages = it,
+                )
+            }
+        }
+
+        // **빈 목록은 발행하지 않는다** — 구독자가 빈 알림을 거르지 않아도 되게 한다.
+        if (targets.isNotEmpty()) {
+            eventPublisher.publish(TranslationTargetsFound(targets))
+        }
+
+        log.info(
+            "catalog translation targets: found={} skipped={}",
+            targets.size, candidates.size - targets.size,
+        )
+        return TranslationResult(translated = targets.size, skipped = candidates.size - targets.size)
     }
 
     private companion object {
         /**
          * 한 번의 배정(= 한 트랜잭션)에서 처리할 최대 행 수.
          *
-         * **작게 잡는다.** 한 행마다 후보 조회·배정·번역 upsert·표준값 확정으로 6~8개 문장이
-         * 나가므로, 5,000행이면 한 트랜잭션이 4만 문장을 붙들고 커넥션 하나를 오래 점유한다.
-         * 그리고 마지막 한 건이 실패하면 앞의 전부가 롤백되어 처음부터 다시 한다.
+         * **작게 잡는다.** 한 트랜잭션이 길수록 커넥션을 오래 점유하고, 마지막 한 건이
+         * 실패하면 앞의 전부가 롤백되어 처음부터 다시 한다(실측: 500행 회차가 5분 30초를
+         * 돌다 연결 유실).
          *
-         * Spring Batch의 `CONTINUABLE`이 회차를 이어 주므로 작게 끊어도 전량 처리된다 —
-         * 최초 실행 119,960행은 여러 회차로 나뉘고, 중간에 멈춰도 거기서 재개한다.
+         * Spring Batch의 `CONTINUABLE`이 회차를 이어 주므로 작게 끊어도 전량 처리된다.
          */
-        const val ASSIGNMENT_BATCH_SIZE = 500
+        const val ASSIGNMENT_BATCH_SIZE = 200
     }
 }
