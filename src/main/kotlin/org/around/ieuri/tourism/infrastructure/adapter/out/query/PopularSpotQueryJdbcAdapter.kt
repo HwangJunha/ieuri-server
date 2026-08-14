@@ -89,18 +89,14 @@ class PopularSpotQueryJdbcAdapter(
             LIMIT ?
             """.trimIndent(),
             { rs, _ ->
-                // 카탈로그의 copyright·thumbnail은 nullable이다 — "미제공"이 곧 UNSPECIFIED이고,
-                // 썸네일은 빈 문자열로 자리를 비운다. 조회를 통째로 실패시킬 값이 아니다.
-                val copyright = rs.getString("copyright")
-                    ?.let { CopyrightType.valueOf(it) }
-                    ?: CopyrightType.UNSPECIFIED
+                val copyright = CopyrightType.valueOf(rs.getString("copyright"))
                 PopularSpotView(
                     spot = SpotView(
                         // **클라이언트에 나가는 id는 카탈로그 id다**(SPEC-0019).
                         id = rs.getLong("id"),
                         title = rs.getString("title"),
                         address = rs.getString("address"),
-                        thumbnailImageUrl = rs.getString("thumbnail_image_url").orEmpty(),
+                        thumbnailImageUrl = rs.getString("thumbnail_image_url"),
                         distanceMeters = rs.getDouble("distance_meters"),
                         category = SpotCategory.valueOf(rs.getString("category")),
                         copyright = copyright,
@@ -124,8 +120,9 @@ class PopularSpotQueryJdbcAdapter(
         // 카테고리 없는 카탈로그는 카드를 그릴 수 없다 — 도메인 enum에 미분류 값이 없다.
         // 좌표 없는 카탈로그는 ST_DWithin이 참을 돌려주지 않아 자연히 빠진다.
         val conditions = mutableListOf(
-            "cat.category IS NOT NULL",
             "ST_DWithin(cat.location, c.center, ?)",
+            // 원본이 사라진 카탈로그는 감춘다 — 상세를 열면 실패하는 장소가 되기 때문이다.
+            LiveCatalogPredicate.sql("cat"),
         )
         val params = mutableListOf<Any>(
             query.center.longitude, query.center.latitude, // CTE의 center

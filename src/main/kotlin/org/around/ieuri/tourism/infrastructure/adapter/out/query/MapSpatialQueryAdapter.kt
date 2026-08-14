@@ -49,8 +49,8 @@ class MapSpatialQueryAdapter(
             -- `UNIQUE(catalog_id, language)`가 있어 이 조인은 카탈로그당 최대 1행이다.
             JOIN spot_catalog_translation t ON t.catalog_id = cat.id AND t.language = ?
             WHERE $BBOX_PREDICATE
+              AND ${LiveCatalogPredicate.sql("cat")}
               -- 카테고리 없는 카탈로그는 마커를 그릴 수 없다 — 도메인 enum에 미분류 값이 없다.
-              AND cat.category IS NOT NULL
               $categoryCondition
             ORDER BY cat.id
             LIMIT ?

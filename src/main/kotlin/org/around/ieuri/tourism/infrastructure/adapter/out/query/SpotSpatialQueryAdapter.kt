@@ -53,15 +53,12 @@ class SpotSpatialQueryAdapter(
                     address = rs.getString("address"),
                     // 카탈로그의 썸네일은 nullable이다. 카드 자리를 비워 두는 편이 조회를 통째로
                     // 실패시키는 것보다 낫다.
-                    thumbnailImageUrl = rs.getString("thumbnail_image_url").orEmpty(),
+                    thumbnailImageUrl = rs.getString("thumbnail_image_url"),
                     mapX = rs.getDouble("map_x"),
                     mapY = rs.getDouble("map_y"),
                     category = SpotCategory.valueOf(rs.getString("category")),
-                    // copyright는 nullable이며 "미제공"이 곧 UNSPECIFIED다. 컬럼에는 enum 이름이
-                    // 그대로 들어 있으므로 코드 문자열 변환(fromCode)이 아니라 valueOf다.
-                    copyright = rs.getString("copyright")
-                        ?.let { CopyrightType.valueOf(it) }
-                        ?: CopyrightType.UNSPECIFIED,
+                    // 컬럼에 enum 이름이 그대로 들어 있으므로 코드 변환(fromCode)이 아니라 valueOf다.
+                    copyright = CopyrightType.valueOf(rs.getString("copyright")),
                     distanceMeters = rs.getDouble("distance_meters"),
                 )
             },
@@ -124,10 +121,11 @@ class SpotSpatialQueryAdapter(
 
         return jdbcTemplate.query(
             """
-            SELECT id FROM spot_catalog
-            WHERE ST_DWithin(location, $CENTER, ?)
+            SELECT id FROM spot_catalog cat
+            WHERE ST_DWithin(cat.location, $CENTER, ?)
+              AND ${LiveCatalogPredicate.sql("cat")}
               $categoryCondition
-            ORDER BY location <-> $CENTER, id
+            ORDER BY cat.location <-> $CENTER, cat.id
             LIMIT ?
             """.trimIndent(),
             { rs, _ -> rs.getLong("id") },
@@ -155,8 +153,9 @@ class SpotSpatialQueryAdapter(
         // 미분류 값이 없다) 임의의 기본값을 만들면 잘못된 분류로 노출된다.
         val conditions = mutableListOf(
             "t.language = ?",
-            "cat.category IS NOT NULL",
             "ST_DWithin(cat.location, c.center, ?)",
+            // 원본이 사라진 카탈로그는 감춘다 — 상세를 열면 실패하는 장소가 되기 때문이다.
+            LiveCatalogPredicate.sql("cat"),
         )
         val params = mutableListOf<Any>(
             query.center.longitude, query.center.latitude,

@@ -29,7 +29,7 @@ import org.springframework.transaction.annotation.Transactional
  * **검색은 `spot_catalog_translation` 단독으로 돈다**(SPEC-0019). BM25 인덱스가 그 테이블에
  * 걸리고, pg_search는 `@@@`·`pdb.score()`·`ORDER BY`·`LIMIT`이 전부 같은 질의 레벨에 있어야
  * 인덱스로 밀어넣기 때문에 **어떤 조인도 붙일 수 없다.** 거리 필터·정렬에 필요한 좌표는 그래서
- * 번역 행에 복사돼 있다(V55).
+ * 번역 행에 복사돼 있다(V52).
  *
  * 카드에 필요한 나머지 값(썸네일·분류·저작권)은 번역 테이블에 없어 **[loadCards]가 2단계로
  * 읽는다.** 거리 필터가 1단계에서 이미 걸렸으므로 2단계는 이미 좁혀진 한 페이지에 대한 단순
@@ -71,7 +71,7 @@ class SpotSearchJdbcAdapter(
         // `query is incompatible with @@@ operator`로 실패한다(실측).
         //
         // **그래서 `spot_catalog`를 조인하지 않는다.** 거리에 필요한 좌표는 번역 행에 복사돼
-        // 있고(V55), 카드의 나머지 값은 [loadCards]가 2단계로 읽는다.
+        // 있고(V52), 카드의 나머지 값은 [loadCards]가 2단계로 읽는다.
         //
         // 커서 seek도 같은 이유로 쓸 수 없다 — 조건절에 관련도를 넣으려면 `pdb.score()`를
         // WHERE에 써야 하는데 그건 SELECT 전용 자리표시자라 `Unsupported query shape`가 된다.
@@ -137,17 +137,15 @@ class SpotSearchJdbcAdapter(
         return jdbcTemplate.query(
             """
             SELECT id, thumbnail_image_url, category, copyright
-            FROM spot_catalog
-            WHERE id IN ($placeholders) AND category IS NOT NULL
+            FROM spot_catalog cat
+            WHERE cat.id IN ($placeholders)
+              AND ${LiveCatalogPredicate.sql("cat")}
             """.trimIndent(),
             { rs, _ ->
                 rs.getLong("id") to SpotCard(
                     thumbnailImageUrl = rs.getString("thumbnail_image_url"),
                     category = SpotCategory.valueOf(rs.getString("category")),
-                    // copyright는 nullable이며 "미제공"이 곧 UNSPECIFIED다.
-                    copyright = rs.getString("copyright")
-                        ?.let { CopyrightType.valueOf(it) }
-                        ?: CopyrightType.UNSPECIFIED,
+                    copyright = CopyrightType.valueOf(rs.getString("copyright")),
                 )
             },
             *catalogIds.toTypedArray(),
