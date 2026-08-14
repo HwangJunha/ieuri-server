@@ -72,6 +72,25 @@ ieuri:
     # 실측: 이 값으로 252개 중 226개 선정.
     min-spot-count: 10
 
+  # 카탈로그 배정·번역·보고(SPEC-0019). 잡은 spotSyncJob에 Step으로 붙어 있다.
+  catalog:
+    # 한 회차에 번역할 카탈로그 수. 외부 호출 비용이 들어 회차를 나눈다.
+    translation-batch-size: 200
+
+    # 미해결 건 CSV 출력 경로(R-8). **메일 발송은 하지 않는다** — 파일을 어떻게 가져갈지는
+    # 운영자가 정한다. 실측 509건(0.81%)이며, 이 수가 크게 늘면 정규화나 상류 데이터가
+    # 바뀐 것이므로 그 자체가 봐야 할 신호다.
+    unresolved-report-path: build/reports/spot-catalog-unresolved.csv
+
+    # 초기 번역 시드(§5.4). **일회성이다** — 적재가 끝나면 매번 0건으로 끝난다.
+    #
+    # planner 하네스가 만든 34,622건이며 제목과 **주소**를 함께 담는다(R-4, 2026-08-14 개정).
+    # 제목만 있으면 일본어 사용자가 일본어 제목 아래 한국어 주소를 보게 되어 찾아갈 수 없다.
+    #
+    # 경로가 비었거나 파일이 없으면 Step을 건너뛴다 — 이미 적재를 마친 환경에서는 파일을
+    # 치워 두면 된다.
+    translation-seed-path: ${IEURI_TRANSLATION_SEED_PATH:/Users/junha/git/ieuri/ieuri-planner/out/SPEC-0019-translation-seed.json}
+
 logging:
   level:
     org.springframework.batch: INFO
