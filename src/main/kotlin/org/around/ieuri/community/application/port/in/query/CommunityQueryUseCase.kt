@@ -46,8 +46,8 @@ interface CommunityQueryUseCase {
 
     fun postCategories(postIds: List<Long>): Map<Long, TargetCategory>
 
-    /** 장소는 선택이라 **없는 글이 정상이다.** */
-    fun postSpotIds(postIds: List<Long>): Map<Long, Long>
+    /** 장소는 선택이라 **없는 글이 정상이다.** 값은 카탈로그 id다(SPEC-0019 R-12). */
+    fun postCatalogIds(postIds: List<Long>): Map<Long, Long>
 
     /** 호출자가 좋아요한 글의 id만. */
     fun likedPostIds(postIds: List<Long>, memberId: Long): Set<Long>

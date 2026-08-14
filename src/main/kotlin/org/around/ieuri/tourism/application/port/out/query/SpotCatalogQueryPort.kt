@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.application.port.out.query
 
+import org.around.ieuri.tourism.domain.aggregate.CatalogTranslation
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 
@@ -19,10 +20,13 @@ interface SpotCatalogQueryPort {
     fun findUnassigned(limit: Int): List<UnassignedSpot>
 
     /**
-     * 같은 장소로 묶인 비한국어 spot들의 제목. 파생 카탈로그의 대표명을 EN→JA→ZH 순으로
+     * 같은 장소로 묶인 비한국어 spot들의 표시값. 파생 카탈로그의 대표명을 EN→JA→ZH 순으로
      * 고르기 위한 입력이다(R-3).
+     *
+     * **출처는 항상 `OFFICIAL`이다** — TourAPI가 그 언어로 발급한 원본 행에서 읽으므로
+     * 파생 카탈로그의 번역이 되는 순간 이미 공식 표기이며 번역 대상이 아니다.
      */
-    fun findForeignCardsByThumbnail(thumbnailImageUrl: String): Map<DomainLocale, ForeignCard>
+    fun findForeignCardsByThumbnail(thumbnailImageUrl: String): Map<DomainLocale, CatalogTranslation>
 
     /** 번역이 비어 있는 (카탈로그, 언어) 쌍. */
     fun findCatalogsMissingTranslation(languages: Set<DomainLocale>, limit: Int): List<UntranslatedCatalog>
@@ -31,17 +35,19 @@ interface SpotCatalogQueryPort {
     fun findUnresolved(): List<UnresolvedSpotReport>
 }
 
-/** 같은 장소로 묶인 비한국어 행의 언어별 카드. 파생 카탈로그가 이 값으로 선다. */
-data class ForeignCard(val title: String, val address: String?)
-
-/** 배정 대상 spot 한 건. 판정에 필요한 값만 담는다. */
+/**
+ * 배정 대상 spot 한 건. 판정에 필요한 값만 담는다.
+ *
+ * 정규화된 제목 키를 담지 않는 이유는 **판정 시점에 도메인이 계산하기 때문이다**
+ * ([org.around.ieuri.tourism.domain.specification.SpotTitleNormalizer]). 원본 컬럼으로 들고
+ * 오면 정규화 규칙이 바뀌었을 때 적재 시점의 낡은 키로 매칭한다.
+ */
 data class UnassignedSpot(
     val spotId: Long,
     val language: DomainLocale,
     val title: String,
     /** 그 언어의 주소. 카탈로그 번역 행에 함께 심는다(R-4). */
     val address: String?,
-    val titleKey: String?,
     val thumbnailImageUrl: String,
     val mapX: Double,
     val mapY: Double,
@@ -75,11 +81,16 @@ data class UnresolvedSpotReport(
     val candidates: List<UnresolvedCandidate>,
 )
 
-/** 미해결 건의 KO 후보 하나. */
+/**
+ * 미해결 건이 헷갈린 카탈로그 후보 하나.
+ *
+ * 좌표·분류가 nullable인 이유는 **카탈로그의 표준값이 결손일 수 있기 때문이다** — 원본 좌표가
+ * 전부 무효인 카탈로그는 좌표 없이 존재한다. CSV는 그 자리를 비워 내보낸다.
+ */
 data class UnresolvedCandidate(
-    val spotId: Long,
-    val title: String,
-    val category: SpotCategory,
-    val mapX: Double,
-    val mapY: Double,
+    val catalogId: Long,
+    val representativeNameKo: String,
+    val category: SpotCategory?,
+    val mapX: Double?,
+    val mapY: Double?,
 )

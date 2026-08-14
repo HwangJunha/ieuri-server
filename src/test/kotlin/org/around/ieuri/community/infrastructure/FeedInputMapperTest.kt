@@ -22,14 +22,14 @@ class FeedInputMapperTest {
     fun `피드 생성 입력이 커맨드로 변환된다`() {
         val input = CreateFeedItemInput(
             body = "오늘의 경복궁",
-            spotId = 42L,
+            catalogId = 42L,
             photoKeys = listOf("images/community/7/a", "images/community/7/b"),
         )
 
         val command = input.toCommand()
 
         assertEquals("오늘의 경복궁", command.body)
-        assertEquals(42L, command.spotId)
+        assertEquals(42L, command.catalogId)
         assertEquals(listOf("images/community/7/a", "images/community/7/b"), command.photoKeys)
     }
 

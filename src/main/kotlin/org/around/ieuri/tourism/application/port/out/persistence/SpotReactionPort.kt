@@ -13,12 +13,8 @@ interface SpotReactionPort {
     /** 신규 생성 또는 재평가 저장(upsert). */
     fun save(reaction: SpotReaction)
 
-    /**
-     * `spot.id` → 소속 카탈로그 id. 배정되지 않았거나 없는 spot이면 null이다.
-     *
-     * **클라이언트는 계속 `spot.id`를 보낸다**(계약 불변) — 서버가 내부에서 카탈로그로 해석한다.
-     */
-    fun findCatalogIdBySpotId(spotId: Long): Long?
+    /** 카탈로그가 실재하는지. 반응을 붙일 대상 유효성 판정이다. */
+    fun existsCatalog(catalogId: Long): Boolean
 
     /** 탈퇴 회원의 기록 전량 삭제(SPEC-0011 R17). 지운 행 수를 돌려준다. */
     fun deleteByMember(memberId: Long): Long

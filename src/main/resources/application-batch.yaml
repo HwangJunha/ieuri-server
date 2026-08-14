@@ -89,7 +89,7 @@ ieuri:
     #
     # 경로가 비었거나 파일이 없으면 Step을 건너뛴다 — 이미 적재를 마친 환경에서는 파일을
     # 치워 두면 된다.
-    translation-seed-path: ${IEURI_TRANSLATION_SEED_PATH:/Users/junha/git/ieuri/ieuri-planner/out/SPEC-0019-translation-seed.json}
+    translation-seed-path: ${IEURI_TRANSLATION_SEED_PATH:}
 
 logging:
   level:

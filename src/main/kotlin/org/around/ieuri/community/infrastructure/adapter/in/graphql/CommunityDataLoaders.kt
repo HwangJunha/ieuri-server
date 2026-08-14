@@ -22,8 +22,8 @@ class PostSpotDataLoader(
     private val spotLookupPort: SpotLookupPort,
 ) : MappedBatchLoader<Long, PostSpotView> {
 
-    override fun load(spotIds: Set<Long>): CompletionStage<Map<Long, PostSpotView>> =
-        CompletableFuture.completedFuture(spotLookupPort.findSummaries(spotIds.toList()))
+    override fun load(catalogIds: Set<Long>): CompletionStage<Map<Long, PostSpotView>> =
+        CompletableFuture.completedFuture(spotLookupPort.findSummaries(catalogIds.toList()))
 
     companion object {
         const val NAME = "postSpot"

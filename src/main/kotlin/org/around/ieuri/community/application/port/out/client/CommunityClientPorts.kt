@@ -46,11 +46,16 @@ interface ObjectStoragePort {
  * 고르는 계층을 두지 않는다 — 쓰지 않는 분기는 읽는 사람에게 비용이다.
  */
 interface SpotLookupPort {
-    /** 피드 카드용 요약. 존재하지 않으면 null이며 그것이 대상 유효성 판정이다. */
-    fun findSummary(spotId: Long): PostSpotView?
+    /**
+     * 피드 카드용 요약. 존재하지 않으면 null이며 그것이 대상 유효성 판정이다.
+     *
+     * 인자는 **카탈로그 id다**(SPEC-0019 R-12) — 언어별 `spot.id`를 받으면 같은 장소인데도
+     * 요청 언어에 따라 다른 대상으로 판정된다.
+     */
+    fun findSummary(catalogId: Long): PostSpotView?
 
-    /** 여러 spot의 요약을 한 번에. 카테고리 칩 필터가 쓴다 — 행마다 물으면 조회가 20번 붙는다. */
-    fun findSummaries(spotIds: List<Long>): Map<Long, PostSpotView>
+    /** 여러 장소의 요약을 한 번에. 카테고리 칩 필터가 쓴다 — 행마다 물으면 조회가 20번 붙는다. */
+    fun findSummaries(catalogIds: List<Long>): Map<Long, PostSpotView>
 }
 
 /**

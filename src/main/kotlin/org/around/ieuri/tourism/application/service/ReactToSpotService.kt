@@ -13,12 +13,11 @@ import org.springframework.transaction.annotation.Transactional
  * — 같은 장소를 어느 언어에서 눌렀든 한 기록으로 모인다. 재평가는 같은 키에 대한 upsert
  * 덮어쓰기이며 이력을 남기지 않는다.
  *
- * **클라이언트는 계속 `spot.id`를 보낸다**(계약 불변) — 여기서 카탈로그로 해석한다.
- * 카탈로그가 없는 spot은 `SPOT_NOT_FOUND`다: 아직 배정되지 않았거나 사라진 행이며, 어느 쪽이든
- * 좋아요를 붙일 장소가 없다.
+ * **클라이언트가 카탈로그 id를 보낸다** — 목록·상세가 이미 그 축으로 id를 내려주므로
+ * 서버가 다시 해석할 것이 없다. 없는 카탈로그는 `SPOT_NOT_FOUND`다.
  *
- * 인증(UNAUTHENTICATED)은 리졸버가 SecurityContext로 확립해 memberId를 넘긴다. spotId 형식
- * 검증은 커맨드(init)가 담당하므로 여기서 중복 검증하지 않는다.
+ * 인증(UNAUTHENTICATED)은 리졸버가 SecurityContext로 확립해 memberId를 넘긴다. 형식 검증은
+ * 커맨드(init)가 담당하므로 여기서 중복 검증하지 않는다.
  */
 @Service
 class ReactToSpotService(
@@ -27,8 +26,9 @@ class ReactToSpotService(
 
     @Transactional
     override fun react(command: ReactToSpotCommand, memberId: Long) {
-        val catalogId = spotReactionPort.findCatalogIdBySpotId(command.spotId)
-            ?: throw SpotNotFoundException()
+        val catalogId = command.catalogId
+        // 존재를 먼저 본다 — FK 위반으로 터뜨리면 클라이언트가 받는 것이 계약에 없는 오류가 된다.
+        if (!spotReactionPort.existsCatalog(catalogId)) throw SpotNotFoundException()
 
         val existing = spotReactionPort.find(memberId, catalogId)
         if (existing != null) {
@@ -36,13 +36,12 @@ class ReactToSpotService(
             spotReactionPort.save(existing)
             return
         }
-        val reaction = SpotReaction.record(
-            memberId = memberId,
-            catalogId = catalogId,
-            // 어느 언어 화면에서 눌렀는가의 기록. 식별의 일부가 아니다.
-            spotId = command.spotId,
-            reaction = command.reaction,
+        spotReactionPort.save(
+            SpotReaction.record(
+                memberId = memberId,
+                catalogId = catalogId,
+                reaction = command.reaction,
+            ),
         )
-        spotReactionPort.save(reaction)
     }
 }

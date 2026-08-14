@@ -2,15 +2,15 @@ package org.around.ieuri.tourism.application.service
 
 import org.around.ieuri.tourism.application.port.out.client.SpotTitleTranslationPort
 import org.around.ieuri.tourism.application.port.out.client.TranslatedCard
-import org.around.ieuri.tourism.application.port.out.query.ForeignCard
 import org.around.ieuri.tourism.application.port.out.persistence.SpotCatalogStorePort
 import org.around.ieuri.tourism.application.port.out.query.SpotCatalogQueryPort
 import org.around.ieuri.tourism.application.port.out.query.UnassignedSpot
 import org.around.ieuri.tourism.application.port.out.query.UnresolvedSpotReport
 import org.around.ieuri.tourism.application.port.out.query.UntranslatedCatalog
+import org.around.ieuri.tourism.domain.aggregate.CatalogTranslation
 import org.around.ieuri.tourism.domain.aggregate.SpotCatalog
 import org.around.ieuri.tourism.domain.vo.DomainLocale
-import org.around.ieuri.tourism.domain.vo.KoreanSpotCandidate
+import org.around.ieuri.tourism.domain.vo.CatalogCandidate
 import org.around.ieuri.tourism.domain.vo.TranslationSource
 import org.around.ieuri.tourism.domain.vo.UnresolvedReason
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -43,8 +43,6 @@ class SpotCatalogAssignmentServiceTest {
         language = language,
         title = title,
         address = address,
-        // 적재가 넣는 값은 제목 전체의 정규화 키다 — 조회에 쓰면 안 되는 바로 그 값이다.
-        titleKey = "MarineCity(마린시티)",
         thumbnailImageUrl = "https://img/1.jpg",
         mapX = mapX,
         mapY = mapY,
@@ -54,7 +52,6 @@ class SpotCatalogAssignmentServiceTest {
         spotId: Long = 11,
         title: String = "마린시티",
         address: String? = "부산광역시 해운대구",
-        titleKey: String? = "마린시티",
         mapX: Double = this.mapX,
         mapY: Double = this.mapY,
     ) = UnassignedSpot(
@@ -62,7 +59,6 @@ class SpotCatalogAssignmentServiceTest {
         language = DomainLocale.KO,
         title = title,
         address = address,
-        titleKey = titleKey,
         thumbnailImageUrl = "https://img/1.jpg",
         mapX = mapX,
         mapY = mapY,
@@ -73,7 +69,7 @@ class SpotCatalogAssignmentServiceTest {
     fun `looks up candidates by the extracted korean key`() {
         val store = RecordingStorePort(
             candidatesByKey = mapOf(
-                "마린시티" to listOf(KoreanSpotCandidate(spotId = 11, catalogId = 900, mapX = mapX, mapY = mapY)),
+                "마린시티" to listOf(CatalogCandidate(catalogId = 900, mapX = mapX, mapY = mapY)),
             ),
         )
         val service = SpotCatalogService(StubQueryPort(listOf(foreignSpot())), store, NoTranslation)
@@ -92,7 +88,7 @@ class SpotCatalogAssignmentServiceTest {
     fun `fullwidth parens produce the same lookup key`() {
         val store = RecordingStorePort(
             candidatesByKey = mapOf(
-                "마린시티" to listOf(KoreanSpotCandidate(spotId = 11, catalogId = 900, mapX = mapX, mapY = mapY)),
+                "마린시티" to listOf(CatalogCandidate(catalogId = 900, mapX = mapX, mapY = mapY)),
             ),
         )
         val spot = foreignSpot(language = DomainLocale.JA, title = "マリンシティ（마린시티）")
@@ -109,7 +105,7 @@ class SpotCatalogAssignmentServiceTest {
     fun `joined language title is stored as official`() {
         val store = RecordingStorePort(
             candidatesByKey = mapOf(
-                "마린시티" to listOf(KoreanSpotCandidate(spotId = 11, catalogId = 900, mapX = mapX, mapY = mapY)),
+                "마린시티" to listOf(CatalogCandidate(catalogId = 900, mapX = mapX, mapY = mapY)),
             ),
         )
         val service = SpotCatalogService(StubQueryPort(listOf(foreignSpot())), store, NoTranslation)
@@ -130,7 +126,7 @@ class SpotCatalogAssignmentServiceTest {
     fun `falls back to thumbnail when no korean key`() {
         val store = RecordingStorePort(
             candidatesByThumbnail = listOf(
-                KoreanSpotCandidate(spotId = 11, catalogId = 950, mapX = mapX, mapY = mapY),
+                CatalogCandidate(catalogId = 950, mapX = mapX, mapY = mapY),
             ),
         )
         val spot = foreignSpot(title = "SM Entertainment")
@@ -149,7 +145,7 @@ class SpotCatalogAssignmentServiceTest {
         // spec R-2의 KO 자체 클러스터링. 51,992행 → 51,907 클러스터(자체 중복 85행).
         val store = RecordingStorePort(
             candidatesByKey = mapOf(
-                "마린시티" to listOf(KoreanSpotCandidate(spotId = 11, catalogId = 900, mapX = mapX, mapY = mapY)),
+                "마린시티" to listOf(CatalogCandidate(catalogId = 900, mapX = mapX, mapY = mapY)),
             ),
         )
         val service = SpotCatalogService(StubQueryPort(listOf(koreanSpot(spotId = 12))), store, NoTranslation)
@@ -166,7 +162,7 @@ class SpotCatalogAssignmentServiceTest {
         // 같은 제목이 전국에 흔하다 — `만두집`. 좌표까지 같아야 같은 장소다.
         val store = RecordingStorePort(
             candidatesByKey = mapOf(
-                "마린시티" to listOf(KoreanSpotCandidate(spotId = 11, catalogId = 900, mapX = 127.0, mapY = 37.0)),
+                "마린시티" to listOf(CatalogCandidate(catalogId = 900, mapX = 127.0, mapY = 37.0)),
             ),
         )
         val service = SpotCatalogService(StubQueryPort(listOf(koreanSpot(spotId = 12))), store, NoTranslation)
@@ -205,8 +201,9 @@ class SpotCatalogAssignmentServiceTest {
     ) : SpotCatalogQueryPort {
         override fun findUnassigned(limit: Int): List<UnassignedSpot> = unassigned
 
-        override fun findForeignCardsByThumbnail(thumbnailImageUrl: String): Map<DomainLocale, ForeignCard> =
-            emptyMap()
+        override fun findForeignCardsByThumbnail(
+            thumbnailImageUrl: String,
+        ): Map<DomainLocale, CatalogTranslation> = emptyMap()
 
         override fun findCatalogsMissingTranslation(
             languages: Set<DomainLocale>,
@@ -218,8 +215,8 @@ class SpotCatalogAssignmentServiceTest {
 
     /** 어떤 키로 후보를 찾았는지까지 기록하는 스텁 — 그것이 이 테스트의 핵심 관측 대상이다. */
     private class RecordingStorePort(
-        private val candidatesByKey: Map<String, List<KoreanSpotCandidate>> = emptyMap(),
-        private val candidatesByThumbnail: List<KoreanSpotCandidate> = emptyList(),
+        private val candidatesByKey: Map<String, List<CatalogCandidate>> = emptyMap(),
+        private val candidatesByThumbnail: List<CatalogCandidate> = emptyList(),
     ) : SpotCatalogStorePort {
         val requestedKeys = mutableListOf<String>()
         val assignments = mutableListOf<Pair<Long, Long>>()
@@ -227,6 +224,8 @@ class SpotCatalogAssignmentServiceTest {
         /** 저장된 주소. 제목만 흐르고 주소가 빠지는 회귀를 잡는다(R-4). */
         val addresses = mutableListOf<String?>()
         val unresolved = mutableListOf<Pair<Long, UnresolvedReason>>()
+        /** 표준값을 다시 확정한 카탈로그. 배정할 때마다 불려야 한다(R-1). */
+        val refreshedCatalogIds = mutableListOf<Long>()
 
         override fun save(catalog: SpotCatalog): Long = NEW_CATALOG_ID
 
@@ -234,19 +233,23 @@ class SpotCatalogAssignmentServiceTest {
             assignments += spotId to catalogId
         }
 
-        override fun findKoreanCandidatesByTitleKey(titleKey: String): List<KoreanSpotCandidate> {
-            requestedKeys += titleKey
-            return candidatesByKey[titleKey].orEmpty()
+        override fun findCatalogCandidatesByNameKey(nameKey: String): List<CatalogCandidate> {
+            requestedKeys += nameKey
+            return candidatesByKey[nameKey].orEmpty()
         }
 
-        override fun findKoreanCandidatesByThumbnail(thumbnailImageUrl: String): List<KoreanSpotCandidate> =
+        override fun findCatalogCandidatesByThumbnail(thumbnailImageUrl: String): List<CatalogCandidate> =
             candidatesByThumbnail
+
+        override fun refreshStandardValues(catalogId: Long) {
+            refreshedCatalogIds += catalogId
+        }
 
         override fun recordUnresolved(
             spotId: Long,
             reason: UnresolvedReason,
             extractedKey: String?,
-            candidateSpotIds: List<Long>,
+            candidateCatalogIds: List<Long>,
         ) {
             unresolved += spotId to reason
         }

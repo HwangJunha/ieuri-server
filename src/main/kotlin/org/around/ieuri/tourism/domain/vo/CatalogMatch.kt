@@ -15,13 +15,13 @@ sealed interface CatalogMatch {
     /**
      * 자동 판정 불가. 독립 카탈로그를 만들고 미해결로 기록한다.
      *
-     * [candidateSpotIds]는 CSV에 후보별 좌표·카테고리를 싣기 위한 것이다. 사람이 판정하려면
+     * [candidateCatalogIds]는 CSV에 후보별 좌표·카테고리를 싣기 위한 것이다. 사람이 판정하려면
      * "무엇과 헷갈렸는가"를 알아야 한다.
      */
     data class Unresolved(
         val reason: UnresolvedReason,
         val extractedKey: String?,
-        val candidateSpotIds: List<Long>,
+        val candidateCatalogIds: List<Long>,
     ) : CatalogMatch
 }
 
@@ -37,9 +37,8 @@ enum class UnresolvedReason {
     URL_AMBIGUOUS,
 }
 
-/** 매칭 후보로 좁혀진 KO spot 한 건. 판정에 필요한 값만 담는다. */
-data class KoreanSpotCandidate(
-    val spotId: Long,
+/** 매칭 후보로 좁혀진 카탈로그 한 건. 판정에 필요한 값만 담는다. */
+data class CatalogCandidate(
     val catalogId: Long,
     /** 저장된 원값. 판정이 등치 비교라 보정하지 않는다. */
     val mapX: Double,

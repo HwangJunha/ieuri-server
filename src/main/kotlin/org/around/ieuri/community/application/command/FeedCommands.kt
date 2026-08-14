@@ -8,17 +8,17 @@ import org.around.ieuri.community.domain.vo.ReportReason
  */
 
 /**
- * 피드 작성. **spotId와 photoKeys가 모두 필수다** — 개수 판정은 도메인(FeedItem.create)이
+ * 피드 작성. **catalogId와 photoKeys가 모두 필수다** — 개수 판정은 도메인(FeedItem.create)이
  * 하므로 여기서는 형식만 본다.
  */
 data class CreateFeedItemCommand(
     val body: String,
-    val spotId: Long,
+    val catalogId: Long,
     /** 확정 키. 배열 순서가 표시 순서다. */
     val photoKeys: List<String>,
 ) {
     init {
-        require(spotId > 0) { "spotId는 양수여야 합니다." }
+        require(catalogId > 0) { "catalogId는 양수여야 합니다." }
     }
 }
 

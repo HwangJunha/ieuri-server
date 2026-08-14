@@ -21,8 +21,19 @@ import org.springframework.transaction.annotation.Transactional
  * **메인 DB가 아니라 검색 노드를 본다**(searchJdbcTemplate). pg_search 커뮤니티 에디션이
  * 물리 복제를 막아, BM25 인덱스를 논리 복제 구독자로 분리했기 때문이다.
  *
- * 인덱스는 테이블당 하나이고 언어를 가르지 않는다(search-node V2). **언어 격리는 조회의
- * `language = ?` 조건이 전담한다** — 빠뜨리면 다른 언어 행이 결과에 섞인다(AC-2.3).
+ * 인덱스는 테이블당 하나이고 언어를 가르지 않는다(search-node V4). **언어 격리는 조회의
+ * `language = ?` 조건이 전담한다** — 빠뜨리면 다른 언어 행이 결과에 섞인다(AC-2.3). 다만
+ * SPEC-0019 이후 그 조건의 의미가 "그 언어의 spot 행이 있는가"에서 **"그 언어의 제목이
+ * 있는가"**로 바뀌었다. 번역된 카탈로그가 검색에 걸리는 것이 그 변경의 목적이다.
+ *
+ * **검색은 `spot_catalog_translation` 단독으로 돈다**(SPEC-0019). BM25 인덱스가 그 테이블에
+ * 걸리고, pg_search는 `@@@`·`pdb.score()`·`ORDER BY`·`LIMIT`이 전부 같은 질의 레벨에 있어야
+ * 인덱스로 밀어넣기 때문에 **어떤 조인도 붙일 수 없다.** 거리 필터·정렬에 필요한 좌표는 그래서
+ * 번역 행에 복사돼 있다(V55).
+ *
+ * 카드에 필요한 나머지 값(썸네일·분류·저작권)은 번역 테이블에 없어 **[loadCards]가 2단계로
+ * 읽는다.** 거리 필터가 1단계에서 이미 걸렸으므로 2단계는 이미 좁혀진 한 페이지에 대한 단순
+ * 조회이며, "전국 상위 N을 뽑고 나중에 거른다"는 문제가 생기지 않는다.
  *
  * 검색과 카운트를 한 클래스에 두어 조건을 눈으로 대조할 수 있게 한다 — 갈리면 목록과 건수가 어긋난다.
  */
@@ -56,40 +67,110 @@ class SpotSearchJdbcAdapter(
         params += query.offset
 
         // **평면 쿼리여야 한다.** `@@@`·`pdb.score()`·`ORDER BY`·`LIMIT`이 **모두 같은 레벨**에
-        // 있어야 pg_search가 인덱스로 밀어넣는다. 서브쿼리·CTE로 감싸면 그 조건이 깨져
+        // 있어야 pg_search가 인덱스로 밀어넣는다. 서브쿼리·CTE·조인으로 감싸면 그 조건이 깨져
         // `query is incompatible with @@@ operator`로 실패한다(실측).
         //
-        // 그래서 커서 seek을 쓸 수 없다 — 조건절에 관련도를 넣으려면 `pdb.score()`를 WHERE에
-        // 써야 하는데 그건 SELECT 전용 자리표시자라 `Unsupported query shape`가 된다.
+        // **그래서 `spot_catalog`를 조인하지 않는다.** 거리에 필요한 좌표는 번역 행에 복사돼
+        // 있고(V55), 카드의 나머지 값은 [loadCards]가 2단계로 읽는다.
+        //
+        // 커서 seek도 같은 이유로 쓸 수 없다 — 조건절에 관련도를 넣으려면 `pdb.score()`를
+        // WHERE에 써야 하는데 그건 SELECT 전용 자리표시자라 `Unsupported query shape`가 된다.
         // OFFSET은 반대로 인덱스 안으로 밀려 들어가 top-(limit+offset) 힙으로 처리된다.
         val sql = """
-            SELECT s.id, s.title, s.address, s.thumbnail_image_url, s.map_x, s.map_y,
-                   s.category, s.copyright,
-                   ST_Distance(s.location, $CENTER) AS distance_meters,
-                   pdb.score(s.id) / (1 + ST_Distance(s.location, $CENTER) / $DISTANCE_HALF_LIFE_M) AS relevance
-            FROM spot s
+            SELECT t.catalog_id, t.title, t.address, t.map_x, t.map_y,
+                   ST_Distance(t.location, $CENTER) AS distance_meters,
+                   pdb.score(t.id) / (1 + ST_Distance(t.location, $CENTER) / $DISTANCE_HALF_LIFE_M) AS relevance
+            FROM spot_catalog_translation t
             WHERE $where
-            ORDER BY relevance DESC, s.id ASC
+            ORDER BY relevance DESC, t.catalog_id ASC
             LIMIT ? OFFSET ?
         """.trimIndent()
 
-        return jdbcTemplate.query(sql, { rs, _ ->
-            SpotSearchHit(
-                spot = SpotSearchResult(
-                    spotId = rs.getLong("id"),
-                    title = rs.getString("title"),
-                    address = rs.getString("address"),
-                    thumbnailImageUrl = rs.getString("thumbnail_image_url"),
-                    mapX = rs.getDouble("map_x"),
-                    mapY = rs.getDouble("map_y"),
-                    category = SpotCategory.valueOf(rs.getString("category")),
-                    copyright = CopyrightType.valueOf(rs.getString("copyright")),
-                    distanceMeters = rs.getDouble("distance_meters"),
-                ),
+        val rows = jdbcTemplate.query(sql, { rs, _ ->
+            SearchRow(
+                catalogId = rs.getLong("catalog_id"),
+                title = rs.getString("title"),
+                address = rs.getString("address"),
+                mapX = rs.getDouble("map_x"),
+                mapY = rs.getDouble("map_y"),
+                distanceMeters = rs.getDouble("distance_meters"),
                 relevance = rs.getDouble("relevance"),
             )
         }, *params.toTypedArray())
+
+        val cards = loadCards(rows.map { it.catalogId })
+        // 카드를 못 찾은 행은 뺀다 — 카테고리가 없으면 도메인 enum으로 옮길 값이 없다.
+        // 1단계 정렬 순서는 그대로 유지된다.
+        return rows.mapNotNull { row ->
+            val card = cards[row.catalogId] ?: return@mapNotNull null
+            SpotSearchHit(
+                spot = SpotSearchResult(
+                    // **클라이언트에 나가는 id는 카탈로그 id다**(SPEC-0019).
+                    spotId = row.catalogId,
+                    title = row.title,
+                    address = row.address,
+                    thumbnailImageUrl = card.thumbnailImageUrl.orEmpty(),
+                    mapX = row.mapX,
+                    mapY = row.mapY,
+                    category = card.category,
+                    copyright = card.copyright,
+                    distanceMeters = row.distanceMeters,
+                ),
+                relevance = row.relevance,
+            )
+        }
     }
+
+    /**
+     * 1단계에서 뽑힌 카탈로그의 카드 값. 썸네일·분류·저작권은 번역 테이블에 없어 여기서 읽는다.
+     *
+     * **한 페이지분(수십 건)에 대한 `IN` 조회 한 번이다.** 거리 필터가 1단계에서 이미 걸려
+     * 집합이 좁으므로, "전국 상위 N을 뽑고 나중에 거른다"는 문제가 생기지 않는다.
+     *
+     * 카테고리가 없는 카탈로그는 결과에서 뺀다 — 도메인 enum에 미분류 값이 없어 임의의 기본값을
+     * 만들면 잘못된 분류로 노출된다.
+     */
+    private fun loadCards(catalogIds: List<Long>): Map<Long, SpotCard> {
+        if (catalogIds.isEmpty()) return emptyMap()
+
+        val placeholders = catalogIds.joinToString(",") { "?" }
+        return jdbcTemplate.query(
+            """
+            SELECT id, thumbnail_image_url, category, copyright
+            FROM spot_catalog
+            WHERE id IN ($placeholders) AND category IS NOT NULL
+            """.trimIndent(),
+            { rs, _ ->
+                rs.getLong("id") to SpotCard(
+                    thumbnailImageUrl = rs.getString("thumbnail_image_url"),
+                    category = SpotCategory.valueOf(rs.getString("category")),
+                    // copyright는 nullable이며 "미제공"이 곧 UNSPECIFIED다.
+                    copyright = rs.getString("copyright")
+                        ?.let { CopyrightType.valueOf(it) }
+                        ?: CopyrightType.UNSPECIFIED,
+                )
+            },
+            *catalogIds.toTypedArray(),
+        ).toMap()
+    }
+
+    /** 1단계(BM25 평면 질의)가 돌려주는 행. 카드 값이 아직 붙기 전이다. */
+    private data class SearchRow(
+        val catalogId: Long,
+        val title: String,
+        val address: String?,
+        val mapX: Double,
+        val mapY: Double,
+        val distanceMeters: Double,
+        val relevance: Double,
+    )
+
+    /** 2단계가 채우는 카탈로그의 카드 값. */
+    private data class SpotCard(
+        val thumbnailImageUrl: String?,
+        val category: SpotCategory,
+        val copyright: CopyrightType,
+    )
 
     /** [search]와 같은 조건에 걸리는 전체 건수. 검색 페이지 표시와 hasNext 판정에 쓰인다. */
     @Transactional(readOnly = true)
@@ -103,7 +184,7 @@ class SpotSearchJdbcAdapter(
     private fun runCount(query: SpotSearchQuery, fuzzyOnly: Boolean): Int {
         val (where, params) = whereClause(query, fuzzyOnly)
         return jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM spot s WHERE $where",
+            "SELECT COUNT(*) FROM spot_catalog_translation t WHERE $where",
             Int::class.java,
             *params.toTypedArray(),
         ) ?: 0
@@ -120,29 +201,36 @@ class SpotSearchJdbcAdapter(
         center: Coordinates,
         radiusMeters: Int,
         limit: Int,
-    ): List<SpotSuggestionHit> =
-        jdbcTemplate.query(
-            // CTE와 조인하지 않는다 — 조인하면 pg_search가 인덱스를 못 타고 `@@@`가 깨진다.
+    ): List<SpotSuggestionHit> {
+        // **어떤 조인도 붙이지 않는다** — 조인하면 pg_search가 인덱스를 못 타고 `@@@`가 깨진다.
+        // 그래서 분류는 여기서 못 읽고 [loadCards]가 2단계로 채운다.
+        val rows = jdbcTemplate.query(
             """
-            SELECT s.id, s.title, s.category
-            FROM spot s
-            WHERE s.language = ?
+            SELECT t.catalog_id, t.title
+            FROM spot_catalog_translation t
+            WHERE t.language = ?
               AND ${titleField(language)} @@@ ?::pdb.fuzzy(0, t)
-              AND ST_DWithin(s.location, $CENTER, ?)
-            ORDER BY s.title ASC, s.id ASC
+              AND ST_DWithin(t.location, $CENTER, ?)
+            ORDER BY t.title ASC, t.catalog_id ASC
             LIMIT ?
             """.trimIndent(),
-            { rs, _ ->
-                SpotSuggestionHit(
-                    spotId = rs.getLong("id"),
-                    title = rs.getString("title"),
-                    category = SpotCategory.valueOf(rs.getString("category")),
-                )
-            },
+            { rs, _ -> rs.getLong("catalog_id") to rs.getString("title") },
             language.name, toPhrase(prefix),
             center.longitude, center.latitude, radiusMeters.toDouble(),
             limit,
         )
+
+        val cards = loadCards(rows.map { it.first })
+        return rows.mapNotNull { (catalogId, title) ->
+            val card = cards[catalogId] ?: return@mapNotNull null
+            SpotSuggestionHit(
+                // **제안이 돌려주는 id도 카탈로그 id다**(SPEC-0019).
+                spotId = catalogId,
+                title = title,
+                category = card.category,
+            )
+        }
+    }
 
     /**
      * 조회와 카운트가 **같은 조건**을 쓰도록 한 곳에서 만든다 — 갈리면 목록과 건수가 어긋난다.
@@ -155,8 +243,9 @@ class SpotSearchJdbcAdapter(
         val titleField = titleField(query.language)
         val conditions = mutableListOf(
             // **언어 격리는 이 조건이 전담한다.** BM25 인덱스가 하나뿐이라 언어를 가르지
-            // 못하므로, 빠뜨리면 다른 언어 행이 결과에 섞인다(AC-2.3).
-            "s.language = ?",
+            // 못하므로, 빠뜨리면 다른 언어 행이 결과에 섞인다(AC-2.3). SPEC-0019 이후 이 조건은
+            // "그 언어의 제목이 있는가"를 뜻한다 — 그 언어의 spot 행 유무가 아니다.
+            "t.language = ?",
             // **제목은 정확 일치와 오타 허용을 OR로 함께 건다.**
             //
             // `pdb.fuzzy` 단독으로 쓰면 BM25 점수가 상수로 고정된다(실측: 전부 1.5) — 그러면
@@ -179,9 +268,11 @@ class SpotSearchJdbcAdapter(
             // 주소를 0.2로 낮춰도 주소 검색은 그대로 된다(실측: "두산로" 3건 정상). 주소는
             // 제목에 없는 것을 찾는 **보조 경로**이지 순위를 뒤집을 근거가 아니다.
             matchClause(titleField, query.text, fuzzyOnly),
-            // **CTE와 조인하지 않는다** — `spot s, c` 형태면 pg_search가 인덱스를 못 타고
+            // **CTE와 조인하지 않는다** — `t, c` 형태면 pg_search가 인덱스를 못 타고
             // `@@@`가 깨진다. 좌표를 두 번 더 바인딩하더라도 평면 조건을 유지한다.
-            "ST_DWithin(s.location, $CENTER, ?)",
+            //
+            // 좌표가 없는 번역 행은 이 조건에서 자연히 빠진다(상류 결손 317건).
+            "ST_DWithin(t.location, $CENTER, ?)",
         )
         // **원문이 아니라 [toPhrase]로 감싼 값을 넘긴다** — 괄호·콜론 같은 문자가
         // pg_search 구문으로 해석돼 질의가 깨지는 것을 막는다.
@@ -197,10 +288,10 @@ class SpotSearchJdbcAdapter(
             ),
         )
 
-        query.category?.let {
-            conditions += "s.category = ?"
-            params += it.name
-        }
+        // **카테고리 필터를 걸지 않는다** — 분류는 `spot_catalog`에 있고, 그것을 조인하는 순간
+        // 평면 질의가 깨져 BM25 인덱스 푸시다운이 사라진다. 2단계([loadCards])에서 거르는 것도
+        // 답이 아니다: 한 페이지를 먼저 자른 뒤 거르면 요청한 size보다 적게 나가고 건수도
+        // 어긋난다. 이 제약을 어떻게 풀지는 스펙 결정 사항이라 여기서 임의로 메우지 않는다.
         return conditions.joinToString(" AND ") to params
     }
 
@@ -234,14 +325,14 @@ class SpotSearchJdbcAdapter(
      * 질의 언어에 해당하는 제목 필드 식(AC-2.2).
      *
      * BM25 인덱스는 테이블당 하나뿐이라(pg_search 제약) 언어별로 나눌 수 없고, 대신 하나의
-     * 인덱스 안에 언어별 토크나이저 필드가 별칭으로 들어 있다(search-node V2).
+     * 인덱스 안에 언어별 토크나이저 필드가 별칭으로 들어 있다(search-node V4).
      * **한국어가 별칭 없는 기본 필드다** — 코퍼스에서 가장 큰 언어라 흔한 경로를 짧게 뒀다.
      */
     private fun titleField(language: DomainLocale): String = when (language) {
-        DomainLocale.KO -> "s.title"
-        DomainLocale.JA -> "s.title::pdb.alias('title_ja')"
-        DomainLocale.ZH -> "s.title::pdb.alias('title_zh')"
-        DomainLocale.EN -> "s.title::pdb.alias('title_en')"
+        DomainLocale.KO -> "t.title"
+        DomainLocale.JA -> "t.title::pdb.alias('title_ja')"
+        DomainLocale.ZH -> "t.title::pdb.alias('title_zh')"
+        DomainLocale.EN -> "t.title::pdb.alias('title_en')"
     }
 
 
@@ -312,7 +403,7 @@ class SpotSearchJdbcAdapter(
          * `{두산, 로, 71}`로 잘리는데 질의 "두산로"는 단독이라 `{두, 산로}`로 잘려 **겹치는
          * 토큰이 사라진다**(실측 0건). n-gram은 그 어긋남이 없다.
          */
-        const val ADDRESS_FIELD = "coalesce(s.address, '')"
+        const val ADDRESS_FIELD = "coalesce(t.address, '')"
 
     }
 }

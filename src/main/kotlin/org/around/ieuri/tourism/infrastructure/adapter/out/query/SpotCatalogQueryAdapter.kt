@@ -2,12 +2,12 @@ package org.around.ieuri.tourism.infrastructure.adapter.out.query
 
 import com.querydsl.jpa.impl.JPAQueryFactory
 import org.around.ieuri.tourism.application.port.out.query.SpotCatalogQueryPort
-import org.around.ieuri.tourism.application.port.out.query.ForeignCard
 import org.around.ieuri.tourism.application.port.out.query.UnassignedSpot
-import org.around.ieuri.tourism.application.port.out.query.UnresolvedCandidate
 import org.around.ieuri.tourism.application.port.out.query.UnresolvedSpotReport
 import org.around.ieuri.tourism.application.port.out.query.UntranslatedCatalog
+import org.around.ieuri.tourism.domain.aggregate.CatalogTranslation
 import org.around.ieuri.tourism.domain.vo.DomainLocale
+import org.around.ieuri.tourism.domain.vo.TranslationSource
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotCatalogEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotCatalogTranslationEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotEntity
@@ -42,7 +42,7 @@ class SpotCatalogQueryAdapter(
     override fun findUnassigned(limit: Int): List<UnassignedSpot> =
         queryFactory
             .select(
-                spot.id, spot.language, spot.title, spot.address, spot.titleKey,
+                spot.id, spot.language, spot.title, spot.address,
                 spot.thumbnailImageUrl, spot.mapX, spot.mapY,
             )
             .from(spot)
@@ -64,7 +64,6 @@ class SpotCatalogQueryAdapter(
                     language = requireNotNull(it.get(spot.language)),
                     title = requireNotNull(it.get(spot.title)),
                     address = it.get(spot.address),
-                    titleKey = it.get(spot.titleKey),
                     thumbnailImageUrl = requireNotNull(it.get(spot.thumbnailImageUrl)),
                     mapX = requireNotNull(it.get(spot.mapX)),
                     mapY = requireNotNull(it.get(spot.mapY)),
@@ -72,12 +71,15 @@ class SpotCatalogQueryAdapter(
             }
 
     /**
-     * 같은 썸네일을 쓰는 비한국어 행들의 제목. 파생 대표명을 EN→JA→ZH 순으로 고르는 입력이다.
+     * 같은 썸네일을 쓰는 비한국어 행들의 표시값. 파생 대표명을 EN→JA→ZH 순으로 고르는 입력이다.
      *
      * 한 언어에 여러 행이 걸리면 첫 행을 쓴다 — 대표명 후보로서 어느 쪽이든 같은 괄호값을 갖는다.
+     *
+     * **출처는 `OFFICIAL`로 고정한다** — TourAPI가 그 언어로 발급한 원본 행이므로 파생
+     * 카탈로그의 번역이 되어도 공식 표기이며, 기계 번역이 나중에 덮지 못한다(R-4).
      */
     @Transactional(readOnly = true)
-    override fun findForeignCardsByThumbnail(thumbnailImageUrl: String): Map<DomainLocale, ForeignCard> =
+    override fun findForeignCardsByThumbnail(thumbnailImageUrl: String): Map<DomainLocale, CatalogTranslation> =
         queryFactory
             .select(spot.language, spot.title, spot.address)
             .from(spot)
@@ -88,7 +90,11 @@ class SpotCatalogQueryAdapter(
             .fetch()
             .associate {
                 requireNotNull(it.get(spot.language)) to
-                    ForeignCard(requireNotNull(it.get(spot.title)), it.get(spot.address))
+                    CatalogTranslation(
+                        title = requireNotNull(it.get(spot.title)),
+                        address = it.get(spot.address),
+                        source = TranslationSource.OFFICIAL,
+                    )
             }
 
     /**

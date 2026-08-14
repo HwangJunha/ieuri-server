@@ -64,12 +64,16 @@ data class SpotDetailView(
 )
 
 /**
- * spot 한 행이 보유한 최소 식별 정보. **upstream 호출 없이** 만들어진다.
+ * 카탈로그 한 행이 보유한 최소 식별 정보. **upstream 호출 없이** 만들어진다.
  *
- * 다른 도메인이 spotId 유효성 확인과 요약 표시에 쓰는 형태다 — 상세 본문이 필요 없는
+ * 다른 도메인이 장소 id의 유효성 확인과 요약 표시에 쓰는 형태다 — 상세 본문이 필요 없는
  * 호출자에게 [SpotDetailView]를 주면 TourAPI 왕복이 딸려 온다.
  */
 data class SpotSummaryView(
+    /**
+     * `spot_catalog.id`(SPEC-0019 R-12). **다른 도메인이 장소를 저장할 때 쓰는 축이다** —
+     * 언어별 `spot.id`를 주면 같은 장소의 글이 언어별로 갈린다.
+     */
     val id: Long,
     val title: String,
     val thumbnailImageUrl: String,
@@ -85,13 +89,6 @@ data class SpotSummaryView(
      */
     val longitude: Double,
     val latitude: Double,
-    /**
-     * 소속 카탈로그(SPEC-0019). **다른 도메인이 장소를 가리킬 때 저장하는 값이다** — 커뮤니티
-     * 글이 이것을 들고 있어야 언어와 무관하게 같은 장소의 글이 한 피드에 모인다.
-     *
-     * 아직 배정되지 않은 spot은 null이며, 그런 spot에는 글을 붙일 수 없다.
-     */
-    val catalogId: Long?,
 )
 
 /** 운영 정보 read DTO. 카테고리별 TourAPI 필드를 공통 이름으로 정규화한 결과(어댑터가 수행). */

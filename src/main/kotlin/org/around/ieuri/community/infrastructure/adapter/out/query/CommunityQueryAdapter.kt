@@ -491,16 +491,16 @@ class CommunityQueryAdapter(
     }
 
     @Transactional(readOnly = true)
-    override fun findSpotIdsOf(postIds: List<Long>): Map<Long, Long> {
+    override fun findCatalogIdsOf(postIds: List<Long>): Map<Long, Long> {
         if (postIds.isEmpty()) return emptyMap()
 
         return queryFactory
-            .select(postSpot.postId, postSpot.spotId)
+            .select(postSpot.postId, postSpot.catalogId)
             .from(postSpot)
             .where(postSpot.postId.`in`(postIds))
             .fetch()
             .associate {
-                requireNotNull(it.get(postSpot.postId)) to requireNotNull(it.get(postSpot.spotId))
+                requireNotNull(it.get(postSpot.postId)) to requireNotNull(it.get(postSpot.catalogId))
             }
     }
 

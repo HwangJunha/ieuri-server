@@ -2,15 +2,15 @@ package org.around.ieuri.tourism.application.service
 
 import org.around.ieuri.tourism.application.port.out.client.SpotTitleTranslationPort
 import org.around.ieuri.tourism.application.port.out.client.TranslatedCard
-import org.around.ieuri.tourism.application.port.out.query.ForeignCard
 import org.around.ieuri.tourism.application.port.out.persistence.SpotCatalogStorePort
 import org.around.ieuri.tourism.application.port.out.query.SpotCatalogQueryPort
 import org.around.ieuri.tourism.application.port.out.query.UnassignedSpot
 import org.around.ieuri.tourism.application.port.out.query.UnresolvedSpotReport
 import org.around.ieuri.tourism.application.port.out.query.UntranslatedCatalog
+import org.around.ieuri.tourism.domain.aggregate.CatalogTranslation
 import org.around.ieuri.tourism.domain.aggregate.SpotCatalog
 import org.around.ieuri.tourism.domain.vo.DomainLocale
-import org.around.ieuri.tourism.domain.vo.KoreanSpotCandidate
+import org.around.ieuri.tourism.domain.vo.CatalogCandidate
 import org.around.ieuri.tourism.domain.vo.TranslationSource
 import org.around.ieuri.tourism.domain.vo.UnresolvedReason
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -154,8 +154,9 @@ class SpotCatalogTranslationServiceTest {
     ) : SpotCatalogQueryPort {
         override fun findUnassigned(limit: Int): List<UnassignedSpot> = emptyList()
 
-        override fun findForeignCardsByThumbnail(thumbnailImageUrl: String): Map<DomainLocale, ForeignCard> =
-            emptyMap()
+        override fun findForeignCardsByThumbnail(
+            thumbnailImageUrl: String,
+        ): Map<DomainLocale, CatalogTranslation> = emptyMap()
 
         override fun findCatalogsMissingTranslation(
             languages: Set<DomainLocale>,
@@ -181,16 +182,18 @@ class SpotCatalogTranslationServiceTest {
 
         override fun assign(spotId: Long, catalogId: Long) = Unit
 
-        override fun findKoreanCandidatesByTitleKey(titleKey: String): List<KoreanSpotCandidate> = emptyList()
+        override fun findCatalogCandidatesByNameKey(nameKey: String): List<CatalogCandidate> = emptyList()
 
-        override fun findKoreanCandidatesByThumbnail(thumbnailImageUrl: String): List<KoreanSpotCandidate> =
+        override fun findCatalogCandidatesByThumbnail(thumbnailImageUrl: String): List<CatalogCandidate> =
             emptyList()
+
+        override fun refreshStandardValues(catalogId: Long) = Unit
 
         override fun recordUnresolved(
             spotId: Long,
             reason: UnresolvedReason,
             extractedKey: String?,
-            candidateSpotIds: List<Long>,
+            candidateCatalogIds: List<Long>,
         ) = Unit
 
         override fun upsertTranslation(

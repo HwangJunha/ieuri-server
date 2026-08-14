@@ -1,5 +1,5 @@
 extend type Query {
-    "spot.id 단건 상세 조회. 언어는 Accept-Language로 전달하며 locale 인자는 없다. 해소 불가한 id는 최상위 오류(SPOT_NOT_FOUND)다."
+    "단건 상세 조회. id는 **언어와 무관한 장소 식별자**로 Spot.id를 그대로 넘긴다 — 언어를 바꿔도 같은 id로 조회된다. 본문 언어는 Accept-Language로 전달하며 locale 인자는 없다. 해소 불가한 id는 최상위 오류(SPOT_NOT_FOUND)다."
     spotDetail(id: ID!): SpotDetail!
 
     "위치 기반 관광지 목록. 오프셋 페이지네이션(page/size)이며 커서가 아니다."
@@ -157,7 +157,7 @@ enum SpotReaction {
 
 "요청 언어로 반환된 물리적 장소 1건."
 type Spot {
-    "안정적 식별자. 언어별로 다르므로 언어를 바꾸면 목록을 다시 받아야 한다."
+    "안정적 식별자. **언어와 무관하다** — 언어를 바꿔도 같은 장소는 같은 id다. spotDetail(id:)·posts(catalogId:)·createPost(catalogId:)·reactToSpot(catalogId:)에 그대로 넘긴다."
     id: ID!
     title: String!
     "주소. 없을 수 있다."
@@ -189,8 +189,8 @@ type SpotPage {
 
 "language 인자를 받지 않는다 — 현재 요청 언어 기준으로 기록된다."
 input ReactToSpotInput {
-    "대상 관광지의 id(Spot.id와 같은 값)."
-    spotId: ID!
+    "대상 장소의 id(Spot.id와 같은 값). **언어와 무관하다** — 어느 언어에서 누르든 같은 기록에 모인다."
+    catalogId: ID!
     reaction: SpotReaction!
 }
 
@@ -213,9 +213,9 @@ type SpotImage {
     attributionText: String!
 }
 
-"관광지 상세. spot.id를 키로 한다."
+"관광지 상세. 언어와 무관한 장소 식별자를 키로 한다."
 type SpotDetail {
-    "Spot.id와 같은 값."
+    "Spot.id와 같은 값. 언어를 바꿔도 변하지 않는다."
     id: ID!
     title: String!
     category: SpotCategory!
@@ -288,7 +288,7 @@ type SpotInfoItem {
 
 "목록 카드와 상세 진입에 필요한 값만 담는다. 거리와 좌표는 제공하지 않는다."
 type LikedSpot {
-    "spot.id — spotDetail(id:)에 그대로 넘긴다."
+    "장소 식별자. 언어와 무관하며 spotDetail(id:)에 그대로 넘긴다."
     id: ID!
     title: String!
     thumbnailImageUrl: String!
@@ -345,7 +345,7 @@ type SpotSearchConnection {
 상세 조회로 이어지므로 그 시점에 온전한 정보를 받는다.
 """
 type SpotSuggestion {
-    "spot.id — spotDetail(id:)에 그대로 넘긴다."
+    "장소 식별자. 언어와 무관하며 spotDetail(id:)에 그대로 넘긴다."
     id: ID!
     title: String!
     category: SpotCategory!
@@ -358,7 +358,7 @@ Spot을 재사용하지 않는 이유: eventStartDate/eventEndDate는 축제 행
 두면 대부분의 spot에서 영구히 null인 필드가 된다.
 """
 type Festival {
-    "spot.id — spotDetail(id:)에 그대로 넘긴다."
+    "장소 식별자. 언어와 무관하며 spotDetail(id:)에 그대로 넘긴다."
     id: ID!
     title: String!
     "주소. 없을 수 있다."

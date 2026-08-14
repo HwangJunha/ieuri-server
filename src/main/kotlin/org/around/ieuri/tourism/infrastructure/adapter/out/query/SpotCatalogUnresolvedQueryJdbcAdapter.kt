@@ -9,11 +9,11 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 /**
- * 미해결 건 조회 어댑터(SPEC-0019 R-8). `candidate_spot_ids`가 `BIGINT[]`이고 **JPA가 배열
+ * 미해결 건 조회 어댑터(SPEC-0019 R-8). `candidate_catalog_ids`가 `BIGINT[]`이고 **JPA가 배열
  * 컬럼을 표현하지 못해** 이 조회만 생 SQL이다 — 엔티티에 매핑하면 `ddl-auto: validate`가
  * 부팅 시 실패한다.
  *
- * 후보의 좌표·카테고리는 배열을 펼쳐 `spot`에 조인해 가져온다. 사람이 판정하려면
+ * 후보의 좌표·카테고리는 배열을 펼쳐 `spot_catalog`에 조인해 가져온다. 사람이 판정하려면
  * "무엇과 헷갈렸는가"를 알아야 하기 때문이다.
  */
 @Component
@@ -59,24 +59,27 @@ class SpotCatalogUnresolvedQueryJdbcAdapter(
      * 후보를 spot별로 미리 모아 둔다. 행마다 따로 조회하면 509번 왕복한다.
      *
      * `unnest`로 배열을 펼쳐 한 번에 조인한다.
+     *
+     * **카탈로그의 표준값은 결손일 수 있다** — 좌표·분류가 NULL인 카탈로그가 존재하므로
+     * `getDouble`로 읽으면 SQL NULL이 0.0이 되어 "적도 위의 후보"가 CSV에 실린다.
      */
     private fun loadCandidates(): Map<Long, List<UnresolvedCandidate>> =
         jdbcTemplate.query(
             """
             SELECT u.spot_id AS owner_id,
-                   c.id, c.title, c.category, c.map_x, c.map_y
+                   c.id, c.representative_name_ko, c.category, c.map_x, c.map_y
             FROM spot_catalog_unresolved u
-            CROSS JOIN LATERAL unnest(u.candidate_spot_ids) AS candidate_id
-            JOIN spot c ON c.id = candidate_id
+            CROSS JOIN LATERAL unnest(u.candidate_catalog_ids) AS candidate_id
+            JOIN spot_catalog c ON c.id = candidate_id
             ORDER BY u.spot_id, c.id
             """.trimIndent(),
         ) { rs, _ ->
             rs.getLong("owner_id") to UnresolvedCandidate(
-                spotId = rs.getLong("id"),
-                title = rs.getString("title"),
-                category = SpotCategory.valueOf(rs.getString("category")),
-                mapX = rs.getDouble("map_x"),
-                mapY = rs.getDouble("map_y"),
+                catalogId = rs.getLong("id"),
+                representativeNameKo = rs.getString("representative_name_ko"),
+                category = rs.getString("category")?.let { SpotCategory.valueOf(it) },
+                mapX = rs.getDouble("map_x").takeUnless { rs.wasNull() },
+                mapY = rs.getDouble("map_y").takeUnless { rs.wasNull() },
             )
         }
             .groupBy({ it.first }) { it.second }

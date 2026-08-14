@@ -10,7 +10,12 @@ import java.time.Instant
  * 도메인/JPA 어느 쪽도 아니다. 리졸버가 이 DTO를 GraphQL 응답 타입으로 매핑한다.
  */
 
-/** 피드 카드의 장소 칩. spot 전체가 아니라 칩에 필요한 최소 정보만 담는다. */
+/**
+ * 피드 카드의 장소 칩. spot 전체가 아니라 칩에 필요한 최소 정보만 담는다.
+ *
+ * [id]는 **카탈로그 id다**(SPEC-0019 R-12) — 언어별 `spot.id`로 가리키면 일본어로 쓴 글이
+ * JA 행만 가리켜 같은 장소의 글이 언어별로 갈린다.
+ */
 data class PostSpotView(
     val id: Long,
     val title: String,
@@ -24,13 +29,6 @@ data class PostSpotView(
      */
     val longitude: Double,
     val latitude: Double,
-    /**
-     * 그 spot이 속한 장소(SPEC-0019 R-12). **글은 이 값을 저장한다** — `id`는 언어별이라
-     * 그대로 두면 일본어로 쓴 글이 JA 행만 가리켜 언어별로 피드가 갈린다.
-     *
-     * 아직 배정되지 않은 spot은 null이며, 그런 spot에는 글을 붙일 수 없다.
-     */
-    val catalogId: Long?,
 )
 
 /** 글·댓글에 실리는 최소 작성자 정보. 커뮤니티 표면에는 이메일·권한·상태가 필요 없다. */
@@ -115,8 +113,8 @@ data class PostImageConfirmFailure(
  * [radiusMeters]·[category]는 좌표를 줄 때만 의미가 있다.
  */
 data class PostsQuery(
-    /** 이 장소에 붙은 글만. null이면 장소로 좁히지 않는다. */
-    val spotId: Long?,
+    /** 이 장소(카탈로그)에 붙은 글만. null이면 장소로 좁히지 않는다. */
+    val catalogId: Long?,
     val latitude: Double?,
     val longitude: Double?,
     val radiusMeters: Int,

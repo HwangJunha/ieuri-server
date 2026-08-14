@@ -4,7 +4,6 @@ import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.community.application.event.PostViewed
 import org.around.ieuri.community.application.policy.CommunityPolicy
 import org.around.ieuri.community.application.port.`in`.query.CommunityQueryUseCase
-import org.around.ieuri.community.application.port.out.client.SpotLookupPort
 import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
 import org.around.ieuri.community.application.port.out.query.BlockedUsersSearch
 import org.around.ieuri.community.application.port.out.query.MyPostsSearch
@@ -43,7 +42,6 @@ import org.springframework.stereotype.Service
 class CommunityQueryService(
     private val communityQueryPort: CommunityQueryPort,
     private val postSpatialQueryPort: PostSpatialQueryPort,
-    private val spotLookupPort: SpotLookupPort,
     private val eventPublisher: CommunityEventPublisherPort,
     private val policy: CommunityPolicy,
 ) : CommunityQueryUseCase {
@@ -54,7 +52,7 @@ class CommunityQueryService(
      */
     override fun posts(query: PostsQuery, memberId: Long): CursorPage<PostView> {
         val search = PostsSearch(
-            catalogId = resolveCatalogId(query.spotId),
+            catalogId = query.catalogId,
             area = resolveArea(query),
             category = query.category,
             // 태그는 정규화해 넘긴다 — 대소문자·선행 #을 가리지 않게 하려는 것이다.
@@ -70,19 +68,6 @@ class CommunityQueryService(
             PostSortOrder.LATEST -> communityQueryPort.findPosts(search)
             PostSortOrder.DISTANCE -> postSpatialQueryPort.findPostsByDistance(search)
         }
-    }
-
-    /**
-     * 클라이언트가 준 `spot.id`를 조회 축인 카탈로그로 해석한다(SPEC-0019 R-12).
-     *
-     * **해석되지 않으면 -1을 넘겨 결과를 비운다.** null로 떨어뜨리면 "장소로 좁히지 않음"이
-     * 되어 **전체 피드가 나온다** — 없는 장소를 물었는데 모든 글이 오는 것은 명백히 틀렸다.
-     * 오류로 올리지 않는 이유는 spot이 정리로 사라진 경우가 정상 경로이기 때문이다
-     * (V31: "spot이 사라져도 글은 남는다").
-     */
-    private fun resolveCatalogId(spotId: Long?): Long? {
-        if (spotId == null) return null
-        return spotLookupPort.findSummary(spotId)?.catalogId ?: EMPTY_RESULT_CATALOG_ID
     }
 
     /**
@@ -159,8 +144,8 @@ class CommunityQueryService(
     override fun postCategories(postIds: List<Long>): Map<Long, TargetCategory> =
         communityQueryPort.findCategoriesOf(postIds)
 
-    override fun postSpotIds(postIds: List<Long>): Map<Long, Long> =
-        communityQueryPort.findSpotIdsOf(postIds)
+    override fun postCatalogIds(postIds: List<Long>): Map<Long, Long> =
+        communityQueryPort.findCatalogIdsOf(postIds)
 
     override fun likedPostIds(postIds: List<Long>, memberId: Long): Set<Long> =
         communityQueryPort.findLikedPostIds(memberId, postIds)
@@ -203,12 +188,4 @@ class CommunityQueryService(
     )
 
     private fun clampPageSize(first: Int): Int = first.coerceIn(1, policy.maxPageSize)
-
-    private companion object {
-        /**
-         * 해석되지 않는 spotId에 쓰는 값. 실재하지 않는 카탈로그 id라 결과가 비고,
-         * null(= 좁히지 않음)로 떨어져 전체 피드가 나오는 것을 막는다.
-         */
-        const val EMPTY_RESULT_CATALOG_ID = -1L
-    }
 }

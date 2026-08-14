@@ -13,7 +13,7 @@ import kotlin.test.assertNull
 /**
  * SpotReactionMapper 필드별 매핑 검증 — 순수 단위테스트(Spring/DB 없음).
  *
- * `memberId`·`catalogId`·`spotId`가 **전부 Long이라 서로 뒤바뀌어도 컴파일된다**(SPEC-0019).
+ * `memberId`·`catalogId`가 **둘 다 Long이라 서로 뒤바뀌어도 컴파일된다**(SPEC-0019 R-10).
  * 그래서 필드마다 다른 값을 준다.
  */
 class SpotReactionMapperTest {
@@ -24,7 +24,6 @@ class SpotReactionMapperTest {
     ) = SpotReactionEntity(
         id = id,
         memberId = 41L,
-        spotId = 52L,
         catalogId = 63L,
         reaction = ReactionType.DISLIKE,
         createdAt = createdAt,
@@ -37,7 +36,6 @@ class SpotReactionMapperTest {
 
         assertEquals(41L, domain.memberId)
         assertEquals(63L, domain.catalogId)
-        assertEquals(52L, domain.spotId)
         assertEquals(ReactionType.DISLIKE, domain.reaction)
     }
 
@@ -48,7 +46,6 @@ class SpotReactionMapperTest {
 
         assertEquals(41L, domain.memberId)
         assertEquals(63L, domain.catalogId)
-        assertEquals(52L, domain.spotId)
         assertEquals(ReactionType.DISLIKE, domain.reaction)
     }
 
@@ -57,14 +54,12 @@ class SpotReactionMapperTest {
         val entity = SpotReaction.record(
             memberId = 41L,
             catalogId = 63L,
-            spotId = 52L,
             reaction = ReactionType.LIKE,
         ).toNewEntity()
 
         assertNull(entity.id) // id는 DB가 채운다.
         assertEquals(41L, entity.memberId)
         assertEquals(63L, entity.catalogId)
-        assertEquals(52L, entity.spotId)
         assertEquals(ReactionType.LIKE, entity.reaction)
         assertNull(entity.createdAt)
     }
@@ -74,7 +69,6 @@ class SpotReactionMapperTest {
         val reaction = SpotReaction.record(
             memberId = 41L,
             catalogId = 63L,
-            spotId = 52L,
             reaction = ReactionType.LIKE,
         )
         reaction.reevaluate(ReactionType.DISLIKE)
@@ -83,11 +77,10 @@ class SpotReactionMapperTest {
     }
 
     @Test
-    fun `왕복해도 세 식별자가 서로 섞이지 않는다`() {
+    fun `왕복해도 두 식별자가 서로 섞이지 않는다`() {
         val original = SpotReaction.record(
             memberId = 41L,
             catalogId = 63L,
-            spotId = 52L,
             reaction = ReactionType.LIKE,
         )
 
@@ -95,6 +88,5 @@ class SpotReactionMapperTest {
 
         assertEquals(41L, restored.memberId)
         assertEquals(63L, restored.catalogId)
-        assertEquals(52L, restored.spotId)
     }
 }

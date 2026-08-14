@@ -57,7 +57,7 @@ class CommunityQueryResolver(
      */
     @DgsQuery
     fun posts(
-        @InputArgument spotId: Long?,
+        @InputArgument catalogId: Long?,
         @InputArgument latitude: Double?,
         @InputArgument longitude: Double?,
         @InputArgument radiusMeters: Int?,
@@ -71,7 +71,7 @@ class CommunityQueryResolver(
         val memberId = currentMemberProvider.requireMemberId()
         val page = communityQueryUseCase.posts(
             PostsQuery(
-                spotId = spotId,
+                catalogId = catalogId,
                 latitude = latitude,
                 longitude = longitude,
                 radiusMeters = radiusMeters ?: DEFAULT_RADIUS_METERS,
@@ -209,14 +209,14 @@ class CommunityQueryResolver(
      */
     @DgsData(parentType = "Post", field = "spot")
     fun postSpot(dfe: DgsDataFetchingEnvironment): CompletableFuture<GqlPostSpot?> =
-        dfe.loader<Long>(PostSpotIdDataLoader.NAME)
+        dfe.loader<Long>(PostCatalogIdDataLoader.NAME)
             .load(dfe.postSource().id)
-            .thenCompose { spotId ->
-                if (spotId == null) {
+            .thenCompose { catalogId ->
+                if (catalogId == null) {
                     CompletableFuture.completedFuture(null)
                 } else {
                     dfe.loader<PostSpotView>(PostSpotDataLoader.NAME)
-                        .load(spotId)
+                        .load(catalogId)
                         .thenApply { it?.toGql() }
                 }
             }

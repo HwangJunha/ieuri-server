@@ -66,7 +66,7 @@ class ConversationCommandServiceTest {
 
     private fun feedItem(author: Long = authorId) = FeedItem.restore(
         id = feedItemId,
-        spotId = 42L,
+        catalogId = 42L,
         authorId = author,
         body = "오늘의 경복궁",
         photoKeys = listOf(

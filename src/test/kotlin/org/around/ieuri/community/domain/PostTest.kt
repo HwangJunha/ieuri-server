@@ -18,7 +18,6 @@ import kotlin.test.assertTrue
 class PostTest {
 
     private val authorId = 7L
-    private val spotId = 42L
     private val catalogId = 420L
 
     private fun confirmedKey(memberId: Long = authorId): PhotoObjectKey =
@@ -30,7 +29,6 @@ class PostTest {
         photoKeys: List<PhotoObjectKey> = emptyList(),
     ) = Post.create(
         category = TargetCategory.TOURIST_SPOT,
-        spotId = spotId,
         catalogId = catalogId,
         spotPoint = SpotPoint(127.0, 37.5),
         authorId = authorId,
@@ -234,9 +232,8 @@ class PostTest {
     fun `장소를 바꾸면 좌표도 함께 바뀐다`() {
         val post = create()
 
-        post.changeSpot(99L, 990L, SpotPoint(128.5, 35.5))
+        post.changeSpot(990L, SpotPoint(128.5, 35.5))
 
-        assertEquals(99L, post.spotId)
         assertEquals(990L, post.catalogId)
         assertEquals(SpotPoint(128.5, 35.5), post.spotPoint)
     }
@@ -245,9 +242,8 @@ class PostTest {
     fun `장소를 뗄 수 있다`() {
         val post = create()
 
-        post.changeSpot(null, null, null)
+        post.changeSpot(null, null)
 
-        assertNull(post.spotId)
         assertNull(post.catalogId)
         assertNull(post.spotPoint)
     }
@@ -257,19 +253,8 @@ class PostTest {
         val post = create()
 
         // 좌표 없이 장소만 바꾸면 그 글이 지역 피드의 거리순에서 조용히 사라진다.
-        assertFailsWith<IllegalArgumentException> { post.changeSpot(99L, 990L, null) }
-        assertFailsWith<IllegalArgumentException> { post.changeSpot(null, null, SpotPoint(127.0, 37.5)) }
-    }
-
-    @Test
-    fun `장소와 카탈로그는 함께 있거나 함께 없어야 한다`() {
-        val post = create()
-
-        // 카탈로그가 조회 축이라, 없으면 그 글은 어느 장소 피드에도 나타나지 않는다.
-        assertFailsWith<IllegalArgumentException> {
-            post.changeSpot(99L, null, SpotPoint(128.5, 35.5))
-        }
-        assertFailsWith<IllegalArgumentException> { post.changeSpot(null, 990L, null) }
+        assertFailsWith<IllegalArgumentException> { post.changeSpot(990L, null) }
+        assertFailsWith<IllegalArgumentException> { post.changeSpot(null, SpotPoint(127.0, 37.5)) }
     }
 
     @Test

@@ -3,8 +3,8 @@ package org.around.ieuri.tourism.infrastructure.adapter.out.persistence
 import com.querydsl.jpa.impl.JPAQueryFactory
 import org.around.ieuri.tourism.application.port.out.persistence.SpotCatalogStorePort
 import org.around.ieuri.tourism.domain.aggregate.SpotCatalog
+import org.around.ieuri.tourism.domain.vo.CatalogCandidate
 import org.around.ieuri.tourism.domain.vo.DomainLocale
-import org.around.ieuri.tourism.domain.vo.KoreanSpotCandidate
 import org.around.ieuri.tourism.domain.vo.TranslationSource
 import org.around.ieuri.tourism.domain.vo.UnresolvedReason
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotCatalogEntity
@@ -63,45 +63,50 @@ class SpotCatalogStoreAdapter(
             .execute()
     }
 
+    /** 이름 키가 일치하는 카탈로그 후보. 순위 1·2가 쓴다. */
+    @Transactional(readOnly = true)
+    override fun findCatalogCandidatesByNameKey(nameKey: String): List<CatalogCandidate> =
+        findCatalogCandidates(catalog.nameKey.eq(nameKey))
+
+    /** 썸네일 URL이 일치하는 카탈로그 후보. 순위 3이 쓴다. */
+    @Transactional(readOnly = true)
+    override fun findCatalogCandidatesByThumbnail(thumbnailImageUrl: String): List<CatalogCandidate> =
+        findCatalogCandidates(catalog.thumbnailImageUrl.eq(thumbnailImageUrl))
+
     /**
-     * 제목 정규화 키가 일치하는 KO 후보.
+     * **좌표가 있는 카탈로그만 후보로 돌려준다.**
      *
-     * **이미 카탈로그가 배정된 행만 후보다** — 배정되지 않은 KO 행에 붙이면 참조할 카탈로그가
-     * 없다. 포트 계약이 KO를 먼저 처리하도록 정한 이유다.
+     * 판정이 좌표 등치 비교뿐이라(CatalogMatchRule) 좌표 없는 카탈로그는 어차피 어떤 행과도
+     * 일치하지 않는다. 그래서 여기서 거르는 편이 [CatalogCandidate]의 좌표를 nullable로 열어
+     * 규칙 쪽에 "좌표 없음" 분기를 만드는 것보다 낫다.
+     *
+     * 감수하는 결과: 좌표 없는 카탈로그는 **후보가 하나뿐일 때의 순위 1 채택에서도 빠지고**,
+     * 미해결 CSV의 후보 목록에도 나오지 않는다. 표준값 확정에 유효 좌표가 하나도 없었던
+     * 카탈로그이므로 사람이 판정할 근거도 그만큼 없다.
      */
-    @Transactional(readOnly = true)
-    override fun findKoreanCandidatesByTitleKey(titleKey: String): List<KoreanSpotCandidate> =
-        findKoreanCandidates(spot.titleKey.eq(titleKey))
-
-    @Transactional(readOnly = true)
-    override fun findKoreanCandidatesByThumbnail(thumbnailImageUrl: String): List<KoreanSpotCandidate> =
-        findKoreanCandidates(spot.thumbnailImageUrl.eq(thumbnailImageUrl))
-
-    private fun findKoreanCandidates(condition: com.querydsl.core.types.Predicate): List<KoreanSpotCandidate> =
+    private fun findCatalogCandidates(condition: com.querydsl.core.types.Predicate): List<CatalogCandidate> =
         queryFactory
-            .select(spot.id, spot.catalogId, spot.mapX, spot.mapY)
-            .from(spot)
-            .where(
-                spot.language.eq(DomainLocale.KO),
-                spot.catalogId.isNotNull,
-                condition,
-            )
+            .select(catalog.id, catalog.mapX, catalog.mapY)
+            .from(catalog)
+            .where(catalog.mapX.isNotNull, catalog.mapY.isNotNull, condition)
             .fetch()
             .map {
-                KoreanSpotCandidate(
-                    spotId = requireNotNull(it.get(spot.id)),
-                    catalogId = requireNotNull(it.get(spot.catalogId)),
-                    mapX = requireNotNull(it.get(spot.mapX)),
-                    mapY = requireNotNull(it.get(spot.mapY)),
+                CatalogCandidate(
+                    catalogId = requireNotNull(it.get(catalog.id)),
+                    mapX = requireNotNull(it.get(catalog.mapX)),
+                    mapY = requireNotNull(it.get(catalog.mapY)),
                 )
             }
+
+    /** 표준값 재확정. 집계 UPDATE라 생 SQL 어댑터가 담당한다. */
+    override fun refreshStandardValues(catalogId: Long) = upsertAdapter.refreshStandardValues(catalogId)
 
     override fun recordUnresolved(
         spotId: Long,
         reason: UnresolvedReason,
         extractedKey: String?,
-        candidateSpotIds: List<Long>,
-    ) = upsertAdapter.upsertUnresolved(spotId, reason, extractedKey, candidateSpotIds)
+        candidateCatalogIds: List<Long>,
+    ) = upsertAdapter.upsertUnresolved(spotId, reason, extractedKey, candidateCatalogIds)
 
     override fun upsertTranslation(
         catalogId: Long,

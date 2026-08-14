@@ -1,19 +1,26 @@
 package org.around.ieuri.tourism.infrastructure.mapper
 
+import org.around.ieuri.tourism.domain.aggregate.CatalogFestivalPeriod
+import org.around.ieuri.tourism.domain.aggregate.CatalogStandardValues
 import org.around.ieuri.tourism.domain.aggregate.CatalogTranslation
 import org.around.ieuri.tourism.domain.aggregate.SpotCatalog
 import org.around.ieuri.tourism.domain.vo.CatalogNameSource
+import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
+import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.tourism.domain.vo.TranslationSource
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.SpotCatalogEntity
+import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.SpotCatalogFestivalEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.SpotCatalogTranslationEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.mapper.toDomain
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.mapper.toNewEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.mapper.toNewTranslationEntities
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import java.time.LocalDate
 
 /**
  * 카탈로그 도메인↔엔티티 변환(POL-033).
@@ -25,10 +32,17 @@ class SpotCatalogMapperTest {
     @Test
     @DisplayName("엔티티 → 도메인 · 필드별로 대조한다")
     fun `entity to domain maps every field`() {
+        // mapX/mapY는 둘 다 Double이라 뒤바뀌어도 컴파일된다 — 값을 확실히 다르게 둔다.
         val entity = SpotCatalogEntity(
             id = 4321,
             representativeNameKo = "마린시티",
             nameSource = CatalogNameSource.DERIVED,
+            nameKey = "마린시티",
+            mapX = 129.1234567,
+            mapY = 35.7654321,
+            thumbnailImageUrl = "https://img/marine.jpg",
+            category = SpotCategory.TOURIST_SPOT,
+            copyright = CopyrightType.TYPE1,
         )
         val translations = listOf(
             SpotCatalogTranslationEntity(
@@ -49,11 +63,25 @@ class SpotCatalogMapperTest {
             ),
         )
 
-        val domain = entity.toDomain(translations)
+        val festival = SpotCatalogFestivalEntity(
+            catalogId = 4321,
+            eventStartDate = LocalDate.of(2026, 5, 1),
+            eventEndDate = LocalDate.of(2026, 5, 9),
+        )
+
+        val domain = entity.toDomain(translations, festival)
 
         assertEquals(4321L, domain.id)
         assertEquals("마린시티", domain.representativeNameKo)
         assertEquals(CatalogNameSource.DERIVED, domain.nameSource)
+        assertEquals(129.1234567, domain.standard.mapX)
+        assertEquals(35.7654321, domain.standard.mapY)
+        assertEquals("https://img/marine.jpg", domain.standard.thumbnailImageUrl)
+        assertEquals(SpotCategory.TOURIST_SPOT, domain.standard.category)
+        assertEquals(CopyrightType.TYPE1, domain.standard.copyright)
+        // 시작일과 종료일도 같은 타입이라 뒤바뀔 수 있다.
+        assertEquals(LocalDate.of(2026, 5, 1), domain.festivalPeriod?.startDate)
+        assertEquals(LocalDate.of(2026, 5, 9), domain.festivalPeriod?.endDate)
         assertEquals(2, domain.translations.size)
         assertEquals("Marine City", domain.translations[DomainLocale.EN]?.title)
         assertEquals("Haeundae-gu, Busan", domain.translations[DomainLocale.EN]?.address)
@@ -75,6 +103,13 @@ class SpotCatalogMapperTest {
 
         assertEquals(7L, domain.id)
         assertTrue(domain.translations.isEmpty())
+        // 표준값이 전부 결손인 카탈로그가 실재한다 — 좌표가 (0,0)·한국 밖인 원본 317건.
+        assertNull(domain.standard.mapX)
+        assertNull(domain.standard.mapY)
+        assertNull(domain.standard.thumbnailImageUrl)
+        assertNull(domain.standard.category)
+        assertNull(domain.standard.copyright)
+        assertNull(domain.festivalPeriod)
     }
 
     @Test
@@ -99,13 +134,43 @@ class SpotCatalogMapperTest {
     @Test
     @DisplayName("도메인 → 신규 엔티티 · id는 DB가 채운다")
     fun `domain to new entity`() {
-        val catalog = SpotCatalog.fromKoreanSpot("마린시티")
+        val catalog = SpotCatalog.fromKoreanSpot(
+            koreanTitle = "마린시티",
+            koreanAddress = "부산광역시 해운대구",
+            standard = CatalogStandardValues(
+                mapX = 129.1234567,
+                mapY = 35.7654321,
+                thumbnailImageUrl = "https://img/marine.jpg",
+                category = SpotCategory.RESTAURANT,
+                copyright = CopyrightType.TYPE3,
+            ),
+        )
 
         val entity = catalog.toNewEntity()
 
         assertEquals(null, entity.id)
         assertEquals("마린시티", entity.representativeNameKo)
         assertEquals(CatalogNameSource.OFFICIAL, entity.nameSource)
+        // nameKey는 컬럼이 아니라 대표명에서 파생된다 — 저장은 인덱스를 위해서다.
+        assertEquals("마린시티", entity.nameKey)
+        assertEquals(129.1234567, entity.mapX)
+        assertEquals(35.7654321, entity.mapY)
+        assertEquals("https://img/marine.jpg", entity.thumbnailImageUrl)
+        assertEquals(SpotCategory.RESTAURANT, entity.category)
+        assertEquals(CopyrightType.TYPE3, entity.copyright)
+    }
+
+    @Test
+    @DisplayName("축제 기간 → 신규 엔티티 · 부모 id를 받아 채운다")
+    fun `festival period to new entity`() {
+        val entity = CatalogFestivalPeriod(
+            startDate = LocalDate.of(2026, 5, 1),
+            endDate = LocalDate.of(2026, 5, 9),
+        ).toNewEntity(catalogId = 5555)
+
+        assertEquals(5555L, entity.catalogId)
+        assertEquals(LocalDate.of(2026, 5, 1), entity.eventStartDate)
+        assertEquals(LocalDate.of(2026, 5, 9), entity.eventEndDate)
     }
 
     @Test
@@ -115,6 +180,7 @@ class SpotCatalogMapperTest {
             id = 4321,
             representativeNameKo = "마린시티",
             nameSource = CatalogNameSource.OFFICIAL,
+            standard = CatalogStandardValues(),
             translations = mapOf(
                 DomainLocale.KO to CatalogTranslation("마린시티", "부산광역시 해운대구", TranslationSource.OFFICIAL),
                 DomainLocale.JA to CatalogTranslation("マリンシティ", "釜山広域市 海雲台区", TranslationSource.MACHINE),

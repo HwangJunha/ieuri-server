@@ -1,7 +1,7 @@
 package org.around.ieuri.tourism.domain.specification
 
 import org.around.ieuri.tourism.domain.vo.CatalogMatch
-import org.around.ieuri.tourism.domain.vo.KoreanSpotCandidate
+import org.around.ieuri.tourism.domain.vo.CatalogCandidate
 import org.around.ieuri.tourism.domain.vo.UnresolvedReason
 
 /**
@@ -18,8 +18,8 @@ object CatalogMatchRule {
     /**
      * 이 비한국어 spot이 어느 KO spot과 같은 장소인가.
      *
-     * @param candidatesByKey 제목 정규화 키가 일치하는 KO 후보. 순위 1·2가 쓴다.
-     * @param candidatesByThumbnail 썸네일 URL이 일치하는 KO 후보. 순위 3이 쓴다.
+     * @param candidatesByKey 이름 정규화 키가 일치하는 카탈로그 후보. 순위 1·2가 쓴다.
+     * @param candidatesByThumbnail 썸네일 URL이 일치하는 카탈로그 후보. 순위 3이 쓴다.
      *
      * 호출자가 두 후보 집합을 **미리 좁혀서** 넘긴다 — 어느 인덱스로 좁힐지는 조회의
      * 책임이고, 좁혀진 뒤 무엇을 채택할지가 이 규칙의 책임이다.
@@ -27,8 +27,8 @@ object CatalogMatchRule {
     fun match(
         title: String,
         coordinates: SpotPoint,
-        candidatesByKey: List<KoreanSpotCandidate>,
-        candidatesByThumbnail: List<KoreanSpotCandidate>,
+        candidatesByKey: List<CatalogCandidate>,
+        candidatesByThumbnail: List<CatalogCandidate>,
     ): CatalogMatch {
         val koreanKeys = SpotTitleNormalizer.extractKoreanKeys(title)
 
@@ -44,11 +44,11 @@ object CatalogMatchRule {
         // 명소의 대표 사진을 재사용하기 때문이며 매칭 로직이 아니라 원본 데이터의 성질이다.
         return when (candidatesByThumbnail.size) {
             1 -> CatalogMatch.Matched(candidatesByThumbnail.single().catalogId)
-            0 -> CatalogMatch.Unresolved(UnresolvedReason.NO_KOREAN_KEY, extractedKey = null, candidateSpotIds = emptyList())
+            0 -> CatalogMatch.Unresolved(UnresolvedReason.NO_KOREAN_KEY, extractedKey = null, candidateCatalogIds = emptyList())
             else -> CatalogMatch.Unresolved(
                 UnresolvedReason.URL_AMBIGUOUS,
                 extractedKey = null,
-                candidateSpotIds = candidatesByThumbnail.map { it.spotId },
+                candidateCatalogIds = candidatesByThumbnail.map { it.catalogId },
             )
         }
     }
@@ -62,7 +62,7 @@ object CatalogMatchRule {
      * **제목 키가 이미 좁혀 놓은 후보들 사이에서만** 쓰인다.
      */
     private fun matchByKey(
-        candidates: List<KoreanSpotCandidate>,
+        candidates: List<CatalogCandidate>,
         coordinates: SpotPoint,
         extractedKey: String,
     ): CatalogMatch {
@@ -78,7 +78,7 @@ object CatalogMatchRule {
             ?: CatalogMatch.Unresolved(
                 UnresolvedReason.KEY_AMBIGUOUS,
                 extractedKey,
-                candidates.map { it.spotId },
+                candidates.map { it.catalogId },
             )
     }
 
@@ -89,7 +89,7 @@ object CatalogMatchRule {
      * 근사 허용은 미해결을 509건에서 177건으로 줄이지만, 좌표가 미세하게 다른 두 spot이
      * 실제로 다른 가게인 경우와 같은 가게의 좌표가 갱신된 경우를 거리로는 구분할 수 없다.
      */
-    private fun KoreanSpotCandidate.matchesExactly(point: SpotPoint): Boolean =
+    private fun CatalogCandidate.matchesExactly(point: SpotPoint): Boolean =
         mapX == point.mapX && mapY == point.mapY
 }
 

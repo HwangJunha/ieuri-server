@@ -12,11 +12,14 @@ import org.springframework.transaction.annotation.Transactional
 import java.sql.Date
 
 /**
- * 진행 중 축제 조회 어댑터(SPEC-0013 R17). `spot_festival`의 최초 읽기 경로다 — 지금까지 이
- * 테이블은 배치 쓰기와 정리 삭제에만 쓰였다.
+ * 진행 중 축제 조회 어댑터(SPEC-0013 R17). PostGIS 거리 계산·정렬 때문에 생 SQL이다.
  *
- * PostGIS 거리 계산·정렬 때문에 생 SQL이다. `spot_festival`에는 language 컬럼이 없어 `spot`을
- * 조인해 언어를 건다(축제 행은 spot_id로만 언어가 결정된다).
+ * **`spot`도 `spot_festival`도 읽지 않는다**(SPEC-0019). 기간은 언어와 무관한 장소 자체의
+ * 속성이라 `spot_catalog_festival`이 카탈로그 단위로 확정해 둔다 — `spot_festival`은 원본
+ * 보관용으로 남는다. 제목·주소는 번역에서, 좌표·썸네일·분류·저작권은 카탈로그에서 온다.
+ *
+ * 언어 격리는 번역 조인의 `t.language = ?`가 전담하며, `UNIQUE(catalog_id, language)`가
+ * 카탈로그당 1행을 보장한다. 그 언어의 spot 행이 없어도 번역만 있으면 목록에 나온다.
  *
  * **메인 DB가 아니라 검색 노드를 본다**(searchJdbcTemplate) — 홈 화면 세 섹션이 한 노드를
  * 보게 해서, 검색과 같은 복제 지연을 공유하도록 맞춘다. 섹션마다 데이터 신선도가 다르면
@@ -53,12 +56,14 @@ class FestivalQueryJdbcAdapter(
             """
             WITH c AS (SELECT $CENTER AS center)
             SELECT * FROM (
-                SELECT s.id, s.title, s.address, s.thumbnail_image_url, s.map_x, s.map_y,
-                       s.category, s.copyright,
+                SELECT cat.id, t.title, t.address, cat.thumbnail_image_url, cat.map_x, cat.map_y,
+                       cat.category, cat.copyright,
                        f.event_start_date, f.event_end_date,
-                       ST_Distance(s.location, c.center) AS distance_meters
-                FROM spot_festival f
-                JOIN spot s ON s.id = f.spot_id
+                       ST_Distance(cat.location, c.center) AS distance_meters
+                FROM spot_catalog cat
+                -- PK가 catalog_id라 이 조인 자체가 "축제인 카탈로그만"을 뜻한다.
+                JOIN spot_catalog_festival f ON f.catalog_id = cat.id
+                JOIN spot_catalog_translation t ON t.catalog_id = cat.id AND t.language = ?
                 CROSS JOIN c
                 WHERE $where
             ) ranked
@@ -67,12 +72,17 @@ class FestivalQueryJdbcAdapter(
             LIMIT ?
             """.trimIndent(),
             { rs, _ ->
-                val copyright = CopyrightType.valueOf(rs.getString("copyright"))
+                // 카탈로그의 copyright·thumbnail은 nullable이다 — "미제공"이 곧 UNSPECIFIED이고,
+                // 썸네일은 빈 문자열로 자리를 비운다.
+                val copyright = rs.getString("copyright")
+                    ?.let { CopyrightType.valueOf(it) }
+                    ?: CopyrightType.UNSPECIFIED
                 FestivalView(
+                    // **클라이언트에 나가는 id는 카탈로그 id다**(SPEC-0019).
                     id = rs.getLong("id"),
                     title = rs.getString("title"),
                     address = rs.getString("address"),
-                    thumbnailImageUrl = rs.getString("thumbnail_image_url"),
+                    thumbnailImageUrl = rs.getString("thumbnail_image_url").orEmpty(),
                     distanceMeters = rs.getDouble("distance_meters"),
                     category = SpotCategory.valueOf(rs.getString("category")),
                     copyright = copyright,
@@ -94,15 +104,17 @@ class FestivalQueryJdbcAdapter(
      * '오늘'은 서비스가 시계에서 읽어 넘긴 값이며 `CURRENT_DATE`를 쓰지 않는다.
      */
     private fun whereClause(query: OngoingFestivalSearch): Pair<String, List<Any>> {
+        // 카테고리 없는 카탈로그는 카드를 그릴 수 없다 — 도메인 enum에 미분류 값이 없다.
+        // 좌표 없는 카탈로그는 ST_DWithin이 참을 돌려주지 않아 자연히 빠진다.
         val conditions = listOf(
-            "s.language = ?",
+            "cat.category IS NOT NULL",
             "f.event_start_date <= ?",
             "f.event_end_date >= ?",
-            "ST_DWithin(s.location, c.center, ?)",
+            "ST_DWithin(cat.location, c.center, ?)",
         )
         val params = listOf<Any>(
             query.center.longitude, query.center.latitude, // CTE의 center
-            query.language.name,
+            query.language.name,                           // translation JOIN 조건
             Date.valueOf(query.asOf),
             Date.valueOf(query.asOf),
             query.radiusMeters.toDouble(),

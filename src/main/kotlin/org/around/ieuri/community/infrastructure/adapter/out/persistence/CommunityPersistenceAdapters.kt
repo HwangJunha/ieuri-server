@@ -70,7 +70,6 @@ class PostPersistenceAdapter(
             category = requireNotNull(chipRepository.findById(postId).orElse(null)) {
                 "글($postId)에 카테고리 연결이 없다."
             }.category,
-            spotId = spot?.spotId,
             catalogId = spot?.catalogId,
             spotPoint = spot?.let { SpotPoint(longitude = it.mapX, latitude = it.mapY) },
             tags = tagRepository.findByPostIdOrderByIdAsc(postId).map { it.toPostTag() },
@@ -112,7 +111,6 @@ class PostPersistenceAdapter(
         tagRepository.saveAll(post.toTagEntities(postId))
         return saved.toDomain(
             category = post.category,
-            spotId = post.spotId,
             catalogId = post.catalogId,
             spotPoint = post.spotPoint,
             tags = post.tags,
@@ -166,7 +164,6 @@ class PostPersistenceAdapter(
             next == null -> Unit
             existing == null -> spotRepository.save(next)
             else -> {
-                existing.spotId = next.spotId
                 // **catalogId를 빠뜨리면 장소를 바꿔도 글이 옛 장소의 피드에 남는다** —
                 // 조회 축이 이 컬럼이기 때문이다(SPEC-0019 R-12).
                 existing.catalogId = next.catalogId

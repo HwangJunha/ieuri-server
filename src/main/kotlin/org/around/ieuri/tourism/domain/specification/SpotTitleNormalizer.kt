@@ -23,18 +23,17 @@ object SpotTitleNormalizer {
             .replace(SEPARATORS, "")
 
     /**
-     * **KO 행이 저장하는** 정규화 키. 빈 키는 null이다 — 빈 문자열끼리는 전부 일치하므로
-     * 키로 쓰면 무관한 장소가 한 카탈로그로 뭉친다.
+     * **카탈로그가 저장하는** 정규화 키(`spot_catalog.name_key`). 빈 키는 null이다 —
+     * 빈 문자열끼리는 전부 일치하므로 키로 쓰면 무관한 장소가 한 카탈로그로 뭉친다.
      *
-     * 비한국어 행의 제목에도 계산해 두지만, 그 값은 **조회에 쓰지 않는다** —
-     * `MarineCity(마린시티)`는 KO의 `마린시티`와 결코 같지 않기 때문이다. 비한국어 쪽이
-     * 대조에 쓸 값은 [lookupKey]가 만든다.
+     * 비한국어 제목에 그대로 쓰면 안 된다 — `MarineCity(마린시티)`는 카탈로그의 `마린시티`와
+     * 결코 같지 않다. 비한국어 쪽이 대조에 쓸 값은 [lookupKey]가 만든다.
      */
     fun matchKey(title: String): String? = normalize(title).takeIf { it.isNotEmpty() }
 
     /**
      * **비한국어 제목이 KO 후보를 찾을 때 쓰는 키.** 괄호에서 뽑은 한국어를 [matchKey]와 같은
-     * 규칙으로 정규화한 값이며, 그래야 KO 행의 `title_key`와 대조된다.
+     * 규칙으로 정규화한 값이며, 그래야 카탈로그의 `name_key`와 대조된다.
      *
      * `Marine City (마린시티)` → `마린시티`. 제목 전체를 정규화한 `MarineCity(마린시티)`를
      * 그대로 쓰면 **어떤 KO 행과도 일치하지 않아 매칭이 전량 실패한다.**

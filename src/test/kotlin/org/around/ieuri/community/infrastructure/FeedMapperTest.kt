@@ -29,7 +29,7 @@ import kotlin.test.assertNull
 class FeedMapperTest {
 
     private val authorId = 11L
-    private val spotId = 22L
+    private val catalogId = 22L
     private val feedItemId = 33L
     private val createdAt = Instant.parse("2026-08-12T01:02:03Z")
 
@@ -44,7 +44,7 @@ class FeedMapperTest {
         val entity = FeedItemEntity(
             id = feedItemId,
             authorId = authorId,
-            spotId = spotId,
+            catalogId = catalogId,
             body = "본문",
             likeCount = 44,
             hidden = true,
@@ -56,7 +56,7 @@ class FeedMapperTest {
         val domain = entity.toDomain(photoKeys = keys)
 
         assertEquals(feedItemId, domain.id)
-        assertEquals(spotId, domain.spotId)
+        assertEquals(catalogId, domain.catalogId)
         assertEquals(authorId, domain.authorId)
         assertEquals("본문", domain.body)
         assertEquals(44, domain.likeCount)
@@ -72,7 +72,7 @@ class FeedMapperTest {
         val entity = FeedItemEntity(
             id = feedItemId,
             authorId = authorId,
-            spotId = spotId,
+            catalogId = catalogId,
             body = "본문",
             likeCount = 0,
             hidden = false,
@@ -87,7 +87,7 @@ class FeedMapperTest {
     @Test
     fun `도메인 피드가 새 엔티티로 변환된다`() {
         val domain = FeedItem.create(
-            spotId = spotId,
+            catalogId = catalogId,
             authorId = authorId,
             body = "  본문  ",
             photoKeys = listOf(photoKey()),
@@ -96,7 +96,7 @@ class FeedMapperTest {
         val entity = domain.toNewEntity()
 
         assertEquals(authorId, entity.authorId)
-        assertEquals(spotId, entity.spotId)
+        assertEquals(catalogId, entity.catalogId)
         assertEquals("본문", entity.body)
         assertEquals(0, entity.likeCount)
         assertEquals(false, entity.hidden)
@@ -109,7 +109,7 @@ class FeedMapperTest {
     @Test
     fun `사진 엔티티의 position이 배열 순서를 따른다`() {
         val keys = List(3) { photoKey() }
-        val domain = FeedItem.create(spotId, authorId, "본문", keys)
+        val domain = FeedItem.create(catalogId, authorId, "본문", keys)
 
         val entities = domain.toPhotoEntities(feedItemId)
 

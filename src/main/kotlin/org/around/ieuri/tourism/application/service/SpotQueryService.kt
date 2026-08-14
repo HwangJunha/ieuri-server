@@ -117,11 +117,15 @@ class SpotQueryService(
      *   - 조회함·부재 : bodyAbsent = true       → upstream 호출 안 함, 단 신선도가 지나면 재조회 (AC-9·AC-13)
      *   - 조회함·존재 : bodyAbsent = false      → upstream 호출 안 함
      */
-    override fun spotDetail(spotId: Long, locale: DomainLocale): SpotDetailView {
-        val identity = resolve(spotId, locale)
+    override fun spotDetail(catalogId: Long, locale: DomainLocale): SpotDetailView {
+        val identity = resolve(catalogId, locale)
+        // **캐시·`spot_detail` 계열의 키는 원본 `spot.id`다.** 카탈로그 id를 쓰면 FK가
+        // `spot(id)`를 가리키는 자식 테이블에 적재가 실패하고(리스너가 삼킨다), 값이 우연히
+        // 겹치면 다른 장소의 본문이 적재된다.
+        val spotId = identity.spotId
 
         // 캐시 히트: 부재도 캐시된 값이다 — 미스로 오판하면 부재 spot이 TTL 내내 DB·upstream을 탄다.
-        spotCachePort.getDetail(spotId)?.let { return it.detail.toView(spotId) }
+        spotCachePort.getDetail(spotId)?.let { return it.detail.toView(catalogId) }
 
         // DB 히트: Valkey를 충전하고 upstream은 건드리지 않는다(AC-35).
         // 단 **부재 행은 신선도를 본다**(R-4) — 나중에 업스트림에 데이터가 생길 수 있다.
@@ -132,7 +136,7 @@ class SpotQueryService(
                 } else {
                     spotCachePort.putDetail(spotId, stored.detail)
                 }
-                return stored.detail.toView(spotId)
+                return stored.detail.toView(catalogId)
             }
             // 부재이면서 신선도가 지났다 — 아래로 떨어져 upstream에 다시 물어본다(AC-13).
         }
@@ -144,17 +148,17 @@ class SpotQueryService(
         if (fetched == null) {
             // 부재 확정. `spot` 행의 값으로 응답을 구성하고(R-2) 부재 사실을 적재한다(R-3).
             // 재조회 결과가 여전히 부재여도 적재 시각이 갱신되어 다음 신선도 창이 새로 시작된다(AC-15).
-            val fallback = fallbackDetail(spotId)
+            val fallback = fallbackDetail(catalogId)
             spotCachePort.putDetailAbsence(spotId, fallback)
             eventPublisher.publish(SpotDetailAbsent(spotId, fallback))
-            return fallback.toView(spotId)
+            return fallback.toView(catalogId)
         }
 
         // 재조회 결과 본문이 생겼다면 부재 행이 본문 있는 상태로 전환된다(AC-14) — saveDetail의 upsert가
         // body_absent를 false로 되돌린다.
         spotCachePort.putDetail(spotId, fetched)
         eventPublisher.publish(SpotDetailFetched(spotId, fetched))
-        return fetched.toView(spotId)
+        return fetched.toView(catalogId)
     }
 
     /**
@@ -172,8 +176,9 @@ class SpotQueryService(
      *
      * [resolve]가 이미 통과한 뒤이므로 행은 존재한다 — 그 사이 사라졌다면 부재가 아니라 미해석이다.
      */
-    private fun fallbackDetail(spotId: Long): SpotDetail {
-        val basics = spotQueryPort.findSpotBasics(spotId) ?: throw SpotDetailNotFoundException()
+    private fun fallbackDetail(catalogId: Long): SpotDetail {
+        // **카탈로그 id로 묻는다** — findSpotBasics는 `spot_catalog`를 조회한다.
+        val basics = spotQueryPort.findSpotBasics(catalogId) ?: throw SpotDetailNotFoundException()
         return SpotDetail(
             title = basics.title,
             category = basics.category,
@@ -186,8 +191,9 @@ class SpotQueryService(
         )
     }
 
-    override fun spotGallery(spotId: Long, locale: DomainLocale): List<SpotImageView> {
-        val identity = resolve(spotId, locale)
+    override fun spotGallery(catalogId: Long, locale: DomainLocale): List<SpotImageView> {
+        val identity = resolve(catalogId, locale)
+        val spotId = identity.spotId
         spotCachePort.getGallery(spotId)?.let { return it.map { image -> image.toView() } }
 
         spotDetailStorePort.findGallery(spotId)?.let { stored ->
@@ -201,8 +207,10 @@ class SpotQueryService(
         return fetched.map { it.toView() }
     }
 
-    override fun spotIntro(spotId: Long, category: SpotCategory, locale: DomainLocale): SpotIntroView? {
-        val identity = resolve(spotId, locale)
+    override fun spotIntro(catalogId: Long, category: SpotCategory, locale: DomainLocale): SpotIntroView? {
+        val identity = resolve(catalogId, locale)
+        // 캐시·저장 키는 원본 `spot.id`다 — 카탈로그 id를 쓰면 자식 테이블의 FK와 어긋난다.
+        val spotId = identity.spotId
         // 히트 판정은 래퍼(non-null)로 한다 — 값 자체는 정상적으로 null일 수 있어, value로 판정하면
         // "값 없음"이 매번 캐시 미스로 취급돼 upstream을 계속 두드리게 된다.
         val cached = spotCachePort.getIntro(spotId, category)
@@ -222,11 +230,13 @@ class SpotQueryService(
     }
 
     override fun spotInfoItems(
-        spotId: Long,
+        catalogId: Long,
         category: SpotCategory,
         locale: DomainLocale,
     ): List<SpotInfoItemView> {
-        val identity = resolve(spotId, locale)
+        val identity = resolve(catalogId, locale)
+        // 캐시·저장 키는 원본 `spot.id`다 — 카탈로그 id를 쓰면 자식 테이블의 FK와 어긋난다.
+        val spotId = identity.spotId
         spotCachePort.getInfoItems(spotId, category)
             ?.let { return it.map { item -> SpotInfoItemView(item.name, item.text) } }
 
@@ -249,19 +259,18 @@ class SpotQueryService(
     override fun spotLikeCount(spotId: Long): Long = spotQueryPort.countLikes(spotId)
 
     /**
-     * `spot` 한 행만 읽는다 — 캐시도 upstream도 타지 않는다. 부재는 예외가 아니라 null이며,
-     * 호출자가 그것을 "유효하지 않은 spotId"로 해석한다.
+     * 카탈로그 한 행만 읽는다 — 캐시도 upstream도 타지 않는다. 부재는 예외가 아니라 null이며,
+     * 호출자가 그것을 "유효하지 않은 장소 id"로 해석한다.
      */
-    override fun spotSummaries(spotIds: List<Long>): Map<Long, SpotSummaryView> =
-        spotQueryPort.findSpotBasicsIn(spotIds).mapValues { (spotId, basics) ->
+    override fun spotSummaries(catalogIds: List<Long>): Map<Long, SpotSummaryView> =
+        spotQueryPort.findSpotBasicsIn(catalogIds).mapValues { (catalogId, basics) ->
             SpotSummaryView(
-                id = spotId,
+                id = catalogId,
                 title = basics.title,
                 thumbnailImageUrl = basics.thumbnailImageUrl,
                 categoryCode = basics.category.name,
                 longitude = basics.longitude,
                 latitude = basics.latitude,
-                catalogId = basics.catalogId,
             )
         }
 
@@ -274,16 +283,15 @@ class SpotQueryService(
     ): List<Long> =
         spotQueryPort.findSpotIdsWithin(longitude, latitude, radiusMeters, limit, categoryCode)
 
-    override fun spotSummary(spotId: Long): SpotSummaryView? =
-        spotQueryPort.findSpotBasics(spotId)?.let {
+    override fun spotSummary(catalogId: Long): SpotSummaryView? =
+        spotQueryPort.findSpotBasics(catalogId)?.let {
             SpotSummaryView(
-                id = spotId,
+                id = catalogId,
                 title = it.title,
                 thumbnailImageUrl = it.thumbnailImageUrl,
                 categoryCode = it.category.name,
                 longitude = it.longitude,
                 latitude = it.latitude,
-                catalogId = it.catalogId,
             )
         }
 
@@ -313,21 +321,18 @@ class SpotQueryService(
     }
 
     /**
-     * `spot.id`를 해석하고 **요청 언어와 일치하는지 검증한다.**
+     * 카탈로그 id를 **요청 언어의 원본 행으로** 해석한다(SPEC-0019).
      *
-     * **캐시·DB를 보기 전에 호출해야 한다.** 검증을 upstream 폴백 직전에 두면 캐시 히트·DB 히트에서
+     * **캐시·DB를 보기 전에 호출해야 한다.** 해석을 upstream 폴백 직전에 두면 캐시 히트·DB 히트에서
      * 그대로 통과해, 정작 흔한 경로에서 교차 언어 콘텐츠가 나간다. `spot_detail`과 캐시 키 모두
      * 언어를 들지 않으므로(V20) 그 단계에서는 언어를 스스로 판별할 수 없다.
      *
-     * 요청 언어와 다른 언어의 id는 **존재하지 않는 것으로 취급한다.** 클라이언트가 언어를 바꾸면
-     * 목록을 다시 받아야 하며, 이전 언어의 id로 상세를 요청하는 것은 버그다 — 조용히 다른 언어를
-     * 돌려주면 그 버그가 드러나지 않는다.
+     * **언어 검증이 조회 조건 자체가 됐다.** 예전에는 언어별 `spot.id`를 받아 뒤늦게 대조했는데,
+     * 이제는 (카탈로그, 언어)로 찾으므로 다른 언어의 행이 애초에 나오지 않는다. 그 언어의 원본이
+     * 없으면 상세를 물을 곳이 없다 — TourAPI의 contentId가 언어별이기 때문이다.
      */
-    private fun resolve(spotId: Long, locale: DomainLocale): SpotIdentity {
-        val identity = spotQueryPort.findIdentity(spotId) ?: throw SpotDetailNotFoundException()
-        if (identity.language != locale) throw SpotDetailNotFoundException()
-        return identity
-    }
+    private fun resolve(catalogId: Long, locale: DomainLocale): SpotIdentity =
+        spotQueryPort.findIdentity(catalogId, locale) ?: throw SpotDetailNotFoundException()
 
     /** upstream 조회 좌표. TourAPI는 우리 PK를 모르므로 해석된 contentId로 묻는다. */
     private fun SpotIdentity.toQuery(locale: DomainLocale) =

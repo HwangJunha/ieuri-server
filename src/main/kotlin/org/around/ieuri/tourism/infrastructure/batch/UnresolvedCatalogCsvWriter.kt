@@ -21,8 +21,16 @@ object UnresolvedCatalogCsvWriter {
         "reason", "extracted_key", "candidate_count", "candidates", "thumbnail_image_url",
     )
 
-    /** 후보 하나를 한 셀 안에 담는 표기. `id@좌표(카테고리)` 꼴이다. */
-    private fun UnresolvedCandidate.render(): String = "$spotId@$mapX,$mapY($category)"
+    /**
+     * 후보 하나를 한 셀 안에 담는 표기. `id:대표명@좌표(카테고리)` 꼴이다.
+     *
+     * 대표명을 함께 싣는 이유는 판정이 "무엇과 헷갈렸는가"를 묻기 때문이다 — id만으로는
+     * 사람이 매번 DB를 조회해야 한다. 표준값이 결손인 카탈로그는 좌표·카테고리 자리가 빈다.
+     */
+    private fun UnresolvedCandidate.render(): String =
+        "$catalogId:$representativeNameKo@${mapX.orEmpty()},${mapY.orEmpty()}(${category?.name.orEmpty()})"
+
+    private fun Double?.orEmpty(): String = this?.toString() ?: ""
 
     fun write(reports: List<UnresolvedSpotReport>, target: Path) {
         target.parent?.let(Files::createDirectories)

@@ -22,6 +22,7 @@ import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toPhotoEntities
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toPhotoKey
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toPostTag
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toSpotEntity
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.Test
@@ -59,7 +60,6 @@ class CommunityMapperTest {
         // 글을 읽을 때마다 자식 조회가 따라붙는다.
         val domain = entity.toDomain(
             category = TargetCategory.TOURIST_SPOT,
-            spotId = 9L,
             catalogId = 90L,
             spotPoint = SpotPoint(127.0, 37.5),
             tags = listOf(tag),
@@ -68,7 +68,6 @@ class CommunityMapperTest {
 
         assertEquals(1L, domain.id)
         assertEquals(TargetCategory.TOURIST_SPOT, domain.category)
-        assertEquals(9L, domain.spotId)
         assertEquals(90L, domain.catalogId)
         assertEquals(listOf(tag), domain.tags)
         assertEquals(listOf(key), domain.photoKeys)
@@ -88,7 +87,7 @@ class CommunityMapperTest {
         val keyB = PhotoObjectKey.issue(3L, UUID.randomUUID()).toConfirmed()
         val domain = Post.create(
             category = TargetCategory.TOURIST_SPOT,
-            spotId = 2L, catalogId = 20L, spotPoint = SpotPoint(127.0, 37.5), authorId = 3L, tags = emptyList(),
+            catalogId = 20L, spotPoint = SpotPoint(127.0, 37.5), authorId = 3L, tags = emptyList(),
             title = "제목", body = "본문", photoKeys = listOf(keyA, keyB),
         )
 
@@ -98,6 +97,35 @@ class CommunityMapperTest {
         assertEquals(listOf(keyA.value, keyB.value), photos.map { it.objectKey })
         assertEquals(listOf<Short>(0, 1), photos.map { it.position })
         assertEquals(listOf(1L, 1L), photos.map { it.postId })
+    }
+
+    @Test
+    fun `장소 연결 행은 카탈로그 id와 좌표를 싣는다`() {
+        // catalogId·mapX·mapY 셋이 전부 숫자라 뒤바뀌어도 컴파일된다 — 값을 서로 다르게 둔다.
+        val domain = Post.create(
+            category = TargetCategory.TOURIST_SPOT,
+            catalogId = 20L, spotPoint = SpotPoint(127.0, 37.5), authorId = 3L, tags = emptyList(),
+            title = "제목", body = "본문", photoKeys = emptyList(),
+        )
+
+        val entity = requireNotNull(domain.toSpotEntity(postId = 1L))
+
+        assertEquals(1L, entity.postId)
+        assertEquals(20L, entity.catalogId)
+        // ST_MakePoint는 (경도, 위도) 순이다 — mapX가 경도다.
+        assertEquals(127.0, entity.mapX)
+        assertEquals(37.5, entity.mapY)
+    }
+
+    @Test
+    fun `장소가 없는 글은 연결 행을 만들지 않는다`() {
+        val domain = Post.create(
+            category = TargetCategory.TOURIST_SPOT,
+            catalogId = null, spotPoint = null, authorId = 3L, tags = emptyList(),
+            title = "제목", body = "본문", photoKeys = emptyList(),
+        )
+
+        assertNull(domain.toSpotEntity(postId = 1L))
     }
 
     @Test
@@ -129,7 +157,6 @@ class CommunityMapperTest {
 
         val domain = entity.toDomain(
             category = TargetCategory.TOURIST_SPOT,
-            spotId = null,
             catalogId = null,
             spotPoint = null,
             tags = emptyList(),
@@ -138,7 +165,6 @@ class CommunityMapperTest {
 
         assertNull(domain.deletedAt)
         // 장소는 선택이라 없는 것이 정상이다.
-        assertNull(domain.spotId)
         assertNull(domain.catalogId)
         assertTrue(domain.photoKeys.isEmpty())
         assertTrue(domain.tags.isEmpty())
@@ -150,7 +176,7 @@ class CommunityMapperTest {
         val keyB = PhotoObjectKey.issue(3L, UUID.randomUUID()).toConfirmed()
         val domain = Post.create(
             category = TargetCategory.TOURIST_SPOT,
-        spotId = 2L, catalogId = 20L, spotPoint = SpotPoint(127.0, 37.5), authorId = 3L, tags = emptyList(),
+            catalogId = 20L, spotPoint = SpotPoint(127.0, 37.5), authorId = 3L, tags = emptyList(),
             title = "제목", body = "본문", photoKeys = listOf(keyA, keyB),
         )
 

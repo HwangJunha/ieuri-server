@@ -1,7 +1,6 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.persistence
 
 import org.around.ieuri.tourism.application.command.SyncSpotCommand
-import org.around.ieuri.tourism.domain.specification.SpotTitleNormalizer
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.ParameterizedPreparedStatementSetter
 import org.springframework.stereotype.Component
@@ -38,9 +37,6 @@ class SpotUpsertJdbcAdapter(
             ps.setInt(9, spot.contentTypeId)
             ps.setString(10, spot.copyright.name)
             ps.setTimestamp(11, syncedTimestamp)
-            // 정규화 키는 제목에서 파생되므로 적재 시점에 함께 계산한다(SPEC-0019). 조회할 때마다
-            // SQL에서 정규화하면 인덱스를 탈 수 없어 KO 51,992행을 매번 전량 스캔한다.
-            ps.setString(12, SpotTitleNormalizer.matchKey(spot.title))
         }
         // batchUpdate(sql, batchArgs, batchSize, pss)는 청크별 결과를 배열의 배열로 돌려준다.
         return jdbcTemplate.batchUpdate(UPSERT_SQL, spots, spots.size, setter)
@@ -56,12 +52,10 @@ class SpotUpsertJdbcAdapter(
         val UPSERT_SQL = """
             INSERT INTO spot (
                 content_id, language, title, address, thumbnail_image_url,
-                map_x, map_y, category, content_type_id, copyright, last_synced_at,
-                title_key
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                map_x, map_y, category, content_type_id, copyright, last_synced_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (content_id, language) DO UPDATE SET
                 title               = EXCLUDED.title,
-                title_key           = EXCLUDED.title_key,
                 address             = EXCLUDED.address,
                 thumbnail_image_url = EXCLUDED.thumbnail_image_url,
                 map_x               = EXCLUDED.map_x,

@@ -35,7 +35,6 @@ import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.
  */
 fun PostEntity.toDomain(
     category: TargetCategory,
-    spotId: Long?,
     catalogId: Long?,
     spotPoint: SpotPoint?,
     tags: List<PostTag>,
@@ -43,7 +42,6 @@ fun PostEntity.toDomain(
 ): Post = Post.restore(
     id = requireNotNull(id) { "적재된 글에는 id가 있어야 한다." },
     category = category,
-    spotId = spotId,
     catalogId = catalogId,
     spotPoint = spotPoint,
     authorId = authorId,
@@ -107,8 +105,7 @@ fun Post.toSpotEntity(postId: Long): PostSpotEntity? {
     val point = spotPoint ?: return null
     return PostSpotEntity(
         postId = postId,
-        spotId = requireNotNull(spotId) { "좌표가 있으면 장소도 있어야 한다." },
-        catalogId = requireNotNull(catalogId) { "좌표가 있으면 카탈로그도 있어야 한다." },
+        catalogId = requireNotNull(catalogId) { "좌표가 있으면 장소도 있어야 한다." },
         mapX = point.longitude,
         mapY = point.latitude,
     )

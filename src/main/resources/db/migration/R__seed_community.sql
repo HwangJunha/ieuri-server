@@ -140,8 +140,12 @@ JOIN (VALUES
 
 -- 3-2) 글 ↔ 장소. **선택이다** — 위 '여행 짐 싸는 팁' 글에는 없다.
 --      좌표는 spot에서 복사한다(location은 트리거가 파생시킨다).
-INSERT INTO community_post_spot (post_id, spot_id, map_x, map_y)
-SELECT p.id, v.spot_id, s.map_x, s.map_y
+--
+--      VALUES에 적힌 것은 언어별 `spot.id`이므로 spot을 경유해 카탈로그로 바꿔 넣는다
+--      (SPEC-0019 R-12). **카탈로그 배정 전에는 catalog_id가 null이라 이 시드가 한 행도
+--      넣지 못한다** — 배정 배치를 먼저 돌려야 한다.
+INSERT INTO community_post_spot (post_id, catalog_id, map_x, map_y)
+SELECT p.id, s.catalog_id, s.map_x, s.map_y
 FROM community_post p
 JOIN (VALUES
     ('경복궁 야간개장 후기', 20, 11094),
@@ -161,7 +165,7 @@ JOIN (VALUES
     ('[대조군] 17번의 정상 글', 17, 9471)
 ) AS v(title, author_id, spot_id)
   ON p.title = v.title AND p.author_id = v.author_id
-JOIN spot s ON s.id = v.spot_id;
+JOIN spot s ON s.id = v.spot_id AND s.catalog_id IS NOT NULL;
 
 -- 4) 사진 키. 실제 R2에 오브젝트가 없으므로 **CDN에서는 깨진 이미지로 나온다** — 키 배열과
 --    순서(position)가 계약대로 내려오는지 확인하는 용도다.
@@ -387,7 +391,7 @@ JOIN (VALUES
 --   SELECT p.id, s.title, p.title
 --   FROM community_post p
 --   JOIN community_post_spot ps ON ps.post_id = p.id
---   JOIN spot s ON s.id = ps.spot_id
+--   JOIN spot_catalog s ON s.id = ps.catalog_id
 --   WHERE p.deleted_at IS NULL
 --     AND ST_DWithin(s.location, ST_MakePoint(126.9780, 37.5665)::geography, 5000)
 --   ORDER BY p.created_at DESC;

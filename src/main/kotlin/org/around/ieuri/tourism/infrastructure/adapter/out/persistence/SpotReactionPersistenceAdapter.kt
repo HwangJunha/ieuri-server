@@ -3,7 +3,7 @@ package org.around.ieuri.tourism.infrastructure.adapter.out.persistence
 import com.querydsl.jpa.impl.JPAQueryFactory
 import org.around.ieuri.tourism.application.port.out.persistence.SpotReactionPort
 import org.around.ieuri.tourism.domain.aggregate.SpotReaction
-import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotEntity
+import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotCatalogEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.mapper.toDomain
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.mapper.toNewEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.repository.SpotReactionJpaRepository
@@ -23,7 +23,7 @@ class SpotReactionPersistenceAdapter(
     private val queryFactory: JPAQueryFactory,
 ) : SpotReactionPort {
 
-    private val spot = QSpotEntity.spotEntity
+    private val catalog = QSpotCatalogEntity.spotCatalogEntity
 
     override fun find(memberId: Long, catalogId: Long): SpotReaction? =
         repository.findByMemberIdAndCatalogId(memberId, catalogId)?.toDomain()
@@ -32,27 +32,19 @@ class SpotReactionPersistenceAdapter(
         val existing = repository.findByMemberIdAndCatalogId(reaction.memberId, reaction.catalogId)
         if (existing != null) {
             // 관리 엔티티에 도메인 변경을 얹는다(dirty-checking → UPDATE). 키는 불변이라 reaction만 갱신.
-            //
-            // **spotId는 갱신한다** — 재평가한 화면의 언어를 최신으로 남긴다. 식별의 일부가
-            // 아니므로 바뀌어도 키가 흔들리지 않는다.
             existing.reaction = reaction.reaction
-            existing.spotId = reaction.spotId
             return
         }
         repository.save(reaction.toNewEntity())
     }
 
-    /**
-     * `spot.id` → 소속 카탈로그. 배정되지 않은 행은 `catalog_id`가 null이라 결과도 null이다 —
-     * 호출자가 그것을 `SPOT_NOT_FOUND`로 해석한다.
-     */
     @Transactional(readOnly = true)
-    override fun findCatalogIdBySpotId(spotId: Long): Long? =
+    override fun existsCatalog(catalogId: Long): Boolean =
         queryFactory
-            .select(spot.catalogId)
-            .from(spot)
-            .where(spot.id.eq(spotId))
-            .fetchFirst()
+            .selectOne()
+            .from(catalog)
+            .where(catalog.id.eq(catalogId))
+            .fetchFirst() != null
 
     /**
      * 파생 삭제라 영속성 컨텍스트를 우회한다. 이 트랜잭션에서 같은 엔티티를 다시 읽는 코드가

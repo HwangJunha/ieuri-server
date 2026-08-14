@@ -85,14 +85,6 @@ class SpotEntity(
     @Column(name = "catalog_id")
     var catalogId: Long? = null,
 
-    /**
-     * 제목 정규화 키(SPEC-0019). 매칭이 이 값으로 KO 후보를 찾는다.
-     *
-     * 적재 시점에 [SpotTitleNormalizer]가 계산해 넣는다 — 조회할 때마다 SQL에서 정규화하면
-     * 인덱스를 탈 수 없다. 제목이 태그뿐이라 정규화 결과가 비면 null이다.
-     */
-    @Column(name = "title_key", length = 255)
-    var titleKey: String? = null,
 
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant? = null,

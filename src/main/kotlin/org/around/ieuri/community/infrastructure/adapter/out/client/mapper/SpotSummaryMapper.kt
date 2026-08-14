@@ -19,5 +19,4 @@ fun SpotSummaryView.toPostSpotView(): PostSpotView = PostSpotView(
     category = TargetCategory.fromOrNull(categoryCode),
     longitude = longitude,
     latitude = latitude,
-    catalogId = catalogId,
 )

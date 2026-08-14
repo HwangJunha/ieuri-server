@@ -2,7 +2,7 @@ package org.around.ieuri.tourism.application.port.out.persistence
 
 import org.around.ieuri.tourism.domain.aggregate.SpotCatalog
 import org.around.ieuri.tourism.domain.vo.DomainLocale
-import org.around.ieuri.tourism.domain.vo.KoreanSpotCandidate
+import org.around.ieuri.tourism.domain.vo.CatalogCandidate
 import org.around.ieuri.tourism.domain.vo.TranslationSource
 import org.around.ieuri.tourism.domain.vo.UnresolvedReason
 
@@ -24,15 +24,25 @@ interface SpotCatalogStorePort {
     fun assign(spotId: Long, catalogId: Long)
 
     /**
-     * 제목 정규화 키가 일치하는 KO 후보. 순위 1·2가 쓴다.
+     * 정규화 이름 키가 일치하는 카탈로그 후보. 순위 1·2가 쓴다.
      *
-     * **정규화 키로 조회한다** — 원문 제목으로 조회하면 전각 괄호·태그·공백 차이 때문에
-     * 매칭률이 무너진다. 저장 시점에 정규화 키를 함께 적재해 두는 것이 이 조회의 전제다.
+     * **`spot`이 아니라 `spot_catalog`를 본다** — 어차피 필요한 것이 catalog_id이므로 한 단계
+     * 줄어들고, 원본 테이블에 매칭용 컬럼을 두지 않아도 된다.
      */
-    fun findKoreanCandidatesByTitleKey(titleKey: String): List<KoreanSpotCandidate>
+    fun findCatalogCandidatesByNameKey(nameKey: String): List<CatalogCandidate>
 
-    /** 썸네일 URL이 일치하는 KO 후보. 순위 3이 쓴다. */
-    fun findKoreanCandidatesByThumbnail(thumbnailImageUrl: String): List<KoreanSpotCandidate>
+    /** 썸네일 URL이 일치하는 카탈로그 후보. 순위 3이 쓴다. */
+    fun findCatalogCandidatesByThumbnail(thumbnailImageUrl: String): List<CatalogCandidate>
+
+    /**
+     * 카탈로그의 **표준값을 원본에서 다시 확정한다** — 좌표·썸네일·분류·저작권·축제기간.
+     *
+     * 규칙은 전부 KO 우선이며, 좌표만 예외적으로 **유효한 것 중에서** KO 우선이다
+     * (원본에 (0,0)·한국 밖이 317건 있어 KO가 무효일 수 있다).
+     *
+     * 배정할 때마다 부르는 이유는 새로 붙은 행이 기존보다 나은 값을 가질 수 있기 때문이다.
+     */
+    fun refreshStandardValues(catalogId: Long)
 
     /**
      * 미해결로 기록한다. 같은 spot을 다시 기록해도 행이 늘지 않는다(UNIQUE upsert).
@@ -44,7 +54,7 @@ interface SpotCatalogStorePort {
         spotId: Long,
         reason: UnresolvedReason,
         extractedKey: String?,
-        candidateSpotIds: List<Long>,
+        candidateCatalogIds: List<Long>,
     )
 
     /**

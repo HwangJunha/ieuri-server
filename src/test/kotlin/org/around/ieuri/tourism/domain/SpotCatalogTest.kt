@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.domain
 
+import org.around.ieuri.tourism.domain.aggregate.CatalogTranslation
 import org.around.ieuri.tourism.domain.aggregate.SpotCatalog
 import org.around.ieuri.tourism.domain.vo.CatalogNameSource
 import org.around.ieuri.tourism.domain.vo.DomainLocale
@@ -15,6 +16,10 @@ import org.junit.jupiter.api.Test
  * 카탈로그 애그리거트(SPEC-0019 R-3·R-4·R-5).
  */
 class SpotCatalogTest {
+
+    /** 원본 외국어 행의 표시값. TourAPI가 그 언어로 발급한 값이라 출처는 항상 OFFICIAL이다. */
+    private fun officialCard(title: String) =
+        CatalogTranslation(title = title, address = null, source = TranslationSource.OFFICIAL)
 
     @Test
     @DisplayName("KO 행에서 만든 카탈로그는 대표명 출처가 OFFICIAL이다")
@@ -39,8 +44,8 @@ class SpotCatalogTest {
     @Test
     @DisplayName("KO 행이 없으면 괄호 한글에서 파생하고 출처는 DERIVED다")
     fun `derives korean name from foreign title`() {
-        val catalog = SpotCatalog.deriveFromForeignTitles(
-            mapOf(DomainLocale.EN to "Lacantina (라칸티나)"),
+        val catalog = SpotCatalog.deriveFromForeign(
+            mapOf(DomainLocale.EN to officialCard("Lacantina (라칸티나)")),
         )
 
         assertEquals("라칸티나", catalog?.representativeNameKo)
@@ -51,11 +56,11 @@ class SpotCatalogTest {
     @DisplayName("괄호값이 언어마다 다르면 EN을 채택한다")
     fun `EN wins when bracket values differ`() {
         // 실측 163개 그룹에서 언어별 괄호값이 달랐다 — `초유향`/`초류향`.
-        val catalog = SpotCatalog.deriveFromForeignTitles(
+        val catalog = SpotCatalog.deriveFromForeign(
             mapOf(
-                DomainLocale.JA to "チョユヒャン（초류향）",
-                DomainLocale.EN to "Chouhyang (초유향)",
-                DomainLocale.ZH to "楚流香（초류향）",
+                DomainLocale.JA to officialCard("チョユヒャン（초류향）"),
+                DomainLocale.EN to officialCard("Chouhyang (초유향)"),
+                DomainLocale.ZH to officialCard("楚流香（초류향）"),
             ),
         )
 
@@ -66,16 +71,16 @@ class SpotCatalogTest {
     @DisplayName("EN이 없으면 JA, JA도 없으면 ZH를 채택한다")
     fun `falls back to JA then ZH`() {
         // ZH만 702개, JA만 278개인 카탈로그가 실재해 EN 단독 규칙으로는 결정되지 않는다.
-        val jaOnly = SpotCatalog.deriveFromForeignTitles(
+        val jaOnly = SpotCatalog.deriveFromForeign(
             mapOf(
-                DomainLocale.JA to "チョユヒャン（초류향）",
-                DomainLocale.ZH to "楚流香（초유향）",
+                DomainLocale.JA to officialCard("チョユヒャン（초류향）"),
+                DomainLocale.ZH to officialCard("楚流香（초유향）"),
             ),
         )
         assertEquals("초류향", jaOnly?.representativeNameKo)
 
-        val zhOnly = SpotCatalog.deriveFromForeignTitles(
-            mapOf(DomainLocale.ZH to "楚流香（초유향）"),
+        val zhOnly = SpotCatalog.deriveFromForeign(
+            mapOf(DomainLocale.ZH to officialCard("楚流香（초유향）")),
         )
         assertEquals("초유향", zhOnly?.representativeNameKo)
     }
@@ -83,8 +88,8 @@ class SpotCatalogTest {
     @Test
     @DisplayName("어느 언어에서도 한국어를 못 뽑으면 파생하지 않는다")
     fun `returns null when no korean can be extracted`() {
-        val catalog = SpotCatalog.deriveFromForeignTitles(
-            mapOf(DomainLocale.EN to "SM Entertainment"),
+        val catalog = SpotCatalog.deriveFromForeign(
+            mapOf(DomainLocale.EN to officialCard("SM Entertainment")),
         )
 
         assertNull(catalog)
@@ -94,8 +99,8 @@ class SpotCatalogTest {
     @DisplayName("파생 카탈로그의 원문 외국어 제목은 OFFICIAL로 선다")
     fun `derived catalog keeps foreign titles as official`() {
         // TourAPI가 발급한 제목이므로 번역 대상이 아니다.
-        val catalog = SpotCatalog.deriveFromForeignTitles(
-            mapOf(DomainLocale.EN to "Lacantina (라칸티나)"),
+        val catalog = SpotCatalog.deriveFromForeign(
+            mapOf(DomainLocale.EN to officialCard("Lacantina (라칸티나)")),
         )
 
         assertEquals(TranslationSource.OFFICIAL, catalog?.translations?.get(DomainLocale.EN)?.source)
@@ -115,8 +120,8 @@ class SpotCatalogTest {
     @DisplayName("기계 번역은 이미 있는 제목을 덮지 않는다")
     fun `machine translation never overwrites`() {
         // TourAPI가 제공한 제목이 공식 표기이며 우리 번역보다 우선한다(R-4).
-        val catalog = SpotCatalog.deriveFromForeignTitles(
-            mapOf(DomainLocale.EN to "Lacantina (라칸티나)"),
+        val catalog = SpotCatalog.deriveFromForeign(
+            mapOf(DomainLocale.EN to officialCard("Lacantina (라칸티나)")),
         )!!
 
         catalog.fillMachineTranslation(DomainLocale.EN, "번역이 밀어낸 값")
@@ -143,7 +148,7 @@ class SpotCatalogTest {
         val catalog = SpotCatalog.fromKoreanSpot("마린시티")
         catalog.fillMachineTranslation(DomainLocale.JA, "マリンシティ")
 
-        catalog.applyOfficialTitle(DomainLocale.JA, "マリンシティ（마린시티）")
+        catalog.applyOfficial(DomainLocale.JA, "マリンシティ（마린시티）")
 
         assertEquals("マリンシティ（마린시티）", catalog.translations[DomainLocale.JA]?.title)
         assertEquals(TranslationSource.OFFICIAL, catalog.translations[DomainLocale.JA]?.source)

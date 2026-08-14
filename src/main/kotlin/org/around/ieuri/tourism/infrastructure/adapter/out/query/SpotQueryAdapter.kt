@@ -12,6 +12,7 @@ import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
 import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
 import org.around.ieuri.tourism.application.exception.InvalidCursorException
 import org.around.ieuri.tourism.application.query.LikedSpotView
+import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.LikedSpotCursor
 import org.around.ieuri.tourism.domain.vo.ReactionType
@@ -40,8 +41,6 @@ class SpotQueryAdapter(
     private val catalog = QSpotCatalogEntity.spotCatalogEntity
     private val translation = QSpotCatalogTranslationEntity.spotCatalogTranslationEntity
 
-    /** 요청 언어의 spot 행. 대표 행([spot])과 구분해야 해서 별칭을 따로 둔다. */
-    private val languageSpot = QSpotEntity("languageSpot")
 
     @Transactional(readOnly = true)
     override fun searchNearby(query: NearbySpotSearch): List<SpotSearchResult> =
@@ -62,16 +61,19 @@ class SpotQueryAdapter(
         spatialQueryAdapter.findIdsWithin(longitude, latitude, radiusMeters, limit, categoryCode)
 
     /**
-     * 그 회원이 해당 언어에서 이미 반응한 관광지 id.
+     * 그 회원이 이미 반응한 **카탈로그 id**. 반경 조회가 이 집합을 제외 조건으로 쓴다.
      *
-     * 반응은 카탈로그 단위지만 **호출자가 기대하는 것은 요청 언어의 `spot.id`다**(카드 필터링에
-     * 쓴다). 조인에 `language`를 포함해 카탈로그당 정확히 1행으로 되돌린다.
+     * **`spot`을 경유하지 않는다**(SPEC-0019). 반응이 이미 카탈로그 단위로 적재되고, 목록이
+     * 내보내는 id도 카탈로그 id라 두 축이 그대로 맞는다 — 예전에는 언어별 `spot.id`로 되돌리기
+     * 위해 `spot`을 조인했으나, 그 조인은 그 언어의 spot 행이 없는 카탈로그를 제외 집합에서
+     * 빠뜨려 이미 반응한 항목이 다시 나오게 만든다.
+     *
+     * [language]는 더 이상 조건이 아니다 — 좋아요는 언어와 무관한 장소 단위 행위다.
      */
     override fun findReactedSpotIds(memberId: Long, language: DomainLocale): Set<Long> =
         queryFactory
-            .select(spot.id)
+            .select(reaction.catalogId)
             .from(reaction)
-            .join(spot).on(spot.catalogId.eq(reaction.catalogId), spot.language.eq(language))
             .where(reaction.memberId.eq(memberId))
             .fetch()
             .toSet()
@@ -81,53 +83,69 @@ class SpotQueryAdapter(
      * 합산되어 **응답값이 커진다.** 의도된 교정이며, 지금까지 장소당 좋아요 수를 실제보다
      * 작게 보고하고 있었던 것이다.
      *
-     * 인자는 여전히 `spot.id`다(계약 불변) — 그 행의 카탈로그로 해석해 센다.
+     * 인자는 카탈로그 id다 — 반응 테이블이 이미 그 축이라 `spot`을 경유할 이유가 없다.
      */
     override fun countLikes(spotId: Long): Long =
         queryFactory
             .select(reaction.count())
             .from(reaction)
-            .join(spot).on(spot.catalogId.eq(reaction.catalogId))
             .where(
-                spot.id.eq(spotId),
+                reaction.catalogId.eq(spotId),
                 reaction.reaction.eq(ReactionType.LIKE),
             )
             .fetchOne() ?: 0L
 
-    /** `spot.id` → upstream 식별 정보. 상세 조회가 캐시·DB를 모두 놓쳤을 때만 쓴다. */
-    override fun findIdentity(spotId: Long): SpotIdentity? =
+    /**
+     * (카탈로그 id, 언어) → upstream 식별 정보. 상세 조회가 캐시·DB를 모두 놓쳤을 때만 쓴다.
+     *
+     * **`spot`을 읽는 유일한 조회 경로다**(SPEC-0019). TourAPI의 contentId가 언어별이라
+     * 그 언어의 원본 행을 거쳐야만 상세를 물을 수 있다 — `idx_spot_catalog_language
+     * (catalog_id, language)`가 이 조회를 받친다.
+     *
+     * 번역만 있고 그 언어의 원본이 없는 카탈로그는 null이며, 호출자가 "상세 없음"으로 해석한다.
+     */
+    override fun findIdentity(catalogId: Long, language: DomainLocale): SpotIdentity? =
         queryFactory
-            .select(spot.contentId, spot.language)
+            .select(spot.id, spot.contentId, spot.language)
             .from(spot)
-            .where(spot.id.eq(spotId))
+            .where(spot.catalogId.eq(catalogId), spot.language.eq(language))
             .fetchFirst()
             ?.let {
                 SpotIdentity(
+                    spotId = requireNotNull(it.get(spot.id)),
                     contentId = requireNotNull(it.get(spot.contentId)),
                     language = requireNotNull(it.get(spot.language)),
                 )
             }
 
-    /** 상세 본문이 부재할 때 응답을 구성할 `spot` 행의 값. */
-    override fun findSpotBasics(spotId: Long): SpotBasics? =
+    /**
+     * 상세 본문이 부재할 때 응답을 구성할 카탈로그의 값. 인자는 **카탈로그 id**다(SPEC-0019).
+     *
+     * **[TODO: 언어 미결]** 제목·주소는 언어별 값인데 이 메서드에는 언어 인자가 없어 번역을
+     * 고를 수 없다. 지금은 카탈로그의 대표 한국어명([SpotCatalogEntity.representativeNameKo])을
+     * 임시로 쓰며, **주소는 null이다** — 아무 언어의 주소나 집어 오면 제목과 언어가 어긋난
+     * 카드가 나가므로 비워 두는 편이 낫다. 시그니처에 언어를 더할지, 호출자가 이미 아는 언어를
+     * 넘길지는 스펙 결정 사항이라 여기서 임의로 정하지 않는다.
+     */
+    override fun findSpotBasics(catalogId: Long): SpotBasics? =
         queryFactory
             .select(
-                spot.title, spot.address, spot.thumbnailImageUrl,
-                spot.category, spot.copyright, spot.mapX, spot.mapY, spot.catalogId,
+                catalog.representativeNameKo, catalog.thumbnailImageUrl,
+                catalog.category, catalog.copyright, catalog.mapX, catalog.mapY,
             )
-            .from(spot)
-            .where(spot.id.eq(spotId))
+            .from(catalog)
+            .where(catalog.id.eq(catalogId))
             .fetchFirst()
             ?.let {
                 SpotBasics(
-                    title = requireNotNull(it.get(spot.title)),
-                    address = it.get(spot.address),
-                    thumbnailImageUrl = requireNotNull(it.get(spot.thumbnailImageUrl)),
-                    category = requireNotNull(it.get(spot.category)),
-                    copyright = requireNotNull(it.get(spot.copyright)),
-                    longitude = requireNotNull(it.get(spot.mapX)),
-                    latitude = requireNotNull(it.get(spot.mapY)),
-                    catalogId = it.get(spot.catalogId),
+                    title = requireNotNull(it.get(catalog.representativeNameKo)),
+                    address = null,
+                    thumbnailImageUrl = it.get(catalog.thumbnailImageUrl).orEmpty(),
+                    // 분류·좌표가 없는 카탈로그는 카드를 구성할 수 없다 — 없는 것으로 취급한다.
+                    category = it.get(catalog.category) ?: return@let null,
+                    copyright = it.get(catalog.copyright) ?: CopyrightType.UNSPECIFIED,
+                    longitude = it.get(catalog.mapX) ?: return@let null,
+                    latitude = it.get(catalog.mapY) ?: return@let null,
                 )
             }
 
@@ -139,33 +157,42 @@ class SpotQueryAdapter(
      * hasNextPage를 판정한다.
      */
     /**
-     * 여러 spot을 한 번에. 호출자가 목록을 들고 있을 때 행마다 묻지 않게 한다 —
+     * 여러 카탈로그를 한 번에. 호출자가 목록을 들고 있을 때 행마다 묻지 않게 한다 —
      * 피드 한 페이지에 20번, 지역 피드에서는 수천 번이 될 수 있다.
+     *
+     * **[TODO: 언어 미결]** [findSpotBasics]와 같은 문제다 — 언어 인자가 없어 번역을 고를 수
+     * 없고, 대표 한국어명을 임시로 쓰며 주소는 null이다.
      */
     @Transactional(readOnly = true)
-    override fun findSpotBasicsIn(spotIds: List<Long>): Map<Long, SpotBasics> {
-        if (spotIds.isEmpty()) return emptyMap()
+    override fun findSpotBasicsIn(catalogIds: List<Long>): Map<Long, SpotBasics> {
+        if (catalogIds.isEmpty()) return emptyMap()
 
         return queryFactory
             .select(
-                spot.id, spot.title, spot.address, spot.thumbnailImageUrl,
-                spot.category, spot.copyright, spot.mapX, spot.mapY, spot.catalogId,
+                catalog.id, catalog.representativeNameKo, catalog.thumbnailImageUrl,
+                catalog.category, catalog.copyright, catalog.mapX, catalog.mapY,
             )
-            .from(spot)
-            .where(spot.id.`in`(spotIds))
+            .from(catalog)
+            .where(catalog.id.`in`(catalogIds))
             .fetch()
-            .associate { row ->
-                requireNotNull(row.get(spot.id)) to SpotBasics(
-                    title = requireNotNull(row.get(spot.title)),
-                    address = row.get(spot.address),
-                    thumbnailImageUrl = requireNotNull(row.get(spot.thumbnailImageUrl)),
-                    category = requireNotNull(row.get(spot.category)),
-                    copyright = requireNotNull(row.get(spot.copyright)),
-                    longitude = requireNotNull(row.get(spot.mapX)),
-                    latitude = requireNotNull(row.get(spot.mapY)),
-                    catalogId = row.get(spot.catalogId),
+            .mapNotNull { row ->
+                val catalogId = requireNotNull(row.get(catalog.id))
+                // 분류·좌표가 없는 카탈로그는 카드를 구성할 수 없다 — 결과에서 키가 빠지며,
+                // 호출자는 그것을 "유효하지 않은 id"와 같게 다룬다.
+                val category = row.get(catalog.category) ?: return@mapNotNull null
+                val longitude = row.get(catalog.mapX) ?: return@mapNotNull null
+                val latitude = row.get(catalog.mapY) ?: return@mapNotNull null
+                catalogId to SpotBasics(
+                    title = requireNotNull(row.get(catalog.representativeNameKo)),
+                    address = null,
+                    thumbnailImageUrl = row.get(catalog.thumbnailImageUrl).orEmpty(),
+                    category = category,
+                    copyright = row.get(catalog.copyright) ?: CopyrightType.UNSPECIFIED,
+                    longitude = longitude,
+                    latitude = latitude,
                 )
             }
+            .toMap()
     }
 
     override fun findLikedSpots(query: LikedSpotsSearch): CursorPage<LikedSpotView> {
@@ -181,34 +208,28 @@ class SpotQueryAdapter(
 
         val rows = queryFactory
             .select(
-                languageSpot.id, spot.id, translation.title,
-                spot.thumbnailImageUrl, spot.address,
-                spot.category, spot.copyright, reaction.updatedAt, reaction.catalogId,
+                catalog.id, translation.title, translation.address,
+                catalog.thumbnailImageUrl, catalog.category, catalog.copyright,
+                reaction.updatedAt,
             )
             .from(reaction)
-            // **제목은 번역에서 온다**(SPEC-0019 R-9). 이 조인이 카탈로그당 정확히 1행을
+            // **제목·주소는 번역에서 온다**(R-4·R-9). 이 조인이 카탈로그당 정확히 1행을
             // 보장하며(UNIQUE(catalog_id, language)), 번역이 없는 언어는 결과에서 빠진다 —
             // 사용자가 읽을 수 없는 항목을 목록에 넣지 않는다는 규칙 그대로다.
             //
-            // 이전에는 `spot.language`로 걸렀는데, 그러면 **번역이 채워져도 그 언어의 spot
-            // 행이 없으면 목록에 나오지 않는다** — 이 스펙 목적의 절반이 무효가 된다.
+            // **`spot`을 조인하지 않는다.** 예전에는 `spot.language`로 걸렀는데, 그러면 번역이
+            // 채워져도 그 언어의 spot 행이 없으면 목록에 나오지 않는다 — 이 스펙 목적의
+            // 절반이 무효가 된다.
             .join(translation).on(
                 translation.catalogId.eq(reaction.catalogId),
                 translation.language.eq(query.language),
             )
-            // 좌표·썸네일·카테고리는 대표 행에서. 언어와 무관하게 같은 값이다(§3.6 실증).
+            // 좌표·썸네일·분류는 카탈로그가 확정해 둔 표준값이다.
             .join(catalog).on(catalog.id.eq(reaction.catalogId))
-            .join(spot).on(spot.id.eq(catalog.representativeSpotId))
-            // 요청 언어의 spot 행이 있으면 그 id를 돌려준다(계약 불변). 없으면 null이고
-            // 그때는 대표 행의 id로 대신한다.
-            .leftJoin(languageSpot).on(
-                languageSpot.catalogId.eq(reaction.catalogId),
-                languageSpot.language.eq(query.language),
-            )
             .where(
                 reaction.memberId.eq(query.memberId),
                 reaction.reaction.eq(ReactionType.LIKE),
-                query.category?.let { spot.category.eq(it) },
+                query.category?.let { catalog.category.eq(it) },
                 // 정렬이 (updated_at DESC, catalog_id DESC)이므로 다음 페이지는 그 튜플보다 "작은" 행이다.
                 // 총계에는 붙이지 않는다 — 커서는 페이지 경계일 뿐 집합의 조건이 아니다.
                 cursor?.let {
@@ -220,21 +241,24 @@ class SpotQueryAdapter(
             .limit((query.first + 1).toLong())
             .fetch()
             .map {
-                val copyright = requireNotNull(it.get(spot.copyright))
+                // 카탈로그의 copyright는 nullable이다 — 원본 spot이 정리로 사라지면 표준값을
+                // 고를 대상이 없어진다. 다른 조회 경로와 같이 UNSPECIFIED로 떨어뜨린다.
+                // requireNotNull이면 그 한 건이 좋아요 목록 페이지 전체를 실패시킨다.
+                val copyright = it.get(catalog.copyright) ?: CopyrightType.UNSPECIFIED
+                val catalogId = requireNotNull(it.get(catalog.id))
                 LikedSpotView(
-                    // 클라이언트에 나가는 것은 요청 언어의 spot.id다(계약 불변).
-                    // 그 언어 행이 없는 카탈로그는 대표 행의 id로 대신한다.
-                    id = it.get(languageSpot.id) ?: requireNotNull(it.get(spot.id)),
+                    // **클라이언트에 나가는 것은 카탈로그 id다.** 좋아요가 장소 단위이므로
+                    // 언어별 spot.id를 돌려줄 이유가 없다.
+                    id = catalogId,
                     title = requireNotNull(it.get(translation.title)),
-                    thumbnailImageUrl = requireNotNull(it.get(spot.thumbnailImageUrl)),
-                    address = it.get(spot.address),
-                    category = requireNotNull(it.get(spot.category)),
+                    thumbnailImageUrl = it.get(catalog.thumbnailImageUrl).orEmpty(),
+                    address = it.get(translation.address),
+                    category = requireNotNull(it.get(catalog.category)),
                     copyright = copyright,
                     // copyright에서 도출되는 값이라 적재하지 않는다(둘이 어긋날 여지를 없앤다).
                     attributionText = copyright.attributionText,
                     likedAt = requireNotNull(it.get(reaction.updatedAt)),
-                    // 커서에 실린다. 정렬 키가 catalog_id이므로 spot.id로는 페이지 경계를 만들 수 없다.
-                    catalogId = requireNotNull(it.get(reaction.catalogId)),
+                    catalogId = catalogId,
                 )
             }
 

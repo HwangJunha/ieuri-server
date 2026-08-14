@@ -3,7 +3,7 @@ package org.around.ieuri.tourism.domain
 import org.around.ieuri.tourism.domain.specification.CatalogMatchRule
 import org.around.ieuri.tourism.domain.specification.SpotPoint
 import org.around.ieuri.tourism.domain.vo.CatalogMatch
-import org.around.ieuri.tourism.domain.vo.KoreanSpotCandidate
+import org.around.ieuri.tourism.domain.vo.CatalogCandidate
 import org.around.ieuri.tourism.domain.vo.UnresolvedReason
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -19,8 +19,8 @@ class CatalogMatchRuleTest {
 
     private val point = SpotPoint(mapX = 129.1234567, mapY = 35.7654321)
 
-    private fun candidate(spotId: Long, catalogId: Long, mapX: Double = point.mapX, mapY: Double = point.mapY) =
-        KoreanSpotCandidate(spotId = spotId, catalogId = catalogId, mapX = mapX, mapY = mapY)
+    private fun candidate(catalogId: Long, mapX: Double = point.mapX, mapY: Double = point.mapY) =
+        CatalogCandidate(catalogId = catalogId, mapX = mapX, mapY = mapY)
 
     @Test
     @DisplayName("순위 1 · 괄호 키 후보가 유일하면 채택한다")
@@ -28,7 +28,7 @@ class CatalogMatchRuleTest {
         val match = CatalogMatchRule.match(
             title = "Marine City (마린시티)",
             coordinates = point,
-            candidatesByKey = listOf(candidate(spotId = 11, catalogId = 900)),
+            candidatesByKey = listOf(candidate(catalogId = 900)),
             candidatesByThumbnail = emptyList(),
         )
 
@@ -41,7 +41,7 @@ class CatalogMatchRuleTest {
         val match = CatalogMatchRule.match(
             title = "マリンシティ（마린시티）",
             coordinates = point,
-            candidatesByKey = listOf(candidate(spotId = 11, catalogId = 900)),
+            candidatesByKey = listOf(candidate(catalogId = 900)),
             candidatesByThumbnail = emptyList(),
         )
 
@@ -55,8 +55,8 @@ class CatalogMatchRuleTest {
             title = "Marine City (마린시티)",
             coordinates = point,
             candidatesByKey = listOf(
-                candidate(spotId = 11, catalogId = 900),
-                candidate(spotId = 12, catalogId = 901, mapX = 127.0, mapY = 37.0),
+                candidate(catalogId = 900),
+                candidate(catalogId = 901, mapX = 127.0, mapY = 37.0),
             ),
             candidatesByThumbnail = emptyList(),
         )
@@ -72,8 +72,8 @@ class CatalogMatchRuleTest {
             title = "Marine City (마린시티)",
             coordinates = point,
             candidatesByKey = listOf(
-                candidate(spotId = 11, catalogId = 900, mapX = 129.1234568, mapY = point.mapY),
-                candidate(spotId = 12, catalogId = 901, mapX = 127.0, mapY = 37.0),
+                candidate(catalogId = 900, mapX = 129.1234568, mapY = point.mapY),
+                candidate(catalogId = 901, mapX = 127.0, mapY = 37.0),
             ),
             candidatesByThumbnail = emptyList(),
         )
@@ -89,15 +89,15 @@ class CatalogMatchRuleTest {
             title = "Marine City (마린시티)",
             coordinates = point,
             candidatesByKey = listOf(
-                candidate(spotId = 11, catalogId = 900),
-                candidate(spotId = 12, catalogId = 901),
+                candidate(catalogId = 900),
+                candidate(catalogId = 901),
             ),
             candidatesByThumbnail = emptyList(),
         )
 
         val unresolved = assertUnresolved(match)
         assertEquals(UnresolvedReason.KEY_AMBIGUOUS, unresolved.reason)
-        assertEquals(listOf(11L, 12L), unresolved.candidateSpotIds)
+        assertEquals(listOf(900L, 901L), unresolved.candidateCatalogIds)
         assertEquals("마린시티", unresolved.extractedKey)
     }
 
@@ -108,7 +108,7 @@ class CatalogMatchRuleTest {
             title = "SM Entertainment",
             coordinates = point,
             candidatesByKey = emptyList(),
-            candidatesByThumbnail = listOf(candidate(spotId = 21, catalogId = 950)),
+            candidatesByThumbnail = listOf(candidate(catalogId = 950)),
         )
 
         assertEquals(CatalogMatch.Matched(950), match)
@@ -121,8 +121,8 @@ class CatalogMatchRuleTest {
         val match = CatalogMatchRule.match(
             title = "Marine City (마린시티)",
             coordinates = point,
-            candidatesByKey = listOf(candidate(spotId = 11, catalogId = 900)),
-            candidatesByThumbnail = listOf(candidate(spotId = 99, catalogId = 111)),
+            candidatesByKey = listOf(candidate(catalogId = 900)),
+            candidatesByThumbnail = listOf(candidate(catalogId = 111)),
         )
 
         assertEquals(CatalogMatch.Matched(900), match)
@@ -135,7 +135,7 @@ class CatalogMatchRuleTest {
             title = "Marine City (마린시티)",
             coordinates = point,
             candidatesByKey = emptyList(),
-            candidatesByThumbnail = listOf(candidate(spotId = 99, catalogId = 111)),
+            candidatesByThumbnail = listOf(candidate(catalogId = 111)),
         )
 
         // 썸네일로 떨어졌다면 Matched(111)이 됐을 것이다.
@@ -166,14 +166,14 @@ class CatalogMatchRuleTest {
             coordinates = point,
             candidatesByKey = emptyList(),
             candidatesByThumbnail = listOf(
-                candidate(spotId = 21, catalogId = 950),
-                candidate(spotId = 22, catalogId = 951),
+                candidate(catalogId = 950),
+                candidate(catalogId = 951),
             ),
         )
 
         val unresolved = assertUnresolved(match)
         assertEquals(UnresolvedReason.URL_AMBIGUOUS, unresolved.reason)
-        assertEquals(listOf(21L, 22L), unresolved.candidateSpotIds)
+        assertEquals(listOf(950L, 951L), unresolved.candidateCatalogIds)
     }
 
     private fun assertUnresolved(match: CatalogMatch): CatalogMatch.Unresolved {
