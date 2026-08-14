@@ -2,6 +2,7 @@ package org.around.ieuri.tourism.infrastructure.adapter.out.query
 
 import com.querydsl.jpa.impl.JPAQueryFactory
 import org.around.ieuri.tourism.application.port.out.query.SpotCatalogQueryPort
+import org.around.ieuri.tourism.application.port.out.query.ForeignCard
 import org.around.ieuri.tourism.application.port.out.query.UnassignedSpot
 import org.around.ieuri.tourism.application.port.out.query.UnresolvedCandidate
 import org.around.ieuri.tourism.application.port.out.query.UnresolvedSpotReport
@@ -40,7 +41,10 @@ class SpotCatalogQueryAdapter(
     @Transactional(readOnly = true)
     override fun findUnassigned(limit: Int): List<UnassignedSpot> =
         queryFactory
-            .select(spot.id, spot.language, spot.title, spot.titleKey, spot.thumbnailImageUrl, spot.mapX, spot.mapY)
+            .select(
+                spot.id, spot.language, spot.title, spot.address, spot.titleKey,
+                spot.thumbnailImageUrl, spot.mapX, spot.mapY,
+            )
             .from(spot)
             .where(spot.catalogId.isNull)
             .orderBy(
@@ -59,6 +63,7 @@ class SpotCatalogQueryAdapter(
                     spotId = requireNotNull(it.get(spot.id)),
                     language = requireNotNull(it.get(spot.language)),
                     title = requireNotNull(it.get(spot.title)),
+                    address = it.get(spot.address),
                     titleKey = it.get(spot.titleKey),
                     thumbnailImageUrl = requireNotNull(it.get(spot.thumbnailImageUrl)),
                     mapX = requireNotNull(it.get(spot.mapX)),
@@ -72,16 +77,19 @@ class SpotCatalogQueryAdapter(
      * 한 언어에 여러 행이 걸리면 첫 행을 쓴다 — 대표명 후보로서 어느 쪽이든 같은 괄호값을 갖는다.
      */
     @Transactional(readOnly = true)
-    override fun findForeignTitlesByThumbnail(thumbnailImageUrl: String): Map<DomainLocale, String> =
+    override fun findForeignCardsByThumbnail(thumbnailImageUrl: String): Map<DomainLocale, ForeignCard> =
         queryFactory
-            .select(spot.language, spot.title)
+            .select(spot.language, spot.title, spot.address)
             .from(spot)
             .where(
                 spot.thumbnailImageUrl.eq(thumbnailImageUrl),
                 spot.language.ne(DomainLocale.KO),
             )
             .fetch()
-            .associate { requireNotNull(it.get(spot.language)) to requireNotNull(it.get(spot.title)) }
+            .associate {
+                requireNotNull(it.get(spot.language)) to
+                    ForeignCard(requireNotNull(it.get(spot.title)), it.get(spot.address))
+            }
 
     /**
      * 번역이 비어 있는 카탈로그.
@@ -110,12 +118,19 @@ class SpotCatalogQueryAdapter(
 
         if (candidateIds.isEmpty()) return emptyList()
 
+        // 번역 원문은 KO 카드다 — 제목은 대표명, 주소는 KO 번역 행의 주소다(R-4).
+        val koTranslation = QSpotCatalogTranslationEntity("koTranslation")
         val names = queryFactory
-            .select(catalog.id, catalog.representativeNameKo)
+            .select(catalog.id, catalog.representativeNameKo, koTranslation.address)
             .from(catalog)
+            .leftJoin(koTranslation)
+            .on(koTranslation.catalogId.eq(catalog.id), koTranslation.language.eq(DomainLocale.KO))
             .where(catalog.id.`in`(candidateIds))
             .fetch()
-            .associate { requireNotNull(it.get(catalog.id)) to requireNotNull(it.get(catalog.representativeNameKo)) }
+            .associate {
+                requireNotNull(it.get(catalog.id)) to
+                    (requireNotNull(it.get(catalog.representativeNameKo)) to it.get(koTranslation.address))
+            }
 
         val existingByCatalog = queryFactory
             .select(translation.catalogId, translation.language)
@@ -128,9 +143,11 @@ class SpotCatalogQueryAdapter(
             val missing = languages - existingByCatalog[catalogId].orEmpty().toSet()
             if (missing.isEmpty()) return@mapNotNull null
 
+            val (nameKo, addressKo) = names[catalogId] ?: return@mapNotNull null
             UntranslatedCatalog(
                 catalogId = catalogId,
-                representativeNameKo = names[catalogId] ?: return@mapNotNull null,
+                representativeNameKo = nameKo,
+                representativeAddressKo = addressKo,
                 missingLanguages = missing,
             )
         }

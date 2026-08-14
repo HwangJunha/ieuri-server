@@ -4,6 +4,7 @@ import org.around.ieuri.tourism.application.port.`in`.command.CatalogAssignmentR
 import org.around.ieuri.tourism.application.port.`in`.command.SpotCatalogUseCase
 import org.around.ieuri.tourism.application.port.`in`.command.TranslationResult
 import org.around.ieuri.tourism.application.port.out.client.SpotTitleTranslationPort
+import org.around.ieuri.tourism.application.port.out.query.ForeignCard
 import org.around.ieuri.tourism.application.port.out.persistence.SpotCatalogStorePort
 import org.around.ieuri.tourism.application.port.out.query.SpotCatalogQueryPort
 import org.around.ieuri.tourism.application.port.out.query.UnassignedSpot
@@ -93,7 +94,9 @@ class SpotCatalogService(
             is CatalogMatch.Matched -> {
                 storePort.assign(spot.spotId, match.catalogId)
                 // 이 언어의 제목은 TourAPI가 발급한 공식 표기다 — 나중에 번역 대상이 되지 않게 지금 심는다.
-                storePort.upsertTranslation(match.catalogId, spot.language, spot.title, TranslationSource.OFFICIAL)
+                storePort.upsertTranslation(
+                    match.catalogId, spot.language, spot.title, spot.address, TranslationSource.OFFICIAL,
+                )
                 Outcome.Joined
             }
             is CatalogMatch.Unresolved -> createStandaloneCatalog(spot, match)
@@ -119,7 +122,7 @@ class SpotCatalogService(
             return Outcome.Joined
         }
 
-        val catalogId = storePort.save(SpotCatalog.fromKoreanSpot(spot.title))
+        val catalogId = storePort.save(SpotCatalog.fromKoreanSpot(spot.title, spot.address))
         storePort.assign(spot.spotId, catalogId)
         return Outcome.Created
     }
@@ -133,17 +136,22 @@ class SpotCatalogService(
     private fun createStandaloneCatalog(spot: UnassignedSpot, match: CatalogMatch.Unresolved): Outcome {
         // 같은 썸네일을 쓰는 다른 언어 행들을 함께 본다 — EN→JA→ZH 순으로 대표명을 고르려면
         // 이 그룹 전체의 제목이 필요하다(R-3). 자기 제목만 보면 ZH만 있는 장소에서 ZH가 채택된다.
-        val siblingTitles = queryPort.findForeignTitlesByThumbnail(spot.thumbnailImageUrl)
-            .ifEmpty { mapOf(spot.language to spot.title) }
+        val siblings = queryPort.findForeignCardsByThumbnail(spot.thumbnailImageUrl)
+            .ifEmpty { mapOf(spot.language to ForeignCard(spot.title, spot.address)) }
 
-        val derived = SpotCatalog.deriveFromForeignTitles(siblingTitles)
+        val derived = SpotCatalog.deriveFromForeignTitles(
+            titlesByLanguage = siblings.mapValues { it.value.title },
+            addressesByLanguage = siblings.mapNotNull { (l, c) -> c.address?.let { l to it } }.toMap(),
+        )
 
         if (derived == null) {
             // 어느 언어에서도 한국어를 못 뽑았다. 대표명이 없으면 카탈로그를 만들 수 없으므로
             // 원문 제목을 대표명 자리에 둔다 — 사람이 CSV를 보고 고칠 값이다.
-            val catalogId = storePort.save(SpotCatalog.fromKoreanSpot(spot.title))
+            val catalogId = storePort.save(SpotCatalog.fromKoreanSpot(spot.title, spot.address))
             storePort.assign(spot.spotId, catalogId)
-            storePort.upsertTranslation(catalogId, spot.language, spot.title, TranslationSource.OFFICIAL)
+            storePort.upsertTranslation(
+                catalogId, spot.language, spot.title, spot.address, TranslationSource.OFFICIAL,
+            )
             return Outcome.CreatedUnresolved(UnresolvedReason.NO_KOREAN_KEY, match.extractedKey, match.candidateSpotIds)
         }
 
@@ -172,10 +180,14 @@ class SpotCatalogService(
                 return@forEach
             }
 
-            val results = translationPort.translate(catalog.representativeNameKo, wanted)
-            results.forEach { (language, title) ->
+            val results = translationPort.translate(
+                catalog.representativeNameKo, catalog.representativeAddressKo, wanted,
+            )
+            results.forEach { (language, card) ->
                 // MACHINE은 기존 값을 덮지 않는다 — 포트 계약이 그것을 보장한다.
-                storePort.upsertTranslation(catalog.catalogId, language, title, TranslationSource.MACHINE)
+                storePort.upsertTranslation(
+                    catalog.catalogId, language, card.title, card.address, TranslationSource.MACHINE,
+                )
                 translated++
             }
             // 번역기가 돌려주지 않은 언어는 다음 실행이 다시 대상으로 삼는다.

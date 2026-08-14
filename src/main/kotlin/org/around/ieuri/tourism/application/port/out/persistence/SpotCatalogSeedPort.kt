@@ -23,8 +23,15 @@ data class SeededTranslation(
     val expectedKoreanTitle: String,
     val expectedMapX: Double,
     val expectedMapY: Double,
-    val titles: Map<DomainLocale, String>,
+    /**
+     * 언어별 카드(제목·주소). **주소가 함께 온다**(R-4) — 제목만 있으면 사용자가 목록에서
+     * 이름은 읽어도 찾아갈 수 없다. 시드에 주소가 없는 항목은 address가 null이다.
+     */
+    val cards: Map<DomainLocale, SeededCard>,
 )
+
+/** 시드의 언어별 카드 한 건. */
+data class SeededCard(val title: String, val address: String?)
 
 /** [mismatched]는 시드와 DB가 어긋나 건너뛴 항목 수다. 크면 시드가 낡은 것이다. */
 data class SeedLoadResult(

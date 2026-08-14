@@ -53,9 +53,11 @@ class SpotCatalogSeedAdapter(
                 return@forEach
             }
 
-            entry.titles.forEach { (language, title) ->
+            entry.cards.forEach { (language, card) ->
                 // MACHINE이라 이미 제목이 있으면 덮지 않는다 — 공식 표기가 우선한다(R-4).
-                upsertAdapter.upsertTranslation(matched, language, title, TranslationSource.MACHINE)
+                upsertAdapter.upsertTranslation(
+                    matched, language, card.title, card.address, TranslationSource.MACHINE,
+                )
                 loaded++
             }
         }

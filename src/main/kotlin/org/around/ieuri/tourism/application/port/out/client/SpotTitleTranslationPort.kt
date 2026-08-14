@@ -16,10 +16,23 @@ import org.around.ieuri.tourism.domain.vo.DomainLocale
 interface SpotTitleTranslationPort {
 
     /**
-     * KO 제목 하나를 여러 언어로 번역한다.
+     * KO 카드(제목·주소)를 여러 언어로 번역한다.
+     *
+     * **주소가 함께 간다**(R-4) — 제목만 번역하면 사용자가 목록에서 이름은 읽어도 찾아갈 수
+     * 없다. [koreanAddress]가 null이면 원문에 주소가 없는 것이며, 결과의 주소도 null이다.
      *
      * 번역하지 못한 언어는 결과에서 빠진다 — 빈 문자열이나 원문을 돌려주지 않는다.
      * 그래야 다음 실행이 그 쌍을 다시 대상으로 삼는다.
      */
-    fun translate(koreanTitle: String, targets: Set<DomainLocale>): Map<DomainLocale, String>
+    fun translate(
+        koreanTitle: String,
+        koreanAddress: String?,
+        targets: Set<DomainLocale>,
+    ): Map<DomainLocale, TranslatedCard>
 }
+
+/** 번역된 언어별 카드. 주소는 원문에 없으면 null이다. */
+data class TranslatedCard(
+    val title: String,
+    val address: String?,
+)

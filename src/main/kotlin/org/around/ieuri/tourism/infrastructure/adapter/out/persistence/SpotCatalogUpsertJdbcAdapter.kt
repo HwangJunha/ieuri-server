@@ -25,10 +25,16 @@ class SpotCatalogUpsertJdbcAdapter(
      * 이 분기를 SQL의 `WHERE`로 표현해 두면 호출자가 순서를 신경 쓰지 않아도 된다.
      */
     @Transactional
-    fun upsertTranslation(catalogId: Long, language: DomainLocale, title: String, source: TranslationSource) {
+    fun upsertTranslation(
+        catalogId: Long,
+        language: DomainLocale,
+        title: String,
+        address: String?,
+        source: TranslationSource,
+    ) {
         jdbcTemplate.update(
             UPSERT_TRANSLATION_SQL,
-            catalogId, language.name, title, source.name,
+            catalogId, language.name, title, address, source.name,
         )
     }
 
@@ -62,10 +68,11 @@ class SpotCatalogUpsertJdbcAdapter(
          * 대상이 아니므로(R-4) 이 경로 자체가 정상 동작에서는 오지 않는다.
          */
         val UPSERT_TRANSLATION_SQL = """
-            INSERT INTO spot_catalog_translation (catalog_id, language, title, source)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO spot_catalog_translation (catalog_id, language, title, address, source)
+            VALUES (?, ?, ?, ?, ?)
             ON CONFLICT (catalog_id, language) DO UPDATE SET
                 title      = EXCLUDED.title,
+                address    = EXCLUDED.address,
                 source     = EXCLUDED.source,
                 updated_at = now()
             WHERE EXCLUDED.source = 'OFFICIAL'

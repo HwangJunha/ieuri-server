@@ -1,6 +1,8 @@
 package org.around.ieuri.tourism.application.service
 
 import org.around.ieuri.tourism.application.port.out.client.SpotTitleTranslationPort
+import org.around.ieuri.tourism.application.port.out.client.TranslatedCard
+import org.around.ieuri.tourism.application.port.out.query.ForeignCard
 import org.around.ieuri.tourism.application.port.out.persistence.SpotCatalogStorePort
 import org.around.ieuri.tourism.application.port.out.query.SpotCatalogQueryPort
 import org.around.ieuri.tourism.application.port.out.query.UnassignedSpot
@@ -33,12 +35,14 @@ class SpotCatalogAssignmentServiceTest {
         spotId: Long = 21,
         language: DomainLocale = DomainLocale.EN,
         title: String = "Marine City (마린시티)",
+        address: String? = "Busan Haeundae-gu",
         mapX: Double = this.mapX,
         mapY: Double = this.mapY,
     ) = UnassignedSpot(
         spotId = spotId,
         language = language,
         title = title,
+        address = address,
         // 적재가 넣는 값은 제목 전체의 정규화 키다 — 조회에 쓰면 안 되는 바로 그 값이다.
         titleKey = "MarineCity(마린시티)",
         thumbnailImageUrl = "https://img/1.jpg",
@@ -49,6 +53,7 @@ class SpotCatalogAssignmentServiceTest {
     private fun koreanSpot(
         spotId: Long = 11,
         title: String = "마린시티",
+        address: String? = "부산광역시 해운대구",
         titleKey: String? = "마린시티",
         mapX: Double = this.mapX,
         mapY: Double = this.mapY,
@@ -56,6 +61,7 @@ class SpotCatalogAssignmentServiceTest {
         spotId = spotId,
         language = DomainLocale.KO,
         title = title,
+        address = address,
         titleKey = titleKey,
         thumbnailImageUrl = "https://img/1.jpg",
         mapX = mapX,
@@ -115,6 +121,8 @@ class SpotCatalogAssignmentServiceTest {
             listOf(Triple(900L, DomainLocale.EN, TranslationSource.OFFICIAL)),
             store.translations,
         )
+        // **주소도 함께 심어야 한다**(R-4) — 빠지면 그 언어 사용자가 장소를 찾아갈 수 없다.
+        assertEquals(listOf("Busan Haeundae-gu"), store.addresses)
     }
 
     @Test
@@ -185,8 +193,11 @@ class SpotCatalogAssignmentServiceTest {
     }
 
     private object NoTranslation : SpotTitleTranslationPort {
-        override fun translate(koreanTitle: String, targets: Set<DomainLocale>): Map<DomainLocale, String> =
-            emptyMap()
+        override fun translate(
+            koreanTitle: String,
+            koreanAddress: String?,
+            targets: Set<DomainLocale>,
+        ): Map<DomainLocale, TranslatedCard> = emptyMap()
     }
 
     private class StubQueryPort(
@@ -194,7 +205,8 @@ class SpotCatalogAssignmentServiceTest {
     ) : SpotCatalogQueryPort {
         override fun findUnassigned(limit: Int): List<UnassignedSpot> = unassigned
 
-        override fun findForeignTitlesByThumbnail(thumbnailImageUrl: String): Map<DomainLocale, String> = emptyMap()
+        override fun findForeignCardsByThumbnail(thumbnailImageUrl: String): Map<DomainLocale, ForeignCard> =
+            emptyMap()
 
         override fun findCatalogsMissingTranslation(
             languages: Set<DomainLocale>,
@@ -212,6 +224,8 @@ class SpotCatalogAssignmentServiceTest {
         val requestedKeys = mutableListOf<String>()
         val assignments = mutableListOf<Pair<Long, Long>>()
         val translations = mutableListOf<Triple<Long, DomainLocale, TranslationSource>>()
+        /** 저장된 주소. 제목만 흐르고 주소가 빠지는 회귀를 잡는다(R-4). */
+        val addresses = mutableListOf<String?>()
         val unresolved = mutableListOf<Pair<Long, UnresolvedReason>>()
 
         override fun save(catalog: SpotCatalog): Long = NEW_CATALOG_ID
@@ -241,9 +255,11 @@ class SpotCatalogAssignmentServiceTest {
             catalogId: Long,
             language: DomainLocale,
             title: String,
+            address: String?,
             source: TranslationSource,
         ) {
             translations += Triple(catalogId, language, source)
+            addresses += address
         }
 
         companion object {

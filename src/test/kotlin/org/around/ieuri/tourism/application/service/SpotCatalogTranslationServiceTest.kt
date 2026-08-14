@@ -1,6 +1,8 @@
 package org.around.ieuri.tourism.application.service
 
 import org.around.ieuri.tourism.application.port.out.client.SpotTitleTranslationPort
+import org.around.ieuri.tourism.application.port.out.client.TranslatedCard
+import org.around.ieuri.tourism.application.port.out.query.ForeignCard
 import org.around.ieuri.tourism.application.port.out.persistence.SpotCatalogStorePort
 import org.around.ieuri.tourism.application.port.out.query.SpotCatalogQueryPort
 import org.around.ieuri.tourism.application.port.out.query.UnassignedSpot
@@ -33,6 +35,7 @@ class SpotCatalogTranslationServiceTest {
                 UntranslatedCatalog(
                     catalogId = 900,
                     representativeNameKo = "마린시티",
+                    representativeAddressKo = "부산광역시 해운대구",
                     missingLanguages = setOf(DomainLocale.JA, DomainLocale.ZH),
                 ),
             ),
@@ -47,6 +50,13 @@ class SpotCatalogTranslationServiceTest {
 
         assertEquals(2, result.translated)
         assertEquals(setOf(DomainLocale.JA, DomainLocale.ZH), translation.requested)
+        // **주소가 번역 원문으로 전달되어야 한다**(R-4) — 빠지면 번역기가 주소를 만들 수 없다.
+        assertEquals("부산광역시 해운대구", translation.requestedAddress)
+        // 그리고 번역된 주소가 저장되어야 한다.
+        assertEquals(
+            listOf("translated-JA", "translated-ZH"),
+            store.translations.sortedBy { it.language.name }.map { it.address },
+        )
         assertEquals(
             listOf(
                 Triple(900L, DomainLocale.JA, TranslationSource.MACHINE),
@@ -80,6 +90,7 @@ class SpotCatalogTranslationServiceTest {
                 UntranslatedCatalog(
                     catalogId = 900,
                     representativeNameKo = "마린시티",
+                    representativeAddressKo = "부산광역시 해운대구",
                     missingLanguages = setOf(DomainLocale.JA, DomainLocale.ZH),
                 ),
             ),
@@ -103,6 +114,7 @@ class SpotCatalogTranslationServiceTest {
                 UntranslatedCatalog(
                     catalogId = 900,
                     representativeNameKo = "마린시티",
+                    representativeAddressKo = "부산광역시 해운대구",
                     missingLanguages = setOf(DomainLocale.JA, DomainLocale.KO),
                 ),
             ),
@@ -122,10 +134,18 @@ class SpotCatalogTranslationServiceTest {
         private val results: Map<DomainLocale, String>,
     ) : SpotTitleTranslationPort {
         val requested = mutableSetOf<DomainLocale>()
+        /** 번역 요청에 실린 KO 주소. 주소가 원문으로 전달되는지 본다(R-4). */
+        var requestedAddress: String? = null
 
-        override fun translate(koreanTitle: String, targets: Set<DomainLocale>): Map<DomainLocale, String> {
+        override fun translate(
+            koreanTitle: String,
+            koreanAddress: String?,
+            targets: Set<DomainLocale>,
+        ): Map<DomainLocale, TranslatedCard> {
             requested += targets
+            requestedAddress = koreanAddress
             return results.filterKeys { it in targets }
+                .mapValues { (language, title) -> TranslatedCard(title, "translated-" + language.name) }
         }
     }
 
@@ -134,7 +154,8 @@ class SpotCatalogTranslationServiceTest {
     ) : SpotCatalogQueryPort {
         override fun findUnassigned(limit: Int): List<UnassignedSpot> = emptyList()
 
-        override fun findForeignTitlesByThumbnail(thumbnailImageUrl: String): Map<DomainLocale, String> = emptyMap()
+        override fun findForeignCardsByThumbnail(thumbnailImageUrl: String): Map<DomainLocale, ForeignCard> =
+            emptyMap()
 
         override fun findCatalogsMissingTranslation(
             languages: Set<DomainLocale>,
@@ -150,6 +171,7 @@ class SpotCatalogTranslationServiceTest {
             val catalogId: Long,
             val language: DomainLocale,
             val title: String,
+            val address: String?,
             val source: TranslationSource,
         )
 
@@ -175,9 +197,10 @@ class SpotCatalogTranslationServiceTest {
             catalogId: Long,
             language: DomainLocale,
             title: String,
+            address: String?,
             source: TranslationSource,
         ) {
-            translations += Stored(catalogId, language, title, source)
+            translations += Stored(catalogId, language, title, address, source)
         }
     }
 }

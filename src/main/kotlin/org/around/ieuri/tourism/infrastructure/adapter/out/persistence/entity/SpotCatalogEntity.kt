@@ -35,6 +35,19 @@ class SpotCatalogEntity(
     @Column(name = "name_source", nullable = false, length = 20)
     var nameSource: CatalogNameSource,
 
+    /**
+     * 카드에 쓸 값(좌표·썸네일·카테고리)을 가져올 spot 행(SPEC-0019 R-9 노출 경로).
+     *
+     * **제목은 여기서 가져오지 않는다** — 제목만 `spot_catalog_translation`에서 온다.
+     * 나머지 값은 언어와 무관하게 같으므로(§3.6 실증) 어느 행이든 되지만, 조회마다 달라지면
+     * 같은 카탈로그가 다른 썸네일을 돌려주므로 고정한다. 채택 순서는 KO → EN → JA → ZH.
+     *
+     * 배정 직후와 spot 정리 직후에 잠깐 null이며, 그 카탈로그는 조회에서 빠진다 —
+     * 대표 행이 없으면 카드를 그릴 값이 없다.
+     */
+    @Column(name = "representative_spot_id")
+    var representativeSpotId: Long? = null,
+
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant? = null,
 
@@ -78,6 +91,15 @@ class SpotCatalogTranslationEntity(
 
     @Column(name = "title", nullable = false, length = 255)
     var title: String,
+
+    /**
+     * 그 언어의 주소. **제목과 함께 번역된다**(R-4, 2026-08-14 개정).
+     *
+     * 제목만 번역하면 일본어 제목 아래 한국어 주소가 붙어 그 장소를 찾아갈 수 없다.
+     * 원문에 주소가 없는 spot이 있어(KO 기준 1.5%) nullable이다.
+     */
+    @Column(name = "address", length = 500)
+    var address: String? = null,
 
     @Enumerated(EnumType.STRING)
     @Column(name = "source", nullable = false, length = 20)

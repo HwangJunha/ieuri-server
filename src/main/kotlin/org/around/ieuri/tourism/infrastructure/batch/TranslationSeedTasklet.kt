@@ -3,6 +3,7 @@ package org.around.ieuri.tourism.infrastructure.batch
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
 import tools.jackson.databind.ObjectMapper
+import org.around.ieuri.tourism.application.port.out.persistence.SeededCard
 import org.around.ieuri.tourism.application.port.out.persistence.SpotCatalogSeedPort
 import org.around.ieuri.tourism.application.port.out.persistence.SeededTranslation
 import org.around.ieuri.tourism.domain.vo.DomainLocale
@@ -74,19 +75,21 @@ class TranslationSeedTasklet(
         val spotIds = koSpotIds.mapNotNull(String::toLongOrNull)
         if (spotIds.isEmpty()) return null
 
-        val titles = buildMap {
-            en?.takeIf { it.isNotBlank() }?.let { put(DomainLocale.EN, it) }
-            ja?.takeIf { it.isNotBlank() }?.let { put(DomainLocale.JA, it) }
-            zh?.takeIf { it.isNotBlank() }?.let { put(DomainLocale.ZH, it) }
+        // 주소는 **시드가 제공하면 함께 싣는다**(R-4, 2026-08-14 개정). 현재 planner 시드에는
+        // 주소가 없어 전부 null이며, 시드가 재생성되면 그대로 채워진다 — 적재 코드는 바뀌지 않는다.
+        val cards = buildMap {
+            en?.takeIf { it.isNotBlank() }?.let { put(DomainLocale.EN, SeededCard(it, enAddress)) }
+            ja?.takeIf { it.isNotBlank() }?.let { put(DomainLocale.JA, SeededCard(it, jaAddress)) }
+            zh?.takeIf { it.isNotBlank() }?.let { put(DomainLocale.ZH, SeededCard(it, zhAddress)) }
         }
-        if (titles.isEmpty()) return null
+        if (cards.isEmpty()) return null
 
         return SeededTranslation(
             koSpotIds = spotIds,
             expectedKoreanTitle = ko,
             expectedMapX = mapX,
             expectedMapY = mapY,
-            titles = titles,
+            cards = cards,
         )
     }
 
@@ -120,4 +123,11 @@ data class TranslationSeedEntry(
     val en: String? = null,
     val ja: String? = null,
     val zh: String? = null,
+    /**
+     * 언어별 주소(R-4, 2026-08-14 개정). **현재 시드에는 없다** — planner가 재생성하면
+     * 채워지며, 그때까지는 null이라 조회가 대표 행의 주소로 대신한다.
+     */
+    @param:JsonProperty("en_address") val enAddress: String? = null,
+    @param:JsonProperty("ja_address") val jaAddress: String? = null,
+    @param:JsonProperty("zh_address") val zhAddress: String? = null,
 )

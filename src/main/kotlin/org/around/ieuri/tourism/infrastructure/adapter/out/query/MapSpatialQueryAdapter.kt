@@ -39,9 +39,11 @@ class MapSpatialQueryAdapter(
 
         return jdbcTemplate.query(
             """
-            SELECT id, title, thumbnail_image_url, category, map_x, map_y
-            FROM spot
+            SELECT coalesce(language_spot_id, spot_id) AS id,
+                   title, thumbnail_image_url, category, map_x, map_y
+            FROM spot_catalog_card
             WHERE $BBOX_PREDICATE
+              -- 번역 기준(SPEC-0019 R-9) — 그 언어의 spot 행이 없어도 제목이 있으면 나온다.
               AND language = ?
               $categoryCondition
             ORDER BY id

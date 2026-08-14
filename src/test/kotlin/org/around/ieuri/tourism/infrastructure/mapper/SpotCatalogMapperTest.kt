@@ -36,6 +36,7 @@ class SpotCatalogMapperTest {
                 catalogId = 4321,
                 language = DomainLocale.EN,
                 title = "Marine City",
+                address = "Haeundae-gu, Busan",
                 source = TranslationSource.OFFICIAL,
             ),
             SpotCatalogTranslationEntity(
@@ -43,6 +44,7 @@ class SpotCatalogMapperTest {
                 catalogId = 4321,
                 language = DomainLocale.JA,
                 title = "マリンシティ",
+                address = "釜山広域市 海雲台区",
                 source = TranslationSource.MACHINE,
             ),
         )
@@ -54,6 +56,7 @@ class SpotCatalogMapperTest {
         assertEquals(CatalogNameSource.DERIVED, domain.nameSource)
         assertEquals(2, domain.translations.size)
         assertEquals("Marine City", domain.translations[DomainLocale.EN]?.title)
+        assertEquals("Haeundae-gu, Busan", domain.translations[DomainLocale.EN]?.address)
         assertEquals(TranslationSource.OFFICIAL, domain.translations[DomainLocale.EN]?.source)
         assertEquals("マリンシティ", domain.translations[DomainLocale.JA]?.title)
         assertEquals(TranslationSource.MACHINE, domain.translations[DomainLocale.JA]?.source)
@@ -82,12 +85,14 @@ class SpotCatalogMapperTest {
             catalogId = 4321,
             language = DomainLocale.ZH,
             title = "海洋城市",
+            address = "釜山廣域市 海雲臺區",
             source = TranslationSource.MACHINE,
         )
 
         val domain = entity.toDomain()
 
         assertEquals("海洋城市", domain.title)
+        assertEquals("釜山廣域市 海雲臺區", domain.address)
         assertEquals(TranslationSource.MACHINE, domain.source)
     }
 
@@ -111,8 +116,8 @@ class SpotCatalogMapperTest {
             representativeNameKo = "마린시티",
             nameSource = CatalogNameSource.OFFICIAL,
             translations = mapOf(
-                DomainLocale.KO to CatalogTranslation("마린시티", TranslationSource.OFFICIAL),
-                DomainLocale.JA to CatalogTranslation("マリンシティ", TranslationSource.MACHINE),
+                DomainLocale.KO to CatalogTranslation("마린시티", "부산광역시 해운대구", TranslationSource.OFFICIAL),
+                DomainLocale.JA to CatalogTranslation("マリンシティ", "釜山広域市 海雲台区", TranslationSource.MACHINE),
             ),
         )
 
@@ -122,8 +127,11 @@ class SpotCatalogMapperTest {
         // 부모 id는 인자로 받은 값이지 도메인의 id가 아니다 — 신규 저장 시 둘이 다르다.
         assertTrue(entities.values.all { it.catalogId == 5555L })
         assertEquals("마린시티", entities[DomainLocale.KO]?.title)
+        // 주소도 함께 옮겨져야 한다(R-4) — 제목만 흐르면 그 언어 사용자가 찾아갈 수 없다.
+        assertEquals("부산광역시 해운대구", entities[DomainLocale.KO]?.address)
         assertEquals(TranslationSource.OFFICIAL, entities[DomainLocale.KO]?.source)
         assertEquals("マリンシティ", entities[DomainLocale.JA]?.title)
+        assertEquals("釜山広域市 海雲台区", entities[DomainLocale.JA]?.address)
         assertEquals(TranslationSource.MACHINE, entities[DomainLocale.JA]?.source)
     }
 }

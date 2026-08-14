@@ -107,6 +107,7 @@ class SpotCatalogStoreAdapter(
         catalogId: Long,
         language: DomainLocale,
         title: String,
+        address: String?,
         source: TranslationSource,
-    ) = upsertAdapter.upsertTranslation(catalogId, language, title, source)
+    ) = upsertAdapter.upsertTranslation(catalogId, language, title, address, source)
 }

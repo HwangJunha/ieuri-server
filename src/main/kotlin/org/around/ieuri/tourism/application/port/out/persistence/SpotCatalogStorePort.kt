@@ -51,5 +51,11 @@ interface SpotCatalogStorePort {
      * 번역 한 건을 쓴다. 같은 `(catalogId, language)`가 이미 있으면 [source]에 따라 갈린다:
      * `OFFICIAL`은 덮어쓰고, `MACHINE`은 기존 값을 남긴다(R-4·R-5).
      */
-    fun upsertTranslation(catalogId: Long, language: DomainLocale, title: String, source: TranslationSource)
+    fun upsertTranslation(
+        catalogId: Long,
+        language: DomainLocale,
+        title: String,
+        address: String?,
+        source: TranslationSource,
+    )
 }

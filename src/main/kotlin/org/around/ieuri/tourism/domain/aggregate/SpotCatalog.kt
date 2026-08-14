@@ -31,9 +31,9 @@ class SpotCatalog private constructor(
      * 기계 번역을 채운다. **이미 값이 있으면 아무것도 하지 않는다** — TourAPI가 제공한
      * 제목이 공식 표기이며 우리 번역보다 우선한다(R-4).
      */
-    fun fillMachineTranslation(language: DomainLocale, title: String) {
+    fun fillMachineTranslation(language: DomainLocale, title: String, address: String? = null) {
         if (!needsTranslation(language)) return
-        _translations[language] = CatalogTranslation(title, TranslationSource.MACHINE)
+        _translations[language] = CatalogTranslation(title, address, TranslationSource.MACHINE)
     }
 
     /**
@@ -42,8 +42,8 @@ class SpotCatalog private constructor(
      * 이는 R-7의 "재번역 없음"과 충돌하지 않는다 — 새 번역을 만드는 것이 아니라
      * 원본이 도착해 파생값을 밀어내는 것이다.
      */
-    fun applyOfficialTitle(language: DomainLocale, title: String) {
-        _translations[language] = CatalogTranslation(title, TranslationSource.OFFICIAL)
+    fun applyOfficialTitle(language: DomainLocale, title: String, address: String? = null) {
+        _translations[language] = CatalogTranslation(title, address, TranslationSource.OFFICIAL)
     }
 
     companion object {
@@ -53,13 +53,15 @@ class SpotCatalog private constructor(
          * KO 제목 자체가 그 언어의 공식 제목이므로 KO 번역 행도 함께 선다 — 조회가
          * `spot_catalog_translation` 하나만 보면 되게 하기 위해서다(설계 문서 §2.2).
          */
-        fun fromKoreanSpot(koreanTitle: String, id: Long? = null): SpotCatalog {
+        fun fromKoreanSpot(koreanTitle: String, koreanAddress: String? = null, id: Long? = null): SpotCatalog {
             require(koreanTitle.isNotBlank()) { "대표 한국어명은 비어 있을 수 없습니다." }
             return SpotCatalog(
                 id = id,
                 representativeNameKo = koreanTitle,
                 nameSource = CatalogNameSource.OFFICIAL,
-                translations = mapOf(DomainLocale.KO to CatalogTranslation(koreanTitle, TranslationSource.OFFICIAL)),
+                translations = mapOf(
+                    DomainLocale.KO to CatalogTranslation(koreanTitle, koreanAddress, TranslationSource.OFFICIAL),
+                ),
             )
         }
 
@@ -75,7 +77,11 @@ class SpotCatalog private constructor(
          *
          * 어느 언어에서도 한국어를 뽑지 못하면 null이다 — 호출자가 미해결로 처리한다.
          */
-        fun deriveFromForeignTitles(titlesByLanguage: Map<DomainLocale, String>, id: Long? = null): SpotCatalog? {
+        fun deriveFromForeignTitles(
+            titlesByLanguage: Map<DomainLocale, String>,
+            addressesByLanguage: Map<DomainLocale, String> = emptyMap(),
+            id: Long? = null,
+        ): SpotCatalog? {
             val derivedName = DERIVATION_ORDER
                 .firstNotNullOfOrNull { language ->
                     titlesByLanguage[language]?.let { SpotTitleNormalizer.extractKoreanKeys(it).firstOrNull() }
@@ -83,8 +89,8 @@ class SpotCatalog private constructor(
                 ?: return null
 
             // 원본 외국어 제목은 그 언어의 공식 표기다 — 파생 카탈로그라도 번역할 필요가 없다.
-            val translations = titlesByLanguage.mapValues { (_, title) ->
-                CatalogTranslation(title, TranslationSource.OFFICIAL)
+            val translations = titlesByLanguage.mapValues { (language, title) ->
+                CatalogTranslation(title, addressesByLanguage[language], TranslationSource.OFFICIAL)
             }
 
             return SpotCatalog(
@@ -108,9 +114,15 @@ class SpotCatalog private constructor(
     }
 }
 
-/** 카탈로그의 한 언어 제목과 그 출처. */
+/**
+ * 카탈로그의 한 언어 카드 — 제목과 주소, 그리고 그 출처.
+ *
+ * **주소가 함께 있어야 한다**(R-4). 제목만 있으면 사용자가 목록에서 이름은 읽지만 찾아갈
+ * 수는 없다. 원문에 주소가 없는 spot이 있어 [address]는 nullable이다.
+ */
 data class CatalogTranslation(
     val title: String,
+    val address: String? = null,
     val source: TranslationSource,
 ) {
     init {

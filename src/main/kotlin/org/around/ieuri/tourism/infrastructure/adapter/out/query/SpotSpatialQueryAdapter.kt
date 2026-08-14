@@ -29,10 +29,11 @@ class SpotSpatialQueryAdapter(
         // 그때마다 ST_MakePoint(?, ?)를 반복하면 위치 파라미터가 6개로 늘어 순서를 맞추기 어렵다.
         val sql = """
             WITH c AS (SELECT $CENTER AS center)
-            SELECT id, title, address, thumbnail_image_url, map_x, map_y,
+            SELECT coalesce(language_spot_id, spot_id) AS id,
+                   title, address, thumbnail_image_url, map_x, map_y,
                    category, copyright,
                    ST_Distance(location, c.center) AS distance_meters
-            FROM spot, c
+            FROM spot_catalog_card, c
             WHERE $where
             ORDER BY ST_Distance(location, c.center), id
             LIMIT ? OFFSET ?
@@ -61,7 +62,7 @@ class SpotSpatialQueryAdapter(
     fun countNearby(query: NearbySpotSearch): Int {
         val (where, params) = whereClause(query)
         return jdbcTemplate.queryForObject(
-            "WITH c AS (SELECT $CENTER AS center) SELECT COUNT(*) FROM spot, c WHERE $where",
+            "WITH c AS (SELECT $CENTER AS center) SELECT COUNT(*) FROM spot_catalog_card, c WHERE $where",
             Int::class.java,
             *params.toTypedArray(),
         ) ?: 0
@@ -124,6 +125,9 @@ class SpotSpatialQueryAdapter(
      */
     private fun whereClause(query: NearbySpotSearch): Pair<String, List<Any>> {
         // 파라미터 순서: CTE의 center(경도, 위도)가 먼저 오고, 그다음 WHERE 조건 순서다.
+        // **번역 기준으로 거른다**(SPEC-0019 R-9) — 뷰의 language는 spot 행이 아니라
+        // spot_catalog_translation의 언어다. 번역이 채워진 카탈로그는 그 언어의 spot 행이
+        // 없어도 목록에 나온다. 그것이 이 스펙 목적의 절반이다.
         val conditions = mutableListOf("language = ?", "ST_DWithin(location, c.center, ?)")
         val params = mutableListOf<Any>(
             query.center.longitude, query.center.latitude,
@@ -137,7 +141,9 @@ class SpotSpatialQueryAdapter(
         }
         if (query.excludedSpotIds.isNotEmpty()) {
             // 이미 반응한 항목은 DB 단계에서 제외한다 — 조회 후 걸러내면 페이지가 size보다 작아진다.
-            conditions += "id NOT IN (${query.excludedSpotIds.joinToString(",") { "?" }})"
+            // 제외 대상은 클라이언트가 아는 spot.id다. 요청 언어 행이 없으면 대표 행 id로
+            // 나가므로 둘 다 본다.
+            conditions += "coalesce(language_spot_id, spot_id) NOT IN (${query.excludedSpotIds.joinToString(",") { "?" }})"
             params.addAll(query.excludedSpotIds)
         }
         return conditions.joinToString(" AND ") to params

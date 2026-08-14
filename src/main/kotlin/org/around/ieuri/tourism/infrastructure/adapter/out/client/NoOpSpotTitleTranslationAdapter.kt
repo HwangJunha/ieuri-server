@@ -1,6 +1,7 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.client
 
 import org.around.ieuri.tourism.application.port.out.client.SpotTitleTranslationPort
+import org.around.ieuri.tourism.application.port.out.client.TranslatedCard
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.slf4j.LoggerFactory
 
@@ -23,7 +24,11 @@ class NoOpSpotTitleTranslationAdapter : SpotTitleTranslationPort {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
-    override fun translate(koreanTitle: String, targets: Set<DomainLocale>): Map<DomainLocale, String> {
+    override fun translate(
+        koreanTitle: String,
+        koreanAddress: String?,
+        targets: Set<DomainLocale>,
+    ): Map<DomainLocale, TranslatedCard> {
         log.debug("translation engine not configured: skipping {} target(s)", targets.size)
         return emptyMap()
     }

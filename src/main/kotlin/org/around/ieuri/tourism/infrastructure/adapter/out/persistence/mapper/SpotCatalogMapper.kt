@@ -22,7 +22,7 @@ fun SpotCatalogEntity.toDomain(translations: List<SpotCatalogTranslationEntity>)
 
 /** 번역 엔티티를 도메인 값으로. */
 fun SpotCatalogTranslationEntity.toDomain(): CatalogTranslation =
-    CatalogTranslation(title = title, source = source)
+    CatalogTranslation(title = title, address = address, source = source)
 
 /** 도메인 카탈로그를 새 엔티티로. id는 DB가 채운다. */
 fun SpotCatalog.toNewEntity(): SpotCatalogEntity =
@@ -48,5 +48,6 @@ fun CatalogTranslation.toNewEntity(catalogId: Long, language: DomainLocale): Spo
         catalogId = catalogId,
         language = language,
         title = title,
+        address = address,
         source = source,
     )

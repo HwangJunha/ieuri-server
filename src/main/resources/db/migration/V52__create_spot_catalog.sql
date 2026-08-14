@@ -38,6 +38,14 @@ CREATE TABLE spot_catalog_translation (
     catalog_id BIGINT NOT NULL,
     language VARCHAR(2) NOT NULL,
     title VARCHAR(255) NOT NULL,
+    -- 그 언어의 주소. **제목과 함께 번역된다**(R-4, 2026-08-14 개정).
+    --
+    -- 제목만 번역하면 목록에는 나오지만 **찾아갈 수는 없다** — 일본어 사용자가 일본어 제목
+    -- 아래 한국어 주소를 보게 된다. 노출을 늘린다는 이 스펙의 목적이 거기서 멈춘다.
+    --
+    -- nullable인 이유는 원본에 주소가 없는 spot이 실재하기 때문이다(KO 기준 1.5%).
+    -- 번역할 원문이 없으면 여기도 null이다.
+    address VARCHAR(500),
     -- 이 제목이 어디서 왔는가.
     --   OFFICIAL: TourAPI가 그 언어로 발급한 제목.
     --   MACHINE : 이 스펙이 KO 원문에서 생성한 번역.

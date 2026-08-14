@@ -15,6 +15,8 @@ import org.around.ieuri.tourism.application.query.LikedSpotView
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.LikedSpotCursor
 import org.around.ieuri.tourism.domain.vo.ReactionType
+import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotCatalogEntity
+import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotCatalogTranslationEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotReactionEntity
 import org.springframework.stereotype.Component
@@ -35,6 +37,11 @@ class SpotQueryAdapter(
 
     private val spot = QSpotEntity.spotEntity
     private val reaction = QSpotReactionEntity.spotReactionEntity
+    private val catalog = QSpotCatalogEntity.spotCatalogEntity
+    private val translation = QSpotCatalogTranslationEntity.spotCatalogTranslationEntity
+
+    /** 요청 언어의 spot 행. 대표 행([spot])과 구분해야 해서 별칭을 따로 둔다. */
+    private val languageSpot = QSpotEntity("languageSpot")
 
     @Transactional(readOnly = true)
     override fun searchNearby(query: NearbySpotSearch): List<SpotSearchResult> =
@@ -174,16 +181,30 @@ class SpotQueryAdapter(
 
         val rows = queryFactory
             .select(
-                spot.id, spot.title, spot.thumbnailImageUrl, spot.address,
+                languageSpot.id, spot.id, translation.title,
+                spot.thumbnailImageUrl, spot.address,
                 spot.category, spot.copyright, reaction.updatedAt, reaction.catalogId,
             )
             .from(reaction)
-            // **조인 조건에 language가 있어야 한다** — 한 카탈로그에 언어별 spot이 최대 4행
-            // 매달리므로 catalog_id 단독으로 조인하면 같은 좋아요가 4번 나온다.
+            // **제목은 번역에서 온다**(SPEC-0019 R-9). 이 조인이 카탈로그당 정확히 1행을
+            // 보장하며(UNIQUE(catalog_id, language)), 번역이 없는 언어는 결과에서 빠진다 —
+            // 사용자가 읽을 수 없는 항목을 목록에 넣지 않는다는 규칙 그대로다.
             //
-            // 요청 언어의 spot 행이 없으면 결과에서 빠진다 — 사용자가 읽을 수 없는 항목을
-            // 목록에 넣지 않는다는 R-9와 자연히 일치한다.
-            .join(spot).on(spot.catalogId.eq(reaction.catalogId), spot.language.eq(query.language))
+            // 이전에는 `spot.language`로 걸렀는데, 그러면 **번역이 채워져도 그 언어의 spot
+            // 행이 없으면 목록에 나오지 않는다** — 이 스펙 목적의 절반이 무효가 된다.
+            .join(translation).on(
+                translation.catalogId.eq(reaction.catalogId),
+                translation.language.eq(query.language),
+            )
+            // 좌표·썸네일·카테고리는 대표 행에서. 언어와 무관하게 같은 값이다(§3.6 실증).
+            .join(catalog).on(catalog.id.eq(reaction.catalogId))
+            .join(spot).on(spot.id.eq(catalog.representativeSpotId))
+            // 요청 언어의 spot 행이 있으면 그 id를 돌려준다(계약 불변). 없으면 null이고
+            // 그때는 대표 행의 id로 대신한다.
+            .leftJoin(languageSpot).on(
+                languageSpot.catalogId.eq(reaction.catalogId),
+                languageSpot.language.eq(query.language),
+            )
             .where(
                 reaction.memberId.eq(query.memberId),
                 reaction.reaction.eq(ReactionType.LIKE),
@@ -202,8 +223,9 @@ class SpotQueryAdapter(
                 val copyright = requireNotNull(it.get(spot.copyright))
                 LikedSpotView(
                     // 클라이언트에 나가는 것은 요청 언어의 spot.id다(계약 불변).
-                    id = requireNotNull(it.get(spot.id)),
-                    title = requireNotNull(it.get(spot.title)),
+                    // 그 언어 행이 없는 카탈로그는 대표 행의 id로 대신한다.
+                    id = it.get(languageSpot.id) ?: requireNotNull(it.get(spot.id)),
+                    title = requireNotNull(it.get(translation.title)),
                     thumbnailImageUrl = requireNotNull(it.get(spot.thumbnailImageUrl)),
                     address = it.get(spot.address),
                     category = requireNotNull(it.get(spot.category)),
