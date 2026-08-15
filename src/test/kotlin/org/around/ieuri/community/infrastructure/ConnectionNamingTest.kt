@@ -3,7 +3,7 @@ package org.around.ieuri.community.infrastructure
 import com.netflix.graphql.dgs.DgsData
 import com.netflix.graphql.dgs.DgsQuery
 import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.CommunityQueryResolver
-import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.FeedQueryResolver
+import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.ConversationQueryResolver
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -29,9 +29,8 @@ class ConnectionNamingTest {
         "blockedUsers",
     )
 
-    /** 피드·DM 커넥션(SPEC-0017). 리졸버가 달라 목록을 나눠 둔다. */
-    private val feedConnectionReturningFields = setOf(
-        "feed",
+    /** DM 커넥션(SPEC-0017). 리졸버가 달라 목록을 나눠 둔다. */
+    private val conversationConnectionReturningFields = setOf(
         "conversations",
         "conversationMessages",
     )
@@ -42,8 +41,8 @@ class ConnectionNamingTest {
     }
 
     @Test
-    fun `피드와 대화 커넥션의 반환 타입도 이름이 Connection으로 끝난다`() {
-        assertConnectionNaming(FeedQueryResolver::class.java, feedConnectionReturningFields)
+    fun `대화 커넥션의 반환 타입도 이름이 Connection으로 끝난다`() {
+        assertConnectionNaming(ConversationQueryResolver::class.java, conversationConnectionReturningFields)
     }
 
     private fun assertConnectionNaming(resolver: Class<*>, fields: Set<String>) {

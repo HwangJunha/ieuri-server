@@ -10,21 +10,21 @@ import org.around.ieuri.community.application.command.SendMessageCommand
 import org.around.ieuri.community.application.command.StartConversationCommand
 import org.around.ieuri.community.application.exception.BlockedException
 import org.around.ieuri.community.application.exception.ConversationNotFoundException
-import org.around.ieuri.community.application.exception.FeedItemNotFoundException
+import org.around.ieuri.community.application.exception.MemberNotFoundException
 import org.around.ieuri.community.application.exception.NotConversationParticipantException
-import org.around.ieuri.community.application.exception.NotFeedAuthorException
+import org.around.ieuri.community.application.exception.SelfConversationException
 import org.around.ieuri.community.application.port.out.client.ClockPort
+import org.around.ieuri.community.application.port.out.client.MemberLookupPort
 import org.around.ieuri.community.application.port.out.client.ObjectStoragePort
 import org.around.ieuri.community.application.event.NewMessageStored
 import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
 import org.around.ieuri.community.application.port.out.event.ConversationEventPort
 import org.around.ieuri.community.application.port.out.persistence.ConversationRepositoryPort
-import org.around.ieuri.community.application.port.out.persistence.FeedItemRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.MessageRepositoryPort
 import org.around.ieuri.community.application.port.out.query.CommunityQueryPort
 import org.around.ieuri.community.application.port.out.query.ConversationQueryPort
+import org.around.ieuri.community.application.query.PostAuthorView
 import org.around.ieuri.community.domain.aggregate.Conversation
-import org.around.ieuri.community.domain.aggregate.FeedItem
 import org.around.ieuri.community.domain.aggregate.Message
 import org.around.ieuri.community.domain.vo.PhotoObjectKey
 import java.time.Instant
@@ -33,18 +33,21 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
-/** 대화 시작·메시지 전송·타이핑(SPEC-0017 R7·R9·R10·R11). */
+/**
+ * 대화 시작·메시지 전송·타이핑(SPEC-0017 R9·R10·R11).
+ *
+ * 대화 시작은 SPEC-0021 R2로 입력이 회원 id로 바뀌었다.
+ */
 class ConversationCommandServiceTest {
 
     private val memberId = 7L
     private val authorId = 9L
-    private val feedItemId = 100L
     private val conversationId = 300L
     private val now = Instant.parse("2026-08-12T00:00:00Z")
 
     private val conversationRepository = mockk<ConversationRepositoryPort>(relaxed = true)
     private val messageRepository = mockk<MessageRepositoryPort>()
-    private val feedItemRepository = mockk<FeedItemRepositoryPort>()
+    private val memberLookupPort = mockk<MemberLookupPort>()
     private val communityQueryPort = mockk<CommunityQueryPort>()
     private val conversationEventPort = mockk<ConversationEventPort>(relaxed = true)
     private val eventPublisher = mockk<CommunityEventPublisherPort>(relaxed = true)
@@ -55,7 +58,7 @@ class ConversationCommandServiceTest {
     private val service = ConversationCommandService(
         conversationRepository,
         messageRepository,
-        feedItemRepository,
+        memberLookupPort,
         communityQueryPort,
         conversationEventPort,
         conversationQueryPort,
@@ -64,19 +67,10 @@ class ConversationCommandServiceTest {
         clock,
     )
 
-    private fun feedItem(author: Long = authorId) = FeedItem.restore(
-        id = feedItemId,
-        catalogId = 42L,
-        authorId = author,
-        body = "오늘의 경복궁",
-        photoKeys = listOf(
-            requireNotNull(PhotoObjectKey.parse("images/community/$author/${UUID.randomUUID()}")),
-        ),
-        likeCount = 0,
-        hidden = false,
-        deletedAt = null,
-        createdAt = Instant.EPOCH,
-    )
+    private fun givenExistingCounterpart(id: Long = authorId) {
+        every { memberLookupPort.findAuthor(id) } returns
+            PostAuthorView(id = id, nickname = "상대", profileImageUrl = null)
+    }
 
     private fun conversation(low: Long = memberId, high: Long = authorId) = Conversation.restore(
         id = conversationId,
@@ -90,65 +84,78 @@ class ConversationCommandServiceTest {
         every { communityQueryPort.findBlockedMemberIds(any()) } returns emptySet()
     }
 
-    // ── 대화 시작(R7) ────────────────────────────────────────────────
+    // ── 대화 시작(SPEC-0021 R2) ──────────────────────────────────────
 
-    /** AC7-1 — 타인의 피드로 대화를 시작하면 상대방이 그 피드의 작성자다. */
+    /** AC2.1 — 상대 회원을 지목하면 대화가 생성된다. */
     @Test
-    fun `타인의 피드로 대화가 시작된다`() {
-        every { feedItemRepository.findById(feedItemId) } returns feedItem()
+    fun `상대 회원을 지목하면 대화가 시작된다`() {
+        givenExistingCounterpart()
         givenNoBlocks()
         every { conversationRepository.saveIfAbsent(any()) } returns conversation()
 
-        val id = service.startConversation(StartConversationCommand(feedItemId), memberId)
+        val id = service.startConversation(StartConversationCommand(authorId), memberId)
 
         assertEquals(conversationId, id)
     }
 
-    /** AC7-2 — 기존 대화가 있으면 새로 만들지 않는다. 판정은 저장소의 유일 제약이 맡는다. */
+    /** AC2.2 — 기존 대화가 있으면 새로 만들지 않는다. 판정은 저장소의 유일 제약이 맡는다. */
     @Test
     fun `이미 대화가 있으면 기존 대화가 반환된다`() {
-        every { feedItemRepository.findById(feedItemId) } returns feedItem()
+        givenExistingCounterpart()
         givenNoBlocks()
         every { conversationRepository.saveIfAbsent(any()) } returns conversation()
 
-        val id = service.startConversation(StartConversationCommand(feedItemId), memberId)
+        val id = service.startConversation(StartConversationCommand(authorId), memberId)
 
         assertEquals(conversationId, id)
         // saveIfAbsent 한 번만 부른다 — 존재 확인을 따로 하지 않는다(경합에서 중복이 생긴다).
         verify(exactly = 1) { conversationRepository.saveIfAbsent(any()) }
     }
 
+    /** AC2.3 — 자기 자신은 상대가 될 수 없다. 회원 조회도 하지 않는다. */
+    @Test
+    fun `자기 자신을 지목하면 SELF_CONVERSATION이다`() {
+        assertFailsWith<SelfConversationException> {
+            service.startConversation(StartConversationCommand(memberId), memberId)
+        }
+
+        verify(exactly = 0) { memberLookupPort.findAuthor(any()) }
+        verify(exactly = 0) { conversationRepository.saveIfAbsent(any()) }
+    }
+
+    /** AC2.4 — 없는 회원을 지목하면 MEMBER_NOT_FOUND다. */
+    @Test
+    fun `없는 회원을 지목하면 MEMBER_NOT_FOUND다`() {
+        every { memberLookupPort.findAuthor(authorId) } returns null
+
+        assertFailsWith<MemberNotFoundException> {
+            service.startConversation(StartConversationCommand(authorId), memberId)
+        }
+
+        verify(exactly = 0) { conversationRepository.saveIfAbsent(any()) }
+    }
+
     /**
-     * AC7-3 — 커뮤니티 글 id를 넣어도 피드가 아니므로 같은 코드다. **입력이 피드 id라
-     * 커뮤니티 작성자는 구조적으로 상대가 될 수 없다.**
+     * AC2.6 — **탈퇴 회원도 같은 코드다.** 탈퇴는 회원 행 삭제라 조회가 그대로 null이 되며,
+     * 구분해 알려 주면 상대가 탈퇴했다는 사실이 노출된다.
      */
     @Test
-    fun `존재하지 않는 피드면 FEED_ITEM_NOT_FOUND다`() {
-        every { feedItemRepository.findById(feedItemId) } returns null
+    fun `탈퇴 회원을 지목하면 없는 회원과 같은 MEMBER_NOT_FOUND다`() {
+        every { memberLookupPort.findAuthor(authorId) } returns null
 
-        assertFailsWith<FeedItemNotFoundException> {
-            service.startConversation(StartConversationCommand(feedItemId), memberId)
+        assertFailsWith<MemberNotFoundException> {
+            service.startConversation(StartConversationCommand(authorId), memberId)
         }
     }
 
-    /** AC7-4 — 자기 자신과의 대화는 만들지 않는다. */
-    @Test
-    fun `자신의 피드면 NOT_FEED_AUTHOR다`() {
-        every { feedItemRepository.findById(feedItemId) } returns feedItem(author = memberId)
-
-        assertFailsWith<NotFeedAuthorException> {
-            service.startConversation(StartConversationCommand(feedItemId), memberId)
-        }
-    }
-
-    /** AC11-3 — 차단 관계면 대화를 시작할 수 없다. */
+    /** AC2.5 — 차단 관계면 대화를 시작할 수 없다. 판정은 양방향이다(POL-041 1항). */
     @Test
     fun `차단 관계면 대화 시작이 거부된다`() {
-        every { feedItemRepository.findById(feedItemId) } returns feedItem()
+        givenExistingCounterpart()
         every { communityQueryPort.findBlockedMemberIds(memberId) } returns setOf(authorId)
 
         assertFailsWith<BlockedException> {
-            service.startConversation(StartConversationCommand(feedItemId), memberId)
+            service.startConversation(StartConversationCommand(authorId), memberId)
         }
 
         verify(exactly = 0) { conversationRepository.saveIfAbsent(any()) }

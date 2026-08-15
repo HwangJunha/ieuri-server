@@ -32,16 +32,16 @@ class MemberDataEraseServiceTest {
     }
 
     /**
-     * SPEC-0017 AC17-1 — 탈퇴하면 피드와 그가 보낸 DM 메시지도 지워진다.
+     * SPEC-0017 AC17-1 — 탈퇴하면 그가 보낸 DM 메시지도 지워진다.
+     * **피드 삭제 단계는 사라졌다**(SPEC-0021 AC8.1).
      *
      * **대화 자체는 지우지 않는다**(AC17-2) — 상대방 화면에서 남은 자기 메시지가 보여야 하고
      * 조회가 실패하면 안 된다.
      */
     @Test
-    fun `탈퇴하면 피드와 보낸 메시지도 지운다`() {
+    fun `탈퇴하면 보낸 메시지도 지운다`() {
         service.eraseMemberData(memberId)
 
-        verify { erasePort.deleteFeedItemsByAuthor(memberId) }
         verify { erasePort.deleteMessagesBySender(memberId) }
     }
 
@@ -60,7 +60,6 @@ class MemberDataEraseServiceTest {
         // 정지 경로가 이 유스케이스를 재사용하면 같은 회원의 메시지가 다시 지워진다 —
         // 삭제는 탈퇴 1회로 끝나야 한다.
         verify(exactly = 1) { erasePort.deleteMessagesBySender(memberId) }
-        verify(exactly = 1) { erasePort.deleteFeedItemsByAuthor(memberId) }
     }
 
     @Test
