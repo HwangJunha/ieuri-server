@@ -3,10 +3,6 @@ package org.around.ieuri.community.infrastructure.adapter.`in`.graphql
 import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsMutation
 import com.netflix.graphql.dgs.InputArgument
-import org.around.ieuri.common.graphql.generated.types.CreateFeedItemInput
-import org.around.ieuri.common.graphql.generated.types.CreateFeedItemPayload
-import org.around.ieuri.common.graphql.generated.types.LikeFeedItemInput
-import org.around.ieuri.common.graphql.generated.types.LikeFeedItemPayload
 import org.around.ieuri.common.graphql.generated.types.MarkConversationReadInput
 import org.around.ieuri.common.graphql.generated.types.MarkConversationReadPayload
 import org.around.ieuri.common.graphql.generated.types.NotifyTypingInput
@@ -17,21 +13,16 @@ import org.around.ieuri.common.graphql.generated.types.SendMessageInput
 import org.around.ieuri.common.graphql.generated.types.SendMessagePayload
 import org.around.ieuri.common.graphql.generated.types.StartConversationInput
 import org.around.ieuri.common.graphql.generated.types.StartConversationPayload
-import org.around.ieuri.common.graphql.generated.types.UnlikeFeedItemInput
-import org.around.ieuri.common.graphql.generated.types.UnlikeFeedItemPayload
 import org.around.ieuri.common.security.CurrentMemberProvider
-import org.around.ieuri.community.application.command.LikeFeedItemCommand
 import org.around.ieuri.community.application.command.NotifyTypingCommand
 import org.around.ieuri.community.application.command.StartConversationCommand
 import org.around.ieuri.community.application.port.`in`.command.ConversationCommandUseCase
-import org.around.ieuri.community.application.port.`in`.command.FeedItemCommandUseCase
-import org.around.ieuri.community.application.port.`in`.command.FeedItemLikeCommandUseCase
 import org.around.ieuri.community.application.port.`in`.command.MessageReportCommandUseCase
 import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper.toCommand
 import org.springframework.stereotype.Component
 
 /**
- * 피드·DM 쓰기 리졸버(SPEC-0017). 전부 인증이 필요하며, 비로그인은 UnauthorizedException이
+ * DM 쓰기 리졸버(SPEC-0017·SPEC-0021). 전부 인증이 필요하며, 비로그인은 UnauthorizedException이
  * withCommunityUserErrors에 붙잡히지 않고 최상위 errors[]로 전파된다.
  *
  * 리졸버는 얇게 둔다 — 입력을 커맨드로 옮기고 결과를 payload로 옮길 뿐 판단하지 않는다.
@@ -40,51 +31,11 @@ import org.springframework.stereotype.Component
  */
 @DgsComponent
 @Component
-class FeedMutationResolver(
-    private val feedItemCommandUseCase: FeedItemCommandUseCase,
-    private val feedItemLikeCommandUseCase: FeedItemLikeCommandUseCase,
+class ConversationMutationResolver(
     private val conversationCommandUseCase: ConversationCommandUseCase,
     private val messageReportCommandUseCase: MessageReportCommandUseCase,
     private val currentMemberProvider: CurrentMemberProvider,
 ) {
-
-    @DgsMutation
-    fun createFeedItem(@InputArgument input: CreateFeedItemInput): CreateFeedItemPayload =
-        withCommunityUserErrors(
-            onError = { CreateFeedItemPayload(success = false, userErrors = it, feedItemId = null) },
-        ) {
-            val memberId = currentMemberProvider.requireMemberId()
-            val feedItemId = feedItemCommandUseCase.createFeedItem(input.toCommand(), memberId)
-            // feedItem을 채우지 않고 id만 주는 이유는 createPost와 같다 — 생성 타입이
-            // spot·author를 생성자에서 요구하는데 그 둘은 지연 필드다.
-            CreateFeedItemPayload(success = true, userErrors = emptyList(), feedItemId = feedItemId)
-        }
-
-    @DgsMutation
-    fun likeFeedItem(@InputArgument input: LikeFeedItemInput): LikeFeedItemPayload =
-        withCommunityUserErrors(
-            onError = { LikeFeedItemPayload(success = false, userErrors = it, likeCount = null) },
-        ) {
-            val memberId = currentMemberProvider.requireMemberId()
-            val likeCount = feedItemLikeCommandUseCase.like(
-                LikeFeedItemCommand(input.feedItemId),
-                memberId,
-            )
-            LikeFeedItemPayload(success = true, userErrors = emptyList(), likeCount = likeCount)
-        }
-
-    @DgsMutation
-    fun unlikeFeedItem(@InputArgument input: UnlikeFeedItemInput): UnlikeFeedItemPayload =
-        withCommunityUserErrors(
-            onError = { UnlikeFeedItemPayload(success = false, userErrors = it, likeCount = null) },
-        ) {
-            val memberId = currentMemberProvider.requireMemberId()
-            val likeCount = feedItemLikeCommandUseCase.unlike(
-                LikeFeedItemCommand(input.feedItemId),
-                memberId,
-            )
-            UnlikeFeedItemPayload(success = true, userErrors = emptyList(), likeCount = likeCount)
-        }
 
     @DgsMutation
     fun startConversation(
@@ -96,7 +47,7 @@ class FeedMutationResolver(
     ) {
         val memberId = currentMemberProvider.requireMemberId()
         val conversationId = conversationCommandUseCase.startConversation(
-            StartConversationCommand(input.feedItemId),
+            StartConversationCommand(input.counterpartMemberId),
             memberId,
         )
         StartConversationPayload(

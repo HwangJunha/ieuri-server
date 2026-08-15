@@ -237,8 +237,8 @@ class ConversationQueryAdapter(
     )
 
     /**
-     * 첨부만 있는 메시지는 본문이 빈 문자열이라 복호화를 건너뛴다 — 빈 값을 복호화하려
-     * 들면 base64 디코딩에서 터진다.
+     * 본문이 빈 메시지는 복호화를 건너뛴다 — 빈 값을 복호화하려 들면 base64 디코딩에서
+     * 터진다. 사진만 보낸 메시지와, 피드 인용만 있던 과거 메시지가 여기 해당한다.
      */
     private fun MessageEntity.toMessageView(memberId: Long) = MessageView(
         id = requireNotNull(id) { "조회된 메시지에는 id가 있어야 한다." },
@@ -247,7 +247,6 @@ class ConversationQueryAdapter(
         ownedByViewer = senderId == memberId,
         viewerId = memberId,
         createdAt = requireNotNull(createdAt) { "조회된 메시지에는 createdAt이 있어야 한다." },
-        feedItemId = feedItemId,
         photoKey = photoObjectKey,
     )
 }

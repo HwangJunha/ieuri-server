@@ -14,113 +14,15 @@ import org.around.ieuri.community.domain.vo.ReportReason
 import java.time.Instant
 
 /**
- * 피드·DM JPA 엔티티(SPEC-0017). 도메인 모델과 분리되며 `mapper` 패키지가 변환한다.
+ * DM JPA 엔티티(SPEC-0017). 도메인 모델과 분리되며 `mapper` 패키지가 변환한다.
  *
- * 다른 도메인을 가리키는 id(catalog_id·author_id·sender_id)는 plain 컬럼이다 — 물리 FK도
+ * 다른 도메인을 가리키는 id(sender_id·member_low·member_high)는 plain 컬럼이다 — 물리 FK도
  * 연관(@ManyToOne)도 두지 않는다(CommunityEntities와 같은 규약).
  */
-@Entity
-@Table(name = "community_feed_item")
-class FeedItemEntity(
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    var id: Long? = null,
-
-    @Column(name = "author_id", nullable = false)
-    var authorId: Long,
-
-    /** **nullable이 아니다** — 피드에서 장소 연결은 필수다(R1). tourism 소유의 카탈로그 id다. */
-    @Column(name = "catalog_id", nullable = false)
-    var catalogId: Long,
-
-    /** TEXT 컬럼이다 — 길이 판정은 도메인이 소유한다(이모지의 코드포인트 수 문제). */
-    @Column(name = "body", nullable = false, columnDefinition = "TEXT")
-    var body: String,
-
-    @Column(name = "like_count", nullable = false)
-    var likeCount: Int = 0,
-
-    @Column(name = "hidden", nullable = false)
-    var hidden: Boolean = false,
-
-    @Column(name = "deleted_at")
-    var deletedAt: Instant? = null,
-
-    // 사진은 자식 컬렉션으로 두지 않는다 — 이유는 PostEntity의 주석 참고.
-
-    @Column(name = "created_at", nullable = false)
-    var createdAt: Instant? = null,
-
-    @Column(name = "updated_at", nullable = false)
-    var updatedAt: Instant? = null,
-) {
-    @PrePersist
-    fun onCreate() {
-        val now = Instant.now()
-        if (createdAt == null) createdAt = now
-        updatedAt = now
-    }
-
-    @PreUpdate
-    fun onUpdate() {
-        updatedAt = Instant.now()
-    }
-}
-
-/** 피드 사진. object_key가 전역 유일해 애그리게이트 간 재사용을 막는다(AC3-3). */
-@Entity
-@Table(name = "community_feed_item_photo")
-class FeedItemPhotoEntity(
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    var id: Long? = null,
-
-    @Column(name = "feed_item_id", nullable = false)
-    var feedItemId: Long,
-
-    @Column(name = "object_key", nullable = false, length = 512)
-    var objectKey: String,
-
-    @Column(name = "position", nullable = false)
-    var position: Short,
-
-    @Column(name = "created_at", nullable = false)
-    var createdAt: Instant? = null,
-) {
-    @PrePersist
-    fun onCreate() {
-        if (createdAt == null) createdAt = Instant.now()
-    }
-}
-
-@Entity
-@Table(name = "community_feed_item_like")
-class FeedItemLikeEntity(
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    var id: Long? = null,
-
-    @Column(name = "feed_item_id", nullable = false)
-    var feedItemId: Long,
-
-    @Column(name = "member_id", nullable = false)
-    var memberId: Long,
-
-    @Column(name = "created_at", nullable = false)
-    var createdAt: Instant? = null,
-) {
-    @PrePersist
-    fun onCreate() {
-        if (createdAt == null) createdAt = Instant.now()
-    }
-}
 
 /**
  * 1:1 대화. 참여자를 **정렬된 쌍**으로 들고 있다 — member_low < member_high가 DB의 CHECK로
  * 강제되며, 그것이 "같은 쌍에 대화는 하나"를 유일 제약으로 판정할 수 있는 근거다(AC7-2).
- *
- * **시작된 피드를 들지 않는다** — 방은 하나인데 피드는 여러 개라 방에 고정하면 틀린 맥락이
- * 된다. 인용은 메시지에 붙는다([MessageEntity.feedItemId]).
  */
 @Entity
 @Table(name = "community_conversation")
@@ -181,16 +83,12 @@ class MessageEntity(
 
     /**
      * base64(iv || ciphertext+tag). 평문 길이 판정은 도메인이 소유한다.
-     * **첨부만 있는 메시지는 빈 문자열이다** — null과 구분해 복호화 실패와 헷갈리지 않게 한다.
+     * **사진만 있는 메시지는 빈 문자열이다** — null과 구분해 복호화 실패와 헷갈리지 않게 한다.
      */
     @Column(name = "body_encrypted", nullable = false, columnDefinition = "TEXT")
     var bodyEncrypted: String,
 
-    /** 인용한 피드. 피드가 지워지면 null이 되고 메시지는 남는다(ON DELETE SET NULL). */
-    @Column(name = "feed_item_id")
-    var feedItemId: Long? = null,
-
-    /** 첨부 사진의 오브젝트 키. 글·피드와 같은 업로드 경로를 쓴다(POL-042). */
+    /** 첨부 사진의 오브젝트 키. 글과 같은 업로드 경로를 쓴다(POL-042). */
     @Column(name = "photo_object_key", length = 512)
     var photoObjectKey: String? = null,
 
