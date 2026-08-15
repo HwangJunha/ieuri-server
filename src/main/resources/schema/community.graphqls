@@ -42,8 +42,16 @@ extend type Query {
     "본인이 작성한 글 목록. 작성 시각 내림차순. posts()와 달리 위치·반경 인자가 없다 — 소유 글 조회는 위치와 무관하다. 자기가 숨긴 글도 포함된다. first는 기본 20·상한 50이며 초과 요청은 50으로 절삭된다."
     myPosts(first: Int = 20, after: String): PostConnection!
 
-    "커뮤니티 상단 카테고리 칩. 앱(X-App-Key 헤더)과 언어(Accept-Language)마다 구성이 다르다. 표시 문구는 내려주지 않는다 — 클라이언트가 category를 매핑한다. 구성이 없으면 빈 목록이며 오류가 아니다."
-    communityChips: [CommunityChip!]!
+    """
+    커뮤니티 상단 카테고리 칩. 앱(X-App-Key)과 언어(Accept-Language)마다 구성이 다르다.
+
+    **순서를 정해 내려주지 않는다** — 배열 순서는 클라이언트가 정한다.
+    구성이 없으면 빈 목록이며 오류가 아니다.
+
+    커뮤니티가 아는 카테고리만 나온다 — 관광 쪽에 새 카테고리가 생겨도 이 목록은
+    조용히 그것을 빼고 내려간다(칩 하나 때문에 화면 전체가 오류가 되지 않게 한다).
+    """
+    communityChips: [TargetCategory!]!
 }
 
 extend type Mutation {
@@ -236,11 +244,6 @@ type BlockedUserEdge {
     node: PostAuthor!
     "차단 시각(ISO-8601). 정렬 기준."
     blockedAt: String!
-}
-
-"커뮤니티 상단의 카테고리 칩 하나. 누르면 posts(category:)로 그 카테고리의 글만 조회한다. **순서를 정해 내려주지 않는다** — 배열 순서는 클라이언트가 정한다."
-type CommunityChip {
-    category: TargetCategory!
 }
 
 input CreatePostInput {
