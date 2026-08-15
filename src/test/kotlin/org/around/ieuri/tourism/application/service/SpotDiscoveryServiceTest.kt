@@ -524,11 +524,11 @@ class SpotDiscoveryServiceTest {
     @Test
     fun `after를 주면 hasPreviousPage가 true다`() {
         val festivals = service.ongoingFestivals(
-            festivalQuery(after = DistanceCursor(true, 100.0, 1L).encode()),
+            festivalQuery(after = DistanceCursor(100.0, 1L).encode()),
             DomainLocale.KO,
         )
         val popular = service.popularSpots(
-            popularQuery(after = LikeCountCursor(true, 12L, 1L).encode()),
+            popularQuery(after = LikeCountCursor(12L, 1L).encode()),
             DomainLocale.KO,
         )
 
@@ -545,16 +545,16 @@ class SpotDiscoveryServiceTest {
         every { popularSpotQueryPort.findPopular(capture(popularSearch)) } returns emptyList()
 
         service.ongoingFestivals(
-            festivalQuery(after = DistanceCursor(true, 1234.5, 7L).encode()),
+            festivalQuery(after = DistanceCursor(1234.5, 7L).encode()),
             DomainLocale.KO,
         )
         service.popularSpots(
-            popularQuery(after = LikeCountCursor(true, 99L, 3L).encode()),
+            popularQuery(after = LikeCountCursor(99L, 3L).encode()),
             DomainLocale.KO,
         )
 
-        assertEquals(DistanceCursor(true, 1234.5, 7L), festivalSearch.captured.after)
-        assertEquals(LikeCountCursor(true, 99L, 3L), popularSearch.captured.after)
+        assertEquals(DistanceCursor(1234.5, 7L), festivalSearch.captured.after)
+        assertEquals(LikeCountCursor(99L, 3L), popularSearch.captured.after)
     }
 
     /** 다른 커넥션의 커서를 넘기면 조용히 엉뚱한 위치로 뛰지 않고 거절된다. */
@@ -562,7 +562,7 @@ class SpotDiscoveryServiceTest {
     fun `종류가 다른 커서는 거절된다`() {
         assertFailsWith<IllegalArgumentException> {
             service.ongoingFestivals(
-                festivalQuery(after = LikeCountCursor(true, 1L, 1L).encode()),
+                festivalQuery(after = LikeCountCursor(1L, 1L).encode()),
                 DomainLocale.KO,
             )
         }
@@ -624,6 +624,7 @@ class SpotDiscoveryServiceTest {
         latitude = latitude,
         longitude = 127.0,
         radiusMeters = radiusMeters,
+        hasOrigin = null,
         first = first,
         after = after,
     )
@@ -639,6 +640,7 @@ class SpotDiscoveryServiceTest {
         longitude = 127.0,
         radiusMeters = radiusMeters,
         category = category,
+        hasOrigin = null,
         first = first,
         after = after,
     )
@@ -672,7 +674,6 @@ class SpotDiscoveryServiceTest {
         mapY = 37.5,
         eventStartDate = today.minusDays(1),
         eventEndDate = today.plusDays(1),
-        hasOrigin = true,
     )
 
     private fun popular(spotId: Long, likeCount: Long) = PopularSpotView(
@@ -689,6 +690,5 @@ class SpotDiscoveryServiceTest {
             mapY = 37.5,
         ),
         likeCount = likeCount,
-        hasOrigin = true,
     )
 }

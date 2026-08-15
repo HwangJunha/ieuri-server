@@ -10,6 +10,14 @@ extend type Query {
         radiusMeters: Int = 20000
         "언어 중립 카테고리 필터. availableSpotCategories에 있는 값만 유효하다."
         category: SpotCategory
+        """
+        원문 보유 필터. **생략하면 전체**, true면 요청 언어로 쓰인 원문만, false면 번역본만.
+
+        TourAPI가 언어마다 다른 장소를 주므로, 요청 언어의 원문이 없고 번역만 있는 장소가
+        있다(EN·JA·ZH 각 33,000건 안팎). 원문을 먼저 보여주고 소진된 뒤 번역본을 이어
+        받으려면 true로 한 바퀴 돌고 false로 다시 요청한다.
+        """
+        hasOrigin: Boolean
         "페이지 번호, 1부터."
         page: Int = 1
         "페이지 크기. 기본 100, 상한 100 — 초과 시 클램프된다."
@@ -86,6 +94,11 @@ extend type Query {
         longitude: Float!
         "검색 반경(미터). 기본 20000, 최대 100000 — 초과 시 RADIUS_TOO_LARGE."
         radiusMeters: Int = 20000
+        """
+        원문 보유 필터. **생략하면 전체**, true면 요청 언어로 쓰인 원문만, false면 번역본만.
+        원문을 먼저 소진한 뒤 번역본을 이어 받으려면 true로 한 바퀴 돌고 false로 다시 요청한다.
+        """
+        hasOrigin: Boolean
         "기본 20, 상한 50 — 초과 시 클램프된다."
         first: Int = 20
         after: String
@@ -106,6 +119,11 @@ extend type Query {
         radiusMeters: Int = 20000
         "언어 중립 카테고리 필터. 생략하면 전체."
         category: SpotCategory
+        """
+        원문 보유 필터. **생략하면 전체**, true면 요청 언어로 쓰인 원문만, false면 번역본만.
+        원문을 먼저 소진한 뒤 번역본을 이어 받으려면 true로 한 바퀴 돌고 false로 다시 요청한다.
+        """
+        hasOrigin: Boolean
         "기본 20, 상한 50 — 초과 시 클램프된다."
         first: Int = 20
         after: String

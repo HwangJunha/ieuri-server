@@ -52,13 +52,9 @@ class PopularSpotQueryJdbcAdapter(
         params += query.minLikeCount // HAVING
 
         val seek = if (query.after != null) {
-            // **정렬이 (원문 DESC, 좋아요 DESC, id ASC)이라 seek도 3튜플이다.**
-            // 내림차순 둘을 부호 반전으로 오름차순에 맞추면 행 값 비교 한 줄이 된다 —
-            // 2튜플로 두면 원문 구간에서 번역 구간으로 넘어가는 경계에서 페이지가 어긋난다.
-            params += !query.after.hasOrigin
             params += -query.after.likeCount
             params += query.after.spotId
-            "WHERE (NOT has_origin, -like_count, id) > (?, ?, ?)"
+            "WHERE (-like_count, id) > (?, ?)"
         } else {
             ""
         }
@@ -69,7 +65,7 @@ class PopularSpotQueryJdbcAdapter(
             WITH c AS (SELECT $CENTER AS center)
             SELECT * FROM (
                 SELECT cat.id, t.title, t.address, cat.thumbnail_image_url, cat.map_x, cat.map_y,
-                       cat.category, cat.copyright, t.has_origin,
+                       cat.category, cat.copyright,
                        ST_Distance(cat.location, c.center) AS distance_meters,
                        COUNT(r.id) AS like_count
                 FROM spot_catalog cat
@@ -85,12 +81,11 @@ class PopularSpotQueryJdbcAdapter(
                 CROSS JOIN c
                 WHERE $where
                 GROUP BY cat.id, t.title, t.address, cat.thumbnail_image_url,
-                         cat.map_x, cat.map_y, cat.category, cat.copyright, t.has_origin, c.center
+                         cat.map_x, cat.map_y, cat.category, cat.copyright, c.center
                 HAVING COUNT(r.id) >= ?
             ) ranked
             $seek
-            -- **원문이 있는 장소가 먼저다**(SPEC-0019).
-            ORDER BY has_origin DESC, like_count DESC, id ASC
+            ORDER BY like_count DESC, id ASC
             LIMIT ?
             """.trimIndent(),
             { rs, _ ->
@@ -110,7 +105,6 @@ class PopularSpotQueryJdbcAdapter(
                         mapY = rs.getDouble("map_y"),
                     ),
                     likeCount = rs.getLong("like_count"),
-                    hasOrigin = rs.getBoolean("has_origin"),
                 )
             },
             *params.toTypedArray(),
@@ -138,6 +132,11 @@ class PopularSpotQueryJdbcAdapter(
         query.category?.let {
             conditions += "cat.category = ?"
             params += it.name
+        }
+        // 원문 보유 필터. null이면 전체다 — 클라이언트가 원문을 먼저 소진한 뒤 false로 넘어온다.
+        query.hasOrigin?.let {
+            conditions += "t.has_origin = ?"
+            params += it
         }
         return conditions.joinToString(" AND ") to params
     }

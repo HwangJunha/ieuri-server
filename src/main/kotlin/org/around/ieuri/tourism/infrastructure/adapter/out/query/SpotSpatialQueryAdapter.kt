@@ -38,9 +38,7 @@ class SpotSpatialQueryAdapter(
                    ST_Distance(cat.location, c.center) AS distance_meters
             FROM $CARD_SOURCE, c
             WHERE $where
-            -- **원문이 있는 장소가 먼저다**(SPEC-0019). 그 언어로 쓰인 장소를 먼저 보여주고,
-            -- 번역으로 채운 장소는 원문이 소진된 뒤에 나온다. 오프셋 페이징이라 커서는 없다.
-            ORDER BY t.has_origin DESC, ST_Distance(cat.location, c.center), cat.id
+            ORDER BY ST_Distance(cat.location, c.center), cat.id
             LIMIT ? OFFSET ?
         """.trimIndent()
 
@@ -167,6 +165,14 @@ class SpotSpatialQueryAdapter(
         query.category?.let {
             conditions += "cat.category = ?"
             params += it.name
+        }
+        // **원문 보유 필터는 클라이언트가 정한다**(SPEC-0019). null이면 전체다.
+        // 정렬로 끼워넣지 않는 이유는 그것이 숨은 규칙이 되기 때문이다 — 거리순을
+        // 요청했는데 다른 축이 앞서면 응답만 보고는 이유를 알 수 없고, 커서에도 그 축을
+        // 실어야 해서 형식이 깨진다.
+        query.hasOrigin?.let {
+            conditions += "t.has_origin = ?"
+            params += it
         }
         if (query.excludedSpotIds.isNotEmpty()) {
             // 이미 반응한 항목은 DB 단계에서 제외한다 — 조회 후 걸러내면 페이지가 size보다 작아진다.

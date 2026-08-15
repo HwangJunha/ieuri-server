@@ -148,6 +148,7 @@ class SpotDiscoveryService(
             center = center,
             radiusMeters = query.radiusMeters,
             asOf = LocalDate.ofInstant(clock.instant(), FESTIVAL_ZONE),
+            hasOrigin = query.hasOrigin,
             limit = first,
             after = query.after?.let { DistanceCursor.decode(it) },
         )
@@ -156,7 +157,7 @@ class SpotDiscoveryService(
             rows = festivalQueryPort.findOngoing(search),
             first = first,
             after = query.after,
-        ) { DistanceCursor(it.hasOrigin, it.distanceMeters, it.id).encode() }
+        ) { DistanceCursor(it.distanceMeters, it.id).encode() }
     }
 
     /**
@@ -177,6 +178,7 @@ class SpotDiscoveryService(
             center = center,
             radiusMeters = query.radiusMeters,
             category = query.category,
+            hasOrigin = query.hasOrigin,
             minLikeCount = policy.minPopularLikeCount,
             limit = first,
             after = query.after?.let { LikeCountCursor.decode(it) },
@@ -186,7 +188,7 @@ class SpotDiscoveryService(
             rows = popularSpotQueryPort.findPopular(search),
             first = first,
             after = query.after,
-        ) { LikeCountCursor(it.hasOrigin, it.likeCount, it.spot.id).encode() }
+        ) { LikeCountCursor(it.likeCount, it.spot.id).encode() }
     }
 
     /** 검증 실패 시의 응답. connection이 non-null이라 빈 값이라도 있어야 한다(POL-015). */

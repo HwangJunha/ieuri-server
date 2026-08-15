@@ -166,7 +166,7 @@ class SpotQueryServiceTest {
     private fun query(page: Int = 1, size: Int = 100, category: SpotCategory? = null, radius: Int = 20000) =
         SpotsQuery(
             latitude = 37.5665, longitude = 126.9780,
-            radiusMeters = radius, category = category, page = page, size = size,
+            radiusMeters = radius, category = category, hasOrigin = null, page = page, size = size,
         )
 
     @Test
@@ -180,6 +180,25 @@ class SpotQueryServiceTest {
         val result = service.spots(query(), DomainLocale.KO, memberId = null)
 
         assertEquals(listOf(1L, 2L, 3L), result.items.map { it.id })
+    }
+
+    @Test
+    fun `hasOrigin이 조회 조건으로 전달된다`() {
+        // **정렬이 아니라 필터다**(SPEC-0019). 서버가 원문을 앞으로 당기면 거리순을 요청한
+        // 클라이언트가 이유를 알 수 없는 순서를 받고, 커서에도 그 축을 실어야 해 형식이 깨진다.
+        // 원문을 먼저 소진하고 번역본으로 넘어가는 판단은 클라이언트가 한다.
+        val captured = slot<NearbySpotSearch>()
+        every { spotQueryPort.searchNearby(capture(captured)) } returns emptyList()
+
+        service.spots(query().copy(hasOrigin = true), DomainLocale.JA, memberId = null)
+        assertEquals(true, captured.captured.hasOrigin)
+
+        service.spots(query().copy(hasOrigin = false), DomainLocale.JA, memberId = null)
+        assertEquals(false, captured.captured.hasOrigin)
+
+        // 생략하면 전체다 — 원문·번역본을 가리지 않는다.
+        service.spots(query(), DomainLocale.JA, memberId = null)
+        assertNull(captured.captured.hasOrigin)
     }
 
     @Test
@@ -259,7 +278,7 @@ class SpotQueryServiceTest {
     fun `위경도가 범위를 벗어나면 INVALID_COORDINATES`() {
         assertFailsWith<InvalidCoordinatesException> {
             service.spots(
-                SpotsQuery(latitude = 999.0, longitude = 0.0, radiusMeters = 20000, category = null, page = 1, size = 100),
+                SpotsQuery(latitude = 999.0, longitude = 0.0, radiusMeters = 20000, category = null, hasOrigin = null, page = 1, size = 100),
                 DomainLocale.EN,
                 memberId = null,
             )

@@ -81,6 +81,7 @@ class SpotQueryService(
             center = center,
             radiusMeters = query.radiusMeters,
             category = query.category,
+            hasOrigin = query.hasOrigin,
             excludedSpotIds = excluded,
             limit = size,
             offset = (page - 1) * size,

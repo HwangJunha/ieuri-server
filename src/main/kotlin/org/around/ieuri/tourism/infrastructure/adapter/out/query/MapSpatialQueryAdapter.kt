@@ -51,8 +51,7 @@ class MapSpatialQueryAdapter(
             WHERE $BBOX_PREDICATE
               -- 카테고리 없는 카탈로그는 마커를 그릴 수 없다 — 도메인 enum에 미분류 값이 없다.
               $categoryCondition
-            -- 상한에 걸려 잘릴 때 원문 있는 마커가 남도록 우선한다(SPEC-0019).
-            ORDER BY t.has_origin DESC, cat.id
+            ORDER BY cat.id
             LIMIT ?
             """.trimIndent(),
             { rs, _ ->

@@ -116,6 +116,14 @@ data class LikedSpotsSearch(
  * 제외해야 한다 — 조회 후 애플리케이션에서 걸러내면 페이지가 요청한 size보다 작아진다.
  */
 data class NearbySpotSearch(
+    /**
+     * 원문 보유 필터. **null이면 전체**, true면 그 언어 원문이 있는 것만, false면 번역본만.
+     *
+     * 클라이언트가 원문을 먼저 소진한 뒤 false로 넘어오는 흐름을 위한 값이다 — 서버가
+     * 정렬로 끼워넣지 않는다. 정렬로 하면 거리·인기순을 요청했는데 다른 축이 앞서는
+     * 숨은 규칙이 되고, 커서에도 그 축을 실어야 해서 형식이 깨진다.
+     */
+    val hasOrigin: Boolean?,
     val language: DomainLocale,
     val center: Coordinates,
     val radiusMeters: Int,
