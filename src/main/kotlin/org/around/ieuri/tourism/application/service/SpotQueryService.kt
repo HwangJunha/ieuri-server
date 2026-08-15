@@ -1,7 +1,7 @@
 package org.around.ieuri.tourism.application.service
 
-import org.around.ieuri.tourism.application.exception.CategoryNotAvailableForLocaleException
 import org.around.ieuri.tourism.application.exception.SpotDetailNotFoundException
+import org.around.ieuri.tourism.application.exception.UnknownCategoryException
 import org.around.ieuri.tourism.application.exception.InvalidCoordinatesException
 import org.around.ieuri.tourism.application.exception.RadiusTooLargeException
 import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
@@ -22,7 +22,12 @@ import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch
 import org.around.ieuri.tourism.application.port.out.query.SpotIdentity
 import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
 import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
+import org.around.ieuri.common.context.AppKey
+import org.around.ieuri.tourism.application.port.out.query.AppCategoryQueryPort
+import org.around.ieuri.tourism.application.query.AppCategoryCode
+import org.around.ieuri.tourism.application.query.AppCategoryView
 import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.tourism.application.query.CategoryDisplay
 import org.around.ieuri.tourism.application.query.LikedSpotView
 import org.around.ieuri.tourism.application.query.LikedSpotsQuery
 import org.around.ieuri.tourism.application.query.SpotDetailView
@@ -34,6 +39,7 @@ import org.around.ieuri.tourism.application.query.SpotSummaryView
 import org.around.ieuri.tourism.application.query.SpotView
 import org.around.ieuri.tourism.application.query.SpotsQuery
 import org.around.ieuri.tourism.domain.aggregate.SpotDetail
+import org.around.ieuri.tourism.domain.vo.CategorySelection
 import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.domain.vo.SpotImage
 import org.around.ieuri.tourism.domain.vo.SpotIntro
@@ -57,6 +63,7 @@ class SpotQueryService(
     private val spotCachePort: SpotCachePort,
     private val spotDetailStorePort: SpotDetailStorePort,
     private val eventPublisher: TourismEventPublisherPort,
+    private val appCategoryQueryPort: AppCategoryQueryPort,
     private val policy: SpotQueryPolicy,
 ) : SpotQueryUseCase {
 
@@ -67,7 +74,6 @@ class SpotQueryService(
     override fun spots(query: SpotsQuery, locale: DomainLocale, memberId: Long?): SpotPageView {
         val center = validatedCenter(query.latitude, query.longitude)
         validateRadius(query.radiusMeters)
-        query.category?.let { validateCategory(it, locale) }
 
         val page = query.page.coerceAtLeast(1)
         val size = query.size.coerceIn(1, policy.maxPageSize)
@@ -80,7 +86,7 @@ class SpotQueryService(
             language = locale,
             center = center,
             radiusMeters = query.radiusMeters,
-            category = query.category,
+            categories = query.categories,
             hasOrigin = query.hasOrigin,
             excludedSpotIds = excluded,
             limit = size,
@@ -100,8 +106,24 @@ class SpotQueryService(
         )
     }
 
-    override fun availableCategories(locale: DomainLocale): List<SpotCategory> =
-        SpotCategory.availableIn(locale)
+    override fun availableCategories(appKey: AppKey, locale: DomainLocale): List<AppCategoryView> =
+        appCategoryQueryPort.findCategories(appKey, locale)
+
+    override fun availableCategoryCodes(appKey: AppKey, languageCode: String): List<AppCategoryCode> =
+        availableCategories(appKey, DomainLocale.fromLanguageTag(languageCode))
+            .map {
+                AppCategoryCode(
+                    category = it.category.code,
+                    label = it.label,
+                    iconUrl = it.iconUrl,
+                )
+            }
+
+    /** 폴백까지 채워 돌려준다 — 호출자가 코드마다 빈 값을 분기하지 않게 한다. */
+    override fun categoryDisplays(codes: Set<String>, locale: DomainLocale): Map<String, CategoryDisplay> {
+        val found = appCategoryQueryPort.findDisplays(codes, locale)
+        return codes.associateWith { found[it] ?: CategoryDisplay.fallback(SpotCategory(it)) }
+    }
 
     /**
      * 상세 본문(§4). 캐시를 먼저 보고 미스일 때만 upstream(detailCommon2 1콜) 후 저장한다(히트면 upstream
@@ -211,6 +233,7 @@ class SpotQueryService(
     }
 
     override fun spotIntro(catalogId: Long, category: SpotCategory, locale: DomainLocale): SpotIntroView? {
+        requireKnownCategory(category)
         val identity = resolve(catalogId, locale)
         // 캐시·저장 키는 원본 `spot.id`다 — 카탈로그 id를 쓰면 자식 테이블의 FK와 어긋난다.
         val spotId = identity.spotId
@@ -237,6 +260,7 @@ class SpotQueryService(
         category: SpotCategory,
         locale: DomainLocale,
     ): List<SpotInfoItemView> {
+        requireKnownCategory(category)
         val identity = resolve(catalogId, locale)
         // 캐시·저장 키는 원본 `spot.id`다 — 카탈로그 id를 쓰면 자식 테이블의 FK와 어긋난다.
         val spotId = identity.spotId
@@ -275,7 +299,7 @@ class SpotQueryService(
                 id = catalogId,
                 title = basics.title,
                 thumbnailImageUrl = basics.thumbnailImageUrl,
-                categoryCode = basics.category.name,
+                categoryCode = basics.category.code,
                 longitude = basics.longitude,
                 latitude = basics.latitude,
             )
@@ -296,7 +320,7 @@ class SpotQueryService(
                 id = catalogId,
                 title = it.title,
                 thumbnailImageUrl = it.thumbnailImageUrl,
-                categoryCode = it.category.name,
+                categoryCode = it.category.code,
                 longitude = it.longitude,
                 latitude = it.latitude,
             )
@@ -315,12 +339,11 @@ class SpotQueryService(
         memberId: Long,
     ): CursorPage<LikedSpotView> {
         // 카테고리 가용성 판정은 spots와 같다 — 같은 축을 쓰므로 달라질 이유가 없다.
-        query.category?.let { validateCategory(it, locale) }
         return spotQueryPort.findLikedSpots(
             LikedSpotsSearch(
                 memberId = memberId,
                 language = locale,
-                category = query.category,
+                categories = query.categories,
                 first = query.first.coerceIn(1, policy.maxLikedPageSize),
                 after = query.after,
             ),
@@ -365,9 +388,15 @@ class SpotQueryService(
         }
     }
 
-    private fun validateCategory(category: SpotCategory, locale: DomainLocale) {
-        if (!category.isAvailableIn(locale)) {
-            throw CategoryNotAvailableForLocaleException("$category 는 현재 언어에서 제공되지 않습니다.")
+    /**
+     * 정의된 카테고리인가. **필터가 아니라 상세 하위 필드에만 건다** — 여기서는 코드가 캐시 키와
+     * 적재 행의 일부가 되므로, 막지 않으면 임의의 문자열마다 키와 빈 행이 하나씩 쌓인다.
+     *
+     * 유효 집합은 `category` 테이블이 정하므로 새 카테고리는 넣는 즉시 통과한다.
+     */
+    private fun requireKnownCategory(category: SpotCategory) {
+        if (!appCategoryQueryPort.exists(category.code)) {
+            throw UnknownCategoryException("알 수 없는 카테고리입니다: ${category.code}")
         }
     }
 

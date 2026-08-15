@@ -85,7 +85,7 @@ class SpotSyncTasklet(
         executionContext.putInt(KEY_NEXT_PAGE, if (hasMore) pageNo + 1 else pageNo)
 
         if (!hasMore) {
-            // 폴백 건수가 크면 데이터가 아니라 categoryCodes 설정이 잘못됐다는 신호다.
+            // 폴백 건수가 크면 데이터가 아니라 category_external_mapping 행이 빠졌다는 신호다.
             // 제외(excluded) 건수도 마찬가지로 키워드 설정 오류의 신호다(SPEC-0018).
             log.info(
                 "spot sync completed: language={} written={} dropped={} categoryFallback={} excluded={}",

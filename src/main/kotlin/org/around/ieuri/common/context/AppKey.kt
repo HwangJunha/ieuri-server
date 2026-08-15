@@ -1,4 +1,4 @@
-package org.around.ieuri.community.domain.vo
+package org.around.ieuri.common.context
 
 /**
  * 요청을 보낸 앱의 식별자. 상단 칩 구성이 앱마다 다르므로 그것을 고르는 열쇠다.

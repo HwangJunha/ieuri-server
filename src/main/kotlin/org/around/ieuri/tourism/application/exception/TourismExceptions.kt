@@ -46,9 +46,17 @@ class InvalidCoordinatesException(message: String) :
 class RadiusTooLargeException(message: String) :
     SpotQueryException("RADIUS_TOO_LARGE", Classification.BAD_REQUEST, message)
 
-/** 현재 언어에 없는 카테고리(여행코스/교통 비대칭) 조회 시도. */
-class CategoryNotAvailableForLocaleException(message: String) :
-    SpotQueryException("CATEGORY_NOT_AVAILABLE_FOR_LOCALE", Classification.FAILED_PRECONDITION, message)
+/**
+ * `category` 테이블에 없는 카테고리 코드로 상세 하위 필드를 물었다(SPEC-0020).
+ *
+ * **필터에는 이 검증이 없다** — 없는 코드로 거른 목록은 결과가 0건일 뿐이라 해가 없다. 반면
+ * `intro`·`infoItems`는 코드가 캐시 키와 적재 행의 일부가 되므로, 검증하지 않으면 임의의
+ * 문자열마다 캐시 키와 빈 행이 하나씩 생긴다.
+ *
+ * 유효 집합은 코드가 아니라 테이블이 정한다 — 새 카테고리를 넣으면 즉시 통과한다.
+ */
+class UnknownCategoryException(message: String = "알 수 없는 카테고리입니다.") :
+    SpotQueryException("UNKNOWN_CATEGORY", Classification.BAD_REQUEST, message)
 
 /** TourAPI 장애·타임아웃·오류(XML 오류 포함). DB 폴백 없음. */
 class UpstreamUnavailableException(message: String, cause: Throwable? = null) :

@@ -10,6 +10,7 @@ import org.around.ieuri.common.pagination.CursorPageInfo
 import org.around.ieuri.community.application.event.PostViewed
 import org.around.ieuri.community.application.policy.CommunityPolicy
 import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
+import org.around.ieuri.community.application.port.out.client.CategoryConfigPort
 import org.around.ieuri.community.application.port.out.query.BlockedUsersSearch
 import org.around.ieuri.community.application.port.out.query.CommunityQueryPort
 import org.around.ieuri.community.application.port.out.query.MyPostsSearch
@@ -23,7 +24,7 @@ import org.around.ieuri.community.application.query.MyPostsQuery
 import org.around.ieuri.community.application.query.PostCommentsQuery
 import org.around.ieuri.community.application.query.PostView
 import org.around.ieuri.community.application.query.PostsQuery
-import org.around.ieuri.community.domain.vo.AppKey
+import org.around.ieuri.common.context.AppKey
 import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.around.ieuri.community.domain.vo.PostSortOrder
 import org.around.ieuri.community.domain.vo.TargetCategory
@@ -60,8 +61,10 @@ class CommunityQueryServiceTest {
 
     private val eventPublisher = mockk<CommunityEventPublisherPort>(relaxed = true)
 
+    private val categoryConfigPort = mockk<CategoryConfigPort>()
+
     private val service = CommunityQueryService(
-        queryPort, spatialPort, eventPublisher, policy,
+        queryPort, spatialPort, categoryConfigPort, eventPublisher, policy,
     )
 
     private fun <T> emptyPage() = CursorPage<T>(
@@ -86,7 +89,7 @@ class CommunityQueryServiceTest {
         latitude: Double? = null,
         longitude: Double? = null,
         radiusMeters: Int = 20_000,
-        category: TargetCategory? = null,
+        categories: Set<TargetCategory> = emptySet(),
         sort: PostSortOrder = PostSortOrder.LATEST,
         hiddenByViewer: Boolean = false,
         first: Int = 20,
@@ -95,7 +98,7 @@ class CommunityQueryServiceTest {
         latitude = latitude,
         longitude = longitude,
         radiusMeters = radiusMeters,
-        category = category,
+        categories = categories,
         tag = null,
         sort = sort,
         hiddenByViewer = hiddenByViewer,
@@ -190,9 +193,9 @@ class CommunityQueryServiceTest {
         givenBlocked()
         val search = captureSearch()
 
-        service.posts(query(category = TargetCategory.RESTAURANT), memberId)
+        service.posts(query(categories = setOf(TargetCategory.RESTAURANT)), memberId)
 
-        assertEquals(TargetCategory.RESTAURANT, search.captured.category)
+        assertEquals(setOf(TargetCategory.RESTAURANT), search.captured.categories)
     }
 
     @Test
@@ -202,7 +205,7 @@ class CommunityQueryServiceTest {
 
         service.posts(query(), memberId)
 
-        assertNull(search.captured.category)
+        assertTrue(search.captured.categories.isEmpty())
     }
 
     // ---------- 모더레이션 ----------
@@ -331,12 +334,12 @@ class CommunityQueryServiceTest {
     fun `상단 칩은 앱마다 다른 구성을 내려준다`() {
         val trip = AppKey("k-trip-spot")
         val demo = AppKey("demo-app")
-        every { queryPort.findChips(trip, ContentLanguage.KO) } returns listOf(
-            CommunityChipView(TargetCategory.RESTAURANT, 0),
-            CommunityChipView(TargetCategory.FESTIVAL_EVENT, 1),
+        every { categoryConfigPort.findCategories(trip, ContentLanguage.KO) } returns listOf(
+            CommunityChipView(TargetCategory.RESTAURANT),
+            CommunityChipView(TargetCategory.FESTIVAL_EVENT),
         )
-        every { queryPort.findChips(demo, ContentLanguage.KO) } returns listOf(
-            CommunityChipView(TargetCategory.SHOPPING, 0),
+        every { categoryConfigPort.findCategories(demo, ContentLanguage.KO) } returns listOf(
+            CommunityChipView(TargetCategory.SHOPPING),
         )
 
         assertEquals(2, service.communityChips(trip, ContentLanguage.KO).size)
@@ -349,13 +352,13 @@ class CommunityQueryServiceTest {
     @Test
     fun `칩 구성은 언어별로 갈린다 - 여행코스는 국문, 교통은 외국어 전용이다`() {
         val trip = AppKey("k-trip-spot")
-        every { queryPort.findChips(trip, ContentLanguage.KO) } returns listOf(
-            CommunityChipView(TargetCategory.RESTAURANT, 0),
-            CommunityChipView(TargetCategory.TRAVEL_COURSE, 1),
+        every { categoryConfigPort.findCategories(trip, ContentLanguage.KO) } returns listOf(
+            CommunityChipView(TargetCategory.RESTAURANT),
+            CommunityChipView(TargetCategory.TRAVEL_COURSE),
         )
-        every { queryPort.findChips(trip, ContentLanguage.EN) } returns listOf(
-            CommunityChipView(TargetCategory.RESTAURANT, 0),
-            CommunityChipView(TargetCategory.TRANSPORT, 1),
+        every { categoryConfigPort.findCategories(trip, ContentLanguage.EN) } returns listOf(
+            CommunityChipView(TargetCategory.RESTAURANT),
+            CommunityChipView(TargetCategory.TRANSPORT),
         )
 
         val ko = service.communityChips(trip, ContentLanguage.KO).map { it.category }
@@ -371,7 +374,7 @@ class CommunityQueryServiceTest {
     @Test
     fun `구성이 없는 앱은 빈 목록이며 오류가 아니다`() {
         val unknown = AppKey("unknown-app")
-        every { queryPort.findChips(unknown, ContentLanguage.KO) } returns emptyList()
+        every { categoryConfigPort.findCategories(unknown, ContentLanguage.KO) } returns emptyList()
 
         assertTrue(service.communityChips(unknown, ContentLanguage.KO).isEmpty())
     }
@@ -383,11 +386,11 @@ class CommunityQueryServiceTest {
         givenBlocked()
         val search = captureSearch()
 
-        service.posts(query(latitude = 37.5, longitude = 127.0, category = TargetCategory.RESTAURANT), memberId)
+        service.posts(query(latitude = 37.5, longitude = 127.0, categories = setOf(TargetCategory.RESTAURANT)), memberId)
 
         // 목록을 경유하면 그 상한(2000)이 곧 피드의 한계가 된다 — 실측하면 기본 반경 20km에
         // spot이 12,000개가 넘어 대부분이 조용히 잘렸다. 이제 그 포트 자체가 없다.
-        assertEquals(TargetCategory.RESTAURANT, search.captured.category)
+        assertEquals(setOf(TargetCategory.RESTAURANT), search.captured.categories)
         assertEquals(127.0, search.captured.area?.longitude)
     }
 

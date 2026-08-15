@@ -47,7 +47,7 @@ class SpotExclusionRule(
          * 관광 카테고리는 키워드에 걸려도 보호한다(R5) — "서울 대한의원"(사적),
          * "서울대학교병원의학박물관"처럼 업태명을 가진 관광지가 실재한다.
          */
-        val PROTECTED_CATEGORIES = setOf(SpotCategory.TOURIST_SPOT, SpotCategory.CULTURAL_FACILITY)
+        val PROTECTED_CATEGORIES = setOf(SpotCategory.TOURIST_SPOT, SpotCategory("CULTURAL_FACILITY"))
 
         /**
          * 키워드를 정규식으로. **영문 키워드만 단어 경계를 두른다.**

@@ -80,9 +80,12 @@ class PostSpatialQueryAdapter(
             conditions += "ps.catalog_id = ?"
             params += it
         }
-        search.category?.let {
-            conditions += "EXISTS (SELECT 1 FROM community_post_chip c WHERE c.post_id = p.id AND c.category = ?)"
-            params += it.name
+        // 다중 선택은 OR이며 IN으로 표현한다(SPEC-0020). 비어 있으면 조건 자체를 걸지 않는다.
+        search.categories.takeIf { it.isNotEmpty() }?.let { categories ->
+            val placeholders = categories.joinToString(",") { "?" }
+            conditions +=
+                "EXISTS (SELECT 1 FROM community_post_chip c WHERE c.post_id = p.id AND c.category IN ($placeholders))"
+            params.addAll(categories.map { it.name })
         }
         search.normalizedTag?.let {
             conditions += "EXISTS (SELECT 1 FROM community_post_tag t WHERE t.post_id = p.id AND t.normalized = ?)"

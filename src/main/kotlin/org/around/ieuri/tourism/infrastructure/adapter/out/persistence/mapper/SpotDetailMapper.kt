@@ -1,6 +1,7 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.persistence.mapper
 
 import org.around.ieuri.tourism.domain.aggregate.SpotDetail
+import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.tourism.domain.vo.SpotImage
 import org.around.ieuri.tourism.domain.vo.SpotInfoItem
 import org.around.ieuri.tourism.domain.vo.SpotIntro
@@ -17,7 +18,7 @@ import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.Sp
 fun SpotDetailEntity.toDomain(): SpotDetail =
     SpotDetail(
         title = title,
-        category = category,
+        category = SpotCategory(category),
         thumbnailImageUrl = thumbnailImageUrl,
         overview = overview,
         address = address,

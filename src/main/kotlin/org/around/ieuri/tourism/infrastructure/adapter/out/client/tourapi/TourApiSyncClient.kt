@@ -4,6 +4,7 @@ import org.around.ieuri.tourism.application.port.out.client.SpotSyncPage
 import org.around.ieuri.tourism.application.port.out.client.SpotSyncPort
 import org.around.ieuri.tourism.domain.specification.SpotExclusionRule
 import org.around.ieuri.tourism.domain.vo.DomainLocale
+import org.around.ieuri.tourism.application.port.out.query.CategoryExternalMappingPort
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi.mapper.toSyncSpotCommandOrNull
 import org.around.ieuri.tourism.infrastructure.config.TourApiProperties
@@ -28,6 +29,7 @@ class TourApiSyncClient(
     private val properties: TourApiProperties,
     private val tourApiRestClient: RestClient,
     private val exclusionRule: SpotExclusionRule,
+    private val categoryMapping: CategoryExternalMappingPort,
 ) : SpotSyncPort {
 
     override fun fetchPage(language: DomainLocale, pageNo: Int, numOfRows: Int): SpotSyncPage {
@@ -52,9 +54,11 @@ class TourApiSyncClient(
         val body = response.response.body
         var fallbacks = 0
         var excluded = 0
+        // 페이지 안에서 contentTypeId → 카테고리를 한 번만 읽는다.
+        val categoryMemo = mutableMapOf<String, SpotCategory?>()
 
         val records = body.items.item.mapNotNull { item ->
-            val resolved = resolveCategory(item.contenttypeid, language)
+            val resolved = resolveCategory(item.contenttypeid, language, categoryMemo)
             if (resolved.isFallback) fallbacks++
             // 비관광 항목 제외(lclsSystm2). 설정이 빈 목록이면 아무것도 걸러내지 않는다.
             if (item.lclsSystm2 != null && item.lclsSystm2 in properties.excludeLclssystm2) return@mapNotNull null
@@ -84,10 +88,17 @@ class TourApiSyncClient(
      * 동일한 동작이지만, **폴백이었다는 사실을 함께 돌려준다.** 요청 단위에서는 간헐적이던 폴백이
      * 배치에서는 대량으로 적용될 수 있어 관측이 필요하기 때문이다(런타임 계약 위험 4번).
      */
-    private fun resolveCategory(contentTypeId: String?, locale: DomainLocale): ResolvedCategory {
+    private fun resolveCategory(
+        contentTypeId: String?,
+        locale: DomainLocale,
+        memo: MutableMap<String, SpotCategory?>,
+    ): ResolvedCategory {
         val codeset = if (locale.isKorean) TourApiProperties.CODESET_KO else TourApiProperties.CODESET_FOREIGN
-        val id = contentTypeId?.toIntOrNull() ?: return ResolvedCategory(SpotCategory.TOURIST_SPOT, isFallback = true)
-        val matched = properties.categoryCodes[codeset]?.entries?.firstOrNull { it.value == id }?.key
+        if (contentTypeId == null) return ResolvedCategory(SpotCategory.TOURIST_SPOT, isFallback = true)
+        // 한 페이지에 같은 코드가 수십 번 나오므로 페이지 안에서 접는다 — 없으면 행마다 질의가 붙는다.
+        val matched = memo.getOrPut(contentTypeId) {
+            categoryMapping.categoryOf(contentTypeId, CategoryExternalMappingPort.PROVIDER_TOUR_API, codeset)
+        }
         return matched?.let { ResolvedCategory(it, isFallback = false) }
             ?: ResolvedCategory(SpotCategory.TOURIST_SPOT, isFallback = true)
     }

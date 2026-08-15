@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.application.port.out.query
 
+import org.around.ieuri.tourism.domain.vo.CategorySelection
 import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
@@ -47,7 +48,8 @@ data class SpotSearchQuery(
     val language: DomainLocale,
     val center: Coordinates,
     val radiusMeters: Int,
-    val category: SpotCategory?,
+    /** 카테고리 선택. 비어 있으면 전체. 값이 여럿이면 IN으로 거른다(OR). */
+    val categories: CategorySelection,
     val limit: Int,
     val offset: Int,
 )

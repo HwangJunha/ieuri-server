@@ -12,7 +12,6 @@ import jakarta.persistence.PreUpdate
 import jakarta.persistence.Table
 import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
-import org.around.ieuri.tourism.domain.vo.SpotCategory
 import java.time.Instant
 
 /**
@@ -57,9 +56,8 @@ class SpotEntity(
     @Column(name = "map_y", nullable = false)
     var mapY: Double,
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "category", nullable = false, length = 30)
-    var category: SpotCategory,
+    var category: String,
 
     /**
      * 해석 이전의 TourAPI 원본 contentTypeId. **적재 전용 — 응답·로그로 내보내지 말 것**(SPEC-0002 R8·AC-21).

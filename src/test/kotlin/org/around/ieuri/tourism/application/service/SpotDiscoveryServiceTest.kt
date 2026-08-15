@@ -4,7 +4,6 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
-import org.around.ieuri.tourism.application.exception.CategoryNotAvailableForLocaleException
 import org.around.ieuri.tourism.application.exception.InvalidCoordinatesException
 import org.around.ieuri.tourism.application.exception.RadiusTooLargeException
 import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
@@ -23,6 +22,7 @@ import org.around.ieuri.tourism.application.query.PopularSpotView
 import org.around.ieuri.tourism.application.query.PopularSpotsQuery
 import org.around.ieuri.tourism.application.query.SearchSpotsQuery
 import org.around.ieuri.tourism.application.query.SpotView
+import org.around.ieuri.tourism.domain.vo.CategorySelection
 import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DistanceCursor
 import org.around.ieuri.tourism.domain.vo.LikeCountCursor
@@ -155,7 +155,7 @@ class SpotDiscoveryServiceTest {
             DomainLocale.KO,
         )
 
-        assertEquals(SpotCategory.TOURIST_SPOT, captured.captured.category)
+        assertEquals(CategorySelection.ofValues(setOf(SpotCategory.TOURIST_SPOT)), captured.captured.categories)
     }
 
     /** AC-5.2 — 카테고리를 지정하지 않으면 필터가 없다(전체 대상). */
@@ -166,7 +166,7 @@ class SpotDiscoveryServiceTest {
 
         service.searchSpots(searchQuery(query = "경복궁"), DomainLocale.KO)
 
-        assertEquals(null, captured.captured.category)
+        assertEquals(CategorySelection.UNFILTERED, captured.captured.categories)
     }
 
     // ── R7 · 안정적 페이지네이션 ────────────────────────────────────────────
@@ -479,7 +479,7 @@ class SpotDiscoveryServiceTest {
 
         service.popularSpots(popularQuery(category = SpotCategory.TOURIST_SPOT), DomainLocale.KO)
 
-        assertEquals(SpotCategory.TOURIST_SPOT, captured.captured.category)
+        assertEquals(CategorySelection.ofValues(setOf(SpotCategory.TOURIST_SPOT)), captured.captured.categories)
     }
 
     // ── 네 진입점 공통 규약 ─────────────────────────────────────────────────
@@ -568,23 +568,6 @@ class SpotDiscoveryServiceTest {
         }
     }
 
-    /**
-     * 현재 언어에 없는 카테고리는 검색·인기 양쪽에서 같은 예외다 — `spots`와 같은 규약이라
-     * 같은 인자에 다른 코드를 두지 않는다. TRAVEL_COURSE는 EN에서 제공되지 않는다.
-     */
-    @Test
-    fun `현재 언어에 없는 카테고리는 거절된다`() {
-        assertFailsWith<CategoryNotAvailableForLocaleException> {
-            service.searchSpots(
-                searchQuery(query = "course", category = SpotCategory.TRAVEL_COURSE),
-                DomainLocale.EN,
-            )
-        }
-        assertFailsWith<CategoryNotAvailableForLocaleException> {
-            service.popularSpots(popularQuery(category = SpotCategory.TRAVEL_COURSE), DomainLocale.EN)
-        }
-    }
-
     /** first가 0이나 음수여도 최소 1로 올린다 — 스키마가 임의의 Int를 허용한다. */
     @Test
     fun `size가 0 이하이면 1로 올린다`() {
@@ -610,7 +593,7 @@ class SpotDiscoveryServiceTest {
         latitude = latitude,
         longitude = 127.0,
         radiusMeters = radiusMeters,
-        category = category,
+        categories = selection(category),
         page = page,
         size = size,
     )
@@ -639,11 +622,15 @@ class SpotDiscoveryServiceTest {
         latitude = latitude,
         longitude = 127.0,
         radiusMeters = radiusMeters,
-        category = category,
+        categories = selection(category),
         hasOrigin = null,
         first = first,
         after = after,
     )
+
+    /** 단일 카테고리 인자를 다중 선택으로 옮긴다. null이면 필터 없음. */
+    private fun selection(category: SpotCategory?) =
+        category?.let { CategorySelection.ofValues(setOf(it)) } ?: CategorySelection.UNFILTERED
 
     private fun hit(spotId: Long, title: String = "장소$spotId", relevance: Double = 1.0) =
         SpotSearchHit(

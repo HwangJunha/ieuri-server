@@ -9,7 +9,7 @@ import org.around.ieuri.community.application.query.PostCommentsQuery
 import org.around.ieuri.community.application.query.PostView
 import org.around.ieuri.community.application.query.MyPostsQuery
 import org.around.ieuri.community.application.query.PostsQuery
-import org.around.ieuri.community.domain.vo.AppKey
+import org.around.ieuri.common.context.AppKey
 import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.around.ieuri.community.domain.vo.TargetCategory
 

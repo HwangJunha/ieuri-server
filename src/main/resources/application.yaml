@@ -192,26 +192,6 @@ ieuri:
       EN: https://apis.data.go.kr/B551011/EngService2
       JA: https://apis.data.go.kr/B551011/JpnService2
       ZH: https://apis.data.go.kr/B551011/ChtService2
-    # 도메인 카테고리 → 언어별 TourAPI contentTypeId. 값 보정이 코드 수정 없이 가능하도록 설정으로 둔다.
-    category-codes:
-      KO:
-        TOURIST_SPOT: 12
-        CULTURAL_FACILITY: 14
-        FESTIVAL_EVENT: 15
-        TRAVEL_COURSE: 25
-        LEISURE_SPORTS: 28
-        LODGING: 32
-        SHOPPING: 38
-        RESTAURANT: 39
-      FOREIGN:
-        TOURIST_SPOT: 76
-        CULTURAL_FACILITY: 78
-        FESTIVAL_EVENT: 85
-        LEISURE_SPORTS: 75
-        LODGING: 80
-        SHOPPING: 79
-        RESTAURANT: 82
-        TRANSPORT: 77
     # 비관광 제외 lclsSystm2 코드(다국어 공통). [TBD] 실데이터 표본으로 확정 — 초기 빈 목록.
     exclude-lclssystm2: []
     arrange: Q

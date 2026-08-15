@@ -26,14 +26,13 @@ import org.around.ieuri.community.application.query.CommunityChipView
 import org.around.ieuri.community.application.query.PostAuthorView
 import org.around.ieuri.community.application.query.PostSpotView
 import org.around.ieuri.community.application.query.PostView
-import org.around.ieuri.community.domain.vo.AppKey
+import org.around.ieuri.common.context.AppKey
 import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.CommentEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QBlockEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QCommentEntity
-import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QCommunityChipEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostHideEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostLikeEntity
@@ -66,7 +65,6 @@ class CommunityQueryAdapter(
     private val comment = QCommentEntity.commentEntity
     private val photo = QPostPhotoEntity.postPhotoEntity
     private val like = QPostLikeEntity.postLikeEntity
-    private val chip = QCommunityChipEntity.communityChipEntity
     private val tag = QPostTagEntity.postTagEntity
     private val postChip = QPostChipEntity.postChipEntity
     private val postSpot = QPostSpotEntity.postSpotEntity
@@ -94,7 +92,7 @@ class CommunityQueryAdapter(
             after = search.after,
             extraConditions = listOfNotNull(
                 spotCondition(search.catalogId),
-                categoryCondition(search.category),
+                categoryCondition(search.categories),
                 tagCondition(search.normalizedTag),
                 hideCondition(search),
             ),
@@ -132,11 +130,12 @@ class CommunityQueryAdapter(
             )
         }
 
-    private fun categoryCondition(category: TargetCategory?): BooleanExpression? =
-        category?.let {
+    /** 다중 선택은 OR이며 IN으로 표현한다(SPEC-0020). 비어 있으면 조건 자체를 걸지 않는다. */
+    private fun categoryCondition(categories: Set<TargetCategory>): BooleanExpression? =
+        categories.takeIf { it.isNotEmpty() }?.let {
             post.id.`in`(
                 JPAExpressions.select(postChip.postId).from(postChip)
-                    .where(postChip.category.eq(it)),
+                    .where(postChip.category.`in`(it)),
             )
         }
 
@@ -376,22 +375,6 @@ class CommunityQueryAdapter(
             .where(postHide.memberId.eq(memberId))
             .fetch()
             .toSet()
-
-    /** 앱의 켜진 칩만 순서대로. 구성이 없으면 빈 목록이다 — 오류가 아니다. */
-    @Transactional(readOnly = true)
-    override fun findChips(appKey: AppKey, language: ContentLanguage): List<CommunityChipView> =
-        queryFactory
-            .select(chip.category, chip.position)
-            .from(chip)
-            .where(chip.appKey.eq(appKey.value), chip.language.eq(language), chip.enabled.isTrue)
-            .orderBy(chip.position.asc(), chip.id.asc())
-            .fetch()
-            .map {
-                CommunityChipView(
-                    category = requireNotNull(it.get(chip.category)),
-                    position = requireNotNull(it.get(chip.position)).toInt(),
-                )
-            }
 
     /**
      * 피드 공통 조회. spotPosts·nearbyPosts가 조건만 달리해 이 하나를 쓴다 —

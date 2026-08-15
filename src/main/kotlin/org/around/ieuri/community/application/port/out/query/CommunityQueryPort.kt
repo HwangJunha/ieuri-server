@@ -5,7 +5,7 @@ import org.around.ieuri.community.application.query.BlockedUserView
 import org.around.ieuri.community.application.query.CommunityChipView
 import org.around.ieuri.community.application.query.CommentView
 import org.around.ieuri.community.application.query.PostView
-import org.around.ieuri.community.domain.vo.AppKey
+import org.around.ieuri.common.context.AppKey
 import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.domain.vo.PostSortOrder
@@ -101,9 +101,6 @@ interface CommunityQueryPort {
 
     /** [memberId]가 개별로 숨긴 글의 id. 피드 필터가 이 집합을 제외한다. */
     fun findHiddenPostIds(memberId: Long): Set<Long>
-
-    /** 앱의 켜진 칩만 순서대로. 구성이 없으면 빈 목록이다. */
-    fun findChips(appKey: AppKey, language: ContentLanguage): List<CommunityChipView>
 }
 
 /**
@@ -167,8 +164,8 @@ data class PostsSearch(
     val catalogId: Long?,
     /** 좌표 반경. null이면 반경으로 좁히지 않는다. */
     val area: PostsArea?,
-    /** 상단 칩. null이면 카테고리로 좁히지 않는다. */
-    val category: TargetCategory?,
+    /** 카테고리 선택. 비어 있으면 좁히지 않고, 값이 여럿이면 IN으로 거른다(OR). */
+    val categories: Set<TargetCategory>,
     /** 정규화된 태그. null이면 태그로 좁히지 않는다. */
     val normalizedTag: String?,
     /**

@@ -21,12 +21,12 @@ import org.around.ieuri.community.application.query.MyPostsQuery
 import org.around.ieuri.community.application.query.PostsQuery
 import org.around.ieuri.community.domain.vo.PostSortOrder
 import org.around.ieuri.community.domain.vo.TargetCategory
-import org.around.ieuri.community.infrastructure.locale.appKey
+import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper.toTargetCategories
+import org.around.ieuri.common.graphql.appKey
 import org.around.ieuri.community.infrastructure.locale.contentLanguage
 import org.springframework.stereotype.Component
 import org.around.ieuri.common.graphql.generated.types.BlockedUserConnection as GqlBlockedUserConnection
 import org.around.ieuri.common.graphql.generated.types.BlockedUserEdge as GqlBlockedUserEdge
-import org.around.ieuri.common.graphql.generated.types.CommunityChip as GqlCommunityChip
 import org.around.ieuri.common.graphql.generated.types.PageInfo as GqlPageInfo
 import org.around.ieuri.common.graphql.generated.types.PostAuthor as GqlPostAuthor
 import org.around.ieuri.common.graphql.generated.types.PostSortOrder as GqlPostSortOrder
@@ -61,7 +61,7 @@ class CommunityQueryResolver(
         @InputArgument latitude: Double?,
         @InputArgument longitude: Double?,
         @InputArgument radiusMeters: Int?,
-        @InputArgument category: GqlTargetCategory?,
+        @InputArgument categories: List<GqlTargetCategory>?,
         @InputArgument tag: String?,
         @InputArgument sort: GqlPostSortOrder?,
         @InputArgument hiddenByViewer: Boolean?,
@@ -75,7 +75,7 @@ class CommunityQueryResolver(
                 latitude = latitude,
                 longitude = longitude,
                 radiusMeters = radiusMeters ?: DEFAULT_RADIUS_METERS,
-                category = category?.let { TargetCategory.valueOf(it.name) },
+                categories = toTargetCategories(categories),
                 tag = tag,
                 // 스키마 기본값이 LATEST라 null이 오는 경우는 없지만, 계약을 코드에도 남긴다.
                 sort = sort?.let { PostSortOrder.valueOf(it.name) } ?: PostSortOrder.LATEST,
@@ -167,13 +167,9 @@ class CommunityQueryResolver(
      * 클라이언트가 고르는 값이 아니라 요청의 속성이기 때문이다(Accept-Language와 같은 이유).
      */
     @DgsQuery
-    fun communityChips(dfe: DgsDataFetchingEnvironment): List<GqlCommunityChip> =
-        communityQueryUseCase.communityChips(dfe.appKey(), dfe.contentLanguage()).map {
-            GqlCommunityChip(
-                category = GqlTargetCategory.valueOf(it.category.name),
-                position = it.position,
-            )
-        }
+    fun communityChips(dfe: DgsDataFetchingEnvironment): List<GqlTargetCategory> =
+        communityQueryUseCase.communityChips(dfe.appKey(), dfe.contentLanguage())
+            .map { GqlTargetCategory.valueOf(it.category.name) }
 
     /** 사용자가 입력한 태그. 별도 테이블이라 요청된 경우에만 배치로 읽는다. */
     @DgsData(parentType = "Post", field = "tags")

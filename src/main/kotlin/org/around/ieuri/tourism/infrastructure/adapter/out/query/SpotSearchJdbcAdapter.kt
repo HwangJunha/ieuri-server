@@ -143,7 +143,7 @@ class SpotSearchJdbcAdapter(
             { rs, _ ->
                 rs.getLong("id") to SpotCard(
                     thumbnailImageUrl = rs.getString("thumbnail_image_url"),
-                    category = SpotCategory.valueOf(rs.getString("category")),
+                    category = SpotCategory(rs.getString("category")),
                     copyright = CopyrightType.valueOf(rs.getString("copyright")),
                 )
             },
@@ -293,9 +293,11 @@ class SpotSearchJdbcAdapter(
         // **분류 사본으로 거른다.** 좌표와 같은 이유로 이 테이블에 복사해 두었다(V55) —
         // `spot_catalog`를 조인하면 평면 질의가 깨져 BM25 인덱스 푸시다운이 사라지고,
         // 2단계에서 거르면 한 페이지를 자른 뒤 걸러 요청한 size보다 적게 나간다.
-        query.category?.let {
-            conditions += "t.category = ?"
-            params += it.name
+        // 다중 선택은 OR이며 IN으로 표현한다(SPEC-0020). 비어 있으면 조건 자체를 걸지 않는다.
+        if (!query.categories.isUnfiltered) {
+            val codes = query.categories.codes()
+            conditions += "t.category IN (${codes.joinToString(",") { "?" }})"
+            params.addAll(codes)
         }
 
         return conditions.joinToString(" AND ") to params

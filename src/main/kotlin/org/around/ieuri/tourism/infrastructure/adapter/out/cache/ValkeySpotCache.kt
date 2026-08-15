@@ -108,7 +108,7 @@ class ValkeySpotCache(
     private fun key(operation: String, spotId: Long, category: SpotCategory? = null) =
         buildString {
             append(KEY_PREFIX).append(operation).append(':')
-            category?.let { append(it.name).append(':') }
+            category?.let { append(it.code).append(':') }
             append(spotId)
         }
 

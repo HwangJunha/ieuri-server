@@ -1,9 +1,7 @@
 package org.around.ieuri.community.infrastructure.locale
 
-import com.netflix.graphql.dgs.context.DgsContext
 import graphql.schema.DataFetchingEnvironment
 import org.around.ieuri.common.graphql.acceptLanguage
-import org.around.ieuri.community.domain.vo.AppKey
 import org.around.ieuri.community.domain.vo.ContentLanguage
 
 /**
@@ -14,14 +12,3 @@ import org.around.ieuri.community.domain.vo.ContentLanguage
  */
 fun DataFetchingEnvironment.contentLanguage(): ContentLanguage =
     ContentLanguage.fromAcceptLanguage(acceptLanguage())
-
-/**
- * 요청한 앱. 상단 칩 구성이 앱마다 달라 어느 앱이 부르는지 알아야 한다.
- * 헤더가 없으면 기본 앱이다.
- */
-fun DataFetchingEnvironment.appKey(): AppKey =
-    AppKey.fromHeaderOrDefault(
-        DgsContext.getRequestData(this)?.headers?.getFirst(APP_KEY_HEADER),
-    )
-
-private const val APP_KEY_HEADER = "X-App-Key"

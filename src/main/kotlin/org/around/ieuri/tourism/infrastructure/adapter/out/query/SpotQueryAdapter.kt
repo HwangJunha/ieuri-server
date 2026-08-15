@@ -17,6 +17,7 @@ import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.LikedSpotCursor
 import org.around.ieuri.tourism.domain.vo.ReactionType
+import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotCatalogEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotCatalogTranslationEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotEntity
@@ -154,7 +155,7 @@ class SpotQueryAdapter(
                     title = requireNotNull(it.get(translation.title)),
                     address = it.get(translation.address),
                     thumbnailImageUrl = requireNotNull(it.get(catalog.thumbnailImageUrl)),
-                    category = requireNotNull(it.get(catalog.category)),
+                    category = SpotCategory(requireNotNull(it.get(catalog.category))),
                     copyright = requireNotNull(it.get(catalog.copyright)),
                     longitude = requireNotNull(it.get(catalog.mapX)),
                     latitude = requireNotNull(it.get(catalog.mapY)),
@@ -231,7 +232,7 @@ class SpotQueryAdapter(
                     title = requireNotNull(row.get(translation.title)),
                     address = row.get(translation.address),
                     thumbnailImageUrl = requireNotNull(row.get(catalog.thumbnailImageUrl)),
-                    category = requireNotNull(row.get(catalog.category)),
+                    category = SpotCategory(requireNotNull(row.get(catalog.category))),
                     copyright = requireNotNull(row.get(catalog.copyright)),
                     longitude = requireNotNull(row.get(catalog.mapX)),
                     latitude = requireNotNull(row.get(catalog.mapY)),
@@ -279,7 +280,7 @@ class SpotQueryAdapter(
             .where(
                 reaction.memberId.eq(query.memberId),
                 reaction.reaction.eq(ReactionType.LIKE),
-                query.category?.let { catalog.category.eq(it) },
+                query.categories.takeIf { !it.isUnfiltered }?.let { catalog.category.`in`(it.codes()) },
                 // 정렬이 (updated_at DESC, catalog_id DESC)이므로 다음 페이지는 그 튜플보다 "작은" 행이다.
                 // 총계에는 붙이지 않는다 — 커서는 페이지 경계일 뿐 집합의 조건이 아니다.
                 cursor?.let {
@@ -300,7 +301,7 @@ class SpotQueryAdapter(
                     title = requireNotNull(it.get(translation.title)),
                     thumbnailImageUrl = requireNotNull(it.get(catalog.thumbnailImageUrl)),
                     address = it.get(translation.address),
-                    category = requireNotNull(it.get(catalog.category)),
+                    category = SpotCategory(requireNotNull(it.get(catalog.category))),
                     copyright = copyright,
                     // copyright에서 도출되는 값이라 적재하지 않는다(둘이 어긋날 여지를 없앤다).
                     attributionText = copyright.attributionText,

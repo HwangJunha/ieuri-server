@@ -32,7 +32,7 @@ interface SpotSyncPort {
  * 필터-이전 총계다.
  *
  * [droppedCount]·[categoryFallbackCount]·[excludedCount]는 **관측용**이다(설계 문서 §2.3·§4.5). 정상
- * 실행에서 카테고리 폴백이 수천 건 발생하면 그것은 데이터가 아니라 `categoryCodes` 설정이 잘못됐다는
+ * 실행에서 카테고리 폴백이 수천 건 발생하면 그것은 데이터가 아니라 `category_external_mapping` 행이 빠졌다는
  * 신호이며, 원본 contentTypeId를 함께 적재하는 것만으로는 "얼마나 많이 폴백했는가"를 실행 시점에 알 수 없다.
  *
  * **[droppedCount]와 [excludedCount]는 성격이 다르다** — 앞은 필수 필드가 비어 적재할 수 없는 항목,

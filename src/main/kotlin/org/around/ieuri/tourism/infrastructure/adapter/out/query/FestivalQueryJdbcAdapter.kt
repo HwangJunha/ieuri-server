@@ -80,7 +80,7 @@ class FestivalQueryJdbcAdapter(
                     address = rs.getString("address"),
                     thumbnailImageUrl = rs.getString("thumbnail_image_url"),
                     distanceMeters = rs.getDouble("distance_meters"),
-                    category = SpotCategory.valueOf(rs.getString("category")),
+                    category = SpotCategory(rs.getString("category")),
                     copyright = copyright,
                     attributionText = copyright.attributionText,
                     mapX = rs.getDouble("map_x"),

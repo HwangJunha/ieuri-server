@@ -4,7 +4,6 @@ import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.cursorPageOf
 import org.around.ieuri.common.pagination.keysetPageOf
 import org.around.ieuri.common.pagination.map
-import org.around.ieuri.tourism.application.exception.CategoryNotAvailableForLocaleException
 import org.around.ieuri.tourism.application.exception.InvalidCoordinatesException
 import org.around.ieuri.tourism.application.exception.RadiusTooLargeException
 import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
@@ -25,6 +24,7 @@ import org.around.ieuri.tourism.application.query.SearchUserError
 import org.around.ieuri.tourism.application.query.SpotSearchResultView
 import org.around.ieuri.tourism.application.query.SpotSuggestionView
 import org.around.ieuri.tourism.application.query.SpotView
+import org.around.ieuri.tourism.domain.vo.CategorySelection
 import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.domain.vo.DistanceCursor
 import org.around.ieuri.tourism.domain.vo.DomainLocale
@@ -68,7 +68,6 @@ class SpotDiscoveryService(
     override fun searchSpots(query: SearchSpotsQuery, locale: DomainLocale): SpotSearchResultView {
         val center = validatedCenter(query.latitude, query.longitude)
         validateRadius(query.radiusMeters)
-        query.category?.let { validateCategory(it, locale) }
 
         val text = query.query.trim()
         val page = query.page.coerceAtLeast(1)
@@ -80,7 +79,7 @@ class SpotDiscoveryService(
             language = locale,
             center = center,
             radiusMeters = query.radiusMeters,
-            category = query.category,
+            categories = query.categories,
             limit = size,
             offset = (page - 1) * size,
         )
@@ -170,14 +169,13 @@ class SpotDiscoveryService(
     ): CursorPage<PopularSpotView> {
         val center = validatedCenter(query.latitude, query.longitude)
         validateRadius(query.radiusMeters)
-        query.category?.let { validateCategory(it, locale) }
 
         val first = query.first.coerceIn(1, policy.maxSearchPageSize)
         val search = PopularSpotSearch(
             language = locale,
             center = center,
             radiusMeters = query.radiusMeters,
-            category = query.category,
+            categories = query.categories,
             hasOrigin = query.hasOrigin,
             minLikeCount = policy.minPopularLikeCount,
             limit = first,
@@ -239,12 +237,6 @@ class SpotDiscoveryService(
         if (radiusMeters <= 0) throw InvalidCoordinatesException("반경은 양수여야 합니다.")
         if (radiusMeters > policy.maxRadiusMeters) {
             throw RadiusTooLargeException("반경은 최대 ${policy.maxRadiusMeters}m까지 허용됩니다.")
-        }
-    }
-
-    private fun validateCategory(category: SpotCategory, locale: DomainLocale) {
-        if (!category.isAvailableIn(locale)) {
-            throw CategoryNotAvailableForLocaleException("$category 는 현재 언어에서 제공되지 않습니다.")
         }
     }
 

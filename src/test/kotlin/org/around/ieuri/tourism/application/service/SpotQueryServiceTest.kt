@@ -4,12 +4,13 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
-import org.around.ieuri.tourism.application.exception.CategoryNotAvailableForLocaleException
 import org.around.ieuri.tourism.application.exception.InvalidCoordinatesException
 import org.around.ieuri.tourism.application.exception.RadiusTooLargeException
 import org.around.ieuri.tourism.application.exception.SpotDetailNotFoundException
+import org.around.ieuri.tourism.application.exception.UnknownCategoryException
 import org.around.ieuri.tourism.application.exception.UpstreamUnavailableException
 import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
+import org.around.ieuri.common.context.AppKey
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.CursorPageInfo
 import org.around.ieuri.tourism.application.port.out.cache.CachedDetail
@@ -24,16 +25,20 @@ import org.around.ieuri.tourism.application.event.SpotDetailAbsent
 import org.around.ieuri.tourism.application.event.SpotDetailFetched
 import org.around.ieuri.tourism.application.event.SpotGalleryFetched
 import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
+import org.around.ieuri.tourism.application.port.out.query.AppCategoryQueryPort
 import org.around.ieuri.tourism.application.port.out.query.LikedSpotsSearch
 import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch
 import org.around.ieuri.tourism.application.port.out.query.SpotBasics
 import org.around.ieuri.tourism.application.port.out.query.SpotIdentity
 import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
 import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
+import org.around.ieuri.tourism.application.query.AppCategoryView
+import org.around.ieuri.tourism.application.query.CategoryDisplay
 import org.around.ieuri.tourism.application.query.LikedSpotView
 import org.around.ieuri.tourism.application.query.LikedSpotsQuery
 import org.around.ieuri.tourism.application.query.SpotsQuery
 import org.around.ieuri.tourism.domain.aggregate.SpotDetail
+import org.around.ieuri.tourism.domain.vo.CategorySelection
 import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
@@ -69,13 +74,17 @@ class SpotQueryServiceTest {
         maxSearchPage = 500,
         minPopularLikeCount = 10,
     )
+    private val appCategoryQueryPort = mockk<AppCategoryQueryPort>()
     private val service = SpotQueryService(
-        tourInfoPort, spotQueryPort, spotCachePort, spotDetailStorePort, eventPublisher, policy,
+        tourInfoPort, spotQueryPort, spotCachePort, spotDetailStorePort, eventPublisher,
+        appCategoryQueryPort, policy,
     )
 
     // 기본: 아무것도 반응하지 않음(빈 집합). 개별 테스트에서 override.
     init {
         every { spotQueryPort.findReactedSpotIds(any()) } returns emptySet()
+        // 기본: 정의된 카테고리로 둔다. intro·infoItems가 코드 유효성을 확인한다(SPEC-0020).
+        every { appCategoryQueryPort.exists(any()) } returns true
         // (카탈로그 id, 언어) → contentId 해석. 기본은 어느 언어로 물어도 원본이 있다고 둔다.
         // 그 언어의 원본이 없는 경우는 개별 테스트에서 override한다.
         // spotId는 카탈로그 id와 **다른 값**을 준다 — 둘이 섞이면 캐시·spot_detail이 잘못된
@@ -163,10 +172,14 @@ class SpotQueryServiceTest {
         copyright = CopyrightType.UNSPECIFIED,
     )
 
+    /** 단일 카테고리 인자를 다중 선택으로 옮긴다. null이면 필터 없음. */
+    private fun selection(category: SpotCategory?) =
+        category?.let { CategorySelection.ofValues(setOf(it)) } ?: CategorySelection.UNFILTERED
+
     private fun query(page: Int = 1, size: Int = 100, category: SpotCategory? = null, radius: Int = 20000) =
         SpotsQuery(
             latitude = 37.5665, longitude = 126.9780,
-            radiusMeters = radius, category = category, hasOrigin = null, page = page, size = size,
+            radiusMeters = radius, categories = selection(category), hasOrigin = null, page = page, size = size,
         )
 
     @Test
@@ -278,17 +291,10 @@ class SpotQueryServiceTest {
     fun `위경도가 범위를 벗어나면 INVALID_COORDINATES`() {
         assertFailsWith<InvalidCoordinatesException> {
             service.spots(
-                SpotsQuery(latitude = 999.0, longitude = 0.0, radiusMeters = 20000, category = null, hasOrigin = null, page = 1, size = 100),
+                SpotsQuery(latitude = 999.0, longitude = 0.0, radiusMeters = 20000, categories = CategorySelection.UNFILTERED, hasOrigin = null, page = 1, size = 100),
                 DomainLocale.EN,
                 memberId = null,
             )
-        }
-    }
-
-    @Test
-    fun `현재 언어에 없는 카테고리는 CATEGORY_NOT_AVAILABLE_FOR_LOCALE`() {
-        assertFailsWith<CategoryNotAvailableForLocaleException> {
-            service.spots(query(category = SpotCategory.TRAVEL_COURSE), DomainLocale.EN, memberId = null)
         }
     }
 
@@ -297,9 +303,9 @@ class SpotQueryServiceTest {
         val captured = slot<NearbySpotSearch>()
         every { spotQueryPort.searchNearby(capture(captured)) } returns emptyList()
 
-        service.spots(query(category = SpotCategory.LODGING), DomainLocale.KO, memberId = null)
+        service.spots(query(category = SpotCategory("LODGING")), DomainLocale.KO, memberId = null)
 
-        assertEquals(SpotCategory.LODGING, captured.captured.category)
+        assertEquals(CategorySelection.ofValues(setOf(SpotCategory("LODGING"))), captured.captured.categories)
     }
 
     @Test
@@ -417,10 +423,83 @@ class SpotQueryServiceTest {
         verify(exactly = 0) { eventPublisher.publish(any()) }
     }
 
+    /**
+     * 노출 구성은 이제 `app_category`가 정한다(SPEC-0020) — 서비스는 앱·언어를 그대로 넘기고
+     * 포트가 준 목록을 **가공하지 않는다**. 순서는 서버 계약이 아니므로 집합으로만 본다.
+     */
     @Test
-    fun `availableCategories는 언어별 유효 집합을 반환한다`() {
-        assertTrue(SpotCategory.TRAVEL_COURSE in service.availableCategories(DomainLocale.KO))
-        assertTrue(SpotCategory.TRANSPORT in service.availableCategories(DomainLocale.EN))
+    fun `availableCategories는 앱과 언어로 구성을 조회해 그대로 돌려준다`() {
+        val appKey = AppKey("demo-app")
+        every { appCategoryQueryPort.findCategories(appKey, DomainLocale.KO) } returns listOf(
+            AppCategoryView(SpotCategory("RESTAURANT"), "음식점", "https://cdn/restaurant.png"),
+            AppCategoryView(SpotCategory("TRAVEL_COURSE"), "여행코스", null),
+        )
+
+        val result = service.availableCategories(appKey, DomainLocale.KO)
+
+        assertEquals(setOf(SpotCategory("RESTAURANT"), SpotCategory("TRAVEL_COURSE")), result.map { it.category }.toSet())
+        assertEquals(mapOf("RESTAURANT" to "음식점", "TRAVEL_COURSE" to "여행코스"), result.associate { it.category.code to it.label })
+        assertEquals(
+            mapOf("RESTAURANT" to "https://cdn/restaurant.png", "TRAVEL_COURSE" to null),
+            result.associate { it.category.code to it.iconUrl },
+        )
+        verify(exactly = 1) { appCategoryQueryPort.findCategories(appKey, DomainLocale.KO) }
+    }
+
+    /** 다른 도메인이 쓰는 문자열 경로. 언어 태그를 도메인 언어로 읽고 카테고리를 이름으로 내려준다. */
+    @Test
+    fun `availableCategoryCodes는 문자열 축으로 같은 구성을 돌려준다`() {
+        val appKey = AppKey("k-trip-spot")
+        every { appCategoryQueryPort.findCategories(appKey, DomainLocale.JA) } returns
+            listOf(AppCategoryView(SpotCategory("TRANSPORT"), "交通", "https://cdn/transport.png"))
+
+        val result = service.availableCategoryCodes(appKey, "JA")
+
+        assertEquals(listOf("TRANSPORT"), result.map { it.category })
+        assertEquals(listOf("交通"), result.map { it.label })
+        assertEquals(listOf("https://cdn/transport.png"), result.map { it.iconUrl })
+    }
+
+    /** 정의가 없는 코드는 코드 자체를 라벨로 쓰는 폴백으로 채워 돌려준다 — 호출자가 분기하지 않게 한다. */
+    @Test
+    fun `categoryDisplays는 정의가 없는 코드를 폴백으로 채운다`() {
+        every { appCategoryQueryPort.findDisplays(setOf("RESTAURANT", "BRAND_NEW"), DomainLocale.KO) } returns
+            mapOf("RESTAURANT" to CategoryDisplay(SpotCategory("RESTAURANT"), "음식점", "https://cdn/restaurant.png"))
+
+        val result = service.categoryDisplays(setOf("RESTAURANT", "BRAND_NEW"), DomainLocale.KO)
+
+        assertEquals(setOf("RESTAURANT", "BRAND_NEW"), result.keys)
+        assertEquals("음식점", result["RESTAURANT"]?.label)
+        assertEquals("https://cdn/restaurant.png", result["RESTAURANT"]?.iconUrl)
+        assertEquals("BRAND_NEW", result["BRAND_NEW"]?.label)
+        assertNull(result["BRAND_NEW"]?.iconUrl)
+    }
+
+    /**
+     * intro·infoItems는 코드가 캐시 키와 적재 행이 되므로 정의된 카테고리만 받는다(SPEC-0020).
+     * 막지 않으면 비로그인 호출자가 임의 문자열마다 키와 빈 행을 하나씩 쌓을 수 있다.
+     */
+    @Test
+    fun `정의되지 않은 카테고리로 운영정보를 물으면 거절하고 아무것도 적재하지 않는다`() {
+        every { appCategoryQueryPort.exists("NOT_A_CATEGORY") } returns false
+
+        assertFailsWith<UnknownCategoryException> {
+            service.spotIntro(1L, SpotCategory("NOT_A_CATEGORY"), DomainLocale.KO)
+        }
+
+        verify(exactly = 0) { spotCachePort.putIntro(any(), any(), any()) }
+        verify(exactly = 0) { eventPublisher.publish(any()) }
+    }
+
+    @Test
+    fun `정의되지 않은 카테고리로 이용안내를 물으면 거절한다`() {
+        every { appCategoryQueryPort.exists("NOT_A_CATEGORY") } returns false
+
+        assertFailsWith<UnknownCategoryException> {
+            service.spotInfoItems(1L, SpotCategory("NOT_A_CATEGORY"), DomainLocale.KO)
+        }
+
+        verify(exactly = 0) { spotCachePort.putInfoItems(any(), any(), any()) }
     }
 
     // ── spotDetail(SPEC-0003) ───────────────────────────────────────
@@ -626,11 +705,11 @@ class SpotQueryServiceTest {
     @Test
     fun `운영정보 category를 그대로 포트에 전달한다`() {
         every { spotCachePort.getIntro(any(), any()) } returns null
-        every { tourInfoPort.findIntro(any(), SpotCategory.RESTAURANT) } returns null
+        every { tourInfoPort.findIntro(any(), SpotCategory("RESTAURANT")) } returns null
 
-        service.spotIntro(100L, SpotCategory.RESTAURANT, DomainLocale.KO)
+        service.spotIntro(100L, SpotCategory("RESTAURANT"), DomainLocale.KO)
 
-        verify(exactly = 1) { tourInfoPort.findIntro(any(), SpotCategory.RESTAURANT) }
+        verify(exactly = 1) { tourInfoPort.findIntro(any(), SpotCategory("RESTAURANT")) }
     }
 
     // ── 지연 필드: 이용안내 ──────────────────────────────────────────
@@ -920,7 +999,7 @@ class SpotQueryServiceTest {
         val captured = slot<LikedSpotsSearch>()
         every { spotQueryPort.findLikedSpots(capture(captured)) } returns likedPage()
 
-        service.likedSpots(LikedSpotsQuery(category = null, first = 20, after = null), DomainLocale.EN, memberId = 7L)
+        service.likedSpots(LikedSpotsQuery(categories = CategorySelection.UNFILTERED, first = 20, after = null), DomainLocale.EN, memberId = 7L)
 
         assertEquals(7L, captured.captured.memberId)
         assertEquals(DomainLocale.EN, captured.captured.language)
@@ -932,7 +1011,7 @@ class SpotQueryServiceTest {
         // 무의미해진다(spots와 같은 규율).
         every { spotQueryPort.findLikedSpots(any()) } returns likedPage(likedSpot(1L), likedSpot(2L))
 
-        val page = service.likedSpots(LikedSpotsQuery(null, 20, null), DomainLocale.KO, memberId = 7L)
+        val page = service.likedSpots(LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null), DomainLocale.KO, memberId = 7L)
 
         assertEquals(listOf(1L, 2L), page.edges.map { it.node.id })
     }
@@ -942,7 +1021,7 @@ class SpotQueryServiceTest {
         val captured = slot<LikedSpotsSearch>()
         every { spotQueryPort.findLikedSpots(capture(captured)) } returns likedPage()
 
-        service.likedSpots(LikedSpotsQuery(category = null, first = 500, after = null), DomainLocale.KO, memberId = 7L)
+        service.likedSpots(LikedSpotsQuery(categories = CategorySelection.UNFILTERED, first = 500, after = null), DomainLocale.KO, memberId = 7L)
 
         assertEquals(100, captured.captured.first)
     }
@@ -952,7 +1031,7 @@ class SpotQueryServiceTest {
         val captured = slot<LikedSpotsSearch>()
         every { spotQueryPort.findLikedSpots(capture(captured)) } returns likedPage()
 
-        service.likedSpots(LikedSpotsQuery(category = null, first = 0, after = null), DomainLocale.KO, memberId = 7L)
+        service.likedSpots(LikedSpotsQuery(categories = CategorySelection.UNFILTERED, first = 0, after = null), DomainLocale.KO, memberId = 7L)
 
         assertEquals(1, captured.captured.first)
     }
@@ -962,7 +1041,7 @@ class SpotQueryServiceTest {
         val captured = slot<LikedSpotsSearch>()
         every { spotQueryPort.findLikedSpots(capture(captured)) } returns likedPage()
 
-        service.likedSpots(LikedSpotsQuery(null, 20, after = "cursor-abc"), DomainLocale.KO, memberId = 7L)
+        service.likedSpots(LikedSpotsQuery(CategorySelection.UNFILTERED, 20, after = "cursor-abc"), DomainLocale.KO, memberId = 7L)
 
         assertEquals("cursor-abc", captured.captured.after)
     }
@@ -973,12 +1052,12 @@ class SpotQueryServiceTest {
         every { spotQueryPort.findLikedSpots(capture(captured)) } returns likedPage()
 
         service.likedSpots(
-            LikedSpotsQuery(category = SpotCategory.RESTAURANT, first = 20, after = null),
+            LikedSpotsQuery(categories = CategorySelection.ofValues(setOf(SpotCategory("RESTAURANT"))), first = 20, after = null),
             DomainLocale.KO,
             memberId = 7L,
         )
 
-        assertEquals(SpotCategory.RESTAURANT, captured.captured.category)
+        assertEquals(CategorySelection.ofValues(setOf(SpotCategory("RESTAURANT"))), captured.captured.categories)
     }
 
     @Test
@@ -986,24 +1065,9 @@ class SpotQueryServiceTest {
         val captured = slot<LikedSpotsSearch>()
         every { spotQueryPort.findLikedSpots(capture(captured)) } returns likedPage()
 
-        service.likedSpots(LikedSpotsQuery(null, 20, null), DomainLocale.KO, memberId = 7L)
+        service.likedSpots(LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null), DomainLocale.KO, memberId = 7L)
 
-        assertNull(captured.captured.category)
-    }
-
-    @Test
-    fun `현재 언어에 없는 카테고리는 거부한다(spots와 동일)`() {
-        // 두 목록이 같은 카테고리 축을 쓰므로 판정도 같아야 한다 — 한쪽만 통과하면
-        // 클라이언트가 카테고리 칩을 어느 화면에서 보여줄지 판단할 근거가 갈린다.
-        assertFailsWith<CategoryNotAvailableForLocaleException> {
-            service.likedSpots(
-                LikedSpotsQuery(category = SpotCategory.TRAVEL_COURSE, first = 20, after = null),
-                DomainLocale.EN,
-                memberId = 7L,
-            )
-        }
-
-        verify(exactly = 0) { spotQueryPort.findLikedSpots(any()) }
+        assertEquals(CategorySelection.UNFILTERED, captured.captured.categories)
     }
 
     @Test
@@ -1012,7 +1076,7 @@ class SpotQueryServiceTest {
         // spot_detail·캐시·upstream 어느 것도 타지 않는다(AC-55의 전제).
         every { spotQueryPort.findLikedSpots(any()) } returns likedPage(likedSpot(1L))
 
-        service.likedSpots(LikedSpotsQuery(null, 20, null), DomainLocale.KO, memberId = 7L)
+        service.likedSpots(LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null), DomainLocale.KO, memberId = 7L)
 
         verify(exactly = 0) { spotDetailStorePort.findDetail(any()) }
         verify(exactly = 0) { tourInfoPort.findDetail(any()) }

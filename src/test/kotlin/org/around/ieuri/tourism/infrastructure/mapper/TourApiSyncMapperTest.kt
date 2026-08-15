@@ -59,7 +59,7 @@ class TourApiSyncMapperTest {
 
     @Test
     fun `모든 필드가 채워진 item을 NearbySpotData로 옮긴다`() {
-        val data = assertNotNull(item().toNearbySpotDataOrNull(SpotCategory.SHOPPING))
+        val data = assertNotNull(item().toNearbySpotDataOrNull(SpotCategory("SHOPPING")))
 
         assertEquals("3001", data.id)
         assertEquals("남산타워", data.title)
@@ -67,7 +67,7 @@ class TourApiSyncMapperTest {
         assertEquals("https://tong.visitkorea.or.kr/3001.jpg", data.thumbnailImageUrl)
         assertEquals(37.551169, data.coordinates.latitude)
         assertEquals(126.988205, data.coordinates.longitude)
-        assertEquals(SpotCategory.SHOPPING, data.category)
+        assertEquals(SpotCategory("SHOPPING"), data.category)
         assertEquals(CopyrightType.TYPE1, data.copyright)
     }
 
@@ -109,7 +109,7 @@ class TourApiSyncMapperTest {
     @Test
     fun `모든 필드가 채워진 item을 SyncSpotCommand로 옮긴다`() {
         val command = assertNotNull(
-            item().toSyncSpotCommandOrNull(DomainLocale.JA, SpotCategory.SHOPPING),
+            item().toSyncSpotCommandOrNull(DomainLocale.JA, SpotCategory("SHOPPING")),
         )
 
         assertEquals("3001", command.contentId)
@@ -119,7 +119,7 @@ class TourApiSyncMapperTest {
         assertEquals("https://tong.visitkorea.or.kr/3001.jpg", command.thumbnailImageUrl)
         assertEquals(37.551169, command.coordinates.latitude)
         assertEquals(126.988205, command.coordinates.longitude)
-        assertEquals(SpotCategory.SHOPPING, command.category)
+        assertEquals(SpotCategory("SHOPPING"), command.category)
         assertEquals(12, command.contentTypeId)
         assertEquals(CopyrightType.TYPE1, command.copyright)
     }

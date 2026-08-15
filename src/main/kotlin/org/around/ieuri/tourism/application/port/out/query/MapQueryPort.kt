@@ -2,6 +2,7 @@ package org.around.ieuri.tourism.application.port.out.query
 
 import org.around.ieuri.tourism.application.query.CongestionAreaBoundaryView
 import org.around.ieuri.tourism.application.query.MapSpotView
+import org.around.ieuri.tourism.domain.vo.CategorySelection
 import org.around.ieuri.tourism.domain.vo.AreaName
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.MapBounds
@@ -51,7 +52,8 @@ interface CongestionAreaQueryPort {
 data class MapViewportSearch(
     val language: DomainLocale,
     val bounds: MapBounds,
-    val category: SpotCategory?,
+    /** 카테고리 선택. 비어 있으면 전체. 값이 여럿이면 IN으로 거른다(OR). 상한보다 먼저 적용된다. */
+    val categories: CategorySelection,
     /**
      * 원문 보유 필터. **null이면 전체**, true면 그 언어 원문이 있는 것만, false면 번역본만.
      *

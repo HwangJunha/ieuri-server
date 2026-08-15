@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.application.query
 
+import org.around.ieuri.tourism.domain.vo.CategorySelection
 import org.around.ieuri.tourism.domain.vo.CommercialStatus
 import org.around.ieuri.tourism.domain.vo.CongestionForecast
 import org.around.ieuri.tourism.domain.vo.CongestionSnapshot
@@ -17,8 +18,12 @@ import java.time.LocalDateTime
 data class MapViewportQuery(
     val bounds: MapBounds,
     val zoom: Int,
-    val category: SpotCategory?,
-    /** 원문 보유 필터. null이면 전체다. */
+    /**
+     * 카테고리 선택. 비어 있으면 전체이며, 값이 여럿이면 OR로 결합된다(SPEC-0020 R5).
+     * **줌별 상한보다 먼저 적용된다** — 반대 순서면 truncated가 거짓말을 한다(R8).
+     */
+    val categories: CategorySelection,
+    /** 원문 보유 필터. null이면 전체다. 카테고리와 AND로 결합된다. */
     val hasOrigin: Boolean?,
 )
 

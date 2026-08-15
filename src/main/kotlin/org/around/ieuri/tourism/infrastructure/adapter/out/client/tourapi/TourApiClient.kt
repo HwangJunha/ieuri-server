@@ -6,6 +6,7 @@ import org.around.ieuri.tourism.application.port.out.client.SpotDetailQuery
 import org.around.ieuri.tourism.application.port.out.client.TourInfoPort
 import org.around.ieuri.tourism.domain.aggregate.SpotDetail
 import org.around.ieuri.tourism.domain.vo.DomainLocale
+import org.around.ieuri.tourism.application.port.out.query.CategoryExternalMappingPort
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.tourism.domain.vo.SpotImage
 import org.around.ieuri.tourism.domain.vo.SpotInfoItem
@@ -32,6 +33,7 @@ import java.net.URI
 class TourApiClient(
     private val properties: TourApiProperties,
     private val tourApiRestClient: RestClient,
+    private val categoryMapping: CategoryExternalMappingPort,
 ) : TourInfoPort {
 
     override fun findNearby(query: NearbySpotQuery): NearbySpotResult {
@@ -116,7 +118,7 @@ class TourApiClient(
     fun mapInfoItems(info: List<TourApiDetailInfoResponse.Item>): List<SpotInfoItem> = info.toInfoItems()
 
     /** [contentTypeId]는 detailIntro2·detailInfo2에서 필수다(없으면 upstream이 필수 파라미터 누락으로 거절). */
-    private fun detailUri(query: SpotDetailQuery, operation: String, contentTypeId: Int? = null): URI =
+    private fun detailUri(query: SpotDetailQuery, operation: String, contentTypeId: String? = null): URI =
         UriComponentsBuilder.fromUriString(baseUrl(query.locale))
             .path("/$operation")
             .common()
@@ -137,13 +139,19 @@ class TourApiClient(
     private fun codeset(locale: DomainLocale): String =
         if (locale.isKorean) TourApiProperties.CODESET_KO else TourApiProperties.CODESET_FOREIGN
 
-    private fun categoryCode(category: SpotCategory?, locale: DomainLocale): Int? =
-        category?.let { properties.categoryCodes[codeset(locale)]?.get(it) }
+    /**
+     * 이 카테고리의 contentTypeId. **없으면 null이며 호출자가 upstream 호출을 생략한다** —
+     * 그 코드셋에 대응 코드가 없는 카테고리가 실제로 있다(여행코스는 외국어, 교통은 국문에 없다).
+     */
+    private fun categoryCode(category: SpotCategory?, locale: DomainLocale): String? =
+        category?.let {
+            categoryMapping.externalCode(it, CategoryExternalMappingPort.PROVIDER_TOUR_API, codeset(locale))
+        }
 
-    private fun category(contentTypeId: String?, locale: DomainLocale): SpotCategory {
-        val id = contentTypeId?.toIntOrNull() ?: return SpotCategory.TOURIST_SPOT
-        return properties.categoryCodes[codeset(locale)]?.entries?.firstOrNull { it.value == id }?.key
-            ?: SpotCategory.TOURIST_SPOT
-    }
+    /** contentTypeId가 가리키는 우리 카테고리. 모르는 코드는 관광지로 떨어뜨린다(기존 동작). */
+    private fun category(contentTypeId: String?, locale: DomainLocale): SpotCategory =
+        contentTypeId?.let {
+            categoryMapping.categoryOf(it, CategoryExternalMappingPort.PROVIDER_TOUR_API, codeset(locale))
+        } ?: SpotCategory.TOURIST_SPOT
 
 }

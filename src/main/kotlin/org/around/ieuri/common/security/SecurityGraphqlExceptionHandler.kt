@@ -1,5 +1,6 @@
 package org.around.ieuri.common.security
 
+import org.around.ieuri.common.error.EmptyCategorySetException
 import graphql.ErrorClassification
 import graphql.GraphQLError
 import graphql.execution.DataFetcherExceptionHandler
@@ -31,9 +32,11 @@ class SecurityGraphqlExceptionHandler(
     override fun handleException(
         parameters: DataFetcherExceptionHandlerParameters,
     ): CompletableFuture<DataFetcherExceptionHandlerResult> {
-        val code = when (parameters.exception) {
+        val code = when (val ex = parameters.exception) {
             is UnauthorizedException -> "UNAUTHENTICATED"
             is ForbiddenException -> "FORBIDDEN"
+            // 두 도메인이 함께 쓰는 조회 인자 오류. 여기서 코드를 실어야 클라이언트가 분기한다.
+            is EmptyCategorySetException -> ex.code
             else -> return delegate.handleException(parameters)
         }
 
