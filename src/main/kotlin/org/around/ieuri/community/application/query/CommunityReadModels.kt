@@ -85,7 +85,6 @@ data class BlockedUserView(
  */
 data class CommunityChipView(
     val category: TargetCategory,
-    val position: Int,
 )
 
 /** 발급된 presigned URL 한 건. */

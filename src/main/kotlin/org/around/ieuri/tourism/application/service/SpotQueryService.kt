@@ -116,7 +116,6 @@ class SpotQueryService(
                     category = it.category.code,
                     label = it.label,
                     iconUrl = it.iconUrl,
-                    position = it.position,
                 )
             }
 

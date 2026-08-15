@@ -171,7 +171,6 @@ class CommunityQueryResolver(
         communityQueryUseCase.communityChips(dfe.appKey(), dfe.contentLanguage()).map {
             GqlCommunityChip(
                 category = GqlTargetCategory.valueOf(it.category.name),
-                position = it.position,
             )
         }
 

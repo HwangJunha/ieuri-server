@@ -12,5 +12,5 @@ import org.around.ieuri.tourism.application.query.AppCategoryCode
  */
 fun AppCategoryCode.toChipViewOrNull(): CommunityChipView? =
     TargetCategory.fromOrNull(category)?.let {
-        CommunityChipView(category = it, position = position)
+        CommunityChipView(category = it)
     }

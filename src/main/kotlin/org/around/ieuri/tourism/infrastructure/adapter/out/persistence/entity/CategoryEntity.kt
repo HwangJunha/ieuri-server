@@ -4,6 +4,8 @@ import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
+import jakarta.persistence.GeneratedValue
+import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.IdClass
 import jakarta.persistence.PrePersist
@@ -14,14 +16,20 @@ import java.io.Serializable
 import java.time.Instant
 
 /**
- * 카테고리 정의(V58). **코드가 PK다** — 앱·다른 도메인의 저장값이 이 문자열이라 바꾸지 않는다.
+ * 카테고리 정의(V58·V59). 카테고리를 코드에서 데이터로 옮긴 결과이며, 새 카테고리는 행을 넣는
+ * 것으로 끝난다 — 서버 배포도 앱 업데이트도 필요 없다.
  *
- * 표시 문구는 언어에 종속되므로 [CategoryTranslationEntity]에만 있다.
+ * **PK는 대리 키다**(V59) — [code]를 PK로 두면 코드가 곧 신원이라 오타 하나 고치는 데 참조하는
+ * 모든 행을 함께 갱신해야 한다. code는 UNIQUE로 남아 조회 축을 유지한다.
  */
 @Entity
 @Table(name = "category")
 class CategoryEntity(
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    var id: Long? = null,
+
+    /** 안정 식별자. 클라이언트·다른 도메인이 주고받는 값이다. */
     @Column(name = "code", nullable = false, length = 30)
     var code: String,
 
@@ -47,9 +55,10 @@ class CategoryEntity(
         updatedAt = Instant.now()
     }
 }
+
 /** [CategoryTranslationEntity]의 복합 PK. */
 data class CategoryTranslationId(
-    var categoryCode: String = "",
+    var categoryId: Long? = null,
     var language: DomainLocale? = null,
 ) : Serializable
 
@@ -59,8 +68,8 @@ data class CategoryTranslationId(
 @IdClass(CategoryTranslationId::class)
 class CategoryTranslationEntity(
     @Id
-    @Column(name = "category_code", nullable = false, length = 30)
-    var categoryCode: String,
+    @Column(name = "category_id", nullable = false)
+    var categoryId: Long,
 
     @Id
     @Enumerated(EnumType.STRING)
@@ -69,6 +78,57 @@ class CategoryTranslationEntity(
 
     @Column(name = "label", nullable = false, length = 50)
     var label: String,
+
+    @Column(name = "created_at", nullable = false)
+    var createdAt: Instant? = null,
+
+    @Column(name = "updated_at", nullable = false)
+    var updatedAt: Instant? = null,
+) {
+    @PrePersist
+    fun onCreate() {
+        val now = Instant.now()
+        if (createdAt == null) createdAt = now
+        updatedAt = now
+    }
+
+    @PreUpdate
+    fun onUpdate() {
+        updatedAt = Instant.now()
+    }
+}
+
+/**
+ * 우리 카테고리 ↔ 외부 제공자 코드(V59). TourAPI의 contentTypeId가 첫 사용처다.
+ *
+ * 설정(application.yaml)이 아니라 테이블인 이유는, 설정에 있으면 신규 카테고리의 spot을
+ * **수집**하려 할 때마다 배포가 필요하기 때문이다 — 저장·조회는 데이터로 되는데 수집만
+ * 배포가 필요한 반쪽이 된다.
+ *
+ * (제공자, 코드셋)마다 코드가 갈리며 **비어 있는 칸은 행이 없다** — 여행코스는 외국어
+ * 서비스에, 교통은 국문 서비스에 대응 코드가 없다.
+ */
+@Entity
+@Table(name = "category_external_mapping")
+class CategoryExternalMappingEntity(
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    var id: Long? = null,
+
+    @Column(name = "category_id", nullable = false)
+    var categoryId: Long,
+
+    /** 외부 체계 식별자. 지금은 TOUR_API 하나다. */
+    @Column(name = "provider", nullable = false, length = 30)
+    var provider: String,
+
+    /** 제공자 안에서 코드가 갈리는 축(TourAPI는 KO/FOREIGN). 언어가 아니다 — EN·JA·ZH가 같은 값을 쓴다. */
+    @Column(name = "codeset", nullable = false, length = 20)
+    var codeset: String,
+
+    /** 외부 체계의 코드. TourAPI는 숫자지만 제공자마다 다를 수 있어 문자열이다. */
+    @Column(name = "external_code", nullable = false, length = 30)
+    var externalCode: String,
 
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant? = null,

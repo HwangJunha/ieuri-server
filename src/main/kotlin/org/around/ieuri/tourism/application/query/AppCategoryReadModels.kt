@@ -5,6 +5,8 @@ import org.around.ieuri.tourism.domain.vo.SpotCategory
 /**
  * 앱·언어에 노출되는 카테고리 1건(read DTO). **표시 정보를 함께 담는다**(SPEC-0020) —
  * 클라이언트가 모르는 카테고리도 그릴 수 있어야 앱 업데이트 없이 새 카테고리가 나간다.
+ *
+ * **노출 순서는 담지 않는다**(V59) — 서버는 무엇을 보일지만 정하고 순서는 클라이언트가 정한다.
  */
 data class AppCategoryView(
     val category: SpotCategory,
@@ -12,8 +14,6 @@ data class AppCategoryView(
     val label: String,
     /** 칩·마커 이미지. 설정되지 않았으면 null이다. */
     val iconUrl: String?,
-    /** 표시 순서. 작은 값이 앞이다. */
-    val position: Int,
 )
 
 /**
@@ -42,5 +42,4 @@ data class AppCategoryCode(
     val category: String,
     val label: String,
     val iconUrl: String?,
-    val position: Int,
 )

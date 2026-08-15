@@ -238,11 +238,9 @@ type BlockedUserEdge {
     blockedAt: String!
 }
 
-"커뮤니티 상단의 카테고리 칩 하나. 누르면 posts(category:)로 그 카테고리의 글만 조회한다."
+"커뮤니티 상단의 카테고리 칩 하나. 누르면 posts(category:)로 그 카테고리의 글만 조회한다. **순서를 정해 내려주지 않는다** — 배열 순서는 클라이언트가 정한다."
 type CommunityChip {
     category: TargetCategory!
-    "표시 순서. 작은 값이 왼쪽이다."
-    position: Int!
 }
 
 input CreatePostInput {

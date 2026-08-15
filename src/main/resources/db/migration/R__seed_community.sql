@@ -287,44 +287,51 @@ VALUES
 --      외국어(EN/JA/ZH): 교통이 있고 여행코스가 없다
 --    그래서 언어마다 8개씩 넣는다. 없는 카테고리를 칩으로 띄우면 눌러도 결과가 비어 있다.
 --
---    표시 문구는 category_translation이 갖는다(V58). 이 표는 노출 여부와 순서만 정한다.
+--    표시 문구는 category_translation이, 정의는 category가 갖는다(V58·V59).
+--    이 표는 **노출 여부만** 정한다 — 순서는 클라이언트가 정한다(V59).
 DELETE FROM app_category WHERE app_key IN ('k-trip-spot', 'demo-app');
 
-INSERT INTO app_category (app_key, language, category, position, enabled) VALUES
-    ('k-trip-spot', 'KO', 'RESTAURANT', 0, TRUE),
-    ('k-trip-spot', 'KO', 'FESTIVAL_EVENT', 1, TRUE),
-    ('k-trip-spot', 'KO', 'TOURIST_SPOT', 2, TRUE),
-    ('k-trip-spot', 'KO', 'CULTURAL_FACILITY', 3, TRUE),
-    ('k-trip-spot', 'KO', 'LEISURE_SPORTS', 4, TRUE),
-    ('k-trip-spot', 'KO', 'LODGING', 5, TRUE),
-    ('k-trip-spot', 'KO', 'SHOPPING', 6, TRUE),
-    ('k-trip-spot', 'KO', 'TRAVEL_COURSE', 7, TRUE),
-    ('k-trip-spot', 'EN', 'RESTAURANT', 0, TRUE),
-    ('k-trip-spot', 'EN', 'FESTIVAL_EVENT', 1, TRUE),
-    ('k-trip-spot', 'EN', 'TOURIST_SPOT', 2, TRUE),
-    ('k-trip-spot', 'EN', 'CULTURAL_FACILITY', 3, TRUE),
-    ('k-trip-spot', 'EN', 'LEISURE_SPORTS', 4, TRUE),
-    ('k-trip-spot', 'EN', 'LODGING', 5, TRUE),
-    ('k-trip-spot', 'EN', 'SHOPPING', 6, TRUE),
-    ('k-trip-spot', 'EN', 'TRANSPORT', 7, TRUE),
-    ('k-trip-spot', 'JA', 'RESTAURANT', 0, TRUE),
-    ('k-trip-spot', 'JA', 'FESTIVAL_EVENT', 1, TRUE),
-    ('k-trip-spot', 'JA', 'TOURIST_SPOT', 2, TRUE),
-    ('k-trip-spot', 'JA', 'CULTURAL_FACILITY', 3, TRUE),
-    ('k-trip-spot', 'JA', 'LEISURE_SPORTS', 4, TRUE),
-    ('k-trip-spot', 'JA', 'LODGING', 5, TRUE),
-    ('k-trip-spot', 'JA', 'SHOPPING', 6, TRUE),
-    ('k-trip-spot', 'JA', 'TRANSPORT', 7, TRUE),
-    ('k-trip-spot', 'ZH', 'RESTAURANT', 0, TRUE),
-    ('k-trip-spot', 'ZH', 'FESTIVAL_EVENT', 1, TRUE),
-    ('k-trip-spot', 'ZH', 'TOURIST_SPOT', 2, TRUE),
-    ('k-trip-spot', 'ZH', 'CULTURAL_FACILITY', 3, TRUE),
-    ('k-trip-spot', 'ZH', 'LEISURE_SPORTS', 4, TRUE),
-    ('k-trip-spot', 'ZH', 'LODGING', 5, TRUE),
-    ('k-trip-spot', 'ZH', 'SHOPPING', 6, TRUE),
-    ('k-trip-spot', 'ZH', 'TRANSPORT', 7, TRUE),
-    ('demo-app', 'KO', 'SHOPPING', 0, TRUE),
-    ('demo-app', 'KO', 'LEISURE_SPORTS', 1, TRUE);
+-- 코드로 적고 id로 넣는다 — 읽는 사람에게는 코드가, 저장에는 대리 키가 맞다.
+INSERT INTO app_category (app_key, language, category_id, active)
+SELECT v.app_key, v.language, c.id, TRUE
+FROM (VALUES
+    ('k-trip-spot', 'KO', 'RESTAURANT'),
+    ('k-trip-spot', 'KO', 'FESTIVAL_EVENT'),
+    ('k-trip-spot', 'KO', 'TOURIST_SPOT'),
+    ('k-trip-spot', 'KO', 'CULTURAL_FACILITY'),
+    ('k-trip-spot', 'KO', 'LEISURE_SPORTS'),
+    ('k-trip-spot', 'KO', 'LODGING'),
+    ('k-trip-spot', 'KO', 'SHOPPING'),
+    ('k-trip-spot', 'KO', 'TRAVEL_COURSE'),
+    ('k-trip-spot', 'EN', 'RESTAURANT'),
+    ('k-trip-spot', 'EN', 'FESTIVAL_EVENT'),
+    ('k-trip-spot', 'EN', 'TOURIST_SPOT'),
+    ('k-trip-spot', 'EN', 'CULTURAL_FACILITY'),
+    ('k-trip-spot', 'EN', 'LEISURE_SPORTS'),
+    ('k-trip-spot', 'EN', 'LODGING'),
+    ('k-trip-spot', 'EN', 'SHOPPING'),
+    ('k-trip-spot', 'EN', 'TRANSPORT'),
+    ('k-trip-spot', 'JA', 'RESTAURANT'),
+    ('k-trip-spot', 'JA', 'FESTIVAL_EVENT'),
+    ('k-trip-spot', 'JA', 'TOURIST_SPOT'),
+    ('k-trip-spot', 'JA', 'CULTURAL_FACILITY'),
+    ('k-trip-spot', 'JA', 'LEISURE_SPORTS'),
+    ('k-trip-spot', 'JA', 'LODGING'),
+    ('k-trip-spot', 'JA', 'SHOPPING'),
+    ('k-trip-spot', 'JA', 'TRANSPORT'),
+    ('k-trip-spot', 'ZH', 'RESTAURANT'),
+    ('k-trip-spot', 'ZH', 'FESTIVAL_EVENT'),
+    ('k-trip-spot', 'ZH', 'TOURIST_SPOT'),
+    ('k-trip-spot', 'ZH', 'CULTURAL_FACILITY'),
+    ('k-trip-spot', 'ZH', 'LEISURE_SPORTS'),
+    ('k-trip-spot', 'ZH', 'LODGING'),
+    ('k-trip-spot', 'ZH', 'SHOPPING'),
+    ('k-trip-spot', 'ZH', 'TRANSPORT'),
+    -- 앱마다 구성이 다르다는 것을 보이기 위한 두 번째 앱.
+    ('demo-app',    'KO', 'SHOPPING'),
+    ('demo-app',    'KO', 'LEISURE_SPORTS')
+) AS v(app_key, language, code)
+JOIN category c ON c.code = v.code;
 
 -- 8-1) 개별 글 숨김. **community_post.hidden과 다른 개념이다** — 그쪽은 신고 누적으로
 --      모두에게 감춰진 것이고, 이건 한 사람이 자기 화면에서만 감춘 것이다.
@@ -429,8 +436,9 @@ JOIN (VALUES
 --   demo-app    + ko : 2건
 --   헤더 없음        : 기본 앱(k-trip-spot) + 폴백 언어(EN) = 8건
 --
---   SELECT app_key, language, category, position FROM app_category
---   WHERE enabled ORDER BY app_key, language, position;
+--   SELECT a.app_key, a.language, c.code FROM app_category a
+--   JOIN category c ON c.id = a.category_id
+--   WHERE a.active ORDER BY a.app_key, a.language, c.code;
 --
 -- 신고 임계값 — 17번 숨김 글의 서로 다른 신고자가 5명이어야 한다.
 -- 19번(MEMBER 대상)도 5명이지만 그 사람의 글은 hidden=FALSE로 남아야 한다(R22).

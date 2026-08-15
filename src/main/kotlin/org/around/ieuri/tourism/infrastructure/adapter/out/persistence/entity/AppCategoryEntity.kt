@@ -32,15 +32,15 @@ class AppCategoryEntity(
     @Column(name = "language", nullable = false, length = 2)
     var language: DomainLocale,
 
-    @Column(name = "category", nullable = false, length = 30)
-    var category: String,
+    @Column(name = "category_id", nullable = false)
+    var categoryId: Long,
 
-    @Column(name = "position", nullable = false)
-    var position: Short,
-
-    /** 순서를 그대로 둔 채 잠시 내릴 수 있게 한다. */
-    @Column(name = "enabled", nullable = false)
-    var enabled: Boolean = true,
+    /**
+     * 노출 여부. **순서는 담지 않는다**(V59) — 서버는 무엇을 보일지만 정하고 배열 순서는
+     * 클라이언트가 자기 화면 기준으로 정한다.
+     */
+    @Column(name = "active", nullable = false)
+    var active: Boolean = true,
 
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant? = null,
