@@ -454,13 +454,12 @@ type UnblockUserPayload implements BaseResponse {
     userErrors: [UserError!]!
 }
 
+"신고 대상 종류. DM 메시지는 이 열거형을 쓰지 않고 reportMessages를 쓴다."
 enum ReportTargetType {
     POST
     COMMENT
-    "사용자 대상 신고는 기록만 되며 누적되어도 자동 조치가 없다. 자동 숨김은 공개 콘텐츠(POST·COMMENT·FEED_ITEM)에만 적용된다."
+    "사용자 대상 신고는 기록만 되며 누적되어도 자동 조치가 없다. 자동 숨김은 공개 콘텐츠(POST·COMMENT)에만 적용된다."
     MEMBER
-    "피드 신고. 공개 콘텐츠라 글과 같은 누적 자동 숨김이 적용된다. DM 메시지는 이 열거형을 쓰지 않고 reportMessages를 쓴다."
-    FEED_ITEM
 }
 
 "신고 사유 고정 집합."

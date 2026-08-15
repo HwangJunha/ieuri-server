@@ -1,14 +1,4 @@
 extend type Query {
-    """
-    피드. 세로 전면 스크롤 목록이다.
-    최신순 고정이며 정렬 인자를 받지 않는다. 기본 20, 상한 50이고 초과분은 오류가 아니라 절삭된다.
-    차단 관계(양방향) 작성자의 항목은 제외된다.
-    """
-    feed(first: Int = 20, after: String): FeedConnection!
-
-    "피드 단건. 삭제되었거나 차단 관계의 작성자면 오류가 아니라 null이다(post(id:)와 같은 관례)."
-    feedItem(id: ID!): FeedItem
-
     "내가 참여한 대화 목록. 최근 활동순. 기본 20, 상한 50이며 초과분은 절삭된다."
     conversations(first: Int = 20, after: String): ConversationConnection!
 
@@ -23,28 +13,17 @@ extend type Query {
 
 extend type Mutation {
     """
-    피드 작성. catalogId 필수, photoKeys 1~5개 필수다.
-    photoKeys는 confirmPostImageUploads가 확정한 키를 그대로 쓴다.
-    이미 다른 피드에 실린 키는 PHOTO_NOT_CONFIRMED로 거부된다.
-    """
-    createFeedItem(input: CreateFeedItemInput!): CreateFeedItemPayload!
-
-    "피드 좋아요. 멱등이다 — 이미 좋아요한 피드에 다시 눌러도 수가 늘지 않는다."
-    likeFeedItem(input: LikeFeedItemInput!): LikeFeedItemPayload!
-
-    "피드 좋아요 취소. 멱등이며 좋아요 수가 음수가 되지 않는다."
-    unlikeFeedItem(input: UnlikeFeedItemInput!): UnlikeFeedItemPayload!
-
-    """
-    피드 작성자와의 1:1 대화를 시작한다. 입력이 회원 id가 아니라 feedItemId이므로
-    커뮤니티 글 작성자는 대화 상대가 될 수 없다.
+    상대 회원을 지정해 1:1 대화를 시작한다.
     같은 상대와 대화가 이미 있으면 새로 만들지 않고 기존 대화를 반환한다.
     첫 메시지 전송은 별개 호출이라 빈 대화가 존재할 수 있다.
+
+    실패는 MEMBER_NOT_FOUND(없거나 탈퇴한 회원)·BLOCKED(양방향 차단)·
+    SELF_CONVERSATION(자기 자신 지목)이며 userErrors로 반환된다.
     """
     startConversation(input: StartConversationInput!): StartConversationPayload!
 
     """
-    메시지 전송. 텍스트·피드 인용·사진을 함께 또는 각각 보낼 수 있으며 셋 다 비면 거부된다.
+    메시지 전송. 텍스트와 사진을 함께 또는 각각 보낼 수 있으며 둘 다 비면 거부된다.
     대화 성립 이후에 생긴 차단도 여기서 다시 판정되어 거부된다.
     """
     sendMessage(input: SendMessageInput!): SendMessagePayload!
@@ -100,104 +79,7 @@ type Subscription {
     newMessage(conversationId: ID!): Message!
 }
 
-"""
-피드 항목. Post와 별개 타입이다 — 피드는 spot 1곳과 사진 1장 이상을 요구하는 반면
-Post는 둘 다 선택이라 같은 타입에 이 제약을 얹을 수 없다.
-"""
-type FeedItem {
-    id: ID!
-
-    "1~500자."
-    body: String!
-
-    "연결된 장소. 피드는 항상 정확히 1곳을 가진다 — Post.spot과 달리 non-null이다."
-    spot: PostSpot!
-
-    """
-    업로드를 마친 오브젝트 키. 1~5개이며 배열 순서가 표시 순서다.
-    Post.photoKeys와 달리 비어 있을 수 없다.
-    서버는 이미지 바이트를 중계하지 않으며, 클라이언트가 CDN 베이스 URL과 조합해 쓴다.
-    """
-    photoKeys: [String!]!
-
-    author: PostAuthor!
-
-    likeCount: Int!
-
-    "호출자가 좋아요했는지."
-    likedByViewer: Boolean!
-
-    "호출자가 작성자인지. 클라이언트의 삭제·신고 수단 노출 여부를 결정한다."
-    ownedByViewer: Boolean!
-
-    "ISO-8601. 정렬 기준이다."
-    createdAt: String!
-}
-
-"""
-정렬은 createdAt 내림차순 고정이며 정렬 인자가 없다.
-총 개수는 제공하지 않으며 pageInfo.hasNextPage로 소진을 판정한다.
-"""
-type FeedConnection {
-    edges: [FeedItemEdge!]!
-    pageInfo: PageInfo!
-}
-
-type FeedItemEdge {
-    cursor: String!
-    node: FeedItem!
-}
-
-input CreateFeedItemInput {
-    "1~500자. 앞뒤 공백은 제거된 뒤 판정한다."
-    body: String!
-
-    "연결할 장소. 필수다. 언어와 무관한 장소 식별자로, Spot.id·PostSpot.id를 그대로 쓴다."
-    catalogId: ID!
-
-    """
-    confirmPostImageUploads가 반환한 확정 키. 1~5개이며 배열 순서가 표시 순서다.
-    6개 이상이면 앞 5개만 취하지 않고 TOO_MANY_PHOTOS로 거부된다.
-    """
-    photoKeys: [String!]!
-}
-
-type CreateFeedItemPayload implements BaseResponse {
-    success: Boolean!
-    userErrors: [UserError!]!
-
-    "생성된 피드의 id. 성공 시에만 채워진다."
-    feedItemId: ID
-}
-
-input LikeFeedItemInput {
-    feedItemId: ID!
-}
-
-type LikeFeedItemPayload implements BaseResponse {
-    success: Boolean!
-    userErrors: [UserError!]!
-
-    "연산 후의 좋아요 수."
-    likeCount: Int
-}
-
-input UnlikeFeedItemInput {
-    feedItemId: ID!
-}
-
-type UnlikeFeedItemPayload implements BaseResponse {
-    success: Boolean!
-    userErrors: [UserError!]!
-    likeCount: Int
-}
-
-"""
-1:1 대화. 그룹 대화는 다루지 않는다.
-
-**대화가 시작된 피드를 담지 않는다** — 같은 상대와의 방은 하나인데 피드는 여러 개라
-방 단위 맥락이 성립하지 않는다. 피드 인용은 Message.feedItem으로 메시지마다 붙는다.
-"""
+"1:1 대화. 그룹 대화는 다루지 않는다."
 type Conversation {
     id: ID!
 
@@ -232,16 +114,13 @@ type Message {
     id: ID!
 
     """
-    1~1000자. 서버에 암호화되어 저장되며 조회 시 복원된다.
-    **첨부만 보낸 메시지는 빈 문자열이다** — 사진이나 피드 인용만 보낼 수 있다.
+    0~1000자. 서버에 암호화되어 저장되며 조회 시 복원된다.
+    **사진만 보낸 메시지는 빈 문자열이다.**
+
+    본문도 사진도 없는 메시지가 존재한다 — 피드 인용만 있던 과거 메시지이며 삭제하지 않고
+    남긴다. 클라이언트는 이 경우를 빈 말풍선이 아니라 내용 없음으로 표시해야 한다.
     """
     body: String!
-
-    """
-    인용한 피드. 피드를 보고 보낸 메시지에 딸려 붙으며, 그 피드가 삭제되면 null이 되고
-    메시지는 남는다. 대화방이 아니라 **메시지마다** 붙는 값이다.
-    """
-    feedItem: FeedItem
 
     """
     첨부 사진의 오브젝트 키. confirmPostImageUploads가 확정한 키다.
@@ -270,8 +149,8 @@ type MessageEdge {
 }
 
 input StartConversationInput {
-    "대화를 시작할 피드. 이 피드의 작성자가 상대방이 된다."
-    feedItemId: ID!
+    "대화 상대의 회원 id. PostAuthor.id와 같은 식별자다."
+    counterpartMemberId: ID!
 }
 
 type StartConversationPayload implements BaseResponse {
@@ -286,13 +165,10 @@ input SendMessageInput {
     conversationId: ID!
 
     """
-    1~1000자. 앞뒤 공백은 제거된 뒤 판정하며, 상한을 넘으면 잘리지 않고 거부된다.
-    **첨부가 있으면 빈 문자열이어도 된다.** body·feedItemId·photoKey가 모두 비면 거부된다.
+    0~1000자. 앞뒤 공백은 제거된 뒤 판정하며, 상한을 넘으면 잘리지 않고 거부된다.
+    **사진이 있으면 빈 문자열이어도 된다.** body와 photoKey가 모두 비면 거부된다.
     """
     body: String!
-
-    "인용할 피드. 피드를 보고 바로 메시지를 보낼 때 쓴다."
-    feedItemId: ID
 
     "첨부할 사진. confirmPostImageUploads가 반환한 확정 키를 그대로 쓴다."
     photoKey: String
