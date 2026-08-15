@@ -17,12 +17,6 @@ class Message private constructor(
     val conversationId: Long,
     val senderId: Long,
     val body: String,
-    /**
-     * 인용한 피드. **방이 아니라 메시지에 붙는다** — 같은 상대와의 방은 하나인데 피드는
-     * 여러 개라, 방에 고정하면 새 피드로 말을 걸어도 첫 피드가 남아 틀린 맥락이 된다.
-     * 피드가 지워지면 null이 되고 메시지는 남는다.
-     */
-    val feedItemId: Long?,
     /** 첨부 사진. 텍스트 없이 사진만 보낼 수 있다. */
     val photoKey: PhotoObjectKey?,
     val createdAt: Instant?,
@@ -42,25 +36,23 @@ class Message private constructor(
          * 새 메시지. 본문은 트리밍 후 판정하며 상한을 넘으면 **잘라서 저장하지 않고
          * 거부한다**(AC9-3).
          *
-         * **본문이 비어도 첨부가 있으면 성립한다** — 사진만, 또는 피드 인용만 보낼 수 있다.
-         * 셋 다 비면 보낼 것이 없는 전송이라 거부한다(AC9-2).
+         * **본문이 비어도 사진이 있으면 성립한다.** 둘 다 비면 보낼 것이 없는 전송이라
+         * 거부한다(SPEC-0021 AC3.5) — 피드 인용이 사라져 판정 조건이 둘로 줄었다.
          *
          * 사진 키의 **소유권**만 여기서 본다 — 실제 업로드 여부는 저장소에 물어야 하므로
-         * 애플리케이션 계층의 책임이다(피드·글과 같은 층위 구분).
+         * 애플리케이션 계층의 책임이다(글과 같은 층위 구분).
          */
         fun create(
             conversationId: Long,
             senderId: Long,
             body: String,
-            feedItemId: Long? = null,
             photoKey: PhotoObjectKey? = null,
         ): Message {
             require(conversationId > 0) { "conversationId는 양수여야 합니다." }
             require(senderId > 0) { "senderId는 양수여야 합니다." }
-            require(feedItemId == null || feedItemId > 0) { "feedItemId는 양수여야 합니다." }
             val trimmed = body.trim()
             require(trimmed.length <= BODY_MAX_LENGTH) { "메시지는 ${BODY_MAX_LENGTH}자를 넘을 수 없습니다." }
-            require(trimmed.isNotEmpty() || feedItemId != null || photoKey != null) {
+            require(trimmed.isNotEmpty() || photoKey != null) {
                 "메시지를 입력해 주세요."
             }
             require(photoKey == null || photoKey.ownedBy(senderId)) {
@@ -74,27 +66,30 @@ class Message private constructor(
                 conversationId = conversationId,
                 senderId = senderId,
                 body = trimmed,
-                feedItemId = feedItemId,
                 photoKey = photoKey,
                 createdAt = null,
             )
         }
 
-        /** 저장소에서 복원. 본문은 어댑터가 복호화한 평문으로 들어온다. */
+        /**
+         * 저장소에서 복원. 본문은 어댑터가 복호화한 평문으로 들어온다.
+         *
+         * **빈 메시지를 거부하지 않는다**(SPEC-0021 AC4.1). 피드 인용만 있던 과거 메시지는
+         * 인용이 사라져 본문도 사진도 없는 상태로 남는데, 복원에서 막으면 그 메시지가 든
+         * 대화 조회가 통째로 실패한다. 빈 메시지 금지는 [create] 시점의 불변식이다.
+         */
         fun restore(
             id: Long,
             conversationId: Long,
             senderId: Long,
             body: String,
             createdAt: Instant,
-            feedItemId: Long? = null,
             photoKey: PhotoObjectKey? = null,
         ): Message = Message(
             id = id,
             conversationId = conversationId,
             senderId = senderId,
             body = body,
-            feedItemId = feedItemId,
             photoKey = photoKey,
             createdAt = createdAt,
         )

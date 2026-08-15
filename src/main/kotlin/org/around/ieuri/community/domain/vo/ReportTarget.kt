@@ -1,8 +1,8 @@
 package org.around.ieuri.community.domain.vo
 
 /**
- * 신고 대상 종류. 자동 숨김은 공개 콘텐츠([POST]·[COMMENT]·[FEED_ITEM])에만 적용되고
- * [MEMBER]는 기록만 된다 — [autoHideable]이 그 구분을 들고 있다.
+ * 신고 대상 종류. 자동 숨김은 공개 콘텐츠([POST]·[COMMENT])에만 적용되고 [MEMBER]는
+ * 기록만 된다 — [autoHideable]이 그 구분을 들고 있다.
  *
  * **DM 메시지는 여기 없다.** 다건 신고가 필요해 별도 애그리게이트(MessageReport)를 두었고,
  * 대상 타입이 메시지로 고정이라 열거값이 필요 없다(POL-049).
@@ -11,7 +11,6 @@ enum class ReportTargetType {
     POST,
     COMMENT,
     MEMBER,
-    FEED_ITEM,
     ;
 
     /**
