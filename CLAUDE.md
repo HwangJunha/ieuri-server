@@ -254,7 +254,9 @@ Schema is owned by **Flyway migrations**, never by Hibernate. The domain-model �
 
 - **`ddl-auto: validate` only.** Set `spring.jpa.hibernate.ddl-auto=validate` so Hibernate checks entities against the real schema but never creates or alters it. Never use `update`, `create`, or `create-drop` (they let Hibernate mutate schema behind Flyway's back and can drop data).
 - **All schema changes are Flyway migrations** under `src/main/resources/db/migration/`, using Flyway's default naming `V{n}__{snake_case_description}.sql` (e.g. `V1__create_community_post.sql`). Flyway runs `migrate` automatically on app startup.
-- **Applied migrations are immutable.** Flyway checksums each file; once a version is applied, never edit it — add a new `V{n+1}` file to change anything. Determine the next `n` from `flyway_schema_history`, never reuse a number.
+- **Applied migrations are immutable — including comments.** Flyway hashes the whole file, so changing a single comment line breaks the checksum and blocks startup. Once a version is applied, never edit it; add a new `V{n+1}` file instead. Determine the next `n` from `flyway_schema_history`, never reuse a number.
+
+  **Assume every migration in the working tree is already applied.** During a slice you will boot the app several times, and each boot applies whatever is new — so a file you wrote an hour ago is almost certainly in `flyway_schema_history` now. Adding "just one more statement" to it is the mistake, not editing an old file. Check `flyway_schema_history` before touching any migration, and note that **both databases** track their own history (main and search node).
 - **One logical change per migration.** Keep them small and reviewable.
 - **No cross-domain foreign keys.** A table in one domain must not declare a physical FK into another domain's tables — store the other side's id as a plain column and enforce integrity in the application layer. This is what keeps a domain extractable into its own app/DB later. FKs **within** a single domain are fine and encouraged.
 - **Reference across aggregates by id, not object**, even inside a domain.
