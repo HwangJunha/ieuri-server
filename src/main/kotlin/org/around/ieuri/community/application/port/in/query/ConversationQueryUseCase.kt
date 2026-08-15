@@ -2,29 +2,9 @@ package org.around.ieuri.community.application.port.`in`.query
 
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.community.application.query.ConversationView
-import org.around.ieuri.community.application.query.FeedItemView
 import org.around.ieuri.community.application.query.MessageView
 import org.around.ieuri.community.application.query.TypingEventView
 import reactor.core.publisher.Flux
-
-/**
- * 피드 조회 유스케이스(SPEC-0017 R4). 모든 조회가 인증을 전제한다.
- */
-interface FeedQueryUseCase {
-    /** 피드 한 페이지. 최신순 고정이며 차단 관계 작성자의 항목은 질의 단계에서 빠진다. */
-    fun feed(first: Int?, after: String?, memberId: Long): CursorPage<FeedItemView>
-
-    /** 차단·삭제·숨김에 걸리면 오류가 아니라 null이다(기존 `post(id:)`와 같은 관례). */
-    fun feedItem(feedItemId: Long, memberId: Long): FeedItemView?
-
-    /**
-     * 아래 둘은 피드의 **지연 필드**다 — 클라이언트가 고른 경우에만 DataLoader가 한 번에 읽는다.
-     * 결과에 키가 없으면 그 피드에 값이 없다는 뜻이다.
-     */
-    fun feedItemPhotoKeys(feedItemIds: List<Long>): Map<Long, List<String>>
-
-    fun likedFeedItemIds(feedItemIds: List<Long>, memberId: Long): Set<Long>
-}
 
 /**
  * 대화 조회 유스케이스(R8·R10).

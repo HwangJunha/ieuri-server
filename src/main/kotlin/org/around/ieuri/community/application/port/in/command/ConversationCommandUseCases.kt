@@ -1,27 +1,10 @@
 package org.around.ieuri.community.application.port.`in`.command
 
-import org.around.ieuri.community.application.command.CreateFeedItemCommand
-import org.around.ieuri.community.application.command.LikeFeedItemCommand
 import org.around.ieuri.community.application.command.MarkConversationReadCommand
 import org.around.ieuri.community.application.command.NotifyTypingCommand
 import org.around.ieuri.community.application.command.ReportMessagesCommand
 import org.around.ieuri.community.application.command.SendMessageCommand
 import org.around.ieuri.community.application.command.StartConversationCommand
-
-/**
- * 피드 쓰기 유스케이스(SPEC-0017). [memberId]는 인증된 회원이며 리졸버가 확립한다.
- */
-interface FeedItemCommandUseCase {
-    /** 생성된 피드의 id. 이유는 PostCommandUseCase.createPost와 같다. */
-    fun createFeedItem(command: CreateFeedItemCommand, memberId: Long): Long
-}
-
-/** 피드 좋아요. 양방향 모두 멱등이며 연산 후의 좋아요 수를 돌려준다(R6). */
-interface FeedItemLikeCommandUseCase {
-    fun like(command: LikeFeedItemCommand, memberId: Long): Int
-
-    fun unlike(command: LikeFeedItemCommand, memberId: Long): Int
-}
 
 /**
  * 대화·메시지 쓰기(R7·R9·R10).

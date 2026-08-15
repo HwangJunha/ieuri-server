@@ -6,18 +6,18 @@ import org.around.ieuri.community.application.command.SendMessageCommand
 import org.around.ieuri.community.application.command.StartConversationCommand
 import org.around.ieuri.community.application.exception.BlockedException
 import org.around.ieuri.community.application.exception.ConversationNotFoundException
-import org.around.ieuri.community.application.exception.FeedItemNotFoundException
+import org.around.ieuri.community.application.exception.MemberNotFoundException
 import org.around.ieuri.community.application.exception.NotConversationParticipantException
-import org.around.ieuri.community.application.exception.NotFeedAuthorException
 import org.around.ieuri.community.application.exception.PhotoNotConfirmedException
+import org.around.ieuri.community.application.exception.SelfConversationException
 import org.around.ieuri.community.application.port.`in`.command.ConversationCommandUseCase
 import org.around.ieuri.community.application.port.out.client.ClockPort
+import org.around.ieuri.community.application.port.out.client.MemberLookupPort
 import org.around.ieuri.community.application.port.out.client.ObjectStoragePort
 import org.around.ieuri.community.application.event.NewMessageStored
 import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
 import org.around.ieuri.community.application.port.out.event.ConversationEventPort
 import org.around.ieuri.community.application.port.out.persistence.ConversationRepositoryPort
-import org.around.ieuri.community.application.port.out.persistence.FeedItemRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.MessageRepositoryPort
 import org.around.ieuri.community.application.port.out.query.CommunityQueryPort
 import org.around.ieuri.community.application.port.out.query.ConversationQueryPort
@@ -43,7 +43,7 @@ import org.springframework.transaction.annotation.Transactional
 class ConversationCommandService(
     private val conversationRepositoryPort: ConversationRepositoryPort,
     private val messageRepositoryPort: MessageRepositoryPort,
-    private val feedItemRepositoryPort: FeedItemRepositoryPort,
+    private val memberLookupPort: MemberLookupPort,
     private val communityQueryPort: CommunityQueryPort,
     private val conversationEventPort: ConversationEventPort,
     private val conversationQueryPort: ConversationQueryPort,
@@ -53,18 +53,19 @@ class ConversationCommandService(
 ) : ConversationCommandUseCase {
 
     /**
-     * **입력이 피드 id라 커뮤니티 글 작성자는 구조적으로 상대가 될 수 없다**(R7) — 권한 검사만으로
-     * 막으면 검사를 빠뜨린 경로가 생길 수 있지만, 입력 타입으로 막으면 그런 경로가 존재하지 않는다.
-     * 커뮤니티 글 id를 넣어도 피드가 아니므로 FEED_ITEM_NOT_FOUND다(AC7-3).
+     * 상대 회원을 지목해 대화를 연다(SPEC-0021 R2).
+     *
+     * **탈퇴 회원과 없는 회원을 같은 코드로 다룬다**(AC2.6). 탈퇴는 회원 행 삭제라 조회가
+     * 그대로 null이 되며, 구분해 알려 주면 상대가 탈퇴했다는 사실이 노출된다.
      */
     @Transactional
     override fun startConversation(command: StartConversationCommand, memberId: Long): Long {
-        val feedItem = feedItemRepositoryPort.findById(command.feedItemId)
-            ?: throw FeedItemNotFoundException()
-        // 자기 자신과의 대화는 만들지 않는다(AC7-4).
-        if (feedItem.ownedBy(memberId)) throw NotFeedAuthorException()
+        val counterpartId = command.counterpartMemberId
+        // 자기 자신과의 대화는 만들지 않는다(AC2.3). 존재 확인보다 먼저 본다 —
+        // 자기 id는 이미 인증으로 확인된 값이라 조회가 필요 없다.
+        if (counterpartId == memberId) throw SelfConversationException()
+        if (memberLookupPort.findAuthor(counterpartId) == null) throw MemberNotFoundException()
 
-        val counterpartId = feedItem.authorId
         requireNotBlocked(memberId, counterpartId)
 
         // 같은 상대와 대화가 이미 있으면 새로 만들지 않고 기존 것을 돌려준다(AC7-2).
@@ -86,22 +87,16 @@ class ConversationCommandService(
         // 대화가 차단을 우회하는 통로가 된다.
         requireNotBlocked(memberId, conversation.counterpartOf(memberId))
 
-        // 인용할 피드가 실재하는지 본다 — 없는 피드를 인용하면 상대 화면에 빈 카드가 뜬다.
-        // 차단·삭제로 안 보이는 피드도 여기서 걸린다(모더레이션 필터를 그대로 거친다).
-        command.feedItemId?.let {
-            if (feedItemRepositoryPort.findById(it) == null) throw FeedItemNotFoundException()
-        }
-        // 사진은 피드와 **같은 층위 구분**을 따른다 — 소유권·확정 여부는 도메인이 키 문자열로
+        // 사진은 글과 **같은 층위 구분**을 따른다 — 소유권·확정 여부는 도메인이 키 문자열로
         // 보고, 실제 업로드 여부만 여기서 저장소에 묻는다.
         val photoKey = command.photoKey?.let { verifiedPhotoKey(it, memberId) }
 
-        // 본문·첨부가 모두 비면 도메인이 거부한다. 상한을 넘어도 잘라 저장하지 않는다.
+        // 본문·사진이 모두 비면 도메인이 거부한다. 상한을 넘어도 잘라 저장하지 않는다.
         val saved = messageRepositoryPort.save(
             Message.create(
                 conversationId = command.conversationId,
                 senderId = memberId,
                 body = command.body,
-                feedItemId = command.feedItemId,
                 photoKey = photoKey,
             ),
         )
