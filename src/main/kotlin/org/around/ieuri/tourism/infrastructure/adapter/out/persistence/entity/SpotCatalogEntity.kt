@@ -117,6 +117,17 @@ class SpotCatalogTranslationEntity(
     @Column(name = "category", nullable = false, length = 30)
     var category: SpotCategory,
 
+    /**
+     * 원본 `spot`이 남아 있는가. **모든 조회가 이 값으로 거른다.**
+     *
+     * 상류에서 장소가 사라지면 false가 되어 목록·지도·검색에서 빠지고, 돌아오면 true로
+     * 되살아난다. 행을 지우지 않는 이유는 배정 배치의 KO 제목 맵이 이 테이블에서
+     * 만들어지기 때문이다 — 지우면 장소가 돌아왔을 때 좋아요가 달린 옛 카탈로그를 찾지
+     * 못하고 새 카탈로그가 생긴다.
+     */
+    @Column(name = "visible", nullable = false)
+    var visible: Boolean = true,
+
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant? = null,
 

@@ -123,6 +123,8 @@ class SpotSpatialQueryAdapter(
             """
             SELECT id FROM spot_catalog cat
             WHERE ST_DWithin(cat.location, $CENTER, ?)
+              -- 다른 조회와 달리 번역을 거치지 않아 여기서만 명시적으로 확인한다.
+              AND EXISTS (SELECT 1 FROM spot_catalog_translation t WHERE t.catalog_id = cat.id AND t.visible)
               $categoryCondition
             ORDER BY cat.location <-> $CENTER, cat.id
             LIMIT ?
@@ -185,7 +187,7 @@ class SpotSpatialQueryAdapter(
          * 쓰도록 조건을 한 곳에 모으기 위해서다. `UNIQUE(catalog_id, language)`가 있어 이 조인은
          * 카탈로그당 최대 1행이며, 번역이 없는 언어는 결과에서 빠진다.
          */
-        const val CARD_SOURCE = "spot_catalog cat JOIN spot_catalog_translation t ON t.catalog_id = cat.id"
+        const val CARD_SOURCE = "spot_catalog cat JOIN spot_catalog_translation t ON t.catalog_id = cat.id AND t.visible"
 
         /** 카드가 읽는 컬럼. [CARD_SOURCE]의 별칭과 짝이며 조회·카운트가 같은 이름을 본다. */
         const val CARD_COLUMNS =

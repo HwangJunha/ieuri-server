@@ -11,3 +11,9 @@ ALTER TABLE spot_catalog_translation ADD COLUMN IF NOT EXISTS category VARCHAR(3
 -- 검색이 언어로 좁힌 뒤 분류를 거른다. 선행 컬럼이 language여야 한다.
 CREATE INDEX IF NOT EXISTS idx_spot_catalog_translation_language_category
     ON spot_catalog_translation (language, category);
+
+-- 원본 생존 플래그. **DEFAULT를 두어 컬럼 추가 이전 시점의 행이 와도 값이 채워진다.**
+ALTER TABLE spot_catalog_translation ADD COLUMN IF NOT EXISTS visible BOOLEAN NOT NULL DEFAULT TRUE;
+
+CREATE INDEX IF NOT EXISTS idx_spot_catalog_translation_visible
+    ON spot_catalog_translation (visible, language);

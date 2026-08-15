@@ -34,13 +34,13 @@ class SpotCatalogAssignmentTasklet(
         if (languageIndex >= ASSIGNMENT_ORDER.size) {
             // **배정을 다 마친 뒤에야 고아를 확정할 수 있다** — 앞에 두면 방금 들어온 장소를
             // 잠시 원본 없는 것으로 오인한다.
-            val hidden = useCase.hideOrphanCatalogs()
+            val visibilityChanged = useCase.refreshCatalogVisibility()
             log.info(
-                "catalog assignment finished: joined={} created={} skipped={} orphansHidden={}",
+                "catalog assignment finished: joined={} created={} skipped={} visibilityChanged={}",
                 executionContext.getInt(KEY_JOINED, 0),
                 executionContext.getInt(KEY_CREATED, 0),
                 executionContext.getInt(KEY_SKIPPED, 0),
-                hidden,
+                visibilityChanged,
             )
             return RepeatStatus.FINISHED
         }

@@ -209,15 +209,16 @@ class SpotCatalogService(
     }
 
     /**
-     * 원본이 사라진 카탈로그의 번역을 지워 조회에서 감춘다.
+     * 원본 생존 여부를 조회 노출에 반영한다. 사라진 것은 감추고 돌아온 것은 되살린다.
      *
-     * 카탈로그와 좋아요는 남긴다 — 상류가 그 장소를 다시 주면 배정이 번역을 되살린다.
+     * 번역 행을 지우지 않는 이유는 지우면 배정의 KO 제목 맵이 그 카탈로그를 못 찾아,
+     * 장소가 돌아왔을 때 좋아요가 달린 옛 카탈로그 대신 새 카탈로그가 생기기 때문이다.
      */
     @Transactional
-    override fun hideOrphanCatalogs(): Int {
-        val hidden = storePort.purgeOrphanTranslations()
-        if (hidden > 0) log.info("orphan catalogs hidden: translations={}", hidden)
-        return hidden
+    override fun refreshCatalogVisibility(): Int {
+        val changed = storePort.refreshTranslationVisibility()
+        if (changed > 0) log.info("catalog visibility refreshed: changed={}", changed)
+        return changed
     }
 
     private companion object {

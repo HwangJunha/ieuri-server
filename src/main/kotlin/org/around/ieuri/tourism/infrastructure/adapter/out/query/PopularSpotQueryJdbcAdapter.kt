@@ -77,7 +77,7 @@ class PopularSpotQueryJdbcAdapter(
                 -- 받아 결과가 4배로 늘어났다. 이제는 `t.language = ?` + `UNIQUE(catalog_id,
                 -- language)`가 카탈로그당 정확히 1행을 보장한다. 동시에 의미가 바뀌었다:
                 -- "그 언어의 spot 행이 있는가"가 아니라 **"그 언어의 제목이 있는가"**다.
-                JOIN spot_catalog_translation t ON t.catalog_id = cat.id AND t.language = ?
+                JOIN spot_catalog_translation t ON t.catalog_id = cat.id AND t.language = ? AND t.visible
                 CROSS JOIN c
                 WHERE $where
                 GROUP BY cat.id, t.title, t.address, cat.thumbnail_image_url,

@@ -47,7 +47,7 @@ class MapSpatialQueryAdapter(
             FROM spot_catalog cat
             -- **제목만 번역에서 온다.** 좌표·썸네일·분류는 카탈로그가 확정한 표준값이다.
             -- `UNIQUE(catalog_id, language)`가 있어 이 조인은 카탈로그당 최대 1행이다.
-            JOIN spot_catalog_translation t ON t.catalog_id = cat.id AND t.language = ?
+            JOIN spot_catalog_translation t ON t.catalog_id = cat.id AND t.language = ? AND t.visible
             WHERE $BBOX_PREDICATE
               -- 카테고리 없는 카탈로그는 마커를 그릴 수 없다 — 도메인 enum에 미분류 값이 없다.
               $categoryCondition

@@ -68,20 +68,31 @@ class SpotCatalogStoreAdapter(
     override fun refreshFestivalPeriod(catalogId: Long) = upsertPort.refreshFestivalPeriod(catalogId)
 
     /**
-     * 원본이 사라진 카탈로그의 번역 행을 지운다.
+     * 원본 생존 여부를 번역 행의 `visible`에 반영한다. 양방향이다 — 사라진 것은 감추고
+     * 돌아온 것은 다시 보이게 한다.
      *
-     * 벌크 삭제라 영속성 컨텍스트를 우회한다 — 이 트랜잭션에서 같은 엔티티를 다시 읽는
-     * 코드가 없으므로 안전하다.
+     * 벌크 갱신이라 영속성 컨텍스트를 우회한다. 이 트랜잭션에서 같은 엔티티를 다시 읽는
+     * 코드가 없으므로 안전하다. **상태가 실제로 바뀐 행만 건드린다** — 매 실행마다 전 행을
+     * 갱신하면 그 UPDATE가 전부 복제로 흘러가 검색 노드가 불필요하게 출렁인다.
      */
     @Transactional
-    override fun purgeOrphanTranslations(): Int =
-        queryFactory
-            .delete(translation)
-            .where(
-                JPAExpressions.selectOne().from(spot)
-                    .where(spot.catalogId.eq(translation.catalogId))
-                    .notExists(),
-            )
+    override fun refreshTranslationVisibility(): Int {
+        val originExists = JPAExpressions.selectOne().from(spot)
+            .where(spot.catalogId.eq(translation.catalogId))
+            .exists()
+
+        val hidden = queryFactory
+            .update(translation)
+            .set(translation.visible, false)
+            .where(translation.visible.isTrue, originExists.not())
             .execute()
-            .toInt()
+
+        val shown = queryFactory
+            .update(translation)
+            .set(translation.visible, true)
+            .where(translation.visible.isFalse, originExists)
+            .execute()
+
+        return (hidden + shown).toInt()
+    }
 }

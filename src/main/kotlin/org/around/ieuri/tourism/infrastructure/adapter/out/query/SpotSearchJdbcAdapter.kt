@@ -205,7 +205,8 @@ class SpotSearchJdbcAdapter(
             """
             SELECT t.catalog_id, t.title
             FROM spot_catalog_translation t
-            WHERE t.language = ?
+            WHERE t.visible
+              AND t.language = ?
               AND ${titleField(language)} @@@ ?::pdb.fuzzy(0, t)
               AND ST_DWithin(t.location, $CENTER, ?)
             ORDER BY t.title ASC, t.catalog_id ASC
@@ -239,6 +240,10 @@ class SpotSearchJdbcAdapter(
     private fun whereClause(query: SpotSearchQuery, fuzzyOnly: Boolean = false): Pair<String, List<Any>> {
         val titleField = titleField(query.language)
         val conditions = mutableListOf(
+            // **원본이 사라진 카탈로그는 감춘다.** 배정 배치가 이 플래그를 유지하며,
+            // 조건이 여기 있어야 목록과 건수가 같은 집합을 본다 — 2단계에서 거르면
+            // 건수만 필터 이전 값이 되어 빈 페이지가 무한히 이어진다.
+            "t.visible",
             // **언어 격리는 이 조건이 전담한다.** BM25 인덱스가 하나뿐이라 언어를 가르지
             // 못하므로, 빠뜨리면 다른 언어 행이 결과에 섞인다(AC-2.3). SPEC-0019 이후 이 조건은
             // "그 언어의 제목이 있는가"를 뜻한다 — 그 언어의 spot 행 유무가 아니다.

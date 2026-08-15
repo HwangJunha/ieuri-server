@@ -136,7 +136,7 @@ class SpotQueryAdapter(
                 catalog.category, catalog.copyright, catalog.mapX, catalog.mapY,
             )
             .from(catalog)
-            .join(translation).on(translation.catalogId.eq(catalog.id))
+            .join(translation).on(translation.catalogId.eq(catalog.id), translation.visible.isTrue)
             .where(catalog.id.eq(catalogId))
             // **요청 언어를 우선하되 없으면 다른 언어로 떨어진다.** 외국어에만 있는 장소를
             // 한국어로 물으면 KO 행이 없는데(실측 4,196건), 그때 null을 돌려주면 그 장소에
@@ -191,7 +191,7 @@ class SpotQueryAdapter(
                 catalog.category, catalog.copyright, catalog.mapX, catalog.mapY,
             )
             .from(catalog)
-            .join(translation).on(translation.catalogId.eq(catalog.id))
+            .join(translation).on(translation.catalogId.eq(catalog.id), translation.visible.isTrue)
             .where(catalog.id.`in`(catalogIds))
             // **요청 언어 우선, 없으면 다른 언어.** [findSpotBasics]와 같은 판단이다.
             // associate가 뒤 값으로 덮으므로 우선순위가 낮은 것부터 오게 정렬한다.
@@ -238,6 +238,7 @@ class SpotQueryAdapter(
             .join(translation).on(
                 translation.catalogId.eq(reaction.catalogId),
                 translation.language.eq(query.language),
+                translation.visible.isTrue,
             )
             // 좌표·썸네일·분류는 카탈로그가 확정해 둔 표준값이다.
             //

@@ -63,7 +63,7 @@ class FestivalQueryJdbcAdapter(
                 FROM spot_catalog cat
                 -- PK가 catalog_id라 이 조인 자체가 "축제인 카탈로그만"을 뜻한다.
                 JOIN spot_catalog_festival f ON f.catalog_id = cat.id
-                JOIN spot_catalog_translation t ON t.catalog_id = cat.id AND t.language = ?
+                JOIN spot_catalog_translation t ON t.catalog_id = cat.id AND t.language = ? AND t.visible
                 CROSS JOIN c
                 WHERE $where
             ) ranked
