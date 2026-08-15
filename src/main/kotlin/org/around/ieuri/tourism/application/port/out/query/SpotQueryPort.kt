@@ -34,11 +34,16 @@ interface SpotQueryPort {
     fun countLikes(spotId: Long): Long
 
     /**
-     * 카탈로그 id + 언어 → upstream 식별 정보. 없으면 null(= 그 언어의 원본이 없는 장소).
+     * 카탈로그 id → upstream 식별 정보. [language] 원본을 우선하되 **없으면 다른 언어로
+     * 떨어진다.** 카탈로그에 원본이 하나도 없을 때만 null이다.
      *
      * **`spot`을 읽는 유일한 조회 경로다**(SPEC-0019). TourAPI가 contentId를 언어별로 발급하므로
-     * 상세를 물으려면 그 언어의 원본 행이 필요하기 때문이다 — 번역만 있는 카탈로그는 상세
-     * 본문을 가질 수 없고, 호출자가 그것을 "상세 없음"으로 해석한다.
+     * 상세를 물으려면 원본 행이 필요하다.
+     *
+     * **폴백이 필요한 이유가 이 스펙의 목적 그 자체다.** 번역으로 격차를 메운 카탈로그는
+     * 그 언어의 원본이 없다(실측 36,000건 이상) — 목록·검색에는 나오는데 상세만 막히면
+     * 번역이 무의미해진다. 돌려받은 [SpotIdentity.language]가 실제 원본 언어이며, 호출자는
+     * **그 언어로 upstream에 물어야 한다** — 없는 contentId로 물으면 실패한다.
      */
     fun findIdentity(catalogId: Long, language: DomainLocale): SpotIdentity?
 

@@ -100,16 +100,22 @@ class SpotQueryAdapter(
      * (카탈로그 id, 언어) → upstream 식별 정보. 상세 조회가 캐시·DB를 모두 놓쳤을 때만 쓴다.
      *
      * **`spot`을 읽는 유일한 조회 경로다**(SPEC-0019). TourAPI의 contentId가 언어별이라
-     * 그 언어의 원본 행을 거쳐야만 상세를 물을 수 있다 — `idx_spot_catalog_language`
+     * 원본 행을 거쳐야만 상세를 물을 수 있다 — `idx_spot_catalog_language`
      * (spot 테이블의 `(catalog_id, language)` 복합 인덱스)가 이 조회를 받친다.
      *
-     * 번역만 있고 그 언어의 원본이 없는 카탈로그는 null이며, 호출자가 "상세 없음"으로 해석한다.
+     * **요청 언어 원본이 없으면 다른 언어로 떨어진다.** 번역으로 격차를 메운 카탈로그는
+     * 그 언어의 원본이 없어(실측 36,000건 이상), 여기서 null을 돌려주면 목록에는 나오는데
+     * 상세만 막힌다 — 번역이 무의미해진다. 우선순위는 요청 언어 → KO → EN → JA → ZH이며
+     * KO가 2순위인 것은 원본 언어라 본문이 가장 충실하기 때문이다.
+     *
+     * 원본이 하나도 없는 카탈로그만 null이다.
      */
     override fun findIdentity(catalogId: Long, language: DomainLocale): SpotIdentity? =
         queryFactory
             .select(spot.id, spot.contentId, spot.language)
             .from(spot)
-            .where(spot.catalogId.eq(catalogId), spot.language.eq(language))
+            .where(spot.catalogId.eq(catalogId))
+            .orderBy(preferredOriginOrder(language).asc())
             .fetchFirst()
             ?.let {
                 SpotIdentity(
@@ -154,6 +160,17 @@ class SpotQueryAdapter(
                     latitude = requireNotNull(it.get(catalog.mapY)),
                 )
             }
+
+    /**
+     * 원본 `spot` 선택 우선순위. [preferredLanguageOrder]와 같은 규칙이되 대상이 `spot`이다.
+     */
+    private fun preferredOriginOrder(language: DomainLocale) =
+        Expressions.cases()
+            .`when`(spot.language.eq(language)).then(0)
+            .`when`(spot.language.eq(DomainLocale.KO)).then(1)
+            .`when`(spot.language.eq(DomainLocale.EN)).then(2)
+            .`when`(spot.language.eq(DomainLocale.JA)).then(3)
+            .otherwise(4)
 
     /**
      * 언어 선택 우선순위: **요청 언어 → KO → EN → JA → ZH.**

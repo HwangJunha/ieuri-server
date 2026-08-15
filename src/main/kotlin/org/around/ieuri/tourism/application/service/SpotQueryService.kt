@@ -143,7 +143,7 @@ class SpotQueryService(
 
         // 양쪽 미스(또는 부재 재조회 시점): upstream 조회 후 캐시 충전 + 적재 이벤트 발행(AC-36·AC-39).
         // 여기서 던져지는 예외는 **실패**이며 부재로 적재되지 않는다 — 이벤트 발행 전에 전파된다(AC-4·AC-16).
-        val fetched = tourInfoPort.findDetail(identity.toQuery(locale))
+        val fetched = tourInfoPort.findDetail(identity.toQuery())
 
         if (fetched == null) {
             // 부재 확정. `spot` 행의 값으로 응답을 구성하고(R-2) 부재 사실을 적재한다(R-3).
@@ -203,7 +203,7 @@ class SpotQueryService(
             return stored.map { it.toView() }
         }
 
-        val fetched = tourInfoPort.findGallery(identity.toQuery(locale))
+        val fetched = tourInfoPort.findGallery(identity.toQuery())
         spotCachePort.putGallery(spotId, fetched)
         eventPublisher.publish(SpotGalleryFetched(spotId, fetched))
         return fetched.map { it.toView() }
@@ -225,7 +225,7 @@ class SpotQueryService(
             return stored.value?.toView()
         }
 
-        val intro = tourInfoPort.findIntro(identity.toQuery(locale), category)
+        val intro = tourInfoPort.findIntro(identity.toQuery(), category)
         spotCachePort.putIntro(spotId, category, intro)
         eventPublisher.publish(SpotIntroFetched(spotId, category, intro))
         return intro?.toView()
@@ -247,7 +247,7 @@ class SpotQueryService(
             return stored.map { SpotInfoItemView(it.name, it.text) }
         }
 
-        val fetched = tourInfoPort.findInfoItems(identity.toQuery(locale), category)
+        val fetched = tourInfoPort.findInfoItems(identity.toQuery(), category)
         spotCachePort.putInfoItems(spotId, category, fetched)
         eventPublisher.publish(SpotInfoItemsFetched(spotId, category, fetched))
         return fetched.map { SpotInfoItemView(it.name, it.text) }
@@ -340,9 +340,15 @@ class SpotQueryService(
     private fun resolve(catalogId: Long, locale: DomainLocale): SpotIdentity =
         spotQueryPort.findIdentity(catalogId, locale) ?: throw SpotDetailNotFoundException()
 
-    /** upstream 조회 좌표. TourAPI는 우리 PK를 모르므로 해석된 contentId로 묻는다. */
-    private fun SpotIdentity.toQuery(locale: DomainLocale) =
-        SpotDetailQuery(contentId = contentId, locale = locale)
+    /**
+     * upstream 조회 좌표. TourAPI는 우리 PK를 모르므로 해석된 contentId로 묻는다.
+     *
+     * **요청 언어가 아니라 [SpotIdentity.language]로 묻는다.** contentId는 언어별이라
+     * 다른 언어로 물으면 그 id가 없어 실패한다 — 요청 언어의 원본이 없어 폴백한 경우가
+     * 정확히 그 상황이다. 제목·주소는 번역이 요청 언어로 채우므로, 본문만 원본 언어다.
+     */
+    private fun SpotIdentity.toQuery() =
+        SpotDetailQuery(contentId = contentId, locale = language)
 
     private fun validatedCenter(latitude: Double, longitude: Double): Coordinates =
         try {
