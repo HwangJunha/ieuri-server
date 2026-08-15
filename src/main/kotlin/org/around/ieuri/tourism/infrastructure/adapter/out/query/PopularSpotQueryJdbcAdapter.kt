@@ -52,9 +52,13 @@ class PopularSpotQueryJdbcAdapter(
         params += query.minLikeCount // HAVING
 
         val seek = if (query.after != null) {
+            // **정렬이 (원문 DESC, 좋아요 DESC, id ASC)이라 seek도 3튜플이다.**
+            // 내림차순 둘을 부호 반전으로 오름차순에 맞추면 행 값 비교 한 줄이 된다 —
+            // 2튜플로 두면 원문 구간에서 번역 구간으로 넘어가는 경계에서 페이지가 어긋난다.
+            params += !query.after.hasOrigin
             params += -query.after.likeCount
             params += query.after.spotId
-            "WHERE (-like_count, id) > (?, ?)"
+            "WHERE (NOT has_origin, -like_count, id) > (?, ?, ?)"
         } else {
             ""
         }
