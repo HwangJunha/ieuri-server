@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.query
 
+import com.querydsl.core.types.dsl.Expressions
 import com.querydsl.jpa.impl.JPAQueryFactory
 import org.around.ieuri.common.pagination.CursorEdge
 import org.around.ieuri.common.pagination.CursorPage
@@ -68,9 +69,9 @@ class SpotQueryAdapter(
      * 위해 `spot`을 조인했으나, 그 조인은 그 언어의 spot 행이 없는 카탈로그를 제외 집합에서
      * 빠뜨려 이미 반응한 항목이 다시 나오게 만든다.
      *
-     * [language]는 더 이상 조건이 아니다 — 좋아요는 언어와 무관한 장소 단위 행위다.
+     * **언어를 받지 않는다** — 좋아요는 언어와 무관한 장소 단위 행위다.
      */
-    override fun findReactedSpotIds(memberId: Long, language: DomainLocale): Set<Long> =
+    override fun findReactedSpotIds(memberId: Long): Set<Long> =
         queryFactory
             .select(reaction.catalogId)
             .from(reaction)
@@ -121,9 +122,12 @@ class SpotQueryAdapter(
     /**
      * 상세 본문이 부재할 때 응답을 구성할 카탈로그의 값. 인자는 **카탈로그 id**다(SPEC-0019).
      *
-     * 제목·주소는 [language] 번역 행에서 온다. **그 언어 번역이 없으면 null이다** — 아무 언어나
-     * 집어 오면 제목과 요청 언어가 어긋난 카드가 나간다. 외국어에만 있는 장소를 한국어로
-     * 조회하면 이 경우에 해당하며, 보이지 않는 것이 올바른 동작이다.
+     * 제목·주소는 [language] 번역을 우선하되, **없으면 다른 언어로 떨어진다.** 외국어에만
+     * 있는 장소는 KO 행이 없어(실측 4,196건) null을 돌려주면 그 장소에 글을 못 쓰고 이미
+     * 쓴 글의 칩도 사라진다 — 이름이 다른 언어인 편이 없는 것보다 낫다.
+     *
+     * 카탈로그가 없으면 null이다. 번역이 하나도 없는 카탈로그는 원본이 사라진 것이며
+     * (배정 배치가 번역을 지운다) 그 역시 null이 되어 조회에서 빠진다.
      */
     override fun findSpotBasics(catalogId: Long, language: DomainLocale): SpotBasics? =
         queryFactory
@@ -132,9 +136,12 @@ class SpotQueryAdapter(
                 catalog.category, catalog.copyright, catalog.mapX, catalog.mapY,
             )
             .from(catalog)
-            .join(translation)
-            .on(translation.catalogId.eq(catalog.id), translation.language.eq(language))
-            .where(catalog.id.eq(catalogId), LiveCatalogPredicate.queryDsl(catalog))
+            .join(translation).on(translation.catalogId.eq(catalog.id))
+            .where(catalog.id.eq(catalogId))
+            // **요청 언어를 우선하되 없으면 다른 언어로 떨어진다.** 외국어에만 있는 장소를
+            // 한국어로 물으면 KO 행이 없는데(실측 4,196건), 그때 null을 돌려주면 그 장소에
+            // 글을 못 쓰고 이미 쓴 글의 칩도 사라진다 — 이름은 다른 언어라도 있는 편이 낫다.
+            .orderBy(preferredLanguageOrder(language).asc(), translation.language.asc())
             .fetchFirst()
             ?.let {
                 SpotBasics(
@@ -149,6 +156,17 @@ class SpotQueryAdapter(
             }
 
     /**
+     * 요청 언어를 0, 나머지를 1로 매기는 정렬 식. 요청 언어 행이 있으면 그것이 먼저 온다.
+     *
+     * CASE 식이라 인덱스를 타지 않지만, 대상이 카탈로그 하나(또는 IN 목록)로 이미 좁혀진
+     * 뒤라 비용이 없다.
+     */
+    private fun preferredLanguageOrder(language: DomainLocale) =
+        Expressions.cases()
+            .`when`(translation.language.eq(language)).then(0)
+            .otherwise(1)
+
+    /**
      * 좋아요 목록 한 페이지. `spot`을 조인해 카드에 쓸 값과 언어·카테고리를 함께 판정한다.
      * `spot_detail`은 조인하지 않는다 — 상세가 부재한 spot도 목록에는 정상적으로 나타나야 한다.
      *
@@ -159,8 +177,9 @@ class SpotQueryAdapter(
      * 여러 카탈로그를 한 번에. 호출자가 목록을 들고 있을 때 행마다 묻지 않게 한다 —
      * 피드 한 페이지에 20번, 지역 피드에서는 수천 번이 될 수 있다.
      *
-     * **[language] 번역이 없는 카탈로그는 결과에서 빠진다** — 호출자는 그것을 "유효하지 않은
-     * id"와 같게 다룬다. [findSpotBasics]가 null을 돌려주는 것과 같은 판단이다.
+     * [language] 번역을 우선하되 없으면 다른 언어로 떨어진다([findSpotBasics]와 같은 판단).
+     * 번역이 하나도 없는 카탈로그만 결과에서 빠지며, 호출자는 그것을 "유효하지 않은 id"와
+     * 같게 다룬다.
      */
     @Transactional(readOnly = true)
     override fun findSpotBasicsIn(catalogIds: List<Long>, language: DomainLocale): Map<Long, SpotBasics> {
@@ -172,9 +191,11 @@ class SpotQueryAdapter(
                 catalog.category, catalog.copyright, catalog.mapX, catalog.mapY,
             )
             .from(catalog)
-            .join(translation)
-            .on(translation.catalogId.eq(catalog.id), translation.language.eq(language))
-            .where(catalog.id.`in`(catalogIds), LiveCatalogPredicate.queryDsl(catalog))
+            .join(translation).on(translation.catalogId.eq(catalog.id))
+            .where(catalog.id.`in`(catalogIds))
+            // **요청 언어 우선, 없으면 다른 언어.** [findSpotBasics]와 같은 판단이다.
+            // associate가 뒤 값으로 덮으므로 우선순위가 낮은 것부터 오게 정렬한다.
+            .orderBy(preferredLanguageOrder(language).desc(), translation.language.desc())
             .fetch()
             .associate { row ->
                 requireNotNull(row.get(catalog.id)) to SpotBasics(
@@ -220,9 +241,9 @@ class SpotQueryAdapter(
             )
             // 좌표·썸네일·분류는 카탈로그가 확정해 둔 표준값이다.
             //
-            // **여기는 LiveCatalogPredicate를 걸지 않는다.** 원본이 사라진 장소라도 사용자가
-            // 누른 좋아요는 남아야 한다 — 감추면 "내가 누른 것이 사라진" 것처럼 보이고,
-            // 좋아요를 지키려고 카탈로그를 남긴 판단과 어긋난다(SPEC-0019, 2026-08-15).
+            // **원본이 사라진 장소도 여기서는 보인다.** 번역 행이 지워져도 좋아요는 남고,
+            // 이 조회는 번역을 INNER JOIN하므로 그때는 자연히 빠진다 — 다만 카탈로그와
+            // 좋아요 자체는 보존되어 상류가 그 장소를 다시 주면 되살아난다.
             .join(catalog).on(catalog.id.eq(reaction.catalogId))
             .where(
                 reaction.memberId.eq(query.memberId),

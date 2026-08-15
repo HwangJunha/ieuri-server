@@ -26,6 +26,14 @@ interface SpotCatalogUseCase {
      * 둔다. 이는 의도된 동작이며 결함이 아니다.
      */
     fun translateMissing(languages: Set<DomainLocale>, limit: Int): TranslationResult
+
+    /**
+     * 원본이 사라진 카탈로그를 조회에서 감춘다. 감춘 행 수를 돌려준다.
+     *
+     * **배정 뒤에 부른다** — 배정이 새 spot을 붙이고 나서야 "정말 원본이 없는" 카탈로그가
+     * 확정된다. 앞에 두면 방금 들어온 장소를 잠시 고아로 오인한다.
+     */
+    fun hideOrphanCatalogs(): Int
 }
 
 /**

@@ -121,8 +121,6 @@ class PopularSpotQueryJdbcAdapter(
         // 좌표 없는 카탈로그는 ST_DWithin이 참을 돌려주지 않아 자연히 빠진다.
         val conditions = mutableListOf(
             "ST_DWithin(cat.location, c.center, ?)",
-            // 원본이 사라진 카탈로그는 감춘다 — 상세를 열면 실패하는 장소가 되기 때문이다.
-            LiveCatalogPredicate.sql("cat"),
         )
         val params = mutableListOf<Any>(
             query.center.longitude, query.center.latitude, // CTE의 center

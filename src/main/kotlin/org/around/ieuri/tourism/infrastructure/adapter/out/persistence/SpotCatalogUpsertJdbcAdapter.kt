@@ -41,14 +41,26 @@ class SpotCatalogUpsertJdbcAdapter(
 
     private companion object {
         /**
-         * 좌표를 카탈로그에서 가져오므로 `catalog_id`가 두 번 들어간다 — 값 자리와 SELECT의
-         * WHERE 자리다.
+         * 좌표·분류를 카탈로그에서 가져오므로 `catalog_id`가 두 번 들어간다 — 값 자리와
+         * SELECT의 WHERE 자리다.
+         *
+         * **사본 컬럼(map_x·map_y·category)은 충돌 시에도 갱신한다.** 제목·주소와 달리 이들은
+         * 카탈로그가 소유한 값의 복제본이라, 낡은 채로 두면 검색이 지도와 다른 위치를
+         * 돌려주거나 분류 필터가 어긋난다. 제목·주소는 그대로 둔다 — 먼저 들어온 TourAPI
+         * 원문이 우선한다(R-4).
          */
         val UPSERT_TRANSLATION_SQL = """
-            INSERT INTO spot_catalog_translation (catalog_id, language, title, address, map_x, map_y)
-            SELECT ?, ?, ?, ?, c.map_x, c.map_y
+            INSERT INTO spot_catalog_translation (catalog_id, language, title, address, map_x, map_y, category)
+            SELECT ?, ?, ?, ?, c.map_x, c.map_y, c.category
             FROM spot_catalog c WHERE c.id = ?
-            ON CONFLICT (catalog_id, language) DO NOTHING
+            ON CONFLICT (catalog_id, language) DO UPDATE SET
+                map_x      = EXCLUDED.map_x,
+                map_y      = EXCLUDED.map_y,
+                category   = EXCLUDED.category,
+                updated_at = now()
+            WHERE spot_catalog_translation.map_x    IS DISTINCT FROM EXCLUDED.map_x
+               OR spot_catalog_translation.map_y    IS DISTINCT FROM EXCLUDED.map_y
+               OR spot_catalog_translation.category IS DISTINCT FROM EXCLUDED.category
         """.trimIndent()
 
         /**

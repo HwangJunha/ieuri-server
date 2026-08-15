@@ -208,6 +208,18 @@ class SpotCatalogService(
         return TranslationResult(translated = targets.size, skipped = candidates.size - targets.size)
     }
 
+    /**
+     * 원본이 사라진 카탈로그의 번역을 지워 조회에서 감춘다.
+     *
+     * 카탈로그와 좋아요는 남긴다 — 상류가 그 장소를 다시 주면 배정이 번역을 되살린다.
+     */
+    @Transactional
+    override fun hideOrphanCatalogs(): Int {
+        val hidden = storePort.purgeOrphanTranslations()
+        if (hidden > 0) log.info("orphan catalogs hidden: translations={}", hidden)
+        return hidden
+    }
+
     private companion object {
         /**
          * 한 번의 배정(= 한 트랜잭션)에서 처리할 최대 행 수.

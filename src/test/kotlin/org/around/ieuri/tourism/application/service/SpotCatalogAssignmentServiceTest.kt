@@ -289,6 +289,18 @@ class SpotCatalogAssignmentServiceTest {
     }
 
     @Test
+    @DisplayName("고아 카탈로그는 번역을 지워 조회에서 감춘다")
+    fun `orphan catalogs are hidden by purging translations`() {
+        // 카탈로그와 좋아요는 남긴다 — 상류가 그 장소를 다시 주면 배정이 번역을 되살린다.
+        val store = RecordingStorePort()
+        val query = StubQueryPort()
+
+        service(query, store).hideOrphanCatalogs()
+
+        assertEquals(1, store.orphanPurges)
+    }
+
+    @Test
     @DisplayName("대상이 없으면 아무것도 하지 않는다")
     fun `empty target set does nothing`() {
         val store = RecordingStorePort()
@@ -354,6 +366,14 @@ class SpotCatalogAssignmentServiceTest {
 
         override fun refreshFestivalPeriod(catalogId: Long) {
             festivalRefreshed += catalogId
+        }
+
+        var orphanPurges = 0
+            private set
+
+        override fun purgeOrphanTranslations(): Int {
+            orphanPurges++
+            return 0
         }
 
         companion object {

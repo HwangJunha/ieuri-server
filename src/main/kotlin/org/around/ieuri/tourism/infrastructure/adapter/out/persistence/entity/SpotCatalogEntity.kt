@@ -109,6 +109,14 @@ class SpotCatalogTranslationEntity(
     @Column(name = "map_y", nullable = false)
     var mapY: Double,
 
+    /**
+     * 카탈로그 분류의 사본. 좌표와 같은 이유다 — 검색이 평면 질의라 `spot_catalog`를 조인하면
+     * BM25 인덱스 푸시다운이 깨져 분류 필터를 걸 자리가 없다.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "category", nullable = false, length = 30)
+    var category: SpotCategory,
+
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant? = null,
 

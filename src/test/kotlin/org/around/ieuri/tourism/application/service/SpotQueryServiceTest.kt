@@ -75,7 +75,7 @@ class SpotQueryServiceTest {
 
     // 기본: 아무것도 반응하지 않음(빈 집합). 개별 테스트에서 override.
     init {
-        every { spotQueryPort.findReactedSpotIds(any(), any()) } returns emptySet()
+        every { spotQueryPort.findReactedSpotIds(any()) } returns emptySet()
         // (카탈로그 id, 언어) → contentId 해석. 기본은 어느 언어로 물어도 원본이 있다고 둔다.
         // 그 언어의 원본이 없는 경우는 개별 테스트에서 override한다.
         // spotId는 카탈로그 id와 **다른 값**을 준다 — 둘이 섞이면 캐시·spot_detail이 잘못된
@@ -287,7 +287,7 @@ class SpotQueryServiceTest {
     fun `로그인 회원이 이미 반응한 관광지는 DB 조회 단계에서 제외된다`() {
         // 조회 후 걸러내면 페이지가 요청한 size보다 작아지므로 쿼리 조건으로 넘긴다.
         val captured = slot<NearbySpotSearch>()
-        every { spotQueryPort.findReactedSpotIds(7L, DomainLocale.KO) } returns setOf(2L)
+        every { spotQueryPort.findReactedSpotIds(7L) } returns setOf(2L)
         every { spotQueryPort.searchNearby(capture(captured)) } returns emptyList()
 
         service.spots(query(), DomainLocale.KO, memberId = 7L)
@@ -306,7 +306,7 @@ class SpotQueryServiceTest {
 
         assertEquals(listOf(1L, 2L), result.items.map { it.id })
         assertTrue(captured.captured.excludedSpotIds.isEmpty())
-        verify(exactly = 0) { spotQueryPort.findReactedSpotIds(any(), any()) }
+        verify(exactly = 0) { spotQueryPort.findReactedSpotIds(any()) }
     }
 
     // ---------- 3단 폴백: Valkey → DB → TourAPI (SPEC-0004 R-13) ----------

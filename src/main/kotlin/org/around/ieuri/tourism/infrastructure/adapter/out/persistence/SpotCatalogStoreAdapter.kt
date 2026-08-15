@@ -1,10 +1,12 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.persistence
 
+import com.querydsl.jpa.JPAExpressions
 import com.querydsl.jpa.impl.JPAQueryFactory
 import org.around.ieuri.tourism.application.port.out.persistence.SpotCatalogStorePort
 import org.around.ieuri.tourism.application.port.out.persistence.SpotCatalogUpsertPort
 import org.around.ieuri.tourism.domain.aggregate.SpotCatalog
 import org.around.ieuri.tourism.domain.vo.DomainLocale
+import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotCatalogTranslationEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.mapper.toNewEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.mapper.toNewTranslationEntities
@@ -28,6 +30,7 @@ class SpotCatalogStoreAdapter(
 ) : SpotCatalogStorePort {
 
     private val spot = QSpotEntity.spotEntity
+    private val translation = QSpotCatalogTranslationEntity.spotCatalogTranslationEntity
 
     /**
      * 카탈로그와 번역을 함께 저장한다.
@@ -63,4 +66,22 @@ class SpotCatalogStoreAdapter(
         upsertPort.upsertTranslation(catalogId, language, title, address)
 
     override fun refreshFestivalPeriod(catalogId: Long) = upsertPort.refreshFestivalPeriod(catalogId)
+
+    /**
+     * 원본이 사라진 카탈로그의 번역 행을 지운다.
+     *
+     * 벌크 삭제라 영속성 컨텍스트를 우회한다 — 이 트랜잭션에서 같은 엔티티를 다시 읽는
+     * 코드가 없으므로 안전하다.
+     */
+    @Transactional
+    override fun purgeOrphanTranslations(): Int =
+        queryFactory
+            .delete(translation)
+            .where(
+                JPAExpressions.selectOne().from(spot)
+                    .where(spot.catalogId.eq(translation.catalogId))
+                    .notExists(),
+            )
+            .execute()
+            .toInt()
 }

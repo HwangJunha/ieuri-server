@@ -139,7 +139,6 @@ class SpotSearchJdbcAdapter(
             SELECT id, thumbnail_image_url, category, copyright
             FROM spot_catalog cat
             WHERE cat.id IN ($placeholders)
-              AND ${LiveCatalogPredicate.sql("cat")}
             """.trimIndent(),
             { rs, _ ->
                 rs.getLong("id") to SpotCard(
@@ -286,10 +285,14 @@ class SpotSearchJdbcAdapter(
             ),
         )
 
-        // **카테고리 필터를 걸지 않는다** — 분류는 `spot_catalog`에 있고, 그것을 조인하는 순간
-        // 평면 질의가 깨져 BM25 인덱스 푸시다운이 사라진다. 2단계([loadCards])에서 거르는 것도
-        // 답이 아니다: 한 페이지를 먼저 자른 뒤 거르면 요청한 size보다 적게 나가고 건수도
-        // 어긋난다. 이 제약을 어떻게 풀지는 스펙 결정 사항이라 여기서 임의로 메우지 않는다.
+        // **분류 사본으로 거른다.** 좌표와 같은 이유로 이 테이블에 복사해 두었다(V55) —
+        // `spot_catalog`를 조인하면 평면 질의가 깨져 BM25 인덱스 푸시다운이 사라지고,
+        // 2단계에서 거르면 한 페이지를 자른 뒤 걸러 요청한 size보다 적게 나간다.
+        query.category?.let {
+            conditions += "t.category = ?"
+            params += it.name
+        }
+
         return conditions.joinToString(" AND ") to params
     }
 

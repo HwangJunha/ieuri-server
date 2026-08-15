@@ -89,6 +89,7 @@ class SpotCatalogMapperTest {
             address = "釜山広域市 海雲台区",
             mapX = 129.1234,
             mapY = 35.5678,
+            category = SpotCategory.CULTURAL_FACILITY,
         ).toDomain()
 
         assertEquals("マリンシティ", translation.title)
@@ -105,6 +106,7 @@ class SpotCatalogMapperTest {
             address = null,
             mapX = 129.1234,
             mapY = 35.5678,
+            category = SpotCategory.CULTURAL_FACILITY,
         ).toDomain()
 
         assertEquals("마린시티", translation.title)
@@ -149,6 +151,21 @@ class SpotCatalogMapperTest {
         assertEquals("부산광역시 해운대구", entities[DomainLocale.KO]?.address)
         assertEquals("マリンシティ", entities[DomainLocale.JA]?.title)
         assertEquals("釜山広域市 海雲台区", entities[DomainLocale.JA]?.address)
+    }
+
+    @Test
+    fun `번역 엔티티는 카탈로그의 분류를 사본으로 갖는다`() {
+        // 검색이 평면 질의라 spot_catalog를 조인 못 해 이 사본으로 카테고리를 거른다.
+        // 비면 필터가 죽어 "문화시설로 걸러도 쇼핑이 나오는" 상태가 된다.
+        val catalog = SpotCatalog.restore(
+            id = 4321,
+            standard = standard(),
+            translations = mapOf(DomainLocale.KO to CatalogTranslation("마린시티", null)),
+        )
+
+        val entity = catalog.toNewTranslationEntities(catalogId = 5555).single()
+
+        assertEquals(SpotCategory.CULTURAL_FACILITY, entity.category)
     }
 
     @Test

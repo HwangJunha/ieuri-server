@@ -74,7 +74,7 @@ class SpotQueryService(
 
         // 로그인 회원이 이미 반응(좋아요/패스)한 관광지 제외 — 중복 노출 방지. 비로그인은 제외 없음.
         // **DB 쿼리 단계에서 제외한다** — 조회 후 걸러내면 페이지가 요청한 size보다 작아진다.
-        val excluded = memberId?.let { spotQueryPort.findReactedSpotIds(it, locale) }.orEmpty()
+        val excluded = memberId?.let { spotQueryPort.findReactedSpotIds(it) }.orEmpty()
 
         val search = NearbySpotSearch(
             language = locale,

@@ -32,11 +32,15 @@ class SpotCatalogAssignmentTasklet(
         // 진행 중인 언어를 실행 컨텍스트에 남긴다 — 중단 후 재개해도 같은 지점에서 이어진다.
         val languageIndex = executionContext.getInt(KEY_LANGUAGE_INDEX, 0)
         if (languageIndex >= ASSIGNMENT_ORDER.size) {
+            // **배정을 다 마친 뒤에야 고아를 확정할 수 있다** — 앞에 두면 방금 들어온 장소를
+            // 잠시 원본 없는 것으로 오인한다.
+            val hidden = useCase.hideOrphanCatalogs()
             log.info(
-                "catalog assignment finished: joined={} created={} skipped={}",
+                "catalog assignment finished: joined={} created={} skipped={} orphansHidden={}",
                 executionContext.getInt(KEY_JOINED, 0),
                 executionContext.getInt(KEY_CREATED, 0),
                 executionContext.getInt(KEY_SKIPPED, 0),
+                hidden,
             )
             return RepeatStatus.FINISHED
         }

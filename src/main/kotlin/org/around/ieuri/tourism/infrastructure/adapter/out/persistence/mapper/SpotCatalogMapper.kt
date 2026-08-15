@@ -5,6 +5,7 @@ import org.around.ieuri.tourism.domain.aggregate.CatalogStandardValues
 import org.around.ieuri.tourism.domain.aggregate.CatalogTranslation
 import org.around.ieuri.tourism.domain.aggregate.SpotCatalog
 import org.around.ieuri.tourism.domain.vo.DomainLocale
+import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.SpotCatalogEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.SpotCatalogFestivalEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.SpotCatalogTranslationEntity
@@ -65,7 +66,7 @@ fun SpotCatalog.toNewEntity(): SpotCatalogEntity =
  */
 fun SpotCatalog.toNewTranslationEntities(catalogId: Long): List<SpotCatalogTranslationEntity> =
     translations.map { (language, translation) ->
-        translation.toNewEntity(catalogId, language, standard.mapX, standard.mapY)
+        translation.toNewEntity(catalogId, language, standard.mapX, standard.mapY, standard.category)
     }
 
 /** 번역 값 하나를 새 엔티티로. 좌표는 카탈로그 표준값의 사본이라 밖에서 받는다. */
@@ -74,6 +75,7 @@ fun CatalogTranslation.toNewEntity(
     language: DomainLocale,
     mapX: Double,
     mapY: Double,
+    category: SpotCategory,
 ): SpotCatalogTranslationEntity =
     SpotCatalogTranslationEntity(
         catalogId = catalogId,
@@ -82,6 +84,7 @@ fun CatalogTranslation.toNewEntity(
         address = address,
         mapX = mapX,
         mapY = mapY,
+        category = category,
     )
 
 /** 축제 기간을 새 엔티티로. PK가 catalogId라 upsert 단위이기도 하다. */

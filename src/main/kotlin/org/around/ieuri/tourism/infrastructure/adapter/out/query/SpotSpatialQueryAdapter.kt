@@ -123,7 +123,6 @@ class SpotSpatialQueryAdapter(
             """
             SELECT id FROM spot_catalog cat
             WHERE ST_DWithin(cat.location, $CENTER, ?)
-              AND ${LiveCatalogPredicate.sql("cat")}
               $categoryCondition
             ORDER BY cat.location <-> $CENTER, cat.id
             LIMIT ?
@@ -154,8 +153,6 @@ class SpotSpatialQueryAdapter(
         val conditions = mutableListOf(
             "t.language = ?",
             "ST_DWithin(cat.location, c.center, ?)",
-            // 원본이 사라진 카탈로그는 감춘다 — 상세를 열면 실패하는 장소가 되기 때문이다.
-            LiveCatalogPredicate.sql("cat"),
         )
         val params = mutableListOf<Any>(
             query.center.longitude, query.center.latitude,

@@ -106,8 +106,6 @@ class FestivalQueryJdbcAdapter(
             "f.event_start_date <= ?",
             "f.event_end_date >= ?",
             "ST_DWithin(cat.location, c.center, ?)",
-            // 원본이 사라진 카탈로그는 감춘다 — 상세를 열면 실패하는 장소가 되기 때문이다.
-            LiveCatalogPredicate.sql("cat"),
         )
         val params = listOf<Any>(
             query.center.longitude, query.center.latitude, // CTE의 center

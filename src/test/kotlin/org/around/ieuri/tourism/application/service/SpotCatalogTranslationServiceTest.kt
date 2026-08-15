@@ -143,5 +143,7 @@ class SpotCatalogTranslationServiceTest {
         ) = Unit
 
         override fun refreshFestivalPeriod(catalogId: Long) = Unit
+
+        override fun purgeOrphanTranslations(): Int = 0
     }
 }

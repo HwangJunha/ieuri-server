@@ -23,9 +23,9 @@ interface SpotQueryPort {
 
     /**
      * 이 회원이 이미 반응한 **카탈로그 id** 전체. 반경 조회의 제외 집합이다.
-     * **[language]는 조건이 아니다**(SPEC-0019) — 좋아요는 언어와 무관한 장소 단위 행위다.
+     * **언어를 받지 않는다**(SPEC-0019) — 좋아요는 언어와 무관한 장소 단위 행위다.
      */
-    fun findReactedSpotIds(memberId: Long, language: DomainLocale): Set<Long>
+    fun findReactedSpotIds(memberId: Long): Set<Long>
 
     /**
      * 이 **카탈로그**에 대한 LIKE 반응 수. DISLIKE는 세지 않으며, 반응이 없으면 0.
@@ -46,14 +46,15 @@ interface SpotQueryPort {
      * 카탈로그가 [language]로 보유한 상세 표시 값. 상세 본문이 부재할 때 응답을 구성하고 부재
      * 행의 NOT NULL 컬럼을 채우는 재료다.
      *
-     * **그 언어 번역이 없으면 null이다** — 존재하지 않는 카탈로그와 같게 다룬다. 외국어에만
-     * 있는 장소를 한국어로 조회하면 이 경우이며, 보이지 않는 것이 올바른 동작이다.
+     * [language] 번역을 우선하되 **없으면 다른 언어로 떨어진다.** 외국어에만 있는 장소는 KO
+     * 행이 없어(실측 4,196건) null을 돌려주면 그 장소에 글을 못 쓰고 기존 글의 칩도 사라진다.
+     * 번역이 하나도 없는 카탈로그만 null이며, 그것은 원본이 사라진 장소다.
      */
     fun findSpotBasics(catalogId: Long, language: DomainLocale): SpotBasics?
 
     /**
-     * 여러 카탈로그의 기본 정보를 **IN 절 한 번**으로. 없는 id와 [language] 번역이 없는
-     * 카탈로그는 결과에 키가 없다.
+     * 여러 카탈로그의 기본 정보를 **IN 절 한 번**으로. [language]를 우선하되 없으면 다른
+     * 언어로 떨어진다. 없는 id와 번역이 하나도 없는 카탈로그만 결과에 키가 없다.
      */
     fun findSpotBasicsIn(catalogIds: List<Long>, language: DomainLocale): Map<Long, SpotBasics>
 
