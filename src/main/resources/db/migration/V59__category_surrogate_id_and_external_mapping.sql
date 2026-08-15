@@ -42,9 +42,14 @@ ALTER TABLE category_translation ADD CONSTRAINT category_translation_pkey PRIMAR
 ALTER TABLE category_translation ADD CONSTRAINT fk_category_translation_category
     FOREIGN KEY (category_id) REFERENCES category (id) ON DELETE CASCADE;
 
+-- **컬럼을 지우기 전에 그 컬럼에 걸린 UNIQUE를 먼저 지운다.** DROP COLUMN이 딸린 제약을
+-- 함께 없애 버리므로, 나중에 이름으로 다시 지우려 하면 이미 없어서 실패한다.
+ALTER TABLE app_category DROP CONSTRAINT uq_app_category;
 ALTER TABLE app_category DROP COLUMN category;
 ALTER TABLE app_category ADD CONSTRAINT fk_app_category_category
     FOREIGN KEY (category_id) REFERENCES category (id) ON DELETE CASCADE;
+-- 참조 축이 바뀌었으니 같은 이름으로 다시 건다 — 한 앱·한 언어에 같은 카테고리는 한 번이다.
+ALTER TABLE app_category ADD CONSTRAINT uq_app_category UNIQUE (app_key, language, category_id);
 
 -- ── 2) 외부 코드 매핑 ───────────────────────────────────────────────────
 -- 우리 카테고리 ↔ 외부 제공자 코드. TourAPI의 contentTypeId가 첫 사용처다.
@@ -104,6 +109,3 @@ ALTER TABLE app_category RENAME COLUMN enabled TO active;
 DROP INDEX IF EXISTS idx_app_category_app_language;
 CREATE INDEX idx_app_category_app_language ON app_category (app_key, language, category_id);
 
--- 한 앱·한 언어에 같은 카테고리가 두 번 뜨지 않는다(참조 축이 바뀌어 다시 건다).
-ALTER TABLE app_category DROP CONSTRAINT uq_app_category;
-ALTER TABLE app_category ADD CONSTRAINT uq_app_category UNIQUE (app_key, language, category_id);
