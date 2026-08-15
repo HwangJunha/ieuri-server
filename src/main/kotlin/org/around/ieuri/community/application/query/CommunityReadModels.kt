@@ -117,7 +117,8 @@ data class PostsQuery(
     val latitude: Double?,
     val longitude: Double?,
     val radiusMeters: Int,
-    val category: TargetCategory?,
+    /** 카테고리 선택. 비어 있으면 전체이며, 값이 여럿이면 OR로 결합된다(SPEC-0020). */
+    val categories: Set<TargetCategory>,
     /** 태그 필터. 정규화해 매칭하므로 대소문자를 가리지 않는다. */
     val tag: String?,
     /**

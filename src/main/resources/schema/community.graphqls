@@ -15,8 +15,16 @@ extend type Query {
         longitude: Float
         "검색 반경(미터). 좌표를 줄 때만 쓰인다. 기본 20000, 상한 100000 — 초과 시 절삭."
         radiusMeters: Int = 20000
-        "상단 추천 칩. 글의 카테고리로 거른다. 장소 유무와 무관하다."
-        category: TargetCategory
+        """
+        카테고리 다중 필터. 글의 카테고리로 거르며 장소 유무와 무관하다.
+
+        선택된 값들은 **OR**로 결합된다. 생략하거나 null이면 전 카테고리가 대상이다.
+        **빈 배열은 거절된다**(EMPTY_CATEGORY_SET) — "필터 없음"도 "결과 없음"도 아니기
+        때문이다. 개수 상한은 없다.
+
+        관광지 조회(`spots`·`searchSpots` 등)의 `categories`와 같은 규약이다.
+        """
+        categories: [TargetCategory!]
         "태그로 필터링. 대소문자와 선행 #을 가리지 않는다. 생략하면 전체."
         tag: String
         "정렬 방식. 무엇이 보이는지까지 정한다 — PostSortOrder 설명 참고."

@@ -1,6 +1,6 @@
 package org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper
 
-import org.around.ieuri.tourism.application.exception.EmptyCategorySetException
+import org.around.ieuri.common.error.EmptyCategorySetException
 import org.around.ieuri.tourism.domain.vo.CategorySelection
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 

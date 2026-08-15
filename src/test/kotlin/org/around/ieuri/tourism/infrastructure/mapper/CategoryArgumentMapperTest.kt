@@ -1,6 +1,6 @@
 package org.around.ieuri.tourism.infrastructure.mapper
 
-import org.around.ieuri.tourism.application.exception.EmptyCategorySetException
+import org.around.ieuri.common.error.EmptyCategorySetException
 import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toCategorySelection
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -47,6 +47,6 @@ class CategoryArgumentMapperTest {
             toCategorySelection(emptyList())
         }
 
-        assertEquals("EMPTY_CATEGORY_SET", thrown.logicalCode)
+        assertEquals("EMPTY_CATEGORY_SET", thrown.code)
     }
 }

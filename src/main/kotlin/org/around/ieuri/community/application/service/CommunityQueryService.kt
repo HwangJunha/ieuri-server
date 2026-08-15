@@ -56,7 +56,7 @@ class CommunityQueryService(
         val search = PostsSearch(
             catalogId = query.catalogId,
             area = resolveArea(query),
-            category = query.category,
+            categories = query.categories,
             // 태그는 정규화해 넘긴다 — 대소문자·선행 #을 가리지 않게 하려는 것이다.
             normalizedTag = query.tag?.let { PostTag.parseOrNull(it)?.normalized },
             sort = effectiveSort(query),

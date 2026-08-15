@@ -92,7 +92,7 @@ class CommunityQueryAdapter(
             after = search.after,
             extraConditions = listOfNotNull(
                 spotCondition(search.catalogId),
-                categoryCondition(search.category),
+                categoryCondition(search.categories),
                 tagCondition(search.normalizedTag),
                 hideCondition(search),
             ),
@@ -130,11 +130,12 @@ class CommunityQueryAdapter(
             )
         }
 
-    private fun categoryCondition(category: TargetCategory?): BooleanExpression? =
-        category?.let {
+    /** 다중 선택은 OR이며 IN으로 표현한다(SPEC-0020). 비어 있으면 조건 자체를 걸지 않는다. */
+    private fun categoryCondition(categories: Set<TargetCategory>): BooleanExpression? =
+        categories.takeIf { it.isNotEmpty() }?.let {
             post.id.`in`(
                 JPAExpressions.select(postChip.postId).from(postChip)
-                    .where(postChip.category.eq(it)),
+                    .where(postChip.category.`in`(it)),
             )
         }
 

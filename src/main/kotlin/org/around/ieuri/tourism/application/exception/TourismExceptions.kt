@@ -47,14 +47,6 @@ class RadiusTooLargeException(message: String) :
     SpotQueryException("RADIUS_TOO_LARGE", Classification.BAD_REQUEST, message)
 
 /**
- * `categories`에 빈 배열이 왔다(SPEC-0020 R6). "필터 없음"으로도 "결과 없음"으로도 해석하지
- * 않는다 — UI는 선택 0개를 만들 수 없으므로 빈 배열이 도착했다면 클라이언트 결함이고,
- * 어느 쪽으로 읽어도 그 결함을 가린다.
- */
-class EmptyCategorySetException(message: String = "카테고리를 하나 이상 선택해 주세요.") :
-    SpotQueryException("EMPTY_CATEGORY_SET", Classification.BAD_REQUEST, message)
-
-/**
  * `category` 테이블에 없는 카테고리 코드로 상세 하위 필드를 물었다(SPEC-0020).
  *
  * **필터에는 이 검증이 없다** — 없는 코드로 거른 목록은 결과가 0건일 뿐이라 해가 없다. 반면

@@ -164,8 +164,8 @@ data class PostsSearch(
     val catalogId: Long?,
     /** 좌표 반경. null이면 반경으로 좁히지 않는다. */
     val area: PostsArea?,
-    /** 상단 칩. null이면 카테고리로 좁히지 않는다. */
-    val category: TargetCategory?,
+    /** 카테고리 선택. 비어 있으면 좁히지 않고, 값이 여럿이면 IN으로 거른다(OR). */
+    val categories: Set<TargetCategory>,
     /** 정규화된 태그. null이면 태그로 좁히지 않는다. */
     val normalizedTag: String?,
     /**

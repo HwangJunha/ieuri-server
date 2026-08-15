@@ -89,7 +89,7 @@ class CommunityQueryServiceTest {
         latitude: Double? = null,
         longitude: Double? = null,
         radiusMeters: Int = 20_000,
-        category: TargetCategory? = null,
+        categories: Set<TargetCategory> = emptySet(),
         sort: PostSortOrder = PostSortOrder.LATEST,
         hiddenByViewer: Boolean = false,
         first: Int = 20,
@@ -98,7 +98,7 @@ class CommunityQueryServiceTest {
         latitude = latitude,
         longitude = longitude,
         radiusMeters = radiusMeters,
-        category = category,
+        categories = categories,
         tag = null,
         sort = sort,
         hiddenByViewer = hiddenByViewer,
@@ -193,9 +193,9 @@ class CommunityQueryServiceTest {
         givenBlocked()
         val search = captureSearch()
 
-        service.posts(query(category = TargetCategory.RESTAURANT), memberId)
+        service.posts(query(categories = setOf(TargetCategory.RESTAURANT)), memberId)
 
-        assertEquals(TargetCategory.RESTAURANT, search.captured.category)
+        assertEquals(setOf(TargetCategory.RESTAURANT), search.captured.categories)
     }
 
     @Test
@@ -205,7 +205,7 @@ class CommunityQueryServiceTest {
 
         service.posts(query(), memberId)
 
-        assertNull(search.captured.category)
+        assertTrue(search.captured.categories.isEmpty())
     }
 
     // ---------- 모더레이션 ----------
@@ -386,11 +386,11 @@ class CommunityQueryServiceTest {
         givenBlocked()
         val search = captureSearch()
 
-        service.posts(query(latitude = 37.5, longitude = 127.0, category = TargetCategory.RESTAURANT), memberId)
+        service.posts(query(latitude = 37.5, longitude = 127.0, categories = setOf(TargetCategory.RESTAURANT)), memberId)
 
         // 목록을 경유하면 그 상한(2000)이 곧 피드의 한계가 된다 — 실측하면 기본 반경 20km에
         // spot이 12,000개가 넘어 대부분이 조용히 잘렸다. 이제 그 포트 자체가 없다.
-        assertEquals(TargetCategory.RESTAURANT, search.captured.category)
+        assertEquals(setOf(TargetCategory.RESTAURANT), search.captured.categories)
         assertEquals(127.0, search.captured.area?.longitude)
     }
 

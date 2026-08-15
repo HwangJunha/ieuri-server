@@ -21,6 +21,7 @@ import org.around.ieuri.community.application.query.MyPostsQuery
 import org.around.ieuri.community.application.query.PostsQuery
 import org.around.ieuri.community.domain.vo.PostSortOrder
 import org.around.ieuri.community.domain.vo.TargetCategory
+import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper.toTargetCategories
 import org.around.ieuri.common.graphql.appKey
 import org.around.ieuri.community.infrastructure.locale.contentLanguage
 import org.springframework.stereotype.Component
@@ -60,7 +61,7 @@ class CommunityQueryResolver(
         @InputArgument latitude: Double?,
         @InputArgument longitude: Double?,
         @InputArgument radiusMeters: Int?,
-        @InputArgument category: GqlTargetCategory?,
+        @InputArgument categories: List<GqlTargetCategory>?,
         @InputArgument tag: String?,
         @InputArgument sort: GqlPostSortOrder?,
         @InputArgument hiddenByViewer: Boolean?,
@@ -74,7 +75,7 @@ class CommunityQueryResolver(
                 latitude = latitude,
                 longitude = longitude,
                 radiusMeters = radiusMeters ?: DEFAULT_RADIUS_METERS,
-                category = category?.let { TargetCategory.valueOf(it.name) },
+                categories = toTargetCategories(categories),
                 tag = tag,
                 // 스키마 기본값이 LATEST라 null이 오는 경우는 없지만, 계약을 코드에도 남긴다.
                 sort = sort?.let { PostSortOrder.valueOf(it.name) } ?: PostSortOrder.LATEST,
