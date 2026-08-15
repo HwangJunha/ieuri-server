@@ -58,12 +58,14 @@ class MapQueryResolver(
         @InputArgument bbox: GqlMapBoundsInput,
         @InputArgument zoom: Int,
         @InputArgument category: GqlSpotCategory?,
+        @InputArgument hasOrigin: Boolean?,
     ): GqlMapViewportResult =
         mapQueryUseCase.mapViewport(
             MapViewportQuery(
                 bounds = bbox.toDomain(),
                 zoom = zoom,
                 category = category?.let { SpotCategory.valueOf(it.name) },
+                hasOrigin = hasOrigin,
             ),
             locale = dfe.domainLocale(),
         ).toGql()

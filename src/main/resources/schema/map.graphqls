@@ -12,6 +12,13 @@ extend type Query {
         zoom: Int!
         "생략하면 전체."
         category: SpotCategory
+        """
+        원문 보유 필터. **생략하면 전체**, true면 요청 언어로 쓰인 원문만, false면 번역본만.
+
+        마커가 상한에 걸려 잘릴 때(truncated) 무엇이 남을지를 정하는 데 쓴다 — 원문 있는
+        곳만 보려면 true로 요청한다.
+        """
+        hasOrigin: Boolean
     ): MapViewportResult!
 
     """

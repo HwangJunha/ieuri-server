@@ -18,6 +18,8 @@ data class MapViewportQuery(
     val bounds: MapBounds,
     val zoom: Int,
     val category: SpotCategory?,
+    /** 원문 보유 필터. null이면 전체다. */
+    val hasOrigin: Boolean?,
 )
 
 /** mapViewport 응답(R1·R3, R12). */
