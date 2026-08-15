@@ -425,21 +425,24 @@ class SpotQueryServiceTest {
 
     /**
      * 노출 구성은 이제 `app_category`가 정한다(SPEC-0020) — 서비스는 앱·언어를 그대로 넘기고
-     * 구성된 **순서를 바꾸지 않는다**.
+     * 포트가 준 목록을 **가공하지 않는다**. 순서는 서버 계약이 아니므로 집합으로만 본다.
      */
     @Test
-    fun `availableCategories는 앱과 언어로 구성을 조회하고 순서를 유지한다`() {
+    fun `availableCategories는 앱과 언어로 구성을 조회해 그대로 돌려준다`() {
         val appKey = AppKey("demo-app")
         every { appCategoryQueryPort.findCategories(appKey, DomainLocale.KO) } returns listOf(
-            AppCategoryView(SpotCategory("RESTAURANT"), "음식점", "https://cdn/restaurant.png", 0),
-            AppCategoryView(SpotCategory("TRAVEL_COURSE"), "여행코스", null, 1),
+            AppCategoryView(SpotCategory("RESTAURANT"), "음식점", "https://cdn/restaurant.png"),
+            AppCategoryView(SpotCategory("TRAVEL_COURSE"), "여행코스", null),
         )
 
         val result = service.availableCategories(appKey, DomainLocale.KO)
 
-        assertEquals(listOf(SpotCategory("RESTAURANT"), SpotCategory("TRAVEL_COURSE")), result.map { it.category })
-        assertEquals(listOf("음식점", "여행코스"), result.map { it.label })
-        assertEquals(listOf("https://cdn/restaurant.png", null), result.map { it.iconUrl })
+        assertEquals(setOf(SpotCategory("RESTAURANT"), SpotCategory("TRAVEL_COURSE")), result.map { it.category }.toSet())
+        assertEquals(mapOf("RESTAURANT" to "음식점", "TRAVEL_COURSE" to "여행코스"), result.associate { it.category.code to it.label })
+        assertEquals(
+            mapOf("RESTAURANT" to "https://cdn/restaurant.png", "TRAVEL_COURSE" to null),
+            result.associate { it.category.code to it.iconUrl },
+        )
         verify(exactly = 1) { appCategoryQueryPort.findCategories(appKey, DomainLocale.KO) }
     }
 
@@ -448,14 +451,13 @@ class SpotQueryServiceTest {
     fun `availableCategoryCodes는 문자열 축으로 같은 구성을 돌려준다`() {
         val appKey = AppKey("k-trip-spot")
         every { appCategoryQueryPort.findCategories(appKey, DomainLocale.JA) } returns
-            listOf(AppCategoryView(SpotCategory("TRANSPORT"), "交通", "https://cdn/transport.png", 2))
+            listOf(AppCategoryView(SpotCategory("TRANSPORT"), "交通", "https://cdn/transport.png"))
 
         val result = service.availableCategoryCodes(appKey, "JA")
 
         assertEquals(listOf("TRANSPORT"), result.map { it.category })
         assertEquals(listOf("交通"), result.map { it.label })
         assertEquals(listOf("https://cdn/transport.png"), result.map { it.iconUrl })
-        assertEquals(listOf(2), result.map { it.position })
     }
 
     /** 정의가 없는 코드는 코드 자체를 라벨로 쓰는 폴백으로 채워 돌려준다 — 호출자가 분기하지 않게 한다. */

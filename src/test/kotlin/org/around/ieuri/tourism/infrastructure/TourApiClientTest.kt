@@ -20,13 +20,9 @@ class TourApiClientTest {
     private val properties = TourApiProperties(
         serviceKey = "dummy",
         baseUrls = mapOf("KO" to "https://ko", "EN" to "https://en"),
-        categoryCodes = mapOf(
-            "KO" to mapOf("SHOPPING" to 38, "TOURIST_SPOT" to 12),
-            "FOREIGN" to mapOf("SHOPPING" to 79, "TOURIST_SPOT" to 76),
-        ),
         excludeLclssystm2 = listOf("EX999"),
     )
-    private val client = TourApiClient(properties, RestClient.create())
+    private val client = TourApiClient(properties, RestClient.create(), TourApiCategoryMappingStub())
 
     private fun item(
         contentId: String = "100",

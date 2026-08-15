@@ -15,18 +15,16 @@ import kotlin.test.assertNull
 class AppCategoryChipMapperTest {
 
     @Test
-    fun `각 필드가 제자리로 옮겨진다`() {
+    fun `카테고리가 이름으로 옮겨진다`() {
         val source = AppCategoryCode(
             category = "FESTIVAL_EVENT",
             label = "축제·행사",
             iconUrl = "https://cdn.example.com/festival.png",
-            position = 4,
         )
 
         val chip = assertNotNull(source.toChipViewOrNull())
 
         assertEquals(TargetCategory.FESTIVAL_EVENT, chip.category)
-        assertEquals(4, chip.position)
     }
 
     /** 커뮤니티가 아는 값은 모두 옮겨져야 한다 — 하나라도 빠지면 그 칩만 조용히 사라진다. */
@@ -46,18 +44,17 @@ class AppCategoryChipMapperTest {
         assertNull(source("BRAND_NEW_CATEGORY").toChipViewOrNull())
     }
 
+    /** 라벨·아이콘은 칩이 쓰지 않는다 — 비어 있어도 카테고리만 옮겨지면 된다. */
     @Test
-    fun `순서가 0이어도 옮겨진다`() {
-        val chip = assertNotNull(source("LODGING", position = 0).toChipViewOrNull())
+    fun `아이콘이 없어도 칩으로 옮겨진다`() {
+        val source = AppCategoryCode(category = "LODGING", label = "숙박", iconUrl = null)
 
-        assertEquals(TargetCategory.LODGING, chip.category)
-        assertEquals(0, chip.position)
+        assertEquals(TargetCategory.LODGING, assertNotNull(source.toChipViewOrNull()).category)
     }
 
-    private fun source(category: String, position: Int = 1) = AppCategoryCode(
+    private fun source(category: String) = AppCategoryCode(
         category = category,
         label = "라벨-$category",
         iconUrl = "https://cdn.example.com/$category.png",
-        position = position,
     )
 }

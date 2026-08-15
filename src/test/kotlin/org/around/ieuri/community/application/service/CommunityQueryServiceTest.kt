@@ -335,11 +335,11 @@ class CommunityQueryServiceTest {
         val trip = AppKey("k-trip-spot")
         val demo = AppKey("demo-app")
         every { categoryConfigPort.findCategories(trip, ContentLanguage.KO) } returns listOf(
-            CommunityChipView(TargetCategory.RESTAURANT, 0),
-            CommunityChipView(TargetCategory.FESTIVAL_EVENT, 1),
+            CommunityChipView(TargetCategory.RESTAURANT),
+            CommunityChipView(TargetCategory.FESTIVAL_EVENT),
         )
         every { categoryConfigPort.findCategories(demo, ContentLanguage.KO) } returns listOf(
-            CommunityChipView(TargetCategory.SHOPPING, 0),
+            CommunityChipView(TargetCategory.SHOPPING),
         )
 
         assertEquals(2, service.communityChips(trip, ContentLanguage.KO).size)
@@ -353,12 +353,12 @@ class CommunityQueryServiceTest {
     fun `칩 구성은 언어별로 갈린다 - 여행코스는 국문, 교통은 외국어 전용이다`() {
         val trip = AppKey("k-trip-spot")
         every { categoryConfigPort.findCategories(trip, ContentLanguage.KO) } returns listOf(
-            CommunityChipView(TargetCategory.RESTAURANT, 0),
-            CommunityChipView(TargetCategory.TRAVEL_COURSE, 1),
+            CommunityChipView(TargetCategory.RESTAURANT),
+            CommunityChipView(TargetCategory.TRAVEL_COURSE),
         )
         every { categoryConfigPort.findCategories(trip, ContentLanguage.EN) } returns listOf(
-            CommunityChipView(TargetCategory.RESTAURANT, 0),
-            CommunityChipView(TargetCategory.TRANSPORT, 1),
+            CommunityChipView(TargetCategory.RESTAURANT),
+            CommunityChipView(TargetCategory.TRANSPORT),
         )
 
         val ko = service.communityChips(trip, ContentLanguage.KO).map { it.category }

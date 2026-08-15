@@ -24,10 +24,6 @@ class TourApiSyncClientTest {
     private val properties = TourApiProperties(
         serviceKey = "dummy",
         baseUrls = mapOf("KO" to "https://ko", "EN" to "https://en"),
-        categoryCodes = mapOf(
-            "KO" to mapOf("SHOPPING" to 38, "TOURIST_SPOT" to 12),
-            "FOREIGN" to mapOf("SHOPPING" to 79, "TOURIST_SPOT" to 76),
-        ),
         excludeLclssystm2 = listOf("EX999"),
     )
 
@@ -36,7 +32,7 @@ class TourApiSyncClientTest {
         keywords = listOf("약국", "Pharmacy", "CU", "의원"),
         branchNamePatterns = listOf("병원점"),
     )
-    private val client = TourApiSyncClient(properties, RestClient.create(), exclusionRule)
+    private val client = TourApiSyncClient(properties, RestClient.create(), exclusionRule, TourApiCategoryMappingStub())
 
     private fun item(
         contentId: String? = "100",
@@ -255,6 +251,7 @@ class TourApiSyncClientTest {
             properties,
             RestClient.create(),
             SpotExclusionRule(keywords = emptyList(), branchNamePatterns = emptyList()),
+            TourApiCategoryMappingStub(),
         )
 
         val page = permissive.mapPage(

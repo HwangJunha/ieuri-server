@@ -25,13 +25,9 @@ class TourApiDetailMappingTest {
     private val properties = TourApiProperties(
         serviceKey = "dummy",
         baseUrls = mapOf("KO" to "https://ko", "EN" to "https://en"),
-        categoryCodes = mapOf(
-            "KO" to mapOf("TOURIST_SPOT" to 12, "SHOPPING" to 38),
-            "FOREIGN" to mapOf("TOURIST_SPOT" to 76),
-        ),
         excludeLclssystm2 = emptyList(),
     )
-    private val client = TourApiClient(properties, RestClient.create())
+    private val client = TourApiClient(properties, RestClient.create(), TourApiCategoryMappingStub())
     private val mapper = jacksonObjectMapper()
 
     private fun commonItem(
