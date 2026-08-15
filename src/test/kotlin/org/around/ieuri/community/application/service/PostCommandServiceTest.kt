@@ -38,7 +38,7 @@ import kotlin.test.assertTrue
 class PostCommandServiceTest {
 
     private val memberId = 7L
-    private val spotId = 42L
+    private val catalogId = 420L
     private val now = Instant.parse("2026-08-05T00:00:00Z")
 
     private val postRepository = mockk<PostRepositoryPort>()
@@ -51,14 +51,14 @@ class PostCommandServiceTest {
     private fun confirmedKey(owner: Long = memberId) = "images/community/$owner/${UUID.randomUUID()}"
 
     private fun givenValidSpotAndAuthor() {
-        every { spotLookup.findSummary(spotId) } returns
+        every { spotLookup.findSummary(catalogId) } returns
             PostSpotView(
-                id = spotId,
+                id = catalogId,
                 title = "경복궁",
                 thumbnailImageUrl = "https://img/1.jpg",
                 category = null,
-        longitude = 127.0,
-        latitude = 37.5,
+                longitude = 127.0,
+                latitude = 37.5,
             )
     }
 
@@ -68,7 +68,7 @@ class PostCommandServiceTest {
             Post.restore(
                 id = 1L,
                 category = p.category,
-                spotId = p.spotId,
+                catalogId = p.catalogId,
                 authorId = p.authorId,
                 tags = p.tags,
                 title = p.title,
@@ -91,7 +91,7 @@ class PostCommandServiceTest {
         service.createPost(
             CreatePostCommand(
                 category = TargetCategory.TOURIST_SPOT,
-            spotId = spotId, tags = emptyList(),
+                catalogId = catalogId, tags = emptyList(),
                 title = title, body = body, photoKeys = photoKeys,
             ),
             memberId,
@@ -142,7 +142,7 @@ class PostCommandServiceTest {
 
     @Test
     fun `존재하지 않는 대상이면 SPOT_NOT_FOUND이고 글은 생성되지 않는다`() {
-        every { spotLookup.findSummary(spotId) } returns null
+        every { spotLookup.findSummary(catalogId) } returns null
 
         assertFailsWith<SpotNotFoundException> { create() }
         verify(exactly = 0) { postRepository.save(any()) }
@@ -210,7 +210,7 @@ class PostCommandServiceTest {
     fun `작성자는 자신의 글을 삭제할 수 있다`() {
         val post = Post.restore(
             id = 1L, category = TargetCategory.TOURIST_SPOT,
-            spotId = spotId, authorId = memberId, tags = emptyList(),
+            catalogId = catalogId, authorId = memberId, tags = emptyList(),
             title = "제목", body = "본문", photoKeys = emptyList(), likeCount = 0, commentCount = 0,
             hidden = false, deletedAt = null, createdAt = now,
         )
@@ -226,7 +226,7 @@ class PostCommandServiceTest {
     fun `타인의 글 삭제는 NOT_POST_OWNER이고 글은 삭제되지 않는다`() {
         val post = Post.restore(
             id = 1L, category = TargetCategory.TOURIST_SPOT,
-            spotId = spotId, authorId = memberId, tags = emptyList(),
+            catalogId = catalogId, authorId = memberId, tags = emptyList(),
             title = "제목", body = "본문", photoKeys = emptyList(), likeCount = 0, commentCount = 0,
             hidden = false, deletedAt = null, createdAt = now,
         )
@@ -239,7 +239,7 @@ class PostCommandServiceTest {
 
     private fun storedPost(hidden: Boolean = false, authorId: Long = memberId) = Post.restore(
         id = 1L, category = TargetCategory.TOURIST_SPOT,
-        spotId = spotId, authorId = authorId, tags = emptyList(),
+        catalogId = catalogId, authorId = authorId, tags = emptyList(),
         // 저장소가 좌표까지 복원한다 — 빠뜨리면 장소를 안 바꾼 수정에서도 연결이 지워진다.
         spotPoint = SpotPoint(127.0, 37.5),
         title = "원래 제목", body = "원래 본문", photoKeys = emptyList(),
@@ -258,7 +258,7 @@ class PostCommandServiceTest {
 
         // null은 "건드리지 않는다"는 뜻이다 — 빈 값과 다르다.
         assertEquals(TargetCategory.TOURIST_SPOT, post.category)
-        assertEquals(spotId, post.spotId)
+        assertEquals(catalogId, post.catalogId)
         assertTrue(post.tags.isEmpty())
     }
 
@@ -293,17 +293,17 @@ class PostCommandServiceTest {
         val post = storedPost()
         every { postRepository.findById(1L) } returns post
         every { postRepository.save(any()) } returns post
-        every { spotLookup.findSummary(99L) } returns PostSpotView(
-            id = 99L, title = "새 장소", thumbnailImageUrl = "url", category = null,
+        every { spotLookup.findSummary(990L) } returns PostSpotView(
+            id = 990L, title = "새 장소", thumbnailImageUrl = "url", category = null,
             longitude = 128.5, latitude = 35.5,
         )
 
         service.editPost(
-            EditPostCommand(1L, "제목", "본문", null, changeSpot = true, spotId = 99L),
+            EditPostCommand(1L, "제목", "본문", null, changeSpot = true, catalogId = 990L),
             memberId,
         )
 
-        assertEquals(99L, post.spotId)
+        assertEquals(990L, post.catalogId)
         assertEquals(SpotPoint(128.5, 35.5), post.spotPoint)
     }
 
@@ -313,23 +313,23 @@ class PostCommandServiceTest {
         every { postRepository.findById(1L) } returns post
         every { postRepository.save(any()) } returns post
 
-        // spotId를 주지 않은 채 changeSpot만 true — 장소를 떼겠다는 뜻이다.
+        // catalogId를 주지 않은 채 changeSpot만 true — 장소를 떼겠다는 뜻이다.
         service.editPost(
-            EditPostCommand(1L, "제목", "본문", null, changeSpot = true, spotId = null),
+            EditPostCommand(1L, "제목", "본문", null, changeSpot = true, catalogId = null),
             memberId,
         )
 
-        assertNull(post.spotId)
+        assertNull(post.catalogId)
         assertNull(post.spotPoint)
     }
 
     @Test
     fun `없는 장소로 바꾸면 SPOT_NOT_FOUND다`() {
-        every { spotLookup.findSummary(99L) } returns null
+        every { spotLookup.findSummary(990L) } returns null
 
         assertFailsWith<SpotNotFoundException> {
             service.editPost(
-                EditPostCommand(1L, "제목", "본문", null, changeSpot = true, spotId = 99L),
+                EditPostCommand(1L, "제목", "본문", null, changeSpot = true, catalogId = 990L),
                 memberId,
             )
         }
@@ -355,7 +355,7 @@ class PostCommandServiceTest {
     fun `빈 배열을 주면 태그를 전부 뗀다`() {
         val post = Post.restore(
             id = 1L, category = TargetCategory.TOURIST_SPOT,
-            spotId = spotId, authorId = memberId,
+            catalogId = catalogId, authorId = memberId,
             spotPoint = SpotPoint(127.0, 37.5),
             tags = listOf(PostTag.restore("야경", "야경")),
             title = "제목", body = "본문", photoKeys = emptyList(),

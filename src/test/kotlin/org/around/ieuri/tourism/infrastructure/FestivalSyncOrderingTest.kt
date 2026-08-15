@@ -1,17 +1,20 @@
 package org.around.ieuri.tourism.infrastructure
 
 import io.mockk.mockk
+import org.around.ieuri.tourism.application.port.`in`.command.SpotCatalogUseCase
 import org.around.ieuri.tourism.application.port.out.client.FestivalSyncPort
 import org.around.ieuri.tourism.application.port.out.client.SpotSyncPort
 import org.around.ieuri.tourism.application.port.out.persistence.FestivalStorePort
 import org.around.ieuri.tourism.application.port.out.persistence.SpotStorePort
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.infrastructure.batch.FestivalSyncProperties
+import org.around.ieuri.tourism.infrastructure.batch.SpotCatalogProperties
 import org.around.ieuri.tourism.infrastructure.batch.SpotSyncJobConfig
 import org.around.ieuri.tourism.infrastructure.batch.SpotSyncProperties
 import org.springframework.batch.core.job.SimpleJob
 import org.springframework.batch.core.repository.JobRepository
 import org.springframework.transaction.PlatformTransactionManager
+import tools.jackson.databind.ObjectMapper
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -35,6 +38,9 @@ class FestivalSyncOrderingTest {
         festivalSyncPort = mockk<FestivalSyncPort>(),
         festivalStorePort = mockk<FestivalStorePort>(),
         festivalProperties = FestivalSyncProperties(),
+        catalogUseCase = mockk<SpotCatalogUseCase>(),
+        catalogProperties = SpotCatalogProperties(),
+        objectMapper = mockk<ObjectMapper>(),
     )
 
     private val stepNames: List<String>
@@ -63,6 +69,7 @@ class FestivalSyncOrderingTest {
         // 스펙 §선행 조사·§비범위. 별도 잡이면 두 잡의 정리가 서로의 행을 지우고, 관광지 수집이
         // 종료 축제를 되살린다 — R-9가 성립하려면 한 잡 안에서 순서가 보장되어야 한다.
         assertEquals(SpotSyncJobConfig.JOB_NAME, config.spotSyncJob().name)
-        assertEquals(8, stepNames.size)
+        // 관광지 4 + 축제 4 + 카탈로그 배정·번역대상조회 2(SPEC-0019).
+        assertEquals(10, stepNames.size)
     }
 }

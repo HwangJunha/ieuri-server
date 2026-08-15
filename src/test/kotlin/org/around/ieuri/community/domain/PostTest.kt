@@ -18,7 +18,7 @@ import kotlin.test.assertTrue
 class PostTest {
 
     private val authorId = 7L
-    private val spotId = 42L
+    private val catalogId = 420L
 
     private fun confirmedKey(memberId: Long = authorId): PhotoObjectKey =
         PhotoObjectKey.issue(memberId, UUID.randomUUID()).toConfirmed()
@@ -29,8 +29,8 @@ class PostTest {
         photoKeys: List<PhotoObjectKey> = emptyList(),
     ) = Post.create(
         category = TargetCategory.TOURIST_SPOT,
-        spotId = spotId,
-        spotPoint = spotId?.let { SpotPoint(127.0, 37.5) },
+        catalogId = catalogId,
+        spotPoint = SpotPoint(127.0, 37.5),
         authorId = authorId,
         tags = emptyList(),
         title = title,
@@ -232,9 +232,9 @@ class PostTest {
     fun `장소를 바꾸면 좌표도 함께 바뀐다`() {
         val post = create()
 
-        post.changeSpot(99L, SpotPoint(128.5, 35.5))
+        post.changeSpot(990L, SpotPoint(128.5, 35.5))
 
-        assertEquals(99L, post.spotId)
+        assertEquals(990L, post.catalogId)
         assertEquals(SpotPoint(128.5, 35.5), post.spotPoint)
     }
 
@@ -244,7 +244,7 @@ class PostTest {
 
         post.changeSpot(null, null)
 
-        assertNull(post.spotId)
+        assertNull(post.catalogId)
         assertNull(post.spotPoint)
     }
 
@@ -253,7 +253,7 @@ class PostTest {
         val post = create()
 
         // 좌표 없이 장소만 바꾸면 그 글이 지역 피드의 거리순에서 조용히 사라진다.
-        assertFailsWith<IllegalArgumentException> { post.changeSpot(99L, null) }
+        assertFailsWith<IllegalArgumentException> { post.changeSpot(990L, null) }
         assertFailsWith<IllegalArgumentException> { post.changeSpot(null, SpotPoint(127.0, 37.5)) }
     }
 

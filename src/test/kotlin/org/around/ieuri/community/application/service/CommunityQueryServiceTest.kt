@@ -9,7 +9,6 @@ import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.CursorPageInfo
 import org.around.ieuri.community.application.event.PostViewed
 import org.around.ieuri.community.application.policy.CommunityPolicy
-import org.around.ieuri.community.application.port.out.client.SpotLookupPort
 import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
 import org.around.ieuri.community.application.port.out.query.BlockedUsersSearch
 import org.around.ieuri.community.application.port.out.query.CommunityQueryPort
@@ -22,7 +21,6 @@ import org.around.ieuri.community.application.query.BlockedUsersQuery
 import org.around.ieuri.community.application.query.CommunityChipView
 import org.around.ieuri.community.application.query.MyPostsQuery
 import org.around.ieuri.community.application.query.PostCommentsQuery
-import org.around.ieuri.community.application.query.PostSpotView
 import org.around.ieuri.community.application.query.PostView
 import org.around.ieuri.community.application.query.PostsQuery
 import org.around.ieuri.community.domain.vo.AppKey
@@ -49,7 +47,6 @@ class CommunityQueryServiceTest {
     private val memberId = 7L
 
     private val queryPort = mockk<CommunityQueryPort>()
-    private val spotLookup = mockk<SpotLookupPort>()
     private val spatialPort = mockk<PostSpatialQueryPort>()
 
     private val policy = CommunityPolicy(
@@ -64,7 +61,7 @@ class CommunityQueryServiceTest {
     private val eventPublisher = mockk<CommunityEventPublisherPort>(relaxed = true)
 
     private val service = CommunityQueryService(
-        queryPort, spatialPort, spotLookup, eventPublisher, policy,
+        queryPort, spatialPort, eventPublisher, policy,
     )
 
     private fun <T> emptyPage() = CursorPage<T>(
@@ -85,7 +82,7 @@ class CommunityQueryServiceTest {
 
     /** 대상·좌표를 주지 않은 전체 피드 조회. 개별 테스트가 필요한 인자만 덮어쓴다. */
     private fun query(
-        spotId: Long? = null,
+        catalogId: Long? = null,
         latitude: Double? = null,
         longitude: Double? = null,
         radiusMeters: Int = 20_000,
@@ -94,7 +91,7 @@ class CommunityQueryServiceTest {
         hiddenByViewer: Boolean = false,
         first: Int = 20,
     ) = PostsQuery(
-        spotId = spotId,
+        catalogId = catalogId,
         latitude = latitude,
         longitude = longitude,
         radiusMeters = radiusMeters,
@@ -119,9 +116,11 @@ class CommunityQueryServiceTest {
         givenBlocked()
         val search = captureSearch()
 
-        service.posts(query(spotId = 42L), memberId)
+        // **클라이언트가 카탈로그 id를 그대로 보낸다**(SPEC-0019 R-12) — 목록·상세가 이미 그
+        // 축으로 id를 내려주므로 서버가 spot.id를 다시 해석할 것이 없다.
+        service.posts(query(catalogId = 420L), memberId)
 
-        assertEquals(42L, search.captured.spotId)
+        assertEquals(420L, search.captured.catalogId)
         assertNull(search.captured.area)
     }
 
@@ -132,7 +131,7 @@ class CommunityQueryServiceTest {
 
         service.posts(query(), memberId)
 
-        assertNull(search.captured.spotId)
+        assertNull(search.captured.catalogId)
         assertNull(search.captured.area)
     }
 
@@ -165,10 +164,10 @@ class CommunityQueryServiceTest {
         givenBlocked()
         val search = captureSearch()
 
-        service.posts(query(spotId = 42L, latitude = 37.5, longitude = 127.0), memberId)
+        service.posts(query(catalogId = 420L, latitude = 37.5, longitude = 127.0), memberId)
 
         // 서로 배타적이지 않다 — 둘 다 걸면 그 장소이면서 반경 안인 글이 나온다.
-        assertEquals(42L, search.captured.spotId)
+        assertEquals(420L, search.captured.catalogId)
         assertEquals(127.0, search.captured.area?.longitude)
     }
 
@@ -194,8 +193,6 @@ class CommunityQueryServiceTest {
         service.posts(query(category = TargetCategory.RESTAURANT), memberId)
 
         assertEquals(TargetCategory.RESTAURANT, search.captured.category)
-        // 카테고리를 알아내려고 장소를 물을 이유가 없다.
-        verify(exactly = 0) { spotLookup.findSummaries(any()) }
     }
 
     @Test
@@ -533,7 +530,7 @@ class CommunityQueryServiceTest {
         verify(exactly = 0) { queryPort.findTagsOf(any()) }
         verify(exactly = 0) { queryPort.findPhotoKeysOf(any()) }
         verify(exactly = 0) { queryPort.findCategoriesOf(any()) }
-        verify(exactly = 0) { queryPort.findSpotIdsOf(any()) }
+        verify(exactly = 0) { queryPort.findCatalogIdsOf(any()) }
         verify(exactly = 0) { queryPort.findLikedPostIds(any(), any()) }
     }
 
@@ -546,7 +543,7 @@ class CommunityQueryServiceTest {
 
         verify(exactly = 0) { queryPort.findTagsOf(any()) }
         verify(exactly = 0) { queryPort.findCategoriesOf(any()) }
-        verify(exactly = 0) { queryPort.findSpotIdsOf(any()) }
+        verify(exactly = 0) { queryPort.findCatalogIdsOf(any()) }
     }
 
     @Test
@@ -587,12 +584,4 @@ class CommunityQueryServiceTest {
         createdAt = Instant.parse("2026-08-05T00:00:00Z"),
     )
 
-    private fun summary(spotId: Long, category: TargetCategory?) = PostSpotView(
-        id = spotId,
-        title = "대상",
-        thumbnailImageUrl = "url",
-        category = category,
-        longitude = 127.0,
-        latitude = 37.5,
-    )
 }

@@ -72,6 +72,14 @@ ieuri:
     # 실측: 이 값으로 252개 중 226개 선정.
     min-spot-count: 10
 
+  # 카탈로그 배정·번역·보고(SPEC-0019). 잡은 spotSyncJob에 Step으로 붙어 있다.
+  catalog:
+    # 한 회차에 찾을 번역 대상 수. 메일 첨부 크기를 감당 가능한 선으로 끊는다.
+    translation-batch-size: 200
+
+    # 번역 요청 메일 수신자. **비면 발송하지 않는다** — 대상 조회는 그대로 돌고 알림만 빠진다.
+    translation-request-mail-to: ${IEURI_TRANSLATION_MAIL_TO:tarot1415@gmail.com}
+
 logging:
   level:
     org.springframework.batch: INFO

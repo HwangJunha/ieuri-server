@@ -13,12 +13,12 @@ import java.time.Instant
  * 사진·spot·작성자·좋아요 여부는 각자 다른 곳에 있어 **여기 없다** — 클라이언트가 그 필드를
  * 고른 경우에만 DataLoader가 한 번에 읽는다(PostView와 같은 이유).
  *
- * [spotId]만 예외로 담는다 — 같은 행의 컬럼이라 추가 조회가 없고, spot 상세 조회의 입력이다.
+ * [catalogId]만 예외로 담는다 — 같은 행의 컬럼이라 추가 조회가 없고, spot 상세 조회의 입력이다.
  */
 data class FeedItemView(
     val id: Long,
     val body: String,
-    val spotId: Long,
+    val catalogId: Long,
     val authorId: Long,
     val likeCount: Int,
     val ownedByViewer: Boolean,

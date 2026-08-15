@@ -24,7 +24,7 @@ import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.
  */
 fun FeedItemEntity.toDomain(photoKeys: List<PhotoObjectKey>): FeedItem = FeedItem.restore(
     id = requireNotNull(id) { "적재된 피드에는 id가 있어야 한다." },
-    spotId = spotId,
+    catalogId = catalogId,
     authorId = authorId,
     body = body,
     photoKeys = photoKeys,
@@ -37,7 +37,7 @@ fun FeedItemEntity.toDomain(photoKeys: List<PhotoObjectKey>): FeedItem = FeedIte
 /** 도메인 피드를 새 엔티티로. id·시각은 DB가 채우고, 사진은 id가 정해진 뒤 따로 적재한다. */
 fun FeedItem.toNewEntity(): FeedItemEntity = FeedItemEntity(
     authorId = authorId,
-    spotId = spotId,
+    catalogId = catalogId,
     body = body,
     likeCount = likeCount,
     hidden = hidden,

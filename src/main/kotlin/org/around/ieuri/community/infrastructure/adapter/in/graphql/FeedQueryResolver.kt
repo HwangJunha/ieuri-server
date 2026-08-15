@@ -115,10 +115,10 @@ class FeedQueryResolver(
      */
     @DgsData(parentType = "FeedItem", field = "spot")
     fun feedItemSpot(dfe: DgsDataFetchingEnvironment): CompletableFuture<GqlPostSpot> {
-        val spotId = dfe.feedItemSource().spotId
+        val catalogId = dfe.feedItemSource().catalogId
         return dfe.loader<PostSpotView>(PostSpotDataLoader.NAME)
-            .load(spotId)
-            .thenApply { it?.toGql() ?: unresolvedSpot(spotId) }
+            .load(catalogId)
+            .thenApply { it?.toGql() ?: unresolvedSpot(catalogId) }
     }
 
     @DgsData(parentType = "FeedItem", field = "author")
@@ -215,8 +215,8 @@ class FeedQueryResolver(
      * spot을 못 읽어도 **피드 자체는 정상 반환된다**(AC13-2). spot이 non-null이라 자리를
      * 비울 수 없으므로 id만 담은 자리표시자를 내려준다 — 클라이언트는 id로 상세를 다시 물을 수 있다.
      */
-    private fun unresolvedSpot(spotId: Long) = GqlPostSpot(
-        id = spotId,
+    private fun unresolvedSpot(catalogId: Long) = GqlPostSpot(
+        id = catalogId,
         title = "",
         thumbnailImageUrl = "",
         category = null,

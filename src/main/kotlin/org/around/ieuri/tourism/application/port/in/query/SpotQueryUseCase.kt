@@ -52,19 +52,22 @@ interface SpotQueryUseCase {
     fun spotLikeCount(spotId: Long): Long
 
     /**
-     * spot 행이 보유한 최소 식별 정보. **upstream을 호출하지 않는다** — `spot` 한 행을 읽을 뿐이다.
+     * 카탈로그가 보유한 최소 식별 정보. **upstream을 호출하지 않는다** — 한 행을 읽을 뿐이다.
      *
-     * 다른 도메인이 spotId 유효성을 확인하고 칩·요약을 그릴 때 쓰는 진입점이다. 그 용도로
+     * 다른 도메인이 장소 id의 유효성을 확인하고 칩·요약을 그릴 때 쓰는 진입점이다. 그 용도로
      * [spotDetail]을 쓰면 검증 한 번에 TourAPI 왕복이 붙는다. 부재는 예외가 아니라 null이다.
      */
-    fun spotSummary(spotId: Long): SpotSummaryView?
+    fun spotSummary(catalogId: Long): SpotSummaryView?
 
-    /** 여러 spot 요약을 **한 번에**. 목록을 그리는 호출자가 행마다 묻지 않게 한다. */
-    fun spotSummaries(spotIds: List<Long>): Map<Long, SpotSummaryView>
+    /** 여러 카탈로그 요약을 **한 번에**. 목록을 그리는 호출자가 행마다 묻지 않게 한다. */
+    fun spotSummaries(catalogIds: List<Long>): Map<Long, SpotSummaryView>
 
     /**
-     * 좌표 반경 안에 있는 spot의 id. 다른 도메인이 "이 반경의 spot들"을 조건으로 쓸 때의 진입점이며,
-     * `spot` 테이블을 아는 코드가 tourism 안에 머물게 한다.
+     * 좌표 반경 안에 있는 **장소(카탈로그)의 id**. 다른 도메인이 "이 반경의 장소들"을 조건으로
+     * 쓸 때의 진입점이며, tourism의 테이블을 아는 코드가 tourism 안에 머물게 한다.
+     *
+     * **돌려주는 축은 `spot_catalog.id`다**(SPEC-0019 R-12) — 다른 도메인이 장소를 저장할 때
+     * 쓰는 축과 같다. 언어별 `spot.id`를 주면 호출자가 다시 환산해야 한다.
      *
      * **가까운 순으로 돌려준다.** [limit]을 넘는 결과는 조용히 잘리므로 — 반경이 넓으면 수만
      * 건이 되어 호출자의 `IN` 절을 무너뜨린다 — 잘리는 쪽이 먼 spot이어야 한다.

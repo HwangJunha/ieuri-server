@@ -44,4 +44,6 @@ class SearchCursorsTest {
         assertFailsWith<IllegalArgumentException> { DistanceCursor.decode("") }
     }
 
+
+
 }

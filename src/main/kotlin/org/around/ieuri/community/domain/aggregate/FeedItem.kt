@@ -17,7 +17,7 @@ import java.time.Instant
 class FeedItem private constructor(
     val id: Long?,
     /** 연결된 장소. **필수다** — 피드에서 spot은 장식이 아니라 여행지로 들어가는 입구다. */
-    val spotId: Long,
+    val catalogId: Long,
     val authorId: Long,
     body: String,
     photoKeys: List<PhotoObjectKey>,
@@ -79,13 +79,13 @@ class FeedItem private constructor(
          * 물어야 하므로 애플리케이션 계층의 책임이다.
          */
         fun create(
-            spotId: Long,
+            catalogId: Long,
             authorId: Long,
             body: String,
             photoKeys: List<PhotoObjectKey>,
         ): FeedItem {
             require(authorId > 0) { "authorId는 양수여야 합니다." }
-            require(spotId > 0) { "spotId는 양수여야 합니다." }
+            require(catalogId > 0) { "catalogId는 양수여야 합니다." }
             val trimmed = body.trim()
             require(trimmed.isNotEmpty()) { "본문은 비어 있을 수 없습니다." }
             require(trimmed.length <= BODY_MAX_LENGTH) { "본문은 ${BODY_MAX_LENGTH}자를 넘을 수 없습니다." }
@@ -95,7 +95,7 @@ class FeedItem private constructor(
             require(photoKeys.all { it.confirmed }) { "업로드 확인을 마치지 않은 사진 키입니다." }
             return FeedItem(
                 id = null,
-                spotId = spotId,
+                catalogId = catalogId,
                 authorId = authorId,
                 body = trimmed,
                 photoKeys = photoKeys,
@@ -109,7 +109,7 @@ class FeedItem private constructor(
         /** 저장소에서 복원. 불변식은 생성 시점에 이미 통과했으므로 다시 검사하지 않는다. */
         fun restore(
             id: Long,
-            spotId: Long,
+            catalogId: Long,
             authorId: Long,
             body: String,
             photoKeys: List<PhotoObjectKey>,
@@ -119,7 +119,7 @@ class FeedItem private constructor(
             createdAt: Instant,
         ): FeedItem = FeedItem(
             id = id,
-            spotId = spotId,
+            catalogId = catalogId,
             authorId = authorId,
             body = body,
             photoKeys = photoKeys,

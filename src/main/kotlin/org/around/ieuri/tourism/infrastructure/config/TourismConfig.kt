@@ -13,6 +13,7 @@ import org.around.ieuri.tourism.domain.specification.SpotExclusionRule
 import org.around.ieuri.tourism.domain.vo.RegionScoreWeights
 import org.around.ieuri.tourism.infrastructure.batch.FestivalSyncProperties
 import org.around.ieuri.tourism.infrastructure.batch.TourStatsSyncProperties
+import org.around.ieuri.tourism.infrastructure.batch.SpotCatalogProperties
 import org.around.ieuri.tourism.infrastructure.batch.SpotSyncProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -38,6 +39,7 @@ import java.time.Duration
     TourStatsSyncProperties::class,
     DistrictRepresentativeProperties::class,
     SpotExclusionProperties::class,
+    SpotCatalogProperties::class,
 )
 class TourismConfig {
 
@@ -51,6 +53,7 @@ class TourismConfig {
             keywords = properties.keywords,
             branchNamePatterns = properties.branchNamePatterns,
         )
+
 
     @Bean
     fun spotQueryPolicy(properties: TourApiProperties): SpotQueryPolicy =

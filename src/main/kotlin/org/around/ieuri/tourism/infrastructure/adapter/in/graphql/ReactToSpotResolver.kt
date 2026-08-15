@@ -33,7 +33,7 @@ class ReactToSpotResolver(
 
         reactToSpotUseCase.react(
             command = ReactToSpotCommand(
-                spotId = input.spotId,
+                catalogId = input.catalogId,
                 // GraphQL enum → 도메인 enum. 이름 체계가 어긋나면 valueOf가 즉시 실패한다.
                 reaction = ReactionType.valueOf(input.reaction.name),
             ),

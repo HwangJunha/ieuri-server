@@ -19,7 +19,7 @@ import java.time.Instant
 /**
  * community 도메인 JPA 엔티티. 도메인 모델과 분리되며 `mapper` 패키지가 변환한다.
  *
- * 다른 도메인을 가리키는 id(spot_id·author_id·member_id)는 plain 컬럼이다 — 물리 FK도
+ * 다른 도메인을 가리키는 id(catalog_id·author_id·member_id)는 plain 컬럼이다 — 물리 FK도
  * 연관(@ManyToOne)도 두지 않는다. 애그리게이트 간 참조는 id로 한다는 규약이자, 도메인이
  * 분리될 때 따라가야 하는 형태다.
  */
@@ -368,7 +368,7 @@ class PostChipEntity(
     }
 }
 
-/** 글 ↔ 장소. 글당 최대 하나이며 없을 수 있다. spot_id는 tourism 소유라 물리 FK가 없다. */
+/** 글 ↔ 장소. 글당 최대 하나이며 없을 수 있다. catalog_id는 tourism 소유라 물리 FK가 없다. */
 @Entity
 @Table(name = "community_post_spot")
 class PostSpotEntity(
@@ -376,8 +376,8 @@ class PostSpotEntity(
     @Column(name = "post_id")
     var postId: Long,
 
-    @Column(name = "spot_id", nullable = false)
-    var spotId: Long,
+    @Column(name = "catalog_id", nullable = false)
+    var catalogId: Long,
 
     /**
      * 글이 붙은 장소의 좌표. **geography 컬럼은 매핑하지 않는다** — 트리거가 이 둘에서

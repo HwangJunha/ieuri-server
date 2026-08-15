@@ -48,6 +48,7 @@ class SpotQueryResolver(
         @InputArgument longitude: Double,
         @InputArgument radiusMeters: Int?,
         @InputArgument category: GqlSpotCategory?,
+        @InputArgument hasOrigin: Boolean?,
         @InputArgument page: Int?,
         @InputArgument size: Int?,
     ): GqlSpotPage {
@@ -57,6 +58,7 @@ class SpotQueryResolver(
                 longitude = longitude,
                 radiusMeters = radiusMeters ?: DEFAULT_RADIUS_METERS,
                 category = category?.let { SpotCategory.valueOf(it.name) },
+                hasOrigin = hasOrigin,
                 page = page ?: DEFAULT_PAGE,
                 size = size ?: DEFAULT_SIZE,
             ),

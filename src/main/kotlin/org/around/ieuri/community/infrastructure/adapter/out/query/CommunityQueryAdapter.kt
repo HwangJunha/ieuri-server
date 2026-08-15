@@ -93,7 +93,7 @@ class CommunityQueryAdapter(
             first = search.first,
             after = search.after,
             extraConditions = listOfNotNull(
-                spotCondition(search.spotId),
+                spotCondition(search.catalogId),
                 categoryCondition(search.category),
                 tagCondition(search.normalizedTag),
                 hideCondition(search),
@@ -119,12 +119,16 @@ class CommunityQueryAdapter(
      * 아래 셋은 **조건이 필요 없으면 null**을 돌려준다. QueryDSL의 where는 null을 무시하므로
      * 호출부에서 if로 리스트를 쌓지 않아도 된다 — 이 파일의 다른 필터와 같은 관용구다.
      */
-    private fun spotCondition(spotId: Long?): BooleanExpression? =
-        spotId?.let {
+    /**
+     * 장소 필터. **카탈로그로 건다**(SPEC-0019 R-12) — `spot_id`로 걸면 일본어로 쓴 글이
+     * 영어 피드에 나오지 않아 언어별로 피드가 갈린다.
+     */
+    private fun spotCondition(catalogId: Long?): BooleanExpression? =
+        catalogId?.let {
             // 연결 테이블을 서브쿼리로 걸어 조인이 행을 늘리지 않게 한다.
             post.id.`in`(
                 JPAExpressions.select(postSpot.postId).from(postSpot)
-                    .where(postSpot.spotId.eq(it)),
+                    .where(postSpot.catalogId.eq(it)),
             )
         }
 
@@ -487,16 +491,16 @@ class CommunityQueryAdapter(
     }
 
     @Transactional(readOnly = true)
-    override fun findSpotIdsOf(postIds: List<Long>): Map<Long, Long> {
+    override fun findCatalogIdsOf(postIds: List<Long>): Map<Long, Long> {
         if (postIds.isEmpty()) return emptyMap()
 
         return queryFactory
-            .select(postSpot.postId, postSpot.spotId)
+            .select(postSpot.postId, postSpot.catalogId)
             .from(postSpot)
             .where(postSpot.postId.`in`(postIds))
             .fetch()
             .associate {
-                requireNotNull(it.get(postSpot.postId)) to requireNotNull(it.get(postSpot.spotId))
+                requireNotNull(it.get(postSpot.postId)) to requireNotNull(it.get(postSpot.catalogId))
             }
     }
 

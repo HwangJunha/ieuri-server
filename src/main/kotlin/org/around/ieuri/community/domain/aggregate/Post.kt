@@ -9,7 +9,7 @@ import java.time.Instant
 /**
  * 커뮤니티 글. 애그리게이트 루트.
  *
- * 글은 [category]에 반드시 속하고 [spotId]에는 선택적으로 붙는다 — 장소를 고르지 않아도
+ * 글은 [category]에 반드시 속하고 [catalogId]에는 선택적으로 붙는다 — 장소를 고르지 않아도
  * 카테고리만으로 글을 쓸 수 있다.
  *
  * likeCount·commentCount는 파생값이지만 애그리게이트가 들고 있다 — 매 조회마다 세지 않는다.
@@ -20,7 +20,7 @@ import java.time.Instant
 class Post private constructor(
     val id: Long?,
     category: TargetCategory,
-    spotId: Long?,
+    catalogId: Long?,
     spotPoint: SpotPoint?,
     val authorId: Long,
     tags: List<PostTag>,
@@ -37,12 +37,17 @@ class Post private constructor(
     var category: TargetCategory = category
         private set
 
-    /** 연결된 장소. **선택이다** — 장소 없이 카테고리만으로도 글을 쓸 수 있다. */
-    var spotId: Long? = spotId
+    /**
+     * 글이 가리키는 장소(SPEC-0019 R-12). **선택이다** — 장소 없이 카테고리만으로도 글을 쓸 수 있다.
+     *
+     * 언어별 `spot.id`가 아니라 카탈로그 id다 — spot으로 가리키면 일본어로 쓴 글이 JA 행만
+     * 가리켜 같은 장소의 글이 언어별로 갈린다.
+     */
+    var catalogId: Long? = catalogId
         private set
 
     /**
-     * 장소의 좌표. [spotId]가 있을 때만 있다. 적재 시 복사해 두는 값이며 — 지역 피드가
+     * 장소의 좌표. [catalogId]가 있을 때만 있다. 적재 시 복사해 두는 값이며 — 지역 피드가
      * tourism에 spot 목록을 되묻지 않게 한다 — 조회 응답에는 쓰이지 않는다.
      */
     var spotPoint: SpotPoint? = spotPoint
@@ -156,12 +161,12 @@ class Post private constructor(
      *
      * 둘 다 null이면 장소를 뗀다(카테고리만 있는 글이 된다).
      */
-    fun changeSpot(newSpotId: Long?, newSpotPoint: SpotPoint?) {
-        require((newSpotId == null) == (newSpotPoint == null)) {
+    fun changeSpot(newCatalogId: Long?, newSpotPoint: SpotPoint?) {
+        require((newCatalogId == null) == (newSpotPoint == null)) {
             "장소와 좌표는 함께 있거나 함께 없어야 합니다."
         }
-        require(newSpotId == null || newSpotId > 0) { "spotId는 양수여야 합니다." }
-        spotId = newSpotId
+        require(newCatalogId == null || newCatalogId > 0) { "catalogId는 양수여야 합니다." }
+        catalogId = newCatalogId
         spotPoint = newSpotPoint
     }
 
@@ -207,7 +212,7 @@ class Post private constructor(
          */
         fun create(
             category: TargetCategory,
-            spotId: Long?,
+            catalogId: Long?,
             spotPoint: SpotPoint?,
             authorId: Long,
             tags: List<PostTag>,
@@ -216,9 +221,9 @@ class Post private constructor(
             photoKeys: List<PhotoObjectKey>,
         ): Post {
             require(authorId > 0) { "authorId는 양수여야 합니다." }
-            require(spotId == null || spotId > 0) { "spotId는 양수여야 합니다." }
+            require(catalogId == null || catalogId > 0) { "catalogId는 양수여야 합니다." }
             // 장소가 있으면 좌표도 있어야 한다. 없으면 그 글이 지역 피드에서 조용히 사라진다.
-            require((spotId == null) == (spotPoint == null)) {
+            require((catalogId == null) == (spotPoint == null)) {
                 "장소와 좌표는 함께 있거나 함께 없어야 합니다."
             }
             val trimmedTitle = title.trim()
@@ -236,7 +241,7 @@ class Post private constructor(
             return Post(
                 id = null,
                 category = category,
-                spotId = spotId,
+                catalogId = catalogId,
                 spotPoint = spotPoint,
                 authorId = authorId,
                 tags = distinctTags,
@@ -255,7 +260,7 @@ class Post private constructor(
         fun restore(
             id: Long,
             category: TargetCategory,
-            spotId: Long?,
+            catalogId: Long?,
             authorId: Long,
             spotPoint: SpotPoint? = null,
             tags: List<PostTag>,
@@ -271,7 +276,7 @@ class Post private constructor(
         ): Post = Post(
             id = id,
             category = category,
-            spotId = spotId,
+            catalogId = catalogId,
             spotPoint = spotPoint,
             authorId = authorId,
             tags = tags,

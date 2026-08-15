@@ -27,6 +27,20 @@ spring:
       # 첫 커넥션 확보를 30초까지 재시도(기본 1초는 즉시 실패). 로컬 port-forward 터널이
       # Flyway 반납 직후 재연결되는 구간에서 기동이 깨졌다.
       initialization-fail-timeout: 30000
+      # **커넥션을 오래 들고 있지 않는다**(기본 30분 → 10분).
+      #
+      # 끊는 주체가 환경마다 다르지만 대비는 하나로 족하다:
+      #   로컬  — `kubectl port-forward` 터널. 실측(2026-08-14)에서 배정 배치가 커넥션 하나를
+      #           5분 30초 붙들고 있다가 터널이 재시작돼 `EOFException`(SQLSTATE 08006)으로
+      #           전량 실패했다. DB는 5일째 살아 있었다.
+      #   클러스터 — CNPG 장애 조치로 프라이머리가 바뀌거나 파드가 롤링 업데이트될 때.
+      #
+      # **`keepalive-time`은 유휴 커넥션에만 동작해 이 경우를 막지 못한다.** 배치처럼 커넥션을
+      # 계속 쓰고 있으면 keepalive가 나갈 틈이 없다. 수명 자체를 짧게 두는 것이 대비다.
+      #
+      # Postgres 쪽 `idle_session_timeout`·`statement_timeout`은 전부 0(무제한)이라
+      # 서버가 먼저 끊지는 않는다 — 이 값이 유일한 방어선이다.
+      max-lifetime: 600000
   jpa:
     hibernate:
       # 스키마 소유권은 Flyway. Hibernate는 엔티티↔스키마 검증만 한다.

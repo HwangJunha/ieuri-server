@@ -150,7 +150,7 @@ class FeedQueryAdapter(
     private fun FeedItemEntity.toFeedItemView(viewer: ViewerContext) = FeedItemView(
         id = requireNotNull(id) { "조회된 피드에는 id가 있어야 한다." },
         body = body,
-        spotId = spotId,
+        catalogId = catalogId,
         authorId = authorId,
         likeCount = likeCount,
         ownedByViewer = authorId == viewer.memberId,

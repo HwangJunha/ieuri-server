@@ -23,7 +23,7 @@ extend type Query {
 
 extend type Mutation {
     """
-    피드 작성. spotId 필수, photoKeys 1~5개 필수다.
+    피드 작성. catalogId 필수, photoKeys 1~5개 필수다.
     photoKeys는 confirmPostImageUploads가 확정한 키를 그대로 쓴다.
     이미 다른 피드에 실린 키는 PHOTO_NOT_CONFIRMED로 거부된다.
     """
@@ -152,8 +152,8 @@ input CreateFeedItemInput {
     "1~500자. 앞뒤 공백은 제거된 뒤 판정한다."
     body: String!
 
-    "연결할 장소. 필수다."
-    spotId: ID!
+    "연결할 장소. 필수다. 언어와 무관한 장소 식별자로, Spot.id·PostSpot.id를 그대로 쓴다."
+    catalogId: ID!
 
     """
     confirmPostImageUploads가 반환한 확정 키. 1~5개이며 배열 순서가 표시 순서다.

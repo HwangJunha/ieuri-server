@@ -52,6 +52,13 @@ data class MapViewportSearch(
     val language: DomainLocale,
     val bounds: MapBounds,
     val category: SpotCategory?,
+    /**
+     * 원문 보유 필터. **null이면 전체**, true면 그 언어 원문이 있는 것만, false면 번역본만.
+     *
+     * 지도에도 두는 이유는 **상한에 걸려 잘릴 때 무엇이 남을지를 클라이언트가 정하기
+     * 위해서다** — 밀집 지역에서 마커가 잘리면 원문 있는 곳만 남기고 싶을 수 있다.
+     */
+    val hasOrigin: Boolean?,
     val limit: Int,
 )
 

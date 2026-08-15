@@ -24,7 +24,7 @@ import kotlin.test.assertFailsWith
 class FeedItemCommandServiceTest {
 
     private val memberId = 7L
-    private val spotId = 42L
+    private val catalogId = 42L
 
     private val feedItemRepository = mockk<FeedItemRepositoryPort>()
     private val spotLookup = mockk<SpotLookupPort>()
@@ -37,8 +37,8 @@ class FeedItemCommandServiceTest {
     private fun pendingKey(owner: Long = memberId) = "pending/community/$owner/${UUID.randomUUID()}"
 
     private fun givenValidSpot() {
-        every { spotLookup.findSummary(spotId) } returns PostSpotView(
-            id = spotId,
+        every { spotLookup.findSummary(catalogId) } returns PostSpotView(
+            id = catalogId,
             title = "경복궁",
             thumbnailImageUrl = "https://img/1.jpg",
             category = null,
@@ -56,7 +56,7 @@ class FeedItemCommandServiceTest {
             val feedItem = firstArg<FeedItem>()
             FeedItem.restore(
                 id = id,
-                spotId = feedItem.spotId,
+                catalogId = feedItem.catalogId,
                 authorId = feedItem.authorId,
                 body = feedItem.body,
                 photoKeys = feedItem.photoKeys,
@@ -70,9 +70,9 @@ class FeedItemCommandServiceTest {
 
     private fun command(
         body: String = "오늘의 경복궁",
-        spotId: Long = this.spotId,
+        catalogId: Long = this.catalogId,
         photoKeys: List<String> = listOf(confirmedKey()),
-    ) = CreateFeedItemCommand(body = body, spotId = spotId, photoKeys = photoKeys)
+    ) = CreateFeedItemCommand(body = body, catalogId = catalogId, photoKeys = photoKeys)
 
     /** AC1-1 — 유효한 spot과 사진 1장이면 생성되고 그 spot에 묶인다. */
     @Test
@@ -84,7 +84,7 @@ class FeedItemCommandServiceTest {
         every { feedItemRepository.save(capture(saved)) } answers {
             FeedItem.restore(
                 id = 100L,
-                spotId = saved.captured.spotId,
+                catalogId = saved.captured.catalogId,
                 authorId = saved.captured.authorId,
                 body = saved.captured.body,
                 photoKeys = saved.captured.photoKeys,
@@ -98,14 +98,14 @@ class FeedItemCommandServiceTest {
         val feedItemId = service.createFeedItem(command(), memberId)
 
         assertEquals(100L, feedItemId)
-        assertEquals(spotId, saved.captured.spotId)
+        assertEquals(catalogId, saved.captured.catalogId)
         assertEquals(memberId, saved.captured.authorId)
     }
 
     /** AC1-3 — 없는 장소에 묶인 피드가 만들어지지 않는다. */
     @Test
-    fun `존재하지 않는 spot이면 거부된다`() {
-        every { spotLookup.findSummary(spotId) } returns null
+    fun `존재하지 않는 카탈로그면 거부된다`() {
+        every { spotLookup.findSummary(catalogId) } returns null
 
         assertFailsWith<SpotNotFoundException> { service.createFeedItem(command(), memberId) }
 
@@ -186,7 +186,7 @@ class FeedItemCommandServiceTest {
         every { feedItemRepository.save(capture(saved)) } answers {
             FeedItem.restore(
                 id = 100L,
-                spotId = spotId,
+                catalogId = catalogId,
                 authorId = memberId,
                 body = saved.captured.body,
                 photoKeys = saved.captured.photoKeys,

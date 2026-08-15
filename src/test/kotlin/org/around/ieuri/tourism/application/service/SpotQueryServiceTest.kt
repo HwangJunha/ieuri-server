@@ -75,11 +75,18 @@ class SpotQueryServiceTest {
 
     // 기본: 아무것도 반응하지 않음(빈 집합). 개별 테스트에서 override.
     init {
-        every { spotQueryPort.findReactedSpotIds(any(), any()) } returns emptySet()
-        // spot.id → (contentId, language) 해석. 기본은 KO로 두고, 언어 검증을 다루는
-        // 테스트에서만 override한다.
-        every { spotQueryPort.findIdentity(any()) } answers {
-            SpotIdentity(contentId = firstArg<Long>().toString(), language = DomainLocale.KO)
+        every { spotQueryPort.findReactedSpotIds(any()) } returns emptySet()
+        // (카탈로그 id, 언어) → contentId 해석. 기본은 어느 언어로 물어도 원본이 있다고 둔다.
+        // 그 언어의 원본이 없는 경우는 개별 테스트에서 override한다.
+        // spotId는 카탈로그 id와 **다른 값**을 준다 — 둘이 섞이면 캐시·spot_detail이 잘못된
+        // id 공간을 쓰게 되는데, 같은 값을 쓰면 그 버그가 테스트를 통과한다.
+        every { spotQueryPort.findIdentity(any(), any()) } answers {
+            val catalogId = firstArg<Long>()
+            SpotIdentity(
+                spotId = catalogId + SPOT_ID_OFFSET,
+                contentId = catalogId.toString(),
+                language = secondArg(),
+            )
         }
         every { spotQueryPort.searchNearby(any()) } returns emptyList()
         every { spotQueryPort.countNearby(any()) } returns 0
@@ -88,7 +95,7 @@ class SpotQueryServiceTest {
         every { spotCachePort.putDetail(any(), any()) } returns Unit
         every { spotCachePort.putDetailAbsence(any(), any()) } returns Unit
         // 부재 응답 구성용 spot 값(R-2). 부재를 다루지 않는 테스트에도 있어야 무해하다.
-        every { spotQueryPort.findSpotBasics(any()) } answers { basics() }
+        every { spotQueryPort.findSpotBasics(any(), any()) } answers { basics() }
         every { spotCachePort.getGallery(any()) } returns null
         every { spotCachePort.putGallery(any(), any()) } returns Unit
         every { spotCachePort.getIntro(any(), any()) } returns null
@@ -159,7 +166,7 @@ class SpotQueryServiceTest {
     private fun query(page: Int = 1, size: Int = 100, category: SpotCategory? = null, radius: Int = 20000) =
         SpotsQuery(
             latitude = 37.5665, longitude = 126.9780,
-            radiusMeters = radius, category = category, page = page, size = size,
+            radiusMeters = radius, category = category, hasOrigin = null, page = page, size = size,
         )
 
     @Test
@@ -173,6 +180,25 @@ class SpotQueryServiceTest {
         val result = service.spots(query(), DomainLocale.KO, memberId = null)
 
         assertEquals(listOf(1L, 2L, 3L), result.items.map { it.id })
+    }
+
+    @Test
+    fun `hasOrigin이 조회 조건으로 전달된다`() {
+        // **정렬이 아니라 필터다**(SPEC-0019). 서버가 원문을 앞으로 당기면 거리순을 요청한
+        // 클라이언트가 이유를 알 수 없는 순서를 받고, 커서에도 그 축을 실어야 해 형식이 깨진다.
+        // 원문을 먼저 소진하고 번역본으로 넘어가는 판단은 클라이언트가 한다.
+        val captured = slot<NearbySpotSearch>()
+        every { spotQueryPort.searchNearby(capture(captured)) } returns emptyList()
+
+        service.spots(query().copy(hasOrigin = true), DomainLocale.JA, memberId = null)
+        assertEquals(true, captured.captured.hasOrigin)
+
+        service.spots(query().copy(hasOrigin = false), DomainLocale.JA, memberId = null)
+        assertEquals(false, captured.captured.hasOrigin)
+
+        // 생략하면 전체다 — 원문·번역본을 가리지 않는다.
+        service.spots(query(), DomainLocale.JA, memberId = null)
+        assertNull(captured.captured.hasOrigin)
     }
 
     @Test
@@ -252,7 +278,7 @@ class SpotQueryServiceTest {
     fun `위경도가 범위를 벗어나면 INVALID_COORDINATES`() {
         assertFailsWith<InvalidCoordinatesException> {
             service.spots(
-                SpotsQuery(latitude = 999.0, longitude = 0.0, radiusMeters = 20000, category = null, page = 1, size = 100),
+                SpotsQuery(latitude = 999.0, longitude = 0.0, radiusMeters = 20000, category = null, hasOrigin = null, page = 1, size = 100),
                 DomainLocale.EN,
                 memberId = null,
             )
@@ -280,7 +306,7 @@ class SpotQueryServiceTest {
     fun `로그인 회원이 이미 반응한 관광지는 DB 조회 단계에서 제외된다`() {
         // 조회 후 걸러내면 페이지가 요청한 size보다 작아지므로 쿼리 조건으로 넘긴다.
         val captured = slot<NearbySpotSearch>()
-        every { spotQueryPort.findReactedSpotIds(7L, DomainLocale.KO) } returns setOf(2L)
+        every { spotQueryPort.findReactedSpotIds(7L) } returns setOf(2L)
         every { spotQueryPort.searchNearby(capture(captured)) } returns emptyList()
 
         service.spots(query(), DomainLocale.KO, memberId = 7L)
@@ -299,14 +325,15 @@ class SpotQueryServiceTest {
 
         assertEquals(listOf(1L, 2L), result.items.map { it.id })
         assertTrue(captured.captured.excludedSpotIds.isEmpty())
-        verify(exactly = 0) { spotQueryPort.findReactedSpotIds(any(), any()) }
+        verify(exactly = 0) { spotQueryPort.findReactedSpotIds(any()) }
     }
 
     // ---------- 3단 폴백: Valkey → DB → TourAPI (SPEC-0004 R-13) ----------
 
     @Test
     fun `Valkey 히트면 DB와 TourAPI를 모두 호출하지 않는다(AC-34)`() {
-        every { spotCachePort.getDetail(100L) } returns CachedDetail(detail(), bodyAbsent = false)
+        // 캐시 키는 카탈로그 id(100)가 아니라 원본 spot.id다.
+        every { spotCachePort.getDetail(spotIdOf(100L)) } returns CachedDetail(detail(), bodyAbsent = false)
 
         service.spotDetail(100L, DomainLocale.KO)
 
@@ -316,13 +343,14 @@ class SpotQueryServiceTest {
 
     @Test
     fun `Valkey 미스에 DB 히트면 TourAPI를 치지 않고 Valkey를 충전한다(AC-35)`() {
-        every { spotDetailStorePort.findDetail(100L) } returns stored()
+        val spotId = spotIdOf(100L)
+        every { spotDetailStorePort.findDetail(spotId) } returns stored()
 
         val result = service.spotDetail(100L, DomainLocale.KO)
 
         assertEquals("경복궁", result.title)
         verify(exactly = 0) { tourInfoPort.findDetail(any()) }
-        verify(exactly = 1) { spotCachePort.putDetail(100L, any()) }
+        verify(exactly = 1) { spotCachePort.putDetail(spotId, any()) }
     }
 
     @Test
@@ -339,7 +367,7 @@ class SpotQueryServiceTest {
     @Test
     fun `DB 히트 시에는 이벤트를 발행하지 않는다`() {
         // 이미 적재된 것을 또 발행하면 큐가 불필요하게 찬다.
-        every { spotDetailStorePort.findDetail(100L) } returns stored()
+        every { spotDetailStorePort.findDetail(spotIdOf(100L)) } returns stored()
 
         service.spotDetail(100L, DomainLocale.KO)
 
@@ -348,7 +376,7 @@ class SpotQueryServiceTest {
 
     @Test
     fun `갤러리도 같은 3단 구조를 갖는다`() {
-        every { spotDetailStorePort.findGallery(100L) } returns listOf(image())
+        every { spotDetailStorePort.findGallery(spotIdOf(100L)) } returns listOf(image())
 
         val result = service.spotGallery(100L, DomainLocale.KO)
 
@@ -359,7 +387,7 @@ class SpotQueryServiceTest {
     @Test
     fun `intro는 DB에 적재된 값이 null이어도 미스로 취급하지 않는다`() {
         // "적재됐으나 값 없음"을 미스로 오판하면 매 조회마다 upstream을 두드린다.
-        every { spotDetailStorePort.findIntro(100L, SpotCategory.TOURIST_SPOT) } returns
+        every { spotDetailStorePort.findIntro(spotIdOf(100L), SpotCategory.TOURIST_SPOT) } returns
             StoredIntro(null)
 
         val result = service.spotIntro(100L, SpotCategory.TOURIST_SPOT, DomainLocale.KO)
@@ -370,7 +398,7 @@ class SpotQueryServiceTest {
 
     @Test
     fun `infoItems도 같은 3단 구조를 갖는다`() {
-        every { spotDetailStorePort.findInfoItems(100L, SpotCategory.TOURIST_SPOT) } returns
+        every { spotDetailStorePort.findInfoItems(spotIdOf(100L), SpotCategory.TOURIST_SPOT) } returns
             listOf(SpotInfoItem("주차", "가능"))
 
         val result = service.spotInfoItems(100L, SpotCategory.TOURIST_SPOT, DomainLocale.KO)
@@ -420,6 +448,9 @@ class SpotQueryServiceTest {
 
         val view = service.spotDetail(100L, DomainLocale.KO)
 
+        // **뷰의 id는 클라이언트가 보낸 카탈로그 id다.** 내부 spot.id를 실으면 GraphQL의
+        // SpotDetail.id로 내부 축이 새어 나가고, 지연 필드 리졸버가 그 값을 다시 카탈로그 id로
+        // 되먹여 다른 장소를 조회하거나 SPOT_NOT_FOUND가 된다.
         assertEquals(100L, view.id)
         assertEquals("조선의 법궁", view.overview)
         assertEquals(CopyrightType.TYPE1.attributionText, view.attributionText)
@@ -440,7 +471,7 @@ class SpotQueryServiceTest {
 
     @Test
     fun `AC-19 - 본문 캐시 히트면 upstream을 호출하지 않는다`() {
-        every { spotCachePort.getDetail(100L) } returns CachedDetail(detail(), bodyAbsent = false)
+        every { spotCachePort.getDetail(spotIdOf(100L)) } returns CachedDetail(detail(), bodyAbsent = false)
 
         service.spotDetail(100L, DomainLocale.KO)
 
@@ -451,13 +482,13 @@ class SpotQueryServiceTest {
     @Test
     fun `AC-18 - 본문 캐시 미스면 upstream 조회 후 저장한다`() {
         val fetched = detail()
-        every { spotCachePort.getDetail(100L) } returns null
+        every { spotCachePort.getDetail(spotIdOf(100L)) } returns null
         every { tourInfoPort.findDetail(any()) } returns fetched
 
         service.spotDetail(100L, DomainLocale.KO)
 
         verify(exactly = 1) { tourInfoPort.findDetail(any()) }
-        verify(exactly = 1) { spotCachePort.putDetail(100L, fetched) }
+        verify(exactly = 1) { spotCachePort.putDetail(spotIdOf(100L), fetched) }
     }
 
     @Test
@@ -470,11 +501,11 @@ class SpotQueryServiceTest {
     }
 
     @Test
-    fun `spot_id를 contentId로 해석해 upstream에 전달한다`() {
-        // V20 이후 외부 식별자(spot.id)와 upstream 식별자(contentId)가 분리됐다 —
-        // 그대로 넘기는 것이 아니라 해석해서 넘긴다.
-        every { spotQueryPort.findIdentity(777L) } returns
-            SpotIdentity(contentId = "ta-999", language = DomainLocale.JA)
+    fun `catalog_id를 contentId로 해석해 upstream에 전달한다`() {
+        // 외부 식별자(카탈로그 id)와 upstream 식별자(contentId)는 별개다 — 그대로 넘기는 것이
+        // 아니라 (카탈로그, 언어)로 해석해서 넘긴다.
+        every { spotQueryPort.findIdentity(777L, DomainLocale.JA) } returns
+            SpotIdentity(spotId = 777L + SPOT_ID_OFFSET, contentId = "ta-999", language = DomainLocale.JA)
         val captured = slot<SpotDetailQuery>()
         every { tourInfoPort.findDetail(capture(captured)) } returns detail()
 
@@ -485,35 +516,49 @@ class SpotQueryServiceTest {
     }
 
     @Test
-    fun `요청 언어와 다른 언어의 spot_id는 거부한다`() {
-        // 클라이언트가 언어를 바꾸면 목록을 다시 받아야 한다 — 이전 언어의 id로 상세를
-        // 요청하는 것은 버그이며, 조용히 다른 언어를 돌려주면 그 버그가 드러나지 않는다.
-        every { spotQueryPort.findIdentity(777L) } returns
-            SpotIdentity(contentId = "ta-999", language = DomainLocale.EN)
+    fun `원본 언어가 요청 언어와 달라도 그 원본의 언어로 upstream에 묻는다`() {
+        // **회귀 방지.** 번역으로 격차를 메운 카탈로그는 그 언어의 원본이 없다(실측 36,000건
+        // 이상) — 포트가 다른 언어 원본으로 폴백해 돌려준다. 그때 요청 언어로 upstream에
+        // 물으면 그 contentId가 없어 실패한다. **돌려받은 language로 물어야 한다.**
+        every { spotQueryPort.findIdentity(777L, DomainLocale.JA) } returns
+            SpotIdentity(spotId = 777L + SPOT_ID_OFFSET, contentId = "ko-123", language = DomainLocale.KO)
+        val captured = slot<SpotDetailQuery>()
+        every { tourInfoPort.findDetail(capture(captured)) } returns detail()
+
+        service.spotDetail(777L, DomainLocale.JA)
+
+        assertEquals("ko-123", captured.captured.contentId)
+        assertEquals(DomainLocale.KO, captured.captured.locale, "원본 언어로 물어야 한다")
+    }
+
+    @Test
+    fun `원본이 하나도 없는 카탈로그는 거부한다`() {
+        // 폴백해도 원본이 없으면 상세를 물을 곳이 없다 — 상류에서 장소가 사라진 경우다.
+        every { spotQueryPort.findIdentity(777L, DomainLocale.KO) } returns null
 
         assertFailsWith<SpotDetailNotFoundException> { service.spotDetail(777L, DomainLocale.KO) }
         verify(exactly = 0) { tourInfoPort.findDetail(any()) }
     }
 
     @Test
-    fun `캐시가 히트해도 언어가 다르면 거부한다`() {
-        // **회귀 방지.** 언어 검증을 upstream 폴백 직전에 두면 캐시 히트에서 그대로 통과해,
+    fun `캐시가 히트해도 그 언어의 원본이 없으면 거부한다`() {
+        // **회귀 방지.** 언어 판정을 upstream 폴백 직전에 두면 캐시 히트에서 그대로 통과해,
         // 정작 가장 흔한 경로에서 교차 언어 콘텐츠가 나간다. spot_detail과 캐시 키 모두 언어를
         // 들지 않으므로(V20) 그 단계에서는 스스로 판별할 수 없다.
-        every { spotQueryPort.findIdentity(777L) } returns
-            SpotIdentity(contentId = "ta-999", language = DomainLocale.EN)
-        every { spotCachePort.getDetail(777L) } returns CachedDetail(detail(), bodyAbsent = false)
+        every { spotQueryPort.findIdentity(777L, DomainLocale.KO) } returns null
+        // 캐시 키가 어느 축이든 히트하도록 둔다 — 해석이 캐시보다 먼저 걸린다는 것이 요지다.
+        every { spotCachePort.getDetail(any()) } returns CachedDetail(detail(), bodyAbsent = false)
 
         assertFailsWith<SpotDetailNotFoundException> { service.spotDetail(777L, DomainLocale.KO) }
     }
 
     @Test
-    fun `지연 필드도 언어가 다르면 거부한다`() {
+    fun `지연 필드도 그 언어의 원본이 없으면 거부한다`() {
         // 갤러리·운영정보·이용안내가 각각 독립 진입점이라 전부 검증해야 한다 —
         // 하나라도 빠지면 그 필드만 교차 언어로 새어 나간다.
-        every { spotQueryPort.findIdentity(777L) } returns
-            SpotIdentity(contentId = "ta-999", language = DomainLocale.EN)
-        every { spotCachePort.getGallery(777L) } returns emptyList()
+        every { spotQueryPort.findIdentity(777L, DomainLocale.KO) } returns null
+        // 캐시에 값이 있어도 해석 실패가 먼저 걸려야 한다 — 캐시 키가 어느 축이든 무관하게.
+        every { spotCachePort.getGallery(any()) } returns emptyList()
 
         assertFailsWith<SpotDetailNotFoundException> { service.spotGallery(777L, DomainLocale.KO) }
         assertFailsWith<SpotDetailNotFoundException> {
@@ -525,8 +570,8 @@ class SpotQueryServiceTest {
     }
 
     @Test
-    fun `존재하지 않는 spot_id는 거부한다`() {
-        every { spotQueryPort.findIdentity(404L) } returns null
+    fun `존재하지 않는 catalog_id는 거부한다`() {
+        every { spotQueryPort.findIdentity(404L, DomainLocale.KO) } returns null
 
         assertFailsWith<SpotDetailNotFoundException> { service.spotDetail(404L, DomainLocale.KO) }
     }
@@ -536,19 +581,19 @@ class SpotQueryServiceTest {
     @Test
     fun `갤러리는 캐시 미스 시 조회 후 저장한다`() {
         val gallery = listOf(SpotImage("https://img/g1.jpg", null, "야경", CopyrightType.TYPE3))
-        every { spotCachePort.getGallery(100L) } returns null
+        every { spotCachePort.getGallery(spotIdOf(100L)) } returns null
         every { tourInfoPort.findGallery(any()) } returns gallery
 
         val view = service.spotGallery(100L, DomainLocale.KO)
 
         assertEquals(1, view.size)
         assertEquals(CopyrightType.TYPE3.attributionText, view.single().attributionText)
-        verify(exactly = 1) { spotCachePort.putGallery(100L, gallery) }
+        verify(exactly = 1) { spotCachePort.putGallery(spotIdOf(100L), gallery) }
     }
 
     @Test
     fun `갤러리 캐시 히트면 upstream을 호출하지 않는다`() {
-        every { spotCachePort.getGallery(100L) } returns emptyList()
+        every { spotCachePort.getGallery(spotIdOf(100L)) } returns emptyList()
 
         assertTrue(service.spotGallery(100L, DomainLocale.KO).isEmpty())
         verify(exactly = 0) { tourInfoPort.findGallery(any()) }
@@ -558,20 +603,20 @@ class SpotQueryServiceTest {
 
     @Test
     fun `운영정보는 캐시 미스 시 조회 후 저장한다`() {
-        every { spotCachePort.getIntro(100L, SpotCategory.TOURIST_SPOT) } returns null
+        every { spotCachePort.getIntro(spotIdOf(100L), SpotCategory.TOURIST_SPOT) } returns null
         every { tourInfoPort.findIntro(any(), SpotCategory.TOURIST_SPOT) } returns intro()
 
         val view = service.spotIntro(100L, SpotCategory.TOURIST_SPOT, DomainLocale.KO)
 
         assertEquals("09:00~18:00", view?.businessHours)
-        verify(exactly = 1) { spotCachePort.putIntro(100L, SpotCategory.TOURIST_SPOT, any()) }
+        verify(exactly = 1) { spotCachePort.putIntro(spotIdOf(100L), SpotCategory.TOURIST_SPOT, any()) }
     }
 
     @Test
     fun `운영정보가 값 없음으로 캐시돼 있으면 upstream을 다시 부르지 않는다`() {
         // 히트 판정은 래퍼로 한다 — value가 null이라고 미스로 취급하면 매번 upstream을 두드리게 된다.
         every {
-            spotCachePort.getIntro(100L, SpotCategory.TOURIST_SPOT)
+            spotCachePort.getIntro(spotIdOf(100L), SpotCategory.TOURIST_SPOT)
         } returns CachedIntro(null)
 
         assertNull(service.spotIntro(100L, SpotCategory.TOURIST_SPOT, DomainLocale.KO))
@@ -593,14 +638,14 @@ class SpotQueryServiceTest {
     @Test
     fun `이용안내는 캐시 미스 시 조회 후 저장한다`() {
         val items = listOf(SpotInfoItem("입장료", "무료"))
-        every { spotCachePort.getInfoItems(100L, SpotCategory.TOURIST_SPOT) } returns null
+        every { spotCachePort.getInfoItems(spotIdOf(100L), SpotCategory.TOURIST_SPOT) } returns null
         every { tourInfoPort.findInfoItems(any(), SpotCategory.TOURIST_SPOT) } returns items
 
         val view = service.spotInfoItems(100L, SpotCategory.TOURIST_SPOT, DomainLocale.KO)
 
         assertEquals("입장료", view.single().name)
         verify(exactly = 1) {
-            spotCachePort.putInfoItems(100L, SpotCategory.TOURIST_SPOT, items)
+            spotCachePort.putInfoItems(spotIdOf(100L), SpotCategory.TOURIST_SPOT, items)
         }
     }
 
@@ -635,6 +680,7 @@ class SpotQueryServiceTest {
 
         val view = service.spotDetail(100L, DomainLocale.KO)
 
+        // 부재 경로에서도 뷰의 id는 클라이언트가 보낸 카탈로그 id다(내부 spot.id가 아니다).
         assertEquals(100L, view.id)
         assertEquals("경복궁", view.title)
     }
@@ -649,9 +695,9 @@ class SpotQueryServiceTest {
     }
 
     @Test
-    fun `AC-3 - spot 자체가 없으면 SPOT_NOT_FOUND다`() {
+    fun `AC-3 - 카탈로그 자체가 없으면 SPOT_NOT_FOUND다`() {
         // 본문 부재와 id 미해석은 서로 다른 경로다.
-        every { spotQueryPort.findIdentity(404L) } returns null
+        every { spotQueryPort.findIdentity(404L, DomainLocale.KO) } returns null
 
         assertFailsWith<SpotDetailNotFoundException> { service.spotDetail(404L, DomainLocale.KO) }
     }
@@ -695,7 +741,7 @@ class SpotQueryServiceTest {
 
     @Test
     fun `AC-8 - spot의 address가 null이어도 부재 조회는 성공한다`() {
-        every { spotQueryPort.findSpotBasics(any()) } returns basics(address = null)
+        every { spotQueryPort.findSpotBasics(any(), any()) } returns basics(address = null)
         every { tourInfoPort.findDetail(any()) } returns null
 
         val view = service.spotDetail(100L, DomainLocale.KO)
@@ -707,7 +753,7 @@ class SpotQueryServiceTest {
     @Test
     fun `AC-9 - 부재가 적재된 spot은 upstream을 다시 호출하지 않는다`() {
         // 부재 적재의 존재 이유 그 자체 — 없는 데이터를 매 조회마다 다시 묻지 않는다.
-        every { spotDetailStorePort.findDetail(100L) } returns storedAbsence()
+        every { spotDetailStorePort.findDetail(spotIdOf(100L)) } returns storedAbsence()
 
         val view = service.spotDetail(100L, DomainLocale.KO)
 
@@ -718,7 +764,7 @@ class SpotQueryServiceTest {
     @Test
     fun `AC-10 - 한 번도 조회되지 않은 spot은 upstream을 호출한다`() {
         // 행 없음(미조회)과 행 있음+부재는 다른 상태다.
-        every { spotDetailStorePort.findDetail(100L) } returns null
+        every { spotDetailStorePort.findDetail(spotIdOf(100L)) } returns null
         every { tourInfoPort.findDetail(any()) } returns detail()
 
         service.spotDetail(100L, DomainLocale.KO)
@@ -728,21 +774,26 @@ class SpotQueryServiceTest {
 
     @Test
     fun `AC-11 - 부재와 미조회는 서로 다른 상태로 구분된다`() {
+        // 두 카탈로그가 각자의 contentId로 upstream을 묻기 때문에, 호출 수는 카탈로그별로 센다 —
+        // any()로 세면 서로 다른 두 조회가 한 카운터에 합쳐진다.
+        val unseen = SpotDetailQuery(contentId = "1", locale = DomainLocale.KO)
+        val absent = SpotDetailQuery(contentId = "2", locale = DomainLocale.KO)
+
         // 미조회 → upstream을 친다.
-        every { spotDetailStorePort.findDetail(1L) } returns null
+        every { spotDetailStorePort.findDetail(spotIdOf(1L)) } returns null
         every { tourInfoPort.findDetail(any()) } returns detail()
         service.spotDetail(1L, DomainLocale.KO)
-        verify(exactly = 1) { tourInfoPort.findDetail(any()) }
+        verify(exactly = 1) { tourInfoPort.findDetail(unseen) }
 
         // 부재 적재됨 → 치지 않는다. 둘을 같은 null로 표현했다면 이 구분이 불가능하다.
-        every { spotDetailStorePort.findDetail(2L) } returns storedAbsence()
+        every { spotDetailStorePort.findDetail(spotIdOf(2L)) } returns storedAbsence()
         service.spotDetail(2L, DomainLocale.KO)
-        verify(exactly = 1) { tourInfoPort.findDetail(any()) } // 늘지 않았다
+        verify(exactly = 0) { tourInfoPort.findDetail(absent) }
     }
 
     @Test
     fun `AC-12 - 신선도 기준 이전이면 여전히 부재로 응답한다`() {
-        every { spotDetailStorePort.findDetail(100L) } returns storedAbsence(age = Duration.ofDays(3))
+        every { spotDetailStorePort.findDetail(spotIdOf(100L)) } returns storedAbsence(age = Duration.ofDays(3))
 
         val view = service.spotDetail(100L, DomainLocale.KO)
 
@@ -752,7 +803,7 @@ class SpotQueryServiceTest {
 
     @Test
     fun `AC-13 - 부재의 신선도가 지나면 upstream에 다시 묻는다`() {
-        every { spotDetailStorePort.findDetail(100L) } returns storedAbsence(age = Duration.ofDays(8))
+        every { spotDetailStorePort.findDetail(spotIdOf(100L)) } returns storedAbsence(age = Duration.ofDays(8))
         every { tourInfoPort.findDetail(any()) } returns null
 
         service.spotDetail(100L, DomainLocale.KO)
@@ -762,7 +813,7 @@ class SpotQueryServiceTest {
 
     @Test
     fun `AC-14 - 재조회 결과 본문이 생기면 본문 있는 상태로 전환된다`() {
-        every { spotDetailStorePort.findDetail(100L) } returns storedAbsence(age = Duration.ofDays(8))
+        every { spotDetailStorePort.findDetail(spotIdOf(100L)) } returns storedAbsence(age = Duration.ofDays(8))
         every { tourInfoPort.findDetail(any()) } returns detail()
 
         val view = service.spotDetail(100L, DomainLocale.KO)
@@ -777,7 +828,7 @@ class SpotQueryServiceTest {
     fun `AC-15 - 재조회가 여전히 부재면 적재 시각이 갱신된다`() {
         // 갱신하지 않으면 신선도 경과가 누적된 채로 남아 매 조회마다 upstream을 치는 상태로
         // 퇴화한다 — 부재 적재가 무의미해지는 지점이다.
-        every { spotDetailStorePort.findDetail(100L) } returns storedAbsence(age = Duration.ofDays(8))
+        every { spotDetailStorePort.findDetail(spotIdOf(100L)) } returns storedAbsence(age = Duration.ofDays(8))
         every { tourInfoPort.findDetail(any()) } returns null
 
         service.spotDetail(100L, DomainLocale.KO)
@@ -789,7 +840,7 @@ class SpotQueryServiceTest {
     @Test
     fun `AC-16 - 재조회가 실패로 끝나면 적재 시각을 갱신하지 않는다`() {
         // 실패는 부재의 재확인이 아니므로 신선도 창을 연장해서는 안 된다.
-        every { spotDetailStorePort.findDetail(100L) } returns storedAbsence(age = Duration.ofDays(8))
+        every { spotDetailStorePort.findDetail(spotIdOf(100L)) } returns storedAbsence(age = Duration.ofDays(8))
         every { tourInfoPort.findDetail(any()) } throws UpstreamUnavailableException("boom")
 
         assertFailsWith<UpstreamUnavailableException> { service.spotDetail(100L, DomainLocale.KO) }
@@ -811,7 +862,7 @@ class SpotQueryServiceTest {
     @Test
     fun `캐시에 부재가 담겨 있으면 DB·upstream을 모두 건너뛴다`() {
         // 부재를 캐시 미스로 오판하면 본문 없는 spot이 TTL 내내 매 조회마다 DB·upstream을 탄다.
-        every { spotCachePort.getDetail(100L) } returns
+        every { spotCachePort.getDetail(spotIdOf(100L)) } returns
             CachedDetail(storedAbsence().detail, bodyAbsent = true)
 
         val view = service.spotDetail(100L, DomainLocale.KO)
@@ -825,11 +876,11 @@ class SpotQueryServiceTest {
     @Test
     fun `DB의 부재 행을 읽으면 캐시도 부재로 충전한다`() {
         // 부재를 일반 본문으로 캐시하면 캐시 히트 시 bodyAbsent가 false로 되살아난다.
-        every { spotDetailStorePort.findDetail(100L) } returns storedAbsence()
+        every { spotDetailStorePort.findDetail(spotIdOf(100L)) } returns storedAbsence()
 
         service.spotDetail(100L, DomainLocale.KO)
 
-        verify(exactly = 1) { spotCachePort.putDetailAbsence(100L, any()) }
+        verify(exactly = 1) { spotCachePort.putDetailAbsence(spotIdOf(100L), any()) }
         verify(exactly = 0) { spotCachePort.putDetail(any(), any()) }
     }
 
@@ -847,6 +898,7 @@ class SpotQueryServiceTest {
             copyright = CopyrightType.TYPE1,
             attributionText = CopyrightType.TYPE1.attributionText,
             likedAt = likedAt,
+            catalogId = id * 10,
         )
 
     private fun likedPage(vararg nodes: LikedSpotView) = CursorPage(
@@ -965,5 +1017,35 @@ class SpotQueryServiceTest {
         verify(exactly = 0) { spotDetailStorePort.findDetail(any()) }
         verify(exactly = 0) { tourInfoPort.findDetail(any()) }
         verify(exactly = 0) { spotCachePort.getDetail(any()) }
+    }
+    @Test
+    fun `상세 캐시·저장은 카탈로그 id가 아니라 원본 spot_id로 키를 만든다`() {
+        // **두 id 공간이 섞이면 조용히 틀린다.** spot_detail 계열의 FK가 spot(id)를 가리키므로
+        // 카탈로그 id로 적재하면 FK 위반으로 실패하고(리스너가 삼킨다), 값이 우연히 겹치면
+        // 다른 장소의 본문이 적재된다. 캐시도 같은 이유로 영구 미스가 된다.
+        val catalogId = 777L
+        val spotId = catalogId + SPOT_ID_OFFSET
+        every { spotQueryPort.findIdentity(catalogId, DomainLocale.JA) } returns
+            SpotIdentity(spotId = spotId, contentId = "ta-999", language = DomainLocale.JA)
+        every { tourInfoPort.findDetail(any()) } returns detail()
+
+        service.spotDetail(catalogId, DomainLocale.JA)
+
+        // 캐시 조회·적재가 전부 spot.id로 이뤄져야 한다.
+        verify { spotCachePort.getDetail(spotId) }
+        verify { spotDetailStorePort.findDetail(spotId) }
+        verify(exactly = 0) { spotCachePort.getDetail(catalogId) }
+        verify(exactly = 0) { spotDetailStorePort.findDetail(catalogId) }
+    }
+
+    private companion object {
+        /**
+         * 테스트에서 카탈로그 id와 spot.id를 갈라 놓는 값. 두 id가 같으면 서로 뒤바뀐 코드가
+         * 테스트를 통과한다 — 실제로 그 버그가 있었다.
+         */
+        const val SPOT_ID_OFFSET = 1_000_000L
+
+        /** 기본 스텁이 [catalogId]에 대해 돌려주는 원본 `spot.id`. */
+        fun spotIdOf(catalogId: Long): Long = catalogId + SPOT_ID_OFFSET
     }
 }

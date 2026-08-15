@@ -15,7 +15,7 @@ import java.time.Instant
 
 /**
  * 좋아요/싫어요 JPA 엔티티. 도메인 모델(SpotReaction)과 분리되며 `mapper` 패키지가 변환한다.
- * PK는 surrogate id(JPA 친화적: 단일 @Id, 연관·merge 단순). 자연키 (member_id, spot_id)는
+ * PK는 surrogate id(JPA 친화적: 단일 @Id, 연관·merge 단순). 자연키 (member_id, catalog_id)는
  * DB UNIQUE(uq_spot_reaction)로 강제되며 upsert(재평가 덮어쓰기) 단위다(AC-12/13). 관광 데이터는 저장하지 않는다.
  */
 @Entity
@@ -29,14 +29,15 @@ class SpotReactionEntity(
     var memberId: Long,
 
     /**
-     * 부모 `spot` 행의 surrogate PK. **이제 이것이 유일한 관광지 식별자다**(V20) — 자연키
-     * (content_id·language)가 자식에서 제거되어 upsert 단위도 `(member_id, spot_id)`가 됐다.
+     * 소속 카탈로그. **이것이 좋아요의 참조 축이다**(SPEC-0019 R-10).
      *
-     * 연관(`@ManyToOne`)이 아니라 plain 컬럼으로 둔다. `spot`을 객체로 로드할 일이 없어 연관을 걸면
-     * 지연 로딩 프록시와 N+1 위험만 늘고, 애그리거트 간 참조는 id로 한다는 규약과도 맞는다.
+     * 이전에는 `spot_id`가 언어별이라 일본어로 누른 좋아요가 영어로 바꾸면 사라졌다.
+     * 카탈로그는 장소 단위라 언어와 무관하게 하나로 모인다.
+     *
+     * 연관(`@ManyToOne`)이 아니라 plain 컬럼으로 둔다 — 애그리거트 간 참조는 id로 한다.
      */
-    @Column(name = "spot_id", nullable = false)
-    var spotId: Long,
+    @Column(name = "catalog_id", nullable = false)
+    var catalogId: Long,
 
     @Enumerated(EnumType.STRING)
     @Column(name = "reaction", nullable = false, length = 10)

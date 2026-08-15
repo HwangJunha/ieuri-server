@@ -116,7 +116,7 @@ class MapQueryServiceTest {
 
         for (zoom in listOf(1, 8, 12, 14)) {
             val result = service.mapViewport(
-                MapViewportQuery(bounds = seoulBounds, zoom = zoom, category = null),
+                MapViewportQuery(bounds = seoulBounds, zoom = zoom, category = null, hasOrigin = null),
                 DomainLocale.KO,
             )
 
@@ -133,7 +133,7 @@ class MapQueryServiceTest {
             listOf(spot(1), spot(2), spot(3), spot(4))
 
         val result = service.mapViewport(
-            MapViewportQuery(bounds = seoulBounds, zoom = 12, category = null),
+            MapViewportQuery(bounds = seoulBounds, zoom = 12, category = null, hasOrigin = null),
             DomainLocale.KO,
         )
 
@@ -149,7 +149,7 @@ class MapQueryServiceTest {
         every { mapQueryPort.findSpotsWithin(capture(search)) } returns emptyList()
 
         service.mapViewport(
-            MapViewportQuery(bounds = seoulBounds, zoom = 12, category = null),
+            MapViewportQuery(bounds = seoulBounds, zoom = 12, category = null, hasOrigin = null),
             DomainLocale.KO,
         )
 
@@ -157,13 +157,28 @@ class MapQueryServiceTest {
     }
 
     @Test
+    fun `hasOrigin이 조회 조건으로 전달된다`() {
+        // 마커가 상한에 걸려 잘릴 때 무엇이 남을지를 클라이언트가 정한다.
+        every { congestionAreaQueryPort.findAreaCodesWithin(seoulBounds) } returns emptyList()
+        val search = slot<MapViewportSearch>()
+        every { mapQueryPort.findSpotsWithin(capture(search)) } returns emptyList()
+
+        service.mapViewport(
+            MapViewportQuery(bounds = seoulBounds, zoom = 12, category = null, hasOrigin = true),
+            DomainLocale.KO,
+        )
+
+        assertEquals(true, search.captured.hasOrigin)
+    }
+
+    @Test
     fun `줌이 유효 범위 밖이면 거절된다`() {
         // AC R4.
         assertFailsWith<InvalidZoomException> {
-            service.mapViewport(MapViewportQuery(seoulBounds, zoom = 0, category = null), DomainLocale.KO)
+            service.mapViewport(MapViewportQuery(seoulBounds, zoom = 0, category = null, hasOrigin = null), DomainLocale.KO)
         }
         assertFailsWith<InvalidZoomException> {
-            service.mapViewport(MapViewportQuery(seoulBounds, zoom = 15, category = null), DomainLocale.KO)
+            service.mapViewport(MapViewportQuery(seoulBounds, zoom = 15, category = null, hasOrigin = null), DomainLocale.KO)
         }
     }
 
@@ -173,7 +188,7 @@ class MapQueryServiceTest {
         val huge = MapBounds(minLat = 0.0, minLng = 0.0, maxLat = 80.0, maxLng = 170.0)
 
         assertFailsWith<BboxTooLargeException> {
-            service.mapViewport(MapViewportQuery(huge, zoom = 12, category = null), DomainLocale.KO)
+            service.mapViewport(MapViewportQuery(huge, zoom = 12, category = null, hasOrigin = null), DomainLocale.KO)
         }
     }
 
@@ -189,7 +204,7 @@ class MapQueryServiceTest {
         every { mapQueryPort.findSpotsWithin(any()) } returns emptyList()
 
         val result = service.mapViewport(
-            MapViewportQuery(seoulBounds, zoom = 12, category = null),
+            MapViewportQuery(seoulBounds, zoom = 12, category = null, hasOrigin = null),
             DomainLocale.KO,
         )
 

@@ -15,6 +15,8 @@ class SpotSummaryMapperTest {
 
     @Test
     fun `필드마다 옮겨진다`() {
+        // id는 카탈로그 id다(SPEC-0019 R-12) — 언어별 spot.id를 실으면 같은 장소인데도
+        // 요청 언어마다 다른 대상으로 판정된다.
         val view = SpotSummaryView(
             id = 11094L,
             title = "경복궁",

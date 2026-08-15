@@ -101,6 +101,17 @@ class TooManyAreaIdsException(message: String = "한 번에 조회할 수 있는
     SpotQueryException("TOO_MANY_AREA_IDS", Classification.BAD_REQUEST, message)
 
 /**
+ * 커서가 유효하지 않다(SPEC-0019 §7). 조작된 값과 **참조 축 이관 이전에 발급된 구 커서**가
+ * 모두 여기로 온다.
+ *
+ * 기존에 예외 메시지("유효하지 않은 커서입니다")로만 존재하던 실패를 코드로 승격한 것이다 —
+ * 커서 형식이 바뀌는 이번 변경에서 클라이언트가 이 실패를 **다른 오류와 구분해 분기해야**
+ * 하기 때문이다. 클라이언트는 커서를 버리고 첫 페이지부터 다시 요청한다.
+ */
+class InvalidCursorException(message: String = "유효하지 않은 커서입니다.", cause: Throwable? = null) :
+    SpotQueryException("INVALID_CURSOR", Classification.BAD_REQUEST, message, cause)
+
+/**
  * 지역 추천 조회의 개수가 0 이하(SPEC-0015 R29).
  *
  * **상한 초과는 이 예외가 아니다** — 상한을 넘는 값은 클램프한다(POL-018). 0 이하만 거절하는

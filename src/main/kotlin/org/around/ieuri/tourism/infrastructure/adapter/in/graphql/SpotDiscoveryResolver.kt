@@ -111,6 +111,7 @@ class SpotDiscoveryResolver(
         @InputArgument latitude: Double,
         @InputArgument longitude: Double,
         @InputArgument radiusMeters: Int?,
+        @InputArgument hasOrigin: Boolean?,
         @InputArgument first: Int?,
         @InputArgument after: String?,
     ): GqlFestivalConnection {
@@ -119,6 +120,7 @@ class SpotDiscoveryResolver(
                 latitude = latitude,
                 longitude = longitude,
                 radiusMeters = radiusMeters ?: DEFAULT_RADIUS_METERS,
+                hasOrigin = hasOrigin,
                 first = first ?: DEFAULT_PAGE_SIZE,
                 after = after,
             ),
@@ -137,6 +139,7 @@ class SpotDiscoveryResolver(
         @InputArgument longitude: Double,
         @InputArgument radiusMeters: Int?,
         @InputArgument category: GqlSpotCategory?,
+        @InputArgument hasOrigin: Boolean?,
         @InputArgument first: Int?,
         @InputArgument after: String?,
     ): GqlPopularSpotConnection {
@@ -146,6 +149,7 @@ class SpotDiscoveryResolver(
                 longitude = longitude,
                 radiusMeters = radiusMeters ?: DEFAULT_RADIUS_METERS,
                 category = category?.let { SpotCategory.valueOf(it.name) },
+                hasOrigin = hasOrigin,
                 first = first ?: DEFAULT_PAGE_SIZE,
                 after = after,
             ),

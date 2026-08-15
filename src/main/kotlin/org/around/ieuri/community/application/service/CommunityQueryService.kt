@@ -4,7 +4,6 @@ import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.community.application.event.PostViewed
 import org.around.ieuri.community.application.policy.CommunityPolicy
 import org.around.ieuri.community.application.port.`in`.query.CommunityQueryUseCase
-import org.around.ieuri.community.application.port.out.client.SpotLookupPort
 import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
 import org.around.ieuri.community.application.port.out.query.BlockedUsersSearch
 import org.around.ieuri.community.application.port.out.query.MyPostsSearch
@@ -43,7 +42,6 @@ import org.springframework.stereotype.Service
 class CommunityQueryService(
     private val communityQueryPort: CommunityQueryPort,
     private val postSpatialQueryPort: PostSpatialQueryPort,
-    private val spotLookupPort: SpotLookupPort,
     private val eventPublisher: CommunityEventPublisherPort,
     private val policy: CommunityPolicy,
 ) : CommunityQueryUseCase {
@@ -54,7 +52,7 @@ class CommunityQueryService(
      */
     override fun posts(query: PostsQuery, memberId: Long): CursorPage<PostView> {
         val search = PostsSearch(
-            spotId = query.spotId,
+            catalogId = query.catalogId,
             area = resolveArea(query),
             category = query.category,
             // 태그는 정규화해 넘긴다 — 대소문자·선행 #을 가리지 않게 하려는 것이다.
@@ -146,8 +144,8 @@ class CommunityQueryService(
     override fun postCategories(postIds: List<Long>): Map<Long, TargetCategory> =
         communityQueryPort.findCategoriesOf(postIds)
 
-    override fun postSpotIds(postIds: List<Long>): Map<Long, Long> =
-        communityQueryPort.findSpotIdsOf(postIds)
+    override fun postCatalogIds(postIds: List<Long>): Map<Long, Long> =
+        communityQueryPort.findCatalogIdsOf(postIds)
 
     override fun likedPostIds(postIds: List<Long>, memberId: Long): Set<Long> =
         communityQueryPort.findLikedPostIds(memberId, postIds)

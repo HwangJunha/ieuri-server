@@ -21,34 +21,58 @@ interface SpotQueryPort {
     /** [query] 조건에 맞는 전체 건수(페이지 무관). SpotPage.totalCount 산출용. */
     fun countNearby(query: NearbySpotSearch): Int
 
-    /** 이 회원이 현재 언어에서 이미 반응한 `spot.id` 전체. */
-    fun findReactedSpotIds(memberId: Long, language: DomainLocale): Set<Long>
+    /**
+     * 이 회원이 이미 반응한 **카탈로그 id** 전체. 반경 조회의 제외 집합이다.
+     * **언어를 받지 않는다**(SPEC-0019) — 좋아요는 언어와 무관한 장소 단위 행위다.
+     */
+    fun findReactedSpotIds(memberId: Long): Set<Long>
 
     /**
-     * 이 `spot.id`에 대한 LIKE 반응 수. DISLIKE는 세지 않으며, 반응이 없으면 0.
-     * **언어 조건이 없다** — spotId가 이미 언어별이라 언어를 다시 거르면 중복이다.
+     * 이 **카탈로그**에 대한 LIKE 반응 수. DISLIKE는 세지 않으며, 반응이 없으면 0.
+     * 같은 장소의 언어별 좋아요가 합산된다(SPEC-0019 R-10).
      */
     fun countLikes(spotId: Long): Long
 
     /**
-     * `spot.id`에 대응하는 upstream 식별 정보. 없으면 null(= 존재하지 않는 spot).
-     * 반환된 [SpotIdentity.language]는 언어 교차 id를 거부하는 근거이기도 하다.
+     * 카탈로그 id → upstream 식별 정보. [language] 원본을 우선하되 **없으면 다른 언어로
+     * 떨어진다.** 카탈로그에 원본이 하나도 없을 때만 null이다.
+     *
+     * **`spot`을 읽는 유일한 조회 경로다**(SPEC-0019). TourAPI가 contentId를 언어별로 발급하므로
+     * 상세를 물으려면 원본 행이 필요하다.
+     *
+     * **폴백이 필요한 이유가 이 스펙의 목적 그 자체다.** 번역으로 격차를 메운 카탈로그는
+     * 그 언어의 원본이 없다(실측 36,000건 이상) — 목록·검색에는 나오는데 상세만 막히면
+     * 번역이 무의미해진다. 돌려받은 [SpotIdentity.language]가 실제 원본 언어이며, 호출자는
+     * **그 언어로 upstream에 물어야 한다** — 없는 contentId로 물으면 실패한다.
      */
-    fun findIdentity(spotId: Long): SpotIdentity?
+    fun findIdentity(catalogId: Long, language: DomainLocale): SpotIdentity?
 
     /**
-     * `spot` 행이 이미 보유한 상세 표시 값. 상세 본문이 부재할 때 응답을 구성하고 부재 행의 NOT NULL
-     * 컬럼을 채우는 재료다. 없으면 null(= 존재하지 않는 spot).
+     * 카탈로그가 [language]로 보유한 상세 표시 값. 상세 본문이 부재할 때 응답을 구성하고 부재
+     * 행의 NOT NULL 컬럼을 채우는 재료다.
+     *
+     * [language] 번역을 우선하되 **없으면 다른 언어로 떨어진다.** 외국어에만 있는 장소는 KO
+     * 행이 없어(실측 4,196건) null을 돌려주면 그 장소에 글을 못 쓰고 기존 글의 칩도 사라진다.
+     * 번역이 하나도 없는 카탈로그만 null이며, 그것은 원본이 사라진 장소다.
      */
-    fun findSpotBasics(spotId: Long): SpotBasics?
+    fun findSpotBasics(catalogId: Long, language: DomainLocale): SpotBasics?
 
-    /** 여러 spot의 기본 정보를 **IN 절 한 번**으로. 없는 id는 결과에 키가 없다. */
-    fun findSpotBasicsIn(spotIds: List<Long>): Map<Long, SpotBasics>
+    /**
+     * 여러 카탈로그의 기본 정보를 **IN 절 한 번**으로. [language]를 우선하되 없으면 다른
+     * 언어로 떨어진다. 없는 id와 번역이 하나도 없는 카탈로그만 결과에 키가 없다.
+     */
+    fun findSpotBasicsIn(catalogIds: List<Long>, language: DomainLocale): Map<Long, SpotBasics>
 
     /** 회원이 좋아요(LIKE)한 spot 한 페이지. DISLIKE는 제외하고 요청 언어로 한정한다. */
     fun findLikedSpots(query: LikedSpotsSearch): CursorPage<LikedSpotView>
 
-    /** 반경 안의 spot id. [limit]을 넘으면 잘린다 — 호출자가 그것을 감안해야 한다. */
+    /**
+     * 반경 안의 **카탈로그 id**(SPEC-0019 R-12). [limit]을 넘으면 잘린다 — 호출자가 그것을
+     * 감안해야 한다(가까운 순이라 잘리는 것은 먼 쪽이다).
+     *
+     * 다른 도메인이 장소를 저장하는 축이 카탈로그이므로(`community_post_spot.catalog_id`)
+     * 여기서도 같은 축을 돌려준다. 좌표가 없는 카탈로그는 애초에 반경 조건에 걸리지 않는다.
+     */
     fun findSpotIdsWithin(
         longitude: Double,
         latitude: Double,
@@ -92,6 +116,14 @@ data class LikedSpotsSearch(
  * 제외해야 한다 — 조회 후 애플리케이션에서 걸러내면 페이지가 요청한 size보다 작아진다.
  */
 data class NearbySpotSearch(
+    /**
+     * 원문 보유 필터. **null이면 전체**, true면 그 언어 원문이 있는 것만, false면 번역본만.
+     *
+     * 클라이언트가 원문을 먼저 소진한 뒤 false로 넘어오는 흐름을 위한 값이다 — 서버가
+     * 정렬로 끼워넣지 않는다. 정렬로 하면 거리·인기순을 요청했는데 다른 축이 앞서는
+     * 숨은 규칙이 되고, 커서에도 그 축을 실어야 해서 형식이 깨진다.
+     */
+    val hasOrigin: Boolean?,
     val language: DomainLocale,
     val center: Coordinates,
     val radiusMeters: Int,
@@ -120,6 +152,14 @@ data class SpotSearchResult(
 
 /** `spot.id`가 가리키는 행의 upstream 식별 정보. 상세 조회의 TourAPI 폴백과 언어 검증에만 쓴다. */
 data class SpotIdentity(
+    /**
+     * 원본 `spot.id`. **상세 캐시·`spot_detail` 계열의 키다.**
+     *
+     * 카탈로그 id를 그 자리에 쓰면 안 된다 — `spot_detail*`의 FK가 `spot(id)`를 가리키므로
+     * 적재가 FK 위반으로 조용히 실패하고(리스너가 삼킨다), 우연히 값이 겹치면 **다른 장소의
+     * 본문이 적재된다.** 두 id 공간이 겹칠 수 있다는 것이 이 필드가 존재하는 이유다.
+     */
+    val spotId: Long,
     val contentId: String,
     val language: DomainLocale,
 )

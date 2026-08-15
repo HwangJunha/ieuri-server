@@ -21,7 +21,7 @@ import org.around.ieuri.community.domain.vo.ReportReason
 
 fun CreateFeedItemInput.toCommand(): CreateFeedItemCommand = CreateFeedItemCommand(
     body = body,
-    spotId = spotId,
+    catalogId = catalogId,
     photoKeys = photoKeys,
 )
 

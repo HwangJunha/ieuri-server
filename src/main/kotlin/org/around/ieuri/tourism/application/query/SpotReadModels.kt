@@ -15,6 +15,12 @@ data class SpotsQuery(
     val longitude: Double,
     val radiusMeters: Int,
     val category: SpotCategory?,
+    /**
+     * 원문 보유 필터. **null이면 전체**, true면 그 언어 원문이 있는 것만, false면 번역본만.
+     *
+     * 원문을 먼저 소진한 뒤 번역본을 이어 받는 흐름을 클라이언트가 제어한다.
+     */
+    val hasOrigin: Boolean?,
     val page: Int,
     val size: Int,
 )
@@ -64,12 +70,16 @@ data class SpotDetailView(
 )
 
 /**
- * spot 한 행이 보유한 최소 식별 정보. **upstream 호출 없이** 만들어진다.
+ * 카탈로그 한 행이 보유한 최소 식별 정보. **upstream 호출 없이** 만들어진다.
  *
- * 다른 도메인이 spotId 유효성 확인과 요약 표시에 쓰는 형태다 — 상세 본문이 필요 없는
+ * 다른 도메인이 장소 id의 유효성 확인과 요약 표시에 쓰는 형태다 — 상세 본문이 필요 없는
  * 호출자에게 [SpotDetailView]를 주면 TourAPI 왕복이 딸려 온다.
  */
 data class SpotSummaryView(
+    /**
+     * `spot_catalog.id`(SPEC-0019 R-12). **다른 도메인이 장소를 저장할 때 쓰는 축이다** —
+     * 언어별 `spot.id`를 주면 같은 장소의 글이 언어별로 갈린다.
+     */
     val id: Long,
     val title: String,
     val thumbnailImageUrl: String,
@@ -141,6 +151,11 @@ data class LikedSpotView(
     val copyright: CopyrightType,
     val attributionText: String,
     val likedAt: Instant,
+    /**
+     * 소속 카탈로그. **커서의 정렬 키다**(SPEC-0019 §4.3) — 좋아요가 카탈로그 단위로 기록되므로
+     * `spot.id`로는 페이지 경계를 만들 수 없다. 응답에는 나가지 않는다.
+     */
+    val catalogId: Long,
 )
 
 /**
@@ -196,6 +211,12 @@ data class OngoingFestivalsQuery(
     val latitude: Double,
     val longitude: Double,
     val radiusMeters: Int,
+    /**
+     * 원문 보유 필터. **null이면 전체**, true면 그 언어 원문이 있는 것만, false면 번역본만.
+     *
+     * 원문을 먼저 소진한 뒤 번역본을 이어 받는 흐름을 클라이언트가 제어한다.
+     */
+    val hasOrigin: Boolean?,
     val first: Int,
     val after: String?,
 )
@@ -225,6 +246,12 @@ data class PopularSpotsQuery(
     val longitude: Double,
     val radiusMeters: Int,
     val category: SpotCategory?,
+    /**
+     * 원문 보유 필터. **null이면 전체**, true면 그 언어 원문이 있는 것만, false면 번역본만.
+     *
+     * 원문을 먼저 소진한 뒤 번역본을 이어 받는 흐름을 클라이언트가 제어한다.
+     */
+    val hasOrigin: Boolean?,
     val first: Int,
     val after: String?,
 )

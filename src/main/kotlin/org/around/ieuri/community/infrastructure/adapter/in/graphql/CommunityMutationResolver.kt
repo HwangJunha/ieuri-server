@@ -87,7 +87,7 @@ class CommunityMutationResolver(
         val postId = postCommandUseCase.createPost(
             command = CreatePostCommand(
                 category = TargetCategory.valueOf(input.category.name),
-                spotId = input.spotId,
+                catalogId = input.catalogId,
                 tags = input.tags,
                 title = input.title,
                 body = input.body,
@@ -115,7 +115,7 @@ class CommunityMutationResolver(
                 photoKeys = input.photoKeys,
                 category = input.category?.let { TargetCategory.valueOf(it.name) },
                 changeSpot = input.changeSpot ?: false,
-                spotId = input.spotId?.toLong(),
+                catalogId = input.catalogId?.toLong(),
                 tags = input.tags,
             ),
             memberId,

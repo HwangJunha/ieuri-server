@@ -16,7 +16,7 @@ import java.time.Instant
 /**
  * 피드·DM JPA 엔티티(SPEC-0017). 도메인 모델과 분리되며 `mapper` 패키지가 변환한다.
  *
- * 다른 도메인을 가리키는 id(spot_id·author_id·sender_id)는 plain 컬럼이다 — 물리 FK도
+ * 다른 도메인을 가리키는 id(catalog_id·author_id·sender_id)는 plain 컬럼이다 — 물리 FK도
  * 연관(@ManyToOne)도 두지 않는다(CommunityEntities와 같은 규약).
  */
 @Entity
@@ -29,9 +29,9 @@ class FeedItemEntity(
     @Column(name = "author_id", nullable = false)
     var authorId: Long,
 
-    /** **nullable이 아니다** — 피드에서 spot 연결은 필수다(R1). */
-    @Column(name = "spot_id", nullable = false)
-    var spotId: Long,
+    /** **nullable이 아니다** — 피드에서 장소 연결은 필수다(R1). tourism 소유의 카탈로그 id다. */
+    @Column(name = "catalog_id", nullable = false)
+    var catalogId: Long,
 
     /** TEXT 컬럼이다 — 길이 판정은 도메인이 소유한다(이모지의 코드포인트 수 문제). */
     @Column(name = "body", nullable = false, columnDefinition = "TEXT")

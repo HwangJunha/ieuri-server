@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
 class FeedItemTest {
 
     private val authorId = 7L
-    private val spotId = 42L
+    private val catalogId = 42L
 
     private fun confirmedKey(owner: Long = authorId): PhotoObjectKey =
         requireNotNull(PhotoObjectKey.parse("images/community/$owner/${UUID.randomUUID()}"))
@@ -22,16 +22,16 @@ class FeedItemTest {
         requireNotNull(PhotoObjectKey.parse("pending/community/$owner/${UUID.randomUUID()}"))
 
     private fun create(
-        spotId: Long = this.spotId,
+        catalogId: Long = this.catalogId,
         body: String = "오늘의 경복궁",
         photoKeys: List<PhotoObjectKey> = listOf(confirmedKey()),
-    ) = FeedItem.create(spotId = spotId, authorId = authorId, body = body, photoKeys = photoKeys)
+    ) = FeedItem.create(catalogId = catalogId, authorId = authorId, body = body, photoKeys = photoKeys)
 
     @Test
     fun `사진 1장으로 생성된다 - 1장이 하한이다`() {
         val feedItem = create(photoKeys = listOf(confirmedKey()))
 
-        assertEquals(spotId, feedItem.spotId)
+        assertEquals(catalogId, feedItem.catalogId)
         assertEquals(1, feedItem.photoKeys.size)
         assertEquals(0, feedItem.likeCount)
         assertFalse(feedItem.hidden)
@@ -61,8 +61,8 @@ class FeedItemTest {
 
     /** AC1-2 — spot은 필수다. 양수가 아닌 id는 부재와 같이 다룬다. */
     @Test
-    fun `spotId가 유효하지 않으면 생성되지 않는다`() {
-        assertFailsWith<IllegalArgumentException> { create(spotId = 0L) }
+    fun `catalogId가 유효하지 않으면 생성되지 않는다`() {
+        assertFailsWith<IllegalArgumentException> { create(catalogId = 0L) }
     }
 
     @Test

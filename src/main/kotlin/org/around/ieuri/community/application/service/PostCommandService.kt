@@ -61,8 +61,8 @@ class PostCommandService(
         // **장소는 선택이다.** 준 경우에만 존재를 확인한다 — 부재가 곧 유효성 판정이다.
         // 좌표를 여기서 함께 받아 글에 복사한다 — 지역 피드가 tourism에 spot 목록을
         // 되묻지 않게 하는 값이며, 그래야 목록 상한이 피드의 한계가 되지 않는다.
-        val spotPoint = command.spotId?.let { spotId ->
-            val summary = spotLookupPort.findSummary(spotId) ?: throw SpotNotFoundException()
+        val spotPoint = command.catalogId?.let { catalogId ->
+            val summary = spotLookupPort.findSummary(catalogId) ?: throw SpotNotFoundException()
             SpotPoint(longitude = summary.longitude, latitude = summary.latitude)
         }
 
@@ -77,7 +77,7 @@ class PostCommandService(
 
         val post = Post.create(
             category = command.category,
-            spotId = command.spotId,
+            catalogId = command.catalogId,
             spotPoint = spotPoint,
             authorId = memberId,
             tags = tags,
@@ -120,8 +120,8 @@ class PostCommandService(
 
         // 장소를 바꾼다면 좌표를 함께 받아 둔다 — 좌표 없이 장소만 바꾸면 그 글이 지역
         // 피드의 거리순에서 조용히 사라진다.
-        val newSpotPoint = command.spotId?.let { spotId ->
-            val summary = spotLookupPort.findSummary(spotId) ?: throw SpotNotFoundException()
+        val newSpotPoint = command.catalogId?.let { catalogId ->
+            val summary = spotLookupPort.findSummary(catalogId) ?: throw SpotNotFoundException()
             SpotPoint(longitude = summary.longitude, latitude = summary.latitude)
         }
 
@@ -130,8 +130,8 @@ class PostCommandService(
         if (!post.editBy(memberId, title, body)) throw HiddenPostNotEditableException()
         photoKeys?.let { post.replacePhotos(it) }
         command.category?.let { post.changeCategory(it) }
-        // spotId가 null이어도 changeSpot이면 장소를 떼는 것이다 — null 하나로는 구분되지 않는다.
-        if (command.changeSpot) post.changeSpot(command.spotId, newSpotPoint)
+        // catalogId가 null이어도 changeSpot이면 장소를 떼는 것이다 — null 하나로는 구분되지 않는다.
+        if (command.changeSpot) post.changeSpot(command.catalogId, newSpotPoint)
         tags?.let { post.replaceTags(it) }
         postRepositoryPort.save(post)
     }

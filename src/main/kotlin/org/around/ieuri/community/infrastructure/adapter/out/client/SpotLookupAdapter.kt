@@ -20,8 +20,8 @@ class SpotLookupAdapter(
     private val spotQueryUseCase: SpotQueryUseCase,
 ) : SpotLookupPort {
 
-    override fun findSummary(spotId: Long): PostSpotView? =
-        spotQueryUseCase.spotSummary(spotId)?.toPostSpotView()
+    override fun findSummary(catalogId: Long): PostSpotView? =
+        spotQueryUseCase.spotSummary(catalogId)?.toPostSpotView()
 
     /**
      * 여러 spot을 **한 번의 조회로** 가져온다. 존재하지 않는 spot은 결과에서 빠진다.
@@ -29,7 +29,7 @@ class SpotLookupAdapter(
      * 행마다 findSummary를 부르지 않는다 — 지역 피드는 대상이 수천 건일 수 있어
      * 그렇게 하면 쿼리가 그 수만큼 나간다.
      */
-    override fun findSummaries(spotIds: List<Long>): Map<Long, PostSpotView> =
-        spotQueryUseCase.spotSummaries(spotIds.distinct())
+    override fun findSummaries(catalogIds: List<Long>): Map<Long, PostSpotView> =
+        spotQueryUseCase.spotSummaries(catalogIds.distinct())
             .mapValues { (_, summary) -> summary.toPostSpotView() }
 }

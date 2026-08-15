@@ -148,6 +148,7 @@ class SpotDiscoveryService(
             center = center,
             radiusMeters = query.radiusMeters,
             asOf = LocalDate.ofInstant(clock.instant(), FESTIVAL_ZONE),
+            hasOrigin = query.hasOrigin,
             limit = first,
             after = query.after?.let { DistanceCursor.decode(it) },
         )
@@ -177,6 +178,7 @@ class SpotDiscoveryService(
             center = center,
             radiusMeters = query.radiusMeters,
             category = query.category,
+            hasOrigin = query.hasOrigin,
             minLikeCount = policy.minPopularLikeCount,
             limit = first,
             after = query.after?.let { LikeCountCursor.decode(it) },

@@ -75,17 +75,17 @@ class PostCategoryDataLoader(
  * 장소는 **선택이라 없는 글이 정상이다.** 없는 글의 키를 비워 두면 리졸버가 null을 받고,
  * 그것이 곧 "장소 없는 글"이라는 뜻이다.
  */
-@DgsDataLoader(name = PostSpotIdDataLoader.NAME)
+@DgsDataLoader(name = PostCatalogIdDataLoader.NAME)
 @Component
-class PostSpotIdDataLoader(
+class PostCatalogIdDataLoader(
     private val communityQueryUseCase: CommunityQueryUseCase,
 ) : MappedBatchLoader<Long, Long> {
 
     override fun load(postIds: Set<Long>): CompletionStage<Map<Long, Long>> =
-        CompletableFuture.completedFuture(communityQueryUseCase.postSpotIds(postIds.toList()))
+        CompletableFuture.completedFuture(communityQueryUseCase.postCatalogIds(postIds.toList()))
 
     companion object {
-        const val NAME = "postSpotId"
+        const val NAME = "postCatalogId"
     }
 }
 
