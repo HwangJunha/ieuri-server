@@ -141,7 +141,7 @@ class SpotQueryAdapter(
             // **요청 언어를 우선하되 없으면 다른 언어로 떨어진다.** 외국어에만 있는 장소를
             // 한국어로 물으면 KO 행이 없는데(실측 4,196건), 그때 null을 돌려주면 그 장소에
             // 글을 못 쓰고 이미 쓴 글의 칩도 사라진다 — 이름은 다른 언어라도 있는 편이 낫다.
-            .orderBy(preferredLanguageOrder(language).asc(), translation.language.asc())
+            .orderBy(preferredLanguageOrder(language).asc())
             .fetchFirst()
             ?.let {
                 SpotBasics(
@@ -156,7 +156,14 @@ class SpotQueryAdapter(
             }
 
     /**
-     * 요청 언어를 0, 나머지를 1로 매기는 정렬 식. 요청 언어 행이 있으면 그것이 먼저 온다.
+     * 언어 선택 우선순위: **요청 언어 → KO → EN → JA → ZH.**
+     *
+     * 요청 언어가 없을 때 무엇을 고를지 **한 곳에서 정한다.** 이 식이 없으면 단건과 목록이
+     * 서로 다른 폴백을 골라, 같은 장소가 목록에서는 `台北101`이고 상세에서는 `Taipei 101`이
+     * 된다 — enum 문자열 정렬(EN < JA < KO < ZH)이 각 조회의 정렬 방향에 따라 다르게
+     * 작동하기 때문이다.
+     *
+     * KO를 2순위에 두는 이유는 원본 언어라 값이 가장 정확하기 때문이다.
      *
      * CASE 식이라 인덱스를 타지 않지만, 대상이 카탈로그 하나(또는 IN 목록)로 이미 좁혀진
      * 뒤라 비용이 없다.
@@ -164,7 +171,10 @@ class SpotQueryAdapter(
     private fun preferredLanguageOrder(language: DomainLocale) =
         Expressions.cases()
             .`when`(translation.language.eq(language)).then(0)
-            .otherwise(1)
+            .`when`(translation.language.eq(DomainLocale.KO)).then(1)
+            .`when`(translation.language.eq(DomainLocale.EN)).then(2)
+            .`when`(translation.language.eq(DomainLocale.JA)).then(3)
+            .otherwise(4)
 
     /**
      * 좋아요 목록 한 페이지. `spot`을 조인해 카드에 쓸 값과 언어·카테고리를 함께 판정한다.
@@ -193,9 +203,11 @@ class SpotQueryAdapter(
             .from(catalog)
             .join(translation).on(translation.catalogId.eq(catalog.id), translation.visible.isTrue)
             .where(catalog.id.`in`(catalogIds))
-            // **요청 언어 우선, 없으면 다른 언어.** [findSpotBasics]와 같은 판단이다.
-            // associate가 뒤 값으로 덮으므로 우선순위가 낮은 것부터 오게 정렬한다.
-            .orderBy(preferredLanguageOrder(language).desc(), translation.language.desc())
+            // **[findSpotBasics]와 같은 우선순위 식을 쓴다** — 단건과 목록이 다른 언어를
+            // 고르면 같은 장소가 화면마다 다른 이름으로 보인다.
+            //
+            // associate가 뒤 값으로 덮으므로 **순위가 낮은 것부터** 오게 내림차순으로 읽는다.
+            .orderBy(preferredLanguageOrder(language).desc())
             .fetch()
             .associate { row ->
                 requireNotNull(row.get(catalog.id)) to SpotBasics(
@@ -238,13 +250,14 @@ class SpotQueryAdapter(
             .join(translation).on(
                 translation.catalogId.eq(reaction.catalogId),
                 translation.language.eq(query.language),
-                translation.visible.isTrue,
             )
             // 좌표·썸네일·분류는 카탈로그가 확정해 둔 표준값이다.
             //
-            // **원본이 사라진 장소도 여기서는 보인다.** 번역 행이 지워져도 좋아요는 남고,
-            // 이 조회는 번역을 INNER JOIN하므로 그때는 자연히 빠진다 — 다만 카탈로그와
-            // 좋아요 자체는 보존되어 상류가 그 장소를 다시 주면 되살아난다.
+            // **여기만 `visible`을 걸지 않는다.** 원본이 사라진 장소라도 사용자가 누른
+            // 좋아요는 보여야 한다 — 감추면 "내가 누른 것이 사라진" 것처럼 보이고,
+            // 좋아요를 지키려고 카탈로그를 남긴 판단과 어긋난다(사용자 결정 2026-08-15).
+            //
+            // 번역 행은 감춰질 뿐 지워지지 않으므로 이 조인은 그대로 값을 찾는다.
             .join(catalog).on(catalog.id.eq(reaction.catalogId))
             .where(
                 reaction.memberId.eq(query.memberId),

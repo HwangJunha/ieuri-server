@@ -165,7 +165,9 @@ class SpotCatalogMapperTest {
 
         val entity = catalog.toNewTranslationEntities(catalogId = 5555).single()
 
+        // 표준값의 분류가 그대로 와야 한다. copyright와 뒤바뀌면 컴파일은 되지만 값이 다르다.
         assertEquals(SpotCategory.CULTURAL_FACILITY, entity.category)
+        assertEquals(SpotCategory.CULTURAL_FACILITY, catalog.standard.category)
     }
 
     @Test

@@ -178,7 +178,8 @@ class SpotQueryService(
      */
     private fun fallbackDetail(catalogId: Long, language: DomainLocale): SpotDetail {
         // **카탈로그 id로 묻는다** — findSpotBasics는 `spot_catalog`를 조회한다.
-        // 요청 언어의 번역을 읽으므로 제목·주소가 응답 언어와 어긋나지 않는다.
+        // 요청 언어 번역을 우선한다. 이 경로는 resolve()가 그 언어의 spot 행을 이미
+        // 확인한 뒤라 폴백이 발동할 여지가 사실상 없다 — 다만 보장은 아니다.
         val basics = spotQueryPort.findSpotBasics(catalogId, language) ?: throw SpotDetailNotFoundException()
         return SpotDetail(
             title = basics.title,

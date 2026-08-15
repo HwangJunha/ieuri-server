@@ -48,6 +48,9 @@ class SpotCatalogUpsertJdbcAdapter(
          * 카탈로그가 소유한 값의 복제본이라, 낡은 채로 두면 검색이 지도와 다른 위치를
          * 돌려주거나 분류 필터가 어긋난다. 제목·주소는 그대로 둔다 — 먼저 들어온 TourAPI
          * 원문이 우선한다(R-4).
+         *
+         * `map_x`·`map_y`를 갱신하면 트리거(V52)가 `location`도 함께 고친다 — SET 목록에
+         * 없지만 낡은 채로 남지 않는다.
          */
         val UPSERT_TRANSLATION_SQL = """
             INSERT INTO spot_catalog_translation (catalog_id, language, title, address, map_x, map_y, category)
