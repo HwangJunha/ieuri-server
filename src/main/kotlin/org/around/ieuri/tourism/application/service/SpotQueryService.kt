@@ -1,6 +1,7 @@
 package org.around.ieuri.tourism.application.service
 
 import org.around.ieuri.tourism.application.exception.SpotDetailNotFoundException
+import org.around.ieuri.tourism.application.exception.UnknownCategoryException
 import org.around.ieuri.tourism.application.exception.InvalidCoordinatesException
 import org.around.ieuri.tourism.application.exception.RadiusTooLargeException
 import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
@@ -233,6 +234,7 @@ class SpotQueryService(
     }
 
     override fun spotIntro(catalogId: Long, category: SpotCategory, locale: DomainLocale): SpotIntroView? {
+        requireKnownCategory(category)
         val identity = resolve(catalogId, locale)
         // 캐시·저장 키는 원본 `spot.id`다 — 카탈로그 id를 쓰면 자식 테이블의 FK와 어긋난다.
         val spotId = identity.spotId
@@ -259,6 +261,7 @@ class SpotQueryService(
         category: SpotCategory,
         locale: DomainLocale,
     ): List<SpotInfoItemView> {
+        requireKnownCategory(category)
         val identity = resolve(catalogId, locale)
         // 캐시·저장 키는 원본 `spot.id`다 — 카탈로그 id를 쓰면 자식 테이블의 FK와 어긋난다.
         val spotId = identity.spotId
@@ -383,6 +386,18 @@ class SpotQueryService(
         if (radiusMeters <= 0) throw InvalidCoordinatesException("반경은 양수여야 합니다.")
         if (radiusMeters > policy.maxRadiusMeters) {
             throw RadiusTooLargeException("반경은 최대 ${policy.maxRadiusMeters}m까지 허용됩니다.")
+        }
+    }
+
+    /**
+     * 정의된 카테고리인가. **필터가 아니라 상세 하위 필드에만 건다** — 여기서는 코드가 캐시 키와
+     * 적재 행의 일부가 되므로, 막지 않으면 임의의 문자열마다 키와 빈 행이 하나씩 쌓인다.
+     *
+     * 유효 집합은 `category` 테이블이 정하므로 새 카테고리는 넣는 즉시 통과한다.
+     */
+    private fun requireKnownCategory(category: SpotCategory) {
+        if (!appCategoryQueryPort.exists(category.code)) {
+            throw UnknownCategoryException("알 수 없는 카테고리입니다: ${category.code}")
         }
     }
 

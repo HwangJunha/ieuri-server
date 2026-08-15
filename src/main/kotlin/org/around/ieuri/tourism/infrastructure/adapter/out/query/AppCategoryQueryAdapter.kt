@@ -25,20 +25,24 @@ class AppCategoryQueryAdapter(
     override fun findCategories(appKey: AppKey, language: DomainLocale): List<AppCategoryView> {
         val configs = repository
             .findByAppKeyAndLanguageAndEnabledIsTrueOrderByPositionAscIdAsc(appKey.value, language)
-        val displays = findDisplays(configs.map { it.category }.toSet(), language)
+        // 같은 클래스의 @Transactional 메서드를 부르면 프록시를 지나지 않는다 — 둘 다 헬퍼를 부른다.
+        val displays = displaysOf(configs.map { it.category }.toSet(), language)
         return configs.map { it.toView(displays[it.category]) }
     }
+
+    @Transactional(readOnly = true)
+    override fun findDisplays(codes: Set<String>, language: DomainLocale): Map<String, CategoryDisplay> =
+        displaysOf(codes, language)
+
+    @Transactional(readOnly = true)
+    override fun exists(code: String): Boolean = categoryRepository.existsById(code)
 
     /**
      * 코드별 표시 정보를 한 번에. 정의가 없는 코드는 결과에 키가 없다 — 호출자가 폴백을 택한다.
      *
      * 라벨은 요청 언어의 번역이며, 번역이 없으면 코드를 그대로 쓴다.
      */
-    @Transactional(readOnly = true)
-    override fun findDisplays(
-        codes: Set<String>,
-        language: DomainLocale,
-    ): Map<String, CategoryDisplay> {
+    private fun displaysOf(codes: Set<String>, language: DomainLocale): Map<String, CategoryDisplay> {
         if (codes.isEmpty()) return emptyMap()
         val labels = translationRepository
             .findByCategoryCodeInAndLanguage(codes, language)

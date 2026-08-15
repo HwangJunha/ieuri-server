@@ -6,6 +6,8 @@ import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
 import jakarta.persistence.Id
 import jakarta.persistence.IdClass
+import jakarta.persistence.PrePersist
+import jakarta.persistence.PreUpdate
 import jakarta.persistence.Table
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import java.io.Serializable
@@ -32,8 +34,19 @@ class CategoryEntity(
 
     @Column(name = "updated_at", nullable = false)
     var updatedAt: Instant? = null,
-)
+) {
+    @PrePersist
+    fun onCreate() {
+        val now = Instant.now()
+        if (createdAt == null) createdAt = now
+        updatedAt = now
+    }
 
+    @PreUpdate
+    fun onUpdate() {
+        updatedAt = Instant.now()
+    }
+}
 /** [CategoryTranslationEntity]의 복합 PK. */
 data class CategoryTranslationId(
     var categoryCode: String = "",
@@ -62,4 +75,16 @@ class CategoryTranslationEntity(
 
     @Column(name = "updated_at", nullable = false)
     var updatedAt: Instant? = null,
-)
+) {
+    @PrePersist
+    fun onCreate() {
+        val now = Instant.now()
+        if (createdAt == null) createdAt = now
+        updatedAt = now
+    }
+
+    @PreUpdate
+    fun onUpdate() {
+        updatedAt = Instant.now()
+    }
+}

@@ -20,4 +20,13 @@ interface AppCategoryQueryPort {
      * ([CategoryDisplay.fallback]). 없는 카테고리라고 카드를 감추지는 않는다.
      */
     fun findDisplays(codes: Set<String>, language: DomainLocale): Map<String, CategoryDisplay>
+
+    /**
+     * 정의된 카테고리인가. `intro`·`infoItems`처럼 **코드가 캐시 키와 적재 행이 되는** 경로가
+     * 임의 문자열을 받지 않도록 막는 데 쓴다.
+     *
+     * 목록 필터에는 쓰지 않는다 — 없는 코드로 거른 결과는 0건일 뿐이라 막을 이유가 없고,
+     * 막으면 새 카테고리가 배포를 기다리게 된다.
+     */
+    fun exists(code: String): Boolean
 }

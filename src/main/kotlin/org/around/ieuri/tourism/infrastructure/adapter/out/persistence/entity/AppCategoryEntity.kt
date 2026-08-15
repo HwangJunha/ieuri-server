@@ -7,13 +7,15 @@ import jakarta.persistence.Enumerated
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
+import jakarta.persistence.PrePersist
+import jakarta.persistence.PreUpdate
 import jakarta.persistence.Table
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import java.time.Instant
 
 /**
  * 앱·언어별 카테고리 노출 구성(V57). tourism과 community가 함께 읽는 유일한 출처다.
- * **표시 문구 컬럼이 없다** — 앱이 category를 언어별로 매핑한다(POL-023).
+ * 표시 문구는 `category_translation`이 갖는다(V58) — 이 표는 노출 여부와 순서만 정한다.
  */
 @Entity
 @Table(name = "app_category")
@@ -45,4 +47,16 @@ class AppCategoryEntity(
 
     @Column(name = "updated_at", nullable = false)
     var updatedAt: Instant? = null,
-)
+) {
+    @PrePersist
+    fun onCreate() {
+        val now = Instant.now()
+        if (createdAt == null) createdAt = now
+        updatedAt = now
+    }
+
+    @PreUpdate
+    fun onUpdate() {
+        updatedAt = Instant.now()
+    }
+}

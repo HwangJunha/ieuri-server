@@ -7,6 +7,7 @@ import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.tourism.application.port.`in`.query.SpotQueryUseCase
 import org.around.ieuri.tourism.application.exception.SpotDetailNotFoundException
+import org.around.ieuri.tourism.application.query.CategoryDisplay
 import org.around.ieuri.tourism.application.query.LikedSpotView
 import org.around.ieuri.tourism.application.query.LikedSpotsQuery
 import org.around.ieuri.tourism.application.query.SpotDetailView
@@ -71,11 +72,23 @@ class SpotQueryResolver(
         return result.toGql()
     }
 
-    /** 구성된 순서 그대로 내려준다 — 클라이언트가 다시 정렬하지 않는다(SPEC-0020). */
+    /**
+     * 구성된 순서 그대로 내려준다 — 클라이언트가 다시 정렬하지 않는다(SPEC-0020).
+     *
+     * 구성 조회가 라벨·아이콘을 이미 담아 오므로 요청 메모에 심어 둔다 — 그러지 않으면
+     * label·iconUrl 필드 리졸버가 칩마다 같은 것을 다시 묻는다(칩 8개에 조회 8번).
+     */
     @DgsQuery
-    fun availableSpotCategories(dfe: DgsDataFetchingEnvironment): List<GqlSpotCategory> =
-        spotQueryUseCase.availableCategories(dfe.appKey(), dfe.domainLocale())
-            .map { GqlSpotCategory(code = it.category.code, label = it.category.code, iconUrl = null) }
+    fun availableSpotCategories(dfe: DgsDataFetchingEnvironment): List<GqlSpotCategory> {
+        val configured = spotQueryUseCase.availableCategories(dfe.appKey(), dfe.domainLocale())
+        CategoryDisplayResolver.seed(
+            dfe,
+            configured.map { CategoryDisplay(it.category, it.label, it.iconUrl) },
+        )
+        return configured.map {
+            GqlSpotCategory(code = it.category.code, label = it.label, iconUrl = it.iconUrl)
+        }
+    }
 
     /**
      * 상세 본문(detailCommon2 1콜). gallery·intro·infoItems·likeCount는 **요청된 경우에만** 아래 @DgsData

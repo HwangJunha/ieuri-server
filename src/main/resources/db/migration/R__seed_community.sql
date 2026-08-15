@@ -287,7 +287,7 @@ VALUES
 --      외국어(EN/JA/ZH): 교통이 있고 여행코스가 없다
 --    그래서 언어마다 8개씩 넣는다. 없는 카테고리를 칩으로 띄우면 눌러도 결과가 비어 있다.
 --
---    표시 문구는 없다 — 앱이 category를 언어별로 매핑한다.
+--    표시 문구는 category_translation이 갖는다(V58). 이 표는 노출 여부와 순서만 정한다.
 DELETE FROM app_category WHERE app_key IN ('k-trip-spot', 'demo-app');
 
 INSERT INTO app_category (app_key, language, category, position, enabled) VALUES

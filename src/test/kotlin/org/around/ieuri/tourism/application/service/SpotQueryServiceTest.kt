@@ -7,6 +7,7 @@ import io.mockk.verify
 import org.around.ieuri.tourism.application.exception.InvalidCoordinatesException
 import org.around.ieuri.tourism.application.exception.RadiusTooLargeException
 import org.around.ieuri.tourism.application.exception.SpotDetailNotFoundException
+import org.around.ieuri.tourism.application.exception.UnknownCategoryException
 import org.around.ieuri.tourism.application.exception.UpstreamUnavailableException
 import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
 import org.around.ieuri.common.context.AppKey
@@ -82,6 +83,8 @@ class SpotQueryServiceTest {
     // 기본: 아무것도 반응하지 않음(빈 집합). 개별 테스트에서 override.
     init {
         every { spotQueryPort.findReactedSpotIds(any()) } returns emptySet()
+        // 기본: 정의된 카테고리로 둔다. intro·infoItems가 코드 유효성을 확인한다(SPEC-0020).
+        every { appCategoryQueryPort.exists(any()) } returns true
         // (카탈로그 id, 언어) → contentId 해석. 기본은 어느 언어로 물어도 원본이 있다고 둔다.
         // 그 언어의 원본이 없는 경우는 개별 테스트에서 override한다.
         // spotId는 카탈로그 id와 **다른 값**을 준다 — 둘이 섞이면 캐시·spot_detail이 잘못된
@@ -468,6 +471,33 @@ class SpotQueryServiceTest {
         assertEquals("https://cdn/restaurant.png", result["RESTAURANT"]?.iconUrl)
         assertEquals("BRAND_NEW", result["BRAND_NEW"]?.label)
         assertNull(result["BRAND_NEW"]?.iconUrl)
+    }
+
+    /**
+     * intro·infoItems는 코드가 캐시 키와 적재 행이 되므로 정의된 카테고리만 받는다(SPEC-0020).
+     * 막지 않으면 비로그인 호출자가 임의 문자열마다 키와 빈 행을 하나씩 쌓을 수 있다.
+     */
+    @Test
+    fun `정의되지 않은 카테고리로 운영정보를 물으면 거절하고 아무것도 적재하지 않는다`() {
+        every { appCategoryQueryPort.exists("NOT_A_CATEGORY") } returns false
+
+        assertFailsWith<UnknownCategoryException> {
+            service.spotIntro(1L, SpotCategory("NOT_A_CATEGORY"), DomainLocale.KO)
+        }
+
+        verify(exactly = 0) { spotCachePort.putIntro(any(), any(), any()) }
+        verify(exactly = 0) { eventPublisher.publish(any()) }
+    }
+
+    @Test
+    fun `정의되지 않은 카테고리로 이용안내를 물으면 거절한다`() {
+        every { appCategoryQueryPort.exists("NOT_A_CATEGORY") } returns false
+
+        assertFailsWith<UnknownCategoryException> {
+            service.spotInfoItems(1L, SpotCategory("NOT_A_CATEGORY"), DomainLocale.KO)
+        }
+
+        verify(exactly = 0) { spotCachePort.putInfoItems(any(), any(), any()) }
     }
 
     // ── spotDetail(SPEC-0003) ───────────────────────────────────────
