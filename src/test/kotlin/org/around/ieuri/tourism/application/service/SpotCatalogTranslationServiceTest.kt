@@ -140,6 +140,7 @@ class SpotCatalogTranslationServiceTest {
             language: DomainLocale,
             title: String,
             address: String?,
+            hasOrigin: Boolean,
         ) = Unit
 
         override fun refreshFestivalPeriod(catalogId: Long) = Unit

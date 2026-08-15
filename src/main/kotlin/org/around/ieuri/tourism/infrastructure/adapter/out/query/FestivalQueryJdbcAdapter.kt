@@ -44,9 +44,13 @@ class FestivalQueryJdbcAdapter(
         val params = whereParams.toMutableList()
 
         val seek = if (query.after != null) {
+            // **정렬이 (원문 우선 DESC, 거리 ASC, id ASC)이라 seek도 3튜플이다.**
+            // has_origin은 내림차순이므로 부호를 뒤집어(NOT) 오름차순 비교에 맞춘다 —
+            // 그래야 행 값 비교 한 줄로 끝난다.
+            params += !query.after.hasOrigin
             params += query.after.distanceMeters
             params += query.after.spotId
-            "WHERE (distance_meters, id) > (?, ?)"
+            "WHERE (NOT has_origin, distance_meters, id) > (?, ?, ?)"
         } else {
             ""
         }
@@ -57,7 +61,7 @@ class FestivalQueryJdbcAdapter(
             WITH c AS (SELECT $CENTER AS center)
             SELECT * FROM (
                 SELECT cat.id, t.title, t.address, cat.thumbnail_image_url, cat.map_x, cat.map_y,
-                       cat.category, cat.copyright,
+                       cat.category, cat.copyright, t.has_origin,
                        f.event_start_date, f.event_end_date,
                        ST_Distance(cat.location, c.center) AS distance_meters
                 FROM spot_catalog cat
@@ -68,7 +72,9 @@ class FestivalQueryJdbcAdapter(
                 WHERE $where
             ) ranked
             $seek
-            ORDER BY distance_meters ASC, id ASC
+            -- **원문이 있는 장소가 먼저다**(SPEC-0019). 번역으로 채운 장소는 원문이
+            -- 소진된 뒤에 나온다 — 격차를 메우되 번역본을 원문보다 앞세우지는 않는다.
+            ORDER BY has_origin DESC, distance_meters ASC, id ASC
             LIMIT ?
             """.trimIndent(),
             { rs, _ ->
@@ -87,6 +93,7 @@ class FestivalQueryJdbcAdapter(
                     mapY = rs.getDouble("map_y"),
                     eventStartDate = rs.getDate("event_start_date").toLocalDate(),
                     eventEndDate = rs.getDate("event_end_date").toLocalDate(),
+                    hasOrigin = rs.getBoolean("has_origin"),
                 )
             },
             *params.toTypedArray(),

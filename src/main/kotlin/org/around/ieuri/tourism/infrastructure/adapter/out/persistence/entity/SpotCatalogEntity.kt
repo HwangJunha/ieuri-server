@@ -128,6 +128,16 @@ class SpotCatalogTranslationEntity(
     @Column(name = "visible", nullable = false)
     var visible: Boolean = true,
 
+    /**
+     * **그 언어의 `spot` 원본이 있는가.** 목록 정렬의 1순위다 — 원문이 있는 장소가 먼저
+     * 나오고 번역으로 채운 장소는 뒤로 밀린다.
+     *
+     * [visible]과 판정 대상이 다르다. 저쪽은 카탈로그에 원본이 하나라도 있는가이고,
+     * 이쪽은 **이 언어의** 원본이 있는가다.
+     */
+    @Column(name = "has_origin", nullable = false)
+    var hasOrigin: Boolean = false,
+
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant? = null,
 

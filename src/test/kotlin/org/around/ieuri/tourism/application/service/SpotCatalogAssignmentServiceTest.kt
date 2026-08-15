@@ -361,6 +361,7 @@ class SpotCatalogAssignmentServiceTest {
             language: DomainLocale,
             title: String,
             address: String?,
+            hasOrigin: Boolean,
         ) {
             translations += Triple(catalogId, language, title)
         }

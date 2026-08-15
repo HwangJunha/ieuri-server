@@ -83,7 +83,8 @@ class SpotCatalogService(
             if (matched != null) {
                 storePort.assign(spot.spotId, matched)
                 // 이 언어의 값은 TourAPI 원문이다 — 번역 대상이 되지 않게 지금 심는다.
-                storePort.upsertTranslation(matched, spot.language, displayTitle, spot.address)
+                // 이 언어의 spot 원본에서 왔으므로 원문 보유다 — 목록에서 앞에 온다.
+                storePort.upsertTranslation(matched, spot.language, displayTitle, spot.address, hasOrigin = true)
                 joined++
                 return@forEach
             }
@@ -209,7 +210,9 @@ class SpotCatalogService(
     }
 
     /**
-     * 원본 생존 여부를 조회 노출에 반영한다. 사라진 것은 감추고 돌아온 것은 되살린다.
+     * 원본 상태를 번역 행에 반영한다 — 노출 여부(`visible`)와 정렬 우선순위(`has_origin`).
+     *
+     * 사라진 것은 감추고 돌아온 것은 되살린다. 그 언어의 원문이 새로 생기면 목록 앞으로 온다.
      *
      * 번역 행을 지우지 않는 이유는 지우면 배정의 KO 제목 맵이 그 카탈로그를 못 찾아,
      * 장소가 돌아왔을 때 좋아요가 달린 옛 카탈로그 대신 새 카탈로그가 생기기 때문이다.

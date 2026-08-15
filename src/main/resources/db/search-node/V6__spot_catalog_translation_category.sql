@@ -22,3 +22,9 @@ ALTER TABLE spot_catalog_translation ADD COLUMN IF NOT EXISTS visible BOOLEAN NO
 
 CREATE INDEX IF NOT EXISTS idx_spot_catalog_translation_visible
     ON spot_catalog_translation (visible, language);
+
+-- 원문 보유 플래그. 목록 정렬의 1순위다(메인 V55 참조).
+ALTER TABLE spot_catalog_translation ADD COLUMN IF NOT EXISTS has_origin BOOLEAN NOT NULL DEFAULT FALSE;
+
+CREATE INDEX IF NOT EXISTS idx_spot_catalog_translation_origin
+    ON spot_catalog_translation (language, has_origin DESC);

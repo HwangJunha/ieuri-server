@@ -226,6 +226,11 @@ data class FestivalView(
     val mapY: Double,
     val eventStartDate: LocalDate,
     val eventEndDate: LocalDate,
+    /**
+     * 그 언어의 원문이 있는가. **정렬 1순위이자 커서 구성 요소다** — 클라이언트에 노출하지
+     * 않는다(GraphQL 타입에 없다). 원문 있는 장소를 먼저 보여주기 위한 내부 값이다.
+     */
+    val hasOrigin: Boolean,
 )
 
 /** 인기 spot 조회 입력(R18). 좋아요 최소 기준은 인자가 아니라 정책이다. */
@@ -245,4 +250,6 @@ data class PopularSpotsQuery(
 data class PopularSpotView(
     val spot: SpotView,
     val likeCount: Long,
+    /** 그 언어의 원문이 있는가. 정렬 1순위이자 커서 구성 요소이며 응답에 나가지 않는다. */
+    val hasOrigin: Boolean,
 )

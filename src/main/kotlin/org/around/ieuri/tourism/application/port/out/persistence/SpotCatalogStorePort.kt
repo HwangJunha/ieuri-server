@@ -21,7 +21,17 @@ interface SpotCatalogStorePort {
      * 번역 한 건을 쓴다. 같은 `(catalogId, language)`가 이미 있으면 **아무것도 하지 않는다** —
      * 먼저 들어온 값이 TourAPI 원문이고 그것이 우선한다(R-4).
      */
-    fun upsertTranslation(catalogId: Long, language: DomainLocale, title: String, address: String?)
+    fun upsertTranslation(
+        catalogId: Long,
+        language: DomainLocale,
+        title: String,
+        address: String?,
+        /**
+         * 그 언어의 `spot` 원본에서 온 값인가. 배정이 붙일 때는 true, 번역 배치가 채울
+         * 때는 false다 — 목록 정렬이 원문 있는 장소를 먼저 보여준다.
+         */
+        hasOrigin: Boolean,
+    )
 
     /**
      * 축제 기간을 확정한다. **신규 카탈로그를 만든 직후에 부른다.**
@@ -32,7 +42,11 @@ interface SpotCatalogStorePort {
     fun refreshFestivalPeriod(catalogId: Long)
 
     /**
-     * **원본 생존 여부를 번역 행에 반영한다.** 상태가 바뀐 행 수를 돌려준다.
+     * **원본 상태를 번역 행에 반영한다.** 상태가 바뀐 행 수를 돌려준다.
+     *
+     * 두 값을 함께 갱신한다:
+     *  - `visible`   — 카탈로그에 원본이 하나라도 있는가. 조회 노출 여부다
+     *  - `has_origin` — **그 언어의** 원본이 있는가. 목록 정렬의 1순위다
      *
      * 상류에서 장소가 없어지면 동기화가 `spot` 행을 지우지만 카탈로그와 번역은 남는다.
      * 그대로 두면 목록·지도·검색에는 보이는데 상세를 열면 실패하는 장소가 된다.

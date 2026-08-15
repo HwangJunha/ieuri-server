@@ -38,7 +38,9 @@ class SpotSpatialQueryAdapter(
                    ST_Distance(cat.location, c.center) AS distance_meters
             FROM $CARD_SOURCE, c
             WHERE $where
-            ORDER BY ST_Distance(cat.location, c.center), cat.id
+            -- **원문이 있는 장소가 먼저다**(SPEC-0019). 그 언어로 쓰인 장소를 먼저 보여주고,
+            -- 번역으로 채운 장소는 원문이 소진된 뒤에 나온다. 오프셋 페이징이라 커서는 없다.
+            ORDER BY t.has_origin DESC, ST_Distance(cat.location, c.center), cat.id
             LIMIT ? OFFSET ?
         """.trimIndent()
 

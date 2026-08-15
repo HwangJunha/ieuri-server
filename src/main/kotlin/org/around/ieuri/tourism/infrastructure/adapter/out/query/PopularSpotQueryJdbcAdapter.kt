@@ -65,7 +65,7 @@ class PopularSpotQueryJdbcAdapter(
             WITH c AS (SELECT $CENTER AS center)
             SELECT * FROM (
                 SELECT cat.id, t.title, t.address, cat.thumbnail_image_url, cat.map_x, cat.map_y,
-                       cat.category, cat.copyright,
+                       cat.category, cat.copyright, t.has_origin,
                        ST_Distance(cat.location, c.center) AS distance_meters,
                        COUNT(r.id) AS like_count
                 FROM spot_catalog cat
@@ -81,11 +81,12 @@ class PopularSpotQueryJdbcAdapter(
                 CROSS JOIN c
                 WHERE $where
                 GROUP BY cat.id, t.title, t.address, cat.thumbnail_image_url,
-                         cat.map_x, cat.map_y, cat.category, cat.copyright, c.center
+                         cat.map_x, cat.map_y, cat.category, cat.copyright, t.has_origin, c.center
                 HAVING COUNT(r.id) >= ?
             ) ranked
             $seek
-            ORDER BY like_count DESC, id ASC
+            -- **원문이 있는 장소가 먼저다**(SPEC-0019).
+            ORDER BY has_origin DESC, like_count DESC, id ASC
             LIMIT ?
             """.trimIndent(),
             { rs, _ ->
@@ -105,6 +106,7 @@ class PopularSpotQueryJdbcAdapter(
                         mapY = rs.getDouble("map_y"),
                     ),
                     likeCount = rs.getLong("like_count"),
+                    hasOrigin = rs.getBoolean("has_origin"),
                 )
             },
             *params.toTypedArray(),

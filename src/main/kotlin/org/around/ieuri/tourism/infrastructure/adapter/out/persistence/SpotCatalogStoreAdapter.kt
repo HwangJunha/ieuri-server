@@ -62,8 +62,13 @@ class SpotCatalogStoreAdapter(
             .execute()
     }
 
-    override fun upsertTranslation(catalogId: Long, language: DomainLocale, title: String, address: String?) =
-        upsertPort.upsertTranslation(catalogId, language, title, address)
+    override fun upsertTranslation(
+        catalogId: Long,
+        language: DomainLocale,
+        title: String,
+        address: String?,
+        hasOrigin: Boolean,
+    ) = upsertPort.upsertTranslation(catalogId, language, title, address, hasOrigin)
 
     override fun refreshFestivalPeriod(catalogId: Long) = upsertPort.refreshFestivalPeriod(catalogId)
 
@@ -77,22 +82,40 @@ class SpotCatalogStoreAdapter(
      */
     @Transactional
     override fun refreshTranslationVisibility(): Int {
-        val originExists = JPAExpressions.selectOne().from(spot)
+        // 카탈로그에 원본이 하나라도 있는가 — 노출 여부의 기준이다.
+        val anyOriginExists = JPAExpressions.selectOne().from(spot)
             .where(spot.catalogId.eq(translation.catalogId))
+            .exists()
+
+        // **그 언어의** 원본이 있는가 — 정렬 1순위의 기준이라 판정 대상이 다르다.
+        val sameLanguageOriginExists = JPAExpressions.selectOne().from(spot)
+            .where(spot.catalogId.eq(translation.catalogId), spot.language.eq(translation.language))
             .exists()
 
         val hidden = queryFactory
             .update(translation)
             .set(translation.visible, false)
-            .where(translation.visible.isTrue, originExists.not())
+            .where(translation.visible.isTrue, anyOriginExists.not())
             .execute()
 
         val shown = queryFactory
             .update(translation)
             .set(translation.visible, true)
-            .where(translation.visible.isFalse, originExists)
+            .where(translation.visible.isFalse, anyOriginExists)
             .execute()
 
-        return (hidden + shown).toInt()
+        val originGained = queryFactory
+            .update(translation)
+            .set(translation.hasOrigin, true)
+            .where(translation.hasOrigin.isFalse, sameLanguageOriginExists)
+            .execute()
+
+        val originLost = queryFactory
+            .update(translation)
+            .set(translation.hasOrigin, false)
+            .where(translation.hasOrigin.isTrue, sameLanguageOriginExists.not())
+            .execute()
+
+        return (hidden + shown + originGained + originLost).toInt()
     }
 }
