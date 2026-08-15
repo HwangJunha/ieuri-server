@@ -32,7 +32,7 @@ class SpotCatalogMapperTest {
         mapX = 129.1234,
         mapY = 35.5678,
         thumbnailImageUrl = "https://img/1.jpg",
-        category = SpotCategory.CULTURAL_FACILITY,
+        category = "CULTURAL_FACILITY",
         copyright = CopyrightType.TYPE1,
     )
 
@@ -40,7 +40,7 @@ class SpotCatalogMapperTest {
         mapX = 129.1234,
         mapY = 35.5678,
         thumbnailImageUrl = "https://img/1.jpg",
-        category = SpotCategory.CULTURAL_FACILITY,
+        category = SpotCategory("CULTURAL_FACILITY"),
         copyright = CopyrightType.TYPE1,
     )
 
@@ -52,7 +52,7 @@ class SpotCatalogMapperTest {
         assertEquals(129.1234, domain.standard.mapX)
         assertEquals(35.5678, domain.standard.mapY)
         assertEquals("https://img/1.jpg", domain.standard.thumbnailImageUrl)
-        assertEquals(SpotCategory.CULTURAL_FACILITY, domain.standard.category)
+        assertEquals(SpotCategory("CULTURAL_FACILITY"), domain.standard.category)
         assertEquals(CopyrightType.TYPE1, domain.standard.copyright)
     }
 
@@ -89,7 +89,7 @@ class SpotCatalogMapperTest {
             address = "釜山広域市 海雲台区",
             mapX = 129.1234,
             mapY = 35.5678,
-            category = SpotCategory.CULTURAL_FACILITY,
+            category = "CULTURAL_FACILITY",
         ).toDomain()
 
         assertEquals("マリンシティ", translation.title)
@@ -106,7 +106,7 @@ class SpotCatalogMapperTest {
             address = null,
             mapX = 129.1234,
             mapY = 35.5678,
-            category = SpotCategory.CULTURAL_FACILITY,
+            category = "CULTURAL_FACILITY",
         ).toDomain()
 
         assertEquals("마린시티", translation.title)
@@ -126,7 +126,7 @@ class SpotCatalogMapperTest {
         assertEquals(129.1234, entity.mapX)
         assertEquals(35.5678, entity.mapY)
         assertEquals("https://img/1.jpg", entity.thumbnailImageUrl)
-        assertEquals(SpotCategory.CULTURAL_FACILITY, entity.category)
+        assertEquals("CULTURAL_FACILITY", entity.category)
         assertEquals(CopyrightType.TYPE1, entity.copyright)
     }
 
@@ -166,8 +166,8 @@ class SpotCatalogMapperTest {
         val entity = catalog.toNewTranslationEntities(catalogId = 5555).single()
 
         // 표준값의 분류가 그대로 와야 한다. copyright와 뒤바뀌면 컴파일은 되지만 값이 다르다.
-        assertEquals(SpotCategory.CULTURAL_FACILITY, entity.category)
-        assertEquals(SpotCategory.CULTURAL_FACILITY, catalog.standard.category)
+        assertEquals("CULTURAL_FACILITY", entity.category)
+        assertEquals(SpotCategory("CULTURAL_FACILITY"), catalog.standard.category)
     }
 
     @Test

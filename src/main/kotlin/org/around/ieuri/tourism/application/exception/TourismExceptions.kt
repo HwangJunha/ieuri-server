@@ -46,9 +46,13 @@ class InvalidCoordinatesException(message: String) :
 class RadiusTooLargeException(message: String) :
     SpotQueryException("RADIUS_TOO_LARGE", Classification.BAD_REQUEST, message)
 
-/** 현재 언어에 없는 카테고리(여행코스/교통 비대칭) 조회 시도. */
-class CategoryNotAvailableForLocaleException(message: String) :
-    SpotQueryException("CATEGORY_NOT_AVAILABLE_FOR_LOCALE", Classification.FAILED_PRECONDITION, message)
+/**
+ * `categories`에 빈 배열이 왔다(SPEC-0020 R6). "필터 없음"으로도 "결과 없음"으로도 해석하지
+ * 않는다 — UI는 선택 0개를 만들 수 없으므로 빈 배열이 도착했다면 클라이언트 결함이고,
+ * 어느 쪽으로 읽어도 그 결함을 가린다.
+ */
+class EmptyCategorySetException(message: String = "카테고리를 하나 이상 선택해 주세요.") :
+    SpotQueryException("EMPTY_CATEGORY_SET", Classification.BAD_REQUEST, message)
 
 /** TourAPI 장애·타임아웃·오류(XML 오류 포함). DB 폴백 없음. */
 class UpstreamUnavailableException(message: String, cause: Throwable? = null) :

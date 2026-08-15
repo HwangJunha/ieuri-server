@@ -8,6 +8,7 @@ import org.around.ieuri.tourism.application.port.out.query.UntranslatedCatalog
 import org.around.ieuri.tourism.domain.aggregate.CatalogStandardValues
 import org.around.ieuri.tourism.domain.specification.SpotTitleNormalizer
 import org.around.ieuri.tourism.domain.vo.DomainLocale
+import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotCatalogEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotCatalogTranslationEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotEntity
@@ -67,7 +68,7 @@ class SpotCatalogQueryAdapter(
                     thumbnailImageUrl = requireNotNull(it.get(spot.thumbnailImageUrl)),
                     mapX = requireNotNull(it.get(spot.mapX)),
                     mapY = requireNotNull(it.get(spot.mapY)),
-                    category = requireNotNull(it.get(spot.category)),
+                    category = SpotCategory(requireNotNull(it.get(spot.category))),
                     copyright = requireNotNull(it.get(spot.copyright)),
                 )
             }

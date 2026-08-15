@@ -279,7 +279,8 @@ VALUES
     (16, 'MEMBER', 19, 'ABUSE', NULL, now() - interval '2 days'),
     (17, 'MEMBER', 19, 'OTHER', '사용자 신고는 기록만 되고 자동 조치가 없어야 합니다.', now() - interval '2 days');
 
--- 8) 상단 카테고리 칩. **앱마다·언어마다 구성이 다르다** — 그것이 이 테이블의 존재 이유다.
+-- 8) 앱별 카테고리 구성(app_category, SPEC-0020). **앱마다·언어마다 구성이 다르다** —
+--    그것이 이 테이블의 존재 이유다. 커뮤니티 상단 칩과 관광지 목록이 같은 이 표를 읽는다.
 --
 --    카테고리의 가용 집합이 언어별로 갈린다(TourAPI contentTypeId 체계):
 --      국문(KO)   : 여행코스(TRAVEL_COURSE)가 있고 교통(TRANSPORT)이 없다
@@ -287,9 +288,9 @@ VALUES
 --    그래서 언어마다 8개씩 넣는다. 없는 카테고리를 칩으로 띄우면 눌러도 결과가 비어 있다.
 --
 --    표시 문구는 없다 — 앱이 category를 언어별로 매핑한다.
-DELETE FROM community_chip WHERE app_key IN ('k-trip-spot', 'demo-app');
+DELETE FROM app_category WHERE app_key IN ('k-trip-spot', 'demo-app');
 
-INSERT INTO community_chip (app_key, language, category, position, enabled) VALUES
+INSERT INTO app_category (app_key, language, category, position, enabled) VALUES
     ('k-trip-spot', 'KO', 'RESTAURANT', 0, TRUE),
     ('k-trip-spot', 'KO', 'FESTIVAL_EVENT', 1, TRUE),
     ('k-trip-spot', 'KO', 'TOURIST_SPOT', 2, TRUE),
@@ -428,7 +429,7 @@ JOIN (VALUES
 --   demo-app    + ko : 2건
 --   헤더 없음        : 기본 앱(k-trip-spot) + 폴백 언어(EN) = 8건
 --
---   SELECT app_key, language, category, position FROM community_chip
+--   SELECT app_key, language, category, position FROM app_category
 --   WHERE enabled ORDER BY app_key, language, position;
 --
 -- 신고 임계값 — 17번 숨김 글의 서로 다른 신고자가 5명이어야 한다.

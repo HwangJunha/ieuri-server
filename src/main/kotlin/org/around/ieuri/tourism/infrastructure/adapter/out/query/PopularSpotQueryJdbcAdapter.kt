@@ -98,7 +98,7 @@ class PopularSpotQueryJdbcAdapter(
                         address = rs.getString("address"),
                         thumbnailImageUrl = rs.getString("thumbnail_image_url"),
                         distanceMeters = rs.getDouble("distance_meters"),
-                        category = SpotCategory.valueOf(rs.getString("category")),
+                        category = SpotCategory(rs.getString("category")),
                         copyright = copyright,
                         attributionText = copyright.attributionText,
                         mapX = rs.getDouble("map_x"),
@@ -129,9 +129,11 @@ class PopularSpotQueryJdbcAdapter(
             query.radiusMeters.toDouble(),
         )
 
-        query.category?.let {
-            conditions += "cat.category = ?"
-            params += it.name
+        // 다중 선택은 OR이며 IN으로 표현한다(SPEC-0020). 비어 있으면 조건 자체를 걸지 않는다.
+        if (!query.categories.isUnfiltered) {
+            val codes = query.categories.codes()
+            conditions += "cat.category IN (${codes.joinToString(",") { "?" }})"
+            params.addAll(codes)
         }
         // 원문 보유 필터. null이면 전체다 — 클라이언트가 원문을 먼저 소진한 뒤 false로 넘어온다.
         query.hasOrigin?.let {

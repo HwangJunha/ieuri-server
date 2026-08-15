@@ -56,7 +56,7 @@ class SpotSpatialQueryAdapter(
                     thumbnailImageUrl = rs.getString("thumbnail_image_url"),
                     mapX = rs.getDouble("map_x"),
                     mapY = rs.getDouble("map_y"),
-                    category = SpotCategory.valueOf(rs.getString("category")),
+                    category = SpotCategory(rs.getString("category")),
                     // 컬럼에 enum 이름이 그대로 들어 있으므로 코드 변환(fromCode)이 아니라 valueOf다.
                     copyright = CopyrightType.valueOf(rs.getString("copyright")),
                     distanceMeters = rs.getDouble("distance_meters"),
@@ -162,9 +162,11 @@ class SpotSpatialQueryAdapter(
             query.radiusMeters.toDouble(),
         )
 
-        query.category?.let {
-            conditions += "cat.category = ?"
-            params += it.name
+        // 다중 선택은 OR이며 IN으로 표현한다(SPEC-0020). 비어 있으면 조건 자체를 걸지 않는다.
+        if (!query.categories.isUnfiltered) {
+            val codes = query.categories.codes()
+            conditions += "cat.category IN (${codes.joinToString(",") { "?" }})"
+            params.addAll(codes)
         }
         // **원문 보유 필터는 클라이언트가 정한다**(SPEC-0019). null이면 전체다.
         // 정렬로 끼워넣지 않는 이유는 그것이 숨은 규칙이 되기 때문이다 — 거리순을

@@ -138,11 +138,12 @@ class TourApiClient(
         if (locale.isKorean) TourApiProperties.CODESET_KO else TourApiProperties.CODESET_FOREIGN
 
     private fun categoryCode(category: SpotCategory?, locale: DomainLocale): Int? =
-        category?.let { properties.categoryCodes[codeset(locale)]?.get(it) }
+        category?.let { properties.categoryCodes[codeset(locale)]?.get(it.code) }
 
     private fun category(contentTypeId: String?, locale: DomainLocale): SpotCategory {
         val id = contentTypeId?.toIntOrNull() ?: return SpotCategory.TOURIST_SPOT
-        return properties.categoryCodes[codeset(locale)]?.entries?.firstOrNull { it.value == id }?.key
+        return properties.categoryCodes[codeset(locale)]?.entries
+            ?.firstOrNull { it.value == id }?.key?.let { SpotCategory(it) }
             ?: SpotCategory.TOURIST_SPOT
     }
 

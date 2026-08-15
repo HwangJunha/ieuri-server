@@ -26,7 +26,7 @@ fun SpotCatalogEntity.toDomain(
             mapX = mapX,
             mapY = mapY,
             thumbnailImageUrl = thumbnailImageUrl,
-            category = category,
+            category = SpotCategory(category),
             copyright = copyright,
         ),
         translations = translations,
@@ -51,7 +51,7 @@ fun SpotCatalog.toNewEntity(): SpotCatalogEntity =
         mapX = standard.mapX,
         mapY = standard.mapY,
         thumbnailImageUrl = standard.thumbnailImageUrl,
-        category = standard.category,
+        category = standard.category.code,
         copyright = standard.copyright,
     )
 
@@ -86,7 +86,7 @@ fun CatalogTranslation.toNewEntity(
         address = address,
         mapX = mapX,
         mapY = mapY,
-        category = category,
+        category = category.code,
         // 이 경로는 그 언어의 spot에서 카탈로그를 만드는 중이므로 정의상 원문이 있다.
         hasOrigin = true,
     )

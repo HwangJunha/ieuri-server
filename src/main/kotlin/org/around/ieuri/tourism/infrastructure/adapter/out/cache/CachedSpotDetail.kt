@@ -20,7 +20,8 @@ import org.around.ieuri.tourism.domain.vo.SpotIntro
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class CachedSpotDetail(
     val title: String = "",
-    val category: SpotCategory = SpotCategory.TOURIST_SPOT,
+    /** 카테고리 **코드 문자열**로 담는다 — 값 클래스는 Jackson 왕복이 보장되지 않는다. */
+    val category: String = SpotCategory.TOURIST_SPOT.code,
     val thumbnailImageUrl: String = "",
     val overview: String? = null,
     val address: String? = null,
@@ -38,7 +39,7 @@ data class CachedSpotDetail(
 ) {
     fun toDomain(): SpotDetail = SpotDetail(
         title = title,
-        category = category,
+        category = SpotCategory(category),
         thumbnailImageUrl = thumbnailImageUrl,
         overview = overview,
         address = address,
@@ -51,7 +52,7 @@ data class CachedSpotDetail(
     companion object {
         fun from(detail: SpotDetail, bodyAbsent: Boolean = false): CachedSpotDetail = CachedSpotDetail(
             title = detail.title,
-            category = detail.category,
+            category = detail.category.code,
             thumbnailImageUrl = detail.thumbnailImageUrl,
             overview = detail.overview,
             address = detail.address,

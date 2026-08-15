@@ -22,6 +22,7 @@ import org.around.ieuri.tourism.application.query.CulturalEventView
 import org.around.ieuri.tourism.application.query.MapSpotView
 import org.around.ieuri.tourism.application.query.MapViewportQuery
 import org.around.ieuri.tourism.domain.vo.AreaName
+import org.around.ieuri.tourism.domain.vo.CategorySelection
 import org.around.ieuri.tourism.domain.vo.CommercialActivityLevel
 import org.around.ieuri.tourism.domain.vo.CommercialStatus
 import org.around.ieuri.tourism.domain.vo.CongestionForecast
@@ -116,7 +117,7 @@ class MapQueryServiceTest {
 
         for (zoom in listOf(1, 8, 12, 14)) {
             val result = service.mapViewport(
-                MapViewportQuery(bounds = seoulBounds, zoom = zoom, category = null, hasOrigin = null),
+                MapViewportQuery(bounds = seoulBounds, zoom = zoom, categories = CategorySelection.UNFILTERED, hasOrigin = null),
                 DomainLocale.KO,
             )
 
@@ -133,7 +134,7 @@ class MapQueryServiceTest {
             listOf(spot(1), spot(2), spot(3), spot(4))
 
         val result = service.mapViewport(
-            MapViewportQuery(bounds = seoulBounds, zoom = 12, category = null, hasOrigin = null),
+            MapViewportQuery(bounds = seoulBounds, zoom = 12, categories = CategorySelection.UNFILTERED, hasOrigin = null),
             DomainLocale.KO,
         )
 
@@ -149,7 +150,7 @@ class MapQueryServiceTest {
         every { mapQueryPort.findSpotsWithin(capture(search)) } returns emptyList()
 
         service.mapViewport(
-            MapViewportQuery(bounds = seoulBounds, zoom = 12, category = null, hasOrigin = null),
+            MapViewportQuery(bounds = seoulBounds, zoom = 12, categories = CategorySelection.UNFILTERED, hasOrigin = null),
             DomainLocale.KO,
         )
 
@@ -164,7 +165,7 @@ class MapQueryServiceTest {
         every { mapQueryPort.findSpotsWithin(capture(search)) } returns emptyList()
 
         service.mapViewport(
-            MapViewportQuery(bounds = seoulBounds, zoom = 12, category = null, hasOrigin = true),
+            MapViewportQuery(bounds = seoulBounds, zoom = 12, categories = CategorySelection.UNFILTERED, hasOrigin = true),
             DomainLocale.KO,
         )
 
@@ -175,10 +176,10 @@ class MapQueryServiceTest {
     fun `줌이 유효 범위 밖이면 거절된다`() {
         // AC R4.
         assertFailsWith<InvalidZoomException> {
-            service.mapViewport(MapViewportQuery(seoulBounds, zoom = 0, category = null, hasOrigin = null), DomainLocale.KO)
+            service.mapViewport(MapViewportQuery(seoulBounds, zoom = 0, categories = CategorySelection.UNFILTERED, hasOrigin = null), DomainLocale.KO)
         }
         assertFailsWith<InvalidZoomException> {
-            service.mapViewport(MapViewportQuery(seoulBounds, zoom = 15, category = null, hasOrigin = null), DomainLocale.KO)
+            service.mapViewport(MapViewportQuery(seoulBounds, zoom = 15, categories = CategorySelection.UNFILTERED, hasOrigin = null), DomainLocale.KO)
         }
     }
 
@@ -188,7 +189,7 @@ class MapQueryServiceTest {
         val huge = MapBounds(minLat = 0.0, minLng = 0.0, maxLat = 80.0, maxLng = 170.0)
 
         assertFailsWith<BboxTooLargeException> {
-            service.mapViewport(MapViewportQuery(huge, zoom = 12, category = null, hasOrigin = null), DomainLocale.KO)
+            service.mapViewport(MapViewportQuery(huge, zoom = 12, categories = CategorySelection.UNFILTERED, hasOrigin = null), DomainLocale.KO)
         }
     }
 
@@ -204,7 +205,7 @@ class MapQueryServiceTest {
         every { mapQueryPort.findSpotsWithin(any()) } returns emptyList()
 
         val result = service.mapViewport(
-            MapViewportQuery(seoulBounds, zoom = 12, category = null, hasOrigin = null),
+            MapViewportQuery(seoulBounds, zoom = 12, categories = CategorySelection.UNFILTERED, hasOrigin = null),
             DomainLocale.KO,
         )
 

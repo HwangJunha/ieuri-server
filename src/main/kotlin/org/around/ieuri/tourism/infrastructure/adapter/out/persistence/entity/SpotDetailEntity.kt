@@ -9,7 +9,6 @@ import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.Table
 import org.around.ieuri.tourism.domain.vo.CopyrightType
-import org.around.ieuri.tourism.domain.vo.SpotCategory
 import java.time.Instant
 
 /**
@@ -31,9 +30,8 @@ class SpotDetailEntity(
     @Column(name = "title", nullable = false, length = 255)
     var title: String,
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "category", nullable = false, length = 30)
-    var category: SpotCategory,
+    var category: String,
 
     @Column(name = "thumbnail_image_url", nullable = false, length = 500)
     var thumbnailImageUrl: String,

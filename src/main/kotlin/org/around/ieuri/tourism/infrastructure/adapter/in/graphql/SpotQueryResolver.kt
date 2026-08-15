@@ -15,8 +15,10 @@ import org.around.ieuri.tourism.application.query.SpotImageView
 import org.around.ieuri.tourism.application.query.SpotPageView
 import org.around.ieuri.tourism.application.query.SpotView
 import org.around.ieuri.tourism.application.query.SpotsQuery
+import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toCategorySelection
 import org.around.ieuri.tourism.infrastructure.locale.domainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
+import org.around.ieuri.common.graphql.appKey
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
 import org.around.ieuri.common.graphql.generated.types.LikedSpot as GqlLikedSpot
@@ -47,7 +49,7 @@ class SpotQueryResolver(
         @InputArgument latitude: Double,
         @InputArgument longitude: Double,
         @InputArgument radiusMeters: Int?,
-        @InputArgument category: GqlSpotCategory?,
+        @InputArgument categories: List<String>?,
         @InputArgument hasOrigin: Boolean?,
         @InputArgument page: Int?,
         @InputArgument size: Int?,
@@ -57,7 +59,7 @@ class SpotQueryResolver(
                 latitude = latitude,
                 longitude = longitude,
                 radiusMeters = radiusMeters ?: DEFAULT_RADIUS_METERS,
-                category = category?.let { SpotCategory.valueOf(it.name) },
+                categories = toCategorySelection(categories),
                 hasOrigin = hasOrigin,
                 page = page ?: DEFAULT_PAGE,
                 size = size ?: DEFAULT_SIZE,
@@ -69,10 +71,11 @@ class SpotQueryResolver(
         return result.toGql()
     }
 
+    /** 구성된 순서 그대로 내려준다 — 클라이언트가 다시 정렬하지 않는다(SPEC-0020). */
     @DgsQuery
     fun availableSpotCategories(dfe: DgsDataFetchingEnvironment): List<GqlSpotCategory> =
-        spotQueryUseCase.availableCategories(dfe.domainLocale())
-            .map { GqlSpotCategory.valueOf(it.name) }
+        spotQueryUseCase.availableCategories(dfe.appKey(), dfe.domainLocale())
+            .map { GqlSpotCategory(code = it.category.code, label = it.category.code, iconUrl = null) }
 
     /**
      * 상세 본문(detailCommon2 1콜). gallery·intro·infoItems·likeCount는 **요청된 경우에만** 아래 @DgsData
@@ -105,11 +108,11 @@ class SpotQueryResolver(
     @DgsData(parentType = "SpotDetail", field = "intro")
     fun intro(
         dfe: DgsDataFetchingEnvironment,
-        @InputArgument category: GqlSpotCategory,
+        @InputArgument categoryCode: String,
     ): GqlSpotIntro? =
         spotQueryUseCase.spotIntro(
             spotId = dfe.spotId(),
-            category = SpotCategory.valueOf(category.name),
+            category = SpotCategory(categoryCode),
             locale = dfe.domainLocale(),
         )?.toGql()
 
@@ -117,11 +120,11 @@ class SpotQueryResolver(
     @DgsData(parentType = "SpotDetail", field = "infoItems")
     fun infoItems(
         dfe: DgsDataFetchingEnvironment,
-        @InputArgument category: GqlSpotCategory,
+        @InputArgument categoryCode: String,
     ): List<GqlSpotInfoItem>? =
         spotQueryUseCase.spotInfoItems(
             spotId = dfe.spotId(),
-            category = SpotCategory.valueOf(category.name),
+            category = SpotCategory(categoryCode),
             locale = dfe.domainLocale(),
         ).map { GqlSpotInfoItem(name = it.name, text = it.text) }
 
@@ -141,14 +144,14 @@ class SpotQueryResolver(
     @DgsQuery
     fun likedSpots(
         dfe: DgsDataFetchingEnvironment,
-        @InputArgument category: GqlSpotCategory?,
+        @InputArgument categories: List<String>?,
         @InputArgument first: Int?,
         @InputArgument after: String?,
     ): GqlLikedSpotConnection {
         val memberId = currentMemberProvider.requireMemberId()
         val page = spotQueryUseCase.likedSpots(
             LikedSpotsQuery(
-                category = category?.let { SpotCategory.valueOf(it.name) },
+                categories = toCategorySelection(categories),
                 first = first ?: DEFAULT_LIKED_PAGE_SIZE,
                 after = after,
             ),
@@ -179,7 +182,7 @@ class SpotQueryResolver(
         title = title,
         thumbnailImageUrl = thumbnailImageUrl,
         address = address,
-        category = GqlSpotCategory.valueOf(category.name),
+        category = GqlSpotCategory(code = category.code, label = category.code, iconUrl = null),
         copyright = GqlCopyrightType.valueOf(copyright.name),
         attributionText = attributionText,
     )
@@ -197,7 +200,7 @@ class SpotQueryResolver(
         address = address,
         thumbnailImageUrl = thumbnailImageUrl,
         distanceMeters = distanceMeters,
-        category = GqlSpotCategory.valueOf(category.name),
+        category = GqlSpotCategory(code = category.code, label = category.code, iconUrl = null),
         copyright = GqlCopyrightType.valueOf(copyright.name),
         attributionText = attributionText,
         mapX = mapX,

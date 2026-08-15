@@ -7,6 +7,7 @@ import org.around.ieuri.community.application.port.`in`.query.CommunityQueryUseC
 import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
 import org.around.ieuri.community.application.port.out.query.BlockedUsersSearch
 import org.around.ieuri.community.application.port.out.query.MyPostsSearch
+import org.around.ieuri.community.application.port.out.client.CategoryConfigPort
 import org.around.ieuri.community.application.port.out.query.CommunityQueryPort
 import org.around.ieuri.community.application.port.out.query.PostCommentsSearch
 import org.around.ieuri.community.application.port.out.query.PostSpatialQueryPort
@@ -21,7 +22,7 @@ import org.around.ieuri.community.application.query.PostCommentsQuery
 import org.around.ieuri.community.application.query.PostView
 import org.around.ieuri.community.application.query.MyPostsQuery
 import org.around.ieuri.community.application.query.PostsQuery
-import org.around.ieuri.community.domain.vo.AppKey
+import org.around.ieuri.common.context.AppKey
 import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.around.ieuri.community.domain.vo.PostSortOrder
 import org.around.ieuri.community.domain.vo.PostTag
@@ -42,6 +43,7 @@ import org.springframework.stereotype.Service
 class CommunityQueryService(
     private val communityQueryPort: CommunityQueryPort,
     private val postSpatialQueryPort: PostSpatialQueryPort,
+    private val categoryConfigPort: CategoryConfigPort,
     private val eventPublisher: CommunityEventPublisherPort,
     private val policy: CommunityPolicy,
 ) : CommunityQueryUseCase {
@@ -172,8 +174,9 @@ class CommunityQueryService(
             ),
         )
 
+    /** 구성은 tourism의 `app_category`가 소유한다(SPEC-0020) — 커뮤니티는 그 표를 읽을 뿐이다. */
     override fun communityChips(appKey: AppKey, language: ContentLanguage): List<CommunityChipView> =
-        communityQueryPort.findChips(appKey, language)
+        categoryConfigPort.findCategories(appKey, language)
 
     /**
      * 호출자의 차단 관계를 **양방향으로** 읽어 담고, 개별로 숨긴 글 id도 함께 담는다.

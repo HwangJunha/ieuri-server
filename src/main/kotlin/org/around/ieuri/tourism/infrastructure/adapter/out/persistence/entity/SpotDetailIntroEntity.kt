@@ -2,13 +2,10 @@ package org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity
 
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
-import jakarta.persistence.EnumType
-import jakarta.persistence.Enumerated
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.Table
-import org.around.ieuri.tourism.domain.vo.SpotCategory
 import java.time.Instant
 
 /**
@@ -26,9 +23,8 @@ class SpotDetailIntroEntity(
     @Column(name = "spot_id", nullable = false)
     var spotId: Long,
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "category", nullable = false, length = 30)
-    var category: SpotCategory,
+    var category: String,
 
     @Column(name = "business_hours")
     var businessHours: String? = null,

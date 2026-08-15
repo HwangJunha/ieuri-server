@@ -33,7 +33,7 @@ class SpotUpsertJdbcAdapter(
             ps.setString(5, spot.thumbnailImageUrl)
             ps.setDouble(6, spot.coordinates.longitude)
             ps.setDouble(7, spot.coordinates.latitude)
-            ps.setString(8, spot.category.name)
+            ps.setString(8, spot.category.code)
             ps.setInt(9, spot.contentTypeId)
             ps.setString(10, spot.copyright.name)
             ps.setTimestamp(11, syncedTimestamp)

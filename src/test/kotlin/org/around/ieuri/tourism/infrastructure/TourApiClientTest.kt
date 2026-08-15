@@ -21,8 +21,8 @@ class TourApiClientTest {
         serviceKey = "dummy",
         baseUrls = mapOf("KO" to "https://ko", "EN" to "https://en"),
         categoryCodes = mapOf(
-            "KO" to mapOf(SpotCategory.SHOPPING to 38, SpotCategory.TOURIST_SPOT to 12),
-            "FOREIGN" to mapOf(SpotCategory.SHOPPING to 79, SpotCategory.TOURIST_SPOT to 76),
+            "KO" to mapOf("SHOPPING" to 38, "TOURIST_SPOT" to 12),
+            "FOREIGN" to mapOf("SHOPPING" to 79, "TOURIST_SPOT" to 76),
         ),
         excludeLclssystm2 = listOf("EX999"),
     )
@@ -85,7 +85,7 @@ class TourApiClientTest {
     @Test
     fun `contenttypeid를 도메인 카테고리로 역매핑한다`() {
         val result = client.mapResponse(response(listOf(item(contentTypeId = "38"))), DomainLocale.KO) // KO 38=SHOPPING
-        assertEquals(SpotCategory.SHOPPING, result.spots.single().category)
+        assertEquals(SpotCategory("SHOPPING"), result.spots.single().category)
     }
 
     @Test

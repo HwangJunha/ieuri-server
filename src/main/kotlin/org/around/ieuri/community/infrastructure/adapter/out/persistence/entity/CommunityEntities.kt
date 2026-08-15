@@ -265,55 +265,6 @@ class ReportEntity(
 }
 
 /**
- * 상단 카테고리 칩 구성. 앱마다 다른 구성을 데이터로 관리한다.
- * **표시 문구 컬럼이 없다** — 앱이 category를 언어별로 매핑한다.
- */
-@Entity
-@Table(name = "community_chip")
-class CommunityChipEntity(
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    var id: Long? = null,
-
-    @Column(name = "app_key", nullable = false, length = 50)
-    var appKey: String,
-
-    /** 카테고리 가용 집합이 언어마다 달라 구성도 언어별로 나뉜다. */
-    @Enumerated(EnumType.STRING)
-    @Column(name = "language", nullable = false, length = 2)
-    var language: ContentLanguage,
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "category", nullable = false, length = 30)
-    var category: TargetCategory,
-
-    @Column(name = "position", nullable = false)
-    var position: Short,
-
-    /** 순서를 그대로 둔 채 잠시 내릴 수 있게 한다. */
-    @Column(name = "enabled", nullable = false)
-    var enabled: Boolean = true,
-
-    @Column(name = "created_at", nullable = false)
-    var createdAt: Instant? = null,
-
-    @Column(name = "updated_at", nullable = false)
-    var updatedAt: Instant? = null,
-) {
-    @PrePersist
-    fun onCreate() {
-        val now = Instant.now()
-        if (createdAt == null) createdAt = now
-        updatedAt = now
-    }
-
-    @PreUpdate
-    fun onUpdate() {
-        updatedAt = Instant.now()
-    }
-}
-
-/**
  * 글 태그. 표시는 [name](유저 입력 원문), 매칭은 [normalized](소문자)로 한다.
  */
 @Entity

@@ -11,7 +11,7 @@ import org.around.ieuri.tourism.application.query.OngoingFestivalsQuery
 import org.around.ieuri.tourism.application.query.PopularSpotsQuery
 import org.around.ieuri.tourism.application.query.SearchSpotsQuery
 import org.around.ieuri.tourism.application.query.SpotView
-import org.around.ieuri.tourism.domain.vo.SpotCategory
+import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toCategorySelection
 import org.around.ieuri.tourism.infrastructure.locale.domainLocale
 import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
 import org.around.ieuri.common.graphql.generated.types.Festival as GqlFestival
@@ -49,7 +49,7 @@ class SpotDiscoveryResolver(
         @InputArgument latitude: Double,
         @InputArgument longitude: Double,
         @InputArgument radiusMeters: Int?,
-        @InputArgument category: GqlSpotCategory?,
+        @InputArgument categories: List<String>?,
         @InputArgument page: Int?,
         @InputArgument size: Int?,
     ): GqlSpotSearchPayload {
@@ -59,7 +59,7 @@ class SpotDiscoveryResolver(
                 latitude = latitude,
                 longitude = longitude,
                 radiusMeters = radiusMeters ?: DEFAULT_RADIUS_METERS,
-                category = category?.let { SpotCategory.valueOf(it.name) },
+                categories = toCategorySelection(categories),
                 page = page ?: DEFAULT_PAGE,
                 size = size ?: DEFAULT_PAGE_SIZE,
             ),
@@ -101,7 +101,7 @@ class SpotDiscoveryResolver(
             GqlSpotSuggestion(
                 id = it.id,
                 title = it.title,
-                category = GqlSpotCategory.valueOf(it.category.name),
+                category = GqlSpotCategory(code = it.category.code, label = it.category.code, iconUrl = null),
             )
         }
 
@@ -138,7 +138,7 @@ class SpotDiscoveryResolver(
         @InputArgument latitude: Double,
         @InputArgument longitude: Double,
         @InputArgument radiusMeters: Int?,
-        @InputArgument category: GqlSpotCategory?,
+        @InputArgument categories: List<String>?,
         @InputArgument hasOrigin: Boolean?,
         @InputArgument first: Int?,
         @InputArgument after: String?,
@@ -148,7 +148,7 @@ class SpotDiscoveryResolver(
                 latitude = latitude,
                 longitude = longitude,
                 radiusMeters = radiusMeters ?: DEFAULT_RADIUS_METERS,
-                category = category?.let { SpotCategory.valueOf(it.name) },
+                categories = toCategorySelection(categories),
                 hasOrigin = hasOrigin,
                 first = first ?: DEFAULT_PAGE_SIZE,
                 after = after,
@@ -182,7 +182,7 @@ class SpotDiscoveryResolver(
         address = address,
         thumbnailImageUrl = thumbnailImageUrl,
         distanceMeters = distanceMeters,
-        category = GqlSpotCategory.valueOf(category.name),
+        category = GqlSpotCategory(code = category.code, label = category.code, iconUrl = null),
         copyright = GqlCopyrightType.valueOf(copyright.name),
         attributionText = attributionText,
         mapX = mapX,
@@ -196,7 +196,7 @@ class SpotDiscoveryResolver(
         address = address,
         thumbnailImageUrl = thumbnailImageUrl,
         distanceMeters = distanceMeters,
-        category = GqlSpotCategory.valueOf(category.name),
+        category = GqlSpotCategory(code = category.code, label = category.code, iconUrl = null),
         copyright = GqlCopyrightType.valueOf(copyright.name),
         attributionText = attributionText,
         mapX = mapX,

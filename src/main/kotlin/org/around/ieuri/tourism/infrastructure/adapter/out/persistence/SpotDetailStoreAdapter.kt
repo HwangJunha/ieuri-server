@@ -95,7 +95,7 @@ class SpotDetailStoreAdapter(
     override fun findIntro(spotId: Long, category: SpotCategory): StoredIntro? =
         queryFactory
             .selectFrom(intro)
-            .where(intro.spotId.eq(spotId), intro.category.eq(category))
+            .where(intro.spotId.eq(spotId), intro.category.eq(category.code))
             .fetchFirst()
             // 전 컬럼이 null이면 "조회했으나 값 없음"으로 적재된 행이다 — 래퍼는 non-null,
             // 값만 null로 돌려줘야 다음 조회가 미스로 오판하지 않는다.
@@ -112,7 +112,7 @@ class SpotDetailStoreAdapter(
     override fun findInfoItems(spotId: Long, category: SpotCategory): List<SpotInfoItem>? =
         queryFactory
             .selectFrom(info)
-            .where(info.spotId.eq(spotId), info.category.eq(category))
+            .where(info.spotId.eq(spotId), info.category.eq(category.code))
             .orderBy(info.displayOrder.asc())
             .fetch()
             .map { it.toDomain() }

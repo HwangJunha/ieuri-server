@@ -8,10 +8,18 @@ extend type Query {
         longitude: Float!
         "검색 반경(미터). 기본 20000, 최대 100000 — 초과 시 RADIUS_TOO_LARGE."
         radiusMeters: Int = 20000
-        "언어 중립 카테고리 필터. availableSpotCategories에 있는 값만 유효하다."
-        category: SpotCategory
+        """
+        카테고리 코드 다중 필터(availableSpotCategories의 code). 선택된 값들은 **OR**로 결합된다.
+        생략하거나 null이면 전 카테고리가 대상이다. **빈 배열은 거절된다**(EMPTY_CATEGORY_SET) —
+        "필터 없음"도 "결과 없음"도 아니기 때문이다. 개수 상한은 없다.
+
+        존재하지 않는 코드는 오류가 아니라 그 코드에 해당하는 결과가 없을 뿐이다 — 카테고리는
+        데이터로 늘어나는 축이라 서버가 아는 목록으로 요청을 막지 않는다.
+        """
+        categories: [String!]
         """
         원문 보유 필터. **생략하면 전체**, true면 요청 언어로 쓰인 원문만, false면 번역본만.
+        카테고리 필터와는 AND로 결합된다.
 
         TourAPI가 언어마다 다른 장소를 주므로, 요청 언어의 원문이 없고 번역만 있는 장소가
         있다(EN·JA·ZH 각 33,000건 안팎). 원문을 먼저 보여주고 소진된 뒤 번역본을 이어
@@ -24,13 +32,21 @@ extend type Query {
         size: Int = 100
     ): SpotPage!
 
-    "현재 언어(Accept-Language)에서 유효한 카테고리 목록. 언어별로 다르다."
+    """
+    이 앱(X-App-Key)·이 언어(Accept-Language)에 노출하도록 구성된 카테고리를 **구성된 순서대로**.
+    다시 정렬하지 않아도 된다.
+
+    구성이 없으면 빈 목록이며 오류가 아니다 — 헤더를 보내지 않으면 기본 앱으로 읽는다.
+
+    **이 목록은 노출 구성이며 필터의 유효 집합이 아니다.** 여기에 없는 코드를 categories에
+    넘겨도 거절되지 않으며, 결과가 없을 뿐이다.
+    """
     availableSpotCategories: [SpotCategory!]!
 
     "내가 좋아요한 장소 목록. 요청 언어 한정, 최신순. 인증 필수(UNAUTHENTICATED)."
     likedSpots(
-        "카테고리 필터. 생략하면 전체."
-        category: SpotCategory
+        "카테고리 코드 다중 필터(availableSpotCategories의 code). OR 결합. 생략·null이면 전체, 빈 배열은 EMPTY_CATEGORY_SET으로 거절된다. 없는 코드는 오류가 아니라 결과 0건이다."
+        categories: [String!]
         first: Int = 20
         after: String
     ): LikedSpotConnection!
@@ -56,8 +72,8 @@ extend type Query {
         longitude: Float!
         "검색 반경(미터). 기본 20000, 최대 100000 — 초과 시 RADIUS_TOO_LARGE."
         radiusMeters: Int = 20000
-        "언어 중립 카테고리 필터. 생략하면 전체."
-        category: SpotCategory
+        "카테고리 코드 다중 필터(availableSpotCategories의 code). OR 결합. 생략·null이면 전체, 빈 배열은 EMPTY_CATEGORY_SET으로 거절된다. 없는 코드는 오류가 아니라 결과 0건이다."
+        categories: [String!]
         "페이지 번호, 1부터. 최대 500 — 초과 시 PAGE_TOO_DEEP."
         page: Int = 1
         "페이지 크기. 기본 20, 상한 50 — 초과 시 클램프된다."
@@ -117,10 +133,11 @@ extend type Query {
         longitude: Float!
         "검색 반경(미터). 기본 20000, 최대 100000 — 초과 시 RADIUS_TOO_LARGE."
         radiusMeters: Int = 20000
-        "언어 중립 카테고리 필터. 생략하면 전체."
-        category: SpotCategory
+        "카테고리 코드 다중 필터(availableSpotCategories의 code). OR 결합. 생략·null이면 전체, 빈 배열은 EMPTY_CATEGORY_SET으로 거절된다. 없는 코드는 오류가 아니라 결과 0건이다."
+        categories: [String!]
         """
         원문 보유 필터. **생략하면 전체**, true면 요청 언어로 쓰인 원문만, false면 번역본만.
+        카테고리 필터와는 AND로 결합된다.
         원문을 먼저 소진한 뒤 번역본을 이어 받으려면 true로 한 바퀴 돌고 false로 다시 요청한다.
         """
         hasOrigin: Boolean
@@ -143,19 +160,19 @@ enum Locale {
     ZH
 }
 
-"언어 중립 관광지 카테고리. 모든 언어에서 모든 값이 유효하지는 않다 — availableSpotCategories 참조."
-enum SpotCategory {
-    TOURIST_SPOT
-    CULTURAL_FACILITY
-    FESTIVAL_EVENT
-    "한국어(KO) 서비스 전용."
-    TRAVEL_COURSE
-    LEISURE_SPORTS
-    LODGING
-    SHOPPING
-    RESTAURANT
-    "외국어(EN/JA/ZH) 서비스 전용."
-    TRANSPORT
+"""
+카테고리 1건. **enum이 아니다** — 새 카테고리가 추가되면 앱 업데이트 없이 그대로 내려온다.
+
+표시에 필요한 것(label·iconUrl)을 서버가 함께 준다. 클라이언트는 code로 분기하지 말고
+label·iconUrl을 그리기만 하면 된다 — code로 분기하면 모르는 카테고리에서 다시 깨진다.
+"""
+type SpotCategory {
+    "안정 식별자(예: TOURIST_SPOT). 필터 인자에 그대로 넘긴다. 값이 늘어날 수 있다."
+    code: String!
+    "요청 언어(Accept-Language) 표시 문구. 해당 언어 번역이 없으면 code가 그대로 온다."
+    label: String!
+    "칩·마커 이미지 URL(https). 설정되지 않았으면 null이며, 클라이언트 기본 표현으로 떨어진다."
+    iconUrl: String
 }
 
 "저작권 유형. 클라이언트가 유형별로 출처 표기를 분기한다."
@@ -268,14 +285,14 @@ type SpotDetail {
     운영 정보(이용시간·휴무일·주차 등). 이 장소의 category 값을 그대로 넘긴다.
     해당 카테고리·언어에 보여줄 값이 없으면 null이다.
     """
-    intro(category: SpotCategory!): SpotIntro
+    intro(categoryCode: String!): SpotIntro
 
     """
     이용안내 반복 항목. category는 intro와 같은 의미다.
 
     null은 이 필드의 조회 실패(최상위 errors[]에 표면화), 빈 배열은 항목이 없다는 뜻이다.
     """
-    infoItems(category: SpotCategory!): [SpotInfoItem!]
+    infoItems(categoryCode: String!): [SpotInfoItem!]
 }
 
 "운영 정보. 카테고리마다 다른 응답을 공통 필드명으로 정규화한다. 해당 개념이 없는 카테고리에서는 null이다."

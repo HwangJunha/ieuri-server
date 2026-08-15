@@ -30,7 +30,11 @@ class MapSpatialQueryAdapter(
      */
     @Transactional(readOnly = true)
     override fun findSpotsWithin(query: MapViewportSearch): List<MapSpotView> {
-        val categoryCondition = if (query.category != null) "AND cat.category = ?" else ""
+        // 다중 선택은 OR이며 IN으로 표현한다(SPEC-0020). 비어 있으면 조건 자체를 걸지 않는다.
+        val categoryCodes = query.categories.codes()
+        val categoryCondition =
+            if (query.categories.isUnfiltered) ""
+            else "AND cat.category IN (${categoryCodes.joinToString(",") { "?" }})"
         // 원문 보유 필터. null이면 전체다 — 상한에 걸려 잘릴 때 무엇을 남길지 클라이언트가 정한다.
         val originCondition = if (query.hasOrigin != null) "AND t.has_origin = ?" else ""
 
@@ -38,7 +42,7 @@ class MapSpatialQueryAdapter(
         val params = buildList<Any> {
             add(query.language.name)
             addAll(envelopeParams(query.bounds))
-            query.category?.let { add(it.name) }
+            addAll(categoryCodes)
             query.hasOrigin?.let { add(it) }
             add(query.limit)
         }
@@ -63,7 +67,7 @@ class MapSpatialQueryAdapter(
                     id = rs.getLong("id"),
                     title = rs.getString("title"),
                     thumbnailImageUrl = rs.getString("thumbnail_image_url"),
-                    category = SpotCategory.valueOf(rs.getString("category")),
+                    category = SpotCategory(rs.getString("category")),
                     lng = rs.getDouble("map_x"),
                     lat = rs.getDouble("map_y"),
                 )

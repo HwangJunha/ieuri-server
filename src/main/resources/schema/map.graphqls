@@ -10,10 +10,16 @@ extend type Query {
         bbox: MapBoundsInput!
         "카카오맵 줌 레벨(1~14, 클수록 확대). 유효 범위 밖이면 INVALID_ZOOM."
         zoom: Int!
-        "생략하면 전체."
-        category: SpotCategory
+        """
+        카테고리 코드 다중 필터(availableSpotCategories의 code). OR 결합. 생략·null이면 전체,
+        빈 배열은 EMPTY_CATEGORY_SET으로 거절된다. 없는 코드는 오류가 아니라 결과 0건이다.
+
+        줌별 상한보다 먼저 적용되므로 truncated는 필터 후 결과 기준이다.
+        """
+        categories: [String!]
         """
         원문 보유 필터. **생략하면 전체**, true면 요청 언어로 쓰인 원문만, false면 번역본만.
+        카테고리 필터와는 AND로 결합되며, 이것도 상한보다 먼저 적용된다.
 
         마커가 상한에 걸려 잘릴 때(truncated) 무엇이 남을지를 정하는 데 쓴다 — 원문 있는
         곳만 보려면 true로 요청한다.

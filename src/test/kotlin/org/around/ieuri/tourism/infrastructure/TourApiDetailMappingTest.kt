@@ -26,8 +26,8 @@ class TourApiDetailMappingTest {
         serviceKey = "dummy",
         baseUrls = mapOf("KO" to "https://ko", "EN" to "https://en"),
         categoryCodes = mapOf(
-            "KO" to mapOf(SpotCategory.TOURIST_SPOT to 12, SpotCategory.SHOPPING to 38),
-            "FOREIGN" to mapOf(SpotCategory.TOURIST_SPOT to 76),
+            "KO" to mapOf("TOURIST_SPOT" to 12, "SHOPPING" to 38),
+            "FOREIGN" to mapOf("TOURIST_SPOT" to 76),
         ),
         excludeLclssystm2 = emptyList(),
     )

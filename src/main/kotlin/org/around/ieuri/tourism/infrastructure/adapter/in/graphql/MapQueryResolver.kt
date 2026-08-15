@@ -17,7 +17,7 @@ import org.around.ieuri.tourism.domain.vo.CommercialStatus
 import org.around.ieuri.tourism.domain.vo.CongestionForecast
 import org.around.ieuri.tourism.domain.vo.CongestionSnapshot
 import org.around.ieuri.tourism.domain.vo.MapBounds
-import org.around.ieuri.tourism.domain.vo.SpotCategory
+import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toCategorySelection
 import org.around.ieuri.tourism.infrastructure.locale.domainLocale
 import org.around.ieuri.common.graphql.generated.types.CommercialActivityLevel as GqlCommercialActivityLevel
 import org.around.ieuri.common.graphql.generated.types.CommercialStatus as GqlCommercialStatus
@@ -57,14 +57,14 @@ class MapQueryResolver(
         dfe: DgsDataFetchingEnvironment,
         @InputArgument bbox: GqlMapBoundsInput,
         @InputArgument zoom: Int,
-        @InputArgument category: GqlSpotCategory?,
+        @InputArgument categories: List<String>?,
         @InputArgument hasOrigin: Boolean?,
     ): GqlMapViewportResult =
         mapQueryUseCase.mapViewport(
             MapViewportQuery(
                 bounds = bbox.toDomain(),
                 zoom = zoom,
-                category = category?.let { SpotCategory.valueOf(it.name) },
+                categories = toCategorySelection(categories),
                 hasOrigin = hasOrigin,
             ),
             locale = dfe.domainLocale(),
@@ -111,7 +111,7 @@ class MapQueryResolver(
         id = id,
         title = title,
         thumbnailImageUrl = thumbnailImageUrl,
-        category = GqlSpotCategory.valueOf(category.name),
+        category = GqlSpotCategory(code = category.code, label = category.code, iconUrl = null),
         lng = lng,
         lat = lat,
     )

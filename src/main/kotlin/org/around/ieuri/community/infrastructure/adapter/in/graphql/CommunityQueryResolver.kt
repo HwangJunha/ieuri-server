@@ -21,7 +21,7 @@ import org.around.ieuri.community.application.query.MyPostsQuery
 import org.around.ieuri.community.application.query.PostsQuery
 import org.around.ieuri.community.domain.vo.PostSortOrder
 import org.around.ieuri.community.domain.vo.TargetCategory
-import org.around.ieuri.community.infrastructure.locale.appKey
+import org.around.ieuri.common.graphql.appKey
 import org.around.ieuri.community.infrastructure.locale.contentLanguage
 import org.springframework.stereotype.Component
 import org.around.ieuri.common.graphql.generated.types.BlockedUserConnection as GqlBlockedUserConnection

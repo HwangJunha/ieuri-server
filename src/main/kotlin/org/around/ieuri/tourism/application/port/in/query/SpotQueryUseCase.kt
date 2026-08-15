@@ -1,6 +1,10 @@
 package org.around.ieuri.tourism.application.port.`in`.query
 
 import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.common.context.AppKey
+import org.around.ieuri.tourism.application.query.AppCategoryCode
+import org.around.ieuri.tourism.application.query.AppCategoryView
+import org.around.ieuri.tourism.application.query.CategoryDisplay
 import org.around.ieuri.tourism.application.query.LikedSpotView
 import org.around.ieuri.tourism.application.query.LikedSpotsQuery
 import org.around.ieuri.tourism.application.query.SpotDetailView
@@ -24,8 +28,33 @@ interface SpotQueryUseCase {
      */
     fun spots(query: SpotsQuery, locale: DomainLocale, memberId: Long?): SpotPageView
 
-    /** 현재 언어에서 유효한 카테고리 목록. */
-    fun availableCategories(locale: DomainLocale): List<SpotCategory>
+    /**
+     * 이 앱·이 언어에 노출되는 카테고리를 구성된 순서대로(SPEC-0020).
+     *
+     * **`app_category` 한 테이블이 유일한 출처다** — 이전에는 언어 비대칭이 코드에, 앱별
+     * 구성이 `community_chip`에 따로 있어 같은 축이 두 벌로 갈라져 있었다. community의
+     * 상단 칩도 이 메서드를 지난다.
+     *
+     * 구성이 없으면 빈 목록이며 오류가 아니다 — 알 수 없는 앱 키가 그대로 도착할 수 있다.
+     */
+    fun availableCategories(appKey: AppKey, locale: DomainLocale): List<AppCategoryView>
+
+    /**
+     * 위와 같은 구성을, 도메인 타입 없이 **문자열 축으로** 돌려준다. 다른 도메인이 쓰는 진입점이다.
+     *
+     * 언어 코드와 카테고리 코드를 문자열로 주고받는 이유는 `spotIdsWithin(categoryCode:)`와 같다 —
+     * 호출하는 도메인이 tourism의 `DomainLocale`·`SpotCategory`를 import하면 그 도메인만 따로
+     * 떼어낼 수 없게 된다. 모르는 언어 코드는 폴백 언어로 읽는다.
+     */
+    fun availableCategoryCodes(appKey: AppKey, languageCode: String): List<AppCategoryCode>
+
+    /**
+     * 카테고리 코드 → 표시 정보를 **한 번에**(SPEC-0020). 목록 응답이 카드마다 묻지 않게 한다.
+     *
+     * 정의가 없는 코드도 키가 있다 — 코드 자체를 라벨로 쓰는 폴백이 담긴다. 알 수 없는
+     * 카테고리라고 카드를 감추지 않기 위해서다.
+     */
+    fun categoryDisplays(codes: Set<String>, locale: DomainLocale): Map<String, CategoryDisplay>
 
     /**
      * `spot.id` 단건 상세 본문. 캐시를 앞세우며 upstream은 detailCommon2 1콜. 갤러리·운영정보·이용안내·
@@ -87,8 +116,7 @@ interface SpotQueryUseCase {
      * 회원이 좋아요한 spot 한 페이지. likedAt 내림차순, 동률은 spot.id로 타이브레이크.
      *
      * 요청 언어로 한정하며, [memberId] 본인 것만 조회한다 — 미인증 거부는 리졸버가 판정하고 이 포트는
-     * 이미 인증된 회원을 전제한다. [LikedSpotsQuery.category]가 현재 언어에서 유효하지 않으면
-     * CATEGORY_NOT_AVAILABLE_FOR_LOCALE로 거부한다.
+     * 이미 인증된 회원을 전제한다.
      */
     fun likedSpots(query: LikedSpotsQuery, locale: DomainLocale, memberId: Long): CursorPage<LikedSpotView>
 }

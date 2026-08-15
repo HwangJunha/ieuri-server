@@ -40,7 +40,7 @@ class SpotDetailUpsertJdbcAdapter(
                 copyright = EXCLUDED.copyright, body_absent = EXCLUDED.body_absent,
                 fetched_at = now(), updated_at = now()
             """.trimIndent(),
-            spotId, detail.title, detail.category.name, detail.thumbnailImageUrl,
+            spotId, detail.title, detail.category.code, detail.thumbnailImageUrl,
             detail.overview, detail.address, detail.homepage, detail.tel, detail.copyright.name,
             bodyAbsent,
         )
@@ -93,7 +93,7 @@ class SpotDetailUpsertJdbcAdapter(
                 credit_card_accepted = EXCLUDED.credit_card_accepted,
                 fetched_at = now(), updated_at = now()
             """.trimIndent(),
-            spotId, category.name, intro?.businessHours, intro?.closedDays,
+            spotId, category.code, intro?.businessHours, intro?.closedDays,
             intro?.parking, intro?.inquiryPhone, intro?.fee, intro?.petAllowed, intro?.creditCardAccepted,
         )
     }
@@ -102,7 +102,7 @@ class SpotDetailUpsertJdbcAdapter(
     fun replaceInfoItems(spotId: Long, category: SpotCategory, items: List<SpotInfoItem>) {
         jdbcTemplate.update(
             "DELETE FROM spot_detail_info WHERE spot_id = ? AND category = ?",
-            spotId, category.name,
+            spotId, category.code,
         )
         if (items.isEmpty()) return
         jdbcTemplate.batchUpdate(
@@ -117,7 +117,7 @@ class SpotDetailUpsertJdbcAdapter(
                 override fun setValues(ps: PreparedStatement, i: Int) {
                     val item = items[i]
                     ps.setLong(1, spotId)
-                    ps.setString(2, category.name)
+                    ps.setString(2, category.code)
                     ps.setInt(3, i)
                     ps.setString(4, item.name)
                     ps.setString(5, item.text)

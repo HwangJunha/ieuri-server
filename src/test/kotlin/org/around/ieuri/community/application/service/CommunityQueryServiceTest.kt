@@ -10,6 +10,7 @@ import org.around.ieuri.common.pagination.CursorPageInfo
 import org.around.ieuri.community.application.event.PostViewed
 import org.around.ieuri.community.application.policy.CommunityPolicy
 import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
+import org.around.ieuri.community.application.port.out.client.CategoryConfigPort
 import org.around.ieuri.community.application.port.out.query.BlockedUsersSearch
 import org.around.ieuri.community.application.port.out.query.CommunityQueryPort
 import org.around.ieuri.community.application.port.out.query.MyPostsSearch
@@ -23,7 +24,7 @@ import org.around.ieuri.community.application.query.MyPostsQuery
 import org.around.ieuri.community.application.query.PostCommentsQuery
 import org.around.ieuri.community.application.query.PostView
 import org.around.ieuri.community.application.query.PostsQuery
-import org.around.ieuri.community.domain.vo.AppKey
+import org.around.ieuri.common.context.AppKey
 import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.around.ieuri.community.domain.vo.PostSortOrder
 import org.around.ieuri.community.domain.vo.TargetCategory
@@ -60,8 +61,10 @@ class CommunityQueryServiceTest {
 
     private val eventPublisher = mockk<CommunityEventPublisherPort>(relaxed = true)
 
+    private val categoryConfigPort = mockk<CategoryConfigPort>()
+
     private val service = CommunityQueryService(
-        queryPort, spatialPort, eventPublisher, policy,
+        queryPort, spatialPort, categoryConfigPort, eventPublisher, policy,
     )
 
     private fun <T> emptyPage() = CursorPage<T>(
@@ -331,11 +334,11 @@ class CommunityQueryServiceTest {
     fun `상단 칩은 앱마다 다른 구성을 내려준다`() {
         val trip = AppKey("k-trip-spot")
         val demo = AppKey("demo-app")
-        every { queryPort.findChips(trip, ContentLanguage.KO) } returns listOf(
+        every { categoryConfigPort.findCategories(trip, ContentLanguage.KO) } returns listOf(
             CommunityChipView(TargetCategory.RESTAURANT, 0),
             CommunityChipView(TargetCategory.FESTIVAL_EVENT, 1),
         )
-        every { queryPort.findChips(demo, ContentLanguage.KO) } returns listOf(
+        every { categoryConfigPort.findCategories(demo, ContentLanguage.KO) } returns listOf(
             CommunityChipView(TargetCategory.SHOPPING, 0),
         )
 
@@ -349,11 +352,11 @@ class CommunityQueryServiceTest {
     @Test
     fun `칩 구성은 언어별로 갈린다 - 여행코스는 국문, 교통은 외국어 전용이다`() {
         val trip = AppKey("k-trip-spot")
-        every { queryPort.findChips(trip, ContentLanguage.KO) } returns listOf(
+        every { categoryConfigPort.findCategories(trip, ContentLanguage.KO) } returns listOf(
             CommunityChipView(TargetCategory.RESTAURANT, 0),
             CommunityChipView(TargetCategory.TRAVEL_COURSE, 1),
         )
-        every { queryPort.findChips(trip, ContentLanguage.EN) } returns listOf(
+        every { categoryConfigPort.findCategories(trip, ContentLanguage.EN) } returns listOf(
             CommunityChipView(TargetCategory.RESTAURANT, 0),
             CommunityChipView(TargetCategory.TRANSPORT, 1),
         )
@@ -371,7 +374,7 @@ class CommunityQueryServiceTest {
     @Test
     fun `구성이 없는 앱은 빈 목록이며 오류가 아니다`() {
         val unknown = AppKey("unknown-app")
-        every { queryPort.findChips(unknown, ContentLanguage.KO) } returns emptyList()
+        every { categoryConfigPort.findCategories(unknown, ContentLanguage.KO) } returns emptyList()
 
         assertTrue(service.communityChips(unknown, ContentLanguage.KO).isEmpty())
     }

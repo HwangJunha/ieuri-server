@@ -5,7 +5,7 @@ import org.around.ieuri.community.application.query.BlockedUserView
 import org.around.ieuri.community.application.query.CommunityChipView
 import org.around.ieuri.community.application.query.CommentView
 import org.around.ieuri.community.application.query.PostView
-import org.around.ieuri.community.domain.vo.AppKey
+import org.around.ieuri.common.context.AppKey
 import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.domain.vo.PostSortOrder
@@ -101,9 +101,6 @@ interface CommunityQueryPort {
 
     /** [memberId]가 개별로 숨긴 글의 id. 피드 필터가 이 집합을 제외한다. */
     fun findHiddenPostIds(memberId: Long): Set<Long>
-
-    /** 앱의 켜진 칩만 순서대로. 구성이 없으면 빈 목록이다. */
-    fun findChips(appKey: AppKey, language: ContentLanguage): List<CommunityChipView>
 }
 
 /**

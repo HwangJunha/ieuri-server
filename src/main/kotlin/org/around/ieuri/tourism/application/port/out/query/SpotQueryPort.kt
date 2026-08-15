@@ -2,6 +2,7 @@ package org.around.ieuri.tourism.application.port.out.query
 
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.tourism.application.query.LikedSpotView
+import org.around.ieuri.tourism.domain.vo.CategorySelection
 import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
@@ -105,8 +106,8 @@ data class SpotBasics(
 data class LikedSpotsSearch(
     val memberId: Long,
     val language: DomainLocale,
-    /** 카테고리 필터. null이면 전체. 값이 있으면 `spot.category`로 거른다. */
-    val category: SpotCategory?,
+    /** 카테고리 선택. 비어 있으면 전체. 값이 있으면 `spot_catalog.category`를 IN으로 거른다. */
+    val categories: CategorySelection,
     val first: Int,
     val after: String?,
 )
@@ -127,7 +128,8 @@ data class NearbySpotSearch(
     val language: DomainLocale,
     val center: Coordinates,
     val radiusMeters: Int,
-    val category: SpotCategory?,
+    /** 카테고리 선택. 비어 있으면 전체. 값이 여럿이면 IN으로 거른다(OR). */
+    val categories: CategorySelection,
     val excludedSpotIds: Set<Long>,
     val limit: Int,
     val offset: Int,

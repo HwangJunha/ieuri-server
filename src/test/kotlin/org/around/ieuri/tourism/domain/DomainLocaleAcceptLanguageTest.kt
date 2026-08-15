@@ -35,4 +35,15 @@ class DomainLocaleAcceptLanguageTest {
         assertEquals(DomainLocale.FALLBACK, DomainLocale.fromAcceptLanguage(""))
         assertEquals(DomainLocale.FALLBACK, DomainLocale.fromAcceptLanguage("fr-FR,de;q=0.9"))
     }
+
+    /** 단일 태그 정규화(AC-11). `fromAcceptLanguage`가 이 함수 위에 얹혀 있다. */
+    @Test
+    fun `Accept-Language 태그를 도메인 언어로 정규화하고 미지원은 EN 폴백`() {
+        assertEquals(DomainLocale.KO, DomainLocale.fromLanguageTag("ko-KR"))
+        assertEquals(DomainLocale.JA, DomainLocale.fromLanguageTag("ja"))
+        assertEquals(DomainLocale.ZH, DomainLocale.fromLanguageTag("zh-Hant"))
+        assertEquals(DomainLocale.EN, DomainLocale.fromLanguageTag("en-US"))
+        assertEquals(DomainLocale.EN, DomainLocale.fromLanguageTag(null))
+        assertEquals(DomainLocale.EN, DomainLocale.fromLanguageTag("fr"))
+    }
 }

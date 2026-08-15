@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.application.query
 
+import org.around.ieuri.tourism.domain.vo.CategorySelection
 import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import java.time.Instant
@@ -14,7 +15,8 @@ data class SpotsQuery(
     val latitude: Double,
     val longitude: Double,
     val radiusMeters: Int,
-    val category: SpotCategory?,
+    /** 카테고리 선택. 비어 있으면 전체이며, 값이 여럿이면 OR로 결합된다(SPEC-0020 R5). */
+    val categories: CategorySelection,
     /**
      * 원문 보유 필터. **null이면 전체**, true면 그 언어 원문이 있는 것만, false면 번역본만.
      *
@@ -128,8 +130,8 @@ data class SpotImageView(
  * 회원은 인증 컨텍스트에서 온다 — 둘 다 클라이언트가 고를 수 있는 값이 아니다(AC-48·AC-49).
  */
 data class LikedSpotsQuery(
-    /** 언어 중립 카테고리 필터. null이면 전체(`spots`와 같은 규약). */
-    val category: SpotCategory?,
+    /** 카테고리 선택. 비어 있으면 전체이며, 값이 여럿이면 OR로 결합된다(`spots`와 같은 규약). */
+    val categories: CategorySelection,
     val first: Int,
     val after: String?,
 )
@@ -170,7 +172,8 @@ data class SearchSpotsQuery(
     val latitude: Double,
     val longitude: Double,
     val radiusMeters: Int,
-    val category: SpotCategory?,
+    /** 카테고리 선택. 비어 있으면 전체이며, 값이 여럿이면 OR로 결합된다(SPEC-0020 R5). */
+    val categories: CategorySelection,
     val page: Int,
     val size: Int,
 )
@@ -245,7 +248,8 @@ data class PopularSpotsQuery(
     val latitude: Double,
     val longitude: Double,
     val radiusMeters: Int,
-    val category: SpotCategory?,
+    /** 카테고리 선택. 비어 있으면 전체이며, 값이 여럿이면 OR로 결합된다(SPEC-0020 R5). */
+    val categories: CategorySelection,
     /**
      * 원문 보유 필터. **null이면 전체**, true면 그 언어 원문이 있는 것만, false면 번역본만.
      *

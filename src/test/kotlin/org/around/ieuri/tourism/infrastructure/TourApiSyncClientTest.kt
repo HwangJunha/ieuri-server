@@ -25,8 +25,8 @@ class TourApiSyncClientTest {
         serviceKey = "dummy",
         baseUrls = mapOf("KO" to "https://ko", "EN" to "https://en"),
         categoryCodes = mapOf(
-            "KO" to mapOf(SpotCategory.SHOPPING to 38, SpotCategory.TOURIST_SPOT to 12),
-            "FOREIGN" to mapOf(SpotCategory.SHOPPING to 79, SpotCategory.TOURIST_SPOT to 76),
+            "KO" to mapOf("SHOPPING" to 38, "TOURIST_SPOT" to 12),
+            "FOREIGN" to mapOf("SHOPPING" to 79, "TOURIST_SPOT" to 76),
         ),
         excludeLclssystm2 = listOf("EX999"),
     )
@@ -116,8 +116,8 @@ class TourApiSyncClientTest {
         val ko = client.mapPage(response(listOf(item(contentTypeId = "38"))), DomainLocale.KO)
         val en = client.mapPage(response(listOf(item(contentTypeId = "79"))), DomainLocale.EN)
 
-        assertEquals(SpotCategory.SHOPPING, ko.records.first().category)
-        assertEquals(SpotCategory.SHOPPING, en.records.first().category)
+        assertEquals(SpotCategory("SHOPPING"), ko.records.first().category)
+        assertEquals(SpotCategory("SHOPPING"), en.records.first().category)
     }
 
     @Test

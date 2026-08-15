@@ -1,6 +1,7 @@
 package org.around.ieuri.tourism.application.port.out.query
 
 import org.around.ieuri.tourism.application.query.PopularSpotView
+import org.around.ieuri.tourism.domain.vo.CategorySelection
 import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.LikeCountCursor
@@ -34,7 +35,8 @@ data class PopularSpotSearch(
     val language: DomainLocale,
     val center: Coordinates,
     val radiusMeters: Int,
-    val category: SpotCategory?,
+    /** 카테고리 선택. 비어 있으면 전체. 값이 여럿이면 IN으로 거른다(OR). */
+    val categories: CategorySelection,
     val minLikeCount: Int,
     val limit: Int,
     val after: LikeCountCursor?,

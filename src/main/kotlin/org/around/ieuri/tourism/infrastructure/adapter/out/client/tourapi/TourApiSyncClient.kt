@@ -88,7 +88,7 @@ class TourApiSyncClient(
         val codeset = if (locale.isKorean) TourApiProperties.CODESET_KO else TourApiProperties.CODESET_FOREIGN
         val id = contentTypeId?.toIntOrNull() ?: return ResolvedCategory(SpotCategory.TOURIST_SPOT, isFallback = true)
         val matched = properties.categoryCodes[codeset]?.entries?.firstOrNull { it.value == id }?.key
-        return matched?.let { ResolvedCategory(it, isFallback = false) }
+        return matched?.let { ResolvedCategory(SpotCategory(it), isFallback = false) }
             ?: ResolvedCategory(SpotCategory.TOURIST_SPOT, isFallback = true)
     }
 

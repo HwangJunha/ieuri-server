@@ -45,10 +45,10 @@ class TourApiDetailMapperTest {
 
     @Test
     fun `모든 필드가 채워진 item을 SpotDetail로 옮긴다`() {
-        val detail = commonItem().toSpotDetail(SpotCategory.SHOPPING)
+        val detail = commonItem().toSpotDetail(SpotCategory("SHOPPING"))
 
         assertEquals("불국사", detail.title)
-        assertEquals(SpotCategory.SHOPPING, detail.category)
+        assertEquals(SpotCategory("SHOPPING"), detail.category)
         assertEquals("https://tong.visitkorea.or.kr/bulguksa.jpg", detail.thumbnailImageUrl)
         assertEquals("신라의 사찰", detail.overview)
         assertEquals("경상북도 경주시 불국로 385", detail.address)

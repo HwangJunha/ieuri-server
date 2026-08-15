@@ -1,42 +1,38 @@
 package org.around.ieuri.tourism.domain.vo
 
 /**
- * 언어 중립 관광지 카테고리. TourAPI contentTypeId 코드 체계(12/76/38/79…)를 도메인이 직접 알지 않도록
- * 안정 식별자로만 표현한다(POL-023: enum은 표시 문자열이 아니다). 언어별 코드 매핑과 가용성 판정은
- * 어댑터/설정의 책임이며, 카테고리 자체의 언어 비대칭(아래 [koreanOnly]/[foreignOnly])만 도메인이 안다.
+ * 관광지 카테고리 코드(SPEC-0020). **enum이 아니라 열린 값이다** — 새 카테고리가 `category`
+ * 테이블에 추가되면 서버 배포 없이 그대로 흘러간다.
+ *
+ * enum이던 시절에는 카테고리 하나를 늘리려면 Kotlin enum·GraphQL enum·CHECK 제약 3개를 함께
+ * 고치고 배포해야 했고, 표시 문구와 아이콘은 앱에 박혀 있어 앱 업데이트까지 필요했다. 이 타입은
+ * 코드만 들고 있으며 표시 정보(label·iconUrl)는 `category` 테이블이 갖는다.
+ *
+ * **값 자체는 검증하지 않는다.** 존재하지 않는 코드로 걸러진 조회는 결과가 없을 뿐이고, 그것이
+ * 알 수 없는 코드를 거절하는 것보다 낫다 — 카테고리는 앞으로 늘어나는 축이라, 서버가 아는
+ * 목록으로 요청을 막으면 이 변경의 목적이 사라진다.
  */
-enum class SpotCategory {
-    TOURIST_SPOT,
-    CULTURAL_FACILITY,
-    FESTIVAL_EVENT,
-
-    /** 한국어(KO) 서비스에서만 제공됨. */
-    TRAVEL_COURSE,
-    LEISURE_SPORTS,
-    LODGING,
-    SHOPPING,
-    RESTAURANT,
-
-    /** 외국어(EN/JA/ZH) 서비스에서만 제공됨. */
-    TRANSPORT,
-    ;
-
-    /** 국문 전용 카테고리(외국어 서비스엔 없음). */
-    val koreanOnly: Boolean get() = this == TRAVEL_COURSE
-
-    /** 외국어 전용 카테고리(국문 서비스엔 없음). */
-    val foreignOnly: Boolean get() = this == TRANSPORT
-
-    /** 주어진 언어에서 이 카테고리가 유효한가. 비대칭(여행코스/교통)을 흡수한다. */
-    fun isAvailableIn(locale: DomainLocale): Boolean = when {
-        koreanOnly -> locale.isKorean
-        foreignOnly -> !locale.isKorean
-        else -> true
+@JvmInline
+value class SpotCategory(val code: String) {
+    init {
+        require(code.isNotBlank()) { "카테고리 코드는 비어 있을 수 없습니다." }
+        require(code.length <= MAX_LENGTH) { "카테고리 코드는 ${MAX_LENGTH}자를 넘을 수 없습니다." }
     }
 
+    override fun toString(): String = code
+
     companion object {
-        /** 주어진 언어에서 노출 가능한 카테고리 목록(availableSpotCategories). */
-        fun availableIn(locale: DomainLocale): List<SpotCategory> =
-            entries.filter { it.isAvailableIn(locale) }
+        const val MAX_LENGTH = 30
+
+        /**
+         * 기존 코드가 이름으로 참조하던 값들. **특별한 지위는 없다** — 시드에 들어 있는 9개 중
+         * 코드가 실제로 이름을 불러야 하는 것만 남긴 상수다. 새 카테고리는 여기 추가하지 않는다.
+         */
+        val TOURIST_SPOT = SpotCategory("TOURIST_SPOT")
+        val FESTIVAL_EVENT = SpotCategory("FESTIVAL_EVENT")
+
+        /** DB·업스트림에서 읽은 문자열을 코드로. 비어 있으면 null이다. */
+        fun ofOrNull(code: String?): SpotCategory? =
+            code?.trim()?.takeIf { it.isNotEmpty() && it.length <= MAX_LENGTH }?.let { SpotCategory(it) }
     }
 }
