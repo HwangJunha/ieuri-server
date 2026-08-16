@@ -13,7 +13,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** 대화·메시지·DM 신고의 도메인 불변식(SPEC-0017 R7·R9·R15·R16). */
+/** 대화·메시지·DM 신고의 도메인 불변식(SPEC-0017 R9·R15·R16, SPEC-0021 R3·R4). */
 class ConversationAndMessageTest {
 
     private val now = Instant.parse("2026-08-12T00:00:00Z")
@@ -87,16 +87,19 @@ class ConversationAndMessageTest {
         assertEquals(3L, message.senderId)
     }
 
-    /** AC9-2 — 본문도 첨부도 없으면 보낼 것이 없는 전송이라 거부된다. */
+    /**
+     * AC9-2·SPEC-0021 AC3.5 — 본문도 사진도 없으면 보낼 것이 없는 전송이라 거부된다.
+     * 인용이 사라져 판정 조건이 둘로 줄었다.
+     */
     @Test
-    fun `본문도 첨부도 없으면 전송되지 않는다`() {
+    fun `본문도 사진도 없으면 전송되지 않는다`() {
         assertFailsWith<IllegalArgumentException> {
             Message.create(conversationId = 1L, senderId = 3L, body = "   ")
         }
     }
 
     /**
-     * **첨부만 있는 메시지가 성립한다** — 인스타처럼 사진만, 또는 피드 인용만 보낼 수 있다.
+     * **사진만 있는 메시지가 성립한다**(SPEC-0021 AC3.4) — 본문이 비어도 사진이 있으면 보낼 수 있다.
      * 본문 없음은 빈 문자열로 표현한다.
      */
     @Test
@@ -118,16 +121,6 @@ class ConversationAndMessageTest {
 
         assertEquals("이 사진 보세요", message.body)
         assertEquals(key.value, message.photoKey?.value)
-    }
-
-    /**
-     * SPEC-0021 AC3.5 — 인용이 사라져 빈 전송의 판정 조건이 본문·사진 둘뿐이다.
-     */
-    @Test
-    fun `본문과 사진이 모두 비면 전송할 수 없다`() {
-        assertFailsWith<IllegalArgumentException> {
-            Message.create(1L, 3L, body = "   ")
-        }
     }
 
     /**
