@@ -81,16 +81,9 @@ class ReportDetailRequiredException(message: String = "상세 사유를 입력�
 
 // ── DM(SPEC-0017·SPEC-0021) ──────────────────────────────────────────
 
-/** 글은 spot 연결이 필수인 경로가 있다 — 사진과 함께 커뮤니티 글도 쓴다. */
-class SpotRequiredException(message: String = "장소를 선택해 주세요.") :
-    CommunityUserException("SPOT_REQUIRED", message)
-
-class PhotoRequiredException(message: String = "사진을 1장 이상 첨부해 주세요.") :
-    CommunityUserException("PHOTO_REQUIRED", message)
-
 /**
  * 확정되지 않았거나 이미 다른 글에 실린 사진 키. **두 경우를 같은 코드로 다룬다** —
- * 구분해 알려 주면 남의 오브젝트 키가 존재하는지 캐내는 수단이 된다.
+ * 구분해 알려 주면 남의 오브젝트 키가 존재하는지 캐내는 수단이 된다. DM 사진이 쓴다.
  */
 class PhotoNotConfirmedException(message: String = "업로드가 확정되지 않은 사진입니다.") :
     CommunityUserException("PHOTO_NOT_CONFIRMED", message)

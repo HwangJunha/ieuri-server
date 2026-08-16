@@ -18,7 +18,7 @@ class OrphanPhotoServiceTest {
     @Test
     fun `피드에만 쓰인 키가 삭제 대상이다`() {
         every { queryPort.findOrphanPhotoKeys() } returns listOf("images/community/1/a", "images/community/1/b")
-        every { queryPort.findKeysUsedByPosts(any()) } returns emptySet()
+        every { queryPort.findOrphanKeysStillUsedByPosts() } returns emptySet()
 
         val deletable = service.deletableFeedPhotoKeys()
 
@@ -33,7 +33,7 @@ class OrphanPhotoServiceTest {
     fun `커뮤니티 글이 쓰는 키는 대상에서 빠진다`() {
         every { queryPort.findOrphanPhotoKeys() } returns
             listOf("images/community/1/a", "images/community/1/shared", "images/community/1/b")
-        every { queryPort.findKeysUsedByPosts(any()) } returns setOf("images/community/1/shared")
+        every { queryPort.findOrphanKeysStillUsedByPosts() } returns setOf("images/community/1/shared")
 
         val deletable = service.deletableFeedPhotoKeys()
 
@@ -48,14 +48,14 @@ class OrphanPhotoServiceTest {
         val deletable = service.deletableFeedPhotoKeys()
 
         assertTrue(deletable.isEmpty())
-        verify(exactly = 0) { queryPort.findKeysUsedByPosts(any()) }
+        verify(exactly = 0) { queryPort.findOrphanKeysStillUsedByPosts() }
     }
 
     /** 전부 글이 쓰고 있으면 지울 것이 없다 — 빈 목록이지 실패가 아니다. */
     @Test
     fun `모든 키를 글이 쓰고 있으면 대상이 없다`() {
         every { queryPort.findOrphanPhotoKeys() } returns listOf("images/community/1/a")
-        every { queryPort.findKeysUsedByPosts(any()) } returns setOf("images/community/1/a")
+        every { queryPort.findOrphanKeysStillUsedByPosts() } returns setOf("images/community/1/a")
 
         assertTrue(service.deletableFeedPhotoKeys().isEmpty())
     }

@@ -13,8 +13,8 @@ import org.around.ieuri.community.application.command.StartConversationCommand
  */
 interface ConversationCommandUseCase {
     /**
-     * 피드 작성자와의 대화를 시작한다. 같은 상대와 대화가 이미 있으면 **새로 만들지 않고
-     * 기존 대화의 id를 돌려준다**(AC7-2).
+     * 상대 회원을 지목해 대화를 시작한다(SPEC-0021 R2). 같은 상대와 대화가 이미 있으면
+     * **새로 만들지 않고 기존 대화의 id를 돌려준다**(AC2.2).
      */
     fun startConversation(command: StartConversationCommand, memberId: Long): Long
 
