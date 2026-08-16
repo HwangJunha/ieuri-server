@@ -35,6 +35,8 @@ class SecurityGraphqlExceptionHandler(
         val code = when (val ex = parameters.exception) {
             is UnauthorizedException -> "UNAUTHENTICATED"
             is ForbiddenException -> "FORBIDDEN"
+            // 미인증 게이트(SPEC-0024 R9). 인증류 선행 조건이라 위 둘과 같은 표면으로 낸다.
+            is EmailNotVerifiedException -> "EMAIL_NOT_VERIFIED"
             // 두 도메인이 함께 쓰는 조회 인자 오류. 여기서 코드를 실어야 클라이언트가 분기한다.
             is EmptyCategorySetException -> ex.code
             else -> return delegate.handleException(parameters)
