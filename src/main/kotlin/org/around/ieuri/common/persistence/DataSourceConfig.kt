@@ -108,6 +108,22 @@ class DataSourceConfig {
                 dataSourceProperties.password,
             )
             .locations(*properties.locations.toTypedArray())
+            // **`spring.datasource.hikari.connection-init-sql`이 여기 닿지 않는다** — 위에
+            // 적었듯 Flyway는 풀을 쓰지 않고 자체 커넥션을 만든다. 그래서 스키마 5분할
+            // 이후의 이름 해석 경로를 여기서 따로 준다(SPEC-0023).
+            //
+            // **V62부터는 마이그레이션이 스키마 한정으로 쓰여야 한다.** V61까지는 테이블이
+            // 전부 `public`에 있어 한정 없이 써도 맞았지만, 이제는 `ALTER TABLE community_post`
+            // 같은 문장이 이 경로에 의존한다. 경로에 기대는 대신 `community.community_post`로
+            // 적는 편이 안전하다 — 경로가 바뀌면 조용히 다른 스키마를 고칠 수 있다.
+            // 이력 테이블(`flyway_schema_history`)이 `public`에 남게 고정하고, 마이그레이션
+            // 커넥션의 기본 스키마도 `public`으로 둔다. V61이 테이블을 옮겨도 이력은 따라가지
+            // 않으며, 옮기면 기존 환경이 이력을 잃고 V1부터 다시 적용하려 든다.
+            //
+            // **`schemas(...)`로 5개를 나열하지 않는다.** 그 목록은 Flyway가 소유를 주장하는
+            // 대상이라 없으면 만들고 `clean`에서 지운다 — 스키마 생성은 V61과 CNPG
+            // 매니페스트가 이미 나눠 갖고 있으므로 소유자를 셋으로 늘릴 이유가 없다.
+            .defaultSchema("public")
             .baselineOnMigrate(properties.baselineOnMigrate)
             .baselineVersion(properties.baselineVersion)
             .ignoreMigrationPatterns(*properties.ignoreMigrationPatterns.toTypedArray())

@@ -66,8 +66,9 @@ class MigrationRuleTest {
         )
 
         val sql = sources.getValue("V61__split_context_schemas.sql")
+        // 재적용 가드 때문에 `public.` 한정이 붙어 있다 — 스키마 접두사는 선택으로 둔다.
         val moved = Regex(
-            """ALTER\s+FUNCTION\s+(\w+)\s*\(\s*\)\s+SET\s+SCHEMA\s+(\w+)""",
+            """ALTER\s+FUNCTION\s+(?:public\.)?(\w+)\s*\(\s*\)\s+SET\s+SCHEMA\s+(\w+)""",
             RegexOption.IGNORE_CASE,
         ).findAll(sql).associate { it.groupValues[1] to it.groupValues[2] }
 

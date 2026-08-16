@@ -78,8 +78,10 @@ class SearchDataSourceConfig {
             // **flyway_schema_history를 `public`에 유지한다**(SPEC-0023). V8이 테이블을
             // `tour`로 옮겨도 이력 테이블은 따라가지 않는다 — 옮기면 기존 노드가 이력을 잃고
             // V1부터 다시 적용하려 든다.
+            //
+            // `schemas("public", "tour")`로 적지 않는다 — 그 목록은 Flyway가 소유를 주장하는
+            // 대상이라 없으면 만들고 `clean`에서 지운다. `tour`는 V8이 만든다.
             .defaultSchema("public")
-            .schemas("public", "tour")
             // 메인과 이력이 섞이지 않게 테이블 이름을 명시한다. 기본값과 같지만, 이 DB에
             // 두 이력이 공존할 여지를 남기지 않으려는 의도를 드러낸다.
             .table("flyway_schema_history")
