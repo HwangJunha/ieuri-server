@@ -4,9 +4,9 @@ import org.around.ieuri.auth.application.command.ChangeEmailCommand
 import org.around.ieuri.auth.application.command.ConfirmEmailChangeCommand
 import org.around.ieuri.auth.application.command.ResendEmailChangeCommand
 import org.around.ieuri.auth.application.event.VerificationEmailRequested
-import org.around.ieuri.auth.application.exception.EmailAlreadyInUseException
 import org.around.ieuri.auth.application.exception.InvalidEmailFormatException
 import org.around.ieuri.auth.application.exception.MemberNotFoundException
+import org.around.ieuri.auth.application.exception.NotEmailMemberException
 import org.around.ieuri.auth.application.exception.ResendCooldownActiveException
 import org.around.ieuri.auth.application.exception.SameAsCurrentEmailException
 import org.around.ieuri.auth.application.exception.VerificationNotFoundException
@@ -25,7 +25,6 @@ import org.around.ieuri.auth.domain.aggregate.EmailVerification
 import org.around.ieuri.auth.domain.aggregate.VerificationResult
 import org.around.ieuri.auth.domain.vo.Email
 import org.around.ieuri.auth.domain.vo.Provider
-import org.around.ieuri.auth.domain.vo.ProviderUserId
 import org.around.ieuri.auth.domain.vo.VerificationPurpose
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -50,6 +49,7 @@ class EmailChangeService(
     private val codeGenerator: VerificationCodeGeneratorPort,
     private val emailEncryptor: EmailEncryptorPort,
     private val identifierProtector: LoginIdentifierProtectorPort,
+    private val emailUniqueness: ProviderEmailUniqueness,
     private val verificationPolicy: VerificationPolicy,
     private val auditLog: AuditLogPort,
     private val eventPublisher: DomainEventPublisherPort,
@@ -67,12 +67,19 @@ class EmailChangeService(
         val newEmail = runCatching { Email(command.newEmail) }
             .getOrElse { throw InvalidEmailFormatException("이메일 형식이 올바르지 않습니다.") }
 
-        val currentEmail = memberRepository.findEmailByMemberId(command.memberId)
+        val member = memberRepository.load(command.memberId)
             ?: throw MemberNotFoundException("회원을 찾을 수 없습니다.")
-        if (currentEmail.value == newEmail.value) {
+        // 변경 가능 여부는 도메인에 묻는다(SPEC-0024 R6) — provider 판정은 불변식이지
+        // 이 서비스의 분기가 아니다. `confirmEmailChange`·`resendEmailChange`에는 같은
+        // 판정을 두지 않는다. 여기서 막히면 도달할 수 없는 경로이고, 세 곳에 복제하면
+        // 어긋날 여지만 생긴다.
+        if (!member.canChangeEmail()) {
+            throw NotEmailMemberException("SNS 계정은 이메일을 변경할 수 없습니다.")
+        }
+        if (member.email.value == newEmail.value) {
             throw SameAsCurrentEmailException("현재 사용 중인 이메일과 같습니다.")
         }
-        ensureNotTakenByOthers(newEmail)
+        emailUniqueness.ensureAvailable(member.provider, newEmail, excludingMemberId = command.memberId)
 
         val now = clock.instant()
         // 같은 용도의 이전 챌린지만 폐기한다 — 가입 검증이 진행 중이면 그건 그대로 둔다.
@@ -107,16 +114,21 @@ class EmailChangeService(
                 requireNotNull(verification.targetEmailEncrypted) { "이메일 변경 챌린지에 대상 주소가 없습니다." },
             ),
         )
-        // 확인 시점에 다시 본다 — 요청 후 확인 사이에 다른 회원이 그 주소로 가입했을 수 있다.
-        ensureNotTakenByOthers(newEmail)
-
         val member = memberRepository.load(command.memberId)
             ?: throw MemberNotFoundException("회원을 찾을 수 없습니다.")
+        // 확인 시점에 다시 본다 — 요청 후 확인 사이에 다른 회원이 그 주소로 가입했을 수 있다.
+        emailUniqueness.ensureAvailable(member.provider, newEmail, excludingMemberId = command.memberId)
+
         // EMAIL 회원만 provider_user_id가 이메일에서 파생된다(R8). SNS는 provider가 준 값이라 두 값이 무관하다.
         val protectedIdentifier =
             if (member.provider == Provider.EMAIL) identifierProtector.protect(newEmail.value) else null
 
-        memberRepository.updateEmail(command.memberId, newEmail, protectedIdentifier)
+        memberRepository.updateEmail(
+            memberId = command.memberId,
+            newEmail = newEmail,
+            emailIdentifier = emailUniqueness.identifierOf(newEmail),
+            protectedIdentifier = protectedIdentifier,
+        )
 
         // 주소 자체는 남기지 않는다(POL-013) — 무엇이 바뀌었는지는 회원 데이터가 갖는다.
         auditLog.record(
@@ -197,21 +209,5 @@ class EmailChangeService(
             throw VerificationNotFoundException("유효하지 않은 검증 요청입니다.")
         }
         return verification
-    }
-
-    /**
-     * 다른 회원이 그 주소를 쓰고 있는지. **`(provider, provider_user_id)` 유니크와 같은 기준으로
-     * 본다** — EMAIL 가입의 식별자가 이메일에서 파생되므로, 이 판정이 그 제약과 어긋나면
-     * 확인 단계에서야 실패한다.
-     *
-     * SNS 회원이 같은 주소를 쓰는 경우는 걸러 내지 못한다 — 그쪽 식별자는 provider가 준 값이라
-     * 이메일로 조회할 수단이 없다. 스펙이 요구하는 것은 로그인 충돌 방지이므로 이 범위가 맞다.
-     */
-    private fun ensureNotTakenByOthers(email: Email) {
-        val identifier = ProviderUserId(identifierProtector.protect(email.value))
-        if (memberRepository.existsByProviderAndProviderUserId(Provider.EMAIL, identifier)) {
-            // 누가 쓰는지는 담지 않는다(POL-013).
-            throw EmailAlreadyInUseException("이미 사용 중인 이메일입니다.")
-        }
     }
 }

@@ -48,10 +48,6 @@ class SelfDemotionException(message: String) :
 class InvalidCredentialsException(message: String) :
     UserFacingException("INVALID_CREDENTIALS", message)
 
-/** 이메일 인증(활성화) 전 계정으로 로그인을 시도할 때. */
-class EmailNotVerifiedException(message: String) :
-    UserFacingException("EMAIL_NOT_VERIFIED", message)
-
 /** 토큰 서명/만료/타입이 유효하지 않을 때. 인증 실패이므로 최상위 error로 전파된다. */
 class InvalidTokenException(message: String) : RuntimeException(message)
 
@@ -101,6 +97,15 @@ class SameAsCurrentEmailException(message: String) :
 /** 이메일 형식이 올바르지 않을 때(R7). */
 class InvalidEmailFormatException(message: String) :
     UserFacingException("INVALID_EMAIL_FORMAT", message)
+
+/**
+ * SNS 회원이 이메일 변경을 요청할 때(SPEC-0024 R6). SPEC-0011 R8을 파기한 결과다.
+ *
+ * SNS 이메일은 provider에 종속된 값이라 우리 쪽에서 바꾸면 provider가 주는 값과 영구히
+ * 어긋나고, 되돌릴 방법이 없다.
+ */
+class NotEmailMemberException(message: String) :
+    UserFacingException("NOT_EMAIL_MEMBER", message)
 
 /** 재발송 쿨다운(60초) 이내 재요청(R7). 기존 VERIFICATION_RATE_LIMITED와 코드를 나눈다 —
  *  클라이언트가 이메일 변경 화면에서만 다른 안내를 띄운다. */

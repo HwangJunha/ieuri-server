@@ -4,7 +4,6 @@ import org.around.ieuri.auth.application.command.LoginCommand
 import org.around.ieuri.auth.application.command.LoginEmailCommand
 import org.around.ieuri.auth.application.command.LogoutCommand
 import org.around.ieuri.auth.application.command.RefreshTokenCommand
-import org.around.ieuri.auth.application.exception.EmailNotVerifiedException
 import org.around.ieuri.auth.application.exception.InactiveMemberException
 import org.around.ieuri.auth.application.exception.InvalidCredentialsException
 import org.around.ieuri.auth.application.exception.InvalidTokenException
@@ -69,7 +68,7 @@ class AuthTokenService(
     }
 
     /**
-     * 자체(EMAIL) 로그인. 이메일로 회원을 찾아 비밀번호를 검증하고, 이메일 인증 완료·상태를 확인한 뒤 토큰을 발급한다.
+     * 자체(EMAIL) 로그인. 이메일로 회원을 찾아 비밀번호와 상태를 확인한 뒤 토큰을 발급한다.
      * 계정 존재 여부를 드러내지 않도록 실패 메시지는 통일한다(InvalidCredentials).
      */
     @Transactional
@@ -85,10 +84,9 @@ class AuthTokenService(
         if (!passwordEncoder.matches(command.password, passwordHash)) {
             throw InvalidCredentialsException("이메일 또는 비밀번호가 올바르지 않습니다.")
         }
-        if (!auth.emailVerified) {
-            throw EmailNotVerifiedException("이메일 인증이 필요합니다. 메일함의 인증 코드를 확인해 주세요.")
-        }
-
+        // **이메일 미인증을 여기서 막지 않는다**(SPEC-0024 R8). 미인증 회원도 토큰을 받고,
+        // 차단은 오퍼레이션 단계의 게이트가 맡는다(R9) — 그래야 인증 화면에 머무는 동안
+        // 세션이 유지된다. SNS 로그인에는 원래 이 검사가 없었으므로 두 경로가 같아진다.
         ensureLoginable(auth.memberId, auth.status, auth.suspendedUntil, auth.suspensionReason, now)
         return tokenIssuer.issueFor(auth.memberId)
     }

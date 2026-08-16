@@ -97,3 +97,15 @@ data class VerifyEmailCommand(
 data class ResendVerificationCommand(
     val verificationPublicId: UUID,
 )
+
+/**
+ * 인증 주소 재입력 커맨드(SPEC-0024 R7).
+ *
+ * 검증 핸들이 아니라 **[memberId]로 대상을 정한다** — 발급된 핸들을 잃은 회원도 주소를
+ * 고칠 수 있어야 하고, 이 오퍼레이션은 인증된 호출자만 쓰기 때문이다.
+ * 주소 형식은 도메인 `Email`이 판정한다.
+ */
+data class RetargetEmailVerificationCommand(
+    val memberId: Long,
+    val newEmail: String,
+)

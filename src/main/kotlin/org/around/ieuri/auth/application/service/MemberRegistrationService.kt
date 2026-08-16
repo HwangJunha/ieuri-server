@@ -6,10 +6,12 @@ import org.around.ieuri.auth.application.command.RegisterMemberCommand
 import org.around.ieuri.auth.application.command.RequestPasswordResetCommand
 import org.around.ieuri.auth.application.command.ResendVerificationCommand
 import org.around.ieuri.auth.application.command.ResetPasswordCommand
+import org.around.ieuri.auth.application.command.RetargetEmailVerificationCommand
 import org.around.ieuri.auth.application.command.VerifyEmailCommand
 import org.around.ieuri.auth.application.event.PasswordResetRequested
 import org.around.ieuri.auth.application.event.VerificationEmailRequested
 import org.around.ieuri.auth.application.exception.MemberAlreadyRegisteredException
+import org.around.ieuri.auth.application.exception.MemberNotFoundException
 import org.around.ieuri.auth.application.exception.VerificationNotFoundException
 import org.around.ieuri.auth.application.exception.VerificationRateLimitedException
 import org.around.ieuri.auth.application.policy.VerificationPolicy
@@ -17,6 +19,7 @@ import org.around.ieuri.auth.application.port.`in`.command.MemberRegistrationUse
 import org.around.ieuri.auth.application.port.`in`.command.RegisterMemberResult
 import org.around.ieuri.auth.application.port.`in`.command.ResendVerificationResult
 import org.around.ieuri.auth.application.port.`in`.command.ResetPasswordResult
+import org.around.ieuri.auth.application.port.`in`.command.RetargetEmailVerificationResult
 import org.around.ieuri.auth.application.port.`in`.command.VerifyEmailResult
 import org.around.ieuri.auth.application.port.out.client.SnsIdentityVerifierPort
 import org.around.ieuri.auth.application.port.out.event.DomainEventPublisherPort
@@ -45,6 +48,9 @@ import org.around.ieuri.auth.domain.vo.Nickname
 import org.around.ieuri.auth.domain.vo.PasswordHash
 import org.around.ieuri.auth.domain.vo.Provider
 import org.around.ieuri.auth.domain.vo.ProviderUserId
+import org.around.ieuri.auth.domain.vo.VerificationPurpose
+import org.around.ieuri.common.logging.maskEmail
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -72,6 +78,7 @@ class MemberRegistrationService(
     private val nicknameGenerator: NicknameGenerator,
     private val identifierProtector: LoginIdentifierProtectorPort,
     private val providerTokenCollector: ProviderTokenCollector,
+    private val emailUniqueness: ProviderEmailUniqueness,
     private val clock: Clock,
 ) : MemberRegistrationUseCase {
 
@@ -108,9 +115,8 @@ class MemberRegistrationService(
         val member = Member.register(
             provider = command.provider,
             providerUserId = providerUserId,
-            submittedEmail = submittedEmail,
             providerEmail = providerEmail,
-            providerEmailVerified = identity.emailVerified,
+            fallbackEmail = submittedEmail,
             nickname = nickname,
             profileImageUrl = identity.profileImageUrl,
             ageVerified = command.ageVerified,
@@ -118,6 +124,21 @@ class MemberRegistrationService(
             requiredTermsCodes = requiredCodes,
             now = now,
         )
+
+        // 저장 이메일이 확정된 뒤에 판정한다(R5) — provider가 준 값을 쓰는 경우
+        // 제출값으로 조회하면 실제로 저장될 주소와 다른 주소를 검사하게 된다.
+        emailUniqueness.ensureAvailable(command.provider, member.email)
+
+        // 클라이언트가 R1(읽기 전용 표시)을 어긴 흔적. 가입을 막지는 않는다 — R12가 제출값을
+        // 이미 버렸으므로 저장값은 안전하고, 여기서 거부하면 클라이언트 버그가 가입 장애가 된다.
+        if (providerEmail != null && providerEmail != submittedEmail) {
+            log.warn(
+                "SNS 가입: 제출 이메일이 provider 값과 다르다. provider={} submitted={} stored={}",
+                command.provider.name,
+                maskEmail(submittedEmail.value),
+                maskEmail(providerEmail.value),
+            )
+        }
 
         val memberId = memberRepository.save(member)
 
@@ -141,7 +162,8 @@ class MemberRegistrationService(
             verificationRepository.save(verification)
             verificationPublicId = verification.publicId
             // 평문 코드는 저장하지 않고 이벤트로만 전달 → AFTER_COMMIT 발송.
-            eventPublisher.publish(VerificationEmailRequested(submittedEmail.value, plainCode))
+            // 제출값이 아니라 **저장된 주소**로 보낸다 — 둘은 R12에 의해 다를 수 있다.
+            eventPublisher.publish(VerificationEmailRequested(member.email.value, plainCode))
         }
 
         auditLog.record(
@@ -168,6 +190,7 @@ class MemberRegistrationService(
         if (memberRepository.existsByProviderAndProviderUserId(Provider.EMAIL, providerUserId)) {
             throw MemberAlreadyRegisteredException("이미 가입된 이메일입니다.")
         }
+        emailUniqueness.ensureAvailable(Provider.EMAIL, email)
 
         val (agreements, requiredCodes) = buildAgreements(command.agreements, now)
         val passwordHash = PasswordHash(passwordEncoder.encode(command.password))
@@ -242,13 +265,102 @@ class MemberRegistrationService(
             ?: throw VerificationNotFoundException("유효하지 않은 검증 요청입니다.")
 
         val memberId = existing.memberId
-        val lastCreatedAt = verificationRepository.findLatestCreatedAtByMemberId(memberId)
+        ensureResendCooldownPassed(memberId, now)
+
+        // 이전 활성 챌린지 폐기 후 새 코드 발급. **가입 인증 목적만** 폐기한다 —
+        // 같은 회원이 이메일 변경 검증을 동시에 대기 중일 수 있다.
+        verificationRepository.consumeActiveByMemberIdAndPurpose(memberId, VerificationPurpose.REGISTRATION, now)
+
+        val email = memberRepository.findEmailByMemberId(memberId)
+            ?: throw VerificationNotFoundException("회원 정보를 찾을 수 없습니다.")
+        val verification = issueRegistrationChallenge(memberId, email, now)
+
+        return ResendVerificationResult(
+            verificationPublicId = verification.publicId,
+            expiresAt = verification.expiresAt,
+        )
+    }
+
+    /**
+     * 인증 대기 주소를 정정한다(SPEC-0024 R7). 이메일 가입자와 provider가 이메일을 주지 않은
+     * SNS 가입자(R3)가 함께 쓴다.
+     *
+     * **`changeEmail`과 다른 유스케이스다** — 그쪽은 이미 인증된 주소를 바꾸는 것이라
+     * `Provider.EMAIL` 전용이고(R6), 이쪽은 아직 인증되지 않은 대기 주소를 고치는 것이라
+     * provider를 가리지 않는다. 인증을 마치면 이 경로는 닫힌다(R7-2).
+     *
+     * 쿨다운은 `resendVerification`과 **같은 창을 공유한다**(R7-3). 별도 창을 주면 주소를
+     * 바꿔가며 메일 발송을 무제한으로 유발할 수 있다.
+     */
+    @Transactional
+    override fun retargetEmailVerification(command: RetargetEmailVerificationCommand): RetargetEmailVerificationResult {
+        val now = clock.instant()
+        val newEmail = Email(command.newEmail)
+
+        val member = memberRepository.load(command.memberId)
+            ?: throw MemberNotFoundException("회원을 찾을 수 없습니다.")
+
+        // 인증 완료 회원의 호출은 도메인이 거부한다(R7-2). 정정된 회원은 인증 상태가 그대로 거짓이다.
+        val retargeted = member.retargetPendingEmail(newEmail)
+
+        emailUniqueness.ensureAvailable(member.provider, newEmail, excludingMemberId = command.memberId)
+        ensureResendCooldownPassed(command.memberId, now)
+
+        // `Provider.EMAIL` 회원은 provider_user_id가 곧 이메일의 HMAC이라 함께 바뀌어야
+        // 다음 로그인이 성립한다(SPEC-0011 R7·R8). SNS는 provider가 준 값이라 건드리지 않는다.
+        val protectedIdentifier =
+            if (member.provider == Provider.EMAIL) identifierProtector.protect(newEmail.value) else null
+        memberRepository.updateEmail(
+            memberId = command.memberId,
+            newEmail = retargeted.email,
+            emailIdentifier = emailUniqueness.identifierOf(newEmail),
+            protectedIdentifier = protectedIdentifier,
+        )
+
+        // 이전 주소로 발급된 가입 인증 코드를 무효화한다(R7-1). 다른 목적은 건드리지 않는다.
+        verificationRepository.consumeActiveByMemberIdAndPurpose(
+            command.memberId,
+            VerificationPurpose.REGISTRATION,
+            now,
+        )
+        val verification = issueRegistrationChallenge(command.memberId, newEmail, now)
+
+        // 주소 자체는 남기지 않는다(POL-013) — 무엇이 바뀌었는지는 회원 데이터가 갖는다.
+        auditLog.record(
+            memberId = command.memberId,
+            eventType = "EMAIL_VERIFICATION_RETARGETED",
+            payload = mapOf(
+                "provider" to member.provider.name,
+                "loginIdentifierUpdated" to (protectedIdentifier != null),
+            ),
+        )
+
+        return RetargetEmailVerificationResult(
+            verificationPublicId = verification.publicId,
+            expiresAt = verification.expiresAt,
+        )
+    }
+
+    /**
+     * 가입 인증 재발송 쿨다운(R7-3). `resendVerification`과 인증 주소 재입력이 한 창을 공유한다.
+     * 용도별로 세므로 진행 중인 이메일 변경 검증이 이 창을 막지 않는다.
+     */
+    private fun ensureResendCooldownPassed(memberId: Long, now: java.time.Instant) {
+        val lastCreatedAt = verificationRepository.findLatestCreatedAtByMemberIdAndPurpose(
+            memberId,
+            VerificationPurpose.REGISTRATION,
+        )
         if (lastCreatedAt != null && lastCreatedAt.plus(verificationPolicy.resendCooldown).isAfter(now)) {
             throw VerificationRateLimitedException("잠시 후 다시 시도해 주세요.")
         }
+    }
 
-        // 이전 활성 챌린지 폐기 후 새 코드 발급.
-        verificationRepository.consumeActiveByMemberId(memberId, now)
+    /** 가입 인증 코드를 발급하고 평문 코드를 이벤트로만 전달한다(AFTER_COMMIT 발송). */
+    private fun issueRegistrationChallenge(
+        memberId: Long,
+        toEmail: Email,
+        now: java.time.Instant,
+    ): EmailVerification {
         val plainCode = codeGenerator.generate()
         val verification = EmailVerification.issue(
             publicId = UUID.randomUUID(),
@@ -259,15 +371,8 @@ class MemberRegistrationService(
             maxAttempts = verificationPolicy.maxAttempts,
         )
         verificationRepository.save(verification)
-
-        val email = memberRepository.findEmailByMemberId(memberId)
-            ?: throw VerificationNotFoundException("회원 정보를 찾을 수 없습니다.")
-        eventPublisher.publish(VerificationEmailRequested(email.value, plainCode))
-
-        return ResendVerificationResult(
-            verificationPublicId = verification.publicId,
-            expiresAt = verification.expiresAt,
-        )
+        eventPublisher.publish(VerificationEmailRequested(toEmail.value, plainCode))
+        return verification
     }
 
     @Transactional
@@ -344,5 +449,7 @@ class MemberRegistrationService(
     private companion object {
         /** 아직 회원이 없어 '본인 제외'의 기준이 없을 때 쓰는 자리값. 존재하지 않는 id다. */
         const val NEW_MEMBER_ID = 0L
+
+        val log = LoggerFactory.getLogger(MemberRegistrationService::class.java)!!
     }
 }
