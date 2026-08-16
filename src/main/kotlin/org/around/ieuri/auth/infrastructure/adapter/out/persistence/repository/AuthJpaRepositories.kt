@@ -17,6 +17,16 @@ interface MemberJpaRepository : JpaRepository<MemberEntity, Long> {
     fun existsByProviderAndProviderUserId(provider: Provider, providerUserId: String): Boolean
 
     fun findByProviderAndProviderUserId(provider: Provider, providerUserId: String): MemberEntity?
+
+    /** `(provider, email)` 중복 판정(SPEC-0024 R5). 가입처럼 본인이 아직 없을 때. */
+    fun existsByProviderAndEmailIdentifier(provider: Provider, emailIdentifier: String): Boolean
+
+    /** 위와 같되 본인을 제외한다 — 이메일 변경·인증 주소 재입력은 자기 주소가 걸리면 안 된다. */
+    fun existsByProviderAndEmailIdentifierAndIdNot(
+        provider: Provider,
+        emailIdentifier: String,
+        id: Long,
+    ): Boolean
 }
 
 interface MemberProfileJpaRepository : JpaRepository<MemberProfileEntity, Long> {

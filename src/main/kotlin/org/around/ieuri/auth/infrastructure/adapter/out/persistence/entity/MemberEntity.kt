@@ -36,6 +36,16 @@ class MemberEntity(
     @Column(name = "email_encrypted", nullable = false, length = 512)
     var emailEncrypted: String,
 
+    /**
+     * `(provider, email)` 유니크 판정용 파생 값(SPEC-0024 R5). 정규화된 이메일의 결정론적 HMAC.
+     *
+     * 암호문(`email_encrypted`)은 IV가 매번 달라 등호 조회도 유니크 제약도 걸 수 없어 별도 컬럼을
+     * 둔다 — `provider_user_id`가 같은 문제를 푼 방식이다(SPEC-0012 R1).
+     * **`email_encrypted`와 반드시 함께 갱신한다.** 어긋나면 제약이 엉뚱한 주소를 막는다.
+     */
+    @Column(name = "email_identifier", nullable = false, length = 64)
+    var emailIdentifier: String,
+
     @Column(name = "email_verified", nullable = false)
     var emailVerified: Boolean,
 

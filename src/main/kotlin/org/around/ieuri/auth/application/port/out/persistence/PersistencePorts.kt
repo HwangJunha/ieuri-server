@@ -18,6 +18,22 @@ import java.util.UUID
 interface MemberRepositoryPort {
     fun existsByProviderAndProviderUserId(provider: Provider, providerUserId: ProviderUserId): Boolean
 
+    /**
+     * `(provider, email)` 중복 여부(SPEC-0024 R5). 다른 provider에 같은 주소가 있는 것은
+     * 충돌이 아니다 — POL-002가 다계정을 허용해 `(KAKAO, a@b.com)`과 `(EMAIL, a@b.com)`은 공존한다.
+     *
+     * 인자는 평문이 아니라 **정규화된 이메일의 보호 식별자**다
+     * ([org.around.ieuri.auth.application.port.out.security.LoginIdentifierProtectorPort.protect] 결과).
+     * 저장된 이메일 암호문은 IV가 매번 달라 등호 조회가 불가능하기 때문이다.
+     *
+     * @param excludingMemberId 본인을 제외하고 판정할 회원 id. 가입처럼 본인이 없으면 null.
+     */
+    fun existsByProviderAndEmailIdentifier(
+        provider: Provider,
+        emailIdentifier: String,
+        excludingMemberId: Long? = null,
+    ): Boolean
+
     /** 회원 존재 여부(역할 부여/회수 대상 검증용). */
     fun existsById(memberId: Long): Boolean
 
@@ -40,8 +56,12 @@ interface MemberRepositoryPort {
      * 곧 로그인 식별자(이메일의 HMAC)라 이메일만 바꾸면 다음 로그인이 실패한다. 두 값이
      * 반드시 같은 트랜잭션에서 함께 바뀌어야 하므로 한 메서드로 묶는다.
      * SNS 회원은 provider가 준 불투명 식별자를 쓰므로 null을 준다(건드리지 않는다).
+     *
+     * **[emailIdentifier]는 provider와 무관하게 항상 갱신된다**(SPEC-0024 R5) — 유니크 판정용
+     * 파생 값이라 이메일과 어긋나면 제약이 엉뚱한 주소를 막는다. `provider_user_id`와 달리
+     * SNS 회원도 대상이다.
      */
-    fun updateEmail(memberId: Long, newEmail: Email, protectedIdentifier: String?)
+    fun updateEmail(memberId: Long, newEmail: Email, emailIdentifier: String, protectedIdentifier: String?)
 
     /** 로그인용 인증 정보 조회. (provider, provider_user_id)로 회원의 id·상태를 반환. 없으면 null. */
     fun findAuthentication(provider: Provider, providerUserId: ProviderUserId): MemberAuthentication?
