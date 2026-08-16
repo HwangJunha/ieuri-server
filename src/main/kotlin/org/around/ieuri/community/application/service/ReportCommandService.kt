@@ -3,14 +3,12 @@ package org.around.ieuri.community.application.service
 import org.around.ieuri.community.application.command.ReportContentCommand
 import org.around.ieuri.community.application.exception.AlreadyReportedException
 import org.around.ieuri.community.application.exception.CommentNotFoundException
-import org.around.ieuri.community.application.exception.FeedItemNotFoundException
 import org.around.ieuri.community.application.exception.MemberNotFoundException
 import org.around.ieuri.community.application.exception.PostNotFoundException
 import org.around.ieuri.community.application.exception.ReportDetailRequiredException
 import org.around.ieuri.community.application.port.`in`.command.ReportCommandUseCase
 import org.around.ieuri.community.application.port.out.client.MemberLookupPort
 import org.around.ieuri.community.application.port.out.persistence.CommentRepositoryPort
-import org.around.ieuri.community.application.port.out.persistence.FeedItemModerationPort
 import org.around.ieuri.community.application.port.out.persistence.PostCounterPort
 import org.around.ieuri.community.application.port.out.persistence.PostModerationPort
 import org.around.ieuri.community.application.port.out.persistence.ReportRepositoryPort
@@ -23,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional
  * 신고. 기록한 뒤 자동 숨김 임계값 도달 여부를 같은 트랜잭션에서 확인한다 — 알림이 비범위라
  * 도메인 이벤트를 발행할 이유가 없고, 동기 처리로 충분하다.
  *
- * **대상 종류에 따라 갈린다.** 공개 콘텐츠(POST·COMMENT·FEED_ITEM)만 서로 다른 신고자 5명에서
+ * **대상 종류에 따라 갈린다.** 공개 콘텐츠(POST·COMMENT)만 서로 다른 신고자 5명에서
  * 숨김으로 전환되고, MEMBER 신고는 기록만 하고 어떤 자동 조치도 하지 않는다 — 신고 몇 건으로
  * 한 사람의 글이 일괄로 사라지면 조직적 신고가 곧 침묵 수단이 된다.
  *
@@ -40,7 +38,6 @@ class ReportCommandService(
     private val postModerationPort: PostModerationPort,
     private val commentRepositoryPort: CommentRepositoryPort,
     private val memberLookupPort: MemberLookupPort,
-    private val feedItemModerationPort: FeedItemModerationPort,
 ) : ReportCommandUseCase {
 
     @Transactional
@@ -71,14 +68,12 @@ class ReportCommandService(
             ReportTargetType.POST -> postModerationPort.exists(targetId)
             ReportTargetType.COMMENT -> commentRepositoryPort.findById(targetId) != null
             ReportTargetType.MEMBER -> memberLookupPort.findAuthor(targetId) != null
-            ReportTargetType.FEED_ITEM -> feedItemModerationPort.exists(targetId)
         }
         if (exists) return
         throw when (targetType) {
             ReportTargetType.POST -> PostNotFoundException()
             ReportTargetType.COMMENT -> CommentNotFoundException()
             ReportTargetType.MEMBER -> MemberNotFoundException()
-            ReportTargetType.FEED_ITEM -> FeedItemNotFoundException()
         }
     }
 
@@ -102,10 +97,8 @@ class ReportCommandService(
                 postCounterPort.decreaseCommentCount(it.postId)
             }
 
-            // 피드는 공개 콘텐츠라 글과 같은 규칙이 적용된다(POL-041 3항). DM 메시지가
-            // 여기 없는 것은 열거값 자체가 없기 때문이다 — 다건 신고라 별도 경로다(POL-049).
-            ReportTargetType.FEED_ITEM -> feedItemModerationPort.hide(targetId)
-
+            // DM 메시지가 여기 없는 것은 열거값 자체가 없기 때문이다 — 다건 신고라
+            // 별도 경로다(POL-049).
             ReportTargetType.MEMBER -> Unit
         }
     }

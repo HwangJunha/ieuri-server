@@ -4,30 +4,17 @@ import com.querydsl.jpa.impl.JPAQueryFactory
 import org.around.ieuri.common.security.AesGcmCipher
 import org.around.ieuri.community.application.port.out.client.ObjectStoragePort
 import org.around.ieuri.community.application.port.out.persistence.ConversationRepositoryPort
-import org.around.ieuri.community.application.port.out.persistence.FeedItemCounterPort
-import org.around.ieuri.community.application.port.out.persistence.FeedItemLikeRepositoryPort
-import org.around.ieuri.community.application.port.out.persistence.FeedItemModerationPort
-import org.around.ieuri.community.application.port.out.persistence.FeedItemRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.MessagePurgePort
 import org.around.ieuri.community.application.port.out.persistence.MessageReportRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.MessageRepositoryPort
-import org.around.ieuri.community.application.port.out.persistence.PhotoKeyAlreadyUsed
 import org.around.ieuri.community.domain.aggregate.Conversation
-import org.around.ieuri.community.domain.aggregate.FeedItem
 import org.around.ieuri.community.domain.aggregate.Message
 import org.around.ieuri.community.domain.aggregate.MessageReport
-import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.FeedItemLikeEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.MessageReportItemEntity
-import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QFeedItemEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QConversationEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toDomain
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toNewEntity
-import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toPhotoEntities
-import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toPhotoKey
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.ConversationJpaRepository
-import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.FeedItemJpaRepository
-import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.FeedItemLikeJpaRepository
-import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.FeedItemPhotoJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.MessageJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.MessageReportItemJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.MessageReportJpaRepository
@@ -37,141 +24,6 @@ import org.springframework.data.domain.Limit
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
-
-/**
- * 피드 적재. 피드를 먼저 저장해 id를 받은 뒤 사진을 붙인다 — 사진이 피드의 id를 필요로 한다.
- *
- * **사진 키의 재사용을 유일 제약이 판정한다**(AC3-3). 미리 조회해 확인하면 경합에서 두 피드가
- * 같은 키를 나눠 갖는다.
- */
-@Component
-class FeedItemPersistenceAdapter(
-    private val repository: FeedItemJpaRepository,
-    private val photoRepository: FeedItemPhotoJpaRepository,
-) : FeedItemRepositoryPort {
-
-    override fun findById(feedItemId: Long): FeedItem? {
-        val entity = repository.findByIdAndDeletedAtIsNull(feedItemId) ?: return null
-        return entity.toDomain(
-            photoKeys = photoRepository.findByFeedItemIdOrderByPositionAsc(feedItemId)
-                .map { it.toPhotoKey() },
-        )
-    }
-
-    /**
-     * **생성 전용이다.** 피드 수정은 비범위이고, 좋아요 계수와 숨김은 각각 원자적 UPDATE
-     * ([FeedItemCounterAdapter]·[FeedItemModerationAdapter])가 처리한다.
-     *
-     * 갱신 분기를 두지 않는 이유는 **사진이 조용히 사라지기 때문이다** — 갱신 경로는
-     * photoKeys를 반영할 수 없는데(전량 교체는 position 유일성 때문에 flush 순서가 얽힌다)
-     * 반환값은 사진을 그대로 든 도메인 객체라, 저장되지 않은 것이 저장된 것처럼 보인다.
-     * 수정이 필요해지면 그때 사진 교체까지 함께 구현한다.
-     */
-    override fun save(feedItem: FeedItem): FeedItem {
-        require(feedItem.id == null) {
-            "피드 수정은 지원하지 않는다. 계수·숨김은 전용 어댑터가 처리한다."
-        }
-        return create(feedItem)
-    }
-
-    private fun create(feedItem: FeedItem): FeedItem {
-        val saved = repository.save(feedItem.toNewEntity())
-        val feedItemId = requireNotNull(saved.id) { "저장된 피드에는 id가 있어야 한다." }
-        try {
-            photoRepository.saveAll(feedItem.toPhotoEntities(feedItemId))
-            // **flush해야 유일 제약 위반이 여기서 잡힌다** — 커밋 시점으로 미루면 이 try
-            // 바깥에서 터져 PHOTO_NOT_CONFIRMED로 옮길 수 없다.
-            photoRepository.flush()
-        } catch (e: DataIntegrityViolationException) {
-            // 이미 다른 피드에 실린 키다. 애플리케이션이 사용자 코드로 옮긴다.
-            throw PhotoKeyAlreadyUsed()
-        }
-        return saved.toDomain(photoKeys = feedItem.photoKeys)
-    }
-}
-
-/**
- * 피드의 파생 계수 증감. 읽고 고쳐 쓰지 않는다 — 이유는 [PostCounterAdapter]와 같다.
- */
-@Component
-class FeedItemCounterAdapter(
-    private val queryFactory: JPAQueryFactory,
-) : FeedItemCounterPort {
-
-    private val feedItem = QFeedItemEntity.feedItemEntity
-
-    @Transactional
-    override fun increaseLikeCount(feedItemId: Long) {
-        queryFactory
-            .update(feedItem)
-            .set(feedItem.likeCount, feedItem.likeCount.add(1))
-            .where(feedItem.id.eq(feedItemId), feedItem.deletedAt.isNull)
-            .execute()
-    }
-
-    /** **0 아래로 내려가지 않는다** — 조건절이 0인 행을 아예 건드리지 않는다(AC6-3). */
-    @Transactional
-    override fun decreaseLikeCount(feedItemId: Long) {
-        queryFactory
-            .update(feedItem)
-            .set(feedItem.likeCount, feedItem.likeCount.subtract(1))
-            .where(
-                feedItem.id.eq(feedItemId),
-                feedItem.deletedAt.isNull,
-                feedItem.likeCount.gt(0),
-            )
-            .execute()
-    }
-}
-
-@Component
-class FeedItemModerationAdapter(
-    private val repository: FeedItemJpaRepository,
-    private val queryFactory: JPAQueryFactory,
-) : FeedItemModerationPort {
-
-    private val feedItem = QFeedItemEntity.feedItemEntity
-
-    @Transactional(readOnly = true)
-    override fun exists(feedItemId: Long): Boolean =
-        repository.existsByIdAndDeletedAtIsNull(feedItemId)
-
-    /** 이미 숨겨져 있으면 0건이 갱신되고 false다 — 호출자가 중복 처리를 건너뛴다. */
-    @Transactional
-    override fun hide(feedItemId: Long): Boolean =
-        queryFactory
-            .update(feedItem)
-            .set(feedItem.hidden, true)
-            .where(
-                feedItem.id.eq(feedItemId),
-                feedItem.deletedAt.isNull,
-                feedItem.hidden.isFalse,
-            )
-            .execute() > 0
-}
-
-/** 좋아요 유일성. 멱등 판정을 저장소가 맡는다(PostLike와 같은 구조). */
-@Component
-class FeedItemLikePersistenceAdapter(
-    private val repository: FeedItemLikeJpaRepository,
-) : FeedItemLikeRepositoryPort {
-
-    @Transactional
-    override fun save(feedItemId: Long, memberId: Long): Boolean {
-        if (repository.existsByFeedItemIdAndMemberId(feedItemId, memberId)) return false
-        return try {
-            repository.save(FeedItemLikeEntity(feedItemId = feedItemId, memberId = memberId))
-            true
-        } catch (e: DataIntegrityViolationException) {
-            // 확인과 저장 사이에 다른 요청이 먼저 넣었다 — 멱등이므로 실패가 아니다.
-            false
-        }
-    }
-
-    @Transactional
-    override fun delete(feedItemId: Long, memberId: Long): Boolean =
-        repository.deleteByFeedItemIdAndMemberId(feedItemId, memberId) > 0
-}
 
 /**
  * 대화 적재. [saveIfAbsent]가 **경합을 흡수한다** — 유일 제약에 걸리면 새로 만드는 대신

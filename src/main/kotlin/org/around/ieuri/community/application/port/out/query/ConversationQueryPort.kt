@@ -2,37 +2,7 @@ package org.around.ieuri.community.application.port.out.query
 
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.community.application.query.ConversationView
-import org.around.ieuri.community.application.query.FeedItemView
 import org.around.ieuri.community.application.query.MessageView
-
-/**
- * 피드·DM 읽기 아웃바운드 포트(SPEC-0017). 애그리게이트를 우회해 필요한 값만 프로젝션한다.
- */
-interface FeedQueryPort {
-    /**
-     * 피드 한 페이지. **최신순 고정이라 정렬 인자가 없다**(R4) — 정렬을 받으면 커서 인코딩이
-     * 정렬 키에 종속되어 나중에 정렬을 추가할 때 기존 커서가 깨진다.
-     *
-     * 차단 필터를 **이 조회가 함께 건다**(AC11-1·11-2). 조회 후 걸러내면 `first: 20`을
-     * 요청했는데 15건만 남고 hasNextPage가 거짓말을 한다.
-     */
-    fun findFeed(search: FeedSearch): CursorPage<FeedItemView>
-
-    /** 피드 단건. 피드와 같은 모더레이션·차단 필터를 거치며, 걸러지면 null이다. */
-    fun findFeedItem(feedItemId: Long, viewer: ViewerContext): FeedItemView?
-
-    /** 여러 피드의 사진 키를 **한 번에**. 첨부 순서대로이며, 키가 없는 피드는 결과에 없다. */
-    fun findPhotoKeysOf(feedItemIds: List<Long>): Map<Long, List<String>>
-
-    /**
-     * [memberId]가 좋아요한 피드의 id만. 나머지는 좋아요하지 않았다는 뜻이다.
-     * 차단은 이 판정에 영향을 주지 않아 ViewerContext를 받지 않는다.
-     */
-    fun findLikedFeedItemIds(memberId: Long, feedItemIds: List<Long>): Set<Long>
-
-    /** 갱신된 좋아요 수. 카운터를 원자적으로 올린 **뒤** 읽는다(PostView와 같은 이유). */
-    fun findLikeCount(feedItemId: Long): Int?
-}
 
 /**
  * 대화·메시지 읽기 포트(R8).
@@ -76,15 +46,6 @@ interface ConversationQueryPort {
     /** 그 대화의 마지막 메시지 id. 메시지가 없으면 null이다. */
     fun findLastMessageId(conversationId: Long): Long?
 }
-
-/**
- * 피드 조회 조건. **정렬 인자가 없다**(R4·POL-019).
- */
-data class FeedSearch(
-    val first: Int,
-    val after: String?,
-    val viewer: ViewerContext,
-)
 
 data class ConversationsSearch(
     val memberId: Long,

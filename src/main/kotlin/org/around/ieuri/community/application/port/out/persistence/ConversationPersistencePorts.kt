@@ -1,55 +1,9 @@
 package org.around.ieuri.community.application.port.out.persistence
 
 import org.around.ieuri.community.domain.aggregate.Conversation
-import org.around.ieuri.community.domain.aggregate.FeedItem
 import org.around.ieuri.community.domain.aggregate.Message
 import org.around.ieuri.community.domain.aggregate.MessageReport
 import java.time.Instant
-
-/**
- * 피드 애그리게이트 적재·저장(SPEC-0017).
- *
- * [save]는 **사진 키의 재사용을 저장소의 유일 제약으로 판정한다** — 이미 다른 피드에 실린
- * 키면 [PhotoKeyAlreadyUsed]를 던진다. 미리 조회해 확인하면 경합에서 두 피드가 같은 키를
- * 나눠 갖는다.
- */
-interface FeedItemRepositoryPort {
-    /** 삭제되지 않은 피드만. 없으면 null. */
-    fun findById(feedItemId: Long): FeedItem?
-
-    fun save(feedItem: FeedItem): FeedItem
-}
-
-/** 사진 키가 이미 다른 피드에 실려 있을 때. 어댑터가 유일 제약 위반을 이 예외로 옮긴다. */
-class PhotoKeyAlreadyUsed : RuntimeException("이미 사용된 사진 키입니다.")
-
-/**
- * 피드의 파생 계수 증감. 애그리게이트를 거치지 않는다 — 이유는 [PostCounterPort]와 같다
- * (읽고 고쳐 쓰면 동시 요청이 서로의 증가를 덮어쓴다).
- */
-interface FeedItemCounterPort {
-    fun increaseLikeCount(feedItemId: Long)
-
-    /** 0 아래로 내려가지 않는다 — DB의 CHECK 제약과 조건절이 함께 막는다. */
-    fun decreaseLikeCount(feedItemId: Long)
-}
-
-/** 피드 존재 확인과 신고 누적 자동 숨김. 이유는 [PostModerationPort]와 같다. */
-interface FeedItemModerationPort {
-    fun exists(feedItemId: Long): Boolean
-
-    /** 이미 숨겨져 있으면 아무것도 하지 않고 false. */
-    fun hide(feedItemId: Long): Boolean
-}
-
-/** 피드 좋아요 유일성. 멱등 판정을 저장소가 맡는다(이유는 [PostLikeRepositoryPort]와 같다). */
-interface FeedItemLikeRepositoryPort {
-    /** 새로 저장했으면 true, 이미 있었으면 false(멱등 no-op). */
-    fun save(feedItemId: Long, memberId: Long): Boolean
-
-    /** 실제로 지웠으면 true, 원래 없었으면 false(멱등 no-op). */
-    fun delete(feedItemId: Long, memberId: Long): Boolean
-}
 
 /**
  * 대화 적재·저장.

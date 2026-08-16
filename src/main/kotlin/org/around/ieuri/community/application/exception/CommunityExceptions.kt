@@ -79,29 +79,18 @@ class AlreadyReportedException(message: String = "이미 신고한 대상입니�
 class ReportDetailRequiredException(message: String = "상세 사유를 입력해 주세요.") :
     CommunityUserException("REPORT_DETAIL_REQUIRED", message)
 
-// ── 피드·DM(SPEC-0017) ───────────────────────────────────────────────
-
-/** 피드는 spot 연결이 필수다(R1) — 글과 달리 선택이 아니다. */
-class SpotRequiredException(message: String = "장소를 선택해 주세요.") :
-    CommunityUserException("SPOT_REQUIRED", message)
-
-/** 피드는 사진이 최소 1장 필요하다(R2) — 글과 달리 사진 없는 피드는 존재할 수 없다. */
-class PhotoRequiredException(message: String = "사진을 1장 이상 첨부해 주세요.") :
-    CommunityUserException("PHOTO_REQUIRED", message)
+// ── DM(SPEC-0017·SPEC-0021) ──────────────────────────────────────────
 
 /**
- * 확정되지 않았거나 이미 다른 피드·글에 실린 사진 키. **두 경우를 같은 코드로 다룬다** —
- * 구분해 알려 주면 남의 오브젝트 키가 존재하는지 캐내는 수단이 된다(AC3-2·AC3-3).
+ * 확정되지 않았거나 이미 다른 글에 실린 사진 키. **두 경우를 같은 코드로 다룬다** —
+ * 구분해 알려 주면 남의 오브젝트 키가 존재하는지 캐내는 수단이 된다. DM 사진이 쓴다.
  */
 class PhotoNotConfirmedException(message: String = "업로드가 확정되지 않은 사진입니다.") :
     CommunityUserException("PHOTO_NOT_CONFIRMED", message)
 
-class FeedItemNotFoundException(message: String = "해당 피드를 찾을 수 없습니다.") :
-    CommunityUserException("FEED_ITEM_NOT_FOUND", message)
-
-/** 자기 자신의 피드로는 대화를 시작할 수 없다(AC7-4). */
-class NotFeedAuthorException(message: String = "본인의 피드로는 대화를 시작할 수 없습니다.") :
-    CommunityUserException("NOT_FEED_AUTHOR", message)
+/** 자기 자신과는 대화를 시작할 수 없다(SPEC-0021 AC2.3). */
+class SelfConversationException(message: String = "자기 자신과는 대화할 수 없습니다.") :
+    CommunityUserException("SELF_CONVERSATION", message)
 
 /** 차단 관계에서는 대화 시작도 메시지 전송도 거부된다(AC11-3·11-4). */
 class BlockedException(message: String = "차단된 상대와는 대화할 수 없습니다.") :

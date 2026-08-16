@@ -13,7 +13,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** 대화·메시지·DM 신고의 도메인 불변식(SPEC-0017 R7·R9·R15·R16). */
+/** 대화·메시지·DM 신고의 도메인 불변식(SPEC-0017 R9·R15·R16, SPEC-0021 R3·R4). */
 class ConversationAndMessageTest {
 
     private val now = Instant.parse("2026-08-12T00:00:00Z")
@@ -87,16 +87,19 @@ class ConversationAndMessageTest {
         assertEquals(3L, message.senderId)
     }
 
-    /** AC9-2 — 본문도 첨부도 없으면 보낼 것이 없는 전송이라 거부된다. */
+    /**
+     * AC9-2·SPEC-0021 AC3.5 — 본문도 사진도 없으면 보낼 것이 없는 전송이라 거부된다.
+     * 인용이 사라져 판정 조건이 둘로 줄었다.
+     */
     @Test
-    fun `본문도 첨부도 없으면 전송되지 않는다`() {
+    fun `본문도 사진도 없으면 전송되지 않는다`() {
         assertFailsWith<IllegalArgumentException> {
             Message.create(conversationId = 1L, senderId = 3L, body = "   ")
         }
     }
 
     /**
-     * **첨부만 있는 메시지가 성립한다** — 인스타처럼 사진만, 또는 피드 인용만 보낼 수 있다.
+     * **사진만 있는 메시지가 성립한다**(SPEC-0021 AC3.4) — 본문이 비어도 사진이 있으면 보낼 수 있다.
      * 본문 없음은 빈 문자열로 표현한다.
      */
     @Test
@@ -111,23 +114,47 @@ class ConversationAndMessageTest {
     }
 
     @Test
-    fun `본문 없이 피드 인용만 보낼 수 있다`() {
-        val message = Message.create(1L, 3L, body = "", feedItemId = 42L)
-
-        assertEquals(42L, message.feedItemId)
-        assertFalse(message.hasBody)
-    }
-
-    /** 인용은 **메시지에** 붙는다 — 같은 방에서 메시지마다 다른 피드를 인용할 수 있다. */
-    @Test
-    fun `본문과 첨부를 함께 보낼 수 있다`() {
+    fun `본문과 사진을 함께 보낼 수 있다`() {
         val key = confirmedKey(owner = 3L)
 
-        val message = Message.create(1L, 3L, "이 사진 보세요", feedItemId = 42L, photoKey = key)
+        val message = Message.create(1L, 3L, "이 사진 보세요", photoKey = key)
 
         assertEquals("이 사진 보세요", message.body)
-        assertEquals(42L, message.feedItemId)
         assertEquals(key.value, message.photoKey?.value)
+    }
+
+    /**
+     * SPEC-0021 AC4.1 — **복원은 빈 메시지를 거부하지 않는다.** 피드 인용만 있던 과거
+     * 메시지는 인용이 사라져 본문도 사진도 없는 상태로 남는데, 여기서 막으면 그 메시지가
+     * 든 대화 조회가 통째로 실패한다.
+     */
+    @Test
+    fun `본문과 사진이 모두 빈 과거 메시지도 복원된다`() {
+        val restored = Message.restore(
+            id = 500L,
+            conversationId = 1L,
+            senderId = 3L,
+            body = "",
+            createdAt = now,
+        )
+
+        assertEquals(500L, restored.id)
+        assertEquals("", restored.body)
+        assertFalse(restored.hasBody)
+        assertEquals(null, restored.photoKey)
+    }
+
+    /**
+     * SPEC-0021 AC4.3 — 과거 데이터를 허용하는 것이 새 빈 메시지를 허용한다는 뜻은 아니다.
+     * 복원은 통과하고 생성은 거부되는 것이 이 불변식의 요점이다.
+     */
+    @Test
+    fun `과거 빈 메시지를 허용해도 새 빈 메시지는 거부된다`() {
+        Message.restore(id = 500L, conversationId = 1L, senderId = 3L, body = "", createdAt = now)
+
+        assertFailsWith<IllegalArgumentException> {
+            Message.create(1L, 3L, body = "")
+        }
     }
 
     @Test
