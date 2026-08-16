@@ -254,9 +254,21 @@ Schema is owned by **Flyway migrations**, never by Hibernate. The domain-model �
 
 - **`ddl-auto: validate` only.** Set `spring.jpa.hibernate.ddl-auto=validate` so Hibernate checks entities against the real schema but never creates or alters it. Never use `update`, `create`, or `create-drop` (they let Hibernate mutate schema behind Flyway's back and can drop data).
 - **All schema changes are Flyway migrations** under `src/main/resources/db/migration/`, using Flyway's default naming `V{n}__{snake_case_description}.sql` (e.g. `V1__create_community_post.sql`). Flyway runs `migrate` automatically on app startup.
-- **Applied migrations are immutable — including comments.** Flyway hashes the whole file, so changing a single comment line breaks the checksum and blocks startup. Once a version is applied, never edit it; add a new `V{n+1}` file instead. Determine the next `n` from `flyway_schema_history`, never reuse a number.
+- **Migrations from a finished slice are immutable — including comments. The ones you wrote in *this* slice are still yours to edit.** Flyway hashes the whole file, so changing a single comment line breaks the checksum and blocks startup. What that costs depends on who else has the file:
 
-  **Assume every migration in the working tree is already applied.** During a slice you will boot the app several times, and each boot applies whatever is new — so a file you wrote an hour ago is almost certainly in `flyway_schema_history` now. Adding "just one more statement" to it is the mistake, not editing an old file. Check `flyway_schema_history` before touching any migration, and note that **both databases** track their own history (main and search node).
+    - **Written in an earlier slice (merged, or another session's work): never edit.** Other checkouts and environments have already applied it, and a local repair does nothing for them — it would break their startup instead. Add a new `V{n+1}` file. Determine the next `n` from `flyway_schema_history`, never reuse a number.
+    - **Written in this slice, not merged yet: edit the file.** It exists only on this branch, so nobody else has applied it. Splitting a correction into `V{n+1}` here leaves permanent history of a decision that was reverted before anyone saw it — the reviewer then reads two migrations to learn what one says. Keep the branch's migrations in the shape they should ship in.
+
+  **Editing one you already applied locally needs a repair — ask the user to run it.** Your own boot has it in `flyway_schema_history` with the old checksum, so the next startup fails validation. There is **no Flyway Gradle plugin here** (migrations run at boot, from Spring Boot), so there is no `flywayRepair` task — the repair is SQL the user runs against the local DB:
+
+  ```sql
+  UPDATE flyway_schema_history SET checksum = <"Resolved locally" from the failure log>
+  WHERE version = '<n>';
+  ```
+
+  **The checksum is only half of it.** Repair rewrites history, never schema — whatever the old version already created is still in the database. If your edit removed or changed a statement, say so and give the user the DDL that undoes it, or the file and the real schema stay silently out of step. Do not reach for `V{n+1}` merely to dodge this request, and never repair a migration from a finished slice — there the mismatch is the correct alarm.
+
+  **Assume every migration in the working tree is already applied.** During a slice you will boot the app several times, and each boot applies whatever is new — so a file you wrote an hour ago is almost certainly in `flyway_schema_history` now. Check it before touching any migration, and note that **both databases** track their own history (main and search node).
 - **One logical change per migration.** Keep them small and reviewable.
 - **No cross-domain foreign keys.** A table in one domain must not declare a physical FK into another domain's tables — store the other side's id as a plain column and enforce integrity in the application layer. This is what keeps a domain extractable into its own app/DB later. FKs **within** a single domain are fine and encouraged.
 - **Reference across aggregates by id, not object**, even inside a domain.

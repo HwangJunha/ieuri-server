@@ -2,7 +2,8 @@
 --
 -- **순서가 전부다.** 아래 다섯 단계는 서로 의존하며, 뒤집으면 실행 시점에 실패한다.
 --   1) 피드 사진 키를 보존한다  — 테이블을 지운 뒤에는 무엇이 피드 것이었는지 알 수 없다(R6)
---   2) 메시지의 피드 인용을 끊는다 — FK가 남아 있으면 피드 테이블을 지울 수 없다(AC5.2)
+--   2) 메시지의 피드 인용을 끊는다 — 빈 메시지 제약을 먼저 떼야 컬럼을 지울 수 있고,
+--                                  FK가 남아 있으면 피드 테이블을 지울 수 없다(AC5.2)
 --   3) 피드 테이블을 지운다      — 자식(좋아요·사진)이 먼저, 본체가 나중
 --   4) FEED_ITEM 신고를 지운다   — 행이 남으면 CHECK 제약 환원이 실패한다(AC7.3)
 --   5) 신고 대상 제약을 환원한다
@@ -28,23 +29,21 @@ SELECT DISTINCT object_key, 'FEED_ITEM'
 FROM community_feed_item_photo
 ON CONFLICT (object_key) DO NOTHING;
 
--- ── 2. 메시지의 피드 인용 제거 (R3) ──────────────────────────────────
+-- ── 2. 메시지의 피드 인용 제거 (R3·R4) ───────────────────────────────
 --
--- 컬럼을 지우기 전에 **빈 메시지 제약을 먼저 좁힌다.** ck_community_message_not_empty가
+-- 컬럼을 지우기 전에 **빈 메시지 제약을 먼저 떼어낸다.** ck_community_message_not_empty가
 -- feed_item_id IS NOT NULL을 유효 조건으로 인정하고 있어, 컬럼만 먼저 지우면 남은 행이
 -- 제약을 위반한다.
 --
--- 제약을 좁게(본문 또는 사진) 유지하는 것은 실측에 따른 결정이다 — 본문도 사진도 없이
--- 인용만 있던 행이 0건이라 좁혀도 통과한다. 그런 행이 있는 환경에서는 이 ALTER가 실패하며,
--- 그때는 조용히 넘어가는 대신 멈추는 편이 낫다(R4는 그 행을 남기라고 요구하므로, 발견되면
--- 제약 완화로 판단을 다시 해야 한다).
+-- **다시 만들지 않는다.** 좁힌 조건(본문 또는 사진)으로 재추가하면, 인용만 있던 과거 메시지가
+-- 정확히 그 조건에 걸린다 — R4가 "삭제하지 않고 남긴다"고 정한 바로 그 행들이다. 도메인은
+-- 이들을 복원할 수 있도록 Message.restore에서 빈 본문을 허용하게 바꿨는데(AC4.1), 저장소가
+-- 같은 행을 거부하면 두 결정이 서로 모순된다.
+--
+-- 빈 메시지 금지는 **생성 시점의 불변식이고 Message.create가 소유한다**(AC4.3). 저장소 제약은
+-- 과거 데이터와 양립해야 하므로 여기서는 내려놓는다.
 ALTER TABLE community_message
     DROP CONSTRAINT ck_community_message_not_empty;
-
-ALTER TABLE community_message
-    ADD CONSTRAINT ck_community_message_not_empty CHECK (
-        body_encrypted <> '' OR photo_object_key IS NOT NULL
-    );
 
 ALTER TABLE community_message
     DROP CONSTRAINT fk_community_message_feed_item;
