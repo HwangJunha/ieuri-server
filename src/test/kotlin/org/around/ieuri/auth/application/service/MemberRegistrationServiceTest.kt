@@ -25,6 +25,7 @@ import org.around.ieuri.auth.application.port.out.persistence.RoleRepositoryPort
 import org.around.ieuri.auth.application.port.out.persistence.TermsRepositoryPort
 import org.around.ieuri.auth.application.command.RegisterEmailMemberCommand
 import org.around.ieuri.auth.application.command.RequestPasswordResetCommand
+import org.around.ieuri.auth.application.command.ResendVerificationCommand
 import org.around.ieuri.auth.application.command.ResetPasswordCommand
 import org.around.ieuri.auth.application.command.RetargetEmailVerificationCommand
 import org.around.ieuri.auth.application.event.PasswordResetRequested
@@ -660,6 +661,30 @@ class MemberRegistrationServiceTest {
         service.verifyEmail(VerifyEmailCommand(verifyPublicId, "123456"))
 
         verify { memberRepository.updateEmail(100L, any(), any(), "protected:right@example.com") }
+    }
+
+    /**
+     * 주소를 고친 뒤 재발송을 누르면 **정정한 주소로 다시 보낸다.** 회원 행의 이메일을 읽으면
+     * 정정 이전 주소로 되돌아가 정정이 조용히 취소된다.
+     */
+    @Test
+    fun `정정 후 재발송은 정정한 주소를 이어받는다`() {
+        every { verificationRepository.findByPublicId(verifyPublicId) } returns retargetChallenge()
+        every { verificationRepository.findLatestCreatedAtByMemberIdAndPurpose(any(), any()) } returns null
+        every { codeGenerator.generate() } returns "123456"
+        every { codeGenerator.hash("123456") } returns "hashed"
+
+        service.resendVerification(ResendVerificationCommand(verifyPublicId))
+
+        // 회원 행(정정 이전 주소)을 읽지 않는다.
+        verify(exactly = 0) { memberRepository.findEmailByMemberId(any()) }
+        val sent = slot<Any>()
+        verify { eventPublisher.publish(capture(sent)) }
+        assertEquals("right@example.com", (sent.captured as VerificationEmailRequested).toEmail)
+        // 대기 주소가 새 챌린지로 이어져야 이후 verifyEmail이 확정할 수 있다.
+        val issued = slot<EmailVerification>()
+        verify { verificationRepository.save(capture(issued)) }
+        assertEquals("enc:right@example.com", issued.captured.targetEmailEncrypted)
     }
 
     /** 정정하지 않은 보통 가입 챌린지는 이메일을 건드리지 않는다. */

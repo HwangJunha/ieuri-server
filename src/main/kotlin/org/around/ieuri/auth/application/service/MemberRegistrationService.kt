@@ -276,13 +276,19 @@ class MemberRegistrationService(
             throw VerificationRateLimitedException("잠시 후 다시 시도해 주세요.")
         }
 
+        // **정정한 주소를 이어받는다.** 주소를 고친 뒤 재발송을 누르면 대기 주소가 살아 있어야
+        // 한다 — 회원 행의 이메일을 읽으면 정정 이전 주소로 되돌아가고, 정정이 조용히 취소된다.
+        val targetEmailEncrypted = existing.targetEmailEncrypted
+        val toEmail = targetEmailEncrypted
+            ?.let { Email(emailEncryptor.decrypt(it)) }
+            ?: memberRepository.findEmailByMemberId(memberId)
+            ?: throw VerificationNotFoundException("회원 정보를 찾을 수 없습니다.")
+
         // 이전 활성 챌린지 폐기 후 새 코드 발급. **가입 인증 목적만** 폐기한다 —
         // 같은 회원이 이메일 변경 검증을 동시에 대기 중일 수 있다.
         verificationRepository.consumeActiveByMemberIdAndPurpose(memberId, VerificationPurpose.REGISTRATION, now)
 
-        val email = memberRepository.findEmailByMemberId(memberId)
-            ?: throw VerificationNotFoundException("회원 정보를 찾을 수 없습니다.")
-        val verification = issueRegistrationChallenge(memberId, email, now)
+        val verification = issueRegistrationChallenge(memberId, toEmail, now, targetEmailEncrypted)
 
         return ResendVerificationResult(
             verificationPublicId = verification.publicId,
