@@ -263,7 +263,38 @@ URL에 붙이면 주입값마다 다시 붙여야 하고, 한 곳만 빠뜨리�
 `TranslationTargetsFound`처럼 **tourism 내부에서만 소비되는** 이벤트는 계속
 `application/event`에 남습니다. 구분 기준은 "구독자가 다른 도메인인가"입니다.
 
-### 11.7 엔티티 없는 테이블 6개
+### 11.7 스키마를 가로지르는 raw SQL — 추출 시 확인 대상
+
+리뷰에서 나온 지적이며, 이번 범위에서 고치지 않고 **기록만** 남깁니다.
+
+검색 어댑터들(`PopularSpotQueryJdbcAdapter`·`FestivalQueryJdbcAdapter`·
+`SpotSpatialQueryAdapter`·`MapSpatialQueryAdapter`)은 `spot_catalog`(→`tour`)를 읽으면서
+`cat.category` 값으로 분류를 다룹니다. 카테고리 마스터 테이블은 `category` 스키마로 갔으므로,
+이들 질의가 두 스키마에 걸치는 순간이 오면 `search_path` 덕분에 **조용히 동작합니다.**
+
+`MigrationRuleTest`는 컨텍스트 간 **FK**가 없음을 증명하지만 **질의**가 경계를 넘지 않음은
+증명하지 않습니다. 스키마 분리 이후 경계를 넘는 질의는 오류가 아니라 무증상이 되므로,
+컨텍스트를 별도 DB로 들어낼 때 이 어댑터들이 확인 지점입니다.
+
+정적 검사로 강제할 수는 있습니다(어댑터의 raw SQL 테이블 이름을 `SchemaPlacementTest`의
+배치표와 대조). 이번에는 넣지 않았습니다 — 추출 계획이 없는 시점에 규칙부터 만들면 정당한
+질의까지 막게 됩니다.
+
+### 11.8 Flyway는 `connection-init-sql`이 닿지 않는다
+
+리뷰에서 나온 지적입니다. 메인 Flyway 빈은 **Hikari 풀을 쓰지 않고 자체 커넥션을
+만듭니다**(풀을 넘기면 정리 단계에서 `This connection has been closed`가 찍히기 때문).
+따라서 `spring.datasource.hikari.connection-init-sql`이 마이그레이션에는 적용되지 않습니다.
+
+`defaultSchema("public")`으로 이력 테이블 위치를 고정했고, **V62부터는 마이그레이션이 스키마
+한정으로 쓰여야 한다**는 사실을 `DataSourceConfig`의 그 자리에 남겼습니다. V61까지는 테이블이
+전부 `public`에 있어 한정 없이 써도 맞았으므로, 다음 작성자가 기존 61개를 보고 같은 방식을
+따르기 쉽습니다.
+
+`schemas(...)`로 5개를 나열하지는 않았습니다 — 그 목록은 Flyway가 소유를 주장하는 대상이라
+없으면 만들고 `clean`에서 지웁니다. 스키마 생성자는 V61과 CNPG 매니페스트 둘로 충분합니다.
+
+### 11.9 엔티티 없는 테이블 6개
 
 배치표의 46개 중 JPA 엔티티가 있는 것은 40개입니다. 나머지 6개
 (`congestion_area`·`district`·`kto_*` 4개)는 raw SQL 전용이라 `@Table(schema=...)`로 한정되지
