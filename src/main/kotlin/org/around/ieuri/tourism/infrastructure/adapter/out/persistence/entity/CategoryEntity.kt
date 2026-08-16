@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity
 
+import org.around.ieuri.common.persistence.DbSchema
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -23,7 +24,7 @@ import java.time.Instant
  * 모든 행을 함께 갱신해야 한다. code는 UNIQUE로 남아 조회 축을 유지한다.
  */
 @Entity
-@Table(name = "category")
+@Table(name = "category", schema = DbSchema.CATEGORY)
 class CategoryEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -64,7 +65,7 @@ data class CategoryTranslationId(
 
 /** 카테고리의 언어별 표시 문구(V58). 앱이 모르는 카테고리도 이름을 그릴 수 있게 한다. */
 @Entity
-@Table(name = "category_translation")
+@Table(name = "category_translation", schema = DbSchema.CATEGORY)
 @IdClass(CategoryTranslationId::class)
 class CategoryTranslationEntity(
     @Id
@@ -109,7 +110,7 @@ class CategoryTranslationEntity(
  * 서비스에, 교통은 국문 서비스에 대응 코드가 없다.
  */
 @Entity
-@Table(name = "category_external_mapping")
+@Table(name = "category_external_mapping", schema = DbSchema.CATEGORY)
 class CategoryExternalMappingEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

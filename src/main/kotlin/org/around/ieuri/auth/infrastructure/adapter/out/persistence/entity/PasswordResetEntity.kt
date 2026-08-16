@@ -1,5 +1,6 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity
 
+import org.around.ieuri.common.persistence.DbSchema
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.GeneratedValue
@@ -12,7 +13,7 @@ import java.util.UUID
 
 /** 비밀번호 재설정 챌린지 JPA 엔티티. 코드는 code_hash로만 저장한다. */
 @Entity
-@Table(name = "password_reset")
+@Table(name = "password_reset", schema = DbSchema.AUTH)
 class PasswordResetEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

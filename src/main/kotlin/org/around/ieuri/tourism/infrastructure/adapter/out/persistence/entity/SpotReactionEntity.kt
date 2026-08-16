@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity
 
+import org.around.ieuri.common.persistence.DbSchema
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -19,7 +20,7 @@ import java.time.Instant
  * DB UNIQUE(uq_spot_reaction)로 강제되며 upsert(재평가 덮어쓰기) 단위다(AC-12/13). 관광 데이터는 저장하지 않는다.
  */
 @Entity
-@Table(name = "spot_reaction")
+@Table(name = "spot_reaction", schema = DbSchema.TOUR)
 class SpotReactionEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

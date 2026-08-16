@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity
 
+import org.around.ieuri.common.persistence.DbSchema
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -13,7 +14,7 @@ import java.time.Instant
 
 /** 관광지 갤러리 이미지 JPA 엔티티. `display_order`가 표시 순서이자 upsert 키의 일부다. */
 @Entity
-@Table(name = "spot_detail_image")
+@Table(name = "spot_detail_image", schema = DbSchema.TOUR)
 class SpotDetailImageEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

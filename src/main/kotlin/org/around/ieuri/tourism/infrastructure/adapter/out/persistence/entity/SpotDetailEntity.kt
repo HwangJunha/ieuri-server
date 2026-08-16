@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity
 
+import org.around.ieuri.common.persistence.DbSchema
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -18,7 +19,7 @@ import java.time.Instant
  * 담당하고, 이 엔티티는 조회의 QueryDSL 대상이자 스키마 대조 기준이다.
  */
 @Entity
-@Table(name = "spot_detail")
+@Table(name = "spot_detail", schema = DbSchema.TOUR)
 class SpotDetailEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

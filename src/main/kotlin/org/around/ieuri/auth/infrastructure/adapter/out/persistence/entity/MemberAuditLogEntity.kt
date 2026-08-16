@@ -1,5 +1,6 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity
 
+import org.around.ieuri.common.persistence.DbSchema
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.GeneratedValue
@@ -13,7 +14,7 @@ import java.time.Instant
 
 /** 감사 이력/outbox JPA 엔티티. payload는 jsonb 문자열로 저장한다. */
 @Entity
-@Table(name = "member_audit_log")
+@Table(name = "member_audit_log", schema = DbSchema.AUTH)
 class MemberAuditLogEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

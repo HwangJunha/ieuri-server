@@ -1,5 +1,6 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity
 
+import org.around.ieuri.common.persistence.DbSchema
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Id
@@ -9,7 +10,7 @@ import java.io.Serializable
 
 /** 역할↔권한 매핑(다대다) 조인 엔티티. 복합 PK(role_id, permission_id). */
 @Entity
-@Table(name = "role_permission")
+@Table(name = "role_permission", schema = DbSchema.AUTH)
 @IdClass(RolePermissionId::class)
 class RolePermissionEntity(
     @Id

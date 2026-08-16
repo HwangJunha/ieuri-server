@@ -1,5 +1,6 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity
 
+import org.around.ieuri.common.persistence.DbSchema
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.GeneratedValue
@@ -11,7 +12,7 @@ import java.time.Instant
 
 /** 약관 본문 JPA 엔티티(버전 포함). */
 @Entity
-@Table(name = "terms")
+@Table(name = "terms", schema = DbSchema.AUTH)
 class TermsEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

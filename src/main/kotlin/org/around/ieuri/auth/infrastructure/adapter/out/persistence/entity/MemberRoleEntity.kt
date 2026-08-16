@@ -1,5 +1,6 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity
 
+import org.around.ieuri.common.persistence.DbSchema
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Id
@@ -11,7 +12,7 @@ import java.time.Instant
 
 /** 회원↔역할 매핑(다대다) 조인 엔티티. 복합 PK(member_id, role_id). member는 id로만 참조한다. */
 @Entity
-@Table(name = "member_role")
+@Table(name = "member_role", schema = DbSchema.AUTH)
 @IdClass(MemberRoleId::class)
 class MemberRoleEntity(
     @Id

@@ -1,5 +1,6 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity
 
+import org.around.ieuri.common.persistence.DbSchema
 import jakarta.persistence.Column
 import jakarta.persistence.EnumType
 import jakarta.persistence.Entity
@@ -15,7 +16,7 @@ import java.util.UUID
 
 /** 이메일 검증 챌린지 JPA 엔티티. 코드는 code_hash로만 저장한다. */
 @Entity
-@Table(name = "email_verification")
+@Table(name = "email_verification", schema = DbSchema.AUTH)
 class EmailVerificationEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

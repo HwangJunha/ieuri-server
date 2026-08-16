@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity
 
+import org.around.ieuri.common.persistence.DbSchema
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -28,7 +29,7 @@ import java.time.LocalDate
  * JPA가 PostGIS 타입을 알 필요가 없다(spot 테이블과 같은 방식).
  */
 @Entity
-@Table(name = "spot_catalog")
+@Table(name = "spot_catalog", schema = DbSchema.TOUR)
 class SpotCatalogEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -79,7 +80,7 @@ class SpotCatalogEntity(
  * 사본이므로 카탈로그 좌표가 바뀌면 함께 갱신해야 한다.
  */
 @Entity
-@Table(name = "spot_catalog_translation")
+@Table(name = "spot_catalog_translation", schema = DbSchema.TOUR)
 class SpotCatalogTranslationEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -163,7 +164,7 @@ class SpotCatalogTranslationEntity(
  * PK가 catalogId라 그 자체로 upsert 단위다.
  */
 @Entity
-@Table(name = "spot_catalog_festival")
+@Table(name = "spot_catalog_festival", schema = DbSchema.TOUR)
 class SpotCatalogFestivalEntity(
     @Id
     @Column(name = "catalog_id")

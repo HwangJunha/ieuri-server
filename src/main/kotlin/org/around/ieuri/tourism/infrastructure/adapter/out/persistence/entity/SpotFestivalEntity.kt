@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity
 
+import org.around.ieuri.common.persistence.DbSchema
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.GeneratedValue
@@ -18,7 +19,7 @@ import java.time.LocalDate
  * 담당하고, 이 엔티티는 조회·삭제의 QueryDSL 대상이자 `ddl-auto: validate`의 스키마 대조 기준이다.
  */
 @Entity
-@Table(name = "spot_festival")
+@Table(name = "spot_festival", schema = DbSchema.TOUR)
 class SpotFestivalEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -1,5 +1,6 @@
 package org.around.ieuri.community.infrastructure.adapter.out.persistence.entity
 
+import org.around.ieuri.common.persistence.DbSchema
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -24,7 +25,7 @@ import java.time.Instant
  * 분리될 때 따라가야 하는 형태다.
  */
 @Entity
-@Table(name = "community_post")
+@Table(name = "community_post", schema = DbSchema.COMMUNITY)
 class PostEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -90,7 +91,7 @@ class PostEntity(
 }
 
 @Entity
-@Table(name = "community_post_photo")
+@Table(name = "community_post_photo", schema = DbSchema.COMMUNITY)
 class PostPhotoEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -119,7 +120,7 @@ class PostPhotoEntity(
 }
 
 @Entity
-@Table(name = "community_comment")
+@Table(name = "community_comment", schema = DbSchema.COMMUNITY)
 class CommentEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -164,7 +165,7 @@ class CommentEntity(
 }
 
 @Entity
-@Table(name = "community_post_like")
+@Table(name = "community_post_like", schema = DbSchema.COMMUNITY)
 class PostLikeEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -187,7 +188,7 @@ class PostLikeEntity(
 
 /** 사용자가 개별 글을 숨긴 기록. community_post.hidden(신고 누적)과 다른 개념이다. */
 @Entity
-@Table(name = "community_post_hide")
+@Table(name = "community_post_hide", schema = DbSchema.COMMUNITY)
 class PostHideEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -209,7 +210,7 @@ class PostHideEntity(
 }
 
 @Entity
-@Table(name = "community_block")
+@Table(name = "community_block", schema = DbSchema.COMMUNITY)
 class BlockEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -231,7 +232,7 @@ class BlockEntity(
 }
 
 @Entity
-@Table(name = "community_report")
+@Table(name = "community_report", schema = DbSchema.COMMUNITY)
 class ReportEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -268,7 +269,7 @@ class ReportEntity(
  * 글 태그. 표시는 [name](유저 입력 원문), 매칭은 [normalized](소문자)로 한다.
  */
 @Entity
-@Table(name = "community_post_tag")
+@Table(name = "community_post_tag", schema = DbSchema.COMMUNITY)
 class PostTagEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -299,7 +300,7 @@ class PostTagEntity(
  * 유도하면 장소 없이 쓴 글은 상단 칩을 눌렀을 때 전부 사라진다.
  */
 @Entity
-@Table(name = "community_post_chip")
+@Table(name = "community_post_chip", schema = DbSchema.COMMUNITY)
 class PostChipEntity(
     /** 글의 id가 그대로 PK다. 연관 대신 plain 컬럼으로 둔 이유는 PostEntity의 주석 참고. */
     @Id
@@ -321,7 +322,7 @@ class PostChipEntity(
 
 /** 글 ↔ 장소. 글당 최대 하나이며 없을 수 있다. catalog_id는 tourism 소유라 물리 FK가 없다. */
 @Entity
-@Table(name = "community_post_spot")
+@Table(name = "community_post_spot", schema = DbSchema.COMMUNITY)
 class PostSpotEntity(
     @Id
     @Column(name = "post_id")
