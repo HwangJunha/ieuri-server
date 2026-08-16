@@ -122,16 +122,16 @@ class MemberTest {
 
     // --- 인증 주소 재입력 (SPEC-0024 R7) ---
 
+    /** 정정 자체는 도메인이 하지 않는다 — 통과 여부만 판정하고 주소는 챌린지가 들고 있는다. */
     @Test
-    fun `미인증 회원은 인증 대상 주소를 정정할 수 있고 인증 상태는 그대로 거짓이다`() {
+    fun `미인증 회원은 인증 대상 주소를 정정할 수 있다`() {
         val member = register(providerEmail = null, fallbackEmail = "wrong@example.com")
 
-        val retargeted = member.retargetPendingEmail(Email("right@example.com"))
+        member.ensureCanRetargetPendingEmail()
 
-        assertEquals("right@example.com", retargeted.email.value)
-        assertFalse(retargeted.emailVerified)
-        // 원본은 건드리지 않는다.
+        // 회원의 주소는 그대로다 — 소유를 증명하기 전에는 바뀌지 않는다.
         assertEquals("wrong@example.com", member.email.value)
+        assertFalse(member.emailVerified)
     }
 
     @Test
@@ -139,7 +139,7 @@ class MemberTest {
         val member = register(providerEmail = "verified@example.com")
         assertTrue(member.emailVerified)
 
-        assertFailsWith<IllegalArgumentException> { member.retargetPendingEmail(Email("other@example.com")) }
+        assertFailsWith<IllegalArgumentException> { member.ensureCanRetargetPendingEmail() }
     }
 
     // --- registerByEmail (SPEC-0012 R1) ---

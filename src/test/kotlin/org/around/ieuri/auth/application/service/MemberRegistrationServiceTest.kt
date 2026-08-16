@@ -687,6 +687,48 @@ class MemberRegistrationServiceTest {
         assertEquals("enc:right@example.com", issued.captured.targetEmailEncrypted)
     }
 
+    /** 이메일 변경 목적으로 발급된 챌린지. `verifyEmail`·`resendVerification`이 다루면 안 된다. */
+    private fun emailChangeChallenge() = EmailVerification.issue(
+        publicId = verifyPublicId,
+        memberId = 100L,
+        codeHash = "correct",
+        ttl = java.time.Duration.ofMinutes(10),
+        now = clock.instant(),
+        maxAttempts = 5,
+        purpose = VerificationPurpose.EMAIL_CHANGE,
+        targetEmailEncrypted = "enc:victim@example.com",
+    )
+
+    /**
+     * **이메일 변경 핸들로 가입 인증을 통과시킬 수 없다.**
+     *
+     * `verifyEmail`은 인증을 요구하지 않아 호출자가 핸들의 주인인지 확인하지 않는다.
+     * 목적을 거르지 않으면 남의 이메일 변경이 이 경로로 확정된다 —
+     * 소유권 검사를 하는 `confirmEmailChange`를 통째로 우회하게 된다.
+     */
+    @Test
+    fun `이메일 변경 핸들로는 가입 인증을 할 수 없다`() {
+        every { verificationRepository.findByPublicId(verifyPublicId) } returns emailChangeChallenge()
+
+        assertFailsWith<VerificationNotFoundException> {
+            service.verifyEmail(VerifyEmailCommand(verifyPublicId, "123456"))
+        }
+        verify(exactly = 0) { memberRepository.updateEmail(any(), any(), any(), any()) }
+        verify(exactly = 0) { memberRepository.markEmailVerified(any(), any()) }
+    }
+
+    /** 재발송도 같다 — 거르지 않으면 변경 대상 주소로 가입 인증 코드를 보내게 된다. */
+    @Test
+    fun `이메일 변경 핸들로는 가입 인증 코드를 재발송할 수 없다`() {
+        every { verificationRepository.findByPublicId(verifyPublicId) } returns emailChangeChallenge()
+
+        assertFailsWith<VerificationNotFoundException> {
+            service.resendVerification(ResendVerificationCommand(verifyPublicId))
+        }
+        verify(exactly = 0) { verificationRepository.save(any()) }
+        verify(exactly = 0) { eventPublisher.publish(any<VerificationEmailRequested>()) }
+    }
+
     /** 정정하지 않은 보통 가입 챌린지는 이메일을 건드리지 않는다. */
     @Test
     fun `대상 주소가 없는 챌린지는 이메일을 바꾸지 않는다`() {

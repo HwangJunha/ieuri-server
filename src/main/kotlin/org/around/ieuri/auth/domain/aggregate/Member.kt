@@ -58,29 +58,15 @@ class Member private constructor(
     fun canChangeEmail(): Boolean = provider == Provider.EMAIL
 
     /**
-     * 인증 대기 중인 주소를 정정한다(SPEC-0024 R7). 인증을 마친 회원은 이 경로를 쓸 수 없고,
-     * 그 경우 이메일 변경([canChangeEmail])이 담당한다.
+     * 인증 대기 주소를 정정할 수 있는 회원인지 확인한다(SPEC-0024 R7).
+     * 인증을 마쳤으면 거부한다 — 그 경우는 이메일 변경([canChangeEmail])의 몫이다.
      *
-     * **인증 상태는 그대로 거짓이다** — 주소를 바꾼 것일 뿐 새 주소를 검증한 것이 아니다.
+     * **주소를 여기서 바꾸지 않는다.** 정정된 주소는 소유를 증명할 때까지 회원이 아니라
+     * 검증 챌린지가 들고 있다 — 미리 반영하면 증명되지 않은 주소가 `(provider, email)`
+     * 유니크를 선점해 그 주소의 진짜 주인이 가입하지 못한다.
      */
-    fun retargetPendingEmail(newEmail: Email): Member {
+    fun ensureCanRetargetPendingEmail() {
         require(!emailVerified) { "이미 이메일 인증을 마쳐 대상 주소를 정정할 수 없습니다." }
-        return Member(
-            id = id,
-            provider = provider,
-            providerUserId = providerUserId,
-            email = newEmail,
-            emailVerifiedInitial = false,
-            statusInitial = status,
-            ageVerified = ageVerified,
-            suspendedAtInitial = suspendedAt,
-            suspendedUntilInitial = suspendedUntil,
-            suspensionReasonInitial = suspensionReason,
-            profile = profile,
-            agreements = agreements,
-            passwordHash = passwordHash,
-            createdAt = createdAt,
-        )
     }
 
     /**

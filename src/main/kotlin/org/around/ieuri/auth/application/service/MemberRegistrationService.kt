@@ -239,8 +239,7 @@ class MemberRegistrationService(
     @Transactional
     override fun verifyEmail(command: VerifyEmailCommand): VerifyEmailResult {
         val now = clock.instant()
-        val verification = verificationRepository.findByPublicId(command.verificationPublicId)
-            ?: throw VerificationNotFoundException("유효하지 않은 검증 요청입니다.")
+        val verification = loadRegistrationChallenge(command.verificationPublicId)
 
         val result = verification.verify(codeGenerator.hash(command.code), now)
         // 성공/실패 관계없이 attempts·consumed·verifiedAt 변경을 반영한다.
@@ -268,11 +267,10 @@ class MemberRegistrationService(
     @Transactional
     override fun resendVerification(command: ResendVerificationCommand): ResendVerificationResult {
         val now = clock.instant()
-        val existing = verificationRepository.findByPublicId(command.verificationPublicId)
-            ?: throw VerificationNotFoundException("유효하지 않은 검증 요청입니다.")
+        val existing = loadRegistrationChallenge(command.verificationPublicId)
 
         val memberId = existing.memberId
-        if (!ensureResendCooldownPassed(memberId, now)) {
+        if (!isResendCooldownPassed(memberId, now)) {
             throw VerificationRateLimitedException("잠시 후 다시 시도해 주세요.")
         }
 
@@ -321,12 +319,12 @@ class MemberRegistrationService(
             ?: throw MemberNotFoundException("회원을 찾을 수 없습니다.")
 
         // 인증 완료 회원의 호출은 도메인이 거부한다(R7-2).
-        member.retargetPendingEmail(newEmail)
+        member.ensureCanRetargetPendingEmail()
 
         emailUniqueness.ensureAvailable(member.provider, newEmail, excludingMemberId = command.memberId)
         // 계약이 이 오퍼레이션에 지정한 코드는 RESEND_COOLDOWN_ACTIVE다 —
         // 재발송(VERIFICATION_RATE_LIMITED)과 창은 공유하되 클라이언트 화면이 달라 코드를 나눈다.
-        if (!ensureResendCooldownPassed(command.memberId, now)) {
+        if (!isResendCooldownPassed(command.memberId, now)) {
             throw ResendCooldownActiveException("잠시 후 다시 시도해 주세요.")
         }
 
@@ -358,20 +356,36 @@ class MemberRegistrationService(
     }
 
     /**
-     * 가입 인증 재발송 쿨다운이 지났는지(R7-3). `resendVerification`과 인증 주소 재입력이
+     * 가입 인증 재발송 쿨다운이 지났는지(R7-3). **`ensure*`가 아니라 `is*`인 이유**는
+     * 던지지 않고 판정만 돌려주기 때문이다 — 이 파일의 `ensure*`는 전부 위반 시 던지므로,
+     * 같은 이름을 쓰면 반환값을 버리는 호출이 쿨다운을 조용히 없앤다.
+     * `resendVerification`과 인증 주소 재입력이
      * **한 창을 공유한다** — 창을 나누면 주소를 바꿔가며 메일 발송을 무제한으로 유발할 수 있다.
      * 용도별로 세므로 진행 중인 이메일 변경 검증이 이 창을 막지는 않는다.
      *
      * 던지지 않고 판정만 돌려주는 이유는 두 호출부의 오류 코드가 다르기 때문이다 —
      * 재발송은 `VERIFICATION_RATE_LIMITED`, 주소 재입력은 `RESEND_COOLDOWN_ACTIVE`(계약).
      */
-    private fun ensureResendCooldownPassed(memberId: Long, now: java.time.Instant): Boolean {
+    private fun isResendCooldownPassed(memberId: Long, now: java.time.Instant): Boolean {
         val lastCreatedAt = verificationRepository.findLatestCreatedAtByMemberIdAndPurpose(
             memberId,
             VerificationPurpose.REGISTRATION,
         )
         return lastCreatedAt == null || !lastCreatedAt.plus(verificationPolicy.resendCooldown).isAfter(now)
     }
+
+    /**
+     * 핸들을 **가입 인증** 챌린지로만 해석한다. 이메일 변경 핸들이면 없는 것과 같이 응답한다 —
+     * 사유를 구분해 알려 주면 남의 핸들 존재가 새어 나간다(`EmailChangeService`와 대칭).
+     *
+     * **목적을 반드시 걸러야 한다.** 이 경로는 인증을 요구하지 않아 호출자가 핸들의 주인인지
+     * 확인하지 않는다. 예전에는 가입 챌린지에 대상 주소가 없다는 것이 사실상의 방어였으나,
+     * 주소 정정(R7)이 그 전제를 없앴다 — 거르지 않으면 이메일 변경이 이 경로로 확정된다.
+     */
+    private fun loadRegistrationChallenge(publicId: UUID): EmailVerification =
+        verificationRepository.findByPublicId(publicId)
+            ?.takeIf { it.purpose == VerificationPurpose.REGISTRATION }
+            ?: throw VerificationNotFoundException("유효하지 않은 검증 요청입니다.")
 
     /**
      * 가입 인증 코드를 발급하고 평문 코드를 이벤트로만 전달한다(AFTER_COMMIT 발송).
