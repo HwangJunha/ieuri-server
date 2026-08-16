@@ -1,5 +1,6 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity
 
+import org.around.ieuri.common.persistence.DbSchema
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -19,7 +20,7 @@ import java.time.Instant
  * 이메일은 email_encrypted에 암호문으로만 저장한다.
  */
 @Entity
-@Table(name = "member")
+@Table(name = "member", schema = DbSchema.AUTH)
 class MemberEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

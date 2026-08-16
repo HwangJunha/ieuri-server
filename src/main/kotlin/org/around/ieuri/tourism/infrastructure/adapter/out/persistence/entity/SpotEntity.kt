@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity
 
+import org.around.ieuri.common.persistence.DbSchema
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -26,7 +27,7 @@ import java.time.Instant
  * 반대로 여기 있으나 도메인에 없는 [contentTypeId]는 적재 전용 관측 필드다.
  */
 @Entity
-@Table(name = "spot")
+@Table(name = "spot", schema = DbSchema.TOUR)
 class SpotEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

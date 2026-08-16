@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity
 
+import org.around.ieuri.common.persistence.DbSchema
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.GeneratedValue
@@ -14,7 +15,7 @@ import java.time.Instant
  * 전 컬럼이 null인 행은 "조회했으나 값 없음"을 뜻한다 — 미적재와 구분된다.
  */
 @Entity
-@Table(name = "spot_detail_intro")
+@Table(name = "spot_detail_intro", schema = DbSchema.TOUR)
 class SpotDetailIntroEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

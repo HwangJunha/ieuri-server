@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity
 
+import org.around.ieuri.common.persistence.DbSchema
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -18,7 +19,7 @@ import java.time.Instant
  * 표시 문구는 `category_translation`이 갖는다(V58) — 이 표는 노출 여부와 순서만 정한다.
  */
 @Entity
-@Table(name = "app_category")
+@Table(name = "app_category", schema = DbSchema.CATEGORY)
 class AppCategoryEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

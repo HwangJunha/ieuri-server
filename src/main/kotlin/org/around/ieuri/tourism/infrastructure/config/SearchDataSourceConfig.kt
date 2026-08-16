@@ -51,6 +51,11 @@ class SearchDataSourceConfig {
                 // 논리 복제 구독자에 쓰기가 가지 않게 커넥션 단에서 막는다 — 실수로 INSERT가
                 // 나가면 복제가 충돌한다. DDL은 Flyway가 자체 커넥션으로 수행하므로 영향 없다.
                 isReadOnly = true
+                // 검색 어댑터의 raw SQL이 테이블을 스키마 한정 없이 부른다(SPEC-0023 R7).
+                // 이 노드에는 `tour`만 있고, `public`은 PostGIS·pgvector가, `paradedb`는
+                // pg_search가 산다 — BM25 연산자(`@@@`)와 `pdb.score()`가 거기서 해석되므로
+                // 셋 다 남겨야 한다.
+                connectionInitSql = "SET search_path TO tour, public, paradedb"
             }
 
     /**
@@ -70,6 +75,13 @@ class SearchDataSourceConfig {
             // 돌고 끝나므로 자체 커넥션으로 충분하다.
             .dataSource(properties.url, properties.username, properties.password)
             .locations("classpath:db/search-node")
+            // **flyway_schema_history를 `public`에 유지한다**(SPEC-0023). V8이 테이블을
+            // `tour`로 옮겨도 이력 테이블은 따라가지 않는다 — 옮기면 기존 노드가 이력을 잃고
+            // V1부터 다시 적용하려 든다.
+            //
+            // `schemas("public", "tour")`로 적지 않는다 — 그 목록은 Flyway가 소유를 주장하는
+            // 대상이라 없으면 만들고 `clean`에서 지운다. `tour`는 V8이 만든다.
+            .defaultSchema("public")
             // 메인과 이력이 섞이지 않게 테이블 이름을 명시한다. 기본값과 같지만, 이 DB에
             // 두 이력이 공존할 여지를 남기지 않으려는 의도를 드러낸다.
             .table("flyway_schema_history")

@@ -48,7 +48,13 @@ interface PostTagJpaRepository : JpaRepository<PostTagEntity, Long> {
 interface PostChipJpaRepository : JpaRepository<PostChipEntity, Long>
 
 /** 글 ↔ 장소. 장소는 선택이라 행이 없을 수 있다. */
-interface PostSpotJpaRepository : JpaRepository<PostSpotEntity, Long>
+interface PostSpotJpaRepository : JpaRepository<PostSpotEntity, Long> {
+    /**
+     * 사라진 카탈로그를 가리키던 연결 삭제(SPEC-0023 R11). 지운 행 수를 돌려준다 —
+     * 한 장소를 여러 글이 참조하므로 단건이 아니다.
+     */
+    fun deleteByCatalogIdIn(catalogIds: Collection<Long>): Long
+}
 
 /** 글 숨김. 유일 제약이 멱등을 판정하므로 exists→save 순으로 쓴다. */
 interface PostHideJpaRepository : JpaRepository<PostHideEntity, Long> {

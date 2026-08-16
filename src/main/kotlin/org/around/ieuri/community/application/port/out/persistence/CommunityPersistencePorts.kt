@@ -105,6 +105,18 @@ interface BlockRepositoryPort {
     fun delete(blockerId: Long, blockedId: Long): Boolean
 }
 
+/**
+ * 사라진 장소를 가리키는 글-장소 연결 정리(SPEC-0023 R11).
+ *
+ * `community_post_spot.catalog_id`는 NOT NULL이면서 컨텍스트 간 FK가 없다(R4). 그래서
+ * 카탈로그가 사라져도 DB가 막아 주지 않고 매칭 불가능한 행이 조용히 남는다 — 그 정리를
+ * 애플리케이션 계층이 맡는다.
+ */
+interface PostSpotCleanupPort {
+    /** 지운 연결 행 수. 한 장소를 여러 글이 참조하므로 단건이 아니다. */
+    fun deleteByCatalogIds(catalogIds: List<Long>): Long
+}
+
 /** 신고 유일성·집계. */
 interface ReportRepositoryPort {
     /** 새로 저장했으면 true, 같은 대상을 이미 신고했으면 false. */

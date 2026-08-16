@@ -1,5 +1,6 @@
 package org.around.ieuri.community.infrastructure.adapter.out.persistence.entity
 
+import org.around.ieuri.common.persistence.DbSchema
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.GeneratedValue
@@ -15,7 +16,7 @@ import java.time.Instant
  * 도메인 애그리게이트가 없다 — 지울 목록일 뿐 불변식이 없어 값을 읽는 경로만 있으면 된다.
  */
 @Entity
-@Table(name = "community_orphan_photo_object")
+@Table(name = "community_orphan_photo_object", schema = DbSchema.COMMUNITY)
 class OrphanPhotoObjectEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

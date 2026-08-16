@@ -1,5 +1,6 @@
 package org.around.ieuri.community.infrastructure.adapter.out.persistence.entity
 
+import org.around.ieuri.common.persistence.DbSchema
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -25,7 +26,7 @@ import java.time.Instant
  * 강제되며, 그것이 "같은 쌍에 대화는 하나"를 유일 제약으로 판정할 수 있는 근거다(AC7-2).
  */
 @Entity
-@Table(name = "community_conversation")
+@Table(name = "community_conversation", schema = DbSchema.COMMUNITY)
 class ConversationEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -69,7 +70,7 @@ class ConversationEntity(
  * 암호화 컬럼이라 LIKE·전문 검색의 대상이 아니다. 대화 검색은 비범위다.
  */
 @Entity
-@Table(name = "community_message")
+@Table(name = "community_message", schema = DbSchema.COMMUNITY)
 class MessageEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -103,7 +104,7 @@ class MessageEntity(
 
 /** DM 신고 한 건. 여러 메시지를 [MessageReportItemEntity]로 묶는다(R15). */
 @Entity
-@Table(name = "community_message_report")
+@Table(name = "community_message_report", schema = DbSchema.COMMUNITY)
 class MessageReportEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -139,7 +140,7 @@ class MessageReportEntity(
  * 다른 신고 건의 중복을 볼 수 없다(AC15-6).
  */
 @Entity
-@Table(name = "community_message_report_item")
+@Table(name = "community_message_report_item", schema = DbSchema.COMMUNITY)
 class MessageReportItemEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -1,5 +1,6 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity
 
+import org.around.ieuri.common.persistence.DbSchema
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.GeneratedValue
@@ -11,7 +12,7 @@ import java.time.Instant
 
 /** 역할 JPA 엔티티. 도메인 모델(Role)과 분리되며 매퍼로만 오간다. */
 @Entity
-@Table(name = "role")
+@Table(name = "role", schema = DbSchema.AUTH)
 class RoleEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

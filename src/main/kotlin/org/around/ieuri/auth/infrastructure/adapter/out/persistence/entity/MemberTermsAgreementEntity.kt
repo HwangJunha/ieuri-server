@@ -1,5 +1,6 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity
 
+import org.around.ieuri.common.persistence.DbSchema
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.GeneratedValue
@@ -11,7 +12,7 @@ import java.time.Instant
 
 /** 약관 동의 이력 JPA 엔티티. append-only(수정/삭제하지 않음). */
 @Entity
-@Table(name = "member_terms_agreement")
+@Table(name = "member_terms_agreement", schema = DbSchema.AUTH)
 class MemberTermsAgreementEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
