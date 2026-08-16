@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
 class MigrationRuleTest {
 
     private val addedMigrations = listOf(
-        Path.of("src/main/resources/db/migration/V61__split_context_schemas.sql"),
+        Path.of("src/main/resources/db/migration/V62__split_context_schemas.sql"),
         Path.of("src/main/resources/db/search-node/V8__split_tour_schema.sql"),
     )
 
@@ -65,7 +65,7 @@ class MigrationRuleTest {
             "community_post_spot_sync_location" to "community",
         )
 
-        val sql = sources.getValue("V61__split_context_schemas.sql")
+        val sql = sources.getValue("V62__split_context_schemas.sql")
         // 재적용 가드 때문에 `public.` 한정이 붙어 있다 — 스키마 접두사는 선택으로 둔다.
         val moved = Regex(
             """ALTER\s+FUNCTION\s+(?:public\.)?(\w+)\s*\(\s*\)\s+SET\s+SCHEMA\s+(\w+)""",

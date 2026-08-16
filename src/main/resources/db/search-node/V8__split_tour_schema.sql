@@ -1,6 +1,6 @@
 -- 검색 노드를 `tour` 스키마로 정렬한다(SPEC-0023 R7).
 --
--- **이 경로는 검색 노드(ieuri-search) 전용이다.** 메인 DB는 db/migration의 V61이 옮긴다.
+-- **이 경로는 검색 노드(ieuri-search) 전용이다.** 메인 DB는 db/migration의 V62가 옮긴다.
 --
 -- 복제 대상 6개가 전부 tourism 소유라 이 노드에는 `tour` 하나만 만든다. auth·community·
 -- category·batch는 여기 존재할 이유가 없다 — 다른 컨텍스트가 검색을 필요로 하면 그때
