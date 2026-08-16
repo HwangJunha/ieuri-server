@@ -108,21 +108,23 @@ class DataSourceConfig {
                 dataSourceProperties.password,
             )
             .locations(*properties.locations.toTypedArray())
-            // **`spring.datasource.hikari.connection-init-sql`이 여기 닿지 않는다** — 위에
-            // 적었듯 Flyway는 풀을 쓰지 않고 자체 커넥션을 만든다. 그래서 스키마 5분할
-            // 이후의 이름 해석 경로를 여기서 따로 준다(SPEC-0023).
+            // **`flyway_schema_history`가 `public`에 남게 못 박는다**(SPEC-0023).
+            // 지정하지 않으면 Flyway는 커넥션의 기본 스키마에서 이력을 찾는데, 지금 그것이
+            // `public`인 것은 우연이다 — 누가 롤이나 DB의 search_path를 바꾸면 이력을 찾지
+            // 못하고 **V1부터 다시 적용하려 든다.** 테이블이 이미 있는 DB에서는 통째로 실패한다.
             //
-            // **V62부터는 마이그레이션이 스키마 한정으로 쓰여야 한다.** V61까지는 테이블이
-            // 전부 `public`에 있어 한정 없이 써도 맞았지만, 이제는 `ALTER TABLE community_post`
-            // 같은 문장이 이 경로에 의존한다. 경로에 기대는 대신 `community.community_post`로
-            // 적는 편이 안전하다 — 경로가 바뀌면 조용히 다른 스키마를 고칠 수 있다.
-            // 이력 테이블(`flyway_schema_history`)이 `public`에 남게 고정하고, 마이그레이션
-            // 커넥션의 기본 스키마도 `public`으로 둔다. V61이 테이블을 옮겨도 이력은 따라가지
-            // 않으며, 옮기면 기존 환경이 이력을 잃고 V1부터 다시 적용하려 든다.
+            // V61은 이력 테이블을 옮기지 않는다. 옮기면 기존 환경이 이력을 잃는다.
             //
             // **`schemas(...)`로 5개를 나열하지 않는다.** 그 목록은 Flyway가 소유를 주장하는
             // 대상이라 없으면 만들고 `clean`에서 지운다 — 스키마 생성은 V61과 CNPG
             // 매니페스트가 이미 나눠 갖고 있으므로 소유자를 셋으로 늘릴 이유가 없다.
+            //
+            // **주의: `spring.datasource.hikari.connection-init-sql`이 여기 닿지 않는다.**
+            // 위에 적었듯 Flyway는 풀을 쓰지 않고 자체 커넥션을 만들기 때문이다. 그래서
+            // **V62부터 마이그레이션은 스키마 한정으로 써야 한다** — `ALTER TABLE
+            // community_post`가 아니라 `ALTER TABLE community.community_post`. V61까지는
+            // 테이블이 전부 `public`에 있어 한정 없이 써도 맞았으므로, 기존 61개를 보고
+            // 같은 방식을 따르기 쉽다.
             .defaultSchema("public")
             .baselineOnMigrate(properties.baselineOnMigrate)
             .baselineVersion(properties.baselineVersion)
