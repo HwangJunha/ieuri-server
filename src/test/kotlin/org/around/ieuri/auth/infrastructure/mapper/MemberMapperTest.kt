@@ -36,6 +36,7 @@ class MemberMapperTest {
         provider = Provider.KAKAO,
         providerUserId = "kakao-9911",
         emailEncrypted = "enc-blob",
+        emailIdentifier = "hmac-ident",
         emailVerified = true,
         passwordHash = passwordHash,
         status = MemberStatus.SUSPENDED,
@@ -121,12 +122,14 @@ class MemberMapperTest {
 
     @Test
     fun `도메인 회원을 새 엔티티로 옮긴다`() {
-        val entity = member().toNewEntity("enc-blob")
+        val entity = member().toNewEntity("enc-blob", "hmac-ident")
 
         assertNull(entity.id) // id는 DB가 채운다.
         assertEquals(Provider.KAKAO, entity.provider)
         assertEquals("kakao-9911", entity.providerUserId)
         assertEquals("enc-blob", entity.emailEncrypted)
+        // 암호문과 유니크 판정용 파생 값은 서로 다른 인자다(SPEC-0024 R5) — 뒤바뀌면 여기서 깨진다.
+        assertEquals("hmac-ident", entity.emailIdentifier)
         assertEquals(true, entity.emailVerified)
         assertEquals(MemberStatus.SUSPENDED, entity.status)
         assertEquals(true, entity.ageVerified)

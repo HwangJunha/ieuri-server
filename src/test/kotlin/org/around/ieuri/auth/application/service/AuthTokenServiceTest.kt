@@ -8,7 +8,6 @@ import org.around.ieuri.auth.application.command.LoginCommand
 import org.around.ieuri.auth.application.command.LoginEmailCommand
 import org.around.ieuri.auth.application.command.LogoutCommand
 import org.around.ieuri.auth.application.command.RefreshTokenCommand
-import org.around.ieuri.auth.application.exception.EmailNotVerifiedException
 import org.around.ieuri.auth.application.exception.InactiveMemberException
 import org.around.ieuri.auth.application.exception.InvalidCredentialsException
 import org.around.ieuri.auth.application.exception.InvalidTokenException
@@ -257,13 +256,18 @@ class AuthTokenServiceTest {
         assertFailsWith<InvalidCredentialsException> { service.loginByEmail(emailLoginCommand) }
     }
 
+    /**
+     * 미인증은 로그인을 막지 않는다(SPEC-0024 R8) — 토큰은 정상 발급되고, 인증이 필요한
+     * 오퍼레이션만 별도 게이트에서 걸린다(R9).
+     */
     @Test
-    fun `이메일 미인증 계정이면 EmailNotVerifiedException`() {
+    fun `이메일 미인증 회원도 로그인에 성공한다`() {
         every { memberRepository.findEmailAuthentication(any()) } returns emailAuth(emailVerified = false)
         every { passwordEncoder.matches(any(), any()) } returns true
+        every { tokenIssuer.issueFor(100L) } returns tokens
 
-        assertFailsWith<EmailNotVerifiedException> { service.loginByEmail(emailLoginCommand) }
-        verify(exactly = 0) { tokenIssuer.issueFor(any()) }
+        assertEquals(tokens, service.loginByEmail(emailLoginCommand))
+        verify { tokenIssuer.issueFor(100L) }
     }
 
     // --- refresh ---
