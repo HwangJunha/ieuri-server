@@ -6,6 +6,7 @@ import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.auth.application.port.`in`.query.MemberQueryUseCase
 import org.around.ieuri.auth.application.query.MembersQuery
 import org.around.ieuri.auth.application.query.MeView
+import org.around.ieuri.auth.infrastructure.adapter.`in`.graphql.mapper.toGql
 import org.around.ieuri.auth.application.query.MemberDetailView
 import org.around.ieuri.auth.application.query.MemberSummaryView
 import org.around.ieuri.auth.domain.vo.MemberStatus
@@ -59,18 +60,6 @@ class MemberQueryResolver(
         )
         return result.toGql()
     }
-
-    private fun MeView.toGql(): GqlMe = GqlMe(
-        id = memberId,
-        email = email,
-        nickname = nickname,
-        profileImageUrl = profileImageUrl,
-        status = GqlMemberStatus.valueOf(status.name),
-        emailVerified = emailVerified,
-        roles = roles,
-        permissions = permissions,
-        createdAt = createdAt.toString(),
-    )
 
     private fun MemberDetailView.toGql(): GqlMemberDetail = GqlMemberDetail(
         id = memberId,

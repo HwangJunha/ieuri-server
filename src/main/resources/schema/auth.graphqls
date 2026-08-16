@@ -24,7 +24,7 @@ type Mutation {
     resendVerification(input: ResendVerificationInput!): ResendVerificationPayload!
     "SNS 로그인. 기존 회원만 인증하며 accessToken/refreshToken을 발급한다."
     loginSns(input: LoginSnsInput!): AuthTokenPayload!
-    "자체(이메일) 로그인. 비밀번호 검증 + 이메일 인증 완료를 요구하며 토큰을 발급한다."
+    "자체(이메일) 로그인. 비밀번호를 검증하고 토큰을 발급한다. 이메일 인증을 마치지 않은 회원도 성공하며, 그 토큰으로는 me·verifyEmail·resendVerification·retargetEmailVerification·withdrawMember·refreshToken·logout만 호출할 수 있고 나머지는 EMAIL_NOT_VERIFIED 최상위 오류로 거절된다."
     loginEmail(input: LoginEmailInput!): AuthTokenPayload!
     "비밀번호 재설정 요청. 이메일로 재설정 코드를 발송한다(계정 유무는 응답으로 드러내지 않음)."
     requestPasswordReset(input: RequestPasswordResetInput!): RequestPasswordResetPayload!
@@ -54,12 +54,14 @@ type Mutation {
     removeProfileImage: RemoveProfileImagePayload!
     "약관 동의를 개별로 켜고 끈다. 필수 약관도 철회할 수 있으며, 철회하면 required가 참이면서 agreed가 거짓인 상태가 되어 클라이언트가 이용 게이트를 건다. 서버는 철회한 회원의 다른 오퍼레이션을 거절하지 않는다."
     updateAgreement(input: UpdateAgreementInput!): UpdateAgreementPayload!
-    "이메일 변경 요청. 새 주소로 6자리 코드를 발송한다. confirmEmailChange를 통과하기 전까지 Me.email은 기존 값으로 유지된다. SNS·EMAIL 가입 유형 모두 사용할 수 있다."
+    "이메일 변경 요청. 새 주소로 6자리 코드를 발송한다. confirmEmailChange를 통과하기 전까지 Me.email은 기존 값으로 유지된다. **Provider.EMAIL 회원만 사용할 수 있다** — SNS 회원은 NOT_EMAIL_MEMBER로 거절된다(Me.canChangeEmail로 미리 판단할 수 있다). 이미 인증을 마친 주소를 바꾸는 경로이며, 아직 인증하지 않은 대기 주소의 정정은 retargetEmailVerification이 맡는다."
     changeEmail(input: ChangeEmailInput!): ChangeEmailPayload!
     "이메일 변경 코드 확인. 통과하면 Me.email이 새 주소로 교체된다."
     confirmEmailChange(input: ConfirmEmailChangeInput!): ConfirmEmailChangePayload!
     "이메일 변경 코드 재발송. changeEmail이 발급한 핸들을 재사용하며 대상 주소는 그대로다. 쿨다운 60초."
     resendEmailChange(input: ResendEmailChangeInput!): ResendEmailChangePayload!
+    "인증 대기 주소를 정정한다. 아직 인증을 마치지 않은 회원만 사용할 수 있고, 마친 회원은 실패한다(그쪽은 changeEmail의 몫). 가입 유형을 가리지 않는다 — 이메일 가입자와 provider가 이메일을 주지 않은 SNS 가입자가 함께 쓴다. 이전 가입 인증 코드는 무효화되고 새 주소로 코드가 발송되며, 진행 중인 이메일 변경 검증은 영향을 받지 않는다. 쿨다운 60초를 resendVerification과 같은 창으로 공유한다."
+    retargetEmailVerification(input: RetargetEmailVerificationInput!): RetargetEmailVerificationPayload!
     "미동의 상태인 필수 약관에 동의한다. 동의만 받으며 철회는 받지 않는다 — 필수 약관 철회는 사실상 서비스 이용 중단이므로 탈퇴로만 가능하다. 모든 필수 약관이 동의되면 이용 게이트가 해제된다."
     agreeToRequiredTerms(input: AgreeToRequiredTermsInput!): AgreeToRequiredTermsPayload!
 }
@@ -122,6 +124,20 @@ type ConfirmProfileImageUploadPayload implements BaseResponse {
 type RemoveProfileImagePayload implements BaseResponse {
     success: Boolean!
     userErrors: [UserError!]!
+}
+
+input RetargetEmailVerificationInput {
+    "새로 인증받을 이메일 주소. 같은 provider의 다른 회원이 쓰는 주소면 실패한다."
+    newEmail: String!
+}
+
+type RetargetEmailVerificationPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+    "재발급된 검증 핸들. 이후 verifyEmail·resendVerification에 쓴다. 실패 시 null."
+    verificationId: String
+    "새 코드의 만료 시각. 발급 시각 + 10분(ISO-8601). 실패 시 null."
+    expiresAt: String
 }
 
 input ChangeEmailInput {
@@ -216,6 +232,8 @@ enum Provider {
     APPLE
     GOOGLE
     KAKAO
+    "자체 가입(이메일+비밀번호). 이메일 변경이 가능한 유일한 유형이다."
+    EMAIL
 }
 
 "약관 코드. 클라이언트가 동의 항목을 하드코딩 없이 렌더한다."
@@ -410,6 +428,8 @@ type Me {
     profileImageUrl: String
     status: MemberStatus!
     emailVerified: Boolean!
+    "이메일 변경(changeEmail) 가능 여부. Provider.EMAIL 회원만 참이다. 거짓이면 설정 화면에 변경 진입점을 노출하지 않는다."
+    canChangeEmail: Boolean!
     roles: [String!]!
     permissions: [String!]!
     "가입일(ISO-8601)."

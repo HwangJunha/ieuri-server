@@ -1,6 +1,7 @@
 package org.around.ieuri.auth.application.query
 
 import org.around.ieuri.auth.domain.vo.MemberStatus
+import org.around.ieuri.auth.domain.vo.Provider
 import java.time.Instant
 
 /**
@@ -16,10 +17,17 @@ data class MeView(
     val profileImageUrl: String?,
     val status: MemberStatus,
     val emailVerified: Boolean,
+    val provider: Provider,
     val roles: List<String>,
     val permissions: List<String>,
     val createdAt: Instant,
-)
+) {
+    /**
+     * 이메일 변경 가능 여부(SPEC-0024 R6). **저장하지 않고 provider에서 파생한다** —
+     * 저장하면 provider와 어긋날 수 있는 두 번째 진실이 생긴다.
+     */
+    val canChangeEmail: Boolean get() = provider == Provider.EMAIL
+}
 
 /** 관리자 회원 단건 상세(member). member:read 권한 필요. 단건이므로 이메일 평문 노출. */
 data class MemberDetailView(
