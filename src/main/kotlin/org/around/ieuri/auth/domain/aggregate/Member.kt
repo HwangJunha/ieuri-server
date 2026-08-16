@@ -50,6 +50,40 @@ class Member private constructor(
     }
 
     /**
+     * 이메일 변경 가능 여부(SPEC-0024 R6). `Provider.EMAIL` 회원만 참이다.
+     *
+     * SNS 이메일은 provider에 종속된 값이라 우리 쪽에서 바꾸면 provider가 주는 값과
+     * 영구히 어긋난다. SPEC-0011 R8("가입 유형과 무관")을 파기한 판단이다.
+     */
+    fun canChangeEmail(): Boolean = provider == Provider.EMAIL
+
+    /**
+     * 인증 대기 중인 주소를 정정한다(SPEC-0024 R7). 인증을 마친 회원은 이 경로를 쓸 수 없고,
+     * 그 경우 이메일 변경([canChangeEmail])이 담당한다.
+     *
+     * **인증 상태는 그대로 거짓이다** — 주소를 바꾼 것일 뿐 새 주소를 검증한 것이 아니다.
+     */
+    fun retargetPendingEmail(newEmail: Email): Member {
+        require(!emailVerified) { "이미 이메일 인증을 마쳐 대상 주소를 정정할 수 없습니다." }
+        return Member(
+            id = id,
+            provider = provider,
+            providerUserId = providerUserId,
+            email = newEmail,
+            emailVerifiedInitial = false,
+            statusInitial = status,
+            ageVerified = ageVerified,
+            suspendedAtInitial = suspendedAt,
+            suspendedUntilInitial = suspendedUntil,
+            suspensionReasonInitial = suspensionReason,
+            profile = profile,
+            agreements = agreements,
+            passwordHash = passwordHash,
+            createdAt = createdAt,
+        )
+    }
+
+    /**
      * 닉네임 변경(SPEC-0011 R5). 길이·공백 규칙은 [Nickname]이 판정한다.
      *
      * **고유성은 여기서 판정할 수 없다** — 다른 회원을 봐야 알 수 있어 애그리거트 밖의
@@ -93,12 +127,25 @@ class Member private constructor(
         status == MemberStatus.SUSPENDED && suspendedUntil != null && !now.isBefore(suspendedUntil)
 
     companion object {
+        /**
+         * SNS 가입(SPEC-0024 R2·R3·R12).
+         *
+         * **인증 면제는 `providerEmail != null` 하나로 판정한다.** provider의 검증 플래그는
+         * 보지 않는다 — id_token 서명을 검증해 신원을 위임하는 이상(POL-030) 같은 provider가
+         * 준 이메일을 따로 의심할 근거가 없다.
+         *
+         * **제출 이메일을 받지 않는 것이 의도다.** provider 제공 시 그 값을, 미제공 시에만
+         * 제출값을 쓴다는 선택(R12)은 호출부에서 이미 끝나 [providerEmail]/[fallbackEmail]
+         * 중 하나로 확정돼 들어온다. 두 값이 여기까지 오면 어느 쪽을 쓸지가 도메인의 판단이 된다.
+         *
+         * @param providerEmail provider 응답의 이메일. 있으면 이 값이 저장되고 인증이 면제된다.
+         * @param fallbackEmail provider가 이메일을 주지 않았을 때 쓸 사용자 입력값(R3).
+         */
         fun register(
             provider: Provider,
             providerUserId: ProviderUserId,
-            submittedEmail: Email,
             providerEmail: Email?,
-            providerEmailVerified: Boolean,
+            fallbackEmail: Email,
             nickname: Nickname,
             profileImageUrl: String?,
             ageVerified: Boolean,
@@ -112,16 +159,12 @@ class Member private constructor(
             val missing = requiredTermsCodes - agreedCodes
             require(missing.isEmpty()) { "필수 약관에 동의해야 가입할 수 있습니다. 미동의: $missing" }
 
-            val emailVerified = providerEmailVerified &&
-                providerEmail != null &&
-                providerEmail == submittedEmail
-
             return Member(
                 id = null,
                 provider = provider,
                 providerUserId = providerUserId,
-                email = submittedEmail,
-                emailVerifiedInitial = emailVerified,
+                email = providerEmail ?: fallbackEmail,
+                emailVerifiedInitial = providerEmail != null,
                 statusInitial = MemberStatus.ACTIVE,
                 ageVerified = ageVerified,
                 suspendedAtInitial = null,
