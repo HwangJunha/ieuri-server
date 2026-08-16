@@ -70,7 +70,7 @@ class AuthTokenServiceTest {
 
     private val tokens = TokenPairResult("acc", "ref", "Bearer", 300, 2_592_000)
 
-    private fun identity() = SnsIdentity("google-sub-1", "u@example.com", true, "여행자", null)
+    private fun identity() = SnsIdentity("google-sub-1", "u@example.com", "여행자", null)
 
     private fun suspendedMember(until: Instant?) = Member.reconstitute(
         id = 100L, provider = Provider.GOOGLE, providerUserId = ProviderUserId("google-sub-1"),

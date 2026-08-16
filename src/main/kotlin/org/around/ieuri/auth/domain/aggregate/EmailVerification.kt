@@ -48,10 +48,15 @@ class EmailVerification private constructor(
     val targetEmailEncrypted: String?,
 ) {
     init {
-        // purpose와 대상의 짝이 맞는지는 DB 제약(V42)과 같은 규칙이다. 도메인에서도 막아
+        // purpose와 대상의 짝이 맞는지는 DB 제약(V63)과 같은 규칙이다. 도메인에서도 막아
         // 잘못 만든 챌린지가 저장소까지 가지 않게 한다.
-        require((purpose == VerificationPurpose.EMAIL_CHANGE) == (targetEmailEncrypted != null)) {
-            "이메일 변경 챌린지는 대상 주소가 있어야 하고, 가입 챌린지는 없어야 합니다."
+        //
+        // **가입 챌린지도 대상을 가질 수 있다**(SPEC-0024 R7). 인증 주소를 정정하면 새 주소는
+        // 소유를 증명하기 전까지 회원 행이 아니라 이 챌린지가 들고 있다 — 즉시 반영하면
+        // 증명되지 않은 주소가 `(provider, email)` 유니크를 선점한다. 정정하지 않은 최초 가입·
+        // 단순 재발송은 회원이 이미 그 주소를 갖고 있어 null이다.
+        require(purpose != VerificationPurpose.EMAIL_CHANGE || targetEmailEncrypted != null) {
+            "이메일 변경 챌린지는 대상 주소가 있어야 합니다."
         }
     }
 

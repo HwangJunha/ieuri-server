@@ -12,6 +12,7 @@ import org.around.ieuri.auth.application.event.PasswordResetRequested
 import org.around.ieuri.auth.application.event.VerificationEmailRequested
 import org.around.ieuri.auth.application.exception.MemberAlreadyRegisteredException
 import org.around.ieuri.auth.application.exception.MemberNotFoundException
+import org.around.ieuri.auth.application.exception.ResendCooldownActiveException
 import org.around.ieuri.auth.application.exception.VerificationNotFoundException
 import org.around.ieuri.auth.application.exception.VerificationRateLimitedException
 import org.around.ieuri.auth.application.policy.VerificationPolicy
@@ -30,6 +31,7 @@ import org.around.ieuri.auth.application.port.out.persistence.MemberRepositoryPo
 import org.around.ieuri.auth.application.port.out.persistence.PasswordResetRepositoryPort
 import org.around.ieuri.auth.application.port.out.persistence.RoleRepositoryPort
 import org.around.ieuri.auth.application.port.out.persistence.TermsRepositoryPort
+import org.around.ieuri.auth.application.port.out.security.EmailEncryptorPort
 import org.around.ieuri.auth.application.port.out.security.LoginIdentifierProtectorPort
 import org.around.ieuri.auth.application.port.out.security.PasswordEncoderPort
 import org.around.ieuri.auth.application.port.out.security.VerificationCodeGeneratorPort
@@ -77,6 +79,7 @@ class MemberRegistrationService(
     private val profileRepository: MemberProfileRepositoryPort,
     private val nicknameGenerator: NicknameGenerator,
     private val identifierProtector: LoginIdentifierProtectorPort,
+    private val emailEncryptor: EmailEncryptorPort,
     private val providerTokenCollector: ProviderTokenCollector,
     private val emailUniqueness: ProviderEmailUniqueness,
     private val clock: Clock,
@@ -245,6 +248,10 @@ class MemberRegistrationService(
 
         return when (result) {
             is VerificationResult.Success -> {
+                // 주소를 정정한 챌린지면 여기서 회원의 이메일이 확정된다(R7-5).
+                // 정정 시점이 아니라 이 시점인 이유는 소유를 증명하기 전에는 유니크를
+                // 선점시키지 않기 위해서다.
+                verification.targetEmailEncrypted?.let { applyRetargetedEmail(verification.memberId, it) }
                 memberRepository.markEmailVerified(verification.memberId, now)
                 auditLog.record(
                     memberId = verification.memberId,
@@ -265,7 +272,9 @@ class MemberRegistrationService(
             ?: throw VerificationNotFoundException("유효하지 않은 검증 요청입니다.")
 
         val memberId = existing.memberId
-        ensureResendCooldownPassed(memberId, now)
+        if (!ensureResendCooldownPassed(memberId, now)) {
+            throw VerificationRateLimitedException("잠시 후 다시 시도해 주세요.")
+        }
 
         // 이전 활성 챌린지 폐기 후 새 코드 발급. **가입 인증 목적만** 폐기한다 —
         // 같은 회원이 이메일 변경 검증을 동시에 대기 중일 수 있다.
@@ -289,6 +298,11 @@ class MemberRegistrationService(
      * `Provider.EMAIL` 전용이고(R6), 이쪽은 아직 인증되지 않은 대기 주소를 고치는 것이라
      * provider를 가리지 않는다. 인증을 마치면 이 경로는 닫힌다(R7-2).
      *
+     * **회원의 이메일은 아직 바뀌지 않는다.** 새 주소는 챌린지가 암호문으로 들고 있다가
+     * 코드 검증을 통과할 때 반영된다(`verifyEmail`) — `changeEmail`과 같은 구조다.
+     * 즉시 반영하면 소유를 증명하지 않은 주소가 `(provider, email)` 유니크를 선점해, 그
+     * 주소의 진짜 주인이 가입하지 못한다. 정정을 반복하면 임의의 주소를 막을 수 있다.
+     *
      * 쿨다운은 `resendVerification`과 **같은 창을 공유한다**(R7-3). 별도 창을 주면 주소를
      * 바꿔가며 메일 발송을 무제한으로 유발할 수 있다.
      */
@@ -300,22 +314,15 @@ class MemberRegistrationService(
         val member = memberRepository.load(command.memberId)
             ?: throw MemberNotFoundException("회원을 찾을 수 없습니다.")
 
-        // 인증 완료 회원의 호출은 도메인이 거부한다(R7-2). 정정된 회원은 인증 상태가 그대로 거짓이다.
-        val retargeted = member.retargetPendingEmail(newEmail)
+        // 인증 완료 회원의 호출은 도메인이 거부한다(R7-2).
+        member.retargetPendingEmail(newEmail)
 
         emailUniqueness.ensureAvailable(member.provider, newEmail, excludingMemberId = command.memberId)
-        ensureResendCooldownPassed(command.memberId, now)
-
-        // `Provider.EMAIL` 회원은 provider_user_id가 곧 이메일의 HMAC이라 함께 바뀌어야
-        // 다음 로그인이 성립한다(SPEC-0011 R7·R8). SNS는 provider가 준 값이라 건드리지 않는다.
-        val protectedIdentifier =
-            if (member.provider == Provider.EMAIL) identifierProtector.protect(newEmail.value) else null
-        memberRepository.updateEmail(
-            memberId = command.memberId,
-            newEmail = retargeted.email,
-            emailIdentifier = emailUniqueness.identifierOf(newEmail),
-            protectedIdentifier = protectedIdentifier,
-        )
+        // 계약이 이 오퍼레이션에 지정한 코드는 RESEND_COOLDOWN_ACTIVE다 —
+        // 재발송(VERIFICATION_RATE_LIMITED)과 창은 공유하되 클라이언트 화면이 달라 코드를 나눈다.
+        if (!ensureResendCooldownPassed(command.memberId, now)) {
+            throw ResendCooldownActiveException("잠시 후 다시 시도해 주세요.")
+        }
 
         // 이전 주소로 발급된 가입 인증 코드를 무효화한다(R7-1). 다른 목적은 건드리지 않는다.
         verificationRepository.consumeActiveByMemberIdAndPurpose(
@@ -323,16 +330,19 @@ class MemberRegistrationService(
             VerificationPurpose.REGISTRATION,
             now,
         )
-        val verification = issueRegistrationChallenge(command.memberId, newEmail, now)
+        // 대상 주소는 검증 통과 전에도 개인정보라 암호문으로만 저장한다(POL-012).
+        val verification = issueRegistrationChallenge(
+            memberId = command.memberId,
+            toEmail = newEmail,
+            now = now,
+            targetEmailEncrypted = emailEncryptor.encrypt(newEmail.value),
+        )
 
         // 주소 자체는 남기지 않는다(POL-013) — 무엇이 바뀌었는지는 회원 데이터가 갖는다.
         auditLog.record(
             memberId = command.memberId,
             eventType = "EMAIL_VERIFICATION_RETARGETED",
-            payload = mapOf(
-                "provider" to member.provider.name,
-                "loginIdentifierUpdated" to (protectedIdentifier != null),
-            ),
+            payload = mapOf("provider" to member.provider.name),
         )
 
         return RetargetEmailVerificationResult(
@@ -342,24 +352,32 @@ class MemberRegistrationService(
     }
 
     /**
-     * 가입 인증 재발송 쿨다운(R7-3). `resendVerification`과 인증 주소 재입력이 한 창을 공유한다.
-     * 용도별로 세므로 진행 중인 이메일 변경 검증이 이 창을 막지 않는다.
+     * 가입 인증 재발송 쿨다운이 지났는지(R7-3). `resendVerification`과 인증 주소 재입력이
+     * **한 창을 공유한다** — 창을 나누면 주소를 바꿔가며 메일 발송을 무제한으로 유발할 수 있다.
+     * 용도별로 세므로 진행 중인 이메일 변경 검증이 이 창을 막지는 않는다.
+     *
+     * 던지지 않고 판정만 돌려주는 이유는 두 호출부의 오류 코드가 다르기 때문이다 —
+     * 재발송은 `VERIFICATION_RATE_LIMITED`, 주소 재입력은 `RESEND_COOLDOWN_ACTIVE`(계약).
      */
-    private fun ensureResendCooldownPassed(memberId: Long, now: java.time.Instant) {
+    private fun ensureResendCooldownPassed(memberId: Long, now: java.time.Instant): Boolean {
         val lastCreatedAt = verificationRepository.findLatestCreatedAtByMemberIdAndPurpose(
             memberId,
             VerificationPurpose.REGISTRATION,
         )
-        if (lastCreatedAt != null && lastCreatedAt.plus(verificationPolicy.resendCooldown).isAfter(now)) {
-            throw VerificationRateLimitedException("잠시 후 다시 시도해 주세요.")
-        }
+        return lastCreatedAt == null || !lastCreatedAt.plus(verificationPolicy.resendCooldown).isAfter(now)
     }
 
-    /** 가입 인증 코드를 발급하고 평문 코드를 이벤트로만 전달한다(AFTER_COMMIT 발송). */
+    /**
+     * 가입 인증 코드를 발급하고 평문 코드를 이벤트로만 전달한다(AFTER_COMMIT 발송).
+     *
+     * [targetEmailEncrypted]는 주소 정정(R7)에서만 채워진다 — 통과 시 회원의 이메일로 확정될
+     * 대기 주소다. 최초 가입·단순 재발송은 회원이 이미 그 주소를 갖고 있어 null이다.
+     */
     private fun issueRegistrationChallenge(
         memberId: Long,
         toEmail: Email,
         now: java.time.Instant,
+        targetEmailEncrypted: String? = null,
     ): EmailVerification {
         val plainCode = codeGenerator.generate()
         val verification = EmailVerification.issue(
@@ -369,10 +387,33 @@ class MemberRegistrationService(
             ttl = verificationPolicy.ttl,
             now = now,
             maxAttempts = verificationPolicy.maxAttempts,
+            targetEmailEncrypted = targetEmailEncrypted,
         )
         verificationRepository.save(verification)
         eventPublisher.publish(VerificationEmailRequested(toEmail.value, plainCode))
         return verification
+    }
+
+    /**
+     * 정정된 주소를 회원에게 확정한다(R7-5). `Provider.EMAIL` 회원은 provider_user_id가 곧
+     * 이메일의 HMAC이라 함께 바뀌어야 다음 로그인이 성립한다(SPEC-0011 R7·R8).
+     * SNS는 provider가 준 값이라 건드리지 않는다.
+     */
+    private fun applyRetargetedEmail(memberId: Long, targetEmailEncrypted: String) {
+        val member = memberRepository.load(memberId)
+            ?: throw MemberNotFoundException("회원을 찾을 수 없습니다.")
+        val newEmail = Email(emailEncryptor.decrypt(targetEmailEncrypted))
+        // 발급 후 확정 사이에 다른 회원이 그 주소를 가져갔을 수 있다.
+        emailUniqueness.ensureAvailable(member.provider, newEmail, excludingMemberId = memberId)
+
+        val protectedIdentifier =
+            if (member.provider == Provider.EMAIL) identifierProtector.protect(newEmail.value) else null
+        memberRepository.updateEmail(
+            memberId = memberId,
+            newEmail = newEmail,
+            emailIdentifier = emailUniqueness.identifierOf(newEmail),
+            protectedIdentifier = protectedIdentifier,
+        )
     }
 
     @Transactional

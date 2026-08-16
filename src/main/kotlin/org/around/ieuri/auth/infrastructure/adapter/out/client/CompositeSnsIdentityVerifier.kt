@@ -58,7 +58,6 @@ class CompositeSnsIdentityVerifier(
         return SnsIdentity(
             providerUserId = providerUserId,
             email = stringOrNull("email"),
-            emailVerified = booleanOrFalse("email_verified"),
             nickname = firstStringOrNull("nickname", "name", "given_name"),
             profileImageUrl = firstStringOrNull("picture", "profile_image_url"),
         )
@@ -70,10 +69,4 @@ class CompositeSnsIdentityVerifier(
     private fun JWTClaimsSet.firstStringOrNull(vararg names: String): String? =
         names.firstNotNullOfOrNull { stringOrNull(it) }
 
-    private fun JWTClaimsSet.booleanOrFalse(name: String): Boolean =
-        when (val v = getClaim(name)) {
-            is Boolean -> v
-            is String -> v.toBoolean()
-            else -> false
-        }
 }

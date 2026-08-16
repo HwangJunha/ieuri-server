@@ -17,7 +17,6 @@ interface SnsIdentityVerifierPort {
 data class SnsIdentity(
     val providerUserId: String,
     val email: String?,
-    val emailVerified: Boolean,
     val nickname: String?,
     val profileImageUrl: String?,
 )

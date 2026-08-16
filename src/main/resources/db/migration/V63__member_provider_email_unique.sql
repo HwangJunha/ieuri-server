@@ -25,6 +25,11 @@
 -- 그래서 세 덩어리를 함께 지운다.
 --
 -- 삭제 순서는 FK를 따른다(자식 먼저). `member_audit_log`는 FK가 없고 감사 이력이라 보존한다.
+--
+-- **`R__seed_community.sql`이 이 뒤에 돈다.** Flyway는 반복 마이그레이션을 버전 마이그레이션
+-- 뒤에 적용하므로, 시드가 회원 12~20을 참조하는 글을 다시 넣는다. 컨텍스트 간 FK가 없어
+-- 오류는 나지 않지만 개발 DB에는 매칭되지 않는 참조가 남는다. 운영에는 시드가 나가지 않아
+-- 문제가 되지 않으며, 로컬에서 정합성이 필요하면 시드를 실제 회원 id로 다시 맞춰야 한다.
 
 -- community — 참조하는 쪽부터.
 DELETE FROM community.community_message_report_item;
@@ -68,3 +73,15 @@ COMMENT ON COLUMN auth.member.email_identifier IS
 -- 요청 중 하나는 여기서 걸린다.
 ALTER TABLE auth.member ADD CONSTRAINT uq_member_provider_email
     UNIQUE (provider, email_identifier);
+
+-- ── 4. 가입 챌린지도 대상 주소를 가질 수 있다 (R7) ────────────────
+--
+-- V42는 "EMAIL_CHANGE면 대상이 있고, REGISTRATION이면 없다"를 강제했다. 인증 주소 재입력이
+-- 생기면서 후자가 성립하지 않는다 — 정정된 주소는 소유를 증명하기 전까지 회원 행이 아니라
+-- 챌린지가 들고 있어야 한다. 즉시 회원 행에 쓰면 증명되지 않은 주소가 위 유니크를 선점해,
+-- 그 주소의 진짜 주인이 가입하지 못한다.
+--
+-- 남는 규칙은 "EMAIL_CHANGE는 대상이 반드시 있다" 한쪽뿐이다.
+ALTER TABLE auth.email_verification DROP CONSTRAINT ck_ev_target_email;
+ALTER TABLE auth.email_verification ADD CONSTRAINT ck_ev_target_email
+    CHECK (purpose <> 'EMAIL_CHANGE' OR target_email_encrypted IS NOT NULL);

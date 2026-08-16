@@ -12,7 +12,7 @@ package org.around.ieuri.common.security
 object EmailVerificationGate {
 
     /**
-     * 인증을 마치지 않은 회원도 호출할 수 있는 오퍼레이션.
+     * 스펙 R9가 지정한 일곱 개. 인증 화면에서 실제로 쓰는 오퍼레이션이다.
      *
      * `withdrawMember`·`logout`은 **인증 화면에 갇힌 회원의 탈출구**다. 없으면 잘못된 주소로
      * 가입한 회원이 계정을 버릴 수도, 쓸 수도 없는 상태가 된다.
@@ -20,7 +20,7 @@ object EmailVerificationGate {
      * `refreshToken`은 세션 유지 때문이다. accessToken 만료가 5분이라(POL-008) 갱신을 막으면
      * 인증 코드를 입력하는 도중 세션이 끊긴다.
      */
-    val ALLOWED_OPERATIONS: Set<String> = setOf(
+    private val VERIFICATION_SCREEN_OPERATIONS: Set<String> = setOf(
         "me",
         "verifyEmail",
         "resendVerification",
@@ -29,6 +29,27 @@ object EmailVerificationGate {
         "refreshToken",
         "logout",
     )
+
+    /**
+     * 인증 이전 단계의 오퍼레이션. **토큰의 주체를 읽지 않으므로 미인증 회원의 토큰이 붙어
+     * 있어도 판정 대상이 아니다.**
+     *
+     * 게이트는 "주체가 있는가"로 걸리는데, JWT 필터는 오퍼레이션을 가리지 않고 유효한 토큰이면
+     * 주체를 세운다. 그래서 미인증 회원이 **다른 계정으로 로그인**하려 할 때 이전 토큰이 남아
+     * 있으면 `loginEmail`이 게이트에 막힌다 — R8이 미인증 회원에게 오래 쓰는 토큰을 주기로 한
+     * 이상 실제로 밟는 경로다. 목록에 없으면 탈출구가 탈퇴·로그아웃뿐이 된다.
+     */
+    private val PRE_AUTH_OPERATIONS: Set<String> = setOf(
+        "loginEmail",
+        "loginSns",
+        "registerEmailMember",
+        "registerSnsMember",
+        "requestPasswordReset",
+        "resetPassword",
+        "authHealth",
+    )
+
+    val ALLOWED_OPERATIONS: Set<String> = VERIFICATION_SCREEN_OPERATIONS + PRE_AUTH_OPERATIONS
 
     /**
      * [rootFieldNames]의 오퍼레이션을 인증 상태 [emailVerified]로 호출해도 되는지.

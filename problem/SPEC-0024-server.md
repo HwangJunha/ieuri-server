@@ -47,6 +47,14 @@ providerEmailVerified && providerEmail != null && providerEmail == submittedEmai
 
 `Provider.EMAIL` 회원의 경우 이메일이 곧 식별자이므로(`provider_user_id` = 정규화 이메일의 HMAC, SPEC-0012 R1), 주소 정정은 **식별자 재계산을 동반**합니다. SNS 회원은 식별자가 provider가 준 id이므로 이메일만 바뀝니다. SPEC-0011 R7이 이미 `updateEmail(memberId, newEmail, protectedIdentifier)` 형태로 이 비대칭을 다루고 있으므로 같은 형태를 따릅니다 — SNS는 `null`을 전달합니다.
 
+> **[구현 변경 · 2026-08-17] 정정 시점이 아니라 인증 통과 시점에 반영합니다.**
+>
+> 착수 시 설계는 정정 요청 즉시 회원의 이메일을 바꾸는 것이었으나, 구현 리뷰에서 **주소 선점**이 드러나 바꿨습니다. R5의 `(provider, email)` 유니크는 회원 행을 기준으로 판정하므로, 소유를 증명하지 않은 주소를 즉시 회원 행에 쓰면 그 주소가 곧바로 선점됩니다. 미인증 회원이 정정을 반복하면 임의의 주소로 타인의 가입을 막을 수 있고, 게이트(R9)는 본인의 앱 사용만 막을 뿐 이 피해를 막지 못합니다. `Provider.EMAIL` 회원은 `provider_user_id`까지 함께 옮겨가 원래 주소로 로그인할 수도 없게 됩니다.
+>
+> 그래서 **`EmailChangeService`의 선례를 따릅니다** — 새 주소를 `EmailVerification.targetEmailEncrypted`에 암호문으로 두고(POL-012), `verifyEmail`이 통과할 때 회원에게 확정합니다. 이 구조가 이미 이메일 변경에 있으므로 새 장치를 만들지 않았습니다.
+>
+> 부수 변경: V42의 `ck_ev_target_email`이 "REGISTRATION이면 대상이 없다"를 강제하고 있어 V63에서 완화했습니다. 남는 규칙은 "EMAIL_CHANGE는 대상이 반드시 있다" 한쪽입니다. 도메인 `EmailVerification`의 `init` 불변식도 같이 맞췄습니다.
+
 ## 3. 애플리케이션
 
 ### 로그인 (R8)
@@ -93,6 +101,14 @@ mutation logout
 ```
 
 `withdrawMember`와 `logout`이 들어가는 이유는 인증 화면에 갇힌 회원의 탈출구이기 때문입니다. 이것이 없으면 잘못된 주소로 가입한 회원이 계정을 버릴 수도, 쓸 수도 없는 상태가 됩니다.
+
+> **[구현 추가 · 2026-08-17] 인증 이전 단계 오퍼레이션 7개를 함께 통과시킵니다.**
+>
+> `loginEmail` · `loginSns` · `registerEmailMember` · `registerSnsMember` · `requestPasswordReset` · `resetPassword` · `authHealth`.
+>
+> 게이트는 "주체가 있는가"로 걸리는데, JWT 필터는 오퍼레이션을 가리지 않고 유효한 토큰이면 주체를 세웁니다. R8이 미인증 회원에게 오래 쓰는 토큰을 주기로 한 이상, 그 토큰을 든 채 **다른 계정으로 로그인**하려는 요청이 `loginEmail`에서 `EMAIL_NOT_VERIFIED`로 막힙니다. 목록에 없으면 탈출구가 탈퇴·로그아웃뿐이 됩니다.
+>
+> 이 7개는 토큰의 주체를 읽지 않으므로 통과시켜도 접근 범위가 넓어지지 않습니다. 스펙 R9의 "일곱 가지"는 **인증 화면이 쓰는 오퍼레이션**의 목록이고, 이 추가분은 그와 다른 축이라 코드에서도 두 집합을 나눠 두었습니다.
 
 `refreshToken`은 세션 유지 때문입니다. accessToken 만료가 5분이므로(POL-008) 갱신을 막으면 인증 코드를 입력하는 도중 세션이 끊깁니다. R8이 미인증 회원에게 토큰을 발급하기로 한 이상, 그 토큰이 갱신 가능해야 의미가 있습니다.
 
@@ -167,3 +183,13 @@ SPEC-0012 R3 마이그레이션(`V39__ProtectEmailLoginIdentifier`)이 실제 DB
 서버가 이 괴리를 감지할 수는 있습니다 — 제출값과 provider 값이 다르면 로그를 남기는 정도입니다(POL-047의 마스킹 형식 적용). 요청을 거부하지는 않습니다. 거부하면 R12가 조용히 무시하기로 한 값 때문에 가입이 실패하게 되어, 클라이언트 버그가 가입 장애로 번집니다.
 
 근본 해결은 클라이언트가 R1을 지키는 것입니다. 서버는 저장값의 정확성만 보장합니다.
+
+## 9. 변경 이력
+
+| 날짜 | 변경 | 사유 |
+|---|---|---|
+| 2026-08-17 | 최초 작성 | 플래너 |
+| 2026-08-17 | §2 R7 — 정정 주소를 **인증 통과 시점에** 반영하도록 변경(챌린지가 암호문으로 보유). V42의 `ck_ev_target_email`을 V63에서 완화 | 즉시 반영하면 소유를 증명하지 않은 주소가 R5 유니크를 선점해 타인의 가입을 막는다. 구현 리뷰에서 발견 |
+| 2026-08-17 | §4 R9 — 인증 이전 단계 오퍼레이션 7개를 허용 목록에 추가 | 미인증 회원의 토큰이 남은 채 다른 계정으로 로그인하려는 경로가 막혔다. 스펙의 "일곱 가지"(인증 화면용)와는 다른 축이라 코드에서 집합을 분리 |
+| 2026-08-17 | §4 — 게이트가 `AbortExecutionException`을 던지도록 변경 | `Instrumentation`은 DataFetcher 바깥이라 `DataFetcherExceptionHandler`가 보지 못한다. 평범한 `RuntimeException`은 `execute()` 밖으로 새어 나가 `EMAIL_NOT_VERIFIED`가 클라이언트에 도달하지 않았다(graphql-java 25.0에서 실측 확인) |
+| 2026-08-17 | §3 R7 — 쿨다운 거부 코드를 `RESEND_COOLDOWN_ACTIVE`로 확정 | 계약(`contract.graphql`)의 오류 표가 이 오퍼레이션에 지정한 코드다. 재발송(`VERIFICATION_RATE_LIMITED`)과 창은 공유하되 코드는 나뉜다 |

@@ -1,6 +1,7 @@
 package org.around.ieuri.common.graphql
 
 import graphql.ExecutionResult
+import graphql.execution.AbortExecutionException
 import graphql.execution.instrumentation.Instrumentation
 import graphql.execution.instrumentation.InstrumentationContext
 import graphql.execution.instrumentation.InstrumentationState
@@ -12,9 +13,9 @@ import graphql.language.FragmentSpread
 import graphql.language.InlineFragment
 import graphql.language.SelectionSet
 import org.around.ieuri.common.security.CurrentMemberProvider
-import org.around.ieuri.common.security.EmailNotVerifiedException
 import org.around.ieuri.common.security.EmailVerificationGate
 import org.around.ieuri.common.security.EmailVerificationStatusPort
+import org.around.ieuri.common.security.SecurityGraphQLError
 import org.springframework.stereotype.Component
 
 /**
@@ -50,7 +51,19 @@ class EmailVerificationGateInstrumentation(
                 context.fragmentsByName,
             )
             if (!EmailVerificationGate.isAllowed(rootFields, emailVerificationStatus.isEmailVerified(memberId))) {
-                throw EmailNotVerifiedException("이메일 인증이 필요합니다. 메일함의 인증 코드를 확인해 주세요.")
+                // **`AbortExecutionException`이어야 한다.** 이 지점은 DataFetcher 바깥이라
+                // `DataFetcherExceptionHandler`가 보지 못하고, graphql-java가 errors[]로
+                // 바꿔 주는 예외는 이 타입 하나뿐이다(GraphQL.java의 유일한 catch).
+                // 평범한 RuntimeException은 execute() 밖으로 그대로 새어 나가 클라이언트가
+                // 코드를 읽지 못한다 — `GraphQLError` 구현만으로도 부족하다.
+                throw AbortExecutionException(
+                    listOf(
+                        SecurityGraphQLError(
+                            message = "이메일 인증이 필요합니다. 메일함의 인증 코드를 확인해 주세요.",
+                            code = EMAIL_NOT_VERIFIED,
+                        ),
+                    ),
+                )
             }
         }
         return SimpleInstrumentationContext.noOp()
@@ -76,4 +89,9 @@ class EmailVerificationGateInstrumentation(
                 else -> emptyList()
             }
         }
+
+    private companion object {
+        /** 코드 문자열은 SPEC-0024 이전과 같다. 위치만 payload에서 최상위 오류로 옮겼다. */
+        const val EMAIL_NOT_VERIFIED = "EMAIL_NOT_VERIFIED"
+    }
 }

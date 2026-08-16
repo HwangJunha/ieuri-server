@@ -10,6 +10,7 @@ import org.around.ieuri.auth.application.command.VerifyEmailCommand
 import org.around.ieuri.auth.application.event.VerificationEmailRequested
 import org.around.ieuri.auth.application.exception.EmailAlreadyInUseException
 import org.around.ieuri.auth.application.exception.MemberAlreadyRegisteredException
+import org.around.ieuri.auth.application.exception.ResendCooldownActiveException
 import org.around.ieuri.auth.application.exception.VerificationNotFoundException
 import org.around.ieuri.auth.application.exception.VerificationRateLimitedException
 import org.around.ieuri.auth.application.policy.VerificationPolicy
@@ -31,6 +32,7 @@ import org.around.ieuri.auth.application.port.out.persistence.EmailAuthenticatio
 import org.around.ieuri.auth.application.port.out.persistence.MemberProfileRepositoryPort
 import org.around.ieuri.auth.application.port.out.persistence.PasswordResetRepositoryPort
 import org.around.ieuri.auth.application.port.out.persistence.TermsView
+import org.around.ieuri.auth.application.port.out.security.EmailEncryptorPort
 import org.around.ieuri.auth.application.port.out.security.LoginIdentifierProtectorPort
 import org.around.ieuri.auth.application.port.out.security.PasswordEncoderPort
 import org.around.ieuri.auth.application.port.out.security.VerificationCodeGeneratorPort
@@ -83,6 +85,12 @@ class MemberRegistrationServiceTest {
         override fun protect(normalizedIdentifier: String) = "protected:$normalizedIdentifier"
     }
 
+    /** 암호화 스텁: 되돌릴 수 있고 평문과 구분되게 접두사만 붙인다(실제 AES는 어댑터 관심사). */
+    private val emailEncryptor = object : EmailEncryptorPort {
+        override fun encrypt(plaintext: String) = "enc:$plaintext"
+        override fun decrypt(ciphertext: String) = ciphertext.removePrefix("enc:")
+    }
+
     private val tokenExchanger = mockk<SnsTokenExchangerPort>()
 
     // 교환·저장 로직이 실제로 실행되도록 목이 아니라 실제 인스턴스를 조립한다.
@@ -102,7 +110,8 @@ class MemberRegistrationServiceTest {
     private val service = MemberRegistrationService(
         snsVerifier, memberRepository, roleRepository, termsRepository, verificationRepository,
         passwordResetRepository, refreshTokenStore, codeGenerator, auditLog, eventPublisher, policy, passwordEncoder,
-        profileRepository, nicknameGenerator, identifierProtector, providerTokenCollector, emailUniqueness, clock,
+        profileRepository, nicknameGenerator, identifierProtector, emailEncryptor, providerTokenCollector,
+        emailUniqueness, clock,
     )
 
     private val activeTerms = listOf(
@@ -111,8 +120,8 @@ class MemberRegistrationServiceTest {
         TermsView(3, "MARKETING", "1.0", required = false),
     )
 
-    private fun identity(email: String? = "user@example.com", verified: Boolean = true) =
-        SnsIdentity("google-sub-1", email, verified, "여행자", null)
+    private fun identity(email: String? = "user@example.com") =
+        SnsIdentity("google-sub-1", email, "여행자", null)
 
     private fun command(email: String = "user@example.com") = RegisterMemberCommand(
         provider = Provider.GOOGLE,
@@ -546,10 +555,13 @@ class MemberRegistrationServiceTest {
         verify(exactly = 0) {
             verificationRepository.consumeActiveByMemberIdAndPurpose(100L, VerificationPurpose.EMAIL_CHANGE, any())
         }
-        // R7-5 — 회원의 이메일이 정정된 주소로 확정된다.
-        // Email은 value class라 MockK가 소거된 String으로 본다 — 그래서 VO가 아니라 문자열로 맞춘다.
-        verify { memberRepository.updateEmail(100L, Email("right@example.com"), any(), any()) }
-        // 포트가 `publish(event: Any)`라 슬롯도 Any로 받는다.
+        // **아직 회원의 이메일을 바꾸지 않는다** — 소유를 증명하기 전에 유니크를 선점시키지 않는다.
+        verify(exactly = 0) { memberRepository.updateEmail(any(), any(), any(), any()) }
+        // 새 주소는 챌린지가 암호문으로 들고 있다가 verifyEmail 통과 시 확정된다.
+        val issued = slot<EmailVerification>()
+        verify { verificationRepository.save(capture(issued)) }
+        assertEquals("enc:right@example.com", issued.captured.targetEmailEncrypted)
+        // 코드는 새 주소로 간다. 포트가 `publish(event: Any)`라 슬롯도 Any로 받는다.
         val sent = slot<Any>()
         verify { eventPublisher.publish(capture(sent)) }
         assertEquals("right@example.com", (sent.captured as VerificationEmailRequested).toEmail)
@@ -576,7 +588,8 @@ class MemberRegistrationServiceTest {
             verificationRepository.findLatestCreatedAtByMemberIdAndPurpose(100L, VerificationPurpose.REGISTRATION)
         } returns clock.instant().minusSeconds(30)
 
-        assertFailsWith<VerificationRateLimitedException> {
+        // 계약이 이 오퍼레이션에 지정한 코드다 — 재발송과 창은 공유하되 코드는 나뉜다.
+        assertFailsWith<ResendCooldownActiveException> {
             service.retargetEmailVerification(RetargetEmailVerificationCommand(100L, "right@example.com"))
         }
         verify(exactly = 0) { verificationRepository.save(any()) }
@@ -597,31 +610,67 @@ class MemberRegistrationServiceTest {
         verify(exactly = 0) { memberRepository.updateEmail(any(), any(), any(), any()) }
     }
 
-    /** SNS 회원은 provider_user_id가 provider가 준 값이라 건드리지 않는다. */
+    /** 정정한 주소를 담은 챌린지. verifyEmail이 통과시키면 이 주소가 회원에게 확정된다. */
+    private fun retargetChallenge(target: String = "right@example.com") = EmailVerification.issue(
+        publicId = verifyPublicId,
+        memberId = 100L,
+        codeHash = "correct",
+        ttl = java.time.Duration.ofMinutes(10),
+        now = clock.instant(),
+        maxAttempts = 5,
+        targetEmailEncrypted = "enc:$target",
+    )
+
+    /** R7-5. 정정된 주소는 **코드 검증을 통과할 때** 회원에게 확정된다. */
     @Test
-    fun `SNS 회원의 주소 정정은 로그인 식별자를 바꾸지 않는다`() {
+    fun `정정한 주소는 인증을 통과할 때 회원에게 확정된다`() {
+        every { verificationRepository.findByPublicId(verifyPublicId) } returns retargetChallenge()
+        every { codeGenerator.hash("123456") } returns "correct"
         every { memberRepository.load(100L) } returns pendingMember(provider = Provider.KAKAO)
         every { memberRepository.existsByProviderAndEmailIdentifier(any(), any(), any()) } returns false
-        every { verificationRepository.findLatestCreatedAtByMemberIdAndPurpose(any(), any()) } returns null
-        every { codeGenerator.generate() } returns "123456"
-        every { codeGenerator.hash("123456") } returns "hashed"
 
-        service.retargetEmailVerification(RetargetEmailVerificationCommand(100L, "right@example.com"))
+        val result = service.verifyEmail(VerifyEmailCommand(verifyPublicId, "123456"))
+
+        assertTrue(result.verified)
+        verify { memberRepository.updateEmail(100L, Email("right@example.com"), any(), any()) }
+        verify { memberRepository.markEmailVerified(100L, any()) }
+    }
+
+    /** SNS 회원은 provider_user_id가 provider가 준 값이라 건드리지 않는다. */
+    @Test
+    fun `SNS 회원의 주소 확정은 로그인 식별자를 바꾸지 않는다`() {
+        every { verificationRepository.findByPublicId(verifyPublicId) } returns retargetChallenge()
+        every { codeGenerator.hash("123456") } returns "correct"
+        every { memberRepository.load(100L) } returns pendingMember(provider = Provider.KAKAO)
+        every { memberRepository.existsByProviderAndEmailIdentifier(any(), any(), any()) } returns false
+
+        service.verifyEmail(VerifyEmailCommand(verifyPublicId, "123456"))
 
         verify { memberRepository.updateEmail(100L, any(), any(), null) }
     }
 
     /** EMAIL 회원은 이메일이 곧 식별자라 함께 바뀌어야 다음 로그인이 성립한다. */
     @Test
-    fun `EMAIL 회원의 주소 정정은 로그인 식별자도 함께 바꾼다`() {
+    fun `EMAIL 회원의 주소 확정은 로그인 식별자도 함께 바꾼다`() {
+        every { verificationRepository.findByPublicId(verifyPublicId) } returns retargetChallenge()
+        every { codeGenerator.hash("123456") } returns "correct"
         every { memberRepository.load(100L) } returns pendingMember(provider = Provider.EMAIL)
         every { memberRepository.existsByProviderAndEmailIdentifier(any(), any(), any()) } returns false
-        every { verificationRepository.findLatestCreatedAtByMemberIdAndPurpose(any(), any()) } returns null
-        every { codeGenerator.generate() } returns "123456"
-        every { codeGenerator.hash("123456") } returns "hashed"
 
-        service.retargetEmailVerification(RetargetEmailVerificationCommand(100L, "right@example.com"))
+        service.verifyEmail(VerifyEmailCommand(verifyPublicId, "123456"))
 
         verify { memberRepository.updateEmail(100L, any(), any(), "protected:right@example.com") }
+    }
+
+    /** 정정하지 않은 보통 가입 챌린지는 이메일을 건드리지 않는다. */
+    @Test
+    fun `대상 주소가 없는 챌린지는 이메일을 바꾸지 않는다`() {
+        every { verificationRepository.findByPublicId(verifyPublicId) } returns challenge(codeHash = "correct")
+        every { codeGenerator.hash("123456") } returns "correct"
+
+        service.verifyEmail(VerifyEmailCommand(verifyPublicId, "123456"))
+
+        verify(exactly = 0) { memberRepository.updateEmail(any(), any(), any(), any()) }
+        verify { memberRepository.markEmailVerified(any(), any()) }
     }
 }

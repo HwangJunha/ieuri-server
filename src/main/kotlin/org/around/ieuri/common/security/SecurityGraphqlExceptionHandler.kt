@@ -35,8 +35,6 @@ class SecurityGraphqlExceptionHandler(
         val code = when (val ex = parameters.exception) {
             is UnauthorizedException -> "UNAUTHENTICATED"
             is ForbiddenException -> "FORBIDDEN"
-            // 미인증 게이트(SPEC-0024 R9). 인증류 선행 조건이라 위 둘과 같은 표면으로 낸다.
-            is EmailNotVerifiedException -> "EMAIL_NOT_VERIFIED"
             // 두 도메인이 함께 쓰는 조회 인자 오류. 여기서 코드를 실어야 클라이언트가 분기한다.
             is EmptyCategorySetException -> ex.code
             else -> return delegate.handleException(parameters)
@@ -54,10 +52,17 @@ class SecurityGraphqlExceptionHandler(
     }
 }
 
-private class SecurityGraphQLError(
+/**
+ * 코드를 extensions에 싣는 최상위 오류(POL-016).
+ *
+ * `internal`인 이유는 미인증 게이트가 이 형태를 재사용하기 때문이다 — 게이트는
+ * DataFetcher 바깥(Instrumentation)에서 거절하므로 이 핸들러를 거치지 못하고
+ * 오류 객체를 직접 만들어 던진다. 두 곳이 extensions 모양을 따로 갖지 않게 한다.
+ */
+internal class SecurityGraphQLError(
     private val message: String,
-    private val path: ResultPath?,
-    private val location: SourceLocation?,
+    private val path: ResultPath? = null,
+    private val location: SourceLocation? = null,
     private val code: String,
 ) : GraphQLError {
 

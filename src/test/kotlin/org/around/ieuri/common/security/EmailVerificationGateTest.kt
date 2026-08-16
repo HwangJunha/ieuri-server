@@ -23,7 +23,7 @@ class EmailVerificationGateTest {
             "refreshToken",
             "logout",
         )
-        // 스펙이 못박은 개수다 — 목록이 조용히 늘어나면 여기서 걸린다.
+        // 스펙 R9가 못박은 일곱 개다 — 이 목록이 조용히 줄어들면 여기서 걸린다.
         assertTrue(allowed.size == 7)
         allowed.forEach { operation ->
             assertTrue(
@@ -31,7 +31,21 @@ class EmailVerificationGateTest {
                 "$operation 은(는) 허용 목록이라 통과해야 한다",
             )
         }
-        assertTrue(EmailVerificationGate.ALLOWED_OPERATIONS == allowed.toSet())
+        assertTrue(EmailVerificationGate.ALLOWED_OPERATIONS.containsAll(allowed))
+    }
+
+    /**
+     * 인증 이전 단계 오퍼레이션도 통과한다. 토큰의 주체를 읽지 않기 때문이다 —
+     * 미인증 회원의 토큰이 남은 채 다른 계정으로 로그인하려는 경로를 막지 않는다.
+     */
+    @Test
+    fun `인증 이전 단계 오퍼레이션은 미인증이어도 통과한다`() {
+        listOf("loginEmail", "loginSns", "registerEmailMember", "registerSnsMember").forEach { operation ->
+            assertTrue(
+                EmailVerificationGate.isAllowed(listOf(operation), emailVerified = false),
+                "$operation 은(는) 인증 이전 단계라 통과해야 한다",
+            )
+        }
     }
 
     /** R9-1. */
