@@ -49,6 +49,11 @@ object EmailVerificationGate {
         "authHealth",
     )
 
+    /**
+     * 미인증 회원이 호출할 수 있는 오퍼레이션 전체. 두 축의 합집합이다 —
+     * 인증 화면이 쓰는 것([VERIFICATION_SCREEN_OPERATIONS], 스펙 R9의 일곱 개)과
+     * 애초에 주체를 읽지 않는 것([PRE_AUTH_OPERATIONS]).
+     */
     val ALLOWED_OPERATIONS: Set<String> = VERIFICATION_SCREEN_OPERATIONS + PRE_AUTH_OPERATIONS
 
     /**

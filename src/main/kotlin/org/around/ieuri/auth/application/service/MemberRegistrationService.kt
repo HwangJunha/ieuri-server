@@ -392,6 +392,9 @@ class MemberRegistrationService(
      *
      * [targetEmailEncrypted]는 주소 정정(R7)에서만 채워진다 — 통과 시 회원의 이메일로 확정될
      * 대기 주소다. 최초 가입·단순 재발송은 회원이 이미 그 주소를 갖고 있어 null이다.
+     *
+     * **호출자는 먼저 같은 목적의 활성 챌린지를 폐기해야 한다.** `verifyEmail`이 대상 주소를
+     * 그대로 확정하므로, 살아 있는 가입 챌린지가 둘이면 어느 주소로 확정될지 정해지지 않는다.
      */
     private fun issueRegistrationChallenge(
         memberId: Long,

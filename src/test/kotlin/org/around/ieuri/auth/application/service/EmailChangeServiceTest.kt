@@ -245,7 +245,11 @@ class EmailChangeServiceTest {
                 memberId, VerificationPurpose.EMAIL_CHANGE, now,
             )
         }
-        verify(exactly = 0) { verificationRepository.consumeActiveByMemberId(any(), any()) }
+        verify(exactly = 0) {
+            verificationRepository.consumeActiveByMemberIdAndPurpose(
+                memberId, VerificationPurpose.REGISTRATION, any(),
+            )
+        }
     }
 
     // --- R7 확인 ---
@@ -437,7 +441,13 @@ class EmailChangeServiceTest {
 
         service.resendEmailChange(ResendEmailChangeCommand(memberId, publicId))
 
-        verify(exactly = 0) { verificationRepository.findLatestCreatedAtByMemberId(any()) }
+        // 가입 검증 용도의 창은 보지 않는다 — 봤다면 그쪽 발급 시각에 막힐 수 있다.
+        verify(exactly = 0) {
+            verificationRepository.findLatestCreatedAtByMemberIdAndPurpose(
+                memberId,
+                VerificationPurpose.REGISTRATION,
+            )
+        }
     }
 
     @Test

@@ -131,15 +131,10 @@ interface EmailVerificationRepositoryPort {
     /** attempts/consumed/verifiedAt 변경을 반영(dirty-check). */
     fun update(verification: EmailVerification)
 
-    /** 해당 회원의 활성(미소진·미검증) 챌린지를 모두 폐기(재발송 시). */
-    fun consumeActiveByMemberId(memberId: Long, at: Instant)
-
-    /** 재발송 rate limit 판정을 위한 가장 최근 발급 시각. */
-    fun findLatestCreatedAtByMemberId(memberId: Long): Instant?
-
     /**
      * 용도별 가장 최근 발급 시각. **쿨다운을 용도로 나눠 센다**(SPEC-0011 R7) —
      * 가입 검증과 이메일 변경이 한 창을 공유하면 한쪽을 보낸 직후 다른 쪽이 막힌다.
+     * 가입 검증 안에서는 재발송과 주소 정정이 한 창을 공유한다(SPEC-0024 R7-3).
      */
     fun findLatestCreatedAtByMemberIdAndPurpose(memberId: Long, purpose: VerificationPurpose): Instant?
 
