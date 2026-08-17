@@ -130,6 +130,17 @@ class NotEmailMemberException(message: String) :
 class AlreadyVerifiedException(message: String) :
     UserFacingException("ALREADY_VERIFIED", message)
 
+/**
+ * 비밀번호가 정책(8~100자·영문·숫자·특수문자)을 만족하지 않을 때.
+ *
+ * `INVALID_INPUT`과 코드를 나누는 이유는 클라이언트가 **어느 입력이 문제인지 알아야**
+ * 하기 때문이다. 서버 message는 한국어 고정이라 클라이언트가 그대로 노출할 수 없고
+ * (POL-022의 4개 언어), 코드가 있어야 자국어 안내를 띄울 수 있다.
+ * 어느 규칙을 어겼는지까지는 나누지 않는다 — 클라이언트가 전체 규칙을 안내하면 된다.
+ */
+class PasswordPolicyViolationException(message: String) :
+    UserFacingException("PASSWORD_POLICY_VIOLATION", message)
+
 /** 재발송 쿨다운(60초) 이내 재요청(R7). 기존 VERIFICATION_RATE_LIMITED와 코드를 나눈다 —
  *  클라이언트가 이메일 변경 화면에서만 다른 안내를 띄운다. */
 class ResendCooldownActiveException(message: String) :

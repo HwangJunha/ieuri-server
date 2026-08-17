@@ -253,6 +253,8 @@ type UserError {
 enum ErrorCode {
     "입력 형식·도메인 불변식 위반. 어느 필드인지는 message가 설명한다."
     INVALID_INPUT
+    "비밀번호가 정책(8~100자·영문·숫자·특수문자)을 만족하지 않는다. field=input.password."
+    PASSWORD_POLICY_VIOLATION
 
     # ── 가입 ──
     "이미 가입된 계정((provider, provider_user_id) 중복)."

@@ -11,6 +11,7 @@ import org.around.ieuri.auth.application.event.VerificationEmailRequested
 import org.around.ieuri.auth.application.exception.AlreadyVerifiedException
 import org.around.ieuri.auth.application.exception.EmailAlreadyInUseException
 import org.around.ieuri.auth.application.exception.MemberAlreadyRegisteredException
+import org.around.ieuri.auth.application.exception.PasswordPolicyViolationException
 import org.around.ieuri.auth.application.exception.ResendCooldownActiveException
 import org.around.ieuri.auth.application.exception.VerificationNotFoundException
 import org.around.ieuri.auth.application.exception.VerificationRateLimitedException
@@ -371,9 +372,11 @@ class MemberRegistrationServiceTest {
     }
 
     @Test
-    fun `비밀번호 정책 위반이면 커맨드 생성 단계에서 예외`() {
-        // 특수문자 없음 → 정책 위반.
-        assertFailsWith<IllegalArgumentException> { emailCommand(password = "Password1") }
+    fun `비밀번호 정책 위반은 전용 코드로 나간다`() {
+        // 특수문자 없음 → 정책 위반. INVALID_INPUT으로 뭉뚱그리면 클라이언트가 어느 입력이
+        // 문제인지 알 수 없어 자국어 안내를 띄우지 못한다(POL-022).
+        val ex = assertFailsWith<PasswordPolicyViolationException> { emailCommand(password = "Password1") }
+        assertEquals("PASSWORD_POLICY_VIOLATION", ex.code)
     }
 
     // --- requestPasswordReset / resetPassword ---
@@ -417,13 +420,45 @@ class MemberRegistrationServiceTest {
     }
 
     @Test
-    fun `재설정 요청은 계정이 없거나 SNS 계정이면 조용히 무시한다(계정 열거 방지)`() {
+    fun `재설정 요청은 계정이 없으면 조용히 무시한다(계정 열거 방지)`() {
         every { memberRepository.findEmailAuthentication(any()) } returns null
 
         service.requestPasswordReset(RequestPasswordResetCommand("ghost@example.com"))
 
         verify(exactly = 0) { passwordResetRepository.save(any()) }
         verify(exactly = 0) { eventPublisher.publish(any<PasswordResetRequested>()) }
+    }
+
+    /**
+     * **비밀번호가 없는 계정에는 코드를 발급하지도 메일을 보내지도 않는다.**
+     *
+     * 재설정할 비밀번호가 없어 성립하지 않는 요청이고, 보냈다면 주소를 아는 제3자가 메일
+     * 발송을 반복 유발할 수 있다. 응답은 계정 열거 방지를 위해 그대로 성공이다 —
+     * 막는 것은 발송이지 응답이 아니다.
+     */
+    @Test
+    fun `재설정 요청은 비밀번호가 없는 계정이면 발급도 발송도 하지 않는다`() {
+        every { memberRepository.findEmailAuthentication(any()) } returns emailAuth(passwordHash = null)
+
+        service.requestPasswordReset(RequestPasswordResetCommand("sns@example.com"))
+
+        verify(exactly = 0) { passwordResetRepository.save(any()) }
+        verify(exactly = 0) { eventPublisher.publish(any<PasswordResetRequested>()) }
+    }
+
+    /** 같은 이유로 실행 단계도 막힌다 — 코드 대조 자체에 도달하지 않는다. */
+    @Test
+    fun `재설정 실행은 비밀번호가 없는 계정이면 INVALID_OR_EXPIRED로 끝난다`() {
+        every { memberRepository.findEmailAuthentication(any()) } returns emailAuth(passwordHash = null)
+
+        val result = service.resetPassword(
+            ResetPasswordCommand("sns@example.com", "123456", "NewPass1!"),
+        )
+
+        assertFalse(result.success)
+        assertEquals("INVALID_OR_EXPIRED", result.failureReason)
+        verify(exactly = 0) { passwordResetRepository.findActiveByMemberId(any()) }
+        verify(exactly = 0) { memberRepository.updatePassword(any(), any()) }
     }
 
     @Test

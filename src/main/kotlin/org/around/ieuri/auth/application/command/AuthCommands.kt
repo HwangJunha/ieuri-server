@@ -1,5 +1,7 @@
 package org.around.ieuri.auth.application.command
 
+import org.around.ieuri.auth.application.exception.PasswordPolicyViolationException
+
 import org.around.ieuri.auth.domain.vo.Provider
 import java.util.UUID
 
@@ -55,10 +57,18 @@ data class AgreementInput(
  * (개인정보보호법 「개인정보의 안전성 확보조치 기준」: 3종 조합 시 8자 이상 충족.)
  */
 fun validatePasswordPolicy(password: String) {
-    require(password.length in 8..100) { "비밀번호는 8자 이상 100자 이하여야 합니다." }
-    require(password.any { it.isLetter() }) { "비밀번호에 영문자를 포함해야 합니다." }
-    require(password.any { it.isDigit() }) { "비밀번호에 숫자를 포함해야 합니다." }
-    require(password.any { !it.isLetterOrDigit() && !it.isWhitespace() }) { "비밀번호에 특수문자를 포함해야 합니다." }
+    // 전용 코드로 던진다 — INVALID_INPUT으로 뭉뚱그리면 클라이언트가 어느 입력이 문제인지
+    // 알 수 없고, 서버 message에 의존해야 해 다국어 대응이 불가능하다(POL-022).
+    fun requirePolicy(satisfied: Boolean, message: String) {
+        if (!satisfied) throw PasswordPolicyViolationException(message)
+    }
+    requirePolicy(password.length in 8..100, "비밀번호는 8자 이상 100자 이하여야 합니다.")
+    requirePolicy(password.any { it.isLetter() }, "비밀번호에 영문자를 포함해야 합니다.")
+    requirePolicy(password.any { it.isDigit() }, "비밀번호에 숫자를 포함해야 합니다.")
+    requirePolicy(
+        password.any { !it.isLetterOrDigit() && !it.isWhitespace() },
+        "비밀번호에 특수문자를 포함해야 합니다.",
+    )
 }
 
 /** 비밀번호 재설정 요청 커맨드(이메일로 코드 발송). 계정 유무는 응답으로 드러내지 않는다. */
