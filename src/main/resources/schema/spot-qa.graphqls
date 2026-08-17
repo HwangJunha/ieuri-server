@@ -1,0 +1,260 @@
+extend type Query {
+    """
+    이 장소의 질문 목록. 정렬은 계약이다 — 미해결 우선, 그 안에서 작성 시각 내림차순이며
+    정렬을 바꾸는 인자가 없다.
+
+    차단 관계인 작성자의 질문과, 신고 누적으로 숨겨진 질문(작성자 본인 제외)은 결과에서
+    빠진다 — posts()·comments()와 같은 필터링 규약이다. 차단에 의한 제외가 숨김 여부보다
+    먼저 적용된다.
+
+    인증 없이도 조회할 수 있다. 존재하지 않는 장소는 빈 목록이 아니라 SPOT_NOT_FOUND다.
+    first는 기본 20·상한 50이며 초과 요청은 50으로 절삭된다.
+    """
+    spotQuestions(catalogId: ID!, first: Int = 20, after: String): SpotQuestionConnection!
+
+    """
+    질문 하나의 답변 목록. 작성 시각 내림차순. 답글은 SpotAnswer.replies로 내려간다.
+
+    질문이 신고 누적으로 숨겨졌으면(작성자 본인 제외) 그 답변들도 함께 가려져 빈 목록이 된다.
+    이때 답변 각각의 hidden은 바뀌지 않는다 — 질문이 복구되면 답변도 원래 상태로 돌아온다.
+    개별 답변만 숨겨진 경우 질문과 다른 답변은 영향받지 않는다.
+
+    질문이 없거나 차단으로 가려졌으면 QUESTION_NOT_FOUND다.
+    first는 기본 20·상한 50이며 초과 요청은 절삭된다.
+    """
+    spotAnswers(questionId: ID!, first: Int = 20, after: String): SpotAnswerConnection!
+}
+
+extend type Mutation {
+    """
+    이 장소에 질문을 작성한다. 판정 시점의 최신 반응이 SpotReaction.LIKE인 회원만 가능하며,
+    아니면 NOT_ELIGIBLE_TO_ASK다 — 반응 없음과 DISLIKE를 모두 자격 없음으로 본다.
+    이후 반응이 바뀌어도 이미 작성한 질문은 유지된다.
+
+    photoKeys는 confirmPostImageUploads를 통과한 확정 키여야 한다. 최대 5장.
+    """
+    createSpotQuestion(input: CreateSpotQuestionInput!): CreateSpotQuestionPayload!
+
+    "본인 질문 삭제. 타인 질문은 NOT_QUESTION_OWNER. **딸린 답변·답글도 함께 삭제된다** — 타인이 쓴 답변도 포함이다."
+    deleteSpotQuestion(input: DeleteSpotQuestionInput!): DeleteSpotQuestionPayload!
+
+    """
+    질문 작성자가 자기 질문을 해결됨으로 표시한다. 이미 해결됨에 다시 호출해도 성공이다(멱등).
+    되돌리는 뮤테이션은 없다.
+
+    resolved는 "이 답이 정답"이 아니라 "질문자가 충분히 알게 되었다"는 뜻이다 —
+    답변 채택은 두지 않는다.
+    """
+    resolveSpotQuestion(input: ResolveSpotQuestionInput!): ResolveSpotQuestionPayload!
+
+    """
+    질문에 답변한다. 그 장소를 좋아요한 회원만 가능하며 아니면 NOT_ELIGIBLE_TO_ANSWER다.
+    질문이 해결됨으로 표시돼 있어도 답변을 막지 않는다.
+    """
+    createSpotAnswer(input: CreateSpotAnswerInput!): CreateSpotAnswerPayload!
+
+    "본인 답변 삭제. 딸린 답글도 함께 삭제된다."
+    deleteSpotAnswer(input: DeleteSpotAnswerInput!): DeleteSpotAnswerPayload!
+
+    """
+    답변에 답글을 단다. **1단계까지다** — parentAnswerId가 이미 답글을 가리키면
+    REPLY_TO_REPLY_NOT_ALLOWED로 거절한다.
+
+    답변과 같은 좋아요 자격을 요구한다 — 답글로 우회 참여가 되면 게이팅이 무의미해지기 때문이다.
+    """
+    createSpotAnswerReply(input: CreateSpotAnswerReplyInput!): CreateSpotAnswerReplyPayload!
+
+    "본인 답글 삭제."
+    deleteSpotAnswerReply(input: DeleteSpotAnswerReplyInput!): DeleteSpotAnswerReplyPayload!
+}
+
+"""
+장소에 달린 질문 하나. 답변은 별도 커넥션(spotAnswers)으로 조회하며 이 타입에 중첩하지 않는다.
+"""
+type SpotQuestion {
+    id: ID!
+
+    "질문이 달린 장소. **항상 있다** — Post.spot과 달리 nullable이 아니다."
+    spot: PostSpot!
+
+    "1~500자. 앞뒤 공백은 제거된 뒤 판정한다."
+    body: String!
+
+    author: PostAuthor!
+
+    "확정된 오브젝트 키. 최대 5개이며 첨부 순서대로다. 사진이 없으면 빈 배열이다."
+    photoKeys: [String!]!
+
+    "작성자가 해결됨으로 표시했는지."
+    resolved: Boolean!
+
+    "이 질문에 달린 답변 수. 숨겨진 답변은 제외한다. 모든 호출자에게 같은 값이다."
+    answerCount: Int!
+
+    ownedByViewer: Boolean!
+
+    "신고 누적으로 자동 숨김되었는지. 숨겨진 질문은 작성자 본인에게만 보이므로, 이 값이 참인 질문을 받는 것도 본인뿐이다."
+    hidden: Boolean!
+
+    "ISO-8601. resolved 다음의 정렬 기준이다."
+    createdAt: String!
+}
+
+"정렬: 미해결 우선, 그 안에서 작성 시각 내림차순. 기본 20, 상한 50."
+type SpotQuestionConnection {
+    edges: [SpotQuestionEdge!]!
+    pageInfo: PageInfo!
+}
+
+type SpotQuestionEdge {
+    cursor: String!
+    node: SpotQuestion!
+}
+
+"질문에 달린 답변 하나. 답글은 replies로 내려간다(1단계)."
+type SpotAnswer {
+    id: ID!
+    questionId: ID!
+
+    "1~500자."
+    body: String!
+
+    author: PostAuthor!
+
+    "확정된 오브젝트 키. 최대 5개, 첨부 순서대로."
+    photoKeys: [String!]!
+
+    ownedByViewer: Boolean!
+
+    """
+    이 답변 **자체가** 신고 누적으로 숨겨졌는지. 작성자 본인만 자기 답변에서 참을 본다.
+
+    질문이 숨겨져 답변이 함께 가려지는 경우 이 값은 바뀌지 않는다 — 질문이 복구되면 답변도
+    함께 돌아와야 하므로 답변의 상태를 덮어쓰지 않기 때문이다. 따라서 이 필드만으로 노출
+    여부를 판단하지 않는다. 가려진 답변은 애초에 목록에 오지 않는다.
+    """
+    hidden: Boolean!
+
+    createdAt: String!
+
+    """
+    이 답변에 달린 답글. **오래된 순이며 페이지네이션이 없다** — Comment.replies와 같은
+    근거로, 깊이가 2단계라 목록이 화면을 넘길 만큼 커지지 않는다. 답글이 없으면 빈 배열이다.
+    """
+    replies: [SpotAnswerReply!]!
+}
+
+"정렬: 작성 시각 내림차순. 기본 20, 상한 50."
+type SpotAnswerConnection {
+    edges: [SpotAnswerEdge!]!
+    pageInfo: PageInfo!
+}
+
+type SpotAnswerEdge {
+    cursor: String!
+    node: SpotAnswer!
+}
+
+"""
+답변에 달린 답글. **답글에는 답글을 달 수 없다** — 이 타입에 replies 필드가 없는 것이
+그 표현이다.
+"""
+type SpotAnswerReply {
+    id: ID!
+    answerId: ID!
+
+    "1~500자."
+    body: String!
+
+    author: PostAuthor!
+    photoKeys: [String!]!
+    ownedByViewer: Boolean!
+
+    "신고 누적으로 자동 숨김되었는지. 작성자 본인만 자기 답글에서 참을 본다."
+    hidden: Boolean!
+
+    createdAt: String!
+}
+
+input CreateSpotQuestionInput {
+    catalogId: ID!
+
+    "1~500자. 앞뒤 공백은 제거된 뒤 판정한다."
+    body: String!
+
+    "confirmPostImageUploads가 반환한 확정 키. 최대 5개. 빈 목록도 유효하다."
+    photoKeys: [String!]!
+}
+
+type CreateSpotQuestionPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+    questionId: ID
+}
+
+input DeleteSpotQuestionInput {
+    questionId: ID!
+}
+
+type DeleteSpotQuestionPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+}
+
+input ResolveSpotQuestionInput {
+    questionId: ID!
+}
+
+type ResolveSpotQuestionPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+}
+
+input CreateSpotAnswerInput {
+    questionId: ID!
+
+    "1~500자."
+    body: String!
+
+    photoKeys: [String!]!
+}
+
+type CreateSpotAnswerPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+    answerId: ID
+}
+
+input DeleteSpotAnswerInput {
+    answerId: ID!
+}
+
+type DeleteSpotAnswerPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+}
+
+input CreateSpotAnswerReplyInput {
+    "답글을 달 대상 답변. 이 id가 답글을 가리키면 REPLY_TO_REPLY_NOT_ALLOWED다."
+    parentAnswerId: ID!
+
+    "1~500자."
+    body: String!
+
+    photoKeys: [String!]!
+}
+
+type CreateSpotAnswerReplyPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+    replyId: ID
+}
+
+input DeleteSpotAnswerReplyInput {
+    replyId: ID!
+}
+
+type DeleteSpotAnswerReplyPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+}

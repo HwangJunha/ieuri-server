@@ -6,6 +6,7 @@ import org.around.ieuri.tourism.domain.vo.CategorySelection
 import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
+import org.around.ieuri.tourism.domain.vo.ReactionType
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 
 /**
@@ -33,6 +34,15 @@ interface SpotQueryPort {
      * 같은 장소의 언어별 좋아요가 합산된다(SPEC-0019 R-10).
      */
     fun countLikes(spotId: Long): Long
+
+    /**
+     * 이 회원의 이 카탈로그에 대한 **최신 반응**. 반응한 적 없으면 null.
+     *
+     * `reactToSpot`은 덮어쓰기만 가능하고 취소 수단이 없어 행이 하나뿐이다 — 그 행이 곧
+     * 최신 반응이다. 쓰기 포트(SpotReactionPort.find)와 같은 행을 보지만 이쪽은 읽기
+     * 경로라 애그리게이트를 복원하지 않는다.
+     */
+    fun findReaction(catalogId: Long, memberId: Long): ReactionType?
 
     /**
      * 카탈로그 id → upstream 식별 정보. [language] 원본을 우선하되 **없으면 다른 언어로

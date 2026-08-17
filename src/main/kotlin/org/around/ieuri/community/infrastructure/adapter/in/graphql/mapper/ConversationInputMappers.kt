@@ -3,9 +3,11 @@ package org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper
 import org.around.ieuri.common.graphql.generated.types.MarkConversationReadInput
 import org.around.ieuri.common.graphql.generated.types.ReportMessagesInput
 import org.around.ieuri.common.graphql.generated.types.SendMessageInput
+import org.around.ieuri.common.graphql.generated.types.StartConversationInput
 import org.around.ieuri.community.application.command.MarkConversationReadCommand
 import org.around.ieuri.community.application.command.ReportMessagesCommand
 import org.around.ieuri.community.application.command.SendMessageCommand
+import org.around.ieuri.community.application.command.StartConversationCommand
 import org.around.ieuri.community.domain.vo.ReportReason
 
 /**
@@ -16,6 +18,15 @@ import org.around.ieuri.community.domain.vo.ReportReason
  *
  * 호출자(memberId)는 인증 컨텍스트에서 오므로 커맨드에 담지 않는다.
  */
+
+/**
+ * 대화 시작. **[StartConversationInput.sourceAnswerId]는 선택이다** — 없으면 출처 없는
+ * 일반 DM이고, 있어도 답변이 사라졌으면 응용 계층이 무시한다(SPEC-0026 AC-13.4).
+ */
+fun StartConversationInput.toCommand(): StartConversationCommand = StartConversationCommand(
+    counterpartMemberId = counterpartMemberId,
+    sourceAnswerId = sourceAnswerId,
+)
 
 fun SendMessageInput.toCommand(): SendMessageCommand = SendMessageCommand(
     conversationId = conversationId,

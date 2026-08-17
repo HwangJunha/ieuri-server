@@ -116,3 +116,41 @@ class NotConversationParticipantException(message: String = "대화의 참여자
  */
 class InvalidInputException(message: String = "잘못된 입력입니다.") :
     CommunityUserException("INVALID_INPUT", message)
+
+// ── 장소 질문/답변(SPEC-0026) ────────────────────────────────────────
+
+/**
+ * 좋아요 자격 없음. **반응 없음과 DISLIKE를 구분하지 않는다**(R5) — 자격은 "판정 시점의
+ * 최신 반응이 LIKE"로만 성립하고, 클라이언트가 두 경우에 할 안내가 같기 때문이다.
+ */
+class NotEligibleToAskException(message: String = "이 장소를 좋아요한 회원만 질문할 수 있습니다.") :
+    CommunityUserException("NOT_ELIGIBLE_TO_ASK", message)
+
+/** 답글도 답변과 같은 자격을 요구한다(AC-7.3) — 답글로 우회하면 게이팅이 무의미해진다. */
+class NotEligibleToAnswerException(message: String = "이 장소를 좋아요한 회원만 답변할 수 있습니다.") :
+    CommunityUserException("NOT_ELIGIBLE_TO_ANSWER", message)
+
+class QuestionNotFoundException(message: String = "해당 질문을 찾을 수 없습니다.") :
+    CommunityUserException("QUESTION_NOT_FOUND", message)
+
+class AnswerNotFoundException(message: String = "해당 답변을 찾을 수 없습니다.") :
+    CommunityUserException("ANSWER_NOT_FOUND", message)
+
+class ReplyNotFoundException(message: String = "해당 답글을 찾을 수 없습니다.") :
+    CommunityUserException("REPLY_NOT_FOUND", message)
+
+/**
+ * 답글에 답글을 달려는 시도. 도메인 불변식 위반이 아니라 **입력 오류다** — 답글에는
+ * 부모 답글 필드가 없어 그 상태를 도메인이 표현조차 하지 못한다(R7).
+ */
+class ReplyToReplyNotAllowedException(message: String = "답글에는 답글을 달 수 없습니다.") :
+    CommunityUserException("REPLY_TO_REPLY_NOT_ALLOWED", message)
+
+class NotQuestionOwnerException(message: String = "본인의 질문만 처리할 수 있습니다.") :
+    CommunityUserException("NOT_QUESTION_OWNER", message)
+
+class NotAnswerOwnerException(message: String = "본인의 답변만 삭제할 수 있습니다.") :
+    CommunityUserException("NOT_ANSWER_OWNER", message)
+
+class NotReplyOwnerException(message: String = "본인의 답글만 삭제할 수 있습니다.") :
+    CommunityUserException("NOT_REPLY_OWNER", message)

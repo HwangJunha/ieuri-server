@@ -15,6 +15,8 @@ import org.around.ieuri.community.application.port.out.persistence.CommentReposi
 import org.around.ieuri.community.application.port.out.persistence.PostCounterPort
 import org.around.ieuri.community.application.port.out.persistence.PostModerationPort
 import org.around.ieuri.community.application.port.out.persistence.ReportRepositoryPort
+import org.around.ieuri.community.application.port.out.persistence.SpotQaModerationPort
+import org.around.ieuri.community.application.port.out.persistence.SpotQuestionCounterPort
 import org.around.ieuri.community.application.query.PostAuthorView
 import org.around.ieuri.community.domain.aggregate.Comment
 import org.around.ieuri.community.domain.aggregate.Post
@@ -41,9 +43,12 @@ class ReportCommandServiceTest {
     private val moderationPort = mockk<PostModerationPort>()
     private val commentRepository = mockk<CommentRepositoryPort>()
     private val memberLookup = mockk<MemberLookupPort>()
+    private val spotQaModerationPort = mockk<SpotQaModerationPort>(relaxed = true)
+    private val spotQuestionCounterPort = mockk<SpotQuestionCounterPort>(relaxed = true)
 
     private val service = ReportCommandService(
         reportRepository, counterPort, moderationPort, commentRepository, memberLookup,
+        spotQaModerationPort, spotQuestionCounterPort,
     )
 
     private fun comment(id: Long = targetCommentId, postId: Long = targetPostId, hidden: Boolean = false) =

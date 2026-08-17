@@ -98,6 +98,19 @@ class SpotQueryAdapter(
             .fetchOne() ?: 0L
 
     /**
+     * 이 회원의 최신 반응. 반응한 적 없으면 null이며 그것이 정상적인 부재다.
+     *
+     * `(member_id, catalog_id)`에 행이 하나뿐이라(덮어쓰기만 가능) 정렬 없이 단건으로 읽는다.
+     */
+    @Transactional(readOnly = true)
+    override fun findReaction(catalogId: Long, memberId: Long): ReactionType? =
+        queryFactory
+            .select(reaction.reaction)
+            .from(reaction)
+            .where(reaction.catalogId.eq(catalogId), reaction.memberId.eq(memberId))
+            .fetchFirst()
+
+    /**
      * (카탈로그 id, 언어) → upstream 식별 정보. 상세 조회가 캐시·DB를 모두 놓쳤을 때만 쓴다.
      *
      * **`spot`을 읽는 유일한 조회 경로다**(SPEC-0019). TourAPI의 contentId가 언어별이라

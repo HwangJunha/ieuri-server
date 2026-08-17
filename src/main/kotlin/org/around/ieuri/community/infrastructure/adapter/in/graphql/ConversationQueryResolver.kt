@@ -10,6 +10,7 @@ import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.community.application.port.`in`.query.ConversationQueryUseCase
 import org.around.ieuri.community.application.port.out.client.MemberLookupPort
 import org.around.ieuri.community.application.query.ConversationView
+import org.around.ieuri.common.graphql.generated.types.ConversationSpotQaOrigin as GqlConversationSpotQaOrigin
 import org.around.ieuri.community.application.query.MessageView
 import org.around.ieuri.community.application.query.PostAuthorView
 import org.around.ieuri.community.application.query.TypingEventView
@@ -78,6 +79,27 @@ class ConversationQueryResolver(
     @DgsData(parentType = "Conversation", field = "counterpart")
     fun conversationCounterpart(dfe: DgsDataFetchingEnvironment): CompletableFuture<GqlPostAuthor> =
         dfe.loadAuthor(dfe.conversationSource().counterpartId)
+
+    /**
+     * 출처 스냅샷(SPEC-0026 R14). **추가 조회가 없다** — 대화 행이 값을 그대로 들고 있어
+     * read DTO에 이미 담겨 있고, 여기서는 응답 타입으로 옮기기만 한다.
+     *
+     * 그럼에도 필드 리졸버인 이유는 생성 타입의 non-null 필드 때문이다 — 루트가 read DTO를
+     * 노드로 돌려주므로 GraphQL 타입으로의 변환은 필드 단위로 일어난다.
+     */
+    @DgsData(parentType = "Conversation", field = "spotQaOrigin")
+    fun conversationSpotQaOrigin(
+        dfe: DgsDataFetchingEnvironment,
+    ): GqlConversationSpotQaOrigin? = dfe.conversationSource().spotQaOrigin?.let {
+        GqlConversationSpotQaOrigin(
+            catalogId = it.catalogId,
+            spotTitle = it.spotTitle,
+            questionId = it.questionId,
+            questionBodySnapshot = it.questionBodySnapshot,
+            answerId = it.answerId,
+            answerBodySnapshot = it.answerBodySnapshot,
+        )
+    }
 
     /**
      * 메시지 발신자. **DataLoader를 쓰지 않고 직접 읽는다.**

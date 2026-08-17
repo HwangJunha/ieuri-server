@@ -10,6 +10,7 @@ import org.around.ieuri.community.application.port.out.persistence.MessageReposi
 import org.around.ieuri.community.domain.aggregate.Conversation
 import org.around.ieuri.community.domain.aggregate.Message
 import org.around.ieuri.community.domain.aggregate.MessageReport
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.ConversationEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.MessageReportItemEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QConversationEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toDomain
@@ -28,31 +29,50 @@ import java.time.Instant
 /**
  * 대화 적재. [saveIfAbsent]가 **경합을 흡수한다** — 유일 제약에 걸리면 새로 만드는 대신
  * 이미 만들어진 것을 돌려준다(AC7-2).
+ *
+ * 출처 스냅샷의 발췌는 **대화의 일부라 본문과 같이 암호화한다**(POL-050) — 암복호화는
+ * 키를 아는 이 어댑터가 하고 매퍼는 순수 함수로 남는다.
  */
 @Component
 class ConversationPersistenceAdapter(
     private val repository: ConversationJpaRepository,
+    private val cipher: AesGcmCipher,
 ) : ConversationRepositoryPort {
 
     override fun findById(conversationId: Long): Conversation? =
-        repository.findById(conversationId).orElse(null)?.toDomain()
+        repository.findById(conversationId).orElse(null)?.toDecryptedDomain()
 
     @Transactional
     override fun saveIfAbsent(conversation: Conversation): Conversation {
+        // **기존 대화가 있으면 그것을 그대로 돌려준다** — 출처를 소급 적용하지 않는다(AC-13.3).
         repository.findByMemberLowAndMemberHigh(conversation.memberLow, conversation.memberHigh)
-            ?.let { return it.toDomain() }
+            ?.let { return it.toDecryptedDomain() }
+
+        val origin = conversation.spotQaOrigin
+        val newEntity = conversation.toNewEntity(
+            encryptedQuestionExcerpt = origin?.let { cipher.encrypt(it.questionExcerpt) },
+            encryptedAnswerExcerpt = origin?.let { cipher.encrypt(it.answerExcerpt) },
+        )
 
         return try {
-            repository.saveAndFlush(conversation.toNewEntity()).toDomain()
+            // 저장된 엔티티가 아니라 인자를 그대로 쓴다 — 평문 발췌를 다시 복호화할 이유가 없다.
+            repository.saveAndFlush(newEntity)
+            conversation.withId(requireNotNull(newEntity.id) { "저장된 대화에는 id가 있어야 한다." })
         } catch (e: DataIntegrityViolationException) {
             // 조회와 저장 사이에 다른 요청이 먼저 만들었다. 새로 만들지 않고 그것을 쓴다.
             val existing = repository.findByMemberLowAndMemberHigh(
                 conversation.memberLow,
                 conversation.memberHigh,
             )
-            requireNotNull(existing) { "유일 제약에 걸렸는데 기존 대화를 찾을 수 없다." }.toDomain()
+            requireNotNull(existing) { "유일 제약에 걸렸는데 기존 대화를 찾을 수 없다." }
+                .toDecryptedDomain()
         }
     }
+
+    private fun ConversationEntity.toDecryptedDomain(): Conversation = toDomain(
+        decryptedQuestionExcerpt = spotQaQuestionBodyEncrypted?.let { cipher.decrypt(it) },
+        decryptedAnswerExcerpt = spotQaAnswerBodyEncrypted?.let { cipher.decrypt(it) },
+    )
 
     /** 최근 활동 시각 갱신. 관리 엔티티에 얹어 dirty-checking으로 UPDATE를 낸다. */
     @Transactional

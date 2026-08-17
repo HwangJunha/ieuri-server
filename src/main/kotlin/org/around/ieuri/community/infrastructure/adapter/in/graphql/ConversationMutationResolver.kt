@@ -47,7 +47,7 @@ class ConversationMutationResolver(
     ) {
         val memberId = currentMemberProvider.requireMemberId()
         val conversationId = conversationCommandUseCase.startConversation(
-            StartConversationCommand(input.counterpartMemberId),
+            input.toCommand(),
             memberId,
         )
         StartConversationPayload(

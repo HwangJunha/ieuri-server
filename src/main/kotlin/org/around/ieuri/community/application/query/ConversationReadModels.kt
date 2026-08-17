@@ -17,6 +17,26 @@ data class ConversationView(
     val lastMessage: MessageView?,
     val unreadCount: Int,
     val updatedAt: Instant,
+    /**
+     * 이 대화를 시작시킨 장소 질문/답변의 스냅샷(SPEC-0026 R14). 일반 DM이면 null.
+     *
+     * 발췌는 조회 어댑터가 복호화한 평문이다 — 대화의 일부라 본문과 같이 암호화되어
+     * 저장된다(POL-050).
+     */
+    val spotQaOrigin: ConversationSpotQaOriginView? = null,
+)
+
+/**
+ * 출처 스냅샷. **살아있는 참조가 아니다** — [questionId]·[answerId]로 다시 조회하면
+ * 없을 수 있으며, 그래도 이 값들은 남는다.
+ */
+data class ConversationSpotQaOriginView(
+    val catalogId: Long,
+    val spotTitle: String,
+    val questionId: Long,
+    val questionBodySnapshot: String,
+    val answerId: Long,
+    val answerBodySnapshot: String,
 )
 
 /**

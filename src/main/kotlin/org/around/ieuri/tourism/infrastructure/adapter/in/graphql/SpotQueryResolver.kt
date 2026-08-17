@@ -147,6 +147,19 @@ class SpotQueryResolver(
         spotQueryUseCase.spotLikeCount(dfe.spotId()).toInt()
 
     /**
+     * 호출자가 이 장소에 남긴 최신 반응. **비로그인이면 null이다** — 공개 조회라
+     * `requireMemberId`가 아니라 `currentMemberId`를 쓴다(`spots`의 선례).
+     *
+     * 클라이언트가 질문/답변 작성 진입점을 그릴 때 참고하는 값이며(SPEC-0026 AC-3.6),
+     * **서버 판정을 대체하지 않는다** — 실제 자격은 뮤테이션 시점에 다시 본다(R5).
+     */
+    @DgsData(parentType = "SpotDetail", field = "viewerReaction")
+    fun viewerReaction(dfe: DgsDataFetchingEnvironment): String? {
+        val memberId = currentMemberProvider.currentMemberId() ?: return null
+        return spotQueryUseCase.spotViewerReaction(dfe.spotId(), memberId)
+    }
+
+    /**
      * 인증된 회원이 좋아요한 spot 커넥션. 미인증이면 빈 목록이 아니라 UNAUTHENTICATED 오류다.
      *
      * **read DTO(`CursorPage`)를 그대로 반환하면 안 된다.** Spring for GraphQL의

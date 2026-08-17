@@ -1,0 +1,113 @@
+package org.around.ieuri.community.application.service
+
+import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.common.pagination.cursorPageOf
+import org.around.ieuri.community.application.exception.QuestionNotFoundException
+import org.around.ieuri.community.application.exception.SpotNotFoundException
+import org.around.ieuri.community.application.policy.CommunityPolicy
+import org.around.ieuri.community.application.port.`in`.query.SpotQaQueryUseCase
+import org.around.ieuri.community.application.port.out.client.SpotLookupPort
+import org.around.ieuri.community.application.port.out.query.CommunityQueryPort
+import org.around.ieuri.community.application.port.out.query.SpotAnswersSearch
+import org.around.ieuri.community.application.port.out.query.SpotQaQueryPort
+import org.around.ieuri.community.application.port.out.query.SpotQuestionsSearch
+import org.around.ieuri.community.application.port.out.query.ViewerContext
+import org.around.ieuri.community.application.query.SpotAnswerReplyView
+import org.around.ieuri.community.application.query.SpotAnswerView
+import org.around.ieuri.community.application.query.SpotAnswersQuery
+import org.around.ieuri.community.application.query.SpotQuestionView
+import org.around.ieuri.community.application.query.SpotQuestionsQuery
+import org.springframework.stereotype.Service
+
+/**
+ * 장소 질문/답변 조회(SPEC-0026 R1, R2, R11, R12, R16).
+ *
+ * 커뮤니티 조회와 같이 [viewerContext]가 핵심이다 — 목록·답변·답글 세 경로가 모두 이것을
+ * 거치며, 한 곳만 빠뜨려도 차단이 무력화된다.
+ *
+ * **개인 숨김(hiddenPostIds)은 읽지 않는다.** 그것은 글 단위 기능이고 질문에는 없다 —
+ * 넣으면 쓰이지 않는 쿼리가 조회마다 한 번씩 더 붙는다.
+ */
+@Service
+class SpotQaQueryService(
+    private val spotQaQueryPort: SpotQaQueryPort,
+    private val communityQueryPort: CommunityQueryPort,
+    private val spotLookupPort: SpotLookupPort,
+    private val policy: CommunityPolicy,
+) : SpotQaQueryUseCase {
+
+    /** 없는 장소는 빈 목록이 아니라 SPOT_NOT_FOUND다(AC-1.3) — 오타와 "질문 없음"은 다르다. */
+    override fun spotQuestions(
+        query: SpotQuestionsQuery,
+        memberId: Long,
+    ): CursorPage<SpotQuestionView> {
+        if (spotLookupPort.findSummary(query.catalogId) == null) throw SpotNotFoundException()
+        return spotQaQueryPort.findQuestions(
+            SpotQuestionsSearch(
+                catalogId = query.catalogId,
+                first = clampPageSize(query.first),
+                after = query.after,
+                viewer = viewerContext(memberId),
+            ),
+        )
+    }
+
+    /**
+     * 답변 목록. **질문의 숨김이 답변을 함께 가린다**(R11, AC-11.4).
+     *
+     * 답변 레코드의 hidden을 건드리지 않고 조회 시점에 질문 상태를 보는 이유는, 질문이
+     * 복구되면 답변도 함께 돌아와야 하는데 답변의 상태를 덮어쓰면 원래 숨김이었던 답변과
+     * 구분할 수 없게 되기 때문이다.
+     *
+     * 차단으로 걸러진 질문은 조회 자체가 되지 않아 QUESTION_NOT_FOUND다 — 차단 상대의 질문에
+     * 달린 답변을 우회로 읽을 수 없다.
+     */
+    override fun spotAnswers(query: SpotAnswersQuery, memberId: Long): CursorPage<SpotAnswerView> {
+        val viewer = viewerContext(memberId)
+        val question = spotQaQueryPort.findQuestion(query.questionId, viewer)
+            ?: throw QuestionNotFoundException()
+        // 작성자 본인에게는 findQuestion이 숨겨진 질문도 돌려준다 — 그때는 답변도 함께 보인다.
+        if (question.hidden && !question.ownedByViewer) return emptyPage()
+        return spotQaQueryPort.findAnswers(
+            SpotAnswersSearch(
+                questionId = query.questionId,
+                first = clampPageSize(query.first),
+                after = query.after,
+                viewer = viewer,
+            ),
+        )
+    }
+
+    override fun answerReplies(
+        answerIds: List<Long>,
+        memberId: Long,
+    ): Map<Long, List<SpotAnswerReplyView>> =
+        spotQaQueryPort.findRepliesOf(answerIds, viewerContext(memberId))
+
+    // 사진 셋. 포트로 그대로 넘긴다 — 여기서 더할 규칙이 없다.
+    override fun questionPhotoKeys(questionIds: List<Long>): Map<Long, List<String>> =
+        spotQaQueryPort.findQuestionPhotoKeys(questionIds)
+
+    override fun answerPhotoKeys(answerIds: List<Long>): Map<Long, List<String>> =
+        spotQaQueryPort.findAnswerPhotoKeys(answerIds)
+
+    override fun replyPhotoKeys(replyIds: List<Long>): Map<Long, List<String>> =
+        spotQaQueryPort.findReplyPhotoKeys(replyIds)
+
+    /**
+     * 호출자의 차단 관계를 **양방향으로** 읽어 담는다. 커뮤니티 글과 같은 집합을 쓴다 —
+     * 차단은 사람 단위라 어느 표면에서 만나든 같아야 한다.
+     *
+     * 비로그인(memberId = 0)은 차단 관계가 없어 조회를 건너뛴다.
+     */
+    private fun viewerContext(memberId: Long): ViewerContext = ViewerContext(
+        memberId = memberId,
+        blockedMemberIds =
+            if (memberId > 0) communityQueryPort.findBlockedMemberIds(memberId) else emptySet(),
+    )
+
+    private fun <T> emptyPage(): CursorPage<T> =
+        cursorPageOf(edges = emptyList(), hasNextPage = false, hasPreviousPage = false)
+
+    private fun clampPageSize(first: Int): Int = first.coerceIn(1, policy.maxPageSize)
+}

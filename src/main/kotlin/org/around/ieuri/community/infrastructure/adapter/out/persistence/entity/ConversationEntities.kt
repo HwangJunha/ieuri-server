@@ -54,6 +54,32 @@ class ConversationEntity(
 
     @Column(name = "last_read_message_id_high")
     var lastReadMessageIdHigh: Long? = null,
+
+    /**
+     * 대화를 시작시킨 질문/답변의 스냅샷(SPEC-0026 R14). 일반 DM이면 여섯 컬럼이 전부 null이다 —
+     * **전부 있거나 전부 없다**를 DB의 CHECK가 강제한다.
+     *
+     * 값 복사이며 FK가 아니다. 원본이 지워져도 맥락이 남아야 하는데, 맥락을 남기는 것이 이
+     * 컬럼들의 존재 이유이므로 링크로 두면 목적을 달성하지 못한다.
+     */
+    @Column(name = "spot_qa_catalog_id")
+    var spotQaCatalogId: Long? = null,
+
+    @Column(name = "spot_qa_spot_title", length = 255)
+    var spotQaSpotTitle: String? = null,
+
+    @Column(name = "spot_qa_question_id")
+    var spotQaQuestionId: Long? = null,
+
+    /** base64(iv || ciphertext+tag). 발췌도 대화의 일부라 본문과 같이 암호화한다(POL-050). */
+    @Column(name = "spot_qa_question_body_encrypted", columnDefinition = "TEXT")
+    var spotQaQuestionBodyEncrypted: String? = null,
+
+    @Column(name = "spot_qa_answer_id")
+    var spotQaAnswerId: Long? = null,
+
+    @Column(name = "spot_qa_answer_body_encrypted", columnDefinition = "TEXT")
+    var spotQaAnswerBodyEncrypted: String? = null,
 ) {
     @PrePersist
     fun onCreate() {

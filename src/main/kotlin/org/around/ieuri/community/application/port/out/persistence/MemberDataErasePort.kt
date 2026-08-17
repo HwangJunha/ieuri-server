@@ -31,4 +31,16 @@ interface MemberDataErasePort {
      * 실패하면 안 된다(AC17-2).
      */
     fun deleteMessagesBySender(memberId: Long): Long
+
+    /**
+     * 회원이 쓴 장소 질문(SPEC-0026 R17). 그 질문에 달린 **타인의 답변도 함께** 사라진다
+     * (AC-17.2) — 질문 삭제의 종속 규칙과 같으며, FK cascade가 수행한다.
+     */
+    fun deleteSpotQuestionsByAuthor(memberId: Long): Long
+
+    /** 회원이 **남의 질문에** 단 답변. 자기 질문의 답변은 질문과 함께 사라진다. */
+    fun deleteSpotAnswersByAuthor(memberId: Long): Long
+
+    /** 회원이 **남의 답변에** 단 답글. */
+    fun deleteSpotAnswerRepliesByAuthor(memberId: Long): Long
 }

@@ -458,8 +458,14 @@ type UnblockUserPayload implements BaseResponse {
 enum ReportTargetType {
     POST
     COMMENT
-    "사용자 대상 신고는 기록만 되며 누적되어도 자동 조치가 없다. 자동 숨김은 공개 콘텐츠(POST·COMMENT)에만 적용된다."
+    "사용자 대상 신고는 기록만 되며 누적되어도 자동 조치가 없다. 자동 숨김은 공개 콘텐츠에만 적용된다."
     MEMBER
+    "장소 질문. 서로 다른 신고자 5명에서 자동 숨김된다."
+    SPOT_QUESTION
+    "장소 질문의 답변. 숨겨지면 질문의 answerCount에서도 빠진다."
+    SPOT_ANSWER
+    "답변에 달린 답글."
+    SPOT_ANSWER_REPLY
 }
 
 "신고 사유 고정 집합."

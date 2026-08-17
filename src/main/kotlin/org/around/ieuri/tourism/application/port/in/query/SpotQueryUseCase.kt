@@ -81,6 +81,18 @@ interface SpotQueryUseCase {
     fun spotLikeCount(spotId: Long): Long
 
     /**
+     * 이 회원이 이 장소에 남긴 **최신 반응 코드**(`LIKE`·`DISLIKE`). 반응한 적 없으면 null.
+     *
+     * **문자열 축으로 돌려주는 이유는 [availableCategoryCodes]와 같다** — 호출하는 도메인이
+     * tourism의 `ReactionType`을 import하면 그 도메인만 따로 떼어낼 수 없게 된다.
+     * community의 질문/답변 작성 자격 판정(SPEC-0026 R5)이 이 진입점을 지난다.
+     *
+     * `reactToSpot`에는 취소 수단이 없어 null(반응 없음)과 DISLIKE는 서로 다른 상태이며,
+     * 작성 자격 관점에서는 둘 다 자격 없음이다.
+     */
+    fun spotViewerReaction(catalogId: Long, memberId: Long): String?
+
+    /**
      * 카탈로그가 보유한 최소 식별 정보. **upstream을 호출하지 않는다** — 한 행을 읽을 뿐이다.
      *
      * 다른 도메인이 장소 id의 유효성을 확인하고 칩·요약을 그릴 때 쓰는 진입점이다. 그 용도로

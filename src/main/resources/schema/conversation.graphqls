@@ -97,6 +97,42 @@ type Conversation {
 
     "정렬 기준. 최근 메시지 시각이며, 메시지가 없으면 대화 생성 시각이다. ISO-8601."
     updatedAt: String!
+
+    """
+    이 대화가 장소 질문/답변에서 시작됐다면 그 스냅샷. 일반 DM이면 null이다.
+
+    대화 생성 시점에 고정되며, 이후 원본이 삭제되거나 장소명이 바뀌어도 이 값은 바뀌지 않는다.
+    """
+    spotQaOrigin: ConversationSpotQaOrigin
+}
+
+"""
+DM이 어느 장소의 어느 질문/답변에서 시작됐는지의 스냅샷.
+
+**원본을 가리키는 링크가 아니라 값 복사다** — 원본 질문·답변이 나중에 삭제돼도 맥락이
+유지되어야 하며, 맥락을 남기는 것이 이 타입의 존재 이유이기 때문이다.
+
+따라서 questionId·answerId는 삭제 후에도 값이 남지만, 그 id로 spotQuestions·spotAnswers를
+다시 조회하면 없을 수 있다 — 참고용 식별자이지 살아있는 참조가 아니다.
+"""
+type ConversationSpotQaOrigin {
+    "장소 식별자. 언어와 무관하며 spotDetail(id:)에 그대로 넘길 수 있다."
+    catalogId: ID!
+
+    "스냅샷 시점의 장소명. 장소명이 나중에 바뀌어도 이 값은 고정이다."
+    spotTitle: String!
+
+    "출처 질문의 id. 스냅샷이며 살아있는 참조를 보장하지 않는다."
+    questionId: ID!
+
+    "스냅샷 시점의 질문 본문 앞부분. 최대 100자이며 잘릴 때 말줄임표를 붙이지 않는다."
+    questionBodySnapshot: String!
+
+    "DM을 시작시킨 답변의 id."
+    answerId: ID!
+
+    "스냅샷 시점의 답변 본문 앞부분. 최대 100자."
+    answerBodySnapshot: String!
 }
 
 "정렬은 updatedAt 내림차순이다."
@@ -151,6 +187,19 @@ type MessageEdge {
 input StartConversationInput {
     "대화 상대의 회원 id. PostAuthor.id와 같은 식별자다."
     counterpartMemberId: ID!
+
+    """
+    이 대화를 시작시킨 장소 답변. 주면 출처 스냅샷을 이 대화에 남긴다.
+    생략하면 지금까지의 일반 DM 시작과 동일하게 동작한다.
+
+    같은 상대와 대화가 이미 있으면 기존 대화를 반환하며, 이 필드를 줘도 기존 대화에 출처를
+    소급해 붙이지 않는다 — 최초 시작 시점의 맥락만 남긴다.
+
+    아래 경우에는 이 필드를 **무시하고 출처 없는 일반 DM으로 진행한다**(거절하지 않는다):
+    답변이 이미 삭제됐거나, 그 질문이 사라졌거나, 답변 작성자가 counterpartMemberId와 다를 때다.
+    이때 Conversation.spotQaOrigin은 null이다.
+    """
+    sourceAnswerId: ID
 }
 
 type StartConversationPayload implements BaseResponse {
