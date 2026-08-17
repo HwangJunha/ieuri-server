@@ -70,6 +70,9 @@ interface PasswordResetJpaRepository : JpaRepository<PasswordResetEntity, Long> 
     fun findByPublicId(publicId: UUID): PasswordResetEntity?
 
     fun findFirstByMemberIdAndConsumedFalseOrderByCreatedAtDesc(memberId: Long): PasswordResetEntity?
+
+    /** 탈퇴 시 정리(FK 자식). 없으면 member 삭제가 제약에 걸려 탈퇴가 영구히 막힌다. */
+    fun deleteByMemberId(memberId: Long)
 }
 
 interface MemberAuditLogJpaRepository : JpaRepository<MemberAuditLogEntity, Long>
