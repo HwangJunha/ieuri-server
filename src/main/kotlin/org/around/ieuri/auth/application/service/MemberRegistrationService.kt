@@ -13,6 +13,7 @@ import org.around.ieuri.auth.application.event.VerificationEmailRequested
 import org.around.ieuri.auth.application.exception.AlreadyVerifiedException
 import org.around.ieuri.auth.application.exception.MemberAlreadyRegisteredException
 import org.around.ieuri.auth.application.exception.MemberNotFoundException
+import org.around.ieuri.auth.application.exception.NotEmailMemberException
 import org.around.ieuri.auth.application.exception.ResendCooldownActiveException
 import org.around.ieuri.auth.application.exception.VerificationNotFoundException
 import org.around.ieuri.auth.application.exception.VerificationRateLimitedException
@@ -445,13 +446,32 @@ class MemberRegistrationService(
         )
     }
 
+    /**
+     * 비밀번호 재설정 요청.
+     *
+     * **가입되지 않은 주소·SNS 계정은 코드로 거부한다.** 예전에는 계정 열거를 막으려고
+     * 조용히 성공으로 끝냈으나, 그 침묵은 값을 하지 못하면서 사용자만 오지 않을 메일을
+     * 기다리게 했다 — 2단계(`resetPassword`)의 실패 사유가 계정 유무에 따라 갈려
+     * 두 번의 호출로 이미 열거가 가능했기 때문이다. 그 누수는 함께 막고(사유 통일),
+     * 이 단계는 사용자가 바로 알 수 있게 코드를 준다.
+     *
+     * 재설정할 비밀번호가 없는 SNS 계정에 코드를 보내는 것은 애초에 성립하지 않는다.
+     */
     @Transactional
     override fun requestPasswordReset(command: RequestPasswordResetCommand) {
         val now = clock.instant()
         val email = Email(command.email).value
         val auth = memberRepository.findEmailAuthentication(identifierProtector.protect(email))
-        // 계정 열거 방지: 계정이 없거나 비밀번호가 없는(SNS) 계정이면 아무 일도 하지 않고 조용히 성공한다.
-        if (auth?.passwordHash == null) return
+            ?: throw MemberNotFoundException("가입되지 않은 이메일입니다.")
+        if (auth.passwordHash == null) {
+            throw NotEmailMemberException("SNS로 가입한 계정입니다. 해당 SNS로 로그인해 주세요.")
+        }
+
+        // 발송 쿨다운. 없으면 주소를 아는 제3자가 특정인의 메일함에 코드를 무제한 투하할 수 있다.
+        val lastRequestedAt = passwordResetRepository.findLatestCreatedAtByMemberId(auth.memberId)
+        if (lastRequestedAt != null && lastRequestedAt.plus(verificationPolicy.resendCooldown).isAfter(now)) {
+            throw ResendCooldownActiveException("잠시 후 다시 시도해 주세요.")
+        }
 
         passwordResetRepository.consumeActiveByMemberId(auth.memberId)
         val plainCode = codeGenerator.generate()
@@ -474,9 +494,9 @@ class MemberRegistrationService(
         val email = Email(command.email).value
         val auth = memberRepository.findEmailAuthentication(identifierProtector.protect(email))
         // 계정 없음/비밀번호 없음/활성 챌린지 없음은 모두 동일하게 처리(계정 열거 방지).
-        if (auth?.passwordHash == null) return ResetPasswordResult(success = false, failureReason = "INVALID_OR_EXPIRED")
+        if (auth?.passwordHash == null) return ResetPasswordResult(success = false, failureReason = CODE_MISMATCH)
         val reset = passwordResetRepository.findActiveByMemberId(auth.memberId)
-            ?: return ResetPasswordResult(success = false, failureReason = "INVALID_OR_EXPIRED")
+            ?: return ResetPasswordResult(success = false, failureReason = CODE_MISMATCH)
 
         val result = reset.verify(codeGenerator.hash(command.code), now)
         // 성공/실패 관계없이 attempts·consumed 변경을 반영한다.
@@ -519,6 +539,22 @@ class MemberRegistrationService(
     private companion object {
         /** 아직 회원이 없어 '본인 제외'의 기준이 없을 때 쓰는 자리값. 존재하지 않는 id다. */
         const val NEW_MEMBER_ID = 0L
+
+        /**
+         * 계정이 없든, SNS 계정이든, 챌린지가 없든, 코드가 틀렸든 **모두 같은 값을 낸다.**
+         *
+         * 예전에는 앞의 세 경우를 `INVALID_OR_EXPIRED`로 내보내 코드 오타(`CODE_MISMATCH`)와
+         * 갈렸다. 아무 코드나 넣고 사유만 읽으면 그 주소에 이메일 계정이 있는지 알 수 있어,
+         * **인증 없이 회원 목록을 캐낼 수 있는 통로**였다.
+         *
+         * 1단계는 사용자 편의를 위해 계정 유무를 알려 주지만, 그것은 **주소의 주인이 스스로
+         * 물어보는 화면**이다. 이 단계까지 열어 두면 코드를 모르는 제3자가 반복 호출로
+         * 열거할 수 있으므로 여기서는 통일한다.
+         *
+         * 만료·소진은 실제 챌린지가 있을 때만 나오므로 그대로 둔다. 그 값이 나온다는 것은
+         * 이미 코드를 받은 본인이라는 뜻이라 새로 드러나는 사실이 없다.
+         */
+        const val CODE_MISMATCH = "CODE_MISMATCH"
 
         val log = LoggerFactory.getLogger(MemberRegistrationService::class.java)!!
     }

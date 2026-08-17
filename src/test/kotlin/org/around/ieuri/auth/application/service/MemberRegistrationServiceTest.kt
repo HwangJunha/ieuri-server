@@ -11,6 +11,8 @@ import org.around.ieuri.auth.application.event.VerificationEmailRequested
 import org.around.ieuri.auth.application.exception.AlreadyVerifiedException
 import org.around.ieuri.auth.application.exception.EmailAlreadyInUseException
 import org.around.ieuri.auth.application.exception.MemberAlreadyRegisteredException
+import org.around.ieuri.auth.application.exception.MemberNotFoundException
+import org.around.ieuri.auth.application.exception.NotEmailMemberException
 import org.around.ieuri.auth.application.exception.PasswordPolicyViolationException
 import org.around.ieuri.auth.application.exception.ResendCooldownActiveException
 import org.around.ieuri.auth.application.exception.VerificationNotFoundException
@@ -419,12 +421,20 @@ class MemberRegistrationServiceTest {
         verify { passwordResetRepository.save(any<PasswordReset>()) }
     }
 
+    /**
+     * 가입되지 않은 주소는 **코드로 거부한다.** 예전에는 조용히 성공으로 끝냈으나,
+     * 사용자가 오지 않을 메일을 기다리게 만들 뿐이었다 — 2단계 사유가 갈려 계정 열거는
+     * 이미 가능했으므로 침묵이 값을 하지 못했다.
+     */
     @Test
-    fun `재설정 요청은 계정이 없으면 조용히 무시한다(계정 열거 방지)`() {
+    fun `재설정 요청은 가입되지 않은 주소면 MEMBER_NOT_FOUND로 거부한다`() {
         every { memberRepository.findEmailAuthentication(any()) } returns null
 
-        service.requestPasswordReset(RequestPasswordResetCommand("ghost@example.com"))
+        val ex = assertFailsWith<MemberNotFoundException> {
+            service.requestPasswordReset(RequestPasswordResetCommand("ghost@example.com"))
+        }
 
+        assertEquals("MEMBER_NOT_FOUND", ex.code)
         verify(exactly = 0) { passwordResetRepository.save(any()) }
         verify(exactly = 0) { eventPublisher.publish(any<PasswordResetRequested>()) }
     }
@@ -436,11 +446,30 @@ class MemberRegistrationServiceTest {
      * 발송을 반복 유발할 수 있다. 응답은 계정 열거 방지를 위해 그대로 성공이다 —
      * 막는 것은 발송이지 응답이 아니다.
      */
+    /** SNS 계정은 재설정할 비밀번호가 없어 성립하지 않는다. 발송하지 않고 코드로 알린다. */
     @Test
-    fun `재설정 요청은 비밀번호가 없는 계정이면 발급도 발송도 하지 않는다`() {
+    fun `재설정 요청은 SNS 계정이면 NOT_EMAIL_MEMBER로 거부한다`() {
         every { memberRepository.findEmailAuthentication(any()) } returns emailAuth(passwordHash = null)
 
-        service.requestPasswordReset(RequestPasswordResetCommand("sns@example.com"))
+        val ex = assertFailsWith<NotEmailMemberException> {
+            service.requestPasswordReset(RequestPasswordResetCommand("sns@example.com"))
+        }
+
+        assertEquals("NOT_EMAIL_MEMBER", ex.code)
+        verify(exactly = 0) { passwordResetRepository.save(any()) }
+        verify(exactly = 0) { eventPublisher.publish(any<PasswordResetRequested>()) }
+    }
+
+    /** 발송 쿨다운. 없으면 주소를 아는 제3자가 메일함에 코드를 무제한 투하할 수 있다. */
+    @Test
+    fun `재설정 요청은 쿨다운 이내면 RESEND_COOLDOWN_ACTIVE로 거부한다`() {
+        every { memberRepository.findEmailAuthentication(any()) } returns emailAuth()
+        every { passwordResetRepository.findLatestCreatedAtByMemberId(any()) } returns
+            clock.instant().minusSeconds(30)
+
+        assertFailsWith<ResendCooldownActiveException> {
+            service.requestPasswordReset(RequestPasswordResetCommand("user@example.com"))
+        }
 
         verify(exactly = 0) { passwordResetRepository.save(any()) }
         verify(exactly = 0) { eventPublisher.publish(any<PasswordResetRequested>()) }
@@ -448,7 +477,7 @@ class MemberRegistrationServiceTest {
 
     /** 같은 이유로 실행 단계도 막힌다 — 코드 대조 자체에 도달하지 않는다. */
     @Test
-    fun `재설정 실행은 비밀번호가 없는 계정이면 INVALID_OR_EXPIRED로 끝난다`() {
+    fun `재설정 실행은 SNS 계정이면 코드 오타와 같은 사유로 끝난다`() {
         every { memberRepository.findEmailAuthentication(any()) } returns emailAuth(passwordHash = null)
 
         val result = service.resetPassword(
@@ -456,7 +485,8 @@ class MemberRegistrationServiceTest {
         )
 
         assertFalse(result.success)
-        assertEquals("INVALID_OR_EXPIRED", result.failureReason)
+        // 2단계는 사유를 통일한다 — 여기서 갈리면 코드를 모르는 제3자가 열거할 수 있다.
+        assertEquals("CODE_MISMATCH", result.failureReason)
         verify(exactly = 0) { passwordResetRepository.findActiveByMemberId(any()) }
         verify(exactly = 0) { memberRepository.updatePassword(any(), any()) }
     }
@@ -490,14 +520,15 @@ class MemberRegistrationServiceTest {
     }
 
     @Test
-    fun `재설정 실행은 활성 챌린지가 없으면 INVALID_OR_EXPIRED`() {
+    fun `재설정 실행은 활성 챌린지가 없으면 코드 오타와 같은 사유로 끝난다`() {
         every { memberRepository.findEmailAuthentication("protected:user@example.com") } returns emailAuth()
         every { passwordResetRepository.findActiveByMemberId(300L) } returns null
 
         val result = service.resetPassword(ResetPasswordCommand("user@example.com", "123456", "NewPassw0rd!"))
 
         assertFalse(result.success)
-        assertEquals("INVALID_OR_EXPIRED", result.failureReason)
+        // 2단계는 사유를 통일한다 — 여기서 갈리면 코드를 모르는 제3자가 열거할 수 있다.
+        assertEquals("CODE_MISMATCH", result.failureReason)
     }
 
     // --- verifyEmail ---

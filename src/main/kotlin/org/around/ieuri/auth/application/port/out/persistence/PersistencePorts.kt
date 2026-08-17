@@ -154,6 +154,12 @@ interface PasswordResetRepositoryPort {
     /** 회원의 활성(미소진·미만료 아님은 도메인 판정) 최신 챌린지. */
     fun findActiveByMemberId(memberId: Long): PasswordReset?
 
+    /**
+     * 가장 최근 발급 시각(쿨다운 판정용). 소진 여부를 가리지 않는다 —
+     * 발송을 제한하는 것이 목적이라 코드가 이미 쓰였는지는 무관하다.
+     */
+    fun findLatestCreatedAtByMemberId(memberId: Long): Instant?
+
     /** attempts/consumed 변경을 반영(dirty-check). */
     fun update(reset: PasswordReset)
 

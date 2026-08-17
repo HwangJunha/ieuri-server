@@ -26,7 +26,7 @@ type Mutation {
     loginSns(input: LoginSnsInput!): AuthTokenPayload!
     "자체(이메일) 로그인. 비밀번호를 검증하고 토큰을 발급한다. 이메일 인증을 마치지 않은 회원도 성공하며, 그 토큰으로는 me·verifyEmail·resendVerification·retargetEmailVerification·withdrawMember·refreshToken·logout만 호출할 수 있고 나머지는 EMAIL_NOT_VERIFIED 최상위 오류로 거절된다."
     loginEmail(input: LoginEmailInput!): AuthTokenPayload!
-    "비밀번호 재설정 요청. 이메일로 재설정 코드를 발송한다(계정 유무는 응답으로 드러내지 않음)."
+    "비밀번호 재설정 요청. 가입된 이메일 회원에게만 코드를 발송한다. 미가입 주소는 MEMBER_NOT_FOUND, SNS 계정은 NOT_EMAIL_MEMBER로 거부하므로 클라이언트가 코드 입력 화면으로 넘어갈지 판단할 수 있다. 재발송 쿨다운 60초."
     requestPasswordReset(input: RequestPasswordResetInput!): RequestPasswordResetPayload!
     "비밀번호 재설정 실행. 이메일+코드 검증 성공 시 새 비밀번호로 교체하고 기존 세션을 폐기한다."
     resetPassword(input: ResetPasswordInput!): ResetPasswordPayload!
@@ -448,13 +448,24 @@ type RegisterEmailMemberPayload implements BaseResponse {
 
 type RequestPasswordResetPayload implements BaseResponse {
     success: Boolean!
+    """
+    MEMBER_NOT_FOUND(가입되지 않은 주소 → 이메일 칸에 안내) ·
+    NOT_EMAIL_MEMBER(SNS 계정 → 해당 SNS 로그인 안내) ·
+    RESEND_COOLDOWN_ACTIVE(60초 이내 재요청).
+    거부되면 코드 입력 화면으로 넘어가지 마세요 — 메일이 발송되지 않습니다.
+    """
     userErrors: [UserError!]!
 }
 
 type ResetPasswordPayload implements BaseResponse {
     success: Boolean!
     userErrors: [UserError!]!
-    "실패 사유(EXPIRED/CONSUMED/MAX_ATTEMPTS_EXCEEDED/CODE_MISMATCH/INVALID_OR_EXPIRED). 성공 시 null."
+    """
+    실패 사유(EXPIRED/CONSUMED/MAX_ATTEMPTS_EXCEEDED/CODE_MISMATCH). 성공 시 null.
+    **CODE_MISMATCH는 코드 오타뿐 아니라 챌린지가 없는 경우도 포함한다** — 사유가 갈리면
+    코드를 모르는 제3자가 회원 유무를 캐낼 수 있어 통일했다. 사용자에게는 "코드가 올바르지
+    않거나 만료되었습니다"로 안내하면 된다.
+    """
     failureReason: String
 }
 

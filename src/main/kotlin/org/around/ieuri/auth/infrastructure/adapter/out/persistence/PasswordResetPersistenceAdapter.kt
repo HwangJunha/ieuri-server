@@ -8,6 +8,7 @@ import org.around.ieuri.auth.infrastructure.adapter.out.persistence.mapper.toDom
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.mapper.toNewEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.PasswordResetJpaRepository
 import org.springframework.stereotype.Component
+import java.time.Instant
 
 /**
  * 비밀번호 재설정 챌린지 쓰기 포트 구현.
@@ -24,6 +25,9 @@ class PasswordResetPersistenceAdapter(
     override fun save(reset: PasswordReset) {
         repository.save(reset.toNewEntity())
     }
+
+    override fun findLatestCreatedAtByMemberId(memberId: Long): Instant? =
+        repository.findFirstByMemberIdOrderByCreatedAtDesc(memberId)?.createdAt
 
     override fun findActiveByMemberId(memberId: Long): PasswordReset? =
         repository.findFirstByMemberIdAndConsumedFalseOrderByCreatedAtDesc(memberId)?.toDomain()
