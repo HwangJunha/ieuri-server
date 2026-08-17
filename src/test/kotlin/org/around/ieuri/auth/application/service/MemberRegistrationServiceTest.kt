@@ -8,6 +8,7 @@ import org.around.ieuri.auth.application.command.AgreementInput
 import org.around.ieuri.auth.application.command.RegisterMemberCommand
 import org.around.ieuri.auth.application.command.VerifyEmailCommand
 import org.around.ieuri.auth.application.event.VerificationEmailRequested
+import org.around.ieuri.auth.application.exception.AlreadyVerifiedException
 import org.around.ieuri.auth.application.exception.EmailAlreadyInUseException
 import org.around.ieuri.auth.application.exception.MemberAlreadyRegisteredException
 import org.around.ieuri.auth.application.exception.ResendCooldownActiveException
@@ -568,14 +569,19 @@ class MemberRegistrationServiceTest {
         assertEquals("right@example.com", (sent.captured as VerificationEmailRequested).toEmail)
     }
 
-    /** R7-2. */
+    /**
+     * R7-2. **전용 코드로 거부한다** — 도메인은 `require`로 판정하지만 그대로 두면
+     * `INVALID_INPUT`이 되어 클라이언트가 형식 오류와 구분하지 못한다. 이 상태는 입력을
+     * 고칠 것이 아니라 인증 화면을 벗어나야 하는 상황이라 분기가 달라야 한다.
+     */
     @Test
-    fun `이미 인증을 마친 회원의 주소 정정은 거부된다`() {
+    fun `이미 인증을 마친 회원의 주소 정정은 ALREADY_VERIFIED로 거부된다`() {
         every { memberRepository.load(100L) } returns pendingMember(emailVerified = true)
 
-        assertFailsWith<IllegalArgumentException> {
+        val ex = assertFailsWith<AlreadyVerifiedException> {
             service.retargetEmailVerification(RetargetEmailVerificationCommand(100L, "other@example.com"))
         }
+        assertEquals("ALREADY_VERIFIED", ex.code)
         verify(exactly = 0) { memberRepository.updateEmail(any(), any(), any(), any()) }
         verify(exactly = 0) { verificationRepository.save(any()) }
     }

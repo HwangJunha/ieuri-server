@@ -133,6 +133,10 @@ input RetargetEmailVerificationInput {
 
 type RetargetEmailVerificationPayload implements BaseResponse {
     success: Boolean!
+    """
+    ALREADY_VERIFIED(인증을 이미 마침 → 인증 화면 이탈) · EMAIL_ALREADY_IN_USE(같은 provider에 중복) ·
+    RESEND_COOLDOWN_ACTIVE(60초 이내 재요청) · MEMBER_NOT_FOUND · INVALID_INPUT(주소 형식).
+    """
     userErrors: [UserError!]!
     "재발급된 검증 핸들. 이후 verifyEmail·resendVerification에 쓴다. 실패 시 null."
     verificationId: String
@@ -147,6 +151,10 @@ input ChangeEmailInput {
 
 type ChangeEmailPayload implements BaseResponse {
     success: Boolean!
+    """
+    NOT_EMAIL_MEMBER(SNS 회원 → Me.canChangeEmail로 미리 판단) · SAME_AS_CURRENT_EMAIL ·
+    EMAIL_ALREADY_IN_USE · INVALID_EMAIL_FORMAT · MEMBER_NOT_FOUND.
+    """
     userErrors: [UserError!]!
     "코드 검증에 사용할 핸들. 실패 시 null."
     verificationId: String
@@ -161,6 +169,11 @@ input ConfirmEmailChangeInput {
 
 type ConfirmEmailChangePayload implements BaseResponse {
     success: Boolean!
+    """
+    VERIFICATION_NOT_FOUND(핸들이 없거나 남의 것이거나 가입 인증 핸들) · EMAIL_ALREADY_IN_USE
+    (요청 후 확인 사이에 선점됨) · MEMBER_NOT_FOUND · INVALID_INPUT(코드 형식).
+    **코드가 틀린 것은 오류가 아니다** — success=true에 failureReason으로 온다.
+    """
     userErrors: [UserError!]!
     "성공 시 반영된 새 이메일."
     email: String
@@ -214,12 +227,115 @@ interface BaseResponse {
 
 "사용자에게 보여줄 수 있는 도메인/입력 검증 오류."
 type UserError {
-    "머신 판독용 코드(예: MEMBER_ALREADY_REGISTERED, INVALID_INPUT)."
+    """
+    머신 판독용 코드. 값의 목록은 ErrorCode에 있다 — 새 코드가 늘어도 깨지지 않도록 String으로 두고,
+    코드젠으로 받을 수 있는 형태가 필요하면 codeValue를 쓴다.
+    """
     code: String!
-    "사용자 노출 메시지."
+    """
+    code와 같은 값을 enum으로 준다. 클라이언트가 분기를 컴파일 타임에 고정할 때 쓴다.
+    이 스키마가 아직 모르는 코드가 오면 null이다 — 그 경우 code를 그대로 읽어 기본 처리한다.
+    """
+    codeValue: ErrorCode
+    "사용자 노출 메시지. 그대로 노출해도 되며 개인정보를 담지 않는다(POL-013)."
     message: String!
     "관련 입력 필드 경로(있을 때). 예: input.email"
     field: String
+}
+
+"""
+`userErrors[].code`로 올 수 있는 값. **payload의 오류만** 담는다 —
+인증·인가·이메일 미인증은 payload가 아니라 최상위 `errors[].extensions.code`로 오며,
+그 값은 TopLevelErrorCode에 적어 두었다(스키마 타입이 아니라 문서용 enum이다).
+
+코드가 늘어날 수 있으므로 `UserError.code`(String)가 정본이고 이 enum은 편의 사본이다.
+"""
+enum ErrorCode {
+    "입력 형식·도메인 불변식 위반. 어느 필드인지는 message가 설명한다."
+    INVALID_INPUT
+
+    # ── 가입 ──
+    "이미 가입된 계정((provider, provider_user_id) 중복)."
+    MEMBER_ALREADY_REGISTERED
+    "같은 provider에 같은 이메일이 이미 있다. 다른 provider의 같은 주소는 충돌이 아니다."
+    EMAIL_ALREADY_IN_USE
+    "SNS id_token 검증 실패(서명·발급자·만료). 사유는 일반화해 노출하지 않는다."
+    SNS_VERIFICATION_FAILED
+
+    # ── 로그인 ──
+    "이메일 또는 비밀번호가 올바르지 않다. 계정 존재 여부는 드러내지 않는다."
+    INVALID_CREDENTIALS
+    "가입되지 않은 계정이거나 회원을 찾을 수 없다."
+    MEMBER_NOT_FOUND
+    "정지된 계정."
+    ACCOUNT_INACTIVE
+
+    # ── 이메일 인증 ──
+    "검증 핸들에 해당하는 챌린지가 없다. 다른 목적의 핸들을 넘긴 경우도 같은 코드다."
+    VERIFICATION_NOT_FOUND
+    "재발송 rate limit(가입 인증)."
+    VERIFICATION_RATE_LIMITED
+    "재발송 쿨다운 60초 이내(이메일 변경·인증 주소 재입력)."
+    RESEND_COOLDOWN_ACTIVE
+    "이미 인증을 마쳐 인증 주소 재입력을 쓸 수 없다. 인증 화면을 벗어나야 한다."
+    ALREADY_VERIFIED
+
+    # ── 이메일 변경 ──
+    "SNS 회원은 이메일을 변경할 수 없다. Me.canChangeEmail로 미리 판단할 수 있다."
+    NOT_EMAIL_MEMBER
+    "현재 사용 중인 주소와 같다."
+    SAME_AS_CURRENT_EMAIL
+    "이메일 형식이 올바르지 않다."
+    INVALID_EMAIL_FORMAT
+
+    # ── 프로필 ──
+    "닉네임 길이·형식 규칙 위반."
+    INVALID_NICKNAME
+    "다른 회원이 이미 쓰는 닉네임."
+    NICKNAME_ALREADY_TAKEN
+    "허용하지 않는 이미지 형식."
+    UNSUPPORTED_IMAGE_TYPE
+    "선언한 이미지 크기가 상한을 넘는다."
+    IMAGE_TOO_LARGE
+    "이 회원에게 발급된 적 없는 오브젝트 키."
+    OBJECT_KEY_NOT_FOUND
+    "발급받았으나 실제 업로드가 확인되지 않은 키."
+    PHOTO_NOT_UPLOADED
+
+    # ── 약관·역할 ──
+    "시행 중인 약관에서 코드를 찾을 수 없다."
+    TERMS_NOT_FOUND
+    "선택 약관을 필수 동의 경로로 제출했다."
+    TERMS_CODE_NOT_REQUIRED
+    "존재하지 않는 역할 코드."
+    ROLE_NOT_FOUND
+    "본인의 마지막 관리 역할을 스스로 회수하려 했다."
+    SELF_DEMOTION
+}
+
+"""
+최상위 `errors[].extensions.code`로 오는 값. **스키마 타입이 아니라 문서다** —
+GraphQL 오류는 스키마로 형이 잡히지 않으므로 여기에 적어 클라이언트가 분기 근거로 삼는다.
+payload의 `userErrors`와 달리 이 오류가 오면 `data`는 null이거나 아예 없다.
+"""
+enum TopLevelErrorCode {
+    "인증이 필요하다(토큰 없음). 로그인 화면으로 보낸다."
+    UNAUTHENTICATED
+    "인증은 됐으나 권한이 없다."
+    FORBIDDEN
+    """
+    이메일 인증을 마치지 않은 회원이 허용 목록 밖 오퍼레이션을 호출했다.
+    허용 목록은 me·verifyEmail·resendVerification·retargetEmailVerification·withdrawMember·
+    refreshToken·logout과 로그인·가입·비밀번호 재설정 계열이다. 인증 화면으로 보낸다.
+    """
+    EMAIL_NOT_VERIFIED
+    "토큰 서명·만료·타입이 유효하지 않다. refreshToken으로 재발급을 시도한다."
+    INVALID_TOKEN
+    """
+    이미 폐기된 refresh가 다시 제출됐다(탈취 의심). 회원의 모든 refresh가 폐기되므로
+    재발급으로 회복되지 않는다 — 재로그인 화면으로 보낸다.
+    """
+    TOKEN_REUSE_DETECTED
 }
 
 "회원 상태. 탈퇴는 행 삭제(hard delete)이므로 상태값에 없다."
@@ -307,6 +423,10 @@ input ResendVerificationInput {
 
 type RegisterSnsMemberPayload implements BaseResponse {
     success: Boolean!
+    """
+    SNS_VERIFICATION_FAILED(id_token 검증 실패) · MEMBER_ALREADY_REGISTERED ·
+    EMAIL_ALREADY_IN_USE(같은 provider에 같은 주소) · INVALID_INPUT(약관 미동의·연령 등).
+    """
     userErrors: [UserError!]!
     "성공 시 채워짐. 이메일 검증 완료 여부."
     emailVerified: Boolean
@@ -316,6 +436,9 @@ type RegisterSnsMemberPayload implements BaseResponse {
 
 type RegisterEmailMemberPayload implements BaseResponse {
     success: Boolean!
+    """
+    MEMBER_ALREADY_REGISTERED · EMAIL_ALREADY_IN_USE · INVALID_INPUT(이메일·비밀번호 정책·약관).
+    """
     userErrors: [UserError!]!
     "이메일 인증 코드 검증에 사용할 핸들(가입 성공 시 채워짐)."
     verificationId: String
@@ -335,6 +458,11 @@ type ResetPasswordPayload implements BaseResponse {
 
 type VerifyEmailPayload implements BaseResponse {
     success: Boolean!
+    """
+    VERIFICATION_NOT_FOUND(핸들 없음 또는 이메일 변경 핸들) · EMAIL_ALREADY_IN_USE·MEMBER_NOT_FOUND
+    (주소를 정정한 챌린지를 확정할 때) · INVALID_INPUT(코드 형식).
+    **코드가 틀린 것은 오류가 아니다** — success=true에 verified=false, failureReason으로 온다.
+    """
     userErrors: [UserError!]!
     "코드 검증 결과(성공 시 채워짐)."
     verified: Boolean
@@ -344,6 +472,10 @@ type VerifyEmailPayload implements BaseResponse {
 
 type ResendVerificationPayload implements BaseResponse {
     success: Boolean!
+    """
+    VERIFICATION_NOT_FOUND(핸들 없음 또는 이메일 변경 핸들) · VERIFICATION_RATE_LIMITED(60초 쿨다운).
+    쿨다운 창은 retargetEmailVerification과 공유하지만 그쪽 코드는 RESEND_COOLDOWN_ACTIVE다.
+    """
     userErrors: [UserError!]!
     verificationId: String
     expiresAt: String
@@ -367,6 +499,12 @@ input LogoutInput {
 
 type AuthTokenPayload implements BaseResponse {
     success: Boolean!
+    """
+    loginEmail: INVALID_CREDENTIALS · ACCOUNT_INACTIVE · MEMBER_NOT_FOUND.
+    loginSns: SNS_VERIFICATION_FAILED · MEMBER_NOT_FOUND(미가입 → 가입 유도) · ACCOUNT_INACTIVE.
+    refreshToken: 토큰 실패는 payload가 아니라 최상위 오류다 —
+    INVALID_TOKEN(재발급 시도) · TOKEN_REUSE_DETECTED(재로그인 필요).
+    """
     userErrors: [UserError!]!
     accessToken: String
     refreshToken: String

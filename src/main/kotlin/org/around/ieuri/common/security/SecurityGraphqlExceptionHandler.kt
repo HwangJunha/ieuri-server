@@ -35,6 +35,10 @@ class SecurityGraphqlExceptionHandler(
         val code = when (val ex = parameters.exception) {
             is UnauthorizedException -> "UNAUTHENTICATED"
             is ForbiddenException -> "FORBIDDEN"
+            // 토큰류 실패도 인증 실패다(SPEC-0024). 여기 없으면 DGS 기본 핸들러가 코드 없이
+            // `errorType: INTERNAL`로 내보내고 예외 FQCN까지 메시지에 실린다 —
+            // 클라이언트의 자동 재로그인은 이 코드로 분기하므로 그때 동작하지 못한다.
+            is TokenAuthenticationException -> ex.code
             // 두 도메인이 함께 쓰는 조회 인자 오류. 여기서 코드를 실어야 클라이언트가 분기한다.
             is EmptyCategorySetException -> ex.code
             else -> return delegate.handleException(parameters)

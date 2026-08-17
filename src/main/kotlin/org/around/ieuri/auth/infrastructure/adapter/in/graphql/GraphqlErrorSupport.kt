@@ -1,6 +1,7 @@
 package org.around.ieuri.auth.infrastructure.adapter.`in`.graphql
 
 import org.around.ieuri.auth.application.exception.UserFacingException
+import org.around.ieuri.common.graphql.generated.types.ErrorCode
 import org.around.ieuri.common.graphql.generated.types.UserError
 
 /**
@@ -10,11 +11,27 @@ import org.around.ieuri.common.graphql.generated.types.UserError
 
 /** 예외를 UserError로 매핑한다. userErrors 대상이 아니면 null(→ 상위에서 재던짐). */
 fun toUserErrorOrNull(e: Throwable): UserError? = when (e) {
-    is UserFacingException -> UserError(code = e.code, message = e.message ?: e.code, field = null)
+    is UserFacingException -> userError(e.code, e.message ?: e.code)
     // Command 생성/도메인 require 위반 등 입력 형식·불변식 오류.
-    is IllegalArgumentException -> UserError(code = "INVALID_INPUT", message = e.message ?: "잘못된 입력입니다.", field = null)
+    is IllegalArgumentException -> userError(INVALID_INPUT, e.message ?: "잘못된 입력입니다.")
     else -> null
 }
+
+/**
+ * `code`(정본, String)와 `codeValue`(enum 사본)를 함께 채운다.
+ *
+ * **스키마 enum에 없는 코드는 `codeValue`가 null이다** — 새 코드를 추가할 때 스키마를 함께
+ * 고치지 않아도 응답이 깨지지 않게 하려는 것이다. 클라이언트는 `codeValue`로 분기하고
+ * null이면 `code`를 읽어 기본 처리한다.
+ */
+private fun userError(code: String, message: String): UserError = UserError(
+    code = code,
+    codeValue = ErrorCode.entries.firstOrNull { it.name == code },
+    message = message,
+    field = null,
+)
+
+private const val INVALID_INPUT = "INVALID_INPUT"
 
 /**
  * 유스케이스 호출을 감싸 예상 실패를 userErrors payload로 바꾼다.

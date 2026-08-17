@@ -1,5 +1,7 @@
 package org.around.ieuri.auth.application.exception
 
+import org.around.ieuri.common.security.TokenAuthenticationException
+
 /**
  * 사용자에게 그대로 보여줄 수 있는 예상 가능한 도메인/유스케이스 실패.
  * 인바운드 어댑터(리졸버)는 이 예외를 GraphQL 최상위 error가 아니라 payload의 `userErrors`로 변환한다.
@@ -48,11 +50,23 @@ class SelfDemotionException(message: String) :
 class InvalidCredentialsException(message: String) :
     UserFacingException("INVALID_CREDENTIALS", message)
 
-/** 토큰 서명/만료/타입이 유효하지 않을 때. 인증 실패이므로 최상위 error로 전파된다. */
-class InvalidTokenException(message: String) : RuntimeException(message)
+/**
+ * 토큰 서명/만료/타입이 유효하지 않을 때. 최상위 오류 `INVALID_TOKEN`으로 나간다.
+ *
+ * 클라이언트는 이 코드를 받으면 refresh로 재발급을 시도한다 — 세션이 끊긴 것은 아니다.
+ */
+class InvalidTokenException(message: String) :
+    TokenAuthenticationException("INVALID_TOKEN", message)
 
-/** 이미 회전·폐기된 refresh가 다시 제출됐을 때(탈취 의심) → 회원 전체 폐기. 최상위 error로 전파된다. */
-class TokenReuseDetectedException(message: String) : RuntimeException(message)
+/**
+ * 이미 회전·폐기된 refresh가 다시 제출됐을 때(탈취 의심) → 회원 전체 폐기.
+ * 최상위 오류 `TOKEN_REUSE_DETECTED`로 나간다.
+ *
+ * **[InvalidTokenException]과 코드를 나누는 이유**: 이쪽은 재발급으로 회복되지 않는다.
+ * 회원의 모든 refresh가 폐기됐으므로 클라이언트는 재로그인 화면으로 보내야 한다.
+ */
+class TokenReuseDetectedException(message: String) :
+    TokenAuthenticationException("TOKEN_REUSE_DETECTED", message)
 
 /** 다른 회원이 이미 쓰는 닉네임일 때(SPEC-0011 R5). 상대의 정보는 담지 않는다(POL-013). */
 class NicknameAlreadyTakenException(message: String) :
@@ -106,6 +120,15 @@ class InvalidEmailFormatException(message: String) :
  */
 class NotEmailMemberException(message: String) :
     UserFacingException("NOT_EMAIL_MEMBER", message)
+
+/**
+ * 인증을 이미 마친 회원이 인증 주소 재입력을 요청할 때(SPEC-0024 R7-2).
+ *
+ * 도메인 불변식과 같은 판정이지만 `require`가 내는 `INVALID_INPUT`과 코드를 나눈다 —
+ * 클라이언트는 이 코드를 받으면 입력을 고치는 것이 아니라 인증 화면을 벗어나야 한다.
+ */
+class AlreadyVerifiedException(message: String) :
+    UserFacingException("ALREADY_VERIFIED", message)
 
 /** 재발송 쿨다운(60초) 이내 재요청(R7). 기존 VERIFICATION_RATE_LIMITED와 코드를 나눈다 —
  *  클라이언트가 이메일 변경 화면에서만 다른 안내를 띄운다. */

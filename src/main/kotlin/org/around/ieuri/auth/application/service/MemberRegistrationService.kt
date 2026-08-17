@@ -10,6 +10,7 @@ import org.around.ieuri.auth.application.command.RetargetEmailVerificationComman
 import org.around.ieuri.auth.application.command.VerifyEmailCommand
 import org.around.ieuri.auth.application.event.PasswordResetRequested
 import org.around.ieuri.auth.application.event.VerificationEmailRequested
+import org.around.ieuri.auth.application.exception.AlreadyVerifiedException
 import org.around.ieuri.auth.application.exception.MemberAlreadyRegisteredException
 import org.around.ieuri.auth.application.exception.MemberNotFoundException
 import org.around.ieuri.auth.application.exception.ResendCooldownActiveException
@@ -318,7 +319,12 @@ class MemberRegistrationService(
         val member = memberRepository.load(command.memberId)
             ?: throw MemberNotFoundException("회원을 찾을 수 없습니다.")
 
-        // 인증 완료 회원의 호출은 도메인이 거부한다(R7-2).
+        // 인증 완료 회원의 호출은 도메인이 거부한다(R7-2). 도메인은 `require`로 판정하므로
+        // 그대로 두면 INVALID_INPUT이 되어 클라이언트가 형식 오류와 구분하지 못한다 —
+        // 화면 전환이 필요한 상태이므로 전용 코드로 옮긴다.
+        if (member.emailVerified) {
+            throw AlreadyVerifiedException("이미 이메일 인증을 마쳤습니다.")
+        }
         member.ensureCanRetargetPendingEmail()
 
         emailUniqueness.ensureAvailable(member.provider, newEmail, excludingMemberId = command.memberId)
