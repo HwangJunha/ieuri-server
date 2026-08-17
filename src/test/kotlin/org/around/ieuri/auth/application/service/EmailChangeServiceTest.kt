@@ -83,32 +83,41 @@ class EmailChangeServiceTest {
         override fun protect(normalizedIdentifier: String) = "protected:$normalizedIdentifier"
     }
 
+    // 중복 판정은 목이 아니라 실제 인스턴스다 — 판정 규칙까지 함께 고정된다.
+    private val emailUniqueness = ProviderEmailUniqueness(memberRepository, identifierProtector)
+
     private val service = EmailChangeService(
         memberRepository,
         verificationRepository,
         codeGenerator,
         emailEncryptor,
         identifierProtector,
+        emailUniqueness,
         policy,
         auditLog,
         eventPublisher,
         Clock.fixed(now, ZoneOffset.UTC),
     )
 
+    /**
+     * 변경 요청은 회원을 적재해 [Member.canChangeEmail]로 판정하므로(SPEC-0024 R6),
+     * 현재 주소를 세우는 것은 곧 **변경 가능한 `EMAIL` 회원**을 세우는 것이다.
+     */
     private fun givenCurrentEmail(email: String = currentEmail) {
         memberRepository.currentEmail = Email(email)
+        givenMember(Provider.EMAIL, email)
     }
 
     private fun givenNotTaken() {
         memberRepository.identifierTaken = false
     }
 
-    private fun givenMember(provider: Provider) {
+    private fun givenMember(provider: Provider, email: String = currentEmail) {
         memberRepository.member = Member.reconstitute(
             id = memberId,
             provider = provider,
             providerUserId = ProviderUserId("whatever"),
-            email = Email(currentEmail),
+            email = Email(email),
             emailVerified = true,
             status = MemberStatus.ACTIVE,
             ageVerified = true,
@@ -236,7 +245,11 @@ class EmailChangeServiceTest {
                 memberId, VerificationPurpose.EMAIL_CHANGE, now,
             )
         }
-        verify(exactly = 0) { verificationRepository.consumeActiveByMemberId(any(), any()) }
+        verify(exactly = 0) {
+            verificationRepository.consumeActiveByMemberIdAndPurpose(
+                memberId, VerificationPurpose.REGISTRATION, any(),
+            )
+        }
     }
 
     // --- R7 확인 ---
@@ -338,6 +351,7 @@ class EmailChangeServiceTest {
     fun `확인 시점에 그 주소가 선점됐으면 거절한다`() {
         // 요청과 확인 사이에 다른 회원이 그 주소로 가입할 수 있다.
         every { verificationRepository.findByPublicId(publicId) } returns challenge()
+        givenMember(Provider.EMAIL)
         memberRepository.identifierTaken = true
 
         assertFailsWith<EmailAlreadyInUseException> {
@@ -427,7 +441,13 @@ class EmailChangeServiceTest {
 
         service.resendEmailChange(ResendEmailChangeCommand(memberId, publicId))
 
-        verify(exactly = 0) { verificationRepository.findLatestCreatedAtByMemberId(any()) }
+        // 가입 검증 용도의 창은 보지 않는다 — 봤다면 그쪽 발급 시각에 막힐 수 있다.
+        verify(exactly = 0) {
+            verificationRepository.findLatestCreatedAtByMemberIdAndPurpose(
+                memberId,
+                VerificationPurpose.REGISTRATION,
+            )
+        }
     }
 
     @Test
@@ -441,7 +461,7 @@ class EmailChangeServiceTest {
 }
 
 /**
- * `MemberRepositoryPort`의 최소 페이크. **이 슬라이스가 쓰는 네 메서드만 실동작하고**
+ * `MemberRepositoryPort`의 최소 페이크. **이 슬라이스가 쓰는 메서드만 실동작하고**
  * 나머지는 쓰이지 않으므로 호출되면 실패시킨다 — 조용히 no-op이면 검증이 헐거워진다.
  */
 private class FakeMemberRepository : MemberRepositoryPort {
@@ -451,6 +471,9 @@ private class FakeMemberRepository : MemberRepositoryPort {
 
     /** 마지막 updateEmail 호출 인자. null이면 호출되지 않았다는 뜻이다. */
     var updatedEmail: Pair<Email, String?>? = null
+
+    /** 마지막 updateEmail이 받은 유니크 판정용 파생 식별자. */
+    var updatedEmailIdentifier: String? = null
     var updateEmailCallCount: Int = 0
 
     override fun findEmailByMemberId(memberId: Long): Email? = currentEmail
@@ -458,11 +481,19 @@ private class FakeMemberRepository : MemberRepositoryPort {
     override fun existsByProviderAndProviderUserId(provider: Provider, providerUserId: ProviderUserId): Boolean =
         identifierTaken
 
+    /** 선점 여부는 [identifierTaken] 하나로 흉내낸다 — 테스트가 고정하는 것은 판정 결과뿐이다. */
+    override fun existsByProviderAndEmailIdentifier(
+        provider: Provider,
+        emailIdentifier: String,
+        excludingMemberId: Long?,
+    ): Boolean = identifierTaken
+
     override fun load(memberId: Long): Member? = member
 
-    override fun updateEmail(memberId: Long, newEmail: Email, protectedIdentifier: String?) {
+    override fun updateEmail(memberId: Long, newEmail: Email, emailIdentifier: String, protectedIdentifier: String?) {
         updateEmailCallCount++
         updatedEmail = newEmail to protectedIdentifier
+        updatedEmailIdentifier = emailIdentifier
     }
 
     override fun existsById(memberId: Long): Boolean = unused()

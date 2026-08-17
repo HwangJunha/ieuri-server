@@ -39,22 +39,6 @@ class EmailVerificationPersistenceAdapter(
         // dirty-check로 UPDATE.
     }
 
-    /** 해당 회원의 미소비·미검증 챌린지를 한 번에 소비 처리한다. */
-    override fun consumeActiveByMemberId(memberId: Long, at: Instant) {
-        queryFactory
-            .update(verification)
-            .set(verification.consumed, true)
-            .where(
-                verification.memberId.eq(memberId),
-                verification.consumed.isFalse,
-                verification.verifiedAt.isNull,
-            )
-            .execute()
-    }
-
-    override fun findLatestCreatedAtByMemberId(memberId: Long): Instant? =
-        repository.findFirstByMemberIdOrderByCreatedAtDesc(memberId)?.createdAt
-
     override fun findLatestCreatedAtByMemberIdAndPurpose(
         memberId: Long,
         purpose: VerificationPurpose,

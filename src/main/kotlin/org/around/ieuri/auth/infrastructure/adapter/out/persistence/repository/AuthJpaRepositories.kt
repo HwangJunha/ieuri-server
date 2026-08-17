@@ -17,6 +17,16 @@ interface MemberJpaRepository : JpaRepository<MemberEntity, Long> {
     fun existsByProviderAndProviderUserId(provider: Provider, providerUserId: String): Boolean
 
     fun findByProviderAndProviderUserId(provider: Provider, providerUserId: String): MemberEntity?
+
+    /** `(provider, email)` 중복 판정(SPEC-0024 R5). 가입처럼 본인이 아직 없을 때. */
+    fun existsByProviderAndEmailIdentifier(provider: Provider, emailIdentifier: String): Boolean
+
+    /** 위와 같되 본인을 제외한다 — 이메일 변경·인증 주소 재입력은 자기 주소가 걸리면 안 된다. */
+    fun existsByProviderAndEmailIdentifierAndIdNot(
+        provider: Provider,
+        emailIdentifier: String,
+        id: Long,
+    ): Boolean
 }
 
 interface MemberProfileJpaRepository : JpaRepository<MemberProfileEntity, Long> {
@@ -47,9 +57,6 @@ interface TermsJpaRepository : JpaRepository<TermsEntity, Long> {
 interface EmailVerificationJpaRepository : JpaRepository<EmailVerificationEntity, Long> {
     fun findByPublicId(publicId: UUID): EmailVerificationEntity?
 
-    /** 가장 최근에 발급된 챌린지. 재발송 쿨다운 판정에 쓴다. */
-    fun findFirstByMemberIdOrderByCreatedAtDesc(memberId: Long): EmailVerificationEntity?
-
     /** 용도별 최근 챌린지. 쿨다운을 가입 검증과 이메일 변경으로 나눠 센다(SPEC-0011 R7). */
     fun findFirstByMemberIdAndPurposeOrderByCreatedAtDesc(
         memberId: Long,
@@ -63,6 +70,12 @@ interface PasswordResetJpaRepository : JpaRepository<PasswordResetEntity, Long> 
     fun findByPublicId(publicId: UUID): PasswordResetEntity?
 
     fun findFirstByMemberIdAndConsumedFalseOrderByCreatedAtDesc(memberId: Long): PasswordResetEntity?
+
+    /** 쿨다운 판정용. 소진 여부를 가리지 않는다 — 제한 대상은 발송이지 코드 사용이 아니다. */
+    fun findFirstByMemberIdOrderByCreatedAtDesc(memberId: Long): PasswordResetEntity?
+
+    /** 탈퇴 시 정리(FK 자식). 없으면 member 삭제가 제약에 걸려 탈퇴가 영구히 막힌다. */
+    fun deleteByMemberId(memberId: Long)
 }
 
 interface MemberAuditLogJpaRepository : JpaRepository<MemberAuditLogEntity, Long>

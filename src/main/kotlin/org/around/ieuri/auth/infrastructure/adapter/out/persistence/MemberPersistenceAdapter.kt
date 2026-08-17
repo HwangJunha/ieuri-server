@@ -5,6 +5,7 @@ import org.around.ieuri.auth.application.port.out.persistence.EmailAuthenticatio
 import org.around.ieuri.auth.application.port.out.persistence.MemberAuthentication
 import org.around.ieuri.auth.application.port.out.persistence.MemberRepositoryPort
 import org.around.ieuri.auth.application.port.out.security.EmailEncryptorPort
+import org.around.ieuri.auth.application.port.out.security.LoginIdentifierProtectorPort
 import org.around.ieuri.auth.domain.aggregate.Member
 import org.around.ieuri.auth.domain.vo.Email
 import org.around.ieuri.auth.domain.vo.Provider
@@ -17,6 +18,8 @@ import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.M
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.MemberProfileJpaRepository
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.MemberRoleJpaRepository
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.MemberTermsAgreementJpaRepository
+import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.PasswordResetJpaRepository
+import org.around.ieuri.common.security.EmailVerificationStatusPort
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
@@ -32,16 +35,41 @@ class MemberPersistenceAdapter(
     private val agreementRepository: MemberTermsAgreementJpaRepository,
     private val emailVerificationRepository: EmailVerificationJpaRepository,
     private val memberRoleRepository: MemberRoleJpaRepository,
+    private val passwordResetRepository: PasswordResetJpaRepository,
     private val encryptor: EmailEncryptorPort,
-) : MemberRepositoryPort {
+    private val identifierProtector: LoginIdentifierProtectorPort,
+) : MemberRepositoryPort, EmailVerificationStatusPort {
+
+    /**
+     * 미인증 게이트(SPEC-0024 R9)가 매 요청 부른다. 없는 회원은 거짓 —
+     * 존재하지 않는 주체를 통과시키지 않는다.
+     */
+    override fun isEmailVerified(memberId: Long): Boolean =
+        memberRepository.findById(memberId).orElse(null)?.emailVerified ?: false
 
     override fun existsByProviderAndProviderUserId(provider: Provider, providerUserId: ProviderUserId): Boolean =
         memberRepository.existsByProviderAndProviderUserId(provider, providerUserId.value)
 
+    override fun existsByProviderAndEmailIdentifier(
+        provider: Provider,
+        emailIdentifier: String,
+        excludingMemberId: Long?,
+    ): Boolean =
+        if (excludingMemberId == null) {
+            memberRepository.existsByProviderAndEmailIdentifier(provider, emailIdentifier)
+        } else {
+            memberRepository.existsByProviderAndEmailIdentifierAndIdNot(provider, emailIdentifier, excludingMemberId)
+        }
+
     override fun existsById(memberId: Long): Boolean = memberRepository.existsById(memberId)
 
     override fun save(member: Member): Long {
-        val saved = memberRepository.save(member.toNewEntity(encryptor.encrypt(member.email.value)))
+        val saved = memberRepository.save(
+            member.toNewEntity(
+                encryptedEmail = encryptor.encrypt(member.email.value),
+                emailIdentifier = identifierProtector.protect(member.email.value),
+            ),
+        )
         val memberId = requireNotNull(saved.id) { "회원 저장 후 id가 없습니다." }
 
         profileRepository.save(member.toNewProfileEntity(memberId))
@@ -88,10 +116,13 @@ class MemberPersistenceAdapter(
      * 동시에 확정하려는 두 요청 중 하나는 여기서 걸린다.
      */
     @Transactional
-    override fun updateEmail(memberId: Long, newEmail: Email, protectedIdentifier: String?) {
+    override fun updateEmail(memberId: Long, newEmail: Email, emailIdentifier: String, protectedIdentifier: String?) {
         val entity = memberRepository.findById(memberId).orElse(null)
             ?: throw MemberNotFoundException("회원을 찾을 수 없습니다.")
         entity.emailEncrypted = encryptor.encrypt(newEmail.value)
+        // 유니크 판정용 파생 값이라 이메일과 **반드시 함께** 바뀐다(SPEC-0024 R5) —
+        // 어긋나면 제약이 엉뚱한 주소를 막는다. provider를 가리지 않는다.
+        entity.emailIdentifier = emailIdentifier
         if (protectedIdentifier != null) {
             entity.providerUserId = protectedIdentifier
         }
@@ -135,9 +166,20 @@ class MemberPersistenceAdapter(
         // dirty-check로 UPDATE.
     }
 
+    /**
+     * 탈퇴: 회원과 소유 데이터를 지운다. 감사 로그는 FK가 없어 보존된다.
+     *
+     * **`member`를 참조하는 FK 자식을 하나라도 빠뜨리면 탈퇴가 영구히 막힌다.** 제약 위반은
+     * 그 자식 행을 만든 회원에게만 나타나므로(비밀번호 재설정을 요청한 적 없는 계정은 정상
+     * 탈퇴된다) 평소에 드러나지 않는다. 여기 목록은 `member`를 참조하는 FK 전부와 일치해야
+     * 하며, 새 테이블이 `member_id`를 참조하면 이 목록에도 추가해야 한다.
+     *
+     * DB의 `ON DELETE CASCADE`가 아니라 애플리케이션에서 지운다 — 무엇이 함께 지워지는지가
+     * 코드에 보여야 하고, 삭제 범위가 스키마가 아니라 이 유스케이스의 결정이기 때문이다.
+     */
     override fun deleteMember(memberId: Long) {
-        // FK 자식부터 삭제 후 회원 삭제(감사 로그는 FK가 없어 보존됨).
         emailVerificationRepository.deleteByMemberId(memberId)
+        passwordResetRepository.deleteByMemberId(memberId)
         agreementRepository.deleteByMemberId(memberId)
         profileRepository.deleteByMemberId(memberId)
         memberRoleRepository.deleteByMemberId(memberId)

@@ -18,6 +18,22 @@ import java.util.UUID
 interface MemberRepositoryPort {
     fun existsByProviderAndProviderUserId(provider: Provider, providerUserId: ProviderUserId): Boolean
 
+    /**
+     * `(provider, email)` 중복 여부(SPEC-0024 R5). 다른 provider에 같은 주소가 있는 것은
+     * 충돌이 아니다 — POL-002가 다계정을 허용해 `(KAKAO, a@b.com)`과 `(EMAIL, a@b.com)`은 공존한다.
+     *
+     * 인자는 평문이 아니라 **정규화된 이메일의 보호 식별자**다
+     * ([org.around.ieuri.auth.application.port.out.security.LoginIdentifierProtectorPort.protect] 결과).
+     * 저장된 이메일 암호문은 IV가 매번 달라 등호 조회가 불가능하기 때문이다.
+     *
+     * @param excludingMemberId 본인을 제외하고 판정할 회원 id. 가입처럼 본인이 없으면 null.
+     */
+    fun existsByProviderAndEmailIdentifier(
+        provider: Provider,
+        emailIdentifier: String,
+        excludingMemberId: Long? = null,
+    ): Boolean
+
     /** 회원 존재 여부(역할 부여/회수 대상 검증용). */
     fun existsById(memberId: Long): Boolean
 
@@ -40,8 +56,12 @@ interface MemberRepositoryPort {
      * 곧 로그인 식별자(이메일의 HMAC)라 이메일만 바꾸면 다음 로그인이 실패한다. 두 값이
      * 반드시 같은 트랜잭션에서 함께 바뀌어야 하므로 한 메서드로 묶는다.
      * SNS 회원은 provider가 준 불투명 식별자를 쓰므로 null을 준다(건드리지 않는다).
+     *
+     * **[emailIdentifier]는 provider와 무관하게 항상 갱신된다**(SPEC-0024 R5) — 유니크 판정용
+     * 파생 값이라 이메일과 어긋나면 제약이 엉뚱한 주소를 막는다. `provider_user_id`와 달리
+     * SNS 회원도 대상이다.
      */
-    fun updateEmail(memberId: Long, newEmail: Email, protectedIdentifier: String?)
+    fun updateEmail(memberId: Long, newEmail: Email, emailIdentifier: String, protectedIdentifier: String?)
 
     /** 로그인용 인증 정보 조회. (provider, provider_user_id)로 회원의 id·상태를 반환. 없으면 null. */
     fun findAuthentication(provider: Provider, providerUserId: ProviderUserId): MemberAuthentication?
@@ -111,15 +131,10 @@ interface EmailVerificationRepositoryPort {
     /** attempts/consumed/verifiedAt 변경을 반영(dirty-check). */
     fun update(verification: EmailVerification)
 
-    /** 해당 회원의 활성(미소진·미검증) 챌린지를 모두 폐기(재발송 시). */
-    fun consumeActiveByMemberId(memberId: Long, at: Instant)
-
-    /** 재발송 rate limit 판정을 위한 가장 최근 발급 시각. */
-    fun findLatestCreatedAtByMemberId(memberId: Long): Instant?
-
     /**
      * 용도별 가장 최근 발급 시각. **쿨다운을 용도로 나눠 센다**(SPEC-0011 R7) —
      * 가입 검증과 이메일 변경이 한 창을 공유하면 한쪽을 보낸 직후 다른 쪽이 막힌다.
+     * 가입 검증 안에서는 재발송과 주소 정정이 한 창을 공유한다(SPEC-0024 R7-3).
      */
     fun findLatestCreatedAtByMemberIdAndPurpose(memberId: Long, purpose: VerificationPurpose): Instant?
 
@@ -138,6 +153,12 @@ interface PasswordResetRepositoryPort {
 
     /** 회원의 활성(미소진·미만료 아님은 도메인 판정) 최신 챌린지. */
     fun findActiveByMemberId(memberId: Long): PasswordReset?
+
+    /**
+     * 가장 최근 발급 시각(쿨다운 판정용). 소진 여부를 가리지 않는다 —
+     * 발송을 제한하는 것이 목적이라 코드가 이미 쓰였는지는 무관하다.
+     */
+    fun findLatestCreatedAtByMemberId(memberId: Long): Instant?
 
     /** attempts/consumed 변경을 반영(dirty-check). */
     fun update(reset: PasswordReset)

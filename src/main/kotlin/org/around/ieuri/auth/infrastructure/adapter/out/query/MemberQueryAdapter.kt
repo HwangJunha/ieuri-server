@@ -44,7 +44,7 @@ class MemberQueryAdapter(
         val row = queryFactory
             .select(
                 member.emailEncrypted, member.emailVerified, member.status, member.createdAt,
-                profile.nickname, profile.profileImageUrl,
+                member.provider, profile.nickname, profile.profileImageUrl,
             )
             .from(member)
             .leftJoin(profile).on(profile.memberId.eq(member.id))
@@ -58,6 +58,8 @@ class MemberQueryAdapter(
             profileImageUrl = row.get(profile.profileImageUrl),
             status = requireNotNull(row.get(member.status)),
             emailVerified = requireNotNull(row.get(member.emailVerified)),
+            // canChangeEmail은 저장하지 않고 이 값에서 파생한다(SPEC-0024 R6).
+            provider = requireNotNull(row.get(member.provider)),
             roles = roleCodesOf(memberId),
             permissions = permissionCodesOf(memberId),
             createdAt = requireNotNull(row.get(member.createdAt)),

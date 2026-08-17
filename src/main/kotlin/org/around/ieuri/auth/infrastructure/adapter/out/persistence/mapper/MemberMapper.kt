@@ -39,11 +39,18 @@ fun MemberEntity.toDomain(profile: MemberProfileEntity?, decryptedEmail: String)
  *
  * [encryptedEmail]을 인자로 받는다 — 암호화는 암호화 포트의 책임이므로 여기서 하지 않는다.
  */
-fun Member.toNewEntity(encryptedEmail: String): MemberEntity =
+/**
+ * 신규 저장용 엔티티. 암호화와 식별자 계산은 설정이 필요한 관심사라 **호출자가 계산해 넘긴다** —
+ * 매퍼는 순수 함수로 남는다(POL-033).
+ *
+ * [emailIdentifier]는 `(provider, email)` 유니크 판정용 파생 값이다(SPEC-0024 R5).
+ */
+fun Member.toNewEntity(encryptedEmail: String, emailIdentifier: String): MemberEntity =
     MemberEntity(
         provider = provider,
         providerUserId = providerUserId.value,
         emailEncrypted = encryptedEmail,
+        emailIdentifier = emailIdentifier,
         emailVerified = emailVerified,
         passwordHash = passwordHash?.value,
         status = status,

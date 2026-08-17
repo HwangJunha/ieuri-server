@@ -8,7 +8,6 @@ import graphql.execution.DataFetcherExceptionHandlerParameters
 import graphql.execution.DataFetcherExceptionHandlerResult
 import graphql.execution.ResultPath
 import graphql.language.SourceLocation
-import com.netflix.graphql.dgs.exceptions.DefaultDataFetcherExceptionHandler
 import java.util.concurrent.CompletableFuture
 
 /**
@@ -26,7 +25,9 @@ import java.util.concurrent.CompletableFuture
  * 자기 예외를 먼저 보고 나머지를 넘기는 구조다(TourismQueryExceptionHandler 참고).
  */
 class SecurityGraphqlExceptionHandler(
-    private val delegate: DataFetcherExceptionHandler = DefaultDataFetcherExceptionHandler(),
+    // DGS 기본 핸들러가 아니라 정제 핸들러를 끝에 둔다 — 기본 핸들러는 예외 FQCN과 메시지를
+    // 그대로 실어 내부 정보가 클라이언트까지 간다(POL-013).
+    private val delegate: DataFetcherExceptionHandler = InternalErrorSanitizingHandler(),
 ) : DataFetcherExceptionHandler {
 
     override fun handleException(
@@ -35,6 +36,10 @@ class SecurityGraphqlExceptionHandler(
         val code = when (val ex = parameters.exception) {
             is UnauthorizedException -> "UNAUTHENTICATED"
             is ForbiddenException -> "FORBIDDEN"
+            // 토큰류 실패도 인증 실패다(SPEC-0024). 여기 없으면 DGS 기본 핸들러가 코드 없이
+            // `errorType: INTERNAL`로 내보내고 예외 FQCN까지 메시지에 실린다 —
+            // 클라이언트의 자동 재로그인은 이 코드로 분기하므로 그때 동작하지 못한다.
+            is TokenAuthenticationException -> ex.code
             // 두 도메인이 함께 쓰는 조회 인자 오류. 여기서 코드를 실어야 클라이언트가 분기한다.
             is EmptyCategorySetException -> ex.code
             else -> return delegate.handleException(parameters)
@@ -52,10 +57,17 @@ class SecurityGraphqlExceptionHandler(
     }
 }
 
-private class SecurityGraphQLError(
+/**
+ * 코드를 extensions에 싣는 최상위 오류(POL-016).
+ *
+ * `internal`인 이유는 미인증 게이트가 이 형태를 재사용하기 때문이다 — 게이트는
+ * DataFetcher 바깥(Instrumentation)에서 거절하므로 이 핸들러를 거치지 못하고
+ * 오류 객체를 직접 만들어 던진다. 두 곳이 extensions 모양을 따로 갖지 않게 한다.
+ */
+internal class SecurityGraphQLError(
     private val message: String,
-    private val path: ResultPath?,
-    private val location: SourceLocation?,
+    private val path: ResultPath? = null,
+    private val location: SourceLocation? = null,
     private val code: String,
 ) : GraphQLError {
 

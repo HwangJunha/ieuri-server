@@ -15,8 +15,9 @@ import java.util.concurrent.CompletableFuture
  * 쿼리(spots/availableSpotCategories) 도메인 오류를 최상위 errors[]로 내리되, DGS ErrorType으로 분류한다(spec §4.8).
  * 이 스키마엔 쿼리용 payload 컨벤션이 없어(뮤테이션만 BaseResponse) 쿼리 오류는 errors[]로 표면화한다.
  *
- * SpotQueryException이 아니면 DGS 기본 핸들러(DefaultDataFetcherExceptionHandler)에 위임한다 — auth 등 다른
- * 도메인·시스템 오류는 기존 DGS 처리를 그대로 유지한다(이 빈이 @ConditionalOnMissingBean 기본 빈을 대체하므로).
+ * SpotQueryException이 아니면 다음 핸들러에 위임한다. 이 빈이 앱의 유일한 핸들러 빈이므로
+ * (@ConditionalOnMissingBean 기본 빈을 대체한다) 체인 전체의 입구이기도 하다:
+ * tourism → 인증·권한(SecurityGraphqlExceptionHandler) → 정제(InternalErrorSanitizingHandler).
  * extensions.classification에 BAD_REQUEST/FAILED_PRECONDITION/UNAVAILABLE을, code에 논리 코드 문자열을 담는다.
  */
 @Component

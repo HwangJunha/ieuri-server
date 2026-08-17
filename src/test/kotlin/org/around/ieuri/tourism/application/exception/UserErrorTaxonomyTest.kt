@@ -1,6 +1,5 @@
 package org.around.ieuri.tourism.application.exception
 
-import org.around.ieuri.auth.application.exception.EmailNotVerifiedException
 import org.around.ieuri.auth.application.exception.InactiveMemberException
 import org.around.ieuri.auth.application.exception.InvalidCredentialsException
 import org.around.ieuri.auth.application.exception.MemberAlreadyRegisteredException
@@ -52,7 +51,6 @@ class UserErrorTaxonomyTest {
         RoleNotFoundException("m"),
         SelfDemotionException("m"),
         InvalidCredentialsException("m"),
-        EmailNotVerifiedException("m"),
     )
 
     @Test
