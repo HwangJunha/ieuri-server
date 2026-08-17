@@ -8,7 +8,6 @@ import graphql.execution.DataFetcherExceptionHandlerParameters
 import graphql.execution.DataFetcherExceptionHandlerResult
 import graphql.execution.ResultPath
 import graphql.language.SourceLocation
-import com.netflix.graphql.dgs.exceptions.DefaultDataFetcherExceptionHandler
 import java.util.concurrent.CompletableFuture
 
 /**
@@ -26,7 +25,9 @@ import java.util.concurrent.CompletableFuture
  * 자기 예외를 먼저 보고 나머지를 넘기는 구조다(TourismQueryExceptionHandler 참고).
  */
 class SecurityGraphqlExceptionHandler(
-    private val delegate: DataFetcherExceptionHandler = DefaultDataFetcherExceptionHandler(),
+    // DGS 기본 핸들러가 아니라 정제 핸들러를 끝에 둔다 — 기본 핸들러는 예외 FQCN과 메시지를
+    // 그대로 실어 내부 정보가 클라이언트까지 간다(POL-013).
+    private val delegate: DataFetcherExceptionHandler = InternalErrorSanitizingHandler(),
 ) : DataFetcherExceptionHandler {
 
     override fun handleException(
