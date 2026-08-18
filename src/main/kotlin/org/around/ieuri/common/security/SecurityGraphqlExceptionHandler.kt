@@ -33,20 +33,21 @@ class SecurityGraphqlExceptionHandler(
     override fun handleException(
         parameters: DataFetcherExceptionHandlerParameters,
     ): CompletableFuture<DataFetcherExceptionHandlerResult> {
-        val code = when (val ex = parameters.exception) {
+        val unwrapped = unwrap(parameters.exception)
+        val code = when (unwrapped) {
             is UnauthorizedException -> "UNAUTHENTICATED"
             is ForbiddenException -> "FORBIDDEN"
             // 토큰류 실패도 인증 실패다(SPEC-0024). 여기 없으면 DGS 기본 핸들러가 코드 없이
             // `errorType: INTERNAL`로 내보내고 예외 FQCN까지 메시지에 실린다 —
             // 클라이언트의 자동 재로그인은 이 코드로 분기하므로 그때 동작하지 못한다.
-            is TokenAuthenticationException -> ex.code
+            is TokenAuthenticationException -> unwrapped.code
             // 두 도메인이 함께 쓰는 조회 인자 오류. 여기서 코드를 실어야 클라이언트가 분기한다.
-            is EmptyCategorySetException -> ex.code
+            is EmptyCategorySetException -> unwrapped.code
             else -> return delegate.handleException(parameters)
         }
 
         val error = SecurityGraphQLError(
-            message = parameters.exception.message ?: code,
+            message = unwrapped.message ?: code,
             path = parameters.path,
             location = parameters.sourceLocation,
             code = code,
@@ -55,6 +56,37 @@ class SecurityGraphqlExceptionHandler(
             DataFetcherExceptionHandlerResult.newResult().error(error).build(),
         )
     }
+
+    /**
+     * 감싸인 예외를 푼다. **이것이 없으면 인증 실패가 INTERNAL_ERROR로 나간다.**
+     *
+     * DGS는 리졸버 메서드를 리플렉션으로 호출하므로, 리졸버가 던진 예외가
+     * `InvocationTargetException`(또는 그것을 다시 감싼 `CompletionException`)에 담겨
+     * 도착한다. `parameters.exception`을 그대로 `is`로 보면 그 껍데기에 걸려 아래
+     * 정제 핸들러까지 흘러가고, 클라이언트는 코드 없는 `INTERNAL_ERROR`를 받는다 —
+     * 자동 토큰 갱신은 `UNAUTHENTICATED`를 보고 도는 링크 계층에서 일어나므로 그때
+     * 갱신이 트리거되지 않아 재로그인 화면으로도 못 간다(실측: conversations 조회).
+     *
+     * 원인 사슬을 끝까지 따라가되 **자기 자신을 cause로 갖는 예외에서 멈춘다** —
+     * 그런 경우 무한 루프가 된다.
+     */
+    private fun unwrap(exception: Throwable): Throwable {
+        var current = exception
+        while (true) {
+            val cause = current.cause ?: return current
+            if (cause === current) return current
+            // 이미 우리가 아는 예외면 더 풀지 않는다 — 그 예외의 cause까지 내려가면
+            // 엉뚱한 하위 원인으로 분류될 수 있다.
+            if (current.isKnown()) return current
+            current = cause
+        }
+    }
+
+    private fun Throwable.isKnown(): Boolean =
+        this is UnauthorizedException ||
+            this is ForbiddenException ||
+            this is TokenAuthenticationException ||
+            this is EmptyCategorySetException
 }
 
 /**
