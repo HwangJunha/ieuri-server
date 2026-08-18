@@ -65,11 +65,15 @@ extend type Mutation {
     deleteSpotQuestion(input: DeleteSpotQuestionInput!): DeleteSpotQuestionPayload!
 
     """
-    질문 작성자가 자기 질문을 해결됨으로 표시한다. 이미 해결됨에 다시 호출해도 성공이다(멱등).
-    되돌리는 뮤테이션은 없다.
+    질문 작성자가 자기 질문의 해결 상태를 바꾼다. **양방향이다** —
+    `resolved: true`면 해결됨, `false`면 미해결로 되돌린다.
+
+    양쪽 모두 멱등이라 이미 그 상태여도 성공이다. 타인 질문은 NOT_QUESTION_OWNER다.
 
     resolved는 "이 답이 정답"이 아니라 "질문자가 충분히 알게 되었다"는 뜻이다 —
-    답변 채택은 두지 않는다.
+    답변 채택은 두지 않는다. 그 판단이 바뀔 수 있어 되돌릴 수 있다.
+
+    되돌리면 목록에서 미해결 구간(먼저 오는 쪽)으로 올라간다. 답변은 그대로 남는다.
     """
     resolveSpotQuestion(input: ResolveSpotQuestionInput!): ResolveSpotQuestionPayload!
 
@@ -229,6 +233,9 @@ type DeleteSpotQuestionPayload implements BaseResponse {
 
 input ResolveSpotQuestionInput {
     questionId: ID!
+
+    "true면 해결됨, false면 미해결로 되돌린다. 이미 그 상태여도 성공이다."
+    resolved: Boolean!
 }
 
 type ResolveSpotQuestionPayload implements BaseResponse {

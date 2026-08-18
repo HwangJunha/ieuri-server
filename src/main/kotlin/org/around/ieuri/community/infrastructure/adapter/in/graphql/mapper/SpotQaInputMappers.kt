@@ -34,7 +34,7 @@ fun DeleteSpotQuestionInput.toCommand(): DeleteSpotQuestionCommand =
     DeleteSpotQuestionCommand(questionId = questionId)
 
 fun ResolveSpotQuestionInput.toCommand(): ResolveSpotQuestionCommand =
-    ResolveSpotQuestionCommand(questionId = questionId)
+    ResolveSpotQuestionCommand(questionId = questionId, resolved = resolved)
 
 fun CreateSpotAnswerInput.toCommand(): CreateSpotAnswerCommand = CreateSpotAnswerCommand(
     questionId = questionId,

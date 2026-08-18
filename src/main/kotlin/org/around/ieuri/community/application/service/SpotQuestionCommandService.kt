@@ -66,12 +66,17 @@ class SpotQuestionCommandService(
         questionRepositoryPort.deleteWithDescendants(command.questionId)
     }
 
-    /** 이미 해결됨에 다시 호출해도 성공이다 — 멱등이며 되돌리는 경로는 없다(AC-8.3). */
+    /**
+     * 해결 상태 변경. **양방향이며 양쪽 다 멱등이다**(R8) — 이미 그 상태여도 성공이다.
+     *
+     * 되돌리면 목록의 미해결 구간으로 올라간다(정렬이 `resolved ASC`라서다). 답변은
+     * 그대로 남는다 — 해결 표시는 답변을 막지도 지우지도 않는다.
+     */
     @Transactional
     override fun resolveQuestion(command: ResolveSpotQuestionCommand, memberId: Long) {
         val question = questionRepositoryPort.findById(command.questionId)
             ?: throw QuestionNotFoundException()
-        if (!question.resolveBy(memberId)) throw NotQuestionOwnerException()
+        if (!question.changeResolvedBy(memberId, command.resolved)) throw NotQuestionOwnerException()
         questionRepositoryPort.save(question)
     }
 

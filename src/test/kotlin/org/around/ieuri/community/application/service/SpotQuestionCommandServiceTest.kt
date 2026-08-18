@@ -136,18 +136,37 @@ class SpotQuestionCommandServiceTest {
     fun `작성자는 해결 표시를 하고 저장한다`() {
         every { questionRepository.findById(questionId) } returns question()
 
-        service.resolveQuestion(ResolveSpotQuestionCommand(questionId), memberId)
+        service.resolveQuestion(ResolveSpotQuestionCommand(questionId, resolved = true), memberId)
 
         verify { questionRepository.save(match { it.resolved }) }
+    }
+
+    /** R8 — 되돌리기. 저장되는 애그리거트의 resolved가 실제로 false여야 한다. */
+    @Test
+    fun `작성자는 해결을 미해결로 되돌리고 저장한다`() {
+        every { questionRepository.findById(questionId) } returns question(resolved = true)
+
+        service.resolveQuestion(ResolveSpotQuestionCommand(questionId, resolved = false), memberId)
+
+        verify { questionRepository.save(match { !it.resolved }) }
     }
 
     @Test
     fun `이미 해결된 질문에 다시 표시해도 성공이다`() {
         every { questionRepository.findById(questionId) } returns question(resolved = true)
 
-        service.resolveQuestion(ResolveSpotQuestionCommand(questionId), memberId)
+        service.resolveQuestion(ResolveSpotQuestionCommand(questionId, resolved = true), memberId)
 
         verify { questionRepository.save(match { it.resolved }) }
+    }
+
+    @Test
+    fun `이미 미해결인 질문을 되돌려도 성공이다`() {
+        every { questionRepository.findById(questionId) } returns question(resolved = false)
+
+        service.resolveQuestion(ResolveSpotQuestionCommand(questionId, resolved = false), memberId)
+
+        verify { questionRepository.save(match { !it.resolved }) }
     }
 
     @Test
@@ -155,7 +174,18 @@ class SpotQuestionCommandServiceTest {
         every { questionRepository.findById(questionId) } returns question(authorId = memberId + 1)
 
         assertFailsWith<NotQuestionOwnerException> {
-            service.resolveQuestion(ResolveSpotQuestionCommand(questionId), memberId)
+            service.resolveQuestion(ResolveSpotQuestionCommand(questionId, resolved = true), memberId)
+        }
+        verify(exactly = 0) { questionRepository.save(any()) }
+    }
+
+    @Test
+    fun `타인의 질문은 되돌릴 수도 없다`() {
+        every { questionRepository.findById(questionId) } returns
+            question(authorId = memberId + 1, resolved = true)
+
+        assertFailsWith<NotQuestionOwnerException> {
+            service.resolveQuestion(ResolveSpotQuestionCommand(questionId, resolved = false), memberId)
         }
         verify(exactly = 0) { questionRepository.save(any()) }
     }
@@ -165,7 +195,7 @@ class SpotQuestionCommandServiceTest {
         every { questionRepository.findById(questionId) } returns null
 
         assertFailsWith<QuestionNotFoundException> {
-            service.resolveQuestion(ResolveSpotQuestionCommand(questionId), memberId)
+            service.resolveQuestion(ResolveSpotQuestionCommand(questionId, resolved = true), memberId)
         }
     }
 

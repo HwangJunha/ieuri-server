@@ -48,8 +48,20 @@ class SpotQaInputMapperTest {
     }
 
     @Test
-    fun `해결 표시 입력이 옮겨진다`() {
-        assertEquals(34L, ResolveSpotQuestionInput(questionId = 34L).toCommand().questionId)
+    fun `해결 표시 입력이 필드별로 옮겨진다`() {
+        val command = ResolveSpotQuestionInput(questionId = 34L, resolved = true).toCommand()
+
+        assertEquals(34L, command.questionId)
+        assertEquals(true, command.resolved)
+    }
+
+    /** 되돌리기가 true로 굳어 버리면 해제가 동작하지 않는다 — 값이 그대로 흘러야 한다. */
+    @Test
+    fun `되돌리기 입력의 resolved가 false로 옮겨진다`() {
+        val command = ResolveSpotQuestionInput(questionId = 34L, resolved = false).toCommand()
+
+        assertEquals(34L, command.questionId)
+        assertEquals(false, command.resolved)
     }
 
     @Test

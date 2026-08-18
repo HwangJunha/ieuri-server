@@ -23,7 +23,16 @@ data class DeleteSpotQuestionCommand(val questionId: Long) {
     }
 }
 
-data class ResolveSpotQuestionCommand(val questionId: Long) {
+/**
+ * 해결 상태 변경(R8). **양방향이다** — [resolved]가 false면 미해결로 되돌린다.
+ *
+ * 불리언을 받는 이유는 뮤테이션을 둘로 나누지 않기 위해서다. 해제 전용 뮤테이션을 두면
+ * 소유자 판정·멱등 규약이 두 벌이 되고 갈라진다.
+ */
+data class ResolveSpotQuestionCommand(
+    val questionId: Long,
+    val resolved: Boolean,
+) {
     init {
         require(questionId > 0) { "questionId는 양수여야 합니다." }
     }

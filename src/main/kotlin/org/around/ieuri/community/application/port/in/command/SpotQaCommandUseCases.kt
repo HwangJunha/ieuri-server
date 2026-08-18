@@ -21,7 +21,7 @@ interface SpotQuestionCommandUseCase {
     /** 딸린 답변·답글도 함께 삭제된다(AC-10.3). */
     fun deleteQuestion(command: DeleteSpotQuestionCommand, memberId: Long)
 
-    /** 이미 해결됨이어도 성공이다 — 멱등하며 되돌리는 경로는 없다(R8). */
+    /** 해결·미해결 양방향이며 양쪽 다 멱등이다(R8). */
     fun resolveQuestion(command: ResolveSpotQuestionCommand, memberId: Long)
 }
 

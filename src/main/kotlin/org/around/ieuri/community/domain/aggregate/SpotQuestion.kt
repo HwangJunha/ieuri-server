@@ -8,8 +8,8 @@ import java.time.Instant
  *
  * 글([Post])과 달리 [catalogId]가 필수다 — 질문은 언제나 어떤 장소에 대한 것이다.
  *
- * **[resolved]는 한 방향으로만 간다.** 되돌리는 수단을 두지 않았고, 그 뜻은 "이 답이 정답"이
- * 아니라 "질문자가 충분히 알게 되었다"이다.
+ * **[resolved]는 양방향으로 전이한다**(R8). 그 뜻은 "이 답이 정답"이 아니라 "질문자가
+ * 충분히 알게 되었다"이며, 그 판단이 바뀔 수 있으므로 되돌릴 수 있다.
  *
  * 좋아요 자격은 이 모델이 모른다 — 다른 애그리게이트(SpotReaction)의 상태이며 응용 계층이
  * 쓰기 시점에 판정한다.
@@ -44,10 +44,17 @@ class SpotQuestion private constructor(
 
     val deleted: Boolean get() = deletedAt != null
 
-    /** 작성자 본인만 해결 표시를 할 수 있다. 이미 해결됨이어도 true다 — 멱등이다. */
-    fun resolveBy(memberId: Long): Boolean {
+    /**
+     * 해결 상태를 [resolved]로 바꾼다. **작성자 본인만 할 수 있고 양방향이다**(R8).
+     *
+     * 이미 그 상태여도 true다 — 양쪽 모두 멱등이라 재시도가 안전하다. 소유자가 아니면
+     * false이며 상태는 그대로다.
+     *
+     * 되돌려도 답변은 지우지 않는다 — 해결 표시는 답변을 막지도 지우지도 않는다.
+     */
+    fun changeResolvedBy(memberId: Long, resolved: Boolean): Boolean {
         if (authorId != memberId) return false
-        resolved = true
+        this.resolved = resolved
         return true
     }
 

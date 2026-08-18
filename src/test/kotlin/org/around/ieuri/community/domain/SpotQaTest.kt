@@ -80,19 +80,54 @@ class SpotQuestionTest {
     fun `작성자는 해결 표시를 할 수 있고 멱등이다`() {
         val question = restored()
 
-        assertTrue(question.resolveBy(authorId))
+        assertTrue(question.changeResolvedBy(authorId, resolved = true))
         assertTrue(question.resolved)
-        // 이미 해결됨에 다시 호출해도 성공이다(AC-8.3).
-        assertTrue(question.resolveBy(authorId))
+        // 이미 해결됨에 다시 호출해도 성공이다(AC-8.4).
+        assertTrue(question.changeResolvedBy(authorId, resolved = true))
+        assertTrue(question.resolved)
+    }
+
+    /** R8 — 양방향이다. 되돌릴 수 없으면 잘못 누른 상태에 갇힌다. */
+    @Test
+    fun `작성자는 해결을 미해결로 되돌릴 수 있고 멱등이다`() {
+        val question = restored()
+        question.changeResolvedBy(authorId, resolved = true)
+
+        assertTrue(question.changeResolvedBy(authorId, resolved = false))
+        assertFalse(question.resolved)
+        // 이미 미해결에 다시 호출해도 성공이다(AC-8.5).
+        assertTrue(question.changeResolvedBy(authorId, resolved = false))
+        assertFalse(question.resolved)
+    }
+
+    @Test
+    fun `해결과 미해결을 오갈 수 있다`() {
+        val question = restored()
+
+        question.changeResolvedBy(authorId, resolved = true)
+        assertTrue(question.resolved)
+        question.changeResolvedBy(authorId, resolved = false)
+        assertFalse(question.resolved)
+        question.changeResolvedBy(authorId, resolved = true)
         assertTrue(question.resolved)
     }
 
     @Test
-    fun `타인은 해결 표시를 할 수 없고 상태가 바뀌지 않는다`() {
+    fun `타인은 해결 상태를 바꿀 수 없고 상태가 그대로다`() {
         val question = restored()
 
-        assertFalse(question.resolveBy(authorId + 1))
+        assertFalse(question.changeResolvedBy(authorId + 1, resolved = true))
         assertFalse(question.resolved)
+    }
+
+    /** 되돌리기도 소유자만 — 타인이 남의 질문을 미해결로 만들 수 없다. */
+    @Test
+    fun `타인은 해결된 질문을 되돌릴 수 없다`() {
+        val question = restored()
+        question.changeResolvedBy(authorId, resolved = true)
+
+        assertFalse(question.changeResolvedBy(authorId + 1, resolved = false))
+        assertTrue(question.resolved)
     }
 
     @Test
