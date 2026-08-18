@@ -55,6 +55,8 @@ interface SpotQueryPort {
      * 그 언어의 원본이 없다(실측 36,000건 이상) — 목록·검색에는 나오는데 상세만 막히면
      * 번역이 무의미해진다. 돌려받은 [SpotIdentity.language]가 실제 원본 언어이며, 호출자는
      * **그 언어로 upstream에 물어야 한다** — 없는 contentId로 물으면 실패한다.
+     *
+     * 좌표([SpotIdentity.mapX]/[SpotIdentity.mapY])는 원본 행이 아니라 **카탈로그**의 값이다.
      */
     fun findIdentity(catalogId: Long, language: DomainLocale): SpotIdentity?
 
@@ -162,7 +164,10 @@ data class SpotSearchResult(
     val distanceMeters: Double,
 )
 
-/** `spot.id`가 가리키는 행의 upstream 식별 정보. 상세 조회의 TourAPI 폴백과 언어 검증에만 쓴다. */
+/**
+ * `spot.id`가 가리키는 행의 upstream 식별 정보와 카탈로그 좌표.
+ * 상세 조회의 TourAPI 폴백·언어 검증, 그리고 상세 응답의 좌표(SPEC-0027 R1)에 쓴다.
+ */
 data class SpotIdentity(
     /**
      * 원본 `spot.id`. **상세 캐시·`spot_detail` 계열의 키다.**
@@ -174,4 +179,8 @@ data class SpotIdentity(
     val spotId: Long,
     val contentId: String,
     val language: DomainLocale,
+    /** 경도. **`spot_catalog`의 값이며 원본 `spot` 행의 값이 아니다**(SPEC-0027). */
+    val mapX: Double,
+    /** 위도. 출처는 [mapX]와 같다. */
+    val mapY: Double,
 )

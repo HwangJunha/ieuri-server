@@ -95,6 +95,8 @@ class SpotQueryServiceTest {
                 spotId = catalogId + SPOT_ID_OFFSET,
                 contentId = catalogId.toString(),
                 language = secondArg(),
+                mapX = CATALOG_MAP_X,
+                mapY = CATALOG_MAP_Y,
             )
         }
         every { spotQueryPort.searchNearby(any()) } returns emptyList()
@@ -579,12 +581,90 @@ class SpotQueryServiceTest {
         verify(exactly = 0) { spotCachePort.putDetail(any(), any()) }
     }
 
+    // ── 상세 좌표(SPEC-0027 R1) ──────────────────────────────────────
+    //
+    // 본문은 캐시·DB·upstream·부재 폴백 네 경로로 갈리지만 **좌표의 출처는 카탈로그 하나뿐이다.**
+    // 네 경로를 모두 세우는 이유가 그것이다 — 하나라도 다른 곳에서 좌표를 읽으면 그 경로만
+    // 조용히 다른 값을 내보낸다.
+
+    @Test
+    fun `R1-1 - upstream 경로의 상세에 카탈로그 좌표가 실린다`() {
+        every { tourInfoPort.findDetail(any()) } returns detail()
+
+        val view = service.spotDetail(100L, DomainLocale.KO)
+
+        assertEquals(CATALOG_MAP_X, view.mapX)
+        assertEquals(CATALOG_MAP_Y, view.mapY)
+    }
+
+    @Test
+    fun `R1-2 - 본문이 캐시에서 와도 좌표가 실린다`() {
+        // **이 스펙의 핵심 회귀 지점.** 좌표를 캐시 DTO에 담는 구현이면 이미 캐시된 항목이
+        // TTL 내내 기본값(0.0)을 돌려준다 — 캐시에 좌표가 없는 항목으로 세워야 그것이 잡힌다.
+        every { spotCachePort.getDetail(spotIdOf(100L)) } returns CachedDetail(detail(), bodyAbsent = false)
+
+        val view = service.spotDetail(100L, DomainLocale.KO)
+
+        verify(exactly = 0) { tourInfoPort.findDetail(any()) }
+        assertEquals(CATALOG_MAP_X, view.mapX)
+        assertEquals(CATALOG_MAP_Y, view.mapY)
+    }
+
+    @Test
+    fun `R1-2 - 본문이 DB에서 와도 좌표가 실린다`() {
+        every { spotCachePort.getDetail(any()) } returns null
+        every { spotDetailStorePort.findDetail(spotIdOf(100L)) } returns stored()
+
+        val view = service.spotDetail(100L, DomainLocale.KO)
+
+        verify(exactly = 0) { tourInfoPort.findDetail(any()) }
+        assertEquals(CATALOG_MAP_X, view.mapX)
+        assertEquals(CATALOG_MAP_Y, view.mapY)
+    }
+
+    @Test
+    fun `R1-3 - 본문 부재 폴백에서도 좌표는 카탈로그에서 온다`() {
+        // 폴백은 findSpotBasics로 제목·주소를 채우는데, 그 DTO에도 좌표 필드가 있다.
+        // **좌표는 거기서 오면 안 된다** — basics()는 일부러 다른 값을 갖고 있어 출처가 갈리면 실패한다.
+        every { tourInfoPort.findDetail(any()) } returns null
+
+        val view = service.spotDetail(100L, DomainLocale.KO)
+
+        assertEquals(CATALOG_MAP_X, view.mapX, "폴백 좌표도 카탈로그(identity)에서 와야 한다")
+        assertEquals(CATALOG_MAP_Y, view.mapY, "폴백 좌표도 카탈로그(identity)에서 와야 한다")
+    }
+
+    @Test
+    fun `R1-1 - 경도와 위도가 뒤바뀌지 않는다`() {
+        // mapX가 경도, mapY가 위도다. 두 값이 같으면 뒤바뀐 매핑이 통과하므로 포트 응답을
+        // 서로 다른 값으로 세우고 각각을 따로 판정한다.
+        every { spotQueryPort.findIdentity(100L, DomainLocale.KO) } returns SpotIdentity(
+            spotId = spotIdOf(100L),
+            contentId = "100",
+            language = DomainLocale.KO,
+            mapX = 129.0756,
+            mapY = 35.1796,
+        )
+        every { tourInfoPort.findDetail(any()) } returns detail()
+
+        val view = service.spotDetail(100L, DomainLocale.KO)
+
+        assertEquals(129.0756, view.mapX, "mapX는 경도다")
+        assertEquals(35.1796, view.mapY, "mapY는 위도다")
+    }
+
     @Test
     fun `catalog_id를 contentId로 해석해 upstream에 전달한다`() {
         // 외부 식별자(카탈로그 id)와 upstream 식별자(contentId)는 별개다 — 그대로 넘기는 것이
         // 아니라 (카탈로그, 언어)로 해석해서 넘긴다.
         every { spotQueryPort.findIdentity(777L, DomainLocale.JA) } returns
-            SpotIdentity(spotId = 777L + SPOT_ID_OFFSET, contentId = "ta-999", language = DomainLocale.JA)
+            SpotIdentity(
+                spotId = 777L + SPOT_ID_OFFSET,
+                contentId = "ta-999",
+                language = DomainLocale.JA,
+                mapX = CATALOG_MAP_X,
+                mapY = CATALOG_MAP_Y,
+            )
         val captured = slot<SpotDetailQuery>()
         every { tourInfoPort.findDetail(capture(captured)) } returns detail()
 
@@ -600,7 +680,13 @@ class SpotQueryServiceTest {
         // 이상) — 포트가 다른 언어 원본으로 폴백해 돌려준다. 그때 요청 언어로 upstream에
         // 물으면 그 contentId가 없어 실패한다. **돌려받은 language로 물어야 한다.**
         every { spotQueryPort.findIdentity(777L, DomainLocale.JA) } returns
-            SpotIdentity(spotId = 777L + SPOT_ID_OFFSET, contentId = "ko-123", language = DomainLocale.KO)
+            SpotIdentity(
+                spotId = 777L + SPOT_ID_OFFSET,
+                contentId = "ko-123",
+                language = DomainLocale.KO,
+                mapX = CATALOG_MAP_X,
+                mapY = CATALOG_MAP_Y,
+            )
         val captured = slot<SpotDetailQuery>()
         every { tourInfoPort.findDetail(capture(captured)) } returns detail()
 
@@ -1090,7 +1176,13 @@ class SpotQueryServiceTest {
         val catalogId = 777L
         val spotId = catalogId + SPOT_ID_OFFSET
         every { spotQueryPort.findIdentity(catalogId, DomainLocale.JA) } returns
-            SpotIdentity(spotId = spotId, contentId = "ta-999", language = DomainLocale.JA)
+            SpotIdentity(
+                spotId = spotId,
+                contentId = "ta-999",
+                language = DomainLocale.JA,
+                mapX = CATALOG_MAP_X,
+                mapY = CATALOG_MAP_Y,
+            )
         every { tourInfoPort.findDetail(any()) } returns detail()
 
         service.spotDetail(catalogId, DomainLocale.JA)
@@ -1108,6 +1200,13 @@ class SpotQueryServiceTest {
          * 테스트를 통과한다 — 실제로 그 버그가 있었다.
          */
         const val SPOT_ID_OFFSET = 1_000_000L
+
+        /**
+         * 기본 스텁의 카탈로그 좌표. **경도·위도를 서로 다른 값으로 둔다** — 같으면 mapX/mapY가
+         * 뒤바뀐 매핑이 테스트를 통과한다.
+         */
+        const val CATALOG_MAP_X = 127.0276
+        const val CATALOG_MAP_Y = 37.4979
 
         /** 기본 스텁이 [catalogId]에 대해 돌려주는 원본 `spot.id`. */
         fun spotIdOf(catalogId: Long): Long = catalogId + SPOT_ID_OFFSET

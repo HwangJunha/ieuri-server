@@ -123,11 +123,20 @@ class SpotQueryAdapter(
      * KO가 2순위인 것은 원본 언어라 본문이 가장 충실하기 때문이다.
      *
      * 원본이 하나도 없는 카탈로그만 null이다.
+     *
+     * **좌표는 원본 `spot`이 아니라 `spot_catalog`에서 읽는다**(SPEC-0027). 카탈로그 PK 조인이라
+     * 조회가 늘지 않는다.
+     *
+     * 이 조인은 **nullable 컬럼(`spot.catalog_id`, ON DELETE SET NULL)에 건 INNER 조인이다.**
+     * where가 `catalogId`(non-null)로 이미 좁혀 두어 안전하지만, 그 조건을 완화하면 조인이
+     * 필터로 바뀌어 배정되지 않은 spot이 조용히 null이 된다 — 클라이언트에는 좌표 누락이
+     * 아니라 SPOT_NOT_FOUND로 나타난다.
      */
     override fun findIdentity(catalogId: Long, language: DomainLocale): SpotIdentity? =
         queryFactory
-            .select(spot.id, spot.contentId, spot.language)
+            .select(spot.id, spot.contentId, spot.language, catalog.mapX, catalog.mapY)
             .from(spot)
+            .join(catalog).on(catalog.id.eq(spot.catalogId))
             .where(spot.catalogId.eq(catalogId))
             .orderBy(preferredOriginOrder(language).asc())
             .fetchFirst()
@@ -136,6 +145,8 @@ class SpotQueryAdapter(
                     spotId = requireNotNull(it.get(spot.id)),
                     contentId = requireNotNull(it.get(spot.contentId)),
                     language = requireNotNull(it.get(spot.language)),
+                    mapX = requireNotNull(it.get(catalog.mapX)),
+                    mapY = requireNotNull(it.get(catalog.mapY)),
                 )
             }
 
