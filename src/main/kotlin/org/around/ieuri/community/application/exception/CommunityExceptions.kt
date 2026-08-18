@@ -119,17 +119,6 @@ class InvalidInputException(message: String = "잘못된 입력입니다.") :
 
 // ── 장소 질문/답변(SPEC-0026) ────────────────────────────────────────
 
-/**
- * 좋아요 자격 없음. **반응 없음과 DISLIKE를 구분하지 않는다**(R5) — 자격은 "판정 시점의
- * 최신 반응이 LIKE"로만 성립하고, 클라이언트가 두 경우에 할 안내가 같기 때문이다.
- */
-class NotEligibleToAskException(message: String = "이 장소를 좋아요한 회원만 질문할 수 있습니다.") :
-    CommunityUserException("NOT_ELIGIBLE_TO_ASK", message)
-
-/** 답글도 답변과 같은 자격을 요구한다(AC-7.3) — 답글로 우회하면 게이팅이 무의미해진다. */
-class NotEligibleToAnswerException(message: String = "이 장소를 좋아요한 회원만 답변할 수 있습니다.") :
-    CommunityUserException("NOT_ELIGIBLE_TO_ANSWER", message)
-
 class QuestionNotFoundException(message: String = "해당 질문을 찾을 수 없습니다.") :
     CommunityUserException("QUESTION_NOT_FOUND", message)
 

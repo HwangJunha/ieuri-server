@@ -11,12 +11,11 @@ import org.around.ieuri.community.application.command.ResolveSpotQuestionCommand
 /**
  * 장소 질문 쓰기 유스케이스(SPEC-0026).
  *
- * 작성 자격(그 장소를 좋아요했는지)은 **이 계층이 판정한다** — 다른 애그리게이트의 상태라
- * 질문 도메인이 알면 경계가 무너지기 때문이다. 판정 시점은 화면 진입이 아니라 이 커맨드를
- * 처리하는 순간이다(R5).
+ * **반응으로 게이팅하지 않는다**(R5) — 로그인한 회원이면 좋아요·싫어요·무반응과 무관하게
+ * 쓸 수 있다. 남는 대상 검증은 장소가 실재하는가뿐이다.
  */
 interface SpotQuestionCommandUseCase {
-    /** 생성된 질문 id. 자격이 없으면 NOT_ELIGIBLE_TO_ASK. */
+    /** 생성된 질문 id. 장소가 없으면 SPOT_NOT_FOUND. */
     fun createQuestion(command: CreateSpotQuestionCommand, memberId: Long): Long
 
     /** 딸린 답변·답글도 함께 삭제된다(AC-10.3). */
@@ -26,10 +25,7 @@ interface SpotQuestionCommandUseCase {
     fun resolveQuestion(command: ResolveSpotQuestionCommand, memberId: Long)
 }
 
-/**
- * 답변·답글 쓰기 유스케이스. 답글도 답변과 **같은 자격**을 요구한다(AC-7.3) — 답글로
- * 우회 참여가 되면 게이팅이 무의미해진다.
- */
+/** 답변·답글 쓰기 유스케이스. 질문과 같이 반응으로 게이팅하지 않는다(R5). */
 interface SpotAnswerCommandUseCase {
     fun createAnswer(command: CreateSpotAnswerCommand, memberId: Long): Long
 

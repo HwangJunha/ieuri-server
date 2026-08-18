@@ -27,9 +27,8 @@ extend type Query {
 
 extend type Mutation {
     """
-    이 장소에 질문을 작성한다. 판정 시점의 최신 반응이 SpotReaction.LIKE인 회원만 가능하며,
-    아니면 NOT_ELIGIBLE_TO_ASK다 — 반응 없음과 DISLIKE를 모두 자격 없음으로 본다.
-    이후 반응이 바뀌어도 이미 작성한 질문은 유지된다.
+    이 장소에 질문을 작성한다. **로그인한 회원이면 누구나 가능하다** — 그 장소에 좋아요를
+    눌렀는지, 싫어요를 눌렀는지, 아무 반응도 남기지 않았는지와 무관하다.
 
     photoKeys는 confirmPostImageUploads를 통과한 확정 키여야 한다. 최대 5장.
     """
@@ -48,7 +47,7 @@ extend type Mutation {
     resolveSpotQuestion(input: ResolveSpotQuestionInput!): ResolveSpotQuestionPayload!
 
     """
-    질문에 답변한다. 그 장소를 좋아요한 회원만 가능하며 아니면 NOT_ELIGIBLE_TO_ANSWER다.
+    질문에 답변한다. **로그인한 회원이면 누구나 가능하다** — 반응 종류와 무관하다.
     질문이 해결됨으로 표시돼 있어도 답변을 막지 않는다.
     """
     createSpotAnswer(input: CreateSpotAnswerInput!): CreateSpotAnswerPayload!
@@ -60,7 +59,7 @@ extend type Mutation {
     답변에 답글을 단다. **1단계까지다** — parentAnswerId가 이미 답글을 가리키면
     REPLY_TO_REPLY_NOT_ALLOWED로 거절한다.
 
-    답변과 같은 좋아요 자격을 요구한다 — 답글로 우회 참여가 되면 게이팅이 무의미해지기 때문이다.
+    답변과 마찬가지로 로그인한 회원이면 누구나 가능하다.
     """
     createSpotAnswerReply(input: CreateSpotAnswerReplyInput!): CreateSpotAnswerReplyPayload!
 

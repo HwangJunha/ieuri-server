@@ -9,12 +9,10 @@ import org.around.ieuri.community.application.command.DeleteSpotAnswerCommand
 import org.around.ieuri.community.application.command.DeleteSpotAnswerReplyCommand
 import org.around.ieuri.community.application.exception.AnswerNotFoundException
 import org.around.ieuri.community.application.exception.NotAnswerOwnerException
-import org.around.ieuri.community.application.exception.NotEligibleToAnswerException
 import org.around.ieuri.community.application.exception.NotReplyOwnerException
 import org.around.ieuri.community.application.exception.QuestionNotFoundException
 import org.around.ieuri.community.application.exception.ReplyNotFoundException
 import org.around.ieuri.community.application.exception.ReplyToReplyNotAllowedException
-import org.around.ieuri.community.application.port.out.client.SpotLikeQueryPort
 import org.around.ieuri.community.application.port.out.persistence.SpotAnswerReplyRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.SpotAnswerRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.SpotQuestionCounterPort
@@ -30,8 +28,8 @@ import kotlin.test.assertFailsWith
 /**
  * 답변·답글 작성과 삭제(SPEC-0026 R4, R7, R10).
  *
- * 핵심 둘: **답글도 답변과 같은 자격을 요구한다**(우회 참여 차단)는 것과, 숨겨진 답변을
- * 지울 때 답변 수를 **다시 내리지 않는다**는 것이다.
+ * **자격 게이팅이 없다** — 로그인 회원이면 반응과 무관하게 답변·답글을 쓸 수 있다.
+ * 남는 규율은 1단계 제한(R7)과, 숨겨진 답변을 지울 때 답변 수를 **다시 내리지 않는 것**이다.
  */
 class SpotAnswerCommandServiceTest {
 
@@ -46,17 +44,11 @@ class SpotAnswerCommandServiceTest {
     private val replyRepository = mockk<SpotAnswerReplyRepositoryPort>(relaxed = true)
     private val questionRepository = mockk<SpotQuestionRepositoryPort>()
     private val counterPort = mockk<SpotQuestionCounterPort>(relaxed = true)
-    private val spotLikeQueryPort = mockk<SpotLikeQueryPort>()
     private val photoKeyVerifier = mockk<SpotQaPhotoKeyVerifier>()
 
     private val service = SpotAnswerCommandService(
-        answerRepository, replyRepository, questionRepository, counterPort,
-        spotLikeQueryPort, photoKeyVerifier,
+        answerRepository, replyRepository, questionRepository, counterPort, photoKeyVerifier,
     )
-
-    private fun givenEligible(eligible: Boolean = true) {
-        every { spotLikeQueryPort.likedByMember(catalogId, memberId) } returns eligible
-    }
 
     private fun givenQuestion(resolved: Boolean = false) {
         every { questionRepository.findById(questionId) } returns SpotQuestion.restore(
@@ -96,9 +88,8 @@ class SpotAnswerCommandServiceTest {
     // ── 답변 작성(R4) ──────────────────────────────────────────────
 
     @Test
-    fun `좋아요한 회원은 답변을 작성하고 답변 수가 오른다`() {
+    fun `로그인 회원은 반응과 무관하게 답변을 작성하고 답변 수가 오른다`() {
         givenQuestion()
-        givenEligible()
         givenAnswerSaveReturnsWithId()
 
         val created = service.createAnswer(CreateSpotAnswerCommand(questionId, "답변", emptyList()), memberId)
@@ -108,21 +99,8 @@ class SpotAnswerCommandServiceTest {
     }
 
     @Test
-    fun `자격이 없으면 답변할 수 없다`() {
-        givenQuestion()
-        givenEligible(eligible = false)
-
-        assertFailsWith<NotEligibleToAnswerException> {
-            service.createAnswer(CreateSpotAnswerCommand(questionId, "답변", emptyList()), memberId)
-        }
-        verify(exactly = 0) { answerRepository.save(any()) }
-        verify(exactly = 0) { counterPort.increaseAnswerCount(any()) }
-    }
-
-    @Test
     fun `해결된 질문에도 답변할 수 있다`() {
         givenQuestion(resolved = true)
-        givenEligible()
         givenAnswerSaveReturnsWithId()
 
         assertEquals(
@@ -138,27 +116,14 @@ class SpotAnswerCommandServiceTest {
         assertFailsWith<QuestionNotFoundException> {
             service.createAnswer(CreateSpotAnswerCommand(questionId, "답변", emptyList()), memberId)
         }
-        verify(exactly = 0) { spotLikeQueryPort.likedByMember(any(), any()) }
-    }
-
-    @Test
-    fun `자격은 질문이 달린 장소 기준이다`() {
-        givenQuestion()
-        givenEligible()
-        givenAnswerSaveReturnsWithId()
-
-        service.createAnswer(CreateSpotAnswerCommand(questionId, "답변", emptyList()), memberId)
-
-        // 다른 장소가 아니라 **질문의 장소**로 물었다는 것을 고정한다(AC-5.3).
-        verify { spotLikeQueryPort.likedByMember(catalogId, memberId) }
+        verify(exactly = 0) { answerRepository.save(any()) }
     }
 
     // ── 답글 작성(R7) ─────────────────────────────────────────────
 
     @Test
-    fun `자격 있는 회원은 답변에 답글을 단다`() {
+    fun `로그인 회원은 반응과 무관하게 답변에 답글을 단다`() {
         every { answerRepository.findById(answerId) } returns answer(authorId = 99L)
-        givenEligible()
         givenReplySaveReturnsWithId()
 
         val created = service.createReply(
@@ -198,20 +163,6 @@ class SpotAnswerCommandServiceTest {
                 memberId,
             )
         }
-    }
-
-    @Test
-    fun `자격이 없으면 답글도 달 수 없다`() {
-        every { answerRepository.findById(answerId) } returns answer(authorId = 99L)
-        givenEligible(eligible = false)
-
-        assertFailsWith<NotEligibleToAnswerException> {
-            service.createReply(
-                CreateSpotAnswerReplyCommand(parentAnswerId = answerId, body = "답글", photoKeys = emptyList()),
-                memberId,
-            )
-        }
-        verify(exactly = 0) { replyRepository.save(any()) }
     }
 
     // ── 삭제(R10) ─────────────────────────────────────────────────

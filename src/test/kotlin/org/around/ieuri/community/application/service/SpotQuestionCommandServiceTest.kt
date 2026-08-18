@@ -2,17 +2,16 @@ package org.around.ieuri.community.application.service
 
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.confirmVerified
 import io.mockk.verify
 import org.around.ieuri.community.application.command.CreateSpotQuestionCommand
 import org.around.ieuri.community.application.command.DeleteSpotQuestionCommand
 import org.around.ieuri.community.application.command.ResolveSpotQuestionCommand
 import org.around.ieuri.community.application.exception.InvalidInputException
-import org.around.ieuri.community.application.exception.NotEligibleToAskException
 import org.around.ieuri.community.application.exception.NotQuestionOwnerException
 import org.around.ieuri.community.application.exception.QuestionNotFoundException
 import org.around.ieuri.community.application.exception.SpotNotFoundException
 import org.around.ieuri.community.application.exception.TooManyPhotosException
-import org.around.ieuri.community.application.port.out.client.SpotLikeQueryPort
 import org.around.ieuri.community.application.port.out.client.SpotLookupPort
 import org.around.ieuri.community.application.port.out.persistence.SpotQuestionRepositoryPort
 import org.around.ieuri.community.application.query.PostSpotView
@@ -23,10 +22,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 /**
- * 질문 작성·삭제·해결(SPEC-0026 R3, R5, R8, R10).
+ * 질문 작성·삭제·해결(SPEC-0026 R3, R8, R10).
  *
- * 핵심은 **작성 자격이 쓰기 경로에서만 판정된다**는 것이다 — 반응 없음과 DISLIKE가 똑같이
- * 거부되고, 판정은 커맨드를 처리하는 순간에 일어난다.
+ * **자격 게이팅이 없다** — 로그인 회원이면 그 장소에 어떤 반응을 남겼든(무반응 포함)
+ * 질문할 수 있다. 남는 확인은 장소 존재와 입력 검증뿐이다.
  */
 class SpotQuestionCommandServiceTest {
 
@@ -36,12 +35,11 @@ class SpotQuestionCommandServiceTest {
     private val now = Instant.parse("2026-08-18T00:00:00Z")
 
     private val questionRepository = mockk<SpotQuestionRepositoryPort>(relaxed = true)
-    private val spotLikeQueryPort = mockk<SpotLikeQueryPort>()
     private val spotLookupPort = mockk<SpotLookupPort>()
     private val photoKeyVerifier = mockk<SpotQaPhotoKeyVerifier>()
 
     private val service = SpotQuestionCommandService(
-        questionRepository, spotLikeQueryPort, spotLookupPort, photoKeyVerifier,
+        questionRepository, spotLookupPort, photoKeyVerifier,
     )
 
     private fun givenSpotExists(exists: Boolean = true) {
@@ -54,10 +52,6 @@ class SpotQuestionCommandServiceTest {
             } else {
                 null
             }
-    }
-
-    private fun givenEligible(eligible: Boolean = true) {
-        every { spotLikeQueryPort.likedByMember(catalogId, memberId) } returns eligible
     }
 
     private fun givenSaveReturnsWithId() {
@@ -81,50 +75,43 @@ class SpotQuestionCommandServiceTest {
             hidden = false, deletedAt = null, createdAt = now,
         )
 
-    // ── 작성 자격(R3, R5) ───────────────────────────────────────────
+    // ── 작성(R3) ───────────────────────────────────────────────────
 
     @Test
-    fun `좋아요한 회원은 질문을 작성한다`() {
+    fun `로그인 회원은 반응과 무관하게 질문을 작성한다`() {
         givenSpotExists()
-        givenEligible()
         givenSaveReturnsWithId()
 
         assertEquals(questionId, service.createQuestion(command(), memberId))
     }
 
+    /**
+     * 좋아요 게이팅이 사라졌다는 것을 **포트 부재로** 고정한다 — 서비스가 반응을 물을 방법
+     * 자체가 없으므로, 게이팅을 되살리려면 생성자가 바뀌어 이 테스트가 컴파일되지 않는다.
+     */
     @Test
-    fun `반응이 없으면 작성 자격이 없다`() {
+    fun `장소 존재 외에는 어떤 외부 조회도 하지 않는다`() {
         givenSpotExists()
-        givenEligible(eligible = false)
-
-        assertFailsWith<NotEligibleToAskException> { service.createQuestion(command(), memberId) }
-        verify(exactly = 0) { questionRepository.save(any()) }
-    }
-
-    @Test
-    fun `자격 판정은 커맨드 처리 시점에 이루어진다`() {
-        givenSpotExists()
-        givenEligible()
         givenSaveReturnsWithId()
 
         service.createQuestion(command(), memberId)
 
-        // 화면 진입이 아니라 이 순간에 물었다는 것을 고정한다(AC-5.4).
-        verify(exactly = 1) { spotLikeQueryPort.likedByMember(catalogId, memberId) }
+        verify(exactly = 1) { spotLookupPort.findSummary(catalogId) }
+        confirmVerified(spotLookupPort)
     }
 
     @Test
-    fun `없는 장소는 자격을 묻기 전에 거부된다`() {
+    fun `없는 장소에는 질문할 수 없다`() {
         givenSpotExists(exists = false)
 
         assertFailsWith<SpotNotFoundException> { service.createQuestion(command(), memberId) }
-        verify(exactly = 0) { spotLikeQueryPort.likedByMember(any(), any()) }
+        verify(exactly = 0) { questionRepository.save(any()) }
     }
 
     // ── 입력 검증(R3, R9) ──────────────────────────────────────────
 
     @Test
-    fun `공백만 있는 본문은 자격을 묻기 전에 거부된다`() {
+    fun `공백만 있는 본문은 장소를 조회하기 전에 거부된다`() {
         assertFailsWith<InvalidInputException> { service.createQuestion(command(body = "   "), memberId) }
         verify(exactly = 0) { spotLookupPort.findSummary(any()) }
     }

@@ -59,21 +59,6 @@ interface SpotLookupPort {
 }
 
 /**
- * 장소 질문/답변의 작성 자격 판정(SPEC-0026 R3~R5). `tourism`이 구현한다.
- *
- * **community가 tourism의 반응 포트를 직접 부르지 않는다** — [SpotLookupPort]와 같은 근거로,
- * 자기 포트를 선언하고 어댑터가 위임해야 도메인 간 직접 의존이 생기지 않는다.
- *
- * 반환이 Boolean 하나인 이유는 반응 종류를 커뮤니티가 알 필요가 없기 때문이다. 자격은
- * "최신 반응이 LIKE"로만 성립하고, 반응 없음과 DISLIKE는 호출자에게 똑같이 자격 없음이다 —
- * 그 둘을 구분해 받아 봐야 커뮤니티가 할 수 있는 일이 같다.
- */
-interface SpotLikeQueryPort {
-    /** [memberId]의 [catalogId]에 대한 **판정 시점의** 최신 반응이 LIKE인지. */
-    fun likedByMember(catalogId: Long, memberId: Long): Boolean
-}
-
-/**
  * 회원 조회. `auth`가 구현한다 — SpotLookupPort와 같은 이유로 의존 방향을 뒤집어 둔다.
  */
 interface MemberLookupPort {

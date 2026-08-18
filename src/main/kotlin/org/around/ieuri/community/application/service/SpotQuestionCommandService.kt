@@ -4,13 +4,11 @@ import org.around.ieuri.community.application.command.CreateSpotQuestionCommand
 import org.around.ieuri.community.application.command.DeleteSpotQuestionCommand
 import org.around.ieuri.community.application.command.ResolveSpotQuestionCommand
 import org.around.ieuri.community.application.exception.InvalidInputException
-import org.around.ieuri.community.application.exception.NotEligibleToAskException
 import org.around.ieuri.community.application.exception.NotQuestionOwnerException
 import org.around.ieuri.community.application.exception.QuestionNotFoundException
 import org.around.ieuri.community.application.exception.SpotNotFoundException
 import org.around.ieuri.community.application.exception.TooManyPhotosException
 import org.around.ieuri.community.application.port.`in`.command.SpotQuestionCommandUseCase
-import org.around.ieuri.community.application.port.out.client.SpotLikeQueryPort
 import org.around.ieuri.community.application.port.out.client.SpotLookupPort
 import org.around.ieuri.community.application.port.out.persistence.SpotQuestionRepositoryPort
 import org.around.ieuri.community.domain.aggregate.SpotQuestion
@@ -20,17 +18,15 @@ import org.springframework.transaction.annotation.Transactional
 /**
  * 질문 작성·삭제·해결 표시(SPEC-0026 R3, R8, R10).
  *
- * **작성 자격은 이 계층이 판정한다.** 자격은 다른 애그리게이트(SpotReaction)의 상태이고,
- * 질문 도메인이 그것을 알면 경계가 무너진다. 판정 시점은 화면 진입이 아니라 이 커맨드를
- * 처리하는 순간이며(R5), 클라이언트의 버튼 노출은 UX이지 방어가 아니다.
+ * **작성 자격을 묻지 않는다.** 로그인한 회원이면 그 장소에 어떤 반응을 남겼든(좋아요·싫어요·
+ * 무반응) 질문할 수 있다 — 질문은 아직 모르는 사람이 하는 것이라, 좋아요를 먼저 요구하면
+ * 정작 물어볼 것이 있는 사람이 막힌다.
  *
- * 자격은 **쓰기 경로에만** 있다. 반응이 LIKE에서 벗어나도 이미 작성한 질문은 지우지 않는다(R6) —
- * 그 "하지 않음"을 구현하는 방법은 반응 변경 이벤트를 구독하지 않는 것이다.
+ * 남는 확인은 **장소가 실재하는가** 하나뿐이다.
  */
 @Service
 class SpotQuestionCommandService(
     private val questionRepositoryPort: SpotQuestionRepositoryPort,
-    private val spotLikeQueryPort: SpotLikeQueryPort,
     private val spotLookupPort: SpotLookupPort,
     private val photoKeyVerifier: SpotQaPhotoKeyVerifier,
 ) : SpotQuestionCommandUseCase {
@@ -42,11 +38,8 @@ class SpotQuestionCommandService(
         val body = requireValidBody(command.body)
         if (command.photoKeys.size > SpotQuestion.MAX_PHOTOS) throw TooManyPhotosException()
 
-        // 장소 존재를 자격보다 먼저 본다 — 없는 장소에 대고 "좋아요하세요"라고 답할 수는 없다.
+        // 없는 장소에는 질문을 붙일 수 없다. 부재가 곧 대상 유효성 판정이다.
         if (spotLookupPort.findSummary(command.catalogId) == null) throw SpotNotFoundException()
-        if (!spotLikeQueryPort.likedByMember(command.catalogId, memberId)) {
-            throw NotEligibleToAskException()
-        }
 
         // 하나라도 어긋나면 질문 전체를 만들지 않는다 — 부분 생성은 없다.
         val photoKeys = command.photoKeys.map { photoKeyVerifier.verify(it, memberId) }

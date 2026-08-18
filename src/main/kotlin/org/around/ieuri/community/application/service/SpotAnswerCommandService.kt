@@ -7,14 +7,12 @@ import org.around.ieuri.community.application.command.DeleteSpotAnswerReplyComma
 import org.around.ieuri.community.application.exception.AnswerNotFoundException
 import org.around.ieuri.community.application.exception.InvalidInputException
 import org.around.ieuri.community.application.exception.NotAnswerOwnerException
-import org.around.ieuri.community.application.exception.NotEligibleToAnswerException
 import org.around.ieuri.community.application.exception.NotReplyOwnerException
 import org.around.ieuri.community.application.exception.QuestionNotFoundException
 import org.around.ieuri.community.application.exception.ReplyNotFoundException
 import org.around.ieuri.community.application.exception.ReplyToReplyNotAllowedException
 import org.around.ieuri.community.application.exception.TooManyPhotosException
 import org.around.ieuri.community.application.port.`in`.command.SpotAnswerCommandUseCase
-import org.around.ieuri.community.application.port.out.client.SpotLikeQueryPort
 import org.around.ieuri.community.application.port.out.persistence.SpotAnswerReplyRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.SpotAnswerRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.SpotQuestionCounterPort
@@ -27,8 +25,9 @@ import org.springframework.transaction.annotation.Transactional
 /**
  * 답변·답글 작성과 삭제(SPEC-0026 R4, R7, R10).
  *
- * **답글도 답변과 같은 자격을 요구한다**(AC-7.3). 답글로 우회 참여가 가능하면 게이팅이
- * 무의미해지기 때문이다.
+ * **작성 자격을 묻지 않는다.** 로그인한 회원이면 그 장소에 어떤 반응을 남겼든 답변·답글을
+ * 쓸 수 있다 — 그 장소를 아는 사람과 좋아요를 누른 사람이 같지 않기 때문이다. 싫어했더라도
+ * 웨이팅이 얼마였는지는 답할 수 있다.
  *
  * 해결됨으로 표시된 질문에도 답변할 수 있다(AC-4.4) — 해결 표시는 "질문자가 충분히 알게
  * 되었다"는 뜻이지 대화를 닫는 조치가 아니다.
@@ -39,7 +38,6 @@ class SpotAnswerCommandService(
     private val replyRepositoryPort: SpotAnswerReplyRepositoryPort,
     private val questionRepositoryPort: SpotQuestionRepositoryPort,
     private val questionCounterPort: SpotQuestionCounterPort,
-    private val spotLikeQueryPort: SpotLikeQueryPort,
     private val photoKeyVerifier: SpotQaPhotoKeyVerifier,
 ) : SpotAnswerCommandUseCase {
 
@@ -50,8 +48,6 @@ class SpotAnswerCommandService(
 
         val question = questionRepositoryPort.findById(command.questionId)
             ?: throw QuestionNotFoundException()
-        // 자격은 **질문이 달린 장소** 기준이다(AC-5.3) — 다른 장소를 좋아요한 것으로는 안 된다.
-        requireEligible(question.catalogId, memberId)
 
         val photoKeys = command.photoKeys.map { photoKeyVerifier.verify(it, memberId) }
 
@@ -97,7 +93,6 @@ class SpotAnswerCommandService(
 
         val answer = answerRepositoryPort.findById(command.parentAnswerId)
             ?: throw parentNotAnswerException(command.parentAnswerId)
-        requireEligible(answer.catalogId, memberId)
 
         val photoKeys = command.photoKeys.map { photoKeyVerifier.verify(it, memberId) }
 
@@ -129,12 +124,6 @@ class SpotAnswerCommandService(
         } else {
             AnswerNotFoundException()
         }
-
-    private fun requireEligible(catalogId: Long, memberId: Long) {
-        if (!spotLikeQueryPort.likedByMember(catalogId, memberId)) {
-            throw NotEligibleToAnswerException()
-        }
-    }
 
     private fun requireValidBody(raw: String): String {
         val body = raw.trim()
