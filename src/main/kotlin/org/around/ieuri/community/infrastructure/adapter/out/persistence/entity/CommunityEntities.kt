@@ -241,8 +241,13 @@ class ReportEntity(
     @Column(name = "reporter_id", nullable = false)
     var reporterId: Long,
 
+    /**
+     * 길이는 **가장 긴 열거값을 담을 수 있어야 한다** — 지금은 SPOT_ANSWER_REPLY(17자)다.
+     * V28이 잡은 10자로는 장소 질문/답변 값 셋이 들어가지 않아 V65에서 30으로 넓혔다.
+     * 열거값을 더할 때 이 길이를 함께 보지 않으면 INSERT에서만 터진다.
+     */
     @Enumerated(EnumType.STRING)
-    @Column(name = "target_type", nullable = false, length = 10)
+    @Column(name = "target_type", nullable = false, length = 30)
     var targetType: ReportTargetType,
 
     @Column(name = "target_id", nullable = false)

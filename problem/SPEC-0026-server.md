@@ -230,6 +230,21 @@ application·domain 계층 단위 테스트만 작성한다. 어댑터·인프�
 같은 이유로 **탈퇴 시에도 계수를 맞춘다** — 남의 질문에 달린 답변을 지우면서 그 질문의
 `answerCount`를 함께 내린다. 숨겨진 답변은 이미 수에서 빠져 있어 세지 않는다.
 
+### 신고 대상 컬럼을 넓혔다 (V65)
+
+V64가 `community_report`의 CHECK 제약만 넓히고 **컬럼 길이를 함께 보지 않았다.** V28이
+정한 `VARCHAR(10)`에 새 값 셋이 들어가지 않는다 — `SPOT_ANSWER`(11) · `SPOT_QUESTION`(13) ·
+`SPOT_ANSWER_REPLY`(17).
+
+애플리케이션·스키마·CHECK가 전부 통과하고 **INSERT에서만 터지므로** 유닛테스트로는 잡히지
+않았고, 실제 신고 요청에서 `value too long for type character varying(10)`으로 드러났다.
+
+V64는 이미 적용돼 편집할 수 없어 V65로 `VARCHAR(30)`으로 넓혔다(엔티티의 `length`도 함께).
+
+**같은 실수를 막는 테스트를 더했다** — `EnumColumnLengthTest`가 모든
+`@Enumerated(STRING)` 컬럼에 대해 가장 긴 열거값이 `length` 안에 들어가는지 검사한다.
+DB도 Spring도 필요 없이 엔티티 메타데이터와 열거값만 본다.
+
 ### 해결 표시는 양방향 토글 하나다
 
 `unresolveSpotQuestion`을 따로 두지 않고 `resolveSpotQuestion(resolved: Boolean!)`으로
