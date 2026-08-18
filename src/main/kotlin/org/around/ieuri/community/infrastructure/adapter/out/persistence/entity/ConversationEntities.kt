@@ -54,6 +54,7 @@ class ConversationEntity(
 
     @Column(name = "last_read_message_id_high")
     var lastReadMessageIdHigh: Long? = null,
+
 ) {
     @PrePersist
     fun onCreate() {
@@ -100,6 +101,68 @@ class MessageEntity(
     fun onCreate() {
         if (createdAt == null) createdAt = Instant.now()
     }
+}
+
+/**
+ * 메시지가 인용한 대상의 스냅샷(SPEC-0026 R14). **메시지와 별도 표다.**
+ *
+ * 대상 종류를 [quoteType] **값으로** 표현한다 — 컬럼으로 두면 인용 대상이 늘 때마다
+ * 컬럼이 여섯씩 붙는다(community_report가 target_type으로 이미 쓰는 방식이다).
+ *
+ * [targetId]에 FK를 걸 수 없다 — 가리키는 표가 행마다 다르고, 원본이 삭제돼도 인용은
+ * 남아야 한다. 맥락을 남기는 것이 이 표의 존재 이유다.
+ */
+@Entity
+@Table(name = "community_message_quote", schema = DbSchema.COMMUNITY)
+class MessageQuoteEntity(
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    var id: Long? = null,
+
+    @Column(name = "message_id", nullable = false)
+    var messageId: Long,
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "quote_type", nullable = false, length = 30)
+    var quoteType: MessageQuoteType,
+
+    @Column(name = "target_id", nullable = false)
+    var targetId: Long,
+
+    /** 인용 카드의 제목 줄. 장소 답변이면 장소명이다. */
+    @Column(name = "title_snapshot", nullable = false, length = 255)
+    var titleSnapshot: String,
+
+    /** base64(iv || ciphertext+tag). 대화의 일부라 본문과 같이 암호화한다(POL-050). */
+    @Column(name = "primary_excerpt_encrypted", nullable = false, columnDefinition = "TEXT")
+    var primaryExcerptEncrypted: String,
+
+    @Column(name = "secondary_excerpt_encrypted", columnDefinition = "TEXT")
+    var secondaryExcerptEncrypted: String? = null,
+
+    /** 대상에 딸린 부가 식별자. 장소 답변이면 카탈로그 id와 질문 id다. */
+    @Column(name = "context_id")
+    var contextId: Long? = null,
+
+    @Column(name = "parent_id")
+    var parentId: Long? = null,
+
+    @Column(name = "created_at", nullable = false)
+    var createdAt: Instant? = null,
+) {
+    @PrePersist
+    fun onCreate() {
+        if (createdAt == null) createdAt = Instant.now()
+    }
+}
+
+/**
+ * 인용 대상의 종류. **값이 늘어도 컬럼은 그대로다** — 커뮤니티 글·상품이 인용 대상이 되면
+ * 여기 값과 DB의 CHECK만 넓힌다.
+ */
+enum class MessageQuoteType {
+    /** 장소 질문의 답변. contextId=카탈로그 id, parentId=질문 id. */
+    SPOT_ANSWER,
 }
 
 /** DM 신고 한 건. 여러 메시지를 [MessageReportItemEntity]로 묶는다(R15). */

@@ -14,8 +14,11 @@ import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QConversationEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toDomain
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toNewEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toQuoteEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toSpotQaOrigin
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.ConversationJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.MessageJpaRepository
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.MessageQuoteJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.MessageReportItemJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.MessageReportJpaRepository
 import org.slf4j.LoggerFactory
@@ -76,23 +79,53 @@ class ConversationPersistenceAdapter(
 /**
  * 메시지 적재. **본문 암복호화를 여기서 한다**(R16) — 키를 아는 것은 어댑터이고, 매퍼는
  * 암호문·평문을 파라미터로 받는 순수 함수로 남는다(POL-033).
+ *
+ * 인용은 별도 표라 **메시지를 먼저 저장해 id를 받은 뒤** 붙인다(글의 사진과 같은 순서).
  */
 @Component
 class MessagePersistenceAdapter(
     private val repository: MessageJpaRepository,
+    private val quoteRepository: MessageQuoteJpaRepository,
     private val cipher: AesGcmCipher,
 ) : MessageRepositoryPort {
 
     @Transactional
     override fun save(message: Message): Message {
         val saved = repository.saveAndFlush(message.toNewEntity(cipher.encrypt(message.body)))
-        return saved.toDomain(decryptedBody = message.body)
+        val messageId = requireNotNull(saved.id) { "저장된 메시지에는 id가 있어야 한다." }
+
+        message.spotQaOrigin?.let { origin ->
+            quoteRepository.save(
+                origin.toQuoteEntity(
+                    messageId = messageId,
+                    encryptedQuestionExcerpt = cipher.encrypt(origin.questionExcerpt),
+                    encryptedAnswerExcerpt = cipher.encrypt(origin.answerExcerpt),
+                ),
+            )
+        }
+        // 인자의 평문을 그대로 쓴다 — 방금 손에 쥔 값을 다시 복호화할 이유가 없다.
+        return saved.toDomain(decryptedBody = message.body, spotQaOrigin = message.spotQaOrigin)
     }
 
+    /** 인용을 **한 번에** 읽는다 — 메시지마다 물으면 N+1이 된다. */
     @Transactional(readOnly = true)
     override fun findAllByIds(messageIds: List<Long>): List<Message> {
         if (messageIds.isEmpty()) return emptyList()
-        return repository.findByIdIn(messageIds).map { it.toDomain(cipher.decrypt(it.bodyEncrypted)) }
+
+        val quotes = quoteRepository.findByMessageIdIn(messageIds).associate { quote ->
+            quote.messageId to quote.toSpotQaOrigin(
+                decryptedPrimaryExcerpt = cipher.decrypt(quote.primaryExcerptEncrypted),
+                decryptedSecondaryExcerpt = quote.secondaryExcerptEncrypted
+                    ?.let { cipher.decrypt(it) }
+                    .orEmpty(),
+            )
+        }
+        return repository.findByIdIn(messageIds).map { entity ->
+            entity.toDomain(
+                decryptedBody = cipher.decrypt(entity.bodyEncrypted),
+                spotQaOrigin = quotes[entity.id],
+            )
+        }
     }
 }
 

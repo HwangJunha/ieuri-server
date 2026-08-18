@@ -11,6 +11,9 @@ enum class ReportTargetType {
     POST,
     COMMENT,
     MEMBER,
+    SPOT_QUESTION,
+    SPOT_ANSWER,
+    SPOT_ANSWER_REPLY,
     ;
 
     /**

@@ -38,12 +38,19 @@ class MemberDataEraseService(
         // 표시되어야 하고, 조회 자체가 실패하면 안 된다(AC17-2).
         val messages = erasePort.deleteMessagesBySender(memberId)
 
+        // 장소 질문/답변도 같은 순서 규율을 따른다(SPEC-0026 R17) — 질문을 먼저 지우면
+        // 그 질문에 달린 남의 답변·답글이 cascade로 함께 사라지고(AC-17.2), 그 다음 남는
+        // 것이 이 회원이 *남의 질문에* 남긴 흔적이다.
+        val questions = erasePort.deleteSpotQuestionsByAuthor(memberId)
+        val answers = erasePort.deleteSpotAnswersByAuthor(memberId)
+        val replies = erasePort.deleteSpotAnswerRepliesByAuthor(memberId)
+
         // 개인정보를 담지 않는다(POL-013) — 식별자와 건수만 남긴다.
         // DM 본문·수신자는 애초에 기록 대상이 아니다.
         log.info(
             "community data erased for withdrawn member {}: posts={} comments={} likes={} hides={} " +
-                "blocks={} messages={}",
-            memberId, posts, comments, likes, hides, blocks, messages,
+                "blocks={} messages={} spotQuestions={} spotAnswers={} spotAnswerReplies={}",
+            memberId, posts, comments, likes, hides, blocks, messages, questions, answers, replies,
         )
     }
 

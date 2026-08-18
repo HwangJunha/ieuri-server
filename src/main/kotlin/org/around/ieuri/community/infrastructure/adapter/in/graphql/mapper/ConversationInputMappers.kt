@@ -3,9 +3,11 @@ package org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper
 import org.around.ieuri.common.graphql.generated.types.MarkConversationReadInput
 import org.around.ieuri.common.graphql.generated.types.ReportMessagesInput
 import org.around.ieuri.common.graphql.generated.types.SendMessageInput
+import org.around.ieuri.common.graphql.generated.types.StartConversationInput
 import org.around.ieuri.community.application.command.MarkConversationReadCommand
 import org.around.ieuri.community.application.command.ReportMessagesCommand
 import org.around.ieuri.community.application.command.SendMessageCommand
+import org.around.ieuri.community.application.command.StartConversationCommand
 import org.around.ieuri.community.domain.vo.ReportReason
 
 /**
@@ -17,10 +19,18 @@ import org.around.ieuri.community.domain.vo.ReportReason
  * 호출자(memberId)는 인증 컨텍스트에서 오므로 커맨드에 담지 않는다.
  */
 
+fun StartConversationInput.toCommand(): StartConversationCommand =
+    StartConversationCommand(counterpartMemberId = counterpartMemberId)
+
+/**
+ * 메시지 전송. **[SendMessageInput.sourceAnswerId]는 선택이다** — 없으면 인용 없는 일반
+ * 메시지이고, 있어도 답변이 사라졌거나 상대의 것이 아니면 응용 계층이 무시한다(AC-13.4).
+ */
 fun SendMessageInput.toCommand(): SendMessageCommand = SendMessageCommand(
     conversationId = conversationId,
     body = body,
     photoKey = photoKey,
+    sourceAnswerId = sourceAnswerId,
 )
 
 fun MarkConversationReadInput.toCommand(): MarkConversationReadCommand = MarkConversationReadCommand(

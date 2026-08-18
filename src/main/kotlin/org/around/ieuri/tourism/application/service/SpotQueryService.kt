@@ -286,6 +286,13 @@ class SpotQueryService(
     override fun spotLikeCount(spotId: Long): Long = spotQueryPort.countLikes(spotId)
 
     /**
+     * 최신 반응 코드. 좋아요 수와 같은 이유로 캐시 비대상이다 — 판정 시점의 상태여야 하고
+     * (SPEC-0026 R5), 반응은 언제든 덮어써진다.
+     */
+    override fun spotViewerReaction(catalogId: Long, memberId: Long): String? =
+        spotQueryPort.findReaction(catalogId, memberId)?.name
+
+    /**
      * 카탈로그 한 행만 읽는다 — 캐시도 upstream도 타지 않는다. 부재는 예외가 아니라 null이며,
      * 호출자가 그것을 "유효하지 않은 장소 id"로 해석한다.
      *

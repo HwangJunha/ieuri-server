@@ -5,18 +5,19 @@ import com.netflix.graphql.dgs.DgsData
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
-import org.around.ieuri.common.pagination.CursorPageInfo
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.community.application.port.`in`.query.ConversationQueryUseCase
 import org.around.ieuri.community.application.port.out.client.MemberLookupPort
 import org.around.ieuri.community.application.query.ConversationView
+import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper.toGql
+import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper.toGqlOrPlaceholder
+import org.around.ieuri.common.graphql.generated.types.ConversationSpotQaOrigin as GqlConversationSpotQaOrigin
 import org.around.ieuri.community.application.query.MessageView
 import org.around.ieuri.community.application.query.PostAuthorView
 import org.around.ieuri.community.application.query.TypingEventView
 import org.dataloader.DataLoader
 import org.springframework.stereotype.Component
 import java.util.concurrent.CompletableFuture
-import org.around.ieuri.common.graphql.generated.types.PageInfo as GqlPageInfo
 import org.around.ieuri.common.graphql.generated.types.PostAuthor as GqlPostAuthor
 
 /**
@@ -80,6 +81,18 @@ class ConversationQueryResolver(
         dfe.loadAuthor(dfe.conversationSource().counterpartId)
 
     /**
+     * 인용 스냅샷(SPEC-0026 R14). **추가 조회가 없다** — 메시지 행이 값을 그대로 들고 있어
+     * read DTO에 이미 담겨 있고, 여기서는 응답 타입으로 옮기기만 한다.
+     *
+     * 그럼에도 필드 리졸버인 이유는 생성 타입의 non-null 필드 때문이다 — 루트가 read DTO를
+     * 노드로 돌려주므로 GraphQL 타입으로의 변환은 필드 단위로 일어난다.
+     */
+    @DgsData(parentType = "Message", field = "spotQaOrigin")
+    fun messageSpotQaOrigin(
+        dfe: DgsDataFetchingEnvironment,
+    ): GqlConversationSpotQaOrigin? = dfe.messageSource().spotQaOrigin?.toGql()
+
+    /**
      * 메시지 발신자. **DataLoader를 쓰지 않고 직접 읽는다.**
      *
      * DataLoader는 **한 번의 GraphQL 실행에 묶인다.** 구독은 이벤트마다 실행이 새로 도는데
@@ -129,20 +142,4 @@ class ConversationQueryResolver(
         getSource<MessageView>()
             ?: error("Message 필드 리졸버는 부모가 반환한 MessageView를 소스로 받아야 한다.")
 
-    /**
-     * 회원 정보가 없어도 피드·메시지는 남는다(탈퇴해도 상대의 화면이 깨지면 안 된다, AC17-2).
-     * 작성자 표시가 비면 클라이언트가 렌더에 실패하므로 대체 표기를 내려준다.
-     */
-    private fun PostAuthorView?.toGqlOrPlaceholder(memberId: Long) = GqlPostAuthor(
-        id = this?.id ?: memberId,
-        nickname = this?.nickname ?: "알 수 없음",
-        profileImageUrl = this?.profileImageUrl,
-    )
-
-    private fun CursorPageInfo.toGql() = GqlPageInfo(
-        hasNextPage = hasNextPage,
-        hasPreviousPage = hasPreviousPage,
-        startCursor = startCursor,
-        endCursor = endCursor,
-    )
 }

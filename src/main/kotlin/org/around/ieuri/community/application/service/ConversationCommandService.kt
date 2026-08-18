@@ -14,6 +14,7 @@ import org.around.ieuri.community.application.port.`in`.command.ConversationComm
 import org.around.ieuri.community.application.port.out.client.ClockPort
 import org.around.ieuri.community.application.port.out.client.MemberLookupPort
 import org.around.ieuri.community.application.port.out.client.ObjectStoragePort
+import org.around.ieuri.community.application.port.out.client.SpotLookupPort
 import org.around.ieuri.community.application.event.NewMessageStored
 import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
 import org.around.ieuri.community.application.port.out.event.ConversationEventPort
@@ -21,10 +22,12 @@ import org.around.ieuri.community.application.port.out.persistence.ConversationR
 import org.around.ieuri.community.application.port.out.persistence.MessageRepositoryPort
 import org.around.ieuri.community.application.port.out.query.CommunityQueryPort
 import org.around.ieuri.community.application.port.out.query.ConversationQueryPort
+import org.around.ieuri.community.application.port.out.query.SpotQaQueryPort
 import org.around.ieuri.community.application.query.TypingEventView
 import org.around.ieuri.community.domain.aggregate.Conversation
 import org.around.ieuri.community.domain.aggregate.Message
 import org.around.ieuri.community.domain.vo.PhotoObjectKey
+import org.around.ieuri.community.domain.vo.SpotQaOrigin
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -47,6 +50,8 @@ class ConversationCommandService(
     private val communityQueryPort: CommunityQueryPort,
     private val conversationEventPort: ConversationEventPort,
     private val conversationQueryPort: ConversationQueryPort,
+    private val spotQaQueryPort: SpotQaQueryPort,
+    private val spotLookupPort: SpotLookupPort,
     private val eventPublisher: CommunityEventPublisherPort,
     private val objectStoragePort: ObjectStoragePort,
     private val clockPort: ClockPort,
@@ -80,6 +85,33 @@ class ConversationCommandService(
         return requireNotNull(conversation.id) { "저장된 대화에는 id가 있어야 한다." }
     }
 
+    /**
+     * 인용 스냅샷을 만든다(SPEC-0026 R14). **만들지 못하면 null이고 그것은 오류가 아니다** —
+     * 메시지는 정상적으로 전송되고 인용만 비어 있다(AC-13.4).
+     *
+     * null이 되는 경우는 셋이다: 답변이 이미 삭제됐거나, 질문이 사라졌거나, 그 답변의
+     * 작성자가 지금 대화 중인 상대가 아닌 경우다. 마지막 조건은 **다른 사람의 답변을
+     * 인용으로 붙여 맥락을 위조하는 것**을 막는다.
+     *
+     * 장소명은 tourism이 소유한 값이라 자기 포트로 읽는다. 장소가 사라졌으면 스냅샷을
+     * 만들지 않는다 — 이름 없는 인용 카드는 클라이언트가 그릴 수 없다.
+     */
+    private fun resolveSpotQaOrigin(answerId: Long, counterpartId: Long): SpotQaOrigin? {
+        val source = spotQaQueryPort.findAnswerOriginSource(answerId) ?: return null
+        if (source.answerAuthorId != counterpartId) return null
+        val spot = spotLookupPort.findSummary(source.catalogId) ?: return null
+
+        return SpotQaOrigin(
+            catalogId = source.catalogId,
+            spotTitle = spot.title,
+            questionId = source.questionId,
+            // 절삭은 값 객체가 소유한다 — 조회가 미리 자르면 그 규칙이 두 곳에 생긴다.
+            questionExcerpt = SpotQaOrigin.excerpt(source.questionBody),
+            answerId = source.answerId,
+            answerExcerpt = SpotQaOrigin.excerpt(source.answerBody),
+        )
+    }
+
     @Transactional
     override fun sendMessage(command: SendMessageCommand, memberId: Long): Long {
         val conversation = requireParticipatingConversation(command.conversationId, memberId)
@@ -91,13 +123,18 @@ class ConversationCommandService(
         // 보고, 실제 업로드 여부만 여기서 저장소에 묻는다.
         val photoKey = command.photoKey?.let { verifiedPhotoKey(it, memberId) }
 
-        // 본문·사진이 모두 비면 도메인이 거부한다. 상한을 넘어도 잘라 저장하지 않는다.
+        // 인용은 **대화 상대의 답변만** 가능하다 — 남의 답변을 붙여 맥락을 위조할 수 없다.
+        val counterpartId = conversation.counterpartOf(memberId)
+        val spotQaOrigin = command.sourceAnswerId?.let { resolveSpotQaOrigin(it, counterpartId) }
+
+        // 본문·사진·인용이 모두 비면 도메인이 거부한다. 상한을 넘어도 잘라 저장하지 않는다.
         val saved = messageRepositoryPort.save(
             Message.create(
                 conversationId = command.conversationId,
                 senderId = memberId,
                 body = command.body,
                 photoKey = photoKey,
+                spotQaOrigin = spotQaOrigin,
             ),
         )
         // 대화 목록의 정렬이 최근 활동순이라 함께 갱신한다(AC9-1).

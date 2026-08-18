@@ -14,6 +14,8 @@ import org.around.ieuri.community.application.query.BlockedUsersQuery
 import org.around.ieuri.common.pagination.CursorPageInfo
 import org.around.ieuri.community.application.query.CommentView
 import org.around.ieuri.community.application.query.PostAuthorView
+import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper.toGql
+import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper.toGqlOrPlaceholder
 import org.around.ieuri.community.application.query.PostSpotView
 import org.around.ieuri.community.application.query.PostCommentsQuery
 import org.around.ieuri.community.application.query.PostView
@@ -278,10 +280,6 @@ class CommunityQueryResolver(
         getSource<PostView>()
             ?: error("Post 필드 리졸버는 부모가 반환한 PostView를 소스로 받아야 한다.")
 
-    /**
-     * 회원 정보가 없어도 글은 남는다(탈퇴해도 글·댓글은 보존한다). 작성자 표시가 비면
-     * 클라이언트가 렌더에 실패하므로 대체 표기를 내려준다.
-     */
     private fun TargetCategory.toGql() = GqlTargetCategory.valueOf(name)
 
     private fun PostSpotView.toGql() = GqlPostSpot(
@@ -291,25 +289,11 @@ class CommunityQueryResolver(
         category = category?.let { GqlTargetCategory.valueOf(it.name) },
     )
 
-    private fun PostAuthorView?.toGqlOrPlaceholder(
-        memberId: Long,
-    ): GqlPostAuthor = GqlPostAuthor(
-        id = this?.id ?: memberId,
-        nickname = this?.nickname ?: WITHDRAWN_NICKNAME,
-        profileImageUrl = this?.profileImageUrl,
-    )
-
-    private fun CursorPageInfo.toGql() = GqlPageInfo(
-        hasNextPage = hasNextPage,
-        hasPreviousPage = hasPreviousPage,
-        startCursor = startCursor,
-        endCursor = endCursor,
-    )
+    // 작성자 대체 표기와 pageInfo 변환은 mapper 패키지가 소유한다 — 장소 질문/답변도
+    // 같은 모양을 쓰므로, 리졸버마다 두면 한 곳만 고쳐지는 날이 온다(POL-033).
 
     private companion object {
         const val DEFAULT_PAGE_SIZE = 20
         const val DEFAULT_RADIUS_METERS = 20_000
-        /** 탈퇴 회원의 표시명. 글은 보존되지만 프로필은 사라진다. */
-        const val WITHDRAWN_NICKNAME = "알 수 없음"
     }
 }
