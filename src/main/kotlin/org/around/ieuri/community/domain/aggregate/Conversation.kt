@@ -1,6 +1,5 @@
 package org.around.ieuri.community.domain.aggregate
 
-import org.around.ieuri.community.domain.vo.SpotQaOrigin
 import java.time.Instant
 
 /**
@@ -20,13 +19,6 @@ class Conversation private constructor(
     val createdAt: Instant?,
     lastReadMessageIdLow: Long?,
     lastReadMessageIdHigh: Long?,
-    /**
-     * 이 대화를 시작시킨 질문/답변의 스냅샷(SPEC-0026 R13). 일반 DM이면 null.
-     *
-     * **생성 시점에 고정되고 이후 바뀌지 않는다** — 기존 대화에 출처를 소급 적용하지
-     * 않기 때문이며(AC-13.3), 그래서 val이다.
-     */
-    val spotQaOrigin: SpotQaOrigin?,
 ) {
     /** 정렬 키(최근 활동순). 메시지가 없으면 생성 시각이다. */
     var lastMessageAt: Instant = lastMessageAt
@@ -51,26 +43,6 @@ class Conversation private constructor(
     }
 
     fun hasParticipant(memberId: Long): Boolean = memberId == memberLow || memberId == memberHigh
-
-    /**
-     * 저장 직후 부여된 id를 얹은 사본. 나머지 상태는 그대로다.
-     *
-     * 저장한 엔티티를 되읽어 도메인으로 옮기는 대신 이것을 쓰는 이유는 출처 발췌 때문이다 —
-     * 엔티티에는 암호문만 있어, 되읽으면 방금 손에 쥔 평문을 다시 복호화하게 된다.
-     *
-     * **[createdAt]은 비어 있다.** DB가 채우는 값이라 새로 만든 직후에는 알 수 없다 —
-     * 이미 있던 대화를 돌려받는 경로와 이 점이 다르므로, 시각이 필요하면 다시 읽어야 한다.
-     */
-    fun withId(assignedId: Long): Conversation = Conversation(
-        id = assignedId,
-        memberLow = memberLow,
-        memberHigh = memberHigh,
-        lastMessageAt = lastMessageAt,
-        createdAt = createdAt,
-        lastReadMessageIdLow = lastReadMessageIdLow,
-        lastReadMessageIdHigh = lastReadMessageIdHigh,
-        spotQaOrigin = spotQaOrigin,
-    )
 
     /** [memberId]가 마지막으로 읽은 메시지 id. 아직 읽지 않았으면 null이다. */
     fun lastReadMessageIdOf(memberId: Long): Long? {
@@ -117,7 +89,6 @@ class Conversation private constructor(
             memberId: Long,
             counterpartId: Long,
             now: Instant,
-            spotQaOrigin: SpotQaOrigin? = null,
         ): Conversation {
             require(memberId > 0 && counterpartId > 0) { "회원 id는 양수여야 합니다." }
             require(memberId != counterpartId) { "자기 자신과는 대화할 수 없습니다." }
@@ -129,7 +100,6 @@ class Conversation private constructor(
                 createdAt = null,
                 lastReadMessageIdLow = null,
                 lastReadMessageIdHigh = null,
-                spotQaOrigin = spotQaOrigin,
             )
         }
 
@@ -142,7 +112,6 @@ class Conversation private constructor(
             createdAt: Instant,
             lastReadMessageIdLow: Long? = null,
             lastReadMessageIdHigh: Long? = null,
-            spotQaOrigin: SpotQaOrigin? = null,
         ): Conversation = Conversation(
             id = id,
             memberLow = memberLow,
@@ -151,7 +120,6 @@ class Conversation private constructor(
             createdAt = createdAt,
             lastReadMessageIdLow = lastReadMessageIdLow,
             lastReadMessageIdHigh = lastReadMessageIdHigh,
-            spotQaOrigin = spotQaOrigin,
         )
     }
 }

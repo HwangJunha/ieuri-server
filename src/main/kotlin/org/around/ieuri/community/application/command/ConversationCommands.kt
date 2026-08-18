@@ -8,22 +8,9 @@ import org.around.ieuri.community.domain.vo.ReportReason
  */
 
 /** 대화 시작. 상대를 회원으로 직접 지목한다(SPEC-0021 R2). */
-data class StartConversationCommand(
-    val counterpartMemberId: Long,
-    /**
-     * 이 대화를 시작시킨 답변(SPEC-0026 R13). 주면 출처 스냅샷을 남긴다.
-     *
-     * **가리키는 답변이 이미 삭제됐으면 무시하고 출처 없이 진행한다**(AC-13.4) — 거절하지
-     * 않는다. 대화를 여는 것이 본질이고 출처는 그 맥락이므로, 맥락을 만들지 못한다는
-     * 이유로 대화 자체를 막지 않는다.
-     */
-    val sourceAnswerId: Long? = null,
-) {
+data class StartConversationCommand(val counterpartMemberId: Long) {
     init {
         require(counterpartMemberId > 0) { "counterpartMemberId는 양수여야 합니다." }
-        require(sourceAnswerId == null || sourceAnswerId > 0) {
-            "sourceAnswerId는 양수여야 합니다."
-        }
     }
 }
 
@@ -36,6 +23,14 @@ data class SendMessageCommand(
     val body: String,
     /** 확정된 사진 키. 글과 같은 업로드 경로를 쓴다(POL-042). */
     val photoKey: String? = null,
+    /**
+     * 이 메시지가 인용하는 장소 답변(SPEC-0026 R13). 주면 인용 스냅샷을 남긴다.
+     *
+     * **가리키는 답변이 이미 삭제됐으면 무시하고 인용 없이 보낸다**(AC-13.4) — 거절하지
+     * 않는다. 메시지를 보내는 것이 본질이고 인용은 그 맥락이므로, 맥락을 만들지 못한다는
+     * 이유로 전송 자체를 막지 않는다.
+     */
+    val sourceAnswerId: Long? = null,
 ) {
     init {
         require(conversationId > 0) { "conversationId는 양수여야 합니다." }

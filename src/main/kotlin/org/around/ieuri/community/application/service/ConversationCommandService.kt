@@ -74,29 +74,27 @@ class ConversationCommandService(
         requireNotBlocked(memberId, counterpartId)
 
         // 같은 상대와 대화가 이미 있으면 새로 만들지 않고 기존 것을 돌려준다(AC7-2).
-        // 이때 출처는 소급 적용되지 않는다(SPEC-0026 AC-13.3) — 최초 시작 시점의 맥락만 남긴다.
         // 경합 시 삽입 실패를 조회로 흡수하는 것은 어댑터의 몫이다.
         val conversation = conversationRepositoryPort.saveIfAbsent(
             Conversation.create(
                 memberId = memberId,
                 counterpartId = counterpartId,
                 now = clockPort.now(),
-                spotQaOrigin = command.sourceAnswerId?.let { resolveSpotQaOrigin(it, counterpartId) },
             ),
         )
         return requireNotNull(conversation.id) { "저장된 대화에는 id가 있어야 한다." }
     }
 
     /**
-     * 출처 스냅샷을 만든다(SPEC-0026 R14). **만들지 못하면 null이고 그것은 오류가 아니다** —
-     * 대화는 정상적으로 열리고 출처만 비어 있다(AC-13.4).
+     * 인용 스냅샷을 만든다(SPEC-0026 R14). **만들지 못하면 null이고 그것은 오류가 아니다** —
+     * 메시지는 정상적으로 전송되고 인용만 비어 있다(AC-13.4).
      *
      * null이 되는 경우는 셋이다: 답변이 이미 삭제됐거나, 질문이 사라졌거나, 그 답변의
-     * 작성자가 지금 대화하려는 상대가 아닌 경우다. 마지막 조건은 **다른 사람의 답변을
-     * 출처로 붙여 맥락을 위조하는 것**을 막는다.
+     * 작성자가 지금 대화 중인 상대가 아닌 경우다. 마지막 조건은 **다른 사람의 답변을
+     * 인용으로 붙여 맥락을 위조하는 것**을 막는다.
      *
      * 장소명은 tourism이 소유한 값이라 자기 포트로 읽는다. 장소가 사라졌으면 스냅샷을
-     * 만들지 않는다 — 이름 없는 출처 카드는 클라이언트가 그릴 수 없다.
+     * 만들지 않는다 — 이름 없는 인용 카드는 클라이언트가 그릴 수 없다.
      */
     private fun resolveSpotQaOrigin(answerId: Long, counterpartId: Long): SpotQaOrigin? {
         val source = spotQaQueryPort.findAnswerOriginSource(answerId) ?: return null
@@ -125,13 +123,18 @@ class ConversationCommandService(
         // 보고, 실제 업로드 여부만 여기서 저장소에 묻는다.
         val photoKey = command.photoKey?.let { verifiedPhotoKey(it, memberId) }
 
-        // 본문·사진이 모두 비면 도메인이 거부한다. 상한을 넘어도 잘라 저장하지 않는다.
+        // 인용은 **대화 상대의 답변만** 가능하다 — 남의 답변을 붙여 맥락을 위조할 수 없다.
+        val counterpartId = conversation.counterpartOf(memberId)
+        val spotQaOrigin = command.sourceAnswerId?.let { resolveSpotQaOrigin(it, counterpartId) }
+
+        // 본문·사진·인용이 모두 비면 도메인이 거부한다. 상한을 넘어도 잘라 저장하지 않는다.
         val saved = messageRepositoryPort.save(
             Message.create(
                 conversationId = command.conversationId,
                 senderId = memberId,
                 body = command.body,
                 photoKey = photoKey,
+                spotQaOrigin = spotQaOrigin,
             ),
         )
         // 대화 목록의 정렬이 최근 활동순이라 함께 갱신한다(AC9-1).

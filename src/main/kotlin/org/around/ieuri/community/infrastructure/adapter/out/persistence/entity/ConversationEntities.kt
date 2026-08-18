@@ -55,31 +55,6 @@ class ConversationEntity(
     @Column(name = "last_read_message_id_high")
     var lastReadMessageIdHigh: Long? = null,
 
-    /**
-     * 대화를 시작시킨 질문/답변의 스냅샷(SPEC-0026 R14). 일반 DM이면 여섯 컬럼이 전부 null이다 —
-     * **전부 있거나 전부 없다**를 DB의 CHECK가 강제한다.
-     *
-     * 값 복사이며 FK가 아니다. 원본이 지워져도 맥락이 남아야 하는데, 맥락을 남기는 것이 이
-     * 컬럼들의 존재 이유이므로 링크로 두면 목적을 달성하지 못한다.
-     */
-    @Column(name = "spot_qa_catalog_id")
-    var spotQaCatalogId: Long? = null,
-
-    @Column(name = "spot_qa_spot_title", length = 255)
-    var spotQaSpotTitle: String? = null,
-
-    @Column(name = "spot_qa_question_id")
-    var spotQaQuestionId: Long? = null,
-
-    /** base64(iv || ciphertext+tag). 발췌도 대화의 일부라 본문과 같이 암호화한다(POL-050). */
-    @Column(name = "spot_qa_question_body_encrypted", columnDefinition = "TEXT")
-    var spotQaQuestionBodyEncrypted: String? = null,
-
-    @Column(name = "spot_qa_answer_id")
-    var spotQaAnswerId: Long? = null,
-
-    @Column(name = "spot_qa_answer_body_encrypted", columnDefinition = "TEXT")
-    var spotQaAnswerBodyEncrypted: String? = null,
 ) {
     @PrePersist
     fun onCreate() {
@@ -118,6 +93,35 @@ class MessageEntity(
     /** 첨부 사진의 오브젝트 키. 글과 같은 업로드 경로를 쓴다(POL-042). */
     @Column(name = "photo_object_key", length = 512)
     var photoObjectKey: String? = null,
+
+    /**
+     * 이 메시지가 인용한 장소 질문/답변의 스냅샷(SPEC-0026 R14). 인용이 없으면 여섯 컬럼이
+     * 전부 null이며 **전부 있거나 전부 없다**를 DB의 CHECK가 강제한다.
+     *
+     * **대화가 아니라 메시지에 붙는다** — 같은 상대에게 방은 하나인데 물어볼 질문은 여럿이라,
+     * 방에 자리를 하나만 두면 두 번째 질문을 평문으로 우회하게 된다(V66 헤더 참조).
+     *
+     * 값 복사이며 FK가 아니다. 원본이 지워져도 맥락이 남아야 하는데, 맥락을 남기는 것이
+     * 이 컬럼들의 존재 이유이므로 링크로 두면 목적을 달성하지 못한다.
+     */
+    @Column(name = "spot_qa_catalog_id")
+    var spotQaCatalogId: Long? = null,
+
+    @Column(name = "spot_qa_spot_title", length = 255)
+    var spotQaSpotTitle: String? = null,
+
+    @Column(name = "spot_qa_question_id")
+    var spotQaQuestionId: Long? = null,
+
+    /** base64(iv || ciphertext+tag). 발췌도 대화의 일부라 본문과 같이 암호화한다(POL-050). */
+    @Column(name = "spot_qa_question_body_encrypted", columnDefinition = "TEXT")
+    var spotQaQuestionBodyEncrypted: String? = null,
+
+    @Column(name = "spot_qa_answer_id")
+    var spotQaAnswerId: Long? = null,
+
+    @Column(name = "spot_qa_answer_body_encrypted", columnDefinition = "TEXT")
+    var spotQaAnswerBodyEncrypted: String? = null,
 
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant? = null,

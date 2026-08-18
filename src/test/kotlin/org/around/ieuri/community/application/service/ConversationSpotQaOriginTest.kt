@@ -3,7 +3,7 @@ package org.around.ieuri.community.application.service
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
-import org.around.ieuri.community.application.command.StartConversationCommand
+import org.around.ieuri.community.application.command.SendMessageCommand
 import org.around.ieuri.community.application.port.out.client.ClockPort
 import org.around.ieuri.community.application.port.out.client.MemberLookupPort
 import org.around.ieuri.community.application.port.out.client.ObjectStoragePort
@@ -16,33 +16,37 @@ import org.around.ieuri.community.application.port.out.query.CommunityQueryPort
 import org.around.ieuri.community.application.port.out.query.ConversationQueryPort
 import org.around.ieuri.community.application.port.out.query.SpotQaOriginSource
 import org.around.ieuri.community.application.port.out.query.SpotQaQueryPort
-import org.around.ieuri.community.application.query.PostAuthorView
 import org.around.ieuri.community.application.query.PostSpotView
 import org.around.ieuri.community.domain.aggregate.Conversation
+import org.around.ieuri.community.domain.aggregate.Message
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /**
- * DM 출처 스냅샷 생성(SPEC-0026 R13, R14).
+ * 메시지의 장소 질문/답변 인용(SPEC-0026 R13·R14).
  *
- * 핵심은 **출처를 만들지 못해도 대화는 열린다**는 것이다(AC-13.4) — 거절하지 않는다.
- * 그리고 스펙에 없던 방어 하나: 출처 답변의 작성자가 대화 상대가 아니면 무시한다.
- * 없으면 남의 답변을 출처로 붙여 상대의 받은함에 맥락을 위조할 수 있다.
+ * **인용은 메시지에 붙는다** — 한 대화에서 여러 질문을 물을 수 있기 때문이다. 방에 하나만
+ * 두면 두 번째 질문이 담길 곳이 없어 클라이언트가 평문으로 우회하게 된다.
+ *
+ * 핵심 규약 둘: 인용을 만들지 못해도 **메시지는 전송된다**(AC-13.4)는 것과, 스펙에 없던
+ * 방어 하나 — 인용 답변의 작성자가 대화 상대가 아니면 무시한다. 없으면 남의 답변을 붙여
+ * 상대의 받은함에 맥락을 위조할 수 있다.
  */
 class ConversationSpotQaOriginTest {
 
     private val memberId = 7L
     private val counterpartId = 20L
+    private val conversationId = 77L
     private val answerId = 9L
     private val catalogId = 11L
-    private val conversationId = 77L
+    private val messageId = 31L
     private val now = Instant.parse("2026-08-18T00:00:00Z")
 
-    private val conversationRepository = mockk<ConversationRepositoryPort>()
-    private val messageRepository = mockk<MessageRepositoryPort>(relaxed = true)
-    private val memberLookupPort = mockk<MemberLookupPort>()
+    private val conversationRepository = mockk<ConversationRepositoryPort>(relaxed = true)
+    private val messageRepository = mockk<MessageRepositoryPort>()
+    private val memberLookupPort = mockk<MemberLookupPort>(relaxed = true)
     private val communityQueryPort = mockk<CommunityQueryPort>()
     private val conversationEventPort = mockk<ConversationEventPort>(relaxed = true)
     private val conversationQueryPort = mockk<ConversationQueryPort>(relaxed = true)
@@ -66,14 +70,28 @@ class ConversationSpotQaOriginTest {
         clock,
     )
 
-    private val saved = slot<Conversation>()
+    private val saved = slot<Message>()
 
-    private fun givenCounterpartExists() {
-        every { memberLookupPort.findAuthor(counterpartId) } returns
-            PostAuthorView(id = counterpartId, nickname = "상대", profileImageUrl = null)
+    private fun givenParticipatingConversation() {
+        every { conversationRepository.findById(conversationId) } returns Conversation.restore(
+            id = conversationId,
+            memberLow = minOf(memberId, counterpartId),
+            memberHigh = maxOf(memberId, counterpartId),
+            lastMessageAt = now,
+            createdAt = now,
+        )
         every { communityQueryPort.findBlockedMemberIds(memberId) } returns emptySet()
-        every { conversationRepository.saveIfAbsent(capture(saved)) } answers {
-            firstArg<Conversation>().withId(conversationId)
+        every { messageRepository.save(capture(saved)) } answers {
+            val m = firstArg<Message>()
+            Message.restore(
+                id = messageId,
+                conversationId = m.conversationId,
+                senderId = m.senderId,
+                body = m.body,
+                createdAt = now,
+                photoKey = m.photoKey,
+                spotQaOrigin = m.spotQaOrigin,
+            )
         }
     }
 
@@ -104,19 +122,23 @@ class ConversationSpotQaOriginTest {
             }
     }
 
-    private fun startWithSource(sourceAnswerId: Long? = answerId) =
-        service.startConversation(
-            StartConversationCommand(counterpartMemberId = counterpartId, sourceAnswerId = sourceAnswerId),
+    private fun send(body: String = "이것도 궁금해요", sourceAnswerId: Long? = answerId) =
+        service.sendMessage(
+            SendMessageCommand(
+                conversationId = conversationId,
+                body = body,
+                sourceAnswerId = sourceAnswerId,
+            ),
             memberId,
         )
 
     @Test
-    fun `출처를 실으면 스냅샷이 대화에 남는다`() {
-        givenCounterpartExists()
+    fun `인용을 실으면 스냅샷이 메시지에 남는다`() {
+        givenParticipatingConversation()
         givenOriginSource()
         givenSpotExists()
 
-        assertEquals(conversationId, startWithSource())
+        assertEquals(messageId, send())
 
         val origin = requireNotNull(saved.captured.spotQaOrigin)
         assertEquals(catalogId, origin.catalogId)
@@ -128,47 +150,76 @@ class ConversationSpotQaOriginTest {
     }
 
     @Test
-    fun `출처 없이 시작하면 스냅샷이 비어 있다`() {
-        givenCounterpartExists()
+    fun `인용 없이 보내면 스냅샷이 비어 있다`() {
+        givenParticipatingConversation()
 
-        assertEquals(conversationId, startWithSource(sourceAnswerId = null))
-
-        assertNull(saved.captured.spotQaOrigin)
-    }
-
-    /** AC-13.4 — 거절하지 않는다. 대화를 여는 것이 본질이고 출처는 부가 맥락이다. */
-    @Test
-    fun `출처 답변이 이미 삭제됐으면 출처 없이 대화가 열린다`() {
-        givenCounterpartExists()
-        every { spotQaQueryPort.findAnswerOriginSource(answerId) } returns null
-
-        assertEquals(conversationId, startWithSource())
-
-        assertNull(saved.captured.spotQaOrigin)
-    }
-
-    @Test
-    fun `장소가 사라졌으면 출처 없이 대화가 열린다`() {
-        givenCounterpartExists()
-        givenOriginSource()
-        givenSpotExists(exists = false)
-
-        assertEquals(conversationId, startWithSource())
+        assertEquals(messageId, send(sourceAnswerId = null))
 
         assertNull(saved.captured.spotQaOrigin)
     }
 
     /**
-     * 스펙에 없던 방어. 이것이 빠지면 A가 C의 답변을 출처로 B에게 DM을 열어, B의 받은함에
-     * "B의 답변에서 시작된 대화"인 것처럼 보이는 맥락을 만들 수 있다.
+     * **한 대화에서 여러 질문을 인용할 수 있다** — 이것이 대화가 아니라 메시지에 붙인 이유다.
+     * 방에 하나만 두면 두 번째 인용이 담길 곳이 없다.
      */
     @Test
-    fun `출처 답변의 작성자가 대화 상대가 아니면 출처를 무시한다`() {
-        givenCounterpartExists()
+    fun `같은 대화에서 다른 질문을 다시 인용할 수 있다`() {
+        givenParticipatingConversation()
+        givenOriginSource(questionBody = "첫 질문")
+        givenSpotExists()
+        send()
+        assertEquals("첫 질문", requireNotNull(saved.captured.spotQaOrigin).questionExcerpt)
+
+        val secondAnswerId = 40L
+        every { spotQaQueryPort.findAnswerOriginSource(secondAnswerId) } returns SpotQaOriginSource(
+            catalogId = catalogId,
+            questionId = 3L,
+            questionBody = "둘째 질문",
+            answerId = secondAnswerId,
+            answerBody = "둘째 답변",
+            answerAuthorId = counterpartId,
+        )
+
+        send(sourceAnswerId = secondAnswerId)
+
+        val second = requireNotNull(saved.captured.spotQaOrigin)
+        assertEquals(3L, second.questionId)
+        assertEquals("둘째 질문", second.questionExcerpt)
+    }
+
+    /** AC-13.4 — 거절하지 않는다. 메시지를 보내는 것이 본질이고 인용은 부가 맥락이다. */
+    @Test
+    fun `인용 답변이 이미 삭제됐으면 인용 없이 전송된다`() {
+        givenParticipatingConversation()
+        every { spotQaQueryPort.findAnswerOriginSource(answerId) } returns null
+
+        assertEquals(messageId, send())
+
+        assertNull(saved.captured.spotQaOrigin)
+    }
+
+    @Test
+    fun `장소가 사라졌으면 인용 없이 전송된다`() {
+        givenParticipatingConversation()
+        givenOriginSource()
+        givenSpotExists(exists = false)
+
+        assertEquals(messageId, send())
+
+        assertNull(saved.captured.spotQaOrigin)
+    }
+
+    /**
+     * 스펙에 없던 방어. 이것이 빠지면 A가 C의 답변을 인용해 B에게 보내, B의 받은함에
+     * "B의 답변에 대한 문의"인 것처럼 보이는 맥락을 만들 수 있다.
+     */
+    @Test
+    fun `인용 답변의 작성자가 대화 상대가 아니면 인용을 무시한다`() {
+        givenParticipatingConversation()
         givenOriginSource(authorId = counterpartId + 1)
         givenSpotExists()
 
-        assertEquals(conversationId, startWithSource())
+        assertEquals(messageId, send())
 
         assertNull(saved.captured.spotQaOrigin)
     }
@@ -176,14 +227,27 @@ class ConversationSpotQaOriginTest {
     /** AC-14.4 — 발췌는 100자로 자른다. */
     @Test
     fun `긴 본문은 발췌 길이로 잘린다`() {
-        givenCounterpartExists()
+        givenParticipatingConversation()
         givenOriginSource(questionBody = "가".repeat(501), answerBody = "나".repeat(300))
         givenSpotExists()
 
-        startWithSource()
+        send()
 
         val origin = requireNotNull(saved.captured.spotQaOrigin)
         assertEquals(100, origin.questionExcerpt.length)
         assertEquals(100, origin.answerExcerpt.length)
+    }
+
+    /** 인용 자체가 보낼 내용이다 — 본문 없이 인용만 보내는 것도 성립해야 한다. */
+    @Test
+    fun `본문 없이 인용만 보낼 수 있다`() {
+        givenParticipatingConversation()
+        givenOriginSource()
+        givenSpotExists()
+
+        assertEquals(messageId, send(body = ""))
+
+        assertNull(saved.captured.body.ifEmpty { null })
+        assertEquals(2L, requireNotNull(saved.captured.spotQaOrigin).questionId)
     }
 }

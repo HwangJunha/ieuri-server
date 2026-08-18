@@ -1,6 +1,7 @@
 package org.around.ieuri.community.domain.aggregate
 
 import org.around.ieuri.community.domain.vo.PhotoObjectKey
+import org.around.ieuri.community.domain.vo.SpotQaOrigin
 import java.time.Duration
 import java.time.Instant
 
@@ -19,6 +20,13 @@ class Message private constructor(
     val body: String,
     /** 첨부 사진. 텍스트 없이 사진만 보낼 수 있다. */
     val photoKey: PhotoObjectKey?,
+    /**
+     * 이 메시지가 인용한 장소 질문/답변의 스냅샷(SPEC-0026 R14). 인용이 없으면 null.
+     *
+     * **대화가 아니라 메시지에 붙는다** — 같은 상대에게 방은 하나인데 물어볼 질문은 여럿이라,
+     * 방에 자리를 하나만 두면 두 번째 질문이 담길 곳이 없다.
+     */
+    val spotQaOrigin: SpotQaOrigin?,
     val createdAt: Instant?,
 ) {
     fun sentBy(memberId: Long): Boolean = senderId == memberId
@@ -36,8 +44,9 @@ class Message private constructor(
          * 새 메시지. 본문은 트리밍 후 판정하며 상한을 넘으면 **잘라서 저장하지 않고
          * 거부한다**(AC9-3).
          *
-         * **본문이 비어도 사진이 있으면 성립한다.** 둘 다 비면 보낼 것이 없는 전송이라
-         * 거부한다(SPEC-0021 AC3.5) — 피드 인용이 사라져 판정 조건이 둘로 줄었다.
+         * **본문이 비어도 사진이나 인용이 있으면 성립한다.** 셋 다 비면 보낼 것이 없는
+         * 전송이라 거부한다. 인용이 조건에 든 이유는 그것 자체가 보낼 내용이기 때문이다 —
+         * "이 질문에 대해 묻고 싶다"는 의사 표시가 본문 없이도 성립한다.
          *
          * 사진 키의 **소유권**만 여기서 본다 — 실제 업로드 여부는 저장소에 물어야 하므로
          * 애플리케이션 계층의 책임이다(글과 같은 층위 구분).
@@ -47,12 +56,13 @@ class Message private constructor(
             senderId: Long,
             body: String,
             photoKey: PhotoObjectKey? = null,
+            spotQaOrigin: SpotQaOrigin? = null,
         ): Message {
             require(conversationId > 0) { "conversationId는 양수여야 합니다." }
             require(senderId > 0) { "senderId는 양수여야 합니다." }
             val trimmed = body.trim()
             require(trimmed.length <= BODY_MAX_LENGTH) { "메시지는 ${BODY_MAX_LENGTH}자를 넘을 수 없습니다." }
-            require(trimmed.isNotEmpty() || photoKey != null) {
+            require(trimmed.isNotEmpty() || photoKey != null || spotQaOrigin != null) {
                 "메시지를 입력해 주세요."
             }
             require(photoKey == null || photoKey.ownedBy(senderId)) {
@@ -67,6 +77,7 @@ class Message private constructor(
                 senderId = senderId,
                 body = trimmed,
                 photoKey = photoKey,
+                spotQaOrigin = spotQaOrigin,
                 createdAt = null,
             )
         }
@@ -85,12 +96,14 @@ class Message private constructor(
             body: String,
             createdAt: Instant,
             photoKey: PhotoObjectKey? = null,
+            spotQaOrigin: SpotQaOrigin? = null,
         ): Message = Message(
             id = id,
             conversationId = conversationId,
             senderId = senderId,
             body = body,
             photoKey = photoKey,
+            spotQaOrigin = spotQaOrigin,
             createdAt = createdAt,
         )
 

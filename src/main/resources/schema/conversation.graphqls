@@ -97,23 +97,19 @@ type Conversation {
 
     "정렬 기준. 최근 메시지 시각이며, 메시지가 없으면 대화 생성 시각이다. ISO-8601."
     updatedAt: String!
-
-    """
-    이 대화가 장소 질문/답변에서 시작됐다면 그 스냅샷. 일반 DM이면 null이다.
-
-    대화 생성 시점에 고정되며, 이후 원본이 삭제되거나 장소명이 바뀌어도 이 값은 바뀌지 않는다.
-    """
-    spotQaOrigin: ConversationSpotQaOrigin
 }
 
 """
-DM이 어느 장소의 어느 질문/답변에서 시작됐는지의 스냅샷.
+메시지가 인용한 장소 질문/답변의 스냅샷.
 
 **원본을 가리키는 링크가 아니라 값 복사다** — 원본 질문·답변이 나중에 삭제돼도 맥락이
 유지되어야 하며, 맥락을 남기는 것이 이 타입의 존재 이유이기 때문이다.
 
-따라서 questionId·answerId는 삭제 후에도 값이 남지만, 그 id로 spotQuestions·spotAnswers를
-다시 조회하면 없을 수 있다 — 참고용 식별자이지 살아있는 참조가 아니다.
+따라서 questionId·answerId는 삭제 후에도 값이 남지만, 그 id로 spotQuestions를 다시
+조회하면 없을 수 있다 — 참고용 식별자이지 살아있는 참조가 아니다.
+
+**안내 문구를 담지 않는다** — "이 질문에서 시작된 대화예요" 같은 문장은 언어마다 달라
+클라이언트가 쓴다. 서버는 값만 내려준다.
 """
 type ConversationSpotQaOrigin {
     "장소 식별자. 언어와 무관하며 spotDetail(id:)에 그대로 넘길 수 있다."
@@ -151,10 +147,10 @@ type Message {
 
     """
     0~1000자. 서버에 암호화되어 저장되며 조회 시 복원된다.
-    **사진만 보낸 메시지는 빈 문자열이다.**
+    **사진이나 인용만 보낸 메시지는 빈 문자열이다.**
 
-    본문도 사진도 없는 메시지가 존재한다 — 피드 인용만 있던 과거 메시지이며 삭제하지 않고
-    남긴다. 클라이언트는 이 경우를 빈 말풍선이 아니라 내용 없음으로 표시해야 한다.
+    본문도 사진도 인용도 없는 메시지가 존재한다 — 피드 인용만 있던 과거 메시지이며 삭제하지
+    않고 남긴다. 클라이언트는 이 경우를 빈 말풍선이 아니라 내용 없음으로 표시해야 한다.
     """
     body: String!
 
@@ -168,6 +164,14 @@ type Message {
 
     "호출자가 보낸 메시지인지. 클라이언트의 말풍선 정렬을 결정한다."
     ownedByViewer: Boolean!
+
+    """
+    이 메시지가 인용한 장소 질문/답변의 스냅샷. 인용이 없으면 null이다.
+
+    한 대화에 여러 개가 있을 수 있다 — 다른 질문을 물을 때마다 인용이 붙는다.
+    스냅샷이라 원본이 삭제돼도 값은 그대로 남는다.
+    """
+    spotQaOrigin: ConversationSpotQaOrigin
 
     "ISO-8601. 정렬 기준이다."
     createdAt: String!
@@ -187,19 +191,6 @@ type MessageEdge {
 input StartConversationInput {
     "대화 상대의 회원 id. PostAuthor.id와 같은 식별자다."
     counterpartMemberId: ID!
-
-    """
-    이 대화를 시작시킨 장소 답변. 주면 출처 스냅샷을 이 대화에 남긴다.
-    생략하면 지금까지의 일반 DM 시작과 동일하게 동작한다.
-
-    같은 상대와 대화가 이미 있으면 기존 대화를 반환하며, 이 필드를 줘도 기존 대화에 출처를
-    소급해 붙이지 않는다 — 최초 시작 시점의 맥락만 남긴다.
-
-    아래 경우에는 이 필드를 **무시하고 출처 없는 일반 DM으로 진행한다**(거절하지 않는다):
-    답변이 이미 삭제됐거나, 그 질문이 사라졌거나, 답변 작성자가 counterpartMemberId와 다를 때다.
-    이때 Conversation.spotQaOrigin은 null이다.
-    """
-    sourceAnswerId: ID
 }
 
 type StartConversationPayload implements BaseResponse {
@@ -221,6 +212,20 @@ input SendMessageInput {
 
     "첨부할 사진. confirmPostImageUploads가 반환한 확정 키를 그대로 쓴다."
     photoKey: String
+
+    """
+    이 메시지가 인용하는 장소 답변. 주면 Message.spotQaOrigin에 스냅샷이 남는다.
+
+    한 대화에서 **몇 번이든 다른 질문을 인용할 수 있다** — 인용은 메시지의 속성이라
+    방에 하나로 고정되지 않는다.
+
+    아래 경우에는 이 필드를 **무시하고 인용 없는 일반 메시지로 보낸다**(거절하지 않는다):
+    답변이 이미 삭제됐거나, 그 질문이 사라졌거나, 답변 작성자가 대화 상대가 아닐 때다.
+    마지막 조건은 남의 답변을 인용으로 붙여 맥락을 위조하는 것을 막는다.
+
+    **인용만 보내는 것도 성립한다** — body가 비어도 이 값이 있으면 거부되지 않는다.
+    """
+    sourceAnswerId: ID
 }
 
 type SendMessagePayload implements BaseResponse {

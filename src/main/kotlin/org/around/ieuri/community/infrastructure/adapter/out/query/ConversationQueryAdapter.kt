@@ -235,10 +235,6 @@ class ConversationQueryAdapter(
         lastMessage = lastMessage,
         unreadCount = unreadCount,
         updatedAt = requireNotNull(lastMessageAt) { "조회된 대화에는 lastMessageAt이 있어야 한다." },
-        spotQaOrigin = toSpotQaOriginView(
-            decryptedQuestionExcerpt = spotQaQuestionBodyEncrypted?.let { cipher.decrypt(it) },
-            decryptedAnswerExcerpt = spotQaAnswerBodyEncrypted?.let { cipher.decrypt(it) },
-        ),
     )
 
     /**
@@ -252,6 +248,10 @@ class ConversationQueryAdapter(
         ownedByViewer = senderId == memberId,
         viewerId = memberId,
         createdAt = requireNotNull(createdAt) { "조회된 메시지에는 createdAt이 있어야 한다." },
+        spotQaOrigin = toSpotQaOriginView(
+            decryptedQuestionExcerpt = spotQaQuestionBodyEncrypted?.let { cipher.decrypt(it) },
+            decryptedAnswerExcerpt = spotQaAnswerBodyEncrypted?.let { cipher.decrypt(it) },
+        ),
         photoKey = photoObjectKey,
     )
 }
