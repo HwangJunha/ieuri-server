@@ -14,12 +14,14 @@ import org.around.ieuri.community.application.port.out.query.ConversationMessage
 import org.around.ieuri.community.application.port.out.query.ConversationQueryPort
 import org.around.ieuri.community.application.port.out.query.ConversationsSearch
 import org.around.ieuri.community.application.query.ConversationView
+import org.around.ieuri.community.application.query.ConversationSpotQaOriginView
 import org.around.ieuri.community.application.query.MessageView
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.ConversationEntity
 import org.around.ieuri.community.infrastructure.adapter.out.query.mapper.toSpotQaOriginView
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.MessageEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QConversationEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QMessageEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QMessageQuoteEntity
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
@@ -41,6 +43,7 @@ class ConversationQueryAdapter(
 
     private val conversation = QConversationEntity.conversationEntity
     private val message = QMessageEntity.messageEntity
+    private val quote = QMessageQuoteEntity.messageQuoteEntity
 
     /** 내가 참여한 대화. 두 컬럼 어느 쪽에도 내가 올 수 있어 OR로 묶는다. */
     @Transactional(readOnly = true)
@@ -100,12 +103,14 @@ class ConversationQueryAdapter(
 
         val hasNextPage = rows.size > search.first
         val pageRows = if (hasNextPage) rows.take(search.first) else rows
+        // 인용을 **한 번에** 읽는다 — 메시지마다 물으면 여기서 N+1이 된다.
+        val quotes = findQuotesOf(pageRows.mapNotNull { it.id })
         val edges = pageRows.map { entity ->
             val createdAt = requireNotNull(entity.createdAt)
             val id = requireNotNull(entity.id)
             CursorEdge(
                 cursor = encodeCursor(createdAt, id),
-                node = entity.toMessageView(search.memberId),
+                node = entity.toMessageView(search.memberId, quotes[id]),
             )
         }
         return cursorPageOf(edges, hasNextPage = hasNextPage, hasPreviousPage = cursor != null)
@@ -133,7 +138,7 @@ class ConversationQueryAdapter(
             // **대화로도 좁힌다** — 채널 이름이 인가의 근거가 되지 않게 한다.
             .where(message.id.eq(messageId), message.conversationId.eq(conversationId))
             .fetchOne()
-            ?.toMessageView(memberId)
+            ?.let { it.toMessageView(memberId, findQuotesOf(listOf(messageId))[messageId]) }
 
     /**
      * 대화별 안 읽은 메시지 수를 **한 번에** 센다 — 대화마다 물으면 20건에 조회가 20번 붙는다.
@@ -214,6 +219,29 @@ class ConversationQueryAdapter(
             }
     }
 
+    /**
+     * 메시지들의 인용을 **한 번에** 읽는다 — 메시지마다 물으면 30건짜리 페이지에 조회가
+     * 30번 붙는다(N+1). 인용이 없는 메시지는 결과에 키가 없다.
+     *
+     * 발췌 복호화도 여기서 한다 — 키를 아는 것은 어댑터이고 read DTO에는 평문이 담긴다.
+     */
+    private fun findQuotesOf(messageIds: List<Long>): Map<Long, ConversationSpotQaOriginView> {
+        if (messageIds.isEmpty()) return emptyMap()
+
+        return queryFactory
+            .selectFrom(quote)
+            .where(quote.messageId.`in`(messageIds))
+            .fetch()
+            .associate { entity ->
+                entity.messageId to entity.toSpotQaOriginView(
+                    decryptedPrimaryExcerpt = cipher.decrypt(entity.primaryExcerptEncrypted),
+                    decryptedSecondaryExcerpt = entity.secondaryExcerptEncrypted
+                        ?.let { cipher.decrypt(it) }
+                        .orEmpty(),
+                )
+            }
+    }
+
     private fun participantCondition(memberId: Long): BooleanExpression =
         conversation.memberLow.eq(memberId).or(conversation.memberHigh.eq(memberId))
 
@@ -241,17 +269,17 @@ class ConversationQueryAdapter(
      * 본문이 빈 메시지는 복호화를 건너뛴다 — 빈 값을 복호화하려 들면 base64 디코딩에서
      * 터진다. 사진만 보낸 메시지와, 피드 인용만 있던 과거 메시지가 여기 해당한다.
      */
-    private fun MessageEntity.toMessageView(memberId: Long) = MessageView(
+    private fun MessageEntity.toMessageView(
+        memberId: Long,
+        spotQaOrigin: ConversationSpotQaOriginView? = null,
+    ) = MessageView(
         id = requireNotNull(id) { "조회된 메시지에는 id가 있어야 한다." },
         body = if (bodyEncrypted.isEmpty()) "" else cipher.decrypt(bodyEncrypted),
         senderId = senderId,
         ownedByViewer = senderId == memberId,
         viewerId = memberId,
         createdAt = requireNotNull(createdAt) { "조회된 메시지에는 createdAt이 있어야 한다." },
-        spotQaOrigin = toSpotQaOriginView(
-            decryptedQuestionExcerpt = spotQaQuestionBodyEncrypted?.let { cipher.decrypt(it) },
-            decryptedAnswerExcerpt = spotQaAnswerBodyEncrypted?.let { cipher.decrypt(it) },
-        ),
+        spotQaOrigin = spotQaOrigin,
         photoKey = photoObjectKey,
     )
 }

@@ -31,6 +31,7 @@ class SchemaPlacementTest {
             "community_post_tag", "community_post_spot", "community_post_chip", "community_comment",
             "community_block", "community_report", "community_conversation", "community_message",
             "community_message_report", "community_message_report_item", "community_orphan_photo_object",
+            "community_message_quote",
             // 장소 질문/답변(SPEC-0026)
             "community_spot_question", "community_spot_answer", "community_spot_answer_reply",
             "community_spot_qa_photo",
@@ -64,8 +65,8 @@ class SchemaPlacementTest {
     /** AC-6 — 전량 배정, 중복 0, 미배정 0. Map이므로 중복 키는 구조적으로 불가능하다. */
     @Test
     fun `배치표는 애플리케이션 테이블을 빠짐없이 배정한다`() {
-        // 스펙 §4의 46개 + 장소 질문/답변 4개(SPEC-0026).
-        assertEquals(50, placement.size, "배치표에 등록된 애플리케이션 테이블 수")
+        // 스펙 §4의 46개 + 장소 질문/답변 4개 + 메시지 인용 1개(SPEC-0026).
+        assertEquals(51, placement.size, "배치표에 등록된 애플리케이션 테이블 수")
         assertEquals(
             setOf("auth", "community", "tour", "category"),
             placement.values.toSet(),

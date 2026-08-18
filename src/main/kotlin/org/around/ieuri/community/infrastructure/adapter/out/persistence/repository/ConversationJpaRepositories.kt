@@ -2,6 +2,7 @@ package org.around.ieuri.community.infrastructure.adapter.out.persistence.reposi
 
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.ConversationEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.MessageEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.MessageQuoteEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.MessageReportEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.MessageReportItemEntity
 import org.springframework.data.domain.Limit
@@ -38,4 +39,14 @@ interface MessageReportJpaRepository : JpaRepository<MessageReportEntity, Long>
 interface MessageReportItemJpaRepository : JpaRepository<MessageReportItemEntity, Long> {
     /** 신고자가 이미 신고한 메시지가 있는지(AC15-6). 중복 판정은 신고자 단위다. */
     fun existsByReporterIdAndMessageIdIn(reporterId: Long, messageIds: List<Long>): Boolean
+}
+
+/**
+ * 메시지 인용. 메시지 목록을 그릴 때 **한 번에** 읽는다 — 메시지마다 물으면 30건짜리
+ * 페이지에 조회가 30번 붙는다(N+1).
+ *
+ * 메시지가 보관 기간으로 지워지면 FK CASCADE가 인용도 함께 지운다.
+ */
+interface MessageQuoteJpaRepository : JpaRepository<MessageQuoteEntity, Long> {
+    fun findByMessageIdIn(messageIds: Collection<Long>): List<MessageQuoteEntity>
 }

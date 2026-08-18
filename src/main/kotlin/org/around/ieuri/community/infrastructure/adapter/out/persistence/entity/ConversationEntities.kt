@@ -94,34 +94,58 @@ class MessageEntity(
     @Column(name = "photo_object_key", length = 512)
     var photoObjectKey: String? = null,
 
-    /**
-     * 이 메시지가 인용한 장소 질문/답변의 스냅샷(SPEC-0026 R14). 인용이 없으면 여섯 컬럼이
-     * 전부 null이며 **전부 있거나 전부 없다**를 DB의 CHECK가 강제한다.
-     *
-     * **대화가 아니라 메시지에 붙는다** — 같은 상대에게 방은 하나인데 물어볼 질문은 여럿이라,
-     * 방에 자리를 하나만 두면 두 번째 질문을 평문으로 우회하게 된다(V66 헤더 참조).
-     *
-     * 값 복사이며 FK가 아니다. 원본이 지워져도 맥락이 남아야 하는데, 맥락을 남기는 것이
-     * 이 컬럼들의 존재 이유이므로 링크로 두면 목적을 달성하지 못한다.
-     */
-    @Column(name = "spot_qa_catalog_id")
-    var spotQaCatalogId: Long? = null,
+    @Column(name = "created_at", nullable = false)
+    var createdAt: Instant? = null,
+) {
+    @PrePersist
+    fun onCreate() {
+        if (createdAt == null) createdAt = Instant.now()
+    }
+}
 
-    @Column(name = "spot_qa_spot_title", length = 255)
-    var spotQaSpotTitle: String? = null,
+/**
+ * 메시지가 인용한 대상의 스냅샷(SPEC-0026 R14). **메시지와 별도 표다.**
+ *
+ * 대상 종류를 [quoteType] **값으로** 표현한다 — 컬럼으로 두면 인용 대상이 늘 때마다
+ * 컬럼이 여섯씩 붙는다(community_report가 target_type으로 이미 쓰는 방식이다).
+ *
+ * [targetId]에 FK를 걸 수 없다 — 가리키는 표가 행마다 다르고, 원본이 삭제돼도 인용은
+ * 남아야 한다. 맥락을 남기는 것이 이 표의 존재 이유다.
+ */
+@Entity
+@Table(name = "community_message_quote", schema = DbSchema.COMMUNITY)
+class MessageQuoteEntity(
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    var id: Long? = null,
 
-    @Column(name = "spot_qa_question_id")
-    var spotQaQuestionId: Long? = null,
+    @Column(name = "message_id", nullable = false)
+    var messageId: Long,
 
-    /** base64(iv || ciphertext+tag). 발췌도 대화의 일부라 본문과 같이 암호화한다(POL-050). */
-    @Column(name = "spot_qa_question_body_encrypted", columnDefinition = "TEXT")
-    var spotQaQuestionBodyEncrypted: String? = null,
+    @Enumerated(EnumType.STRING)
+    @Column(name = "quote_type", nullable = false, length = 30)
+    var quoteType: MessageQuoteType,
 
-    @Column(name = "spot_qa_answer_id")
-    var spotQaAnswerId: Long? = null,
+    @Column(name = "target_id", nullable = false)
+    var targetId: Long,
 
-    @Column(name = "spot_qa_answer_body_encrypted", columnDefinition = "TEXT")
-    var spotQaAnswerBodyEncrypted: String? = null,
+    /** 인용 카드의 제목 줄. 장소 답변이면 장소명이다. */
+    @Column(name = "title_snapshot", nullable = false, length = 255)
+    var titleSnapshot: String,
+
+    /** base64(iv || ciphertext+tag). 대화의 일부라 본문과 같이 암호화한다(POL-050). */
+    @Column(name = "primary_excerpt_encrypted", nullable = false, columnDefinition = "TEXT")
+    var primaryExcerptEncrypted: String,
+
+    @Column(name = "secondary_excerpt_encrypted", columnDefinition = "TEXT")
+    var secondaryExcerptEncrypted: String? = null,
+
+    /** 대상에 딸린 부가 식별자. 장소 답변이면 카탈로그 id와 질문 id다. */
+    @Column(name = "context_id")
+    var contextId: Long? = null,
+
+    @Column(name = "parent_id")
+    var parentId: Long? = null,
 
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant? = null,
@@ -130,6 +154,15 @@ class MessageEntity(
     fun onCreate() {
         if (createdAt == null) createdAt = Instant.now()
     }
+}
+
+/**
+ * 인용 대상의 종류. **값이 늘어도 컬럼은 그대로다** — 커뮤니티 글·상품이 인용 대상이 되면
+ * 여기 값과 DB의 CHECK만 넓힌다.
+ */
+enum class MessageQuoteType {
+    /** 장소 질문의 답변. contextId=카탈로그 id, parentId=질문 id. */
+    SPOT_ANSWER,
 }
 
 /** DM 신고 한 건. 여러 메시지를 [MessageReportItemEntity]로 묶는다(R15). */

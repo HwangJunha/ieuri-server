@@ -5,8 +5,12 @@ import org.around.ieuri.community.domain.aggregate.Message
 import org.around.ieuri.community.domain.vo.SpotQaOrigin
 import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper.toGql
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.MessageEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.MessageQuoteEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.MessageQuoteType
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toDomain
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toNewEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toQuoteEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toSpotQaOrigin
 import org.around.ieuri.community.infrastructure.adapter.out.query.mapper.toSpotQaOriginView
 import java.time.Instant
 import kotlin.test.Test
@@ -25,31 +29,33 @@ class ConversationSpotQaOriginMapperTest {
 
     private val createdAt = Instant.parse("2026-08-18T01:02:03Z")
 
-    private fun entityWithOrigin() = MessageEntity(
+    /**
+     * 장소 답변 인용의 **자리 배치**. title=장소명, primary=질문, secondary=답변,
+     * context=카탈로그, parent=질문 id, target=답변 id다. 이 배치가 어긋나면 카드가
+     * 영구히 틀린 값을 보여준다.
+     */
+    private fun quoteEntity() = MessageQuoteEntity(
         id = 1L,
-        conversationId = 2L,
-        senderId = 3L,
-        bodyEncrypted = "암호화된-본문",
+        messageId = 7L,
+        quoteType = MessageQuoteType.SPOT_ANSWER,
+        targetId = 63L,
+        titleSnapshot = "경복궁",
+        primaryExcerptEncrypted = "암호문-질문",
+        secondaryExcerptEncrypted = "암호문-답변",
+        contextId = 41L,
+        parentId = 52L,
         createdAt = createdAt,
-        spotQaCatalogId = 41L,
-        spotQaSpotTitle = "경복궁",
-        spotQaQuestionId = 52L,
-        spotQaQuestionBodyEncrypted = "암호문-질문",
-        spotQaAnswerId = 63L,
-        spotQaAnswerBodyEncrypted = "암호문-답변",
     )
 
     // ── 엔티티 → 도메인 ───────────────────────────────────────────
 
     @Test
-    fun `엔티티가 도메인 인용으로 필드별로 옮겨진다`() {
-        val message = entityWithOrigin().toDomain(
-            decryptedBody = "본문 평문",
-            decryptedQuestionExcerpt = "질문 평문",
-            decryptedAnswerExcerpt = "답변 평문",
+    fun `인용 엔티티가 도메인 값으로 필드별로 옮겨진다`() {
+        val origin = quoteEntity().toSpotQaOrigin(
+            decryptedPrimaryExcerpt = "질문 평문",
+            decryptedSecondaryExcerpt = "답변 평문",
         )
 
-        val origin = assertNotNull(message.spotQaOrigin)
         assertEquals(41L, origin.catalogId)
         assertEquals("경복궁", origin.spotTitle)
         assertEquals(52L, origin.questionId)
@@ -58,26 +64,15 @@ class ConversationSpotQaOriginMapperTest {
         assertEquals("답변 평문", origin.answerExcerpt)
     }
 
+    /** 인용 행이 없으면 메시지에 인용이 없다 — 별도 표라 호출자가 넘기지 않으면 그만이다. */
     @Test
-    fun `인용 컬럼이 비어 있으면 도메인 인용이 null이다`() {
+    fun `인용을 넘기지 않으면 메시지의 인용이 null이다`() {
         val entity = MessageEntity(
             id = 1L, conversationId = 2L, senderId = 3L,
             bodyEncrypted = "암호화된-본문", createdAt = createdAt,
         )
 
         assertNull(entity.toDomain(decryptedBody = "본문").spotQaOrigin)
-    }
-
-    /** 복호화 결과가 없으면 인용이 성립하지 않는다 — 발췌 없는 인용 카드는 그릴 수 없다. */
-    @Test
-    fun `발췌 평문이 없으면 도메인 인용이 null이다`() {
-        val message = entityWithOrigin().toDomain(
-            decryptedBody = "본문 평문",
-            decryptedQuestionExcerpt = null,
-            decryptedAnswerExcerpt = null,
-        )
-
-        assertNull(message.spotQaOrigin)
     }
 
     // ── 도메인 → 엔티티 ───────────────────────────────────────────
@@ -98,43 +93,29 @@ class ConversationSpotQaOriginMapperTest {
             ),
         )
 
-        val entity = message.toNewEntity(
-            encryptedBody = "암호문-본문",
+        val entity = requireNotNull(message.spotQaOrigin).toQuoteEntity(
+            messageId = 7L,
             encryptedQuestionExcerpt = "암호문-질문",
             encryptedAnswerExcerpt = "암호문-답변",
         )
 
-        assertEquals(41L, entity.spotQaCatalogId)
-        assertEquals("경복궁", entity.spotQaSpotTitle)
-        assertEquals(52L, entity.spotQaQuestionId)
-        assertEquals("암호문-질문", entity.spotQaQuestionBodyEncrypted)
-        assertEquals(63L, entity.spotQaAnswerId)
-        assertEquals("암호문-답변", entity.spotQaAnswerBodyEncrypted)
-    }
-
-    /** 인용 없는 일반 메시지는 여섯 컬럼이 전부 비어야 CHECK를 만족한다. */
-    @Test
-    fun `인용 없는 메시지는 여섯 컬럼이 모두 비어 있다`() {
-        val entity = Message.create(conversationId = 2L, senderId = 3L, body = "안녕")
-            .toNewEntity(encryptedBody = "암호문-본문")
-
-        assertNull(entity.spotQaCatalogId)
-        assertNull(entity.spotQaSpotTitle)
-        assertNull(entity.spotQaQuestionId)
-        assertNull(entity.spotQaQuestionBodyEncrypted)
-        assertNull(entity.spotQaAnswerId)
-        assertNull(entity.spotQaAnswerBodyEncrypted)
+        assertEquals(7L, entity.messageId)
+        assertEquals(MessageQuoteType.SPOT_ANSWER, entity.quoteType)
+        assertEquals(63L, entity.targetId)
+        assertEquals("경복궁", entity.titleSnapshot)
+        assertEquals("암호문-질문", entity.primaryExcerptEncrypted)
+        assertEquals("암호문-답변", entity.secondaryExcerptEncrypted)
+        assertEquals(41L, entity.contextId)
+        assertEquals(52L, entity.parentId)
     }
 
     // ── 엔티티 → 읽기 모델 ────────────────────────────────────────
 
     @Test
     fun `엔티티가 읽기 모델로 필드별로 옮겨진다`() {
-        val view = assertNotNull(
-            entityWithOrigin().toSpotQaOriginView(
-                decryptedQuestionExcerpt = "질문 평문",
-                decryptedAnswerExcerpt = "답변 평문",
-            ),
+        val view = quoteEntity().toSpotQaOriginView(
+            decryptedPrimaryExcerpt = "질문 평문",
+            decryptedSecondaryExcerpt = "답변 평문",
         )
 
         assertEquals(41L, view.catalogId)
@@ -143,16 +124,6 @@ class ConversationSpotQaOriginMapperTest {
         assertEquals("질문 평문", view.questionBodySnapshot)
         assertEquals(63L, view.answerId)
         assertEquals("답변 평문", view.answerBodySnapshot)
-    }
-
-    @Test
-    fun `인용 컬럼이 비면 읽기 모델도 null이다`() {
-        val entity = MessageEntity(
-            id = 1L, conversationId = 2L, senderId = 3L,
-            bodyEncrypted = "암호화된-본문", createdAt = createdAt,
-        )
-
-        assertNull(entity.toSpotQaOriginView(null, null))
     }
 
     // ── 읽기 모델 → GraphQL ───────────────────────────────────────
