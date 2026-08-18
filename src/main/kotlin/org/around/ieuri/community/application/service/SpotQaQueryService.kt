@@ -36,15 +36,27 @@ class SpotQaQueryService(
     private val policy: CommunityPolicy,
 ) : SpotQaQueryUseCase {
 
-    /** 없는 장소는 빈 목록이 아니라 SPOT_NOT_FOUND다(AC-1.3) — 오타와 "질문 없음"은 다르다. */
+    /**
+     * 질문 목록. **세 필터가 독립적이며 함께 걸린다** — 장소·작성자·id다.
+     *
+     * 장소를 준 경우에만 존재를 확인한다. 없는 장소는 빈 목록이 아니라 SPOT_NOT_FOUND이며
+     * (AC-1.3), 오타와 "질문 없음"은 구분되어야 한다.
+     *
+     * `mine`은 **호출자 자신으로만 좁힌다** — 회원 id를 인자로 받지 않으므로 남의 목록을
+     * 여는 경로가 없다. 비로그인은 좁힐 대상이 없어 리졸버가 미리 막는다.
+     */
     override fun spotQuestions(
         query: SpotQuestionsQuery,
         memberId: Long,
     ): CursorPage<SpotQuestionView> {
-        if (spotLookupPort.findSummary(query.catalogId) == null) throw SpotNotFoundException()
+        query.catalogId?.let {
+            if (spotLookupPort.findSummary(it) == null) throw SpotNotFoundException()
+        }
         return spotQaQueryPort.findQuestions(
             SpotQuestionsSearch(
                 catalogId = query.catalogId,
+                authorId = if (query.mine) memberId else null,
+                ids = query.ids,
                 first = clampPageSize(query.first),
                 after = query.after,
                 viewer = viewerContext(memberId),

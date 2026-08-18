@@ -88,7 +88,12 @@ data class SpotQaOriginSource(
  * `hiddenPostIds`는 글 단위 개인 숨김이라 여기서는 비어 있는 채로 온다(질문에는 개인 숨김이 없다).
  */
 data class SpotQuestionsSearch(
-    val catalogId: Long,
+    /** 이 장소의 질문만. null이면 좁히지 않는다. */
+    val catalogId: Long?,
+    /** 이 작성자의 질문만. null이면 좁히지 않는다 — 호출자 신원은 응용 계층이 채운다. */
+    val authorId: Long? = null,
+    /** 이 id들만. null이면 좁히지 않고, **빈 목록이면 결과가 없다.** */
+    val ids: List<Long>? = null,
     val first: Int,
     val after: String?,
     val viewer: ViewerContext,

@@ -40,19 +40,31 @@ class SpotQaQueryResolver(
     private val currentMemberProvider: CurrentMemberProvider,
 ) {
 
+    /**
+     * 질문 목록. 장소·작성자·id 세 필터가 독립적이며 함께 걸린다.
+     *
+     * **`mine = true`는 인증을 요구한다** — 비로그인은 좁힐 대상이 없어 빈 목록을 주는 대신
+     * `requireMemberId`가 최상위 errors[]로 UNAUTHENTICATED를 낸다. 조용히 빈 목록을 주면
+     * 클라이언트가 "질문을 쓴 적 없음"으로 오해한다.
+     */
     @DgsQuery
     fun spotQuestions(
-        @InputArgument catalogId: Long,
+        @InputArgument catalogId: Long?,
+        @InputArgument mine: Boolean?,
+        @InputArgument ids: List<Long>?,
         @InputArgument first: Int?,
         @InputArgument after: String?,
     ): SpotQuestionConnection {
+        val onlyMine = mine ?: false
         val page = spotQaQueryUseCase.spotQuestions(
             SpotQuestionsQuery(
                 catalogId = catalogId,
+                mine = onlyMine,
+                ids = ids,
                 first = first ?: DEFAULT_PAGE_SIZE,
                 after = after,
             ),
-            memberId = viewerId(),
+            memberId = if (onlyMine) currentMemberProvider.requireMemberId() else viewerId(),
         )
         return SpotQuestionConnection(
             edges = page.edges.map { SpotQuestionEdge(cursor = it.cursor, node = it.node) },

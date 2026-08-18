@@ -24,6 +24,7 @@ import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -100,7 +101,7 @@ class SpotQaQueryServiceTest {
         givenSpotExists(exists = false)
 
         assertFailsWith<SpotNotFoundException> {
-            service.spotQuestions(SpotQuestionsQuery(catalogId, first = 20, after = null), memberId)
+            service.spotQuestions(SpotQuestionsQuery(catalogId = catalogId, first = 20, after = null), memberId)
         }
     }
 
@@ -112,7 +113,7 @@ class SpotQaQueryServiceTest {
         every { spotQaQueryPort.findQuestions(capture(search)) } returns
             cursorPageOf(emptyList(), hasNextPage = false, hasPreviousPage = false)
 
-        service.spotQuestions(SpotQuestionsQuery(catalogId, first = 100, after = null), memberId)
+        service.spotQuestions(SpotQuestionsQuery(catalogId = catalogId, first = 100, after = null), memberId)
 
         assertEquals(50, search.captured.first)
     }
@@ -125,7 +126,7 @@ class SpotQaQueryServiceTest {
         every { spotQaQueryPort.findQuestions(capture(search)) } returns
             cursorPageOf(emptyList(), hasNextPage = false, hasPreviousPage = false)
 
-        service.spotQuestions(SpotQuestionsQuery(catalogId, first = 20, after = null), memberId)
+        service.spotQuestions(SpotQuestionsQuery(catalogId = catalogId, first = 20, after = null), memberId)
 
         assertEquals(setOf(42L), search.captured.viewer.blockedMemberIds)
     }
@@ -136,9 +137,88 @@ class SpotQaQueryServiceTest {
         every { spotQaQueryPort.findQuestions(any()) } returns
             cursorPageOf(emptyList(), hasNextPage = false, hasPreviousPage = false)
 
-        service.spotQuestions(SpotQuestionsQuery(catalogId, first = 20, after = null), memberId = 0L)
+        service.spotQuestions(SpotQuestionsQuery(catalogId = catalogId, first = 20, after = null), memberId = 0L)
 
         verify(exactly = 0) { communityQueryPort.findBlockedMemberIds(any()) }
+    }
+
+    // ── 필터 조합(장소·작성자·id) ──────────────────────────────────
+
+    @Test
+    fun `mine이면 호출자를 작성자 조건으로 넘긴다`() {
+        givenBlockedMembers()
+        val search = slot<SpotQuestionsSearch>()
+        every { spotQaQueryPort.findQuestions(capture(search)) } returns
+            cursorPageOf(emptyList(), hasNextPage = false, hasPreviousPage = false)
+
+        service.spotQuestions(
+            SpotQuestionsQuery(catalogId = null, mine = true, first = 20, after = null),
+            memberId,
+        )
+
+        // **호출자 자신이다.** 인자로 받은 남의 id가 들어갈 자리가 없다.
+        assertEquals(memberId, search.captured.authorId)
+        assertNull(search.captured.catalogId)
+    }
+
+    @Test
+    fun `mine이 아니면 작성자로 좁히지 않는다`() {
+        givenSpotExists()
+        givenBlockedMembers()
+        val search = slot<SpotQuestionsSearch>()
+        every { spotQaQueryPort.findQuestions(capture(search)) } returns
+            cursorPageOf(emptyList(), hasNextPage = false, hasPreviousPage = false)
+
+        service.spotQuestions(SpotQuestionsQuery(catalogId = catalogId, first = 20, after = null), memberId)
+
+        assertNull(search.captured.authorId)
+    }
+
+    @Test
+    fun `장소와 작성자를 함께 좁힐 수 있다`() {
+        givenSpotExists()
+        givenBlockedMembers()
+        val search = slot<SpotQuestionsSearch>()
+        every { spotQaQueryPort.findQuestions(capture(search)) } returns
+            cursorPageOf(emptyList(), hasNextPage = false, hasPreviousPage = false)
+
+        service.spotQuestions(
+            SpotQuestionsQuery(catalogId = catalogId, mine = true, first = 20, after = null),
+            memberId,
+        )
+
+        assertEquals(catalogId, search.captured.catalogId)
+        assertEquals(memberId, search.captured.authorId)
+    }
+
+    @Test
+    fun `ids를 주면 그대로 조회 조건으로 넘어간다`() {
+        givenBlockedMembers()
+        val search = slot<SpotQuestionsSearch>()
+        every { spotQaQueryPort.findQuestions(capture(search)) } returns
+            cursorPageOf(emptyList(), hasNextPage = false, hasPreviousPage = false)
+
+        service.spotQuestions(
+            SpotQuestionsQuery(catalogId = null, ids = listOf(5L), first = 20, after = null),
+            memberId,
+        )
+
+        assertEquals(listOf(5L), search.captured.ids)
+    }
+
+    /** 장소를 주지 않았으면 확인할 대상이 없다 — 없는 장소로 오인해 거부하면 안 된다. */
+    @Test
+    fun `장소를 주지 않으면 장소 존재를 묻지 않는다`() {
+        givenBlockedMembers()
+        every { spotQaQueryPort.findQuestions(any()) } returns
+            cursorPageOf(emptyList(), hasNextPage = false, hasPreviousPage = false)
+
+        service.spotQuestions(
+            SpotQuestionsQuery(catalogId = null, mine = true, first = 20, after = null),
+            memberId,
+        )
+
+        verify(exactly = 0) { spotLookupPort.findSummary(any()) }
     }
 
     // ── 답변 목록과 숨김 종속(R11) ─────────────────────────────────

@@ -3,6 +3,7 @@ package org.around.ieuri.community.infrastructure.adapter.out.query
 import com.querydsl.core.types.dsl.BooleanExpression
 import com.querydsl.core.types.dsl.BooleanPath
 import com.querydsl.core.types.dsl.DateTimePath
+import com.querydsl.core.types.dsl.Expressions
 import com.querydsl.core.types.dsl.NumberPath
 import com.querydsl.jpa.impl.JPAQueryFactory
 import org.around.ieuri.common.pagination.CursorEdge
@@ -56,7 +57,10 @@ class SpotQaQueryAdapter(
         val rows = queryFactory
             .selectFrom(question)
             .where(
-                question.catalogId.eq(search.catalogId),
+                // 셋 다 선택이며 함께 걸린다. null인 where 인자는 QueryDSL이 버린다.
+                search.catalogId?.let { question.catalogId.eq(it) },
+                search.authorId?.let { question.authorId.eq(it) },
+                idsCondition(search.ids),
                 visibleToViewer(search.viewer),
                 cursor?.let { questionKeysetCondition(it) },
             )
@@ -232,6 +236,17 @@ class SpotQaQueryAdapter(
         blockExclusion(viewer, question.authorId)?.let { condition = condition.and(it) }
         condition = condition.and(hiddenExclusion(viewer, question.hidden, question.authorId))
         return condition
+    }
+
+    /**
+     * id 목록 필터. **null과 빈 목록의 뜻이 다르다** — null은 "id로 좁히지 않음"이고
+     * 빈 목록은 "결과 없음"이다. 빈 목록을 그냥 `in`에 넣으면 DB마다 해석이 갈리므로
+     * 명시적으로 거짓 조건을 만든다.
+     */
+    private fun idsCondition(ids: List<Long>?): BooleanExpression? = when {
+        ids == null -> null
+        ids.isEmpty() -> Expressions.FALSE.isTrue
+        else -> question.id.`in`(ids)
     }
 
     /** 차단 집합이 비면 조건을 붙이지 않는다 — QueryDSL은 null인 where 인자를 버린다. */
