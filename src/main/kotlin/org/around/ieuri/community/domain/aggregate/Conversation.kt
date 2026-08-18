@@ -57,6 +57,9 @@ class Conversation private constructor(
      *
      * 저장한 엔티티를 되읽어 도메인으로 옮기는 대신 이것을 쓰는 이유는 출처 발췌 때문이다 —
      * 엔티티에는 암호문만 있어, 되읽으면 방금 손에 쥔 평문을 다시 복호화하게 된다.
+     *
+     * **[createdAt]은 비어 있다.** DB가 채우는 값이라 새로 만든 직후에는 알 수 없다 —
+     * 이미 있던 대화를 돌려받는 경로와 이 점이 다르므로, 시각이 필요하면 다시 읽어야 한다.
      */
     fun withId(assignedId: Long): Conversation = Conversation(
         id = assignedId,

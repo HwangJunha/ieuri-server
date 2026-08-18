@@ -64,9 +64,12 @@ class SpotQaQueryService(
      */
     override fun spotAnswers(query: SpotAnswersQuery, memberId: Long): CursorPage<SpotAnswerView> {
         val viewer = viewerContext(memberId)
-        val question = spotQaQueryPort.findQuestion(query.questionId, viewer)
+        // **숨김 필터를 우회해 읽는다**(includeHidden). 숨겨진 질문을 null로 받으면 "가려졌다"와
+        // "없다"가 같은 값이 되어, 아래 종속 판정이 도달 불가능해지고 계약(빈 목록)이 아니라
+        // QUESTION_NOT_FOUND가 나간다. 차단은 이 플래그와 무관하게 그대로 걸린다.
+        val question = spotQaQueryPort.findQuestion(query.questionId, viewer, includeHidden = true)
             ?: throw QuestionNotFoundException()
-        // 작성자 본인에게는 findQuestion이 숨겨진 질문도 돌려준다 — 그때는 답변도 함께 보인다.
+        // 숨겨진 질문의 답변은 함께 가려진다(AC-11.4). 작성자 본인에게는 그대로 보인다(AC-11.5).
         if (question.hidden && !question.ownedByViewer) return emptyPage()
         return spotQaQueryPort.findAnswers(
             SpotAnswersSearch(

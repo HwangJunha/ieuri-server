@@ -13,10 +13,10 @@ import org.around.ieuri.common.security.AesGcmCipher
 import org.around.ieuri.community.application.port.out.query.ConversationMessagesSearch
 import org.around.ieuri.community.application.port.out.query.ConversationQueryPort
 import org.around.ieuri.community.application.port.out.query.ConversationsSearch
-import org.around.ieuri.community.application.query.ConversationSpotQaOriginView
 import org.around.ieuri.community.application.query.ConversationView
 import org.around.ieuri.community.application.query.MessageView
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.ConversationEntity
+import org.around.ieuri.community.infrastructure.adapter.out.query.mapper.toSpotQaOriginView
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.MessageEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QConversationEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QMessageEntity
@@ -235,26 +235,11 @@ class ConversationQueryAdapter(
         lastMessage = lastMessage,
         unreadCount = unreadCount,
         updatedAt = requireNotNull(lastMessageAt) { "조회된 대화에는 lastMessageAt이 있어야 한다." },
-        spotQaOrigin = toSpotQaOriginView(),
+        spotQaOrigin = toSpotQaOriginView(
+            decryptedQuestionExcerpt = spotQaQuestionBodyEncrypted?.let { cipher.decrypt(it) },
+            decryptedAnswerExcerpt = spotQaAnswerBodyEncrypted?.let { cipher.decrypt(it) },
+        ),
     )
-
-    /**
-     * 출처 스냅샷(SPEC-0026 R14). **여섯 값이 전부 있어야 성립한다** — DB의 CHECK가 그 상태를
-     * 강제하므로 하나라도 비면 출처 없는 일반 DM이다.
-     *
-     * 발췌는 대화의 일부라 암호화되어 있어 여기서 복호화한다(POL-050).
-     */
-    private fun ConversationEntity.toSpotQaOriginView(): ConversationSpotQaOriginView? =
-        ConversationSpotQaOriginView(
-            catalogId = spotQaCatalogId ?: return null,
-            spotTitle = spotQaSpotTitle ?: return null,
-            questionId = spotQaQuestionId ?: return null,
-            questionBodySnapshot = spotQaQuestionBodyEncrypted?.let { cipher.decrypt(it) }
-                ?: return null,
-            answerId = spotQaAnswerId ?: return null,
-            answerBodySnapshot = spotQaAnswerBodyEncrypted?.let { cipher.decrypt(it) }
-                ?: return null,
-        )
 
     /**
      * 본문이 빈 메시지는 복호화를 건너뛴다 — 빈 값을 복호화하려 들면 base64 디코딩에서

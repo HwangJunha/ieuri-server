@@ -53,7 +53,9 @@ class SpotQuestionPersistenceAdapter(
             IllegalStateException("갱신하려는 질문($id)이 존재하지 않는다.")
         }
         entity.resolved = question.resolved
-        entity.answerCount = question.answerCount
+        // **answerCount는 여기서 쓰지 않는다.** 적재와 flush 사이에 답변이 달리면 그 +1을
+        // 덮어써 수가 영구히 작아진다 — 증감은 SpotQuestionCounterAdapter의 원자적 UPDATE가
+        // 소유하며, 이 경로(해결 표시)는 그 값을 건드리지 않는다.
         entity.hidden = question.hidden
         entity.deletedAt = question.deletedAt
         return question

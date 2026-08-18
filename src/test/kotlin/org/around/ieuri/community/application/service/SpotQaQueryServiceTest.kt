@@ -146,7 +146,7 @@ class SpotQaQueryServiceTest {
     @Test
     fun `숨겨진 질문의 답변은 함께 가려진다`() {
         givenBlockedMembers()
-        every { spotQaQueryPort.findQuestion(questionId, any()) } returns questionView(hidden = true)
+        every { spotQaQueryPort.findQuestion(questionId, any(), includeHidden = true) } returns questionView(hidden = true)
 
         val page = service.spotAnswers(SpotAnswersQuery(questionId, first = 20, after = null), memberId)
 
@@ -158,7 +158,7 @@ class SpotQaQueryServiceTest {
     @Test
     fun `숨겨진 질문이라도 작성자 본인에게는 답변이 보인다`() {
         givenBlockedMembers()
-        every { spotQaQueryPort.findQuestion(questionId, any()) } returns
+        every { spotQaQueryPort.findQuestion(questionId, any(), includeHidden = true) } returns
             questionView(hidden = true, ownedByViewer = true)
         every { spotQaQueryPort.findAnswers(any()) } returns answerPage()
 
@@ -170,7 +170,7 @@ class SpotQaQueryServiceTest {
     @Test
     fun `숨겨지지 않은 질문의 답변은 정상 반환된다`() {
         givenBlockedMembers()
-        every { spotQaQueryPort.findQuestion(questionId, any()) } returns questionView()
+        every { spotQaQueryPort.findQuestion(questionId, any(), includeHidden = true) } returns questionView()
         every { spotQaQueryPort.findAnswers(any()) } returns answerPage()
 
         assertEquals(
@@ -182,8 +182,9 @@ class SpotQaQueryServiceTest {
     @Test
     fun `차단으로 가려진 질문의 답변은 QUESTION_NOT_FOUND다`() {
         givenBlockedMembers(setOf(99L))
-        // 차단 필터에 걸려 조회 자체가 비면 질문이 없는 것과 같다 — 우회로를 만들지 않는다.
-        every { spotQaQueryPort.findQuestion(questionId, any()) } returns null
+        // includeHidden은 **숨김만** 우회한다 — 차단은 그대로 걸려 null이 되고, 그래야
+        // 차단 상대의 질문에 달린 답변을 우회로 읽을 수 없다.
+        every { spotQaQueryPort.findQuestion(questionId, any(), includeHidden = true) } returns null
 
         assertFailsWith<QuestionNotFoundException> {
             service.spotAnswers(SpotAnswersQuery(questionId, first = 20, after = null), memberId)
@@ -193,7 +194,7 @@ class SpotQaQueryServiceTest {
     @Test
     fun `답변 목록의 first도 상한으로 절삭된다`() {
         givenBlockedMembers()
-        every { spotQaQueryPort.findQuestion(questionId, any()) } returns questionView()
+        every { spotQaQueryPort.findQuestion(questionId, any(), includeHidden = true) } returns questionView()
         val search = slot<SpotAnswersSearch>()
         every { spotQaQueryPort.findAnswers(capture(search)) } returns answerPage()
 

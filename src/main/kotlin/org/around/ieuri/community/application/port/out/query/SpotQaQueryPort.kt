@@ -17,8 +17,22 @@ interface SpotQaQueryPort {
      */
     fun findQuestions(search: SpotQuestionsSearch): CursorPage<SpotQuestionView>
 
-    /** 질문 단건. 목록과 같은 모더레이션 필터를 거치며, 걸러지면 null이다. */
-    fun findQuestion(questionId: Long, viewer: ViewerContext): SpotQuestionView?
+    /**
+     * 질문 단건. 차단 필터는 항상 걸리며, 걸러지면 null이다.
+     *
+     * [includeHidden]이 true면 **숨김 필터만 우회한다** — 숨겨진 질문도 돌려주므로 호출자가
+     * `hidden`을 보고 판단할 수 있다. 답변 목록이 R11의 종속(질문이 숨겨지면 답변도 가려짐)을
+     * 적용하려면 "숨겨진 질문이 존재한다"와 "질문이 없다"를 구분해야 하는데, 숨김 필터를
+     * 거치면 둘 다 null이 되어 구분이 사라진다.
+     *
+     * **차단은 우회하지 않는다.** 차단 상대의 질문은 이 플래그와 무관하게 null이며,
+     * 그래야 차단이 답변 목록으로 우회되지 않는다.
+     */
+    fun findQuestion(
+        questionId: Long,
+        viewer: ViewerContext,
+        includeHidden: Boolean = false,
+    ): SpotQuestionView?
 
     /** 답변 목록. 최신순. 질문의 숨김 종속(R11)은 호출자가 이미 판정한 뒤 부른다. */
     fun findAnswers(search: SpotAnswersSearch): CursorPage<SpotAnswerView>

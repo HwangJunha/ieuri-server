@@ -5,11 +5,12 @@ import com.netflix.graphql.dgs.DgsData
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
-import org.around.ieuri.common.pagination.CursorPageInfo
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.community.application.port.`in`.query.ConversationQueryUseCase
 import org.around.ieuri.community.application.port.out.client.MemberLookupPort
 import org.around.ieuri.community.application.query.ConversationView
+import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper.toGql
+import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper.toGqlOrPlaceholder
 import org.around.ieuri.common.graphql.generated.types.ConversationSpotQaOrigin as GqlConversationSpotQaOrigin
 import org.around.ieuri.community.application.query.MessageView
 import org.around.ieuri.community.application.query.PostAuthorView
@@ -17,7 +18,6 @@ import org.around.ieuri.community.application.query.TypingEventView
 import org.dataloader.DataLoader
 import org.springframework.stereotype.Component
 import java.util.concurrent.CompletableFuture
-import org.around.ieuri.common.graphql.generated.types.PageInfo as GqlPageInfo
 import org.around.ieuri.common.graphql.generated.types.PostAuthor as GqlPostAuthor
 
 /**
@@ -90,16 +90,7 @@ class ConversationQueryResolver(
     @DgsData(parentType = "Conversation", field = "spotQaOrigin")
     fun conversationSpotQaOrigin(
         dfe: DgsDataFetchingEnvironment,
-    ): GqlConversationSpotQaOrigin? = dfe.conversationSource().spotQaOrigin?.let {
-        GqlConversationSpotQaOrigin(
-            catalogId = it.catalogId,
-            spotTitle = it.spotTitle,
-            questionId = it.questionId,
-            questionBodySnapshot = it.questionBodySnapshot,
-            answerId = it.answerId,
-            answerBodySnapshot = it.answerBodySnapshot,
-        )
-    }
+    ): GqlConversationSpotQaOrigin? = dfe.conversationSource().spotQaOrigin?.toGql()
 
     /**
      * 메시지 발신자. **DataLoader를 쓰지 않고 직접 읽는다.**
@@ -151,20 +142,4 @@ class ConversationQueryResolver(
         getSource<MessageView>()
             ?: error("Message 필드 리졸버는 부모가 반환한 MessageView를 소스로 받아야 한다.")
 
-    /**
-     * 회원 정보가 없어도 피드·메시지는 남는다(탈퇴해도 상대의 화면이 깨지면 안 된다, AC17-2).
-     * 작성자 표시가 비면 클라이언트가 렌더에 실패하므로 대체 표기를 내려준다.
-     */
-    private fun PostAuthorView?.toGqlOrPlaceholder(memberId: Long) = GqlPostAuthor(
-        id = this?.id ?: memberId,
-        nickname = this?.nickname ?: "알 수 없음",
-        profileImageUrl = this?.profileImageUrl,
-    )
-
-    private fun CursorPageInfo.toGql() = GqlPageInfo(
-        hasNextPage = hasNextPage,
-        hasPreviousPage = hasPreviousPage,
-        startCursor = startCursor,
-        endCursor = endCursor,
-    )
 }

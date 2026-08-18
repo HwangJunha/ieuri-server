@@ -1,7 +1,9 @@
 package org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper
 
 import org.around.ieuri.common.pagination.CursorPageInfo
+import org.around.ieuri.community.application.query.ConversationSpotQaOriginView
 import org.around.ieuri.community.application.query.PostAuthorView
+import org.around.ieuri.common.graphql.generated.types.ConversationSpotQaOrigin as GqlConversationSpotQaOrigin
 import org.around.ieuri.common.graphql.generated.types.PageInfo as GqlPageInfo
 import org.around.ieuri.common.graphql.generated.types.PostAuthor as GqlPostAuthor
 
@@ -28,4 +30,20 @@ fun CursorPageInfo.toGql(): GqlPageInfo = GqlPageInfo(
     hasPreviousPage = hasPreviousPage,
     startCursor = startCursor,
     endCursor = endCursor,
+)
+
+/**
+ * DM 출처 스냅샷의 응답 변환(SPEC-0026 R14).
+ *
+ * 리졸버 안에 인라인으로 두지 않는 이유는 필드가 여섯이고 그중 셋이 `Long`, 셋이 `String`이라
+ * **뒤바뀌어도 컴파일이 통과하기** 때문이다 — 질문 발췌 자리에 답변 발췌가 실리면 맥락 카드가
+ * 영구히 틀린 값을 보여준다(스냅샷은 대화 생성 시 한 번 쓰이고 다시 만들어지지 않는다).
+ */
+fun ConversationSpotQaOriginView.toGql(): GqlConversationSpotQaOrigin = GqlConversationSpotQaOrigin(
+    catalogId = catalogId,
+    spotTitle = spotTitle,
+    questionId = questionId,
+    questionBodySnapshot = questionBodySnapshot,
+    answerId = answerId,
+    answerBodySnapshot = answerBodySnapshot,
 )

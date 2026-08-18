@@ -80,10 +80,21 @@ class SpotQaQueryAdapter(
     }
 
     @Transactional(readOnly = true)
-    override fun findQuestion(questionId: Long, viewer: ViewerContext): SpotQuestionView? =
+    override fun findQuestion(
+        questionId: Long,
+        viewer: ViewerContext,
+        includeHidden: Boolean,
+    ): SpotQuestionView? =
         queryFactory
             .selectFrom(question)
-            .where(question.id.eq(questionId), visibleToViewer(viewer))
+            .where(
+                question.id.eq(questionId),
+                question.deletedAt.isNull,
+                // 차단은 언제나 건다 — 우회하면 답변 목록이 차단을 뚫는 통로가 된다.
+                blockExclusion(viewer, question.authorId),
+                // 숨김만 선택적으로 우회한다(R11 종속 판정용).
+                if (includeHidden) null else hiddenExclusion(viewer, question.hidden, question.authorId),
+            )
             .fetchOne()
             ?.toQuestionView(viewer)
 
