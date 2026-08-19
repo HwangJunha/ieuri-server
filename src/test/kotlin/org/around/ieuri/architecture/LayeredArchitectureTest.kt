@@ -160,6 +160,15 @@ class LayeredArchitectureTest {
      *
      * 목으로 짠 단위 테스트는 전파를 볼 수 없고 컴파일도 통과하므로, 여기서 구조로 막는다.
      * 읽기 전용이거나 DB를 만지지 않는 리스너(메일 발송 등)는 대상이 아니다.
+     *
+     * **호출을 끝까지 따라간다.** 직접 호출만 보면 두 가지가 통째로 빠져나간다.
+     *  - 리스너가 private 헬퍼를 거쳐 부르는 경우(`AlarmPushTriggerListener.dispatchQuietly`).
+     *    예외를 삼키려면 헬퍼가 자연스러운 형태라 흔하다.
+     *  - 트랜잭션 없는 서비스를 하나 거쳐 다른 빈이 쓰는 경우(`PushDispatchService` →
+     *    `PushDispatchStore`). 원격 호출을 트랜잭션 밖으로 빼려면 빈을 나눠야 하므로
+     *    그 구조 자체는 정당하고, 따라서 규칙이 따라가야 한다.
+     *
+     * 그래서 리스너에서 시작해 `org.around.ieuri` 안의 호출을 닫힐 때까지 훑는다.
      */
     @Test
     fun `AFTER_COMMIT 리스너가 부르는 쓰기 유스케이스는 REQUIRES_NEW여야 한다`() {
@@ -167,14 +176,28 @@ class LayeredArchitectureTest {
             .flatMap { it.methods }
             .filter { it.isAnnotatedWith("org.springframework.transaction.event.TransactionalEventListener") }
 
-        // 리스너가 직접 호출하는 유스케이스 구현들. 인터페이스 호출이라 대상 타입으로 되짚는다.
-        val calledUseCases = listenerMethods
-            .flatMap { it.methodCallsFromSelf }
-            .map { it.targetOwner }
-            .filter { it.packageName.startsWith("org.around.ieuri") }
-            .flatMap { target -> classes.filter { it.allRawInterfaces.contains(target) } }
+        // 호출 대상 타입 → 그 타입 자신과, 그 타입을 구현한 클래스들.
+        // 인터페이스로 호출하므로 구현으로 되짚어야 하고, PushDispatchStore처럼 인터페이스가
+        // 없는 빈은 자기 자신으로 잡힌다.
+        fun implementationsOf(target: JavaClass): List<JavaClass> =
+            classes.filter { it == target || it.allRawInterfaces.contains(target) }
+
+        // 리스너에서 도달 가능한 우리 코드 전부. 방문 집합으로 순환을 끊는다.
+        val reachable = mutableSetOf<JavaClass>()
+        val queue = ArrayDeque(listenerMethods.map { it.owner }.distinct())
+        while (queue.isNotEmpty()) {
+            val current = queue.removeFirst()
+            if (!reachable.add(current)) continue
+            current.methods
+                .flatMap { it.methodCallsFromSelf }
+                .map { it.targetOwner }
+                .filter { it.packageName.startsWith("org.around.ieuri") }
+                .flatMap { implementationsOf(it) }
+                .forEach { if (it !in reachable) queue.addLast(it) }
+        }
+
+        val calledUseCases = reachable
             .filter { it.isAnnotatedWith("org.springframework.stereotype.Service") }
-            .distinct()
 
         val offenders = calledUseCases.flatMap { service ->
             service.methods

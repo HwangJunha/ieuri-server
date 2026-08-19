@@ -21,9 +21,13 @@ import org.springframework.transaction.annotation.Transactional
  * 밖에서 일어난다. **같은 클래스의 private 메서드로 나누면 안 된다** — 자기 호출은 프록시를
  * 지나지 않아 `@Transactional`이 조용히 무효가 된다.
  *
- * `REQUIRES_NEW`인 이유는 호출자가 `AFTER_COMMIT` 리스너이기 때문이다. 그 시점의 원본
- * 트랜잭션은 이미 커밋됐으면서도 스레드에 묶여 있어, 기본 전파로 두면 커밋할 수 없는 그
- * 트랜잭션에 합류해 쓰기가 조용히 사라진다.
+ * `REQUIRES_NEW`는 **오늘의 경로에서는 아무 일도 하지 않는다.** 호출자인 리스너가 `@Async`라
+ * 실행이 발송 워커 스레드로 넘어가고, 거기에는 묶인 트랜잭션이 없어 중단할 것이 없다.
+ *
+ * 그럼에도 두는 이유는 `@Async`가 빠지는 경우에 대한 대비다. 그러면 호출자가 `AFTER_COMMIT`
+ * 리스너의 스레드가 되는데, 그 시점의 원본 트랜잭션은 이미 커밋됐으면서도 스레드에 묶여
+ * 있어 기본 전파로는 커밋할 수 없는 그 트랜잭션에 합류해 **쓰기가 조용히 사라진다.**
+ * `LayeredArchitectureTest`가 이 전파를 강제한다.
  */
 @Service
 class PushDispatchStore(
