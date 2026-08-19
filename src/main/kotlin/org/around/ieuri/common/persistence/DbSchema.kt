@@ -15,4 +15,5 @@ object DbSchema {
     const val COMMUNITY = "community"
     const val TOUR = "tour"
     const val CATEGORY = "category"
+    const val ALARM = "alarm"
 }

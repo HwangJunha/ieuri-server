@@ -61,6 +61,15 @@ interface CommunityQueryUseCase {
     fun blockedUsers(query: BlockedUsersQuery, memberId: Long): CursorPage<BlockedUserView>
 
     /**
+     * 두 회원이 **어느 방향으로든** 차단 관계인지(POL-041). 차단은 양방향이라 누가 걸었는지를
+     * 묻지 않는다.
+     *
+     * [blockedUsers]와 달리 목록이 아니라 판정이다 — 알림 발송처럼 상대 한 명만 두고
+     * 보낼지 말지를 정하는 호출자가 쓴다(SPEC-0028 R9).
+     */
+    fun isBlockedBetween(memberId: Long, counterpartId: Long): Boolean
+
+    /**
      * 본인이 작성한 글(SPEC-0011 R3). 작성 시각 내림차순이며 **숨김·차단 필터를 거치지
      * 않는다** — 자기 글은 자기가 숨겼더라도 마이페이지에 보여야 한다.
      */

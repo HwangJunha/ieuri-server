@@ -13,12 +13,15 @@ import org.around.ieuri.community.application.exception.ReplyNotFoundException
 import org.around.ieuri.community.application.exception.ReplyToReplyNotAllowedException
 import org.around.ieuri.community.application.exception.TooManyPhotosException
 import org.around.ieuri.community.application.port.`in`.command.SpotAnswerCommandUseCase
+import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
 import org.around.ieuri.community.application.port.out.persistence.SpotAnswerReplyRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.SpotAnswerRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.SpotQuestionCounterPort
 import org.around.ieuri.community.application.port.out.persistence.SpotQuestionRepositoryPort
 import org.around.ieuri.community.domain.aggregate.SpotAnswer
 import org.around.ieuri.community.domain.aggregate.SpotAnswerReply
+import org.around.ieuri.community.domain.event.SpotAnswerNotificationTriggered
+import org.around.ieuri.community.domain.event.SpotAnswerReplyNotificationTriggered
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -39,6 +42,7 @@ class SpotAnswerCommandService(
     private val questionRepositoryPort: SpotQuestionRepositoryPort,
     private val questionCounterPort: SpotQuestionCounterPort,
     private val photoKeyVerifier: SpotQaPhotoKeyVerifier,
+    private val eventPublisher: CommunityEventPublisherPort,
 ) : SpotAnswerCommandUseCase {
 
     @Transactional
@@ -60,7 +64,20 @@ class SpotAnswerCommandService(
         )
         val saved = answerRepositoryPort.save(answer)
         questionCounterPort.increaseAnswerCount(command.questionId)
-        return requireNotNull(saved.id) { "저장된 답변에는 id가 있어야 한다." }
+        val answerId = requireNotNull(saved.id) { "저장된 답변에는 id가 있어야 한다." }
+
+        // 푸시 알림 트리거(SPEC-0028 R6). 자기 질문에 자기가 답한 경우는 alarm이 거른다(R8) —
+        // 수신자 판정을 한곳에 모아 두려는 것이고, 여기서 미리 걸러도 결과는 같다.
+        eventPublisher.publish(
+            SpotAnswerNotificationTriggered(
+                spotId = question.catalogId,
+                questionId = command.questionId,
+                answerId = answerId,
+                actorId = memberId,
+                recipientId = question.authorId,
+            ),
+        )
+        return answerId
     }
 
     /**
@@ -104,7 +121,20 @@ class SpotAnswerCommandService(
             photoKeys = photoKeys,
         )
         val saved = replyRepositoryPort.save(reply)
-        return requireNotNull(saved.id) { "저장된 답글에는 id가 있어야 한다." }
+        val replyId = requireNotNull(saved.id) { "저장된 답글에는 id가 있어야 한다." }
+
+        // 푸시 알림 트리거(SPEC-0028 R7). 목적지는 그 답변이 속한 질문 상세다(AC7.2) —
+        // 답글 단독 화면이 없다. **질문 작성자에게는 보내지 않는다**(AC7.3).
+        eventPublisher.publish(
+            SpotAnswerReplyNotificationTriggered(
+                spotId = answer.catalogId,
+                questionId = answer.questionId,
+                replyId = replyId,
+                actorId = memberId,
+                recipientId = answer.authorId,
+            ),
+        )
+        return replyId
     }
 
     @Transactional

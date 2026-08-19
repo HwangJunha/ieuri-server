@@ -46,6 +46,11 @@ class SchemaPlacementTest {
 
         listOf("category", "category_translation", "category_external_mapping", "app_category")
             .forEach { put(it, "category") }
+
+        // 알림(SPEC-0028). 다섯에 없던 컨텍스트라 스키마를 새로 만들었다 — auth에 얹으면
+        // 그 스키마에 사는 유일한 비-auth 표가 되어 컨텍스트당 스키마라는 전제가 깨진다.
+        listOf("device_token", "notification_preference", "notification_message")
+            .forEach { put(it, "alarm") }
     }
 
     /**
@@ -65,19 +70,19 @@ class SchemaPlacementTest {
     /** AC-6 — 전량 배정, 중복 0, 미배정 0. Map이므로 중복 키는 구조적으로 불가능하다. */
     @Test
     fun `배치표는 애플리케이션 테이블을 빠짐없이 배정한다`() {
-        // 스펙 §4의 46개 + 장소 질문/답변 4개 + 메시지 인용 1개(SPEC-0026).
-        assertEquals(51, placement.size, "배치표에 등록된 애플리케이션 테이블 수")
+        // 스펙 §4의 46개 + 장소 질문/답변 4개 + 메시지 인용 1개(SPEC-0026) + 알림 3개(SPEC-0028).
+        assertEquals(54, placement.size, "배치표에 등록된 애플리케이션 테이블 수")
         assertEquals(
-            setOf("auth", "community", "tour", "category"),
+            setOf("auth", "community", "tour", "category", "alarm"),
             placement.values.toSet(),
-            "배치 대상 스키마는 4개다 — batch는 JPA 엔티티가 없어 이 표에 없다",
+            "배치 대상 스키마는 5개다 — batch는 JPA 엔티티가 없어 이 표에 없다",
         )
     }
 
     /** AC-1 — 모든 엔티티가 비어 있지 않은, 허용된 스키마 이름을 갖는다. */
     @Test
     fun `모든 JPA 엔티티가 스키마를 명시한다`() {
-        val allowed = setOf("auth", "community", "tour", "category")
+        val allowed = setOf("auth", "community", "tour", "category", "alarm")
 
         val missing = entities.filter { schemaOf(it).isBlank() }.map { it.simpleName }
         assertTrue(missing.isEmpty(), "스키마를 명시하지 않은 엔티티: $missing")

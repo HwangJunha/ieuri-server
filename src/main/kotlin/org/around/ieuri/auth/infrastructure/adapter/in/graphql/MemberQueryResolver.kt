@@ -1,12 +1,13 @@
 package org.around.ieuri.auth.infrastructure.adapter.`in`.graphql
 
 import com.netflix.graphql.dgs.DgsComponent
+import com.netflix.graphql.dgs.DgsData
+import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.auth.application.port.`in`.query.MemberQueryUseCase
 import org.around.ieuri.auth.application.query.MembersQuery
 import org.around.ieuri.auth.application.query.MeView
-import org.around.ieuri.auth.infrastructure.adapter.`in`.graphql.mapper.toGql
 import org.around.ieuri.auth.application.query.MemberDetailView
 import org.around.ieuri.auth.application.query.MemberSummaryView
 import org.around.ieuri.auth.domain.vo.MemberStatus
@@ -14,7 +15,6 @@ import org.around.ieuri.auth.domain.vo.Permission
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.auth.infrastructure.security.RequiresPermission
 import org.around.ieuri.common.pagination.CursorPage
-import org.around.ieuri.common.graphql.generated.types.Me as GqlMe
 import org.around.ieuri.common.graphql.generated.types.MemberConnection as GqlMemberConnection
 import org.around.ieuri.common.graphql.generated.types.MemberDetail as GqlMemberDetail
 import org.around.ieuri.common.graphql.generated.types.MemberEdge as GqlMemberEdge
@@ -31,11 +31,34 @@ class MemberQueryResolver(
     private val memberQueryUseCase: MemberQueryUseCase,
     private val currentMemberProvider: CurrentMemberProvider,
 ) {
+    /**
+     * 본인 정보.
+     *
+     * **생성 타입이 아니라 read DTO를 돌려준다.** `Me.notificationPreferences`가 선택했을
+     * 때만 조회가 붙는 지연 필드라(SPEC-0028) 필드 리졸버가 이 값을 `getSource`로 받는다 —
+     * 생성 타입은 non-null 필드를 생성자에서 요구해 지연 필드를 비운 채로 만들 수 없다.
+     *
+     * 나머지 필드는 이름이 같아 DGS가 프로퍼티로 바로 해석하고, 어긋나는 셋(`id`·`status`·
+     * `createdAt`)만 아래에서 옮긴다.
+     */
     @DgsQuery
-    fun me(): GqlMe {
+    fun me(): MeView {
         val memberId = currentMemberProvider.requireMemberId()
-        return memberQueryUseCase.me(memberId).toGql()
+        return memberQueryUseCase.me(memberId)
     }
+
+    @DgsData(parentType = "Me", field = "id")
+    fun meId(dfe: DgsDataFetchingEnvironment): Long = dfe.meSource().memberId
+
+    @DgsData(parentType = "Me", field = "status")
+    fun meStatus(dfe: DgsDataFetchingEnvironment): GqlMemberStatus =
+        GqlMemberStatus.valueOf(dfe.meSource().status.name)
+
+    @DgsData(parentType = "Me", field = "createdAt")
+    fun meCreatedAt(dfe: DgsDataFetchingEnvironment): String = dfe.meSource().createdAt.toString()
+
+    private fun DgsDataFetchingEnvironment.meSource(): MeView =
+        getSource<MeView>() ?: error("Me 필드 리졸버는 부모가 반환한 MeView를 소스로 받아야 한다.")
 
     @DgsQuery
     @RequiresPermission(Permission.MEMBER_READ)

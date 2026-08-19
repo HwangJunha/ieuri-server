@@ -162,6 +162,13 @@ class CommunityQueryService(
         )
 
     /**
+     * 양방향 차단 판정(POL-041). 상대 목록을 한 번 읽어 포함 여부를 본다 —
+     * `ConversationCommandService.requireNotBlocked`와 같은 관용구다.
+     */
+    override fun isBlockedBetween(memberId: Long, counterpartId: Long): Boolean =
+        counterpartId in communityQueryPort.findBlockedMemberIds(memberId)
+
+    /**
      * 내가 쓴 글. **[viewerContext]를 쓰지 않는다** — 차단·숨김 집합을 읽을 이유가 없고,
      * 자기 글은 자기가 숨겼더라도 마이페이지에 보여야 한다(R3).
      */
