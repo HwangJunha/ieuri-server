@@ -148,7 +148,7 @@ class SpotQueryService(
         val spotId = identity.spotId
 
         // 캐시 히트: 부재도 캐시된 값이다 — 미스로 오판하면 부재 spot이 TTL 내내 DB·upstream을 탄다.
-        spotCachePort.getDetail(spotId)?.let { return it.detail.toView(catalogId) }
+        spotCachePort.getDetail(spotId)?.let { return it.detail.toView(catalogId, identity) }
 
         // DB 히트: Valkey를 충전하고 upstream은 건드리지 않는다(AC-35).
         // 단 **부재 행은 신선도를 본다**(R-4) — 나중에 업스트림에 데이터가 생길 수 있다.
@@ -159,7 +159,7 @@ class SpotQueryService(
                 } else {
                     spotCachePort.putDetail(spotId, stored.detail)
                 }
-                return stored.detail.toView(catalogId)
+                return stored.detail.toView(catalogId, identity)
             }
             // 부재이면서 신선도가 지났다 — 아래로 떨어져 upstream에 다시 물어본다(AC-13).
         }
@@ -174,14 +174,14 @@ class SpotQueryService(
             val fallback = fallbackDetail(catalogId, locale)
             spotCachePort.putDetailAbsence(spotId, fallback)
             eventPublisher.publish(SpotDetailAbsent(spotId, fallback))
-            return fallback.toView(catalogId)
+            return fallback.toView(catalogId, identity)
         }
 
         // 재조회 결과 본문이 생겼다면 부재 행이 본문 있는 상태로 전환된다(AC-14) — saveDetail의 upsert가
         // body_absent를 false로 되돌린다.
         spotCachePort.putDetail(spotId, fetched)
         eventPublisher.publish(SpotDetailFetched(spotId, fetched))
-        return fetched.toView(catalogId)
+        return fetched.toView(catalogId, identity)
     }
 
     /**
@@ -407,9 +407,14 @@ class SpotQueryService(
         }
     }
 
-    /** 어댑터가 만든 본문에 요청받은 `spot.id`를 얹는다 — 캐시·DB·upstream 어느 경로도 우리 PK를 모른다. */
-    private fun SpotDetail.toView(spotId: Long): SpotDetailView = SpotDetailView(
-        id = spotId,
+    /**
+     * 어댑터가 만든 본문에 카탈로그 id와 좌표를 얹는다 — 캐시·DB·upstream 어느 경로도 우리 PK와
+     * 좌표를 모른다.
+     *
+     * **좌표는 본문 출처와 무관하게 [identity]에서만 온다**(SPEC-0027).
+     */
+    private fun SpotDetail.toView(catalogId: Long, identity: SpotIdentity): SpotDetailView = SpotDetailView(
+        id = catalogId,
         title = title,
         category = category,
         thumbnailImageUrl = thumbnailImageUrl,
@@ -419,6 +424,8 @@ class SpotQueryService(
         tel = tel,
         copyright = copyright,
         attributionText = attributionText,
+        mapX = identity.mapX,
+        mapY = identity.mapY,
     )
 
     private fun SpotIntro.toView(): SpotIntroView = SpotIntroView(
