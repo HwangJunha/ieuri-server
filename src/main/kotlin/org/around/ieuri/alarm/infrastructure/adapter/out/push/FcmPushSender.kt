@@ -1,5 +1,7 @@
 package org.around.ieuri.alarm.infrastructure.adapter.out.push
 
+import com.google.firebase.messaging.ApnsConfig
+import com.google.firebase.messaging.Aps
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.Message
 import com.google.firebase.messaging.MessagingErrorCode
@@ -85,7 +87,26 @@ class FcmPushSender(
             )
             // 목적지 식별자. 클라이언트가 추가 왕복 없이 라우트를 만든다(R11·AC11.4).
             .putAllData(notification.destination.asData())
+            .setApnsConfig(iosConfig())
             .build()
+
+    /**
+     * iOS 전용 설정. **Android에는 영향이 없다.**
+     *
+     * `content-available`은 알림 도착 시 앱을 깨워 코드를 실행할 기회를 준다. 이것이 없으면
+     * 포그라운드에서 클라이언트가 알림을 **전달받지 못한다** — 배너를 띄울지 말지를 앱이
+     * 정하려면(R15) 일단 앱에 도달해야 하기 때문이다.
+     *
+     * `apns-priority`를 5로 낮춰야 한다 — `content-available`이 있는데 10이면 APNs가
+     * 거부한다. FCM이 대개 맞춰 주지만 조합이 깨지면 조용히 실패하는 자리라 명시한다.
+     *
+     * `alert`를 여기서 다시 채우지 않는다. `Notification`이 이미 그 자리를 채우며, 둘 다
+     * 지정하면 이쪽이 덮어써 제목·본문이 사라진다.
+     */
+    private fun iosConfig(): ApnsConfig = ApnsConfig.builder()
+        .putHeader("apns-priority", APNS_PRIORITY_BACKGROUND_ELIGIBLE)
+        .setAps(Aps.builder().setContentAvailable(true).build())
+        .build()
 
     /**
      * 이 응답으로 토큰을 지워야 하는가(R4).
@@ -134,6 +155,12 @@ class FcmPushSender(
     }
 
     private companion object {
+        /**
+         * APNs 우선순위. **`content-available`과 함께 쓰려면 10이 아니라 5여야 한다** —
+         * 10은 즉시 전달을 요구하는 값이라 백그라운드 실행 요청과 조합할 수 없다.
+         */
+        const val APNS_PRIORITY_BACKGROUND_ELIGIBLE = "5"
+
         /**
          * `INVALID_ARGUMENT` 메시지에서 토큰 문제를 가리키는 표지.
          * FCM이 문구를 바꾸면 판정이 보수적으로 기울어 지우지 않게 된다 — 안전한 방향이다.

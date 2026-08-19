@@ -68,9 +68,14 @@ switch (data['type']) {
 - **`SPOT_QA_ANSWER`와 `SPOT_QA_REPLY`는 `type` 말고 완전히 동일합니다.** 두 알림을
   구분할 근거는 `type`뿐입니다.
 
-**설정하지 않은 것들:** `collapseKey`, `priority`, `sound`, `badge`, `clickAction`,
-`ApnsConfig`, `AndroidConfig` — 전부 FCM 기본값입니다. 알림 채널 지정도 서버가 하지
-않으므로 Android 채널은 클라이언트가 만들어 붙이세요.
+**iOS는 `content-available`이 붙어 나갑니다.** 포그라운드에서도 알림이 앱에 전달되도록
+`aps.content-available = 1`과 `apns-priority: 5`를 함께 보냅니다. 그래서 iOS는
+포그라운드·백그라운드 모두에서 콜백을 받으며, **배너를 띄울지 말지는 클라이언트가
+정합니다**(R15는 포그라운드에서 안 띄우는 것).
+
+**설정하지 않은 것들:** `collapseKey`, `sound`, `badge`, `clickAction`, `AndroidConfig`
+— FCM 기본값입니다. 알림 채널 지정도 서버가 하지 않으므로 Android 채널은 클라이언트가
+만들어 붙이세요.
 
 ---
 
@@ -280,5 +285,6 @@ DM은 전송 자체가 막힙니다.
   확인하게 됩니다.
 - **FCM 자격증명 주입 여부는 환경마다 다릅니다.** 없으면 서버는 정상 기동하고 발송만
   건너뜁니다. 알림이 전혀 안 올 때 이 가능성을 먼저 의심하세요.
-- **플랫폼별 페이로드 분기가 없습니다.** `DevicePlatform`을 저장하지만 발송에는 쓰지
-  않아 IOS·ANDROID가 동일한 메시지를 받습니다. iOS에서 별도 처리가 필요하면 알려 주세요.
+- **`DevicePlatform`으로 발송을 분기하지는 않습니다.** APNs 설정을 모든 메시지에 함께
+  실어 보내고 iOS 기기만 그것을 씁니다. 저장하는 이유는 운영 진단(어느 플랫폼 기기였는지)
+  입니다.
