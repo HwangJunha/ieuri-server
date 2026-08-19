@@ -1,7 +1,9 @@
 package org.around.ieuri.alarm.infrastructure.adapter.out.persistence.repository
 
 import org.around.ieuri.alarm.domain.vo.NotificationCategory
+import org.around.ieuri.alarm.domain.vo.NotificationType
 import org.around.ieuri.alarm.infrastructure.adapter.out.persistence.entity.DeviceTokenEntity
+import org.around.ieuri.alarm.infrastructure.adapter.out.persistence.entity.NotificationMessageEntity
 import org.around.ieuri.alarm.infrastructure.adapter.out.persistence.entity.NotificationPreferenceEntity
 import org.springframework.data.jpa.repository.JpaRepository
 
@@ -17,6 +19,10 @@ interface DeviceTokenJpaRepository : JpaRepository<DeviceTokenEntity, Long> {
 
     /** 무효 토큰 제거(R4). */
     fun deleteByDeviceIdIn(deviceIds: Collection<String>): Long
+}
+
+interface NotificationMessageJpaRepository : JpaRepository<NotificationMessageEntity, Long> {
+    fun findByNotificationType(notificationType: NotificationType): List<NotificationMessageEntity>
 }
 
 interface NotificationPreferenceJpaRepository : JpaRepository<NotificationPreferenceEntity, Long> {

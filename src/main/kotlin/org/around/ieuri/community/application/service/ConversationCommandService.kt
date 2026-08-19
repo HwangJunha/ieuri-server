@@ -158,7 +158,6 @@ class ConversationCommandService(
                 messageId = messageId,
                 senderId = memberId,
                 recipientId = counterpartId,
-                body = command.body,
             ),
         )
         return messageId

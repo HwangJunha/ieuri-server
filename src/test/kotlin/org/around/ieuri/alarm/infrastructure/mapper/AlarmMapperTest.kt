@@ -9,7 +9,9 @@ import org.around.ieuri.alarm.domain.aggregate.NotificationPreference
 import org.around.ieuri.alarm.domain.vo.AlarmLocale
 import org.around.ieuri.alarm.domain.vo.DevicePlatform
 import org.around.ieuri.alarm.domain.vo.NotificationCategory
+import org.around.ieuri.alarm.domain.vo.NotificationType
 import org.around.ieuri.alarm.infrastructure.adapter.out.persistence.entity.DeviceTokenEntity
+import org.around.ieuri.alarm.infrastructure.adapter.out.persistence.entity.NotificationMessageEntity
 import org.around.ieuri.alarm.infrastructure.adapter.out.persistence.entity.NotificationPreferenceEntity
 import org.around.ieuri.alarm.infrastructure.adapter.out.persistence.mapper.toDomain
 import org.around.ieuri.alarm.infrastructure.adapter.out.persistence.mapper.toNewEntity
@@ -87,6 +89,26 @@ class AlarmMapperTest {
         assertEquals(55L, domain.memberId)
         assertEquals(NotificationCategory.SPOT_QA, domain.category)
         assertEquals(false, domain.enabled)
+    }
+
+    /** 종류와 언어가 둘 다 enum이라 뒤바뀌면 컴파일이 통과한다 — 값을 다르게 준다. */
+    @Test
+    fun `알림 문구 엔티티가 도메인으로 옮겨진다`() {
+        val entity = NotificationMessageEntity(
+            id = 77L,
+            notificationType = NotificationType.SPOT_QA_REPLY,
+            locale = AlarmLocale.ZH,
+            title = "제목값",
+            createdAt = createdAt,
+            updatedAt = createdAt,
+        )
+
+        val domain = entity.toDomain()
+
+        assertEquals(77L, domain.id)
+        assertEquals(NotificationType.SPOT_QA_REPLY, domain.type)
+        assertEquals(AlarmLocale.ZH, domain.locale)
+        assertEquals("제목값", domain.title)
     }
 
     @Test

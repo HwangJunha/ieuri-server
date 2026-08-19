@@ -8,17 +8,26 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import org.around.ieuri.alarm.application.port.out.persistence.DeviceTokenRepositoryPort
+import org.around.ieuri.alarm.application.port.out.persistence.NotificationMessageRepositoryPort
 import org.around.ieuri.alarm.application.port.out.persistence.NotificationPreferenceRepositoryPort
+import org.around.ieuri.alarm.domain.aggregate.NotificationMessage
 import org.around.ieuri.alarm.domain.aggregate.NotificationPreference
+import org.around.ieuri.alarm.domain.vo.AlarmLocale
 import org.around.ieuri.alarm.domain.vo.NotificationCategory
+import org.around.ieuri.alarm.domain.vo.NotificationType
 
 /** 발송 경로의 DB 접근(SPEC-0028 R4·R10). */
 class PushDispatchStoreTest {
 
     private val deviceTokenRepository = mockk<DeviceTokenRepositoryPort>(relaxed = true)
     private val preferenceRepository = mockk<NotificationPreferenceRepositoryPort>()
+    private val messageRepository = mockk<NotificationMessageRepositoryPort>()
 
-    private val store = PushDispatchStore(deviceTokenRepository, preferenceRepository)
+    private val store = PushDispatchStore(
+        deviceTokenRepository,
+        preferenceRepository,
+        messageRepository,
+    )
 
     private val memberId = 1L
 
@@ -63,5 +72,27 @@ class PushDispatchStoreTest {
 
         assertEquals(emptyList(), store.findTokens(memberId))
         verify { deviceTokenRepository.findByMemberId(memberId) }
+    }
+
+    /** 언어로 바로 찾을 수 있게 맵으로 접는다 — 발송이 언어별로 갈리기 때문이다. */
+    @Test
+    fun `문구를 언어별 맵으로 돌려준다`() {
+        every { messageRepository.findByType(NotificationType.DM) } returns listOf(
+            NotificationMessage.restore(1L, NotificationType.DM, AlarmLocale.KO, "한국어제목"),
+            NotificationMessage.restore(2L, NotificationType.DM, AlarmLocale.EN, "영어제목"),
+        )
+
+        val titles = store.findTitles(NotificationType.DM)
+
+        assertEquals("한국어제목", titles[AlarmLocale.KO])
+        assertEquals("영어제목", titles[AlarmLocale.EN])
+        assertEquals(2, titles.size)
+    }
+
+    @Test
+    fun `문구가 없으면 빈 맵이다`() {
+        every { messageRepository.findByType(NotificationType.DM) } returns emptyList()
+
+        assertEquals(emptyMap(), store.findTitles(NotificationType.DM))
     }
 }

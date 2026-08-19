@@ -1,10 +1,13 @@
 package org.around.ieuri.alarm.application.service
 
 import org.around.ieuri.alarm.application.port.out.persistence.DeviceTokenRepositoryPort
+import org.around.ieuri.alarm.application.port.out.persistence.NotificationMessageRepositoryPort
 import org.around.ieuri.alarm.application.port.out.persistence.NotificationPreferenceRepositoryPort
 import org.around.ieuri.alarm.domain.aggregate.DeviceToken
 import org.around.ieuri.alarm.domain.aggregate.NotificationPreference
+import org.around.ieuri.alarm.domain.vo.AlarmLocale
 import org.around.ieuri.alarm.domain.vo.NotificationCategory
+import org.around.ieuri.alarm.domain.vo.NotificationType
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
@@ -33,6 +36,7 @@ import org.springframework.transaction.annotation.Transactional
 class PushDispatchStore(
     private val deviceTokenRepositoryPort: DeviceTokenRepositoryPort,
     private val preferenceRepositoryPort: NotificationPreferenceRepositoryPort,
+    private val notificationMessageRepositoryPort: NotificationMessageRepositoryPort,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -48,6 +52,16 @@ class PushDispatchStore(
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     fun findTokens(memberId: Long): List<DeviceToken> =
         deviceTokenRepositoryPort.findByMemberId(memberId)
+
+    /**
+     * 이 종류의 언어별 제목 문구(R13). 언어로 바로 찾을 수 있게 맵으로 돌려준다.
+     *
+     * **한 번만 읽는다** — 수신자가 기기마다 다른 언어를 쓸 수 있어 발송을 언어별로 나누는데,
+     * 그때마다 조회하면 발송 1건에 조회가 여러 번 붙는다.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    fun findTitles(type: NotificationType): Map<AlarmLocale, String> =
+        notificationMessageRepositoryPort.findByType(type).associate { it.locale to it.title }
 
     /** FCM이 무효로 판정한 기기를 지운다(R4). */
     @Transactional(propagation = Propagation.REQUIRES_NEW)

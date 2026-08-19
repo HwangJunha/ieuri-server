@@ -54,13 +54,12 @@ interface PushDispatchUseCase {
 /**
  * 발송 요청 한 건.
  *
- * [body]는 **사용자가 쓴 원문**이다 — 번역하지 않으며 상한을 넘으면 잘린다(R13).
- * 사진만 있는 메시지처럼 빈 본문도 정상이다(AC13.3).
+ * **본문이 없다**(R13). 알림에 사용자가 쓴 내용을 싣지 않으므로 발송에 필요한 것은 누구에게
+ * 어디로 보낼지가 전부다 — 제목은 목적지의 종류와 기기 언어로 DB에서 찾는다.
  */
 data class PushDispatchRequest(
     val recipientId: Long,
     /** 알림을 유발한 사람. [recipientId]와 같으면 발송하지 않는다(R8). */
     val actorId: Long,
     val destination: PushDestination,
-    val body: String,
 )

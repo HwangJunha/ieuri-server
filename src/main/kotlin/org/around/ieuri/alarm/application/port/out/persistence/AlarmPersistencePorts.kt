@@ -1,8 +1,10 @@
 package org.around.ieuri.alarm.application.port.out.persistence
 
 import org.around.ieuri.alarm.domain.aggregate.DeviceToken
+import org.around.ieuri.alarm.domain.aggregate.NotificationMessage
 import org.around.ieuri.alarm.domain.aggregate.NotificationPreference
 import org.around.ieuri.alarm.domain.vo.NotificationCategory
+import org.around.ieuri.alarm.domain.vo.NotificationType
 
 /**
  * 기기 토큰 저장(SPEC-0028 R1~R4).
@@ -28,6 +30,20 @@ interface DeviceTokenRepositoryPort {
 
     /** 무효 토큰 제거(R4). 발송 실패 응답으로 판정된 기기만 지운다. */
     fun deleteByDeviceIds(deviceIds: Collection<String>): Long
+}
+
+/**
+ * 알림 제목 문구 조회(SPEC-0028 R13).
+ *
+ * 쓰기가 없다 — 문구는 마이그레이션이 넣고 운영자가 DB에서 고친다. 앱이 바꿀 값이 아니라
+ * 앱이 읽는 값이라, 지금 필요 없는 저장 연산을 포트에 두지 않는다.
+ */
+interface NotificationMessageRepositoryPort {
+    /**
+     * 한 종류의 모든 언어 문구. **발송 1건에 한 번만 읽는다** — 수신자가 기기마다 다른
+     * 언어를 쓸 수 있어 언어별로 나눠 보내는데, 그때마다 조회하면 조회가 여러 번 붙는다.
+     */
+    fun findByType(type: NotificationType): List<NotificationMessage>
 }
 
 /**

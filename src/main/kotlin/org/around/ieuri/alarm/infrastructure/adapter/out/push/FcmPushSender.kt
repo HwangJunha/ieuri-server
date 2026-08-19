@@ -60,10 +60,10 @@ class FcmPushSender(
     private fun PushTarget.toMessage(notification: PushNotification): Message =
         Message.builder()
             .setToken(fcmToken)
+            // 본문을 담지 않는다(R13) — 잠금화면에 대화 내용이 뜨지 않게 제목만 보낸다.
             .setNotification(
                 Notification.builder()
                     .setTitle(notification.title)
-                    .setBody(notification.body)
                     .build(),
             )
             // 목적지 식별자. 클라이언트가 추가 왕복 없이 라우트를 만든다(R11·AC11.4).

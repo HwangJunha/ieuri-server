@@ -1,13 +1,17 @@
 package org.around.ieuri.alarm.infrastructure.adapter.out.persistence
 
 import org.around.ieuri.alarm.application.port.out.persistence.DeviceTokenRepositoryPort
+import org.around.ieuri.alarm.application.port.out.persistence.NotificationMessageRepositoryPort
 import org.around.ieuri.alarm.application.port.out.persistence.NotificationPreferenceRepositoryPort
 import org.around.ieuri.alarm.domain.aggregate.DeviceToken
+import org.around.ieuri.alarm.domain.aggregate.NotificationMessage
 import org.around.ieuri.alarm.domain.aggregate.NotificationPreference
 import org.around.ieuri.alarm.domain.vo.NotificationCategory
+import org.around.ieuri.alarm.domain.vo.NotificationType
 import org.around.ieuri.alarm.infrastructure.adapter.out.persistence.mapper.toDomain
 import org.around.ieuri.alarm.infrastructure.adapter.out.persistence.mapper.toNewEntity
 import org.around.ieuri.alarm.infrastructure.adapter.out.persistence.repository.DeviceTokenJpaRepository
+import org.around.ieuri.alarm.infrastructure.adapter.out.persistence.repository.NotificationMessageJpaRepository
 import org.around.ieuri.alarm.infrastructure.adapter.out.persistence.repository.NotificationPreferenceJpaRepository
 import org.springframework.stereotype.Component
 
@@ -42,6 +46,15 @@ class DeviceTokenPersistenceAdapter(
         if (deviceIds.isEmpty()) return 0
         return repository.deleteByDeviceIdIn(deviceIds)
     }
+}
+
+@Component
+class NotificationMessagePersistenceAdapter(
+    private val repository: NotificationMessageJpaRepository,
+) : NotificationMessageRepositoryPort {
+
+    override fun findByType(type: NotificationType): List<NotificationMessage> =
+        repository.findByNotificationType(type).map { it.toDomain() }
 }
 
 @Component

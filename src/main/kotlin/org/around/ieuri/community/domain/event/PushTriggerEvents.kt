@@ -7,19 +7,8 @@ package org.around.ieuri.community.domain.event
  * 도메인 간 구독은 `domain/event` 타입으로만 허용된다(LayeredArchitectureTest).
  * community 내부에서만 소비되는 `NewMessageStored`는 계속 `application/event`에 남는다.
  *
- * ### 본문을 싣는 이유
- *
- * 다른 이벤트들이 id만 싣는 것과 다르다. **되읽는 쪽을 택하면 알림 전용 복호화 조회 포트를
- * 새로 만들어야 하기 때문이다** — DM 본문은 암호화 저장이라(POL-050) 기존 조회 경로로는
- * 평문을 얻을 수 없다. 노출을 줄이지도 못하면서 인프라만 하나 느는데, 이 본문의 목적지는
- * 어차피 FCM이라 다시 읽어도 같은 값이 같은 곳으로 간다.
- *
- * 부차적으로, 오늘은 Spring ApplicationEvent라 프로세스 밖으로 나가지도 않는다. 다만 이
- * 근거는 Kafka로 옮기는 순간 사라진다.
- *
- * **Kafka로 옮길 때 이 결정을 다시 봐야 한다**(POL-028) — 그 시점에는 본문이 브로커를 지나므로
- * id만 싣고 구독자가 되읽는 형태로 바뀌어야 하며, 그때 위의 복호화 포트를 만들게 된다.
- * 이 문단만이 그 시점의 유일한 신호는 아니어야 한다 — SPEC-0028 이슈에도 남긴다.
+ * **본문을 싣지 않는다.** 푸시가 제목만 보내고 사용자가 쓴 내용은 담지 않으므로(R13),
+ * 알림 경로에 본문이 필요한 지점이 아예 없다. 다른 이벤트들과 같이 id만 싣는다(POL-013).
  */
 
 /** DM 새 메시지 도착(R5). */
@@ -29,8 +18,6 @@ data class MessageNotificationTriggered(
     /** 보낸 사람. 수신자와 같을 수 없다. */
     val senderId: Long,
     val recipientId: Long,
-    /** 사용자 원문. 사진만 있는 메시지면 비어 있다(AC13.3). */
-    val body: String,
 )
 
 /** 내 질문에 답변이 달림(R6). */
@@ -43,7 +30,6 @@ data class SpotAnswerNotificationTriggered(
     val actorId: Long,
     /** 질문 작성자 — 알림 수신자다. */
     val recipientId: Long,
-    val body: String,
 )
 
 /** 내 답변에 답글이 달림(R7). 목적지는 그 답변이 속한 질문 상세다(AC7.2). */
@@ -55,5 +41,4 @@ data class SpotAnswerReplyNotificationTriggered(
     val actorId: Long,
     /** 답변 작성자 — 알림 수신자다. 질문 작성자에게는 보내지 않는다(AC7.3). */
     val recipientId: Long,
-    val body: String,
 )

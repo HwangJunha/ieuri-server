@@ -75,7 +75,6 @@ class SpotAnswerCommandService(
                 answerId = answerId,
                 actorId = memberId,
                 recipientId = question.authorId,
-                body = body,
             ),
         )
         return answerId
@@ -133,7 +132,6 @@ class SpotAnswerCommandService(
                 replyId = replyId,
                 actorId = memberId,
                 recipientId = answer.authorId,
-                body = body,
             ),
         )
         return replyId

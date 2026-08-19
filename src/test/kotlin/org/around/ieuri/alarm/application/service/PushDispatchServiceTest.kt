@@ -8,10 +8,8 @@ import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import org.around.ieuri.alarm.application.port.`in`.command.PushDispatchRequest
 import org.around.ieuri.alarm.application.port.out.client.BlockLookupPort
-import org.around.ieuri.alarm.application.port.out.client.MemberNicknameLookupPort
 import org.around.ieuri.alarm.application.port.out.push.PushSendResult
 import org.around.ieuri.alarm.application.port.out.push.PushSenderPort
 import org.around.ieuri.alarm.application.port.out.push.PushTarget
@@ -19,8 +17,8 @@ import org.around.ieuri.alarm.domain.aggregate.DeviceToken
 import org.around.ieuri.alarm.domain.vo.AlarmLocale
 import org.around.ieuri.alarm.domain.vo.DevicePlatform
 import org.around.ieuri.alarm.domain.vo.NotificationCategory
+import org.around.ieuri.alarm.domain.vo.NotificationType
 import org.around.ieuri.alarm.domain.vo.PushDestination
-import org.around.ieuri.alarm.domain.vo.PushMessages
 import org.around.ieuri.alarm.domain.vo.PushNotification
 
 /** 발송 판정과 페이로드 구성(SPEC-0028 R5~R13). */
@@ -28,19 +26,26 @@ class PushDispatchServiceTest {
 
     private val store = mockk<PushDispatchStore>(relaxed = true)
     private val blockLookup = mockk<BlockLookupPort>()
-    private val nicknameLookup = mockk<MemberNicknameLookupPort>()
     private val pushSender = mockk<PushSenderPort>()
 
-    private val service = PushDispatchService(store, blockLookup, nicknameLookup, pushSender)
+    private val service = PushDispatchService(store, blockLookup, pushSender)
 
     private val recipientId = 1L
     private val actorId = 2L
 
+    /** 언어마다 다른 값을 줘, 잘못된 언어의 제목이 나가면 깨지게 한다. */
+    private val titles = mapOf(
+        AlarmLocale.KO to "한국어제목",
+        AlarmLocale.EN to "영어제목",
+        AlarmLocale.JA to "일본어제목",
+        AlarmLocale.ZH to "중국어제목",
+    )
+
     @BeforeTest
     fun setUp() {
         every { store.categoryEnabled(any(), any()) } returns true
+        every { store.findTitles(any()) } returns titles
         every { blockLookup.isBlockedBetween(any(), any()) } returns false
-        every { nicknameLookup.findNickname(any()) } returns "보낸사람"
         every { pushSender.send(any(), any()) } returns PushSendResult.NONE
     }
 
@@ -62,8 +67,7 @@ class PushDispatchServiceTest {
         recipient: Long = recipientId,
         actor: Long = actorId,
         destination: PushDestination = PushDestination.Dm(50L),
-        body: String = "본문",
-    ) = PushDispatchRequest(recipient, actor, destination, body)
+    ) = PushDispatchRequest(recipient, actor, destination)
 
     private fun givenTokens(vararg tokens: DeviceToken) {
         every { store.findTokens(recipientId) } returns tokens.toList()
@@ -192,76 +196,50 @@ class PushDispatchServiceTest {
         assertEquals("22", notification.captured.destination.asData()["questionId"])
     }
 
-    /** AC13.1 — 본문은 원문 그대로. 수신자 언어가 EN이어도 번역하지 않는다. */
+    /** 제목은 수신 기기 언어의 문구다. */
     @Test
-    fun `본문은 수신자 언어와 무관하게 원문이다`() {
-        givenTokens(token("d1", language = AlarmLocale.EN))
-        val notification = slot<PushNotification>()
-
-        service.dispatch(request(body = "한국어 본문입니다"))
-
-        verify { pushSender.send(capture(notification), any()) }
-        assertEquals("한국어 본문입니다", notification.captured.body)
-    }
-
-    /** AC13.2 — 긴 본문은 잘려서 나간다. */
-    @Test
-    fun `긴 본문은 잘려서 발송된다`() {
-        givenTokens(token("d1"))
-        val notification = slot<PushNotification>()
-
-        service.dispatch(request(body = "가".repeat(PushMessages.BODY_MAX_LENGTH + 100)))
-
-        verify { pushSender.send(capture(notification), any()) }
-        assertEquals(PushMessages.BODY_MAX_LENGTH, notification.captured.body.length)
-    }
-
-    /** 제목은 수신 기기 언어로 번역된다(R13 — 서버가 조립하는 문구). */
-    @Test
-    fun `제목은 기기 언어로 번역된다`() {
+    fun `제목은 기기 언어의 문구다`() {
         givenTokens(token("d1", language = AlarmLocale.JA))
         val notification = slot<PushNotification>()
 
-        service.dispatch(request(destination = PushDestination.SpotQaAnswer(11L, 22L)))
+        service.dispatch(request())
 
         verify { pushSender.send(capture(notification), any()) }
-        assertEquals(PushMessages.answerTitle(AlarmLocale.JA), notification.captured.title)
+        assertEquals("일본어제목", notification.captured.title)
     }
 
-    /** DM 제목에는 보낸 사람 닉네임이 들어간다. */
+    /** 알림 종류마다 다른 문구를 읽는다 — 답변과 답글이 한 카테고리지만 문구는 갈린다. */
     @Test
-    fun `DM 제목에 보낸 사람 닉네임이 들어간다`() {
+    fun `알림 종류로 문구를 찾는다`() {
         givenTokens(token("d1"))
-        every { nicknameLookup.findNickname(actorId) } returns "홍길동"
+
+        service.dispatch(request(destination = PushDestination.SpotQaReply(11L, 22L)))
+
+        verify { store.findTitles(NotificationType.SPOT_QA_REPLY) }
+    }
+
+    /** POL-039 폴백 — 그 언어 문구가 없으면 EN으로 떨어뜨린다. */
+    @Test
+    fun `문구가 없는 언어는 EN으로 떨어진다`() {
+        givenTokens(token("d1", language = AlarmLocale.ZH))
+        every { store.findTitles(any()) } returns mapOf(AlarmLocale.EN to "영어제목")
         val notification = slot<PushNotification>()
 
-        service.dispatch(request(destination = PushDestination.Dm(50L)))
+        service.dispatch(request())
 
         verify { pushSender.send(capture(notification), any()) }
-        assertTrue(notification.captured.title.contains("홍길동"))
+        assertEquals("영어제목", notification.captured.title)
     }
 
-    /** 닉네임을 못 읽어도 발송한다 — 알림을 거르는 것보다 낫다. */
+    /** 문구가 아예 없으면 보낼 것이 없다 — 시드가 지워진 상태이므로 조용히 넘기지 않는다. */
     @Test
-    fun `닉네임이 없어도 DM은 발송된다`() {
+    fun `문구가 하나도 없으면 발송하지 않는다`() {
         givenTokens(token("d1"))
-        every { nicknameLookup.findNickname(actorId) } returns null
-        val notification = slot<PushNotification>()
+        every { store.findTitles(any()) } returns emptyMap()
 
-        service.dispatch(request(destination = PushDestination.Dm(50L)))
+        service.dispatch(request())
 
-        verify { pushSender.send(capture(notification), any()) }
-        assertEquals(PushMessages.dmTitleWithoutSender(AlarmLocale.KO), notification.captured.title)
-    }
-
-    /** Q&A 알림은 닉네임을 읽지 않는다 — 제목에 쓰지 않으므로 조회가 붙으면 안 된다. */
-    @Test
-    fun `답변 알림은 닉네임을 조회하지 않는다`() {
-        givenTokens(token("d1"))
-
-        service.dispatch(request(destination = PushDestination.SpotQaAnswer(11L, 22L)))
-
-        verify(exactly = 0) { nicknameLookup.findNickname(any()) }
+        verify(exactly = 0) { pushSender.send(any(), any()) }
     }
 
     /** AC4.1·AC4.3 — 무효로 판정된 기기만 지운다. */

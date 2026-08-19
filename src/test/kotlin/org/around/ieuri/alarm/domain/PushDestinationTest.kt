@@ -3,6 +3,7 @@ package org.around.ieuri.alarm.domain
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import org.around.ieuri.alarm.domain.vo.NotificationCategory
+import org.around.ieuri.alarm.domain.vo.NotificationType
 import org.around.ieuri.alarm.domain.vo.PushDestination
 
 /**
@@ -55,5 +56,28 @@ class PushDestinationTest {
     fun `답변과 답글은 SPOT_QA 카테고리다`() {
         assertEquals(NotificationCategory.SPOT_QA, PushDestination.SpotQaAnswer(1L, 2L).category)
         assertEquals(NotificationCategory.SPOT_QA, PushDestination.SpotQaReply(1L, 2L).category)
+    }
+
+    /**
+     * **카테고리는 같아도 종류는 갈린다.** 문구를 이 값으로 찾으므로, 답변과 답글이 같은
+     * 종류가 되면 두 알림의 제목이 같아진다.
+     */
+    @Test
+    fun `답변과 답글은 종류가 다르다`() {
+        assertEquals(NotificationType.SPOT_QA_ANSWER, PushDestination.SpotQaAnswer(1L, 2L).type)
+        assertEquals(NotificationType.SPOT_QA_REPLY, PushDestination.SpotQaReply(1L, 2L).type)
+        assertEquals(NotificationType.DM, PushDestination.Dm(1L).type)
+    }
+
+    /** FCM 데이터의 `type` 값이 곧 종류의 이름이다 — 둘이 어긋나면 클라이언트가 라우팅에 실패한다. */
+    @Test
+    fun `데이터의 type이 종류 이름과 같다`() {
+        listOf<PushDestination>(
+            PushDestination.Dm(1L),
+            PushDestination.SpotQaAnswer(1L, 2L),
+            PushDestination.SpotQaReply(1L, 2L),
+        ).forEach { destination ->
+            assertEquals(destination.type.name, destination.asData()["type"])
+        }
     }
 }

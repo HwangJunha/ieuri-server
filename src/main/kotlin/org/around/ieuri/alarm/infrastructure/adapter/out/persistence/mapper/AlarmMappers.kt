@@ -1,8 +1,10 @@
 package org.around.ieuri.alarm.infrastructure.adapter.out.persistence.mapper
 
 import org.around.ieuri.alarm.domain.aggregate.DeviceToken
+import org.around.ieuri.alarm.domain.aggregate.NotificationMessage
 import org.around.ieuri.alarm.domain.aggregate.NotificationPreference
 import org.around.ieuri.alarm.infrastructure.adapter.out.persistence.entity.DeviceTokenEntity
+import org.around.ieuri.alarm.infrastructure.adapter.out.persistence.entity.NotificationMessageEntity
 import org.around.ieuri.alarm.infrastructure.adapter.out.persistence.entity.NotificationPreferenceEntity
 
 /** 기기 토큰 엔티티를 도메인 모델로 옮긴다. */
@@ -23,6 +25,17 @@ fun DeviceToken.toNewEntity(): DeviceTokenEntity = DeviceTokenEntity(
     fcmToken = fcmToken,
     language = language,
     platform = platform,
+)
+
+/**
+ * 알림 문구 엔티티를 도메인 모델로 옮긴다.
+ * 반대 방향이 없는 것은 앱에 쓰기 경로가 없기 때문이다.
+ */
+fun NotificationMessageEntity.toDomain(): NotificationMessage = NotificationMessage.restore(
+    id = requireNotNull(id) { "저장된 알림 문구에는 id가 있어야 한다." },
+    type = notificationType,
+    locale = locale,
+    title = title,
 )
 
 /** 수신 설정 엔티티를 도메인 모델로 옮긴다. */

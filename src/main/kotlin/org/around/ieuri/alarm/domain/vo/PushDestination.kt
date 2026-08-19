@@ -10,7 +10,11 @@ package org.around.ieuri.alarm.domain.vo
  * FCM 데이터 메시지로 나가는 형태는 [asData]가 정한다. GraphQL 계약 표면이 아니다.
  */
 sealed interface PushDestination {
+    /** 사용자가 끄고 켜는 단위(R10). 답변과 답글은 같은 카테고리다. */
     val category: NotificationCategory
+
+    /** 문구 조회 키이자 FCM 데이터의 `type` 값. 답변과 답글이 갈린다. */
+    val type: NotificationType
 
     /** FCM 데이터 메시지에 실리는 키-값. 값이 전부 문자열인 것은 FCM 데이터의 제약이다. */
     fun asData(): Map<String, String>
@@ -18,9 +22,10 @@ sealed interface PushDestination {
     /** DM 새 메시지 → 대화 화면. */
     data class Dm(val conversationId: Long) : PushDestination {
         override val category = NotificationCategory.MESSAGE
+        override val type = NotificationType.DM
 
         override fun asData(): Map<String, String> = mapOf(
-            KEY_TYPE to TYPE_DM,
+            KEY_TYPE to type.name,
             KEY_CONVERSATION_ID to conversationId.toString(),
         )
     }
@@ -28,9 +33,10 @@ sealed interface PushDestination {
     /** 내 질문에 달린 답변 → 질문 상세. */
     data class SpotQaAnswer(val spotId: Long, val questionId: Long) : PushDestination {
         override val category = NotificationCategory.SPOT_QA
+        override val type = NotificationType.SPOT_QA_ANSWER
 
         override fun asData(): Map<String, String> = mapOf(
-            KEY_TYPE to TYPE_SPOT_QA_ANSWER,
+            KEY_TYPE to type.name,
             KEY_SPOT_ID to spotId.toString(),
             KEY_QUESTION_ID to questionId.toString(),
         )
@@ -42,9 +48,10 @@ sealed interface PushDestination {
      */
     data class SpotQaReply(val spotId: Long, val questionId: Long) : PushDestination {
         override val category = NotificationCategory.SPOT_QA
+        override val type = NotificationType.SPOT_QA_REPLY
 
         override fun asData(): Map<String, String> = mapOf(
-            KEY_TYPE to TYPE_SPOT_QA_REPLY,
+            KEY_TYPE to type.name,
             KEY_SPOT_ID to spotId.toString(),
             KEY_QUESTION_ID to questionId.toString(),
         )
@@ -55,9 +62,5 @@ sealed interface PushDestination {
         const val KEY_CONVERSATION_ID = "conversationId"
         const val KEY_SPOT_ID = "spotId"
         const val KEY_QUESTION_ID = "questionId"
-
-        const val TYPE_DM = "DM"
-        const val TYPE_SPOT_QA_ANSWER = "SPOT_QA_ANSWER"
-        const val TYPE_SPOT_QA_REPLY = "SPOT_QA_REPLY"
     }
 }

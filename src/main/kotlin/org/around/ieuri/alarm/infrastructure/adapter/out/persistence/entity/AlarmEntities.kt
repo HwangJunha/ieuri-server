@@ -14,6 +14,7 @@ import java.time.Instant
 import org.around.ieuri.alarm.domain.vo.AlarmLocale
 import org.around.ieuri.alarm.domain.vo.DevicePlatform
 import org.around.ieuri.alarm.domain.vo.NotificationCategory
+import org.around.ieuri.alarm.domain.vo.NotificationType
 import org.around.ieuri.common.persistence.DbSchema
 
 /**
@@ -48,6 +49,49 @@ class DeviceTokenEntity(
     @Enumerated(EnumType.STRING)
     @Column(name = "platform", nullable = false, length = 10)
     var platform: DevicePlatform,
+
+    @Column(name = "created_at", nullable = false)
+    var createdAt: Instant? = null,
+
+    @Column(name = "updated_at", nullable = false)
+    var updatedAt: Instant? = null,
+) {
+    @PrePersist
+    fun onCreate() {
+        val now = Instant.now()
+        if (createdAt == null) createdAt = now
+        if (updatedAt == null) updatedAt = now
+    }
+
+    @PreUpdate
+    fun onUpdate() {
+        updatedAt = Instant.now()
+    }
+}
+
+/**
+ * 알림 제목 문구(SPEC-0028 R13).
+ *
+ * **읽기 전용으로 쓴다** — 값은 마이그레이션이 넣고 운영자가 DB에서 고친다. 앱에는 쓰기
+ * 경로가 없다.
+ */
+@Entity
+@Table(name = "notification_message", schema = DbSchema.ALARM)
+class NotificationMessageEntity(
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    var id: Long? = null,
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "notification_type", nullable = false, length = 30)
+    var notificationType: NotificationType,
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "locale", nullable = false, length = 10)
+    var locale: AlarmLocale,
+
+    @Column(name = "title", nullable = false, length = 200)
+    var title: String,
 
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant? = null,

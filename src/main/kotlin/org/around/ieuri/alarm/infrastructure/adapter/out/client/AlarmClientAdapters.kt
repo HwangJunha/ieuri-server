@@ -1,8 +1,6 @@
 package org.around.ieuri.alarm.infrastructure.adapter.out.client
 
 import org.around.ieuri.alarm.application.port.out.client.BlockLookupPort
-import org.around.ieuri.alarm.application.port.out.client.MemberNicknameLookupPort
-import org.around.ieuri.auth.application.port.`in`.query.MemberQueryUseCase
 import org.around.ieuri.community.application.port.`in`.query.CommunityQueryUseCase
 import org.springframework.stereotype.Component
 
@@ -19,18 +17,4 @@ class AlarmBlockLookupAdapter(
 
     override fun isBlockedBetween(memberId: Long, counterpartId: Long): Boolean =
         communityQueryUseCase.isBlockedBetween(memberId, counterpartId)
-}
-
-/**
- * 알림 제목에 넣을 닉네임을 auth의 인바운드 포트로 읽는다.
- *
- * 표시용 최소 정보를 주는 `memberPublicProfile`을 쓴다 — 이메일을 복호화하지 않는 진입점이다.
- */
-@Component
-class AlarmMemberNicknameLookupAdapter(
-    private val memberQueryUseCase: MemberQueryUseCase,
-) : MemberNicknameLookupPort {
-
-    override fun findNickname(memberId: Long): String? =
-        memberQueryUseCase.memberPublicProfile(memberId)?.nickname
 }
