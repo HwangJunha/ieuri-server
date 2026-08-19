@@ -49,7 +49,10 @@ class FcmPushSender(
         } catch (e: Exception) {
             // 발송 전체가 실패해도 원래 작업은 건드리지 않고 재시도하지도 않는다(R12·AC12.3).
             // **토큰을 지우지 않는다** — 호출 자체가 실패한 것이라 토큰의 유효성과 무관하다.
-            log.warn("FCM 발송에 실패했다: targets={}", targets.size, e)
+            //
+            // 예외 전체가 아니라 메시지만 남긴다 — FCM 오류 본문이 요청 맥락을 되비칠 수
+            // 있어, 스택트레이스째 남기면 그것까지 함께 들어간다(POL-013).
+            log.warn("FCM 발송에 실패했다: targets={} cause={}", targets.size, e.message)
             PushSendResult.NONE
         }
     }

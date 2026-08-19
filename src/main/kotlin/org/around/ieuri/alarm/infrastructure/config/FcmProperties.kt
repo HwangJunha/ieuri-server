@@ -1,5 +1,6 @@
 package org.around.ieuri.alarm.infrastructure.config
 
+import java.time.Duration
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.core.io.Resource
 
@@ -16,6 +17,15 @@ import org.springframework.core.io.Resource
 data class FcmProperties(
     /** 서비스 계정 JSON 경로(`file:/...` 또는 `classpath:...`). 파일은 저장소에 커밋하지 않는다. */
     val serviceAccountLocation: Resource? = null,
+
+    /**
+     * FCM 호출 대기 상한. **기본값에 기대지 않는다** — google-http-client의 기본은 0이고
+     * 그것은 무제한이라, 응답 없는 FCM이 발송 스레드를 영영 붙든다.
+     *
+     * 값의 근거는 사용자 대기가 아니라 워커 회수다(POL-040) — 발송은 이미 비동기라
+     * 아무도 이 시간을 기다리지 않고, 상한의 목적은 큐가 막히지 않게 하는 것이다.
+     */
+    val timeout: Duration = Duration.ofSeconds(10),
 ) {
     fun isConfigured(): Boolean = serviceAccountLocation?.exists() == true
 }

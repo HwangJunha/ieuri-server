@@ -41,6 +41,11 @@ class AlarmConfig {
                                 GoogleCredentials.fromStream(it)
                             },
                         )
+                        // **상한을 명시해야 한다.** 기본값 0은 무제한이라, 응답 없는 FCM이
+                        // 발송 워커를 영영 붙들어 큐가 막힌다.
+                        .setConnectTimeout(properties.timeout.toMillis().toInt())
+                        .setReadTimeout(properties.timeout.toMillis().toInt())
+                        .setWriteTimeout(properties.timeout.toMillis().toInt())
                         .build(),
                 )
             FirebaseMessaging.getInstance(app)

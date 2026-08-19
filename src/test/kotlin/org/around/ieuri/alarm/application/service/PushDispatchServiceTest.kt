@@ -12,13 +12,10 @@ import kotlin.test.assertTrue
 import org.around.ieuri.alarm.application.port.`in`.command.PushDispatchRequest
 import org.around.ieuri.alarm.application.port.out.client.BlockLookupPort
 import org.around.ieuri.alarm.application.port.out.client.MemberNicknameLookupPort
-import org.around.ieuri.alarm.application.port.out.persistence.DeviceTokenRepositoryPort
-import org.around.ieuri.alarm.application.port.out.persistence.NotificationPreferenceRepositoryPort
 import org.around.ieuri.alarm.application.port.out.push.PushSendResult
 import org.around.ieuri.alarm.application.port.out.push.PushSenderPort
 import org.around.ieuri.alarm.application.port.out.push.PushTarget
 import org.around.ieuri.alarm.domain.aggregate.DeviceToken
-import org.around.ieuri.alarm.domain.aggregate.NotificationPreference
 import org.around.ieuri.alarm.domain.vo.AlarmLocale
 import org.around.ieuri.alarm.domain.vo.DevicePlatform
 import org.around.ieuri.alarm.domain.vo.NotificationCategory
@@ -29,26 +26,19 @@ import org.around.ieuri.alarm.domain.vo.PushNotification
 /** 발송 판정과 페이로드 구성(SPEC-0028 R5~R13). */
 class PushDispatchServiceTest {
 
-    private val deviceTokenRepository = mockk<DeviceTokenRepositoryPort>(relaxed = true)
-    private val preferenceRepository = mockk<NotificationPreferenceRepositoryPort>()
+    private val store = mockk<PushDispatchStore>(relaxed = true)
     private val blockLookup = mockk<BlockLookupPort>()
     private val nicknameLookup = mockk<MemberNicknameLookupPort>()
     private val pushSender = mockk<PushSenderPort>()
 
-    private val service = PushDispatchService(
-        deviceTokenRepository,
-        preferenceRepository,
-        blockLookup,
-        nicknameLookup,
-        pushSender,
-    )
+    private val service = PushDispatchService(store, blockLookup, nicknameLookup, pushSender)
 
     private val recipientId = 1L
     private val actorId = 2L
 
     @BeforeTest
     fun setUp() {
-        every { preferenceRepository.findByMemberIdAndCategory(any(), any()) } returns null
+        every { store.categoryEnabled(any(), any()) } returns true
         every { blockLookup.isBlockedBetween(any(), any()) } returns false
         every { nicknameLookup.findNickname(any()) } returns "보낸사람"
         every { pushSender.send(any(), any()) } returns PushSendResult.NONE
@@ -76,7 +66,7 @@ class PushDispatchServiceTest {
     ) = PushDispatchRequest(recipient, actor, destination, body)
 
     private fun givenTokens(vararg tokens: DeviceToken) {
-        every { deviceTokenRepository.findByMemberId(recipientId) } returns tokens.toList()
+        every { store.findTokens(recipientId) } returns tokens.toList()
     }
 
     /** AC5.1 */
@@ -130,7 +120,7 @@ class PushDispatchServiceTest {
 
         verify(exactly = 0) { pushSender.send(any(), any()) }
         // 걸러졌으면 토큰 조회조차 하지 않는다 — 판정은 싼 것부터다.
-        verify(exactly = 0) { deviceTokenRepository.findByMemberId(any()) }
+        verify(exactly = 0) { store.findTokens(any()) }
     }
 
     /** AC9.1·AC9.2 — 차단은 양방향이다(POL-041). */
@@ -159,9 +149,7 @@ class PushDispatchServiceTest {
     @Test
     fun `카테고리를 끈 회원에게는 발송하지 않는다`() {
         givenTokens(token("d1"))
-        every {
-            preferenceRepository.findByMemberIdAndCategory(recipientId, NotificationCategory.MESSAGE)
-        } returns NotificationPreference.restore(1L, recipientId, NotificationCategory.MESSAGE, false)
+        every { store.categoryEnabled(recipientId, NotificationCategory.MESSAGE) } returns false
 
         service.dispatch(request(destination = PushDestination.Dm(50L)))
 
@@ -172,9 +160,8 @@ class PushDispatchServiceTest {
     @Test
     fun `끈 카테고리와 다른 카테고리는 발송한다`() {
         givenTokens(token("d1"))
-        every {
-            preferenceRepository.findByMemberIdAndCategory(recipientId, NotificationCategory.MESSAGE)
-        } returns NotificationPreference.restore(1L, recipientId, NotificationCategory.MESSAGE, false)
+        every { store.categoryEnabled(recipientId, NotificationCategory.MESSAGE) } returns false
+        every { store.categoryEnabled(recipientId, NotificationCategory.SPOT_QA) } returns true
 
         service.dispatch(request(destination = PushDestination.SpotQaAnswer(11L, 22L)))
 
@@ -185,7 +172,7 @@ class PushDispatchServiceTest {
     @Test
     fun `설정 행이 없으면 발송한다`() {
         givenTokens(token("d1"))
-        every { preferenceRepository.findByMemberIdAndCategory(any(), any()) } returns null
+        every { store.categoryEnabled(any(), any()) } returns true
 
         service.dispatch(request())
 
@@ -286,7 +273,7 @@ class PushDispatchServiceTest {
 
         service.dispatch(request())
 
-        verify { deviceTokenRepository.deleteByDeviceIds(listOf("d2")) }
+        verify { store.removeInvalidTokens(listOf("d2")) }
     }
 
     /** AC4.4·AC4.5·AC4.6 — 어댑터가 무효로 판정하지 않으면 아무것도 지우지 않는다. */
@@ -298,6 +285,6 @@ class PushDispatchServiceTest {
 
         service.dispatch(request())
 
-        verify(exactly = 0) { deviceTokenRepository.deleteByDeviceIds(any()) }
+        verify { store.removeInvalidTokens(emptyList()) }
     }
 }

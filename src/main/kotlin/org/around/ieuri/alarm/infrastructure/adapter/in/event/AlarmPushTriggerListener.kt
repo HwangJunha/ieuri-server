@@ -3,10 +3,12 @@ package org.around.ieuri.alarm.infrastructure.adapter.`in`.event
 import org.around.ieuri.alarm.application.port.`in`.command.PushDispatchRequest
 import org.around.ieuri.alarm.application.port.`in`.command.PushDispatchUseCase
 import org.around.ieuri.alarm.domain.vo.PushDestination
+import org.around.ieuri.alarm.infrastructure.config.AlarmAsyncConfig
 import org.around.ieuri.community.domain.event.MessageNotificationTriggered
 import org.around.ieuri.community.domain.event.SpotAnswerNotificationTriggered
 import org.around.ieuri.community.domain.event.SpotAnswerReplyNotificationTriggered
 import org.slf4j.LoggerFactory
+import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Component
 import org.springframework.transaction.event.TransactionalEventListener
 import org.springframework.transaction.event.TransactionPhase
@@ -20,6 +22,11 @@ import org.springframework.transaction.event.TransactionPhase
  * `AFTER_COMMIT`인 이유는 **롤백된 메시지의 알림이 나가면 안 되기** 때문이다. 커밋 전에
  * 보내면 저장이 취소된 메시지의 푸시가 이미 도착해 있다.
  *
+ * **`@Async`가 반드시 있어야 한다.** Spring 이벤트는 기본이 동기라 `AFTER_COMMIT` 콜백도
+ * 커밋한 스레드 — 곧 사용자의 요청 스레드 — 에서 실행된다. 없으면 FCM으로 나가는 블로킹
+ * HTTP 왕복이 메시지 전송 응답 시간에 그대로 실려, 발송이 느려질 때 전송도 함께 느려진다.
+ * R12는 실패가 전파되지 않는 것만이 아니라 **지연도 전가되지 않는다**는 뜻이다.
+ *
  * 예외를 삼키고 **재시도하지 않는다**(AC12.3) — 알림 1건 누락의 비용이 재시도 큐를 운영하는
  * 비용보다 작고, 재시도 간격에 댈 근거도 없다(POL-040).
  */
@@ -29,6 +36,7 @@ class AlarmPushTriggerListener(
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
+    @Async(AlarmAsyncConfig.PUSH_EXECUTOR)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     fun onMessage(event: MessageNotificationTriggered) {
         dispatchQuietly(
@@ -43,6 +51,7 @@ class AlarmPushTriggerListener(
         )
     }
 
+    @Async(AlarmAsyncConfig.PUSH_EXECUTOR)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     fun onSpotAnswer(event: SpotAnswerNotificationTriggered) {
         dispatchQuietly(
@@ -57,6 +66,7 @@ class AlarmPushTriggerListener(
         )
     }
 
+    @Async(AlarmAsyncConfig.PUSH_EXECUTOR)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     fun onSpotAnswerReply(event: SpotAnswerReplyNotificationTriggered) {
         dispatchQuietly(
