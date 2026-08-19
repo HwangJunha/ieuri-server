@@ -4,6 +4,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import org.around.ieuri.community.application.command.CreateSpotAnswerCommand
+import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
 import org.around.ieuri.community.application.command.CreateSpotAnswerReplyCommand
 import org.around.ieuri.community.application.command.DeleteSpotAnswerCommand
 import org.around.ieuri.community.application.command.DeleteSpotAnswerReplyCommand
@@ -45,9 +46,11 @@ class SpotAnswerCommandServiceTest {
     private val questionRepository = mockk<SpotQuestionRepositoryPort>()
     private val counterPort = mockk<SpotQuestionCounterPort>(relaxed = true)
     private val photoKeyVerifier = mockk<SpotQaPhotoKeyVerifier>()
+    private val eventPublisher = mockk<CommunityEventPublisherPort>(relaxed = true)
 
     private val service = SpotAnswerCommandService(
         answerRepository, replyRepository, questionRepository, counterPort, photoKeyVerifier,
+        eventPublisher,
     )
 
     private fun givenQuestion(resolved: Boolean = false) {

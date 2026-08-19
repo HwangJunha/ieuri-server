@@ -25,6 +25,7 @@ import org.around.ieuri.community.application.port.out.query.ConversationQueryPo
 import org.around.ieuri.community.application.port.out.query.SpotQaQueryPort
 import org.around.ieuri.community.application.query.TypingEventView
 import org.around.ieuri.community.domain.aggregate.Conversation
+import org.around.ieuri.community.domain.event.MessageNotificationTriggered
 import org.around.ieuri.community.domain.aggregate.Message
 import org.around.ieuri.community.domain.vo.PhotoObjectKey
 import org.around.ieuri.community.domain.vo.SpotQaOrigin
@@ -149,6 +150,17 @@ class ConversationCommandService(
         // 버려진다 — 커밋과 조회의 경합이라 유실이 무작위로 나타난다.
         // id만 싣는다: 본문을 브로커에 흘리지 않기 위함이다(POL-013).
         eventPublisher.publish(NewMessageStored(command.conversationId, messageId))
+        // 푸시 알림 트리거(SPEC-0028 R5). 실시간 구독과 목적이 달라 이벤트를 나눈다 —
+        // 구독은 대화를 보고 있는 사람에게, 푸시는 앱이 꺼진 사람에게 간다.
+        eventPublisher.publish(
+            MessageNotificationTriggered(
+                conversationId = command.conversationId,
+                messageId = messageId,
+                senderId = memberId,
+                recipientId = counterpartId,
+                body = command.body,
+            ),
+        )
         return messageId
     }
 
