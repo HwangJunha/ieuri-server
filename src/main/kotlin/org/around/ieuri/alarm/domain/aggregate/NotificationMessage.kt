@@ -16,11 +16,9 @@ class NotificationMessage private constructor(
     val id: Long?,
     val type: NotificationType,
     val locale: AlarmLocale,
-    title: String,
+    /** **`val`이다** — 앱에 쓰기 경로가 없다. 값은 마이그레이션이 넣고 운영자가 DB에서 고친다. */
+    val title: String,
 ) {
-    var title: String = title
-        private set
-
     companion object {
         fun restore(
             id: Long,
