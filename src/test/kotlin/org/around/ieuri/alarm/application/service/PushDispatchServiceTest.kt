@@ -14,6 +14,7 @@ import org.around.ieuri.alarm.application.port.out.push.PushSendResult
 import org.around.ieuri.alarm.application.port.out.push.PushSenderPort
 import org.around.ieuri.alarm.application.port.out.push.PushTarget
 import org.around.ieuri.alarm.domain.aggregate.DeviceToken
+import org.around.ieuri.alarm.domain.aggregate.NotificationMessage
 import org.around.ieuri.alarm.domain.vo.AlarmLocale
 import org.around.ieuri.alarm.domain.vo.DevicePlatform
 import org.around.ieuri.alarm.domain.vo.NotificationCategory
@@ -33,18 +34,21 @@ class PushDispatchServiceTest {
     private val recipientId = 1L
     private val actorId = 2L
 
-    /** 언어마다 다른 값을 줘, 잘못된 언어의 제목이 나가면 깨지게 한다. */
-    private val titles = mapOf(
-        AlarmLocale.KO to "한국어제목",
-        AlarmLocale.EN to "영어제목",
-        AlarmLocale.JA to "일본어제목",
-        AlarmLocale.ZH to "중국어제목",
-    )
+    /** 언어마다 다른 값을 줘, 잘못된 언어의 문구가 나가면 깨지게 한다. */
+    private val messages = AlarmLocale.entries.associateWith { locale ->
+        NotificationMessage.restore(
+            id = locale.ordinal + 1L,
+            type = NotificationType.SPOT_QA_ANSWER,
+            locale = locale,
+            title = "${locale.name}제목",
+            body = "${locale.name}본문",
+        )
+    }
 
     @BeforeTest
     fun setUp() {
         every { store.categoryEnabled(any(), any()) } returns true
-        every { store.findTitles(any()) } returns titles
+        every { store.findMessages(any()) } returns messages
         every { blockLookup.isBlockedBetween(any(), any()) } returns false
         every { pushSender.send(any(), any()) } returns PushSendResult.NONE
     }
@@ -205,7 +209,23 @@ class PushDispatchServiceTest {
         service.dispatch(request())
 
         verify { pushSender.send(capture(notification), any()) }
-        assertEquals("일본어제목", notification.captured.title)
+        assertEquals("JA제목", notification.captured.title)
+    }
+
+    /**
+     * **본문이 반드시 실려야 한다.** iOS(APNs)는 본문 없는 알림을 표시하지 않아, 비면
+     * FCM은 성공으로 응답하는데 기기에는 아무것도 뜨지 않는다 — 오류가 없어 발견이 어렵다.
+     * 실제로 그 형태의 장애가 났다.
+     */
+    @Test
+    fun `본문이 비지 않는다`() {
+        givenTokens(token("d1", language = AlarmLocale.JA))
+        val notification = slot<PushNotification>()
+
+        service.dispatch(request())
+
+        verify { pushSender.send(capture(notification), any()) }
+        assertEquals("JA본문", notification.captured.body)
     }
 
     /** 알림 종류마다 다른 문구를 읽는다 — 답변과 답글이 한 카테고리지만 문구는 갈린다. */
@@ -215,27 +235,27 @@ class PushDispatchServiceTest {
 
         service.dispatch(request(destination = PushDestination.SpotQaReply(11L, 22L)))
 
-        verify { store.findTitles(NotificationType.SPOT_QA_REPLY) }
+        verify { store.findMessages(NotificationType.SPOT_QA_REPLY) }
     }
 
     /** POL-039 폴백 — 그 언어 문구가 없으면 EN으로 떨어뜨린다. */
     @Test
     fun `문구가 없는 언어는 EN으로 떨어진다`() {
         givenTokens(token("d1", language = AlarmLocale.ZH))
-        every { store.findTitles(any()) } returns mapOf(AlarmLocale.EN to "영어제목")
+        every { store.findMessages(any()) } returns mapOf(AlarmLocale.EN to messages.getValue(AlarmLocale.EN))
         val notification = slot<PushNotification>()
 
         service.dispatch(request())
 
         verify { pushSender.send(capture(notification), any()) }
-        assertEquals("영어제목", notification.captured.title)
+        assertEquals("EN제목", notification.captured.title)
     }
 
     /** 문구가 아예 없으면 보낼 것이 없다 — 시드가 지워진 상태이므로 조용히 넘기지 않는다. */
     @Test
     fun `문구가 하나도 없으면 발송하지 않는다`() {
         givenTokens(token("d1"))
-        every { store.findTitles(any()) } returns emptyMap()
+        every { store.findMessages(any()) } returns emptyMap()
 
         service.dispatch(request())
 

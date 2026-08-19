@@ -18,6 +18,13 @@ class NotificationMessage private constructor(
     val locale: AlarmLocale,
     /** **`val`이다** — 앱에 쓰기 경로가 없다. 값은 마이그레이션이 넣고 운영자가 DB에서 고친다. */
     val title: String,
+    /**
+     * 알림 본문. **사용자가 쓴 내용이 아니라 서버가 정한 안내 문구다**(R13).
+     *
+     * 비울 수 없다 — iOS(APNs)는 본문이 없는 알림을 표시하지 않아서, 빈 값을 허용하면
+     * 그 언어의 iOS 알림이 오류 없이 조용히 사라진다.
+     */
+    val body: String,
 ) {
     companion object {
         fun restore(
@@ -25,11 +32,18 @@ class NotificationMessage private constructor(
             type: NotificationType,
             locale: AlarmLocale,
             title: String,
-        ): NotificationMessage = NotificationMessage(id, type, locale, requireValidTitle(title))
+            body: String,
+        ): NotificationMessage = NotificationMessage(
+            id,
+            type,
+            locale,
+            requireNotBlank(title, "알림 제목"),
+            requireNotBlank(body, "알림 본문"),
+        )
 
-        private fun requireValidTitle(value: String): String {
+        private fun requireNotBlank(value: String, label: String): String {
             val trimmed = value.trim()
-            require(trimmed.isNotEmpty()) { "알림 제목은 비어 있을 수 없다." }
+            require(trimmed.isNotEmpty()) { "${label}은 비어 있을 수 없다." }
             return trimmed
         }
     }

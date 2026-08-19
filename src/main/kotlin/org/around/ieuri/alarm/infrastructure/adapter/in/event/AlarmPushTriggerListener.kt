@@ -78,8 +78,11 @@ class AlarmPushTriggerListener(
         )
     }
 
-    /** 본문도 수신자도 로그 대상이 아니다(POL-013) — 트리거 종류와 식별자만 남긴다. */
+    /** 본문은 로그 대상이 아니다(POL-013) — 트리거 종류와 식별자만 남긴다. */
     private fun dispatchQuietly(request: PushDispatchRequest, trigger: String, sourceId: Long) {
+        // 이벤트가 여기까지 왔다는 사실을 남긴다. 이 줄이 없으면 "알림이 안 온다"의 원인이
+        // 트리거 미발행인지 발송 단계 탈락인지 가릴 수 없다.
+        log.debug("푸시 트리거 수신: trigger={} sourceId={}", trigger, sourceId)
         try {
             pushDispatchUseCase.dispatch(request)
         } catch (e: Exception) {

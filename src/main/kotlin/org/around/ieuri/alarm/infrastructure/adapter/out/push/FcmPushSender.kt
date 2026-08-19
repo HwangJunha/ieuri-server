@@ -45,6 +45,19 @@ class FcmPushSender(
                 .map { (index, _) -> targets[index].deviceId }
 
             response.responses.forEachIndexed { index, each -> each.logIfNoteworthy(targets[index]) }
+
+            // **성공도 남긴다.** FCM이 받았다는 사실이 로그에 없으면, 알림이 안 왔을 때
+            // 서버가 보냈는지 아닌지부터 확인할 방법이 없다 — 실제로 그 진단에 DB를 뒤졌다.
+            //
+            // 다만 여기서 성공은 **FCM이 접수했다**는 뜻이지 기기에 도착했다는 뜻이 아니다.
+            // 특히 iOS는 FCM이 APNs로 중계하므로, 이 로그가 성공인데 알림이 없으면 원인은
+            // 서버 밖(APNs 자격증명·기기 설정·클라이언트 수신 처리)에 있다.
+            log.info(
+                "FCM 접수 완료: 성공={} 실패={} 무효토큰={}",
+                response.successCount,
+                response.failureCount,
+                invalid.size,
+            )
             PushSendResult(successCount = response.successCount, invalidDeviceIds = invalid)
         } catch (e: Exception) {
             // 발송 전체가 실패해도 원래 작업은 건드리지 않고 재시도하지도 않는다(R12·AC12.3).
@@ -60,10 +73,14 @@ class FcmPushSender(
     private fun PushTarget.toMessage(notification: PushNotification): Message =
         Message.builder()
             .setToken(fcmToken)
-            // 본문을 담지 않는다(R13) — 잠금화면에 대화 내용이 뜨지 않게 제목만 보낸다.
+            // **본문은 서버가 정한 안내 문구다** — 사용자가 쓴 메시지·답변 내용은 싣지 않는다(R13).
+            //
+            // 제목만 보내면 안 된다: iOS(APNs)는 본문 없는 알림을 표시하지 않아, FCM이 정상
+            // 접수하고도 기기에서 조용히 버려진다. 오류가 나지 않아 발견이 어렵다.
             .setNotification(
                 Notification.builder()
                     .setTitle(notification.title)
+                    .setBody(notification.body)
                     .build(),
             )
             // 목적지 식별자. 클라이언트가 추가 왕복 없이 라우트를 만든다(R11·AC11.4).

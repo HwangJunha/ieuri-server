@@ -4,6 +4,7 @@ import org.around.ieuri.alarm.application.port.out.persistence.DeviceTokenReposi
 import org.around.ieuri.alarm.application.port.out.persistence.NotificationMessageRepositoryPort
 import org.around.ieuri.alarm.application.port.out.persistence.NotificationPreferenceRepositoryPort
 import org.around.ieuri.alarm.domain.aggregate.DeviceToken
+import org.around.ieuri.alarm.domain.aggregate.NotificationMessage
 import org.around.ieuri.alarm.domain.aggregate.NotificationPreference
 import org.around.ieuri.alarm.domain.vo.AlarmLocale
 import org.around.ieuri.alarm.domain.vo.NotificationCategory
@@ -54,14 +55,14 @@ class PushDispatchStore(
         deviceTokenRepositoryPort.findByMemberId(memberId)
 
     /**
-     * 이 종류의 언어별 제목 문구(R13). 언어로 바로 찾을 수 있게 맵으로 돌려준다.
+     * 이 종류의 언어별 문구(R13). 언어로 바로 찾을 수 있게 맵으로 돌려준다.
      *
      * **한 번만 읽는다** — 수신자가 기기마다 다른 언어를 쓸 수 있어 발송을 언어별로 나누는데,
      * 그때마다 조회하면 발송 1건에 조회가 여러 번 붙는다.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
-    fun findTitles(type: NotificationType): Map<AlarmLocale, String> =
-        notificationMessageRepositoryPort.findByType(type).associate { it.locale to it.title }
+    fun findMessages(type: NotificationType): Map<AlarmLocale, NotificationMessage> =
+        notificationMessageRepositoryPort.findByType(type).associateBy { it.locale }
 
     /** FCM이 무효로 판정한 기기를 지운다(R4). */
     @Transactional(propagation = Propagation.REQUIRES_NEW)

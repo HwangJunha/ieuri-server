@@ -36,3 +36,9 @@ logging:
     org.springframework.graphql: DEBUG
     # 우리 인터셉터의 판정 로그(INFO면 충분하나 함께 올려 둔다).
     org.around.ieuri.auth.infrastructure.security: DEBUG
+    # 푸시 발송 경로. **로컬 전용이다.**
+    #
+    # 발송은 조용히 걸러지는 분기가 많고(자기 행위·수신 거부·차단·기기 없음) 전부 정상
+    # 동작이라 INFO로 올릴 수 없다. 그런데 "알림이 안 온다"를 진단하려면 그중 어디서
+    # 멈췄는지가 바로 그 정보다. 로컬에서만 켠다.
+    org.around.ieuri.alarm: DEBUG

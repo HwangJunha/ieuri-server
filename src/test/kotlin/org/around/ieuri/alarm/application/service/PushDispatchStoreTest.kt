@@ -78,21 +78,22 @@ class PushDispatchStoreTest {
     @Test
     fun `문구를 언어별 맵으로 돌려준다`() {
         every { messageRepository.findByType(NotificationType.DM) } returns listOf(
-            NotificationMessage.restore(1L, NotificationType.DM, AlarmLocale.KO, "한국어제목"),
-            NotificationMessage.restore(2L, NotificationType.DM, AlarmLocale.EN, "영어제목"),
+            NotificationMessage.restore(1L, NotificationType.DM, AlarmLocale.KO, "한국어제목", "한국어본문"),
+            NotificationMessage.restore(2L, NotificationType.DM, AlarmLocale.EN, "영어제목", "영어본문"),
         )
 
-        val titles = store.findTitles(NotificationType.DM)
+        val found = store.findMessages(NotificationType.DM)
 
-        assertEquals("한국어제목", titles[AlarmLocale.KO])
-        assertEquals("영어제목", titles[AlarmLocale.EN])
-        assertEquals(2, titles.size)
+        assertEquals("한국어제목", found[AlarmLocale.KO]?.title)
+        assertEquals("한국어본문", found[AlarmLocale.KO]?.body)
+        assertEquals("영어제목", found[AlarmLocale.EN]?.title)
+        assertEquals(2, found.size)
     }
 
     @Test
     fun `문구가 없으면 빈 맵이다`() {
         every { messageRepository.findByType(NotificationType.DM) } returns emptyList()
 
-        assertEquals(emptyMap(), store.findTitles(NotificationType.DM))
+        assertEquals(emptyMap(), store.findMessages(NotificationType.DM))
     }
 }

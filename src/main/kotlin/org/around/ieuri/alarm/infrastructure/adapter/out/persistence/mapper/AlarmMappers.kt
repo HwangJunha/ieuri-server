@@ -36,6 +36,7 @@ fun NotificationMessageEntity.toDomain(): NotificationMessage = NotificationMess
     type = notificationType,
     locale = locale,
     title = title,
+    body = body,
 )
 
 /** 수신 설정 엔티티를 도메인 모델로 옮긴다. */

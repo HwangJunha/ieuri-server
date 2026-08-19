@@ -93,6 +93,10 @@ class NotificationMessageEntity(
     @Column(name = "title", nullable = false, length = 200)
     var title: String,
 
+    /** 서버가 정한 안내 문구. 사용자 본문이 아니다 — iOS 표시 요건이라 비울 수 없다. */
+    @Column(name = "body", nullable = false, length = 200)
+    var body: String,
+
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant? = null,
 

@@ -99,6 +99,7 @@ class AlarmMapperTest {
             notificationType = NotificationType.SPOT_QA_REPLY,
             locale = AlarmLocale.ZH,
             title = "제목값",
+            body = "본문값",
             createdAt = createdAt,
             updatedAt = createdAt,
         )
@@ -109,6 +110,7 @@ class AlarmMapperTest {
         assertEquals(NotificationType.SPOT_QA_REPLY, domain.type)
         assertEquals(AlarmLocale.ZH, domain.locale)
         assertEquals("제목값", domain.title)
+        assertEquals("본문값", domain.body)
     }
 
     @Test
