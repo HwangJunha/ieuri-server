@@ -1,0 +1,136 @@
+# 앱 푸시 알림(SPEC-0028). 기기 토큰 등록·해제와 카테고리별 수신 설정.
+#
+# 새 루트 Query가 없다 — 설정은 이미 있는 `me`로 읽는다. OS 알림 권한 상태는 기기 사실이라
+# 서버가 가질 값이 아니다.
+
+extend type Mutation {
+    """
+    이 기기의 FCM 토큰을 등록한다. **업서트다** — 같은 deviceId로 다시 부르면 새 레코드를
+    만들지 않고 토큰과 언어를 덮어쓴다.
+
+    등록·FCM 토큰 로테이션·기기 언어 변경을 모두 이 한 연산의 재호출로 처리한다.
+    갱신 전용 뮤테이션을 따로 두지 않는다.
+
+    **기기의 소유가 옮겨진다** — 다른 회원이 쓰던 deviceId로 등록하면 그 기기는 호출자에게만
+    귀속되고 이전 회원에게는 발송되지 않는다.
+    """
+    registerDeviceToken(input: RegisterDeviceTokenInput!): RegisterDeviceTokenPayload!
+
+    """
+    이 기기의 토큰을 삭제한다. 로그아웃 흐름에서 클라이언트가 호출한다.
+    이미 없는 토큰을 지워도 성공이다.
+    """
+    deleteDeviceToken(input: DeleteDeviceTokenInput!): DeleteDeviceTokenPayload!
+
+    """
+    카테고리별 푸시 수신 여부를 켜고 끈다. 회원 단위로 저장되어 재설치와 기기 변경에도
+    유지된다.
+
+    한 번에 한 카테고리를 바꾼다 — 두 토글이 같은 화면에 있어도 각각 독립된 호출이다.
+    같은 값으로 다시 불러도 성공한다.
+    """
+    updateNotificationPreference(
+        input: UpdateNotificationPreferenceInput!
+    ): UpdateNotificationPreferencePayload!
+}
+
+extend type Me {
+    """
+    호출자의 카테고리별 푸시 수신 설정. 두 카테고리를 **항상** 반환한다 — 한 번도 설정을
+    바꾼 적 없는 회원에게도 기본값 true로 두 항목이 온다. 별도의 초기화 호출이 필요 없다.
+    """
+    notificationPreferences: [NotificationPreference!]!
+}
+
+"""
+알림 카테고리.
+
+트리거 3종을 두 값으로 묶는다 — 답변과 답글은 사용자에게 같은 성격의 알림이고 목적지도
+같은 화면이라 나눌 이유가 없다.
+"""
+enum NotificationCategory {
+    "DM 새 메시지."
+    MESSAGE
+
+    "내 질문에 달린 답변, 내 답변에 달린 답글."
+    SPOT_QA
+}
+
+"카테고리 1건에 대한 호출자의 수신 설정."
+type NotificationPreference {
+    category: NotificationCategory!
+
+    """
+    참이면 이 카테고리를 발송한다. 거짓이면 서버가 발송 자체를 건너뛴다.
+
+    이 값이 참이어도 기기의 OS 알림 설정이 꺼져 있으면 알림은 표시되지 않는다 — 둘은
+    직렬로 걸리며 서버는 OS 쪽 상태를 알지 못한다.
+    """
+    enabled: Boolean!
+}
+
+"토큰이 속한 OS. 발송 페이로드 형식이 갈리므로 서버가 알아야 한다."
+enum DevicePlatform {
+    IOS
+    ANDROID
+}
+
+input RegisterDeviceTokenInput {
+    """
+    클라이언트가 만들어 보관하는 기기 식별자. 같은 기기의 재등록을 이 값으로 판별한다.
+
+    FCM 토큰 자체는 로테이션되므로 식별자가 될 수 없다 — 토큰을 키로 삼으면 로테이션마다
+    새 행이 쌓이고 옛 토큰으로 계속 발송을 시도하게 된다.
+    """
+    deviceId: String!
+
+    "FCM이 발급한 푸시 토큰."
+    fcmToken: String!
+
+    """
+    기기 언어. 알림 제목 등 서버가 조립하는 문구에 쓴다. 사용자가 작성한 본문은 이 값과
+    무관하게 원문 그대로 발송된다.
+
+    지원하지 않는 언어는 EN으로 저장한다. 이 값은 고정되지 않으며, 기기 언어가 바뀌면
+    같은 deviceId로 재호출해 갱신한다.
+    """
+    language: Locale!
+
+    platform: DevicePlatform!
+}
+
+type RegisterDeviceTokenPayload implements BaseResponse {
+    success: Boolean!
+
+    "INVALID_INPUT — deviceId 또는 fcmToken이 비었거나 형식을 위반했을 때."
+    userErrors: [UserError!]!
+}
+
+input DeleteDeviceTokenInput {
+    deviceId: String!
+}
+
+type DeleteDeviceTokenPayload implements BaseResponse {
+    success: Boolean!
+
+    "비어 있다. 멱등 삭제라 도메인 실패 모드가 성립하지 않는다."
+    userErrors: [UserError!]!
+}
+
+input UpdateNotificationPreferenceInput {
+    category: NotificationCategory!
+    enabled: Boolean!
+}
+
+type UpdateNotificationPreferencePayload implements BaseResponse {
+    success: Boolean!
+
+    "비어 있다. enum과 Boolean이라 무효 상태가 성립하지 않는다."
+    userErrors: [UserError!]!
+
+    """
+    반영 후 **전체** 설정. 바뀐 한 건이 아니라 두 카테고리를 모두 돌려준다 — 클라이언트가
+    이 배열로 Me 캐시를 통째로 갈아 끼우면 재조회가 필요 없다.
+    """
+    notificationPreferences: [NotificationPreference!]!
+}
