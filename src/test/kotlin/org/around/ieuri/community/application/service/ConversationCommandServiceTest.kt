@@ -28,6 +28,7 @@ import org.around.ieuri.community.application.port.out.query.SpotQaQueryPort
 import org.around.ieuri.community.application.query.PostAuthorView
 import org.around.ieuri.community.domain.aggregate.Conversation
 import org.around.ieuri.community.domain.aggregate.Message
+import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.around.ieuri.community.domain.vo.PhotoObjectKey
 import java.time.Instant
 import java.util.UUID
@@ -46,6 +47,7 @@ class ConversationCommandServiceTest {
     private val authorId = 9L
     private val conversationId = 300L
     private val now = Instant.parse("2026-08-12T00:00:00Z")
+    private val language = ContentLanguage.EN
 
     private val conversationRepository = mockk<ConversationRepositoryPort>(relaxed = true)
     private val messageRepository = mockk<MessageRepositoryPort>()
@@ -181,7 +183,7 @@ class ConversationCommandServiceTest {
             Message.restore(500L, message.conversationId, message.senderId, message.body, sentAt)
         }
 
-        val messageId = service.sendMessage(SendMessageCommand(conversationId, "안녕"), memberId)
+        val messageId = service.sendMessage(SendMessageCommand(conversationId, "안녕"), memberId, language)
 
         assertEquals(500L, messageId)
         verify { conversationRepository.touch(conversationId, sentAt) }
@@ -200,7 +202,7 @@ class ConversationCommandServiceTest {
             Message.restore(500L, message.conversationId, message.senderId, message.body, now)
         }
 
-        service.sendMessage(SendMessageCommand(conversationId, "안녕"), memberId)
+        service.sendMessage(SendMessageCommand(conversationId, "안녕"), memberId, language)
 
         // **브로커로 직접 발행하지 않는다** — 커밋 전에 발행하면 구독자가 그 id로 DB를 읽을 때
         // 아직 행이 없어 이벤트가 조용히 버려진다. 커밋 뒤 발행은 리스너의 몫이다.
@@ -215,7 +217,7 @@ class ConversationCommandServiceTest {
         every { communityQueryPort.findBlockedMemberIds(memberId) } returns setOf(authorId)
 
         assertFailsWith<BlockedException> {
-            service.sendMessage(SendMessageCommand(conversationId, "안녕"), memberId)
+            service.sendMessage(SendMessageCommand(conversationId, "안녕"), memberId, language)
         }
 
         verify(exactly = 0) { eventPublisher.publish(any()) }
@@ -281,7 +283,7 @@ class ConversationCommandServiceTest {
         every { conversationRepository.findById(conversationId) } returns conversation(low = 100L, high = 200L)
 
         assertFailsWith<NotConversationParticipantException> {
-            service.sendMessage(SendMessageCommand(conversationId, "안녕"), memberId)
+            service.sendMessage(SendMessageCommand(conversationId, "안녕"), memberId, language)
         }
     }
 
@@ -294,7 +296,7 @@ class ConversationCommandServiceTest {
         every { conversationRepository.findById(conversationId) } returns null
 
         assertFailsWith<ConversationNotFoundException> {
-            service.sendMessage(SendMessageCommand(conversationId, "안녕"), memberId)
+            service.sendMessage(SendMessageCommand(conversationId, "안녕"), memberId, language)
         }
     }
 
@@ -308,7 +310,7 @@ class ConversationCommandServiceTest {
         every { communityQueryPort.findBlockedMemberIds(memberId) } returns setOf(authorId)
 
         assertFailsWith<BlockedException> {
-            service.sendMessage(SendMessageCommand(conversationId, "안녕"), memberId)
+            service.sendMessage(SendMessageCommand(conversationId, "안녕"), memberId, language)
         }
 
         verify(exactly = 0) { messageRepository.save(any()) }
@@ -321,7 +323,7 @@ class ConversationCommandServiceTest {
         givenNoBlocks()
 
         assertFailsWith<IllegalArgumentException> {
-            service.sendMessage(SendMessageCommand(conversationId, "   "), memberId)
+            service.sendMessage(SendMessageCommand(conversationId, "   "), memberId, language)
         }
     }
 
@@ -335,6 +337,7 @@ class ConversationCommandServiceTest {
             service.sendMessage(
                 SendMessageCommand(conversationId, "가".repeat(Message.BODY_MAX_LENGTH + 1)),
                 memberId,
+                language,
             )
         }
 

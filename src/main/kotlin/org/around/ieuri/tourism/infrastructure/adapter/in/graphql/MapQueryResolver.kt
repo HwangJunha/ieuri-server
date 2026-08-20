@@ -58,14 +58,12 @@ class MapQueryResolver(
         @InputArgument bbox: GqlMapBoundsInput,
         @InputArgument zoom: Int,
         @InputArgument categories: List<String>?,
-        @InputArgument hasOrigin: Boolean?,
     ): GqlMapViewportResult =
         mapQueryUseCase.mapViewport(
             MapViewportQuery(
                 bounds = bbox.toDomain(),
                 zoom = zoom,
                 categories = toCategorySelection(categories),
-                hasOrigin = hasOrigin,
             ),
             locale = dfe.domainLocale(),
         ).toGql()

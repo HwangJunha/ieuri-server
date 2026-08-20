@@ -19,9 +19,18 @@ package org.around.ieuri.tourism.application.exception
 /** reactToSpot의 사용자 노출 실패. code는 머신 판독용 안정 식별자. 인증 실패는 여기에 속하지 않는다(위 참조). */
 abstract class ReactionUserException(val code: String, message: String) : RuntimeException(message)
 
-/** 현재 요청 언어에서 resolve되지 않는 spotId(오래된 카드 등, AC-14b). */
+/** 카탈로그 자체가 없다. 어떤 언어로 물어도 없는 id다. */
 class SpotNotFoundException(message: String = "해당 관광지를 찾을 수 없습니다.") :
     ReactionUserException("SPOT_NOT_FOUND", message)
+
+/**
+ * 카탈로그는 있으나 **활성 언어에 원본이 없다**(SPEC-0029 R-12). 뮤테이션 경로의 userError다.
+ *
+ * [SpotNotFoundException]과 반드시 구분한다 — 클라이언트가 다른 안내를 띄운다. 이쪽은 언어를
+ * 바꾸면 볼 수 있는 장소이고, 저쪽은 어느 언어에서도 없는 id다(AC-12.3).
+ */
+class SpotNotFoundInLocaleException(message: String = "이 언어에서는 볼 수 없는 장소입니다.") :
+    ReactionUserException("SPOT_NOT_FOUND_IN_LOCALE", message)
 
 /**
  * spots/availableSpotCategories 쿼리의 도메인 실패. [logicalCode]는 클라이언트 분기 기준 문자열,
@@ -63,11 +72,23 @@ class UpstreamUnavailableException(message: String, cause: Throwable? = null) :
     SpotQueryException("UPSTREAM_UNAVAILABLE", Classification.UNAVAILABLE, message, cause)
 
 /**
- * spotDetail 쿼리에서 contentId가 현재 언어 서비스에서 콘텐츠로 해소되지 않음(없거나 무효, 언어 교차 id 포함, AC-15/AC-6).
- * 쿼리 경로이므로 최상위 errors[]로 표면화된다(reactToSpot의 SpotNotFoundException(userError)과 별개).
+ * 카탈로그 자체가 없다. 쿼리 경로이므로 최상위 errors[]로 표면화된다
+ * (reactToSpot의 [SpotNotFoundException](userError)과 별개).
  */
 class SpotDetailNotFoundException(message: String = "해당 관광지를 찾을 수 없습니다.") :
     SpotQueryException("SPOT_NOT_FOUND", Classification.NOT_FOUND, message)
+
+/**
+ * 카탈로그는 있으나 **활성 언어에 원본이 없다**(SPEC-0029 R-12). 쿼리 경로의 실패다.
+ *
+ * [SpotDetailNotFoundException]과 반드시 구분한다(AC-12.3) — 언어를 바꾸면 볼 수 있는 장소와
+ * 어느 언어에서도 없는 id는 클라이언트가 다르게 안내해야 한다.
+ *
+ * **정상 경로가 아니라 마지막 방어선이다.** 목록은 전부 활성 언어로 걸러지므로 이 오류에
+ * 도달하는 경로는 딥링크·푸시·복원된 초안 같은 우회 진입뿐이다(AC-23.5).
+ */
+class SpotNotFoundInLocaleQueryException(message: String = "이 언어에서는 볼 수 없는 장소입니다.") :
+    SpotQueryException("SPOT_NOT_FOUND_IN_LOCALE", Classification.NOT_FOUND, message)
 
 /** TourAPI 일일 호출 한도 초과(캐시 미스 시, AC-16). UPSTREAM_UNAVAILABLE과 구분해 클라가 다르게 안내한다. */
 class UpstreamRateLimitedException(message: String = "잠시 후 다시 시도해 주세요.", cause: Throwable? = null) :

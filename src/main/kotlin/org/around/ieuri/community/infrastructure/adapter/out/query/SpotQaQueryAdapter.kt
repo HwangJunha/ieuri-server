@@ -5,6 +5,7 @@ import com.querydsl.core.types.dsl.BooleanPath
 import com.querydsl.core.types.dsl.DateTimePath
 import com.querydsl.core.types.dsl.Expressions
 import com.querydsl.core.types.dsl.NumberPath
+import com.querydsl.jpa.JPAExpressions
 import com.querydsl.jpa.impl.JPAQueryFactory
 import org.around.ieuri.common.pagination.CursorEdge
 import org.around.ieuri.common.pagination.CursorPage
@@ -17,9 +18,11 @@ import org.around.ieuri.community.application.port.out.query.ViewerContext
 import org.around.ieuri.community.application.query.SpotAnswerReplyView
 import org.around.ieuri.community.application.query.SpotAnswerView
 import org.around.ieuri.community.application.query.SpotQuestionView
+import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QSpotAnswerEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QSpotAnswerReplyEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QSpotQaPhotoEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QSpotCatalogLanguageEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QSpotQuestionEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.SpotAnswerEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.SpotAnswerReplyEntity
@@ -43,6 +46,7 @@ class SpotQaQueryAdapter(
     private val answer = QSpotAnswerEntity.spotAnswerEntity
     private val reply = QSpotAnswerReplyEntity.spotAnswerReplyEntity
     private val photo = QSpotQaPhotoEntity.spotQaPhotoEntity
+    private val catalogLanguage = QSpotCatalogLanguageEntity.spotCatalogLanguageEntity
 
     /**
      * 질문 목록. 정렬은 **미해결 우선, 그 안에서 최신순**이다(R2) — 인자로 바꿀 수 없다.
@@ -61,6 +65,7 @@ class SpotQaQueryAdapter(
                 search.catalogId?.let { question.catalogId.eq(it) },
                 search.authorId?.let { question.authorId.eq(it) },
                 idsCondition(search.ids),
+                languageCondition(search.language),
                 visibleToViewer(search.viewer),
                 cursor?.let { questionKeysetCondition(it) },
             )
@@ -248,6 +253,21 @@ class SpotQaQueryAdapter(
         ids.isEmpty() -> Expressions.FALSE.isTrue
         else -> question.id.`in`(ids)
     }
+
+    /**
+     * 활성 언어 필터(SPEC-0029 R-23). 장소가 이 언어에서 해소되지 않는 질문을 뺀다 —
+     * **오류가 아니라 부재다.**
+     *
+     * **무조건 걸린다.** 질문은 `catalog_id`가 NOT NULL이라 장소 없는 질문이 없고, 그래서
+     * 글 목록과 달리 "장소 없는 항목은 남긴다"는 예외 절이 필요 없다(AC-15.4는 글에만 해당).
+     *
+     * 언어 사본은 커뮤니티가 들고 있어 tour 스키마를 조인하지 않는다.
+     */
+    private fun languageCondition(language: ContentLanguage): BooleanExpression =
+        question.catalogId.`in`(
+            JPAExpressions.select(catalogLanguage.catalogId).from(catalogLanguage)
+                .where(catalogLanguage.language.eq(language)),
+        )
 
     /** 차단 집합이 비면 조건을 붙이지 않는다 — QueryDSL은 null인 where 인자를 버린다. */
     private fun blockExclusion(

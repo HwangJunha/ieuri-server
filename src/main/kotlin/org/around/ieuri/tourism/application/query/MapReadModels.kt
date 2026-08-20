@@ -23,8 +23,6 @@ data class MapViewportQuery(
      * **줌별 상한보다 먼저 적용된다** — 반대 순서면 truncated가 거짓말을 한다(R8).
      */
     val categories: CategorySelection,
-    /** 원문 보유 필터. null이면 전체다. 카테고리와 AND로 결합된다. */
-    val hasOrigin: Boolean?,
 )
 
 /** mapViewport 응답(R1·R3, R12). */

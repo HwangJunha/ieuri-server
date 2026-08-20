@@ -1,6 +1,8 @@
 package org.around.ieuri.tourism.application.service
 
 import org.around.ieuri.tourism.application.exception.SpotDetailNotFoundException
+import org.around.ieuri.tourism.application.exception.SpotNotFoundInLocaleQueryException
+import org.around.ieuri.tourism.application.exception.SpotQueryException
 import org.around.ieuri.tourism.application.exception.UnknownCategoryException
 import org.around.ieuri.tourism.application.exception.InvalidCoordinatesException
 import org.around.ieuri.tourism.application.exception.RadiusTooLargeException
@@ -39,7 +41,6 @@ import org.around.ieuri.tourism.application.query.SpotSummaryView
 import org.around.ieuri.tourism.application.query.SpotView
 import org.around.ieuri.tourism.application.query.SpotsQuery
 import org.around.ieuri.tourism.domain.aggregate.SpotDetail
-import org.around.ieuri.tourism.domain.vo.CategorySelection
 import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.domain.vo.SpotImage
 import org.around.ieuri.tourism.domain.vo.SpotIntro
@@ -80,14 +81,15 @@ class SpotQueryService(
 
         // 로그인 회원이 이미 반응(좋아요/패스)한 관광지 제외 — 중복 노출 방지. 비로그인은 제외 없음.
         // **DB 쿼리 단계에서 제외한다** — 조회 후 걸러내면 페이지가 요청한 size보다 작아진다.
-        val excluded = memberId?.let { spotQueryPort.findReactedSpotIds(it) }.orEmpty()
+        // **제외도 활성 언어 단위다**(SPEC-0029 R-13) — 다른 언어에서 누른 반응까지 제외하면
+        // 이 언어에서는 아직 보지 못한 장소를 잃는다.
+        val excluded = memberId?.let { spotQueryPort.findReactedSpotIds(it, locale) }.orEmpty()
 
         val search = NearbySpotSearch(
             language = locale,
             center = center,
             radiusMeters = query.radiusMeters,
             categories = query.categories,
-            hasOrigin = query.hasOrigin,
             excludedSpotIds = excluded,
             limit = size,
             offset = (page - 1) * size,
@@ -171,7 +173,7 @@ class SpotQueryService(
         if (fetched == null) {
             // 부재 확정. `spot` 행의 값으로 응답을 구성하고(R-2) 부재 사실을 적재한다(R-3).
             // 재조회 결과가 여전히 부재여도 적재 시각이 갱신되어 다음 신선도 창이 새로 시작된다(AC-15).
-            val fallback = fallbackDetail(catalogId, locale)
+            val fallback = bodyAbsentDetail(catalogId, locale)
             spotCachePort.putDetailAbsence(spotId, fallback)
             eventPublisher.publish(SpotDetailAbsent(spotId, fallback))
             return fallback.toView(catalogId, identity)
@@ -198,12 +200,13 @@ class SpotQueryService(
      * overview·homepage·tel은 null로 남는다(AC-7). address는 `spot`이 갖고 있으면 쓰고 없으면 null이다(AC-8).
      *
      * [resolve]가 이미 통과한 뒤이므로 행은 존재한다 — 그 사이 사라졌다면 부재가 아니라 미해석이다.
+     *
+     * **언어 폴백이 아니다**(SPEC-0029). "본문이 없을 때 카탈로그 값으로 상세를 구성한다"는 뜻이며,
+     * 값은 활성 언어의 번역에서만 온다.
      */
-    private fun fallbackDetail(catalogId: Long, language: DomainLocale): SpotDetail {
+    private fun bodyAbsentDetail(catalogId: Long, language: DomainLocale): SpotDetail {
         // **카탈로그 id로 묻는다** — findSpotBasics는 `spot_catalog`를 조회한다.
-        // 요청 언어 번역을 우선한다. 이 경로는 resolve()가 그 언어의 spot 행을 이미
-        // 확인한 뒤라 폴백이 발동할 여지가 사실상 없다 — 다만 보장은 아니다.
-        val basics = spotQueryPort.findSpotBasics(catalogId, language) ?: throw SpotDetailNotFoundException()
+        val basics = spotQueryPort.findSpotBasics(catalogId, language) ?: throw spotAbsenceFor(catalogId)
         return SpotDetail(
             title = basics.title,
             category = basics.category,
@@ -283,46 +286,49 @@ class SpotQueryService(
      * **3단 폴백 경로에 넣지 않는다**(AC-38) — spot_reaction 기반이라 TourInfoPort와 완전히 다른
      * 포트이며, write-behind는 upstream 파생 데이터만 다룬다.
      */
-    override fun spotLikeCount(spotId: Long): Long = spotQueryPort.countLikes(spotId)
+    override fun spotLikeCount(catalogId: Long, locale: DomainLocale): Long =
+        spotQueryPort.countLikes(catalogId, locale)
 
     /**
      * 최신 반응 코드. 좋아요 수와 같은 이유로 캐시 비대상이다 — 판정 시점의 상태여야 하고
      * (SPEC-0026 R5), 반응은 언제든 덮어써진다.
      */
-    override fun spotViewerReaction(catalogId: Long, memberId: Long): String? =
-        spotQueryPort.findReaction(catalogId, memberId)?.name
+    override fun spotViewerReaction(catalogId: Long, memberId: Long, locale: DomainLocale): String? =
+        spotQueryPort.findReaction(catalogId, memberId, locale)?.name
 
     /**
-     * 카탈로그 한 행만 읽는다 — 캐시도 upstream도 타지 않는다. 부재는 예외가 아니라 null이며,
-     * 호출자가 그것을 "유효하지 않은 장소 id"로 해석한다.
+     * 카탈로그 여러 행을 읽는다 — 캐시도 upstream도 타지 않는다.
      *
-     * **언어가 KO로 고정돼 있다.** 유일한 호출자인 커뮤니티 장소 칩이 언어를 전달하지 않는
-     * 구조이고, 그 표면은 재설계 대상으로 남아 있다(사용자 판단 2026-08-14). 지금 임의로
-     * 시그니처를 바꾸면 재설계 때 다시 손대야 하므로 종전 동작을 그대로 둔다.
+     * **[languageCode]에서 해소되지 않는 id는 결과에 키가 없다**(SPEC-0029 R-24·AC-24.3). 호출자는
+     * 그것을 "이 언어에 없는 장소"로 해석한다 — 존재 검사도 이 규칙을 따르므로, 활성 언어에
+     * 없는 spot은 첨부·조회 어느 쪽에서도 성립하지 않는다(R-25).
      */
-    override fun spotSummaries(catalogIds: List<Long>): Map<Long, SpotSummaryView> =
-        spotQueryPort.findSpotBasicsIn(catalogIds, DomainLocale.KO).mapValues { (catalogId, basics) ->
-            SpotSummaryView(
-                id = catalogId,
-                title = basics.title,
-                thumbnailImageUrl = basics.thumbnailImageUrl,
-                categoryCode = basics.category.code,
-                longitude = basics.longitude,
-                latitude = basics.latitude,
-            )
-        }
+    override fun spotSummaries(catalogIds: List<Long>, languageCode: String): Map<Long, SpotSummaryView> =
+        spotQueryPort.findSpotBasicsIn(catalogIds, DomainLocale.fromLanguageTag(languageCode))
+            .mapValues { (catalogId, basics) ->
+                SpotSummaryView(
+                    id = catalogId,
+                    title = basics.title,
+                    thumbnailImageUrl = basics.thumbnailImageUrl,
+                    categoryCode = basics.category.code,
+                    longitude = basics.longitude,
+                    latitude = basics.latitude,
+                )
+            }
 
-    override fun spotIdsWithin(
-        longitude: Double,
-        latitude: Double,
-        radiusMeters: Int,
-        limit: Int,
-        categoryCode: String?,
-    ): List<Long> =
-        spotQueryPort.findSpotIdsWithin(longitude, latitude, radiusMeters, limit, categoryCode)
+    /**
+     * 해소되는 언어의 코드 전부(SPEC-0029 R-15). 카탈로그가 없으면 빈 집합이며, 그것이
+     * "어느 언어에서도 보이지 않는다"와 같은 뜻이다 — 구독자는 두 경우에 같은 처리를 한다.
+     */
+    override fun resolvedLanguageCodes(catalogId: Long): Set<String> =
+        spotQueryPort.findResolvedLanguages(catalogId).mapTo(mutableSetOf()) { it.name }
 
-    override fun spotSummary(catalogId: Long): SpotSummaryView? =
-        spotQueryPort.findSpotBasics(catalogId, DomainLocale.KO)?.let {
+    /**
+     * 카탈로그 한 행만 읽는다. **[languageCode]에서 해소되지 않으면 null이다**(AC-24.2) — 다른 언어
+     * 이름으로 대신하지 않는다. 호출자가 그것을 "이 언어에 없는 장소"로 해석한다.
+     */
+    override fun spotSummary(catalogId: Long, languageCode: String): SpotSummaryView? =
+        spotQueryPort.findSpotBasics(catalogId, DomainLocale.fromLanguageTag(languageCode))?.let {
             SpotSummaryView(
                 id = catalogId,
                 title = it.title,
@@ -358,25 +364,36 @@ class SpotQueryService(
     }
 
     /**
-     * 카탈로그 id를 **요청 언어의 원본 행으로** 해석한다(SPEC-0019).
+     * 카탈로그 id를 **활성 언어의 원본 행으로** 해석한다(SPEC-0019, SPEC-0029 R-9·R-10).
      *
-     * **캐시·DB를 보기 전에 호출해야 한다.** 해석을 upstream 폴백 직전에 두면 캐시 히트·DB 히트에서
+     * **캐시·DB를 보기 전에 호출해야 한다.** 해석을 upstream 조회 직전에 두면 캐시 히트·DB 히트에서
      * 그대로 통과해, 정작 흔한 경로에서 교차 언어 콘텐츠가 나간다. `spot_detail`과 캐시 키 모두
      * 언어를 들지 않으므로(V20) 그 단계에서는 언어를 스스로 판별할 수 없다.
      *
-     * **언어 검증이 조회 조건 자체가 됐다.** 예전에는 언어별 `spot.id`를 받아 뒤늦게 대조했는데,
-     * 이제는 (카탈로그, 언어)로 찾으므로 다른 언어의 행이 애초에 나오지 않는다. 그 언어의 원본이
-     * 없으면 상세를 물을 곳이 없다 — TourAPI의 contentId가 언어별이기 때문이다.
+     * **폴백하지 않는다.** 활성 언어에 원본이 없으면 다른 언어 값으로 대신하지 않고
+     * `SPOT_NOT_FOUND_IN_LOCALE`로 실패한다 — 없는 것은 없는 것이다(POL-043).
+     * 카탈로그 자체가 없는 경우와는 다른 코드다(AC-12.3).
      */
     private fun resolve(catalogId: Long, locale: DomainLocale): SpotIdentity =
-        spotQueryPort.findIdentity(catalogId, locale) ?: throw SpotDetailNotFoundException()
+        spotQueryPort.findIdentity(catalogId, locale) ?: throw spotAbsenceFor(catalogId)
+
+    /**
+     * 해소 실패의 원인을 갈라 예외를 만든다. 카탈로그가 있으면 "이 언어에 없음", 없으면 "그런 장소 없음".
+     *
+     * **카탈로그 존재 확인은 실패 경로에서만 한다** — 성공 경로에 조회를 하나 더 붙이지 않는다.
+     */
+    private fun spotAbsenceFor(catalogId: Long): SpotQueryException =
+        if (spotQueryPort.existsCatalog(catalogId)) {
+            SpotNotFoundInLocaleQueryException()
+        } else {
+            SpotDetailNotFoundException()
+        }
 
     /**
      * upstream 조회 좌표. TourAPI는 우리 PK를 모르므로 해석된 contentId로 묻는다.
      *
-     * **요청 언어가 아니라 [SpotIdentity.language]로 묻는다.** contentId는 언어별이라
-     * 다른 언어로 물으면 그 id가 없어 실패한다 — 요청 언어의 원본이 없어 폴백한 경우가
-     * 정확히 그 상황이다. 제목·주소는 번역이 요청 언어로 채우므로, 본문만 원본 언어다.
+     * [SpotIdentity.language]는 이제 항상 활성 언어와 같다 — 폴백이 없어졌기 때문이다.
+     * contentId가 언어별이므로 그 언어로 물어야 한다는 사실 자체는 그대로다.
      */
     private fun SpotIdentity.toQuery() =
         SpotDetailQuery(contentId = contentId, locale = language)

@@ -13,7 +13,7 @@ package org.around.ieuri.tourism.domain.event
  * **`application/event`가 아니라 여기 있는 이유는 구독자가 다른 도메인이기 때문이다.**
  * 도메인 간 구독은 `domain/event`의 타입으로만 허용된다(LayeredArchitectureTest) —
  * `MemberWithdrawn`이 auth의 `domain/event`에 있는 것과 같다. tourism 내부에서만 소비되는
- * `TranslationTargetsFound` 같은 이벤트는 계속 `application/event`에 남는다.
+ * `SpotDetailFetched` 같은 이벤트는 계속 `application/event`에 남는다.
  */
 data class SpotCatalogDeleted(
     val catalogIds: List<Long>,

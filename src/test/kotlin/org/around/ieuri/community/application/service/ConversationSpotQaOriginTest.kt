@@ -19,6 +19,7 @@ import org.around.ieuri.community.application.port.out.query.SpotQaQueryPort
 import org.around.ieuri.community.application.query.PostSpotView
 import org.around.ieuri.community.domain.aggregate.Conversation
 import org.around.ieuri.community.domain.aggregate.Message
+import org.around.ieuri.community.domain.vo.ContentLanguage
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -43,6 +44,7 @@ class ConversationSpotQaOriginTest {
     private val catalogId = 11L
     private val messageId = 31L
     private val now = Instant.parse("2026-08-18T00:00:00Z")
+    private val language = ContentLanguage.EN
 
     private val conversationRepository = mockk<ConversationRepositoryPort>(relaxed = true)
     private val messageRepository = mockk<MessageRepositoryPort>()
@@ -111,7 +113,7 @@ class ConversationSpotQaOriginTest {
     }
 
     private fun givenSpotExists(title: String = "경복궁", exists: Boolean = true) {
-        every { spotLookupPort.findSummary(catalogId) } returns
+        every { spotLookupPort.findSummary(catalogId, language) } returns
             if (exists) {
                 PostSpotView(
                     id = catalogId, title = title, thumbnailImageUrl = "https://cdn/x.jpg",
@@ -130,6 +132,7 @@ class ConversationSpotQaOriginTest {
                 sourceAnswerId = sourceAnswerId,
             ),
             memberId,
+            language,
         )
 
     @Test

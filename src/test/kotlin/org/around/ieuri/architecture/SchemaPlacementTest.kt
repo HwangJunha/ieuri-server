@@ -35,6 +35,8 @@ class SchemaPlacementTest {
             // 장소 질문/답변(SPEC-0026)
             "community_spot_question", "community_spot_answer", "community_spot_answer_reply",
             "community_spot_qa_photo",
+            // 카탈로그가 해소되는 언어의 커뮤니티 사본(SPEC-0029 R-15)
+            "community_spot_catalog_language",
         ).forEach { put(it, "community") }
 
         listOf(
@@ -71,7 +73,7 @@ class SchemaPlacementTest {
     @Test
     fun `배치표는 애플리케이션 테이블을 빠짐없이 배정한다`() {
         // 스펙 §4의 46개 + 장소 질문/답변 4개 + 메시지 인용 1개(SPEC-0026) + 알림 3개(SPEC-0028).
-        assertEquals(54, placement.size, "배치표에 등록된 애플리케이션 테이블 수")
+        assertEquals(55, placement.size, "배치표에 등록된 애플리케이션 테이블 수")
         assertEquals(
             setOf("auth", "community", "tour", "category", "alarm"),
             placement.values.toSet(),

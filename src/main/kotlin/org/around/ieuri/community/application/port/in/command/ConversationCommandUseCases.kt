@@ -5,6 +5,7 @@ import org.around.ieuri.community.application.command.NotifyTypingCommand
 import org.around.ieuri.community.application.command.ReportMessagesCommand
 import org.around.ieuri.community.application.command.SendMessageCommand
 import org.around.ieuri.community.application.command.StartConversationCommand
+import org.around.ieuri.community.domain.vo.ContentLanguage
 
 /**
  * 대화·메시지 쓰기(R7·R9·R10).
@@ -18,8 +19,18 @@ interface ConversationCommandUseCase {
      */
     fun startConversation(command: StartConversationCommand, memberId: Long): Long
 
-    /** 생성된 메시지의 id. 대화의 최근 활동 시각이 함께 갱신된다(AC9-1). */
-    fun sendMessage(command: SendMessageCommand, memberId: Long): Long
+    /**
+     * 생성된 메시지의 id. 대화의 최근 활동 시각이 함께 갱신된다(AC9-1).
+     *
+     * [language]는 **인용 스냅샷의 장소명을 해소하는 언어다**(SPEC-0029 AC-25.4) — 스냅샷을
+     * 만드는 쪽, 곧 이 메시지를 쓰는 회원의 활성 언어다. 그 언어에서 장소가 해소되지 않으면
+     * 인용 없이 전송된다(기존 AC-13.4와 같은 처리이며 오류가 아니다).
+     */
+    fun sendMessage(
+        command: SendMessageCommand,
+        memberId: Long,
+        language: ContentLanguage,
+    ): Long
 
     /**
      * 타이핑 알림. **수신자가 구독 중이 아니어도 성공한다**(AC10-2) — 받을 사람이 없는 것은

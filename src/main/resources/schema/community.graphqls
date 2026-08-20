@@ -63,10 +63,20 @@ extend type Query {
 }
 
 extend type Mutation {
-    "글 생성. 카테고리·제목·본문 필수이고 장소는 선택이다. photoKeys는 confirmPostImageUploads를 통과한 키여야 한다."
+    """
+    글 생성. 카테고리·제목·본문 필수이고 장소는 선택이다. photoKeys는 confirmPostImageUploads를 통과한 키여야 한다.
+
+    catalogId를 주면 **Accept-Language의 언어에서 해소되는 장소여야 한다** — 아니면
+    SPOT_NOT_FOUND_IN_LOCALE userError다(언어를 바꾸면 붙일 수 있는 장소라는 뜻이며,
+    어느 언어에도 없는 id를 뜻하는 SPOT_NOT_FOUND와 구분된다).
+    """
     createPost(input: CreatePostInput!): CreatePostPayload!
 
-    "본인 글 수정. 제목·본문은 필수이고 사진·카테고리·장소·태그는 준 것만 바뀐다. 신고 누적으로 숨겨진 글은 수정할 수 없다(POST_NOT_EDITABLE)."
+    """
+    본인 글 수정. 제목·본문은 필수이고 사진·카테고리·장소·태그는 준 것만 바뀐다.
+    신고 누적으로 숨겨진 글은 수정할 수 없다(POST_NOT_EDITABLE).
+    장소를 바꿀 때의 언어 제약은 createPost와 같다(SPOT_NOT_FOUND_IN_LOCALE).
+    """
     editPost(input: EditPostInput!): EditPostPayload!
 
     "본인 글 삭제. 타인의 글은 거부된다."
@@ -146,7 +156,7 @@ enum TargetCategory {
 
 "피드 카드의 장소 칩."
 type PostSpot {
-    "장소 식별자. **언어와 무관하다** — 어느 언어로 조회해도 같은 값이며, Query.spotDetail(id:)와 posts(catalogId:)에 그대로 넘긴다."
+    "장소 식별자. **id 자체는 언어와 무관하지만 열람 가능 여부는 아니다** — 목록에서 방금 받은 id는 현재 언어에서 안전하나, 저장해 두었다가 언어를 바꾼 뒤 spotDetail(id:)·posts(catalogId:)에 넘기면 SPOT_NOT_FOUND_IN_LOCALE로 실패한다."
     id: ID!
     title: String!
     thumbnailImageUrl: String!

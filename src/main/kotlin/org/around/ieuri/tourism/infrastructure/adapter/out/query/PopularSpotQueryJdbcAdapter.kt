@@ -13,8 +13,8 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 /**
- * 인기 spot 조회 어댑터(SPEC-0013 R18). `spot_reaction`의 LIKE를 **카탈로그(장소) 단위로**
- * 집계하며 기간 제한이 없다. PostGIS 거리 계산 때문에 생 SQL이다.
+ * 인기 spot 조회 어댑터(SPEC-0013 R18). `spot_reaction`의 LIKE를 **카탈로그(장소) 단위로,
+ * 활성 언어 안에서** 집계하며 기간 제한이 없다. PostGIS 거리 계산 때문에 생 SQL이다.
  *
  * 반경 조건이 `spot_catalog`에 걸리므로 조인 단계에서 이미 범위가 좁혀진다. 좋아요 하한은
  * 집계 **후** HAVING으로 적용한다(AC-18.2).
@@ -27,11 +27,11 @@ import org.springframework.transaction.annotation.Transactional
  * 방금 누른 좋아요가 인기 순위에 즉시 반영되지 않을 수 있다. 순위는 누적 총합이라 한두 건의
  * 지연이 순서를 뒤집지 않는다.
  *
- * `idx_spot_reaction_catalog_reaction (catalog_id, reaction)`이 이 집계를 받친다.
+ * `idx_spot_reaction_catalog_reaction (catalog_id, language, reaction)`이 이 집계를 받친다.
  *
- * **SPEC-0019로 집계 단위가 카탈로그(장소)가 되면서 값이 커졌다** — 같은 장소의 언어별
- * 좋아요가 합산된다. `minLikeCount` 하한의 의미가 달라지므로, 하한을 그대로 두면 통과하는
- * spot이 늘어난다. 배포 전 현재 값과 새 분포를 대조해 조정할 것.
+ * **SPEC-0029로 집계가 언어별로 다시 갈리면서 값이 작아진다** — SPEC-0019가 합쳤던 언어별
+ * 좋아요를 되돌린다. `minLikeCount` 하한을 그대로 두면 통과하는 spot이 줄어드므로, 배포 전
+ * 현재 값과 새 분포를 대조해 조정할 것.
  */
 @Component
 class PopularSpotQueryJdbcAdapter(
@@ -69,9 +69,9 @@ class PopularSpotQueryJdbcAdapter(
                        ST_Distance(cat.location, c.center) AS distance_meters,
                        COUNT(r.id) AS like_count
                 FROM spot_catalog cat
-                -- **카탈로그 축으로 집계한다**(SPEC-0019 R-10). 같은 장소의 언어별 좋아요가
-                -- 합산되어 값이 커진다 — 의도된 교정이다.
-                JOIN spot_reaction r ON r.catalog_id = cat.id AND r.reaction = ?
+                -- **카탈로그 축이되 활성 언어 안에서만 집계한다**(SPEC-0029 AC-13.5).
+                -- `r.language`가 빠지면 다른 언어에서 누른 좋아요가 이 언어의 순위를 올린다.
+                JOIN spot_reaction r ON r.catalog_id = cat.id AND r.reaction = ? AND r.language = ?
                 -- **카탈로그를 1행으로 접는 역할은 이 조인이 맡는다.** 예전에는 `s.language = ?`가
                 -- 그 역할이었다 — 그 조건이 없으면 같은 카탈로그의 4개 언어 행이 각각 같은 집계를
                 -- 받아 결과가 4배로 늘어났다. 이제는 `t.language = ?` + `UNIQUE(catalog_id,
@@ -124,7 +124,8 @@ class PopularSpotQueryJdbcAdapter(
         )
         val params = mutableListOf<Any>(
             query.center.longitude, query.center.latitude, // CTE의 center
-            ReactionType.LIKE.name,                        // spot_reaction JOIN 조건
+            ReactionType.LIKE.name,                        // spot_reaction JOIN: reaction
+            query.language.name,                           // spot_reaction JOIN: language
             query.language.name,                           // translation JOIN 조건
             query.radiusMeters.toDouble(),
         )
@@ -134,11 +135,6 @@ class PopularSpotQueryJdbcAdapter(
             val codes = query.categories.codes()
             conditions += "cat.category IN (${codes.joinToString(",") { "?" }})"
             params.addAll(codes)
-        }
-        // 원문 보유 필터. null이면 전체다 — 클라이언트가 원문을 먼저 소진한 뒤 false로 넘어온다.
-        query.hasOrigin?.let {
-            conditions += "t.has_origin = ?"
-            params += it
         }
         return conditions.joinToString(" AND ") to params
     }

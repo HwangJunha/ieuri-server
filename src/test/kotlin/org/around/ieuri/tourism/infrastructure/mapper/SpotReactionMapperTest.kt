@@ -1,6 +1,7 @@
 package org.around.ieuri.tourism.infrastructure.mapper
 
 import org.around.ieuri.tourism.domain.aggregate.SpotReaction
+import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.ReactionType
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.SpotReactionEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.mapper.toDomain
@@ -14,7 +15,8 @@ import kotlin.test.assertNull
  * SpotReactionMapper 필드별 매핑 검증 — 순수 단위테스트(Spring/DB 없음).
  *
  * `memberId`·`catalogId`가 **둘 다 Long이라 서로 뒤바뀌어도 컴파일된다**(SPEC-0019 R-10).
- * 그래서 필드마다 다른 값을 준다.
+ * 그래서 필드마다 다른 값을 준다. `language`도 자연키의 일부이므로 양방향 모두 옮겨져야
+ * 한다(SPEC-0029 R-13) — 빠지면 반응이 엉뚱한 언어에 붙는다.
  */
 class SpotReactionMapperTest {
 
@@ -25,6 +27,7 @@ class SpotReactionMapperTest {
         id = id,
         memberId = 41L,
         catalogId = 63L,
+        language = DomainLocale.JA,
         reaction = ReactionType.DISLIKE,
         createdAt = createdAt,
         updatedAt = Instant.parse("2026-03-02T00:00:00Z"),
@@ -36,6 +39,7 @@ class SpotReactionMapperTest {
 
         assertEquals(41L, domain.memberId)
         assertEquals(63L, domain.catalogId)
+        assertEquals(DomainLocale.JA, domain.language)
         assertEquals(ReactionType.DISLIKE, domain.reaction)
     }
 
@@ -46,6 +50,7 @@ class SpotReactionMapperTest {
 
         assertEquals(41L, domain.memberId)
         assertEquals(63L, domain.catalogId)
+        assertEquals(DomainLocale.JA, domain.language)
         assertEquals(ReactionType.DISLIKE, domain.reaction)
     }
 
@@ -54,12 +59,14 @@ class SpotReactionMapperTest {
         val entity = SpotReaction.record(
             memberId = 41L,
             catalogId = 63L,
+            language = DomainLocale.ZH,
             reaction = ReactionType.LIKE,
         ).toNewEntity()
 
         assertNull(entity.id) // id는 DB가 채운다.
         assertEquals(41L, entity.memberId)
         assertEquals(63L, entity.catalogId)
+        assertEquals(DomainLocale.ZH, entity.language)
         assertEquals(ReactionType.LIKE, entity.reaction)
         assertNull(entity.createdAt)
     }
@@ -69,6 +76,7 @@ class SpotReactionMapperTest {
         val reaction = SpotReaction.record(
             memberId = 41L,
             catalogId = 63L,
+            language = DomainLocale.ZH,
             reaction = ReactionType.LIKE,
         )
         reaction.reevaluate(ReactionType.DISLIKE)
@@ -77,10 +85,11 @@ class SpotReactionMapperTest {
     }
 
     @Test
-    fun `왕복해도 두 식별자가 서로 섞이지 않는다`() {
+    fun `왕복해도 식별자와 언어가 서로 섞이지 않는다`() {
         val original = SpotReaction.record(
             memberId = 41L,
             catalogId = 63L,
+            language = DomainLocale.ZH,
             reaction = ReactionType.LIKE,
         )
 
@@ -88,5 +97,6 @@ class SpotReactionMapperTest {
 
         assertEquals(41L, restored.memberId)
         assertEquals(63L, restored.catalogId)
+        assertEquals(DomainLocale.ZH, restored.language)
     }
 }

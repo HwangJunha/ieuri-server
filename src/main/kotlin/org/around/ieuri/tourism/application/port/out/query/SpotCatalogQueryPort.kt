@@ -47,9 +47,6 @@ interface SpotCatalogQueryPort {
      * 97%다(실측).
      */
     fun loadKoreanThumbnailIndex(): Map<String, Long>
-
-    /** 번역이 비어 있는 (카탈로그, 언어) 쌍. */
-    fun findCatalogsMissingTranslation(languages: Set<DomainLocale>, limit: Int): List<UntranslatedCatalog>
 }
 
 /**
@@ -82,13 +79,4 @@ data class CatalogCandidate(
     val catalogId: Long,
     val mapX: Double,
     val mapY: Double,
-)
-
-/** 번역이 필요한 카탈로그. KO 번역 행이 번역 원문이다. */
-data class UntranslatedCatalog(
-    val catalogId: Long,
-    val koreanTitle: String,
-    /** 번역 원문이 되는 KO 주소. 원문에 주소가 없으면 null이다(R-4). */
-    val koreanAddress: String?,
-    val missingLanguages: Set<DomainLocale>,
 )

@@ -22,8 +22,22 @@ class PostBodyRequiredException(message: String = "본문을 입력해 주세요
 class PostBodyLengthInvalidException(message: String = "본문은 500자를 넘을 수 없습니다.") :
     CommunityUserException("POST_BODY_LENGTH_INVALID", message)
 
+/** 카탈로그 자체가 없다. 어떤 언어로 물어도 없는 id다. */
 class SpotNotFoundException(message: String = "해당 장소를 찾을 수 없습니다.") :
     CommunityUserException("SPOT_NOT_FOUND", message)
+
+/**
+ * 카탈로그는 있으나 **활성 언어에 원본이 없다**(SPEC-0029 R-16·R-25).
+ *
+ * [SpotNotFoundException]과 반드시 구분한다 — 클라이언트가 다른 안내를 띄운다. 이쪽은 언어를
+ * 바꾸면 볼 수 있는 장소이고, 저쪽은 어느 언어에서도 없는 id다(AC-12.3).
+ *
+ * 뮤테이션(createPost·editPost·createSpotQuestion)에서는 다른 커뮤니티 실패와 같이
+ * payload의 userErrors로 나가고, `spotQuestions` 조회에서는 리졸버가 감싸지 않아 최상위
+ * errors[]로 전파된다(AC-15.3).
+ */
+class SpotNotFoundInLocaleException(message: String = "이 언어에서는 볼 수 없는 장소입니다.") :
+    CommunityUserException("SPOT_NOT_FOUND_IN_LOCALE", message)
 
 class InvalidTagException(message: String = "태그는 공백 없이 30자 이내여야 합니다.") :
     CommunityUserException("INVALID_TAG", message)

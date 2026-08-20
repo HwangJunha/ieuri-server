@@ -26,11 +26,6 @@ interface SpotCatalogStorePort {
         language: DomainLocale,
         title: String,
         address: String?,
-        /**
-         * 그 언어의 `spot` 원본에서 온 값인가. 배정이 붙일 때는 true, 번역 배치가 채울
-         * 때는 false다 — 목록 정렬이 원문 있는 장소를 먼저 보여준다.
-         */
-        hasOrigin: Boolean,
     )
 
     /**
@@ -42,11 +37,11 @@ interface SpotCatalogStorePort {
     fun refreshFestivalPeriod(catalogId: Long)
 
     /**
-     * **원본 상태를 번역 행에 반영한다.** 상태가 바뀐 행 수를 돌려준다.
+     * **원본 상태를 번역 행의 `visible`에 반영한다.** 바뀐 (카탈로그, 언어)를 돌려준다.
      *
-     * 두 값을 함께 갱신한다:
-     *  - `visible`   — 카탈로그에 원본이 하나라도 있는가. 조회 노출 여부다
-     *  - `has_origin` — **그 언어의** 원본이 있는가. 목록 정렬의 1순위다
+     * `visible`은 **그 언어에 원본이 있는가**다(SPEC-0029). 이전에는 카탈로그 단위 노출
+     * 여부였고 언어별 판정은 `has_origin`이 따로 들었는데, 같은 사실을 두 단위로 말하는
+     * 컬럼이 둘이라 조회가 늘 둘을 AND 해야 했다. 하나로 합쳤다.
      *
      * 상류에서 장소가 없어지면 동기화가 `spot` 행을 지우지만 카탈로그와 번역은 남는다.
      * 그대로 두면 목록·지도·검색에는 보이는데 상세를 열면 실패하는 장소가 된다.
@@ -61,5 +56,28 @@ interface SpotCatalogStorePort {
      * 조인을 걸 수 없기 때문이다** — 목록은 걸러지는데 건수는 안 걸러져 빈 페이지가
      * 무한히 이어졌다.
      */
-    fun refreshTranslationVisibility(): Int
+    fun refreshTranslationVisibility(): CatalogVisibilityChanges
+}
+
+/** 노출 여부가 바뀐 (카탈로그, 언어). 다른 도메인이 자기 사본을 맞추는 근거다. */
+data class CatalogLanguage(
+    val catalogId: Long,
+    val language: DomainLocale,
+)
+
+/**
+ * 노출 갱신의 결과.
+ *
+ * [hidden]·[shown]은 이번에 **상태가 뒤집힌** 행이고, [visible]은 갱신 후 **노출 중인 전부**다.
+ *
+ * **구독자에게는 [visible]이 정본이다.** 뒤집힌 것만 실으면 사본을 채울 수 없다 — 전량
+ * 초기화 후 재적재하면 모든 행이 신규 INSERT라 뒤집힌 적이 없고, 그러면 이벤트가 영원히
+ * 비어 사본이 빈 채로 남는다. [hidden]·[shown]은 로그와 관측용이다.
+ */
+data class CatalogVisibilityChanges(
+    val hidden: List<CatalogLanguage>,
+    val shown: List<CatalogLanguage>,
+    val visible: List<CatalogLanguage>,
+) {
+    val changedCount: Int get() = hidden.size + shown.size
 }

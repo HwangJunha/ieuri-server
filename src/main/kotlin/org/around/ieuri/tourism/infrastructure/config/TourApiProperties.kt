@@ -10,6 +10,7 @@ import java.time.Duration
  * @param baseUrls       언어(KO/EN/JA/ZH)→base-url.
  * @param excludeLclssystm2 비관광 제외 lclsSystm2 코드 목록(다국어 공통 적용).
  * @param arrange        정렬/필터 코드. Q=이미지 보유 항목만 + 수정일순.
+ * @param showflag       표출 여부 필터. 1=표출 중인 항목만. 응답에서도 다시 확인한다.
  * @param maxRadiusMeters 반경 상한. 초과 시 RADIUS_TOO_LARGE.
  * @param maxPageSize    `spots` size 상한. 초과 요청은 클램프.
  * @param maxLikedPageSize `likedSpots` first 상한.
@@ -26,6 +27,7 @@ data class TourApiProperties(
     val baseUrls: Map<String, String> = emptyMap(),
     val excludeLclssystm2: List<String> = emptyList(),
     val arrange: String = "Q",
+    val showflag: String = "1",
     val mobileOs: String = "ETC",
     val mobileApp: String = "ieuri",
     val maxRadiusMeters: Int = 100_000,
@@ -36,7 +38,7 @@ data class TourApiProperties(
     val maxSuggestionCount: Int = 10,
     val maxSearchQueryLength: Int = 100,
     val maxSearchPage: Int = 500,
-    val minPopularLikeCount: Int = 10,
+    val minPopularLikeCount: Int = 5,
     val connectTimeoutMillis: Long = 15_000,
     val readTimeoutMillis: Long = 30_000,
 ) {

@@ -3,8 +3,13 @@ package org.around.ieuri.community.application.service
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import org.around.ieuri.community.application.port.`in`.command.CatalogLanguage
+import org.around.ieuri.community.application.port.out.persistence.CatalogLanguageEntry
 import org.around.ieuri.community.application.port.out.persistence.PostSpotCleanupPort
+import org.around.ieuri.community.application.port.out.persistence.SpotCatalogLanguagePort
+import org.around.ieuri.community.domain.vo.ContentLanguage
 import kotlin.test.Test
+import kotlin.test.assertEquals
 
 /**
  * 사라진 장소를 가리키는 글-장소 연결 정리(SPEC-0023 R11, AC-8·AC-9).
@@ -15,7 +20,8 @@ import kotlin.test.Test
 class PostSpotCleanupServiceTest {
 
     private val cleanupPort = mockk<PostSpotCleanupPort>()
-    private val service = PostSpotCleanupService(cleanupPort)
+    private val languagePort = mockk<SpotCatalogLanguagePort>(relaxed = true)
+    private val service = PostSpotCleanupService(cleanupPort, languagePort)
 
     /** AC-8 — 삭제된 카탈로그를 가리키던 참조에만 정리가 1회 간다. */
     @Test
@@ -63,5 +69,61 @@ class PostSpotCleanupServiceTest {
         service.cleanupDeletedCatalogs(deleted)
 
         verify(exactly = 1) { cleanupPort.deleteByCatalogIds(deleted) }
+    }
+
+    // ── 카탈로그-언어 사본 동기화(SPEC-0029 R-15) ────────────────────
+
+    /**
+     * **정본을 그대로 넘긴다.** 이벤트가 싣는 것은 변화분이 아니라 "지금 해소되는 전부"이며,
+     * 저장소가 그 목록에 없는 조합을 지운다.
+     */
+    @Test
+    fun `해소되는 쌍 전부를 정본으로 넘긴다`() {
+        val resolved = listOf(
+            CatalogLanguage(10L, ContentLanguage.EN),
+            CatalogLanguage(11L, ContentLanguage.JA),
+        )
+        every { languagePort.replaceAll(any()) } returns 2
+
+        service.syncCatalogLanguages(resolved)
+
+        verify(exactly = 1) {
+            languagePort.replaceAll(
+                listOf(
+                    CatalogLanguageEntry(10L, ContentLanguage.EN),
+                    CatalogLanguageEntry(11L, ContentLanguage.JA),
+                ),
+            )
+        }
+    }
+
+    /**
+     * **빈 정본도 반영한다.** 이것이 이 슬라이스에서 가장 조용히 틀렸던 지점이다 — 변화분만
+     * 싣던 설계에서는 전량 재적재 직후 모든 행이 신규 INSERT라 뒤집힌 것이 없어 이벤트가 비었고,
+     * 그 빈 이벤트를 "할 일 없음"으로 건너뛰면 사본이 영원히 빈 채로 남아 목록이 spot 붙은
+     * 글·질문을 전부 조용히 걸러 냈다.
+     *
+     * 정본 방식에서 빈 목록은 "해소되는 것이 없다"는 사실이고, 그것도 반영해야 한다 —
+     * 원본이 비었는데 사본만 남으면 사라진 장소의 글이 계속 보인다.
+     */
+    @Test
+    fun `정본이 비어 있어도 저장소에 반영한다`() {
+        every { languagePort.replaceAll(any()) } returns 0
+
+        service.syncCatalogLanguages(emptyList())
+
+        verify(exactly = 1) { languagePort.replaceAll(emptyList()) }
+    }
+
+    /** 같은 정본이 두 번 와도 결과가 같다 — 배치가 매 회차 발행하므로 멱등이어야 한다. */
+    @Test
+    fun `같은 정본을 두 번 받아도 같은 호출을 한다`() {
+        val resolved = listOf(CatalogLanguage(10L, ContentLanguage.KO))
+        every { languagePort.replaceAll(any()) } returns 1
+
+        service.syncCatalogLanguages(resolved)
+        service.syncCatalogLanguages(resolved)
+
+        verify(exactly = 2) { languagePort.replaceAll(listOf(CatalogLanguageEntry(10L, ContentLanguage.KO))) }
     }
 }

@@ -35,15 +35,12 @@ class MapSpatialQueryAdapter(
         val categoryCondition =
             if (query.categories.isUnfiltered) ""
             else "AND cat.category IN (${categoryCodes.joinToString(",") { "?" }})"
-        // 원문 보유 필터. null이면 전체다 — 상한에 걸려 잘릴 때 무엇을 남길지 클라이언트가 정한다.
-        val originCondition = if (query.hasOrigin != null) "AND t.has_origin = ?" else ""
 
         // **파라미터 순서는 SQL 문자열의 ? 등장 순서다.** 언어가 JOIN 조건에 있어 bbox보다 앞선다.
         val params = buildList<Any> {
             add(query.language.name)
             addAll(envelopeParams(query.bounds))
             addAll(categoryCodes)
-            query.hasOrigin?.let { add(it) }
             add(query.limit)
         }
 
@@ -58,7 +55,6 @@ class MapSpatialQueryAdapter(
             WHERE $BBOX_PREDICATE
               -- 카테고리 없는 카탈로그는 마커를 그릴 수 없다 — 도메인 enum에 미분류 값이 없다.
               $categoryCondition
-              $originCondition
             ORDER BY cat.id
             LIMIT ?
             """.trimIndent(),

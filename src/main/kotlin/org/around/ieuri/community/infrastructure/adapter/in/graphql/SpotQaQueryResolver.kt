@@ -16,6 +16,7 @@ import org.around.ieuri.community.application.query.SpotQuestionView
 import org.around.ieuri.community.application.query.SpotQuestionsQuery
 import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper.toGql
 import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper.toGqlOrPlaceholder
+import org.around.ieuri.community.infrastructure.locale.contentLanguage
 import org.dataloader.DataLoader
 import org.springframework.stereotype.Component
 import java.util.concurrent.CompletableFuture
@@ -46,6 +47,8 @@ class SpotQaQueryResolver(
      * **`mine = true`는 인증을 요구한다** — 비로그인은 좁힐 대상이 없어 빈 목록을 주는 대신
      * `requireMemberId`가 최상위 errors[]로 UNAUTHENTICATED를 낸다. 조용히 빈 목록을 주면
      * 클라이언트가 "질문을 쓴 적 없음"으로 오해한다.
+     *
+     * `catalogId` 필터의 존재 검사는 **활성 언어 기준이다**(SPEC-0029 R-16, AC-15.3).
      */
     @DgsQuery
     fun spotQuestions(
@@ -54,6 +57,7 @@ class SpotQaQueryResolver(
         @InputArgument ids: List<Long>?,
         @InputArgument first: Int?,
         @InputArgument after: String?,
+        dfe: DgsDataFetchingEnvironment,
     ): SpotQuestionConnection {
         val onlyMine = mine ?: false
         val page = spotQaQueryUseCase.spotQuestions(
@@ -65,6 +69,7 @@ class SpotQaQueryResolver(
                 after = after,
             ),
             memberId = if (onlyMine) currentMemberProvider.requireMemberId() else viewerId(),
+            language = dfe.contentLanguage(),
         )
         return SpotQuestionConnection(
             edges = page.edges.map { SpotQuestionEdge(cursor = it.cursor, node = it.node) },
@@ -97,12 +102,15 @@ class SpotQaQueryResolver(
     /**
      * 질문이 달린 장소. **질문은 언제나 장소에 속하므로 non-null이다** — 조회가 비면
      * 카탈로그가 사라진 것이고, 그것은 데이터 손상이라 조용히 넘기지 않는다.
+     *
+     * **활성 언어에서 해소되지 않는 질문은 여기 오지 않는다**(SPEC-0029 R-23·AC-23.3) —
+     * 목록 조회가 이미 걸러낸다. 그러므로 여기서의 부재는 여전히 데이터 손상이다.
      */
     @DgsData(parentType = "SpotQuestion", field = "spot")
     fun questionSpot(dfe: DgsDataFetchingEnvironment): CompletableFuture<GqlPostSpot> {
         val catalogId = dfe.questionSource().catalogId
         return dfe.loader<PostSpotView>(PostSpotDataLoader.NAME)
-            .load(catalogId)
+            .load(catalogId, dfe.contentLanguage())
             .thenApply { summary ->
                 requireNotNull(summary) { "질문이 가리키는 장소($catalogId)를 찾을 수 없다." }.toGql()
             }

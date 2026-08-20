@@ -23,6 +23,8 @@ import org.springframework.web.util.UriComponentsBuilder
  * `arrange=Q`(수정일순 + **대표이미지 필수**)로 수집하므로 이미지 없는 항목은 upstream 단계에서 이미
  * 걸러진다(R-6). 다만 그 보장에만 기대지 않고 매핑에서도 한 번 더 드랍한다 — `thumbnailImageUrl: String!`의
  * 보장이 요청 시점 필터에서 쓰기 시점 규율로 옮겨왔기 때문이다(런타임 계약 위험 1번).
+ *
+ * `showflag=1`(표출 중인 항목만)도 같은 규율을 따른다 — 요청에 넘기고 매핑에서 다시 확인한다.
  */
 @Component
 class TourApiSyncClient(
@@ -42,6 +44,7 @@ class TourApiSyncClient(
             .queryParam("numOfRows", numOfRows)
             .queryParam("pageNo", pageNo)
             .queryParam("arrange", properties.arrange)
+            .queryParam("showflag", properties.showflag)
             .build(true)
             .toUri()
 

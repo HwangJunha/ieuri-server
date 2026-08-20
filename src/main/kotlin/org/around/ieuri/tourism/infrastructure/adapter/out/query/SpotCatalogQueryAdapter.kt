@@ -4,7 +4,6 @@ import com.querydsl.jpa.impl.JPAQueryFactory
 import org.around.ieuri.tourism.application.port.out.query.CatalogCandidate
 import org.around.ieuri.tourism.application.port.out.query.SpotCatalogQueryPort
 import org.around.ieuri.tourism.application.port.out.query.UnassignedSpot
-import org.around.ieuri.tourism.application.port.out.query.UntranslatedCatalog
 import org.around.ieuri.tourism.domain.aggregate.CatalogStandardValues
 import org.around.ieuri.tourism.domain.specification.SpotTitleNormalizer
 import org.around.ieuri.tourism.domain.vo.DomainLocale
@@ -16,7 +15,7 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 /**
- * 카탈로그 배정·번역의 읽기 포트 구현(SPEC-0019, CQRS 읽기).
+ * 카탈로그 배정의 읽기 포트 구현(SPEC-0019, CQRS 읽기).
  */
 @Component
 class SpotCatalogQueryAdapter(
@@ -124,70 +123,4 @@ class SpotCatalogQueryAdapter(
             .associate {
                 requireNotNull(it.get(spot.thumbnailImageUrl)) to requireNotNull(it.get(spot.catalogId.min()))
             }
-
-    /**
-     * 번역이 비어 있는 카탈로그.
-     *
-     * 카탈로그별로 **이미 가진 언어**를 모아 요청 언어에서 빼는 방식이다. "없는 것"을 SQL로
-     * 직접 구하려면 언어 수만큼 NOT EXISTS가 붙어 조건이 입력 개수에 비례해 늘어난다.
-     *
-     * **KO 번역이 있는 카탈로그만 대상이다** — 번역 원문이 KO이므로, 외국어에만 있는 장소는
-     * 번역할 원문 자체가 없다. 그 장소는 자기 언어 사용자에게만 보이며 그것이 올바른 동작이다.
-     */
-    @Transactional(readOnly = true)
-    override fun findCatalogsMissingTranslation(
-        languages: Set<DomainLocale>,
-        limit: Int,
-    ): List<UntranslatedCatalog> {
-        if (languages.isEmpty()) return emptyList()
-
-        val koTranslation = QSpotCatalogTranslationEntity("koTranslation")
-
-        // 요청 언어를 전부 가진 카탈로그는 애초에 제외한다 — 그래야 limit이 실제 대상으로 채워진다.
-        val candidateIds = queryFactory
-            .select(catalog.id)
-            .from(catalog)
-            .join(koTranslation)
-            .on(koTranslation.catalogId.eq(catalog.id), koTranslation.language.eq(DomainLocale.KO))
-            .leftJoin(translation)
-            .on(translation.catalogId.eq(catalog.id), translation.language.`in`(languages))
-            .groupBy(catalog.id)
-            .having(translation.id.count().lt(languages.size.toLong()))
-            .orderBy(catalog.id.asc())
-            .limit(limit.toLong())
-            .fetch()
-
-        if (candidateIds.isEmpty()) return emptyList()
-
-        // 번역 원문은 KO 행의 제목과 주소다(R-4).
-        val originals = queryFactory
-            .select(koTranslation.catalogId, koTranslation.title, koTranslation.address)
-            .from(koTranslation)
-            .where(koTranslation.catalogId.`in`(candidateIds), koTranslation.language.eq(DomainLocale.KO))
-            .fetch()
-            .associate {
-                requireNotNull(it.get(koTranslation.catalogId)) to
-                    (requireNotNull(it.get(koTranslation.title)) to it.get(koTranslation.address))
-            }
-
-        val existingByCatalog = queryFactory
-            .select(translation.catalogId, translation.language)
-            .from(translation)
-            .where(translation.catalogId.`in`(candidateIds))
-            .fetch()
-            .groupBy({ requireNotNull(it.get(translation.catalogId)) }) { requireNotNull(it.get(translation.language)) }
-
-        return candidateIds.mapNotNull { catalogId ->
-            val missing = languages - existingByCatalog[catalogId].orEmpty().toSet()
-            if (missing.isEmpty()) return@mapNotNull null
-
-            val (title, address) = originals[catalogId] ?: return@mapNotNull null
-            UntranslatedCatalog(
-                catalogId = catalogId,
-                koreanTitle = title,
-                koreanAddress = address,
-                missingLanguages = missing,
-            )
-        }
-    }
 }

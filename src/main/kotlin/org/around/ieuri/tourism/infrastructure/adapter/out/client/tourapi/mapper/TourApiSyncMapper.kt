@@ -32,12 +32,17 @@ fun TourApiResponse.Item.toNearbySpotDataOrNull(category: SpotCategory): NearbyS
 /**
  * areaBasedSyncList2 item을 적재 [SyncSpotCommand]로 옮긴다. 필수 필드가 비거나 좌표가 범위를 벗어나면
  * null로 드랍한다 — 한 건의 이상 데이터가 페이지 전체를 실패시키지 않는다.
+ *
+ * `showflag`가 `"1"`이 아니면 드랍한다. **결측도 드랍이다** — `"1"`로 간주하면 표출이 중단된
+ * 항목이 그대로 들어온다. 요청에 `showflag=1`을 넘겨도 여기서 다시 본다(SPEC-0029 R-2).
  */
 fun TourApiResponse.Item.toSyncSpotCommandOrNull(
     language: DomainLocale,
     category: SpotCategory,
-): SyncSpotCommand? =
-    SyncSpotCommand(
+): SyncSpotCommand? {
+    if (showflag?.trim() != SHOWFLAG_VISIBLE) return null
+
+    return SyncSpotCommand(
         contentId = contentid?.takeIf { it.isNotBlank() } ?: return null,
         language = language,
         title = title?.takeIf { it.isNotBlank() } ?: return null,
@@ -48,6 +53,10 @@ fun TourApiResponse.Item.toSyncSpotCommandOrNull(
         contentTypeId = contenttypeid?.toIntOrNull() ?: return null,
         copyright = CopyrightType.fromCode(cpyrhtDivCd),
     )
+}
+
+/** 표출 중인 항목의 `showflag` 값. 이 값이 아니면(결측 포함) 적재하지 않는다. */
+const val SHOWFLAG_VISIBLE: String = "1"
 
 /**
  * searchFestival2 item을 적재 [SyncFestivalCommand]로 옮긴다. [asOf] 기준으로 이미 종료된 축제와

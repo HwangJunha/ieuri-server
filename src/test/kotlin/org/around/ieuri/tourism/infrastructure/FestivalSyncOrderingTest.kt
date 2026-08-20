@@ -8,7 +8,6 @@ import org.around.ieuri.tourism.application.port.out.persistence.FestivalStorePo
 import org.around.ieuri.tourism.application.port.out.persistence.SpotStorePort
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.infrastructure.batch.FestivalSyncProperties
-import org.around.ieuri.tourism.infrastructure.batch.SpotCatalogProperties
 import org.around.ieuri.tourism.infrastructure.batch.SpotSyncJobConfig
 import org.around.ieuri.tourism.infrastructure.batch.SpotSyncProperties
 import org.springframework.batch.core.job.SimpleJob
@@ -39,7 +38,6 @@ class FestivalSyncOrderingTest {
         festivalStorePort = mockk<FestivalStorePort>(),
         festivalProperties = FestivalSyncProperties(),
         catalogUseCase = mockk<SpotCatalogUseCase>(),
-        catalogProperties = SpotCatalogProperties(),
         objectMapper = mockk<ObjectMapper>(),
     )
 
@@ -69,7 +67,7 @@ class FestivalSyncOrderingTest {
         // 스펙 §선행 조사·§비범위. 별도 잡이면 두 잡의 정리가 서로의 행을 지우고, 관광지 수집이
         // 종료 축제를 되살린다 — R-9가 성립하려면 한 잡 안에서 순서가 보장되어야 한다.
         assertEquals(SpotSyncJobConfig.JOB_NAME, config.spotSyncJob().name)
-        // 관광지 4 + 축제 4 + 카탈로그 배정·번역대상조회 2(SPEC-0019).
-        assertEquals(10, stepNames.size)
+        // 관광지 4 + 축제 4 + 카탈로그 배정 1. 번역 대상 조회 Step은 SPEC-0029 R-6이 제거했다.
+        assertEquals(9, stepNames.size)
     }
 }

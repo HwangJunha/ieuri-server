@@ -74,7 +74,6 @@ class MapQueryService(
                 language = locale,
                 bounds = query.bounds,
                 categories = query.categories,
-                hasOrigin = query.hasOrigin,
                 // 상한 + 1건을 받아 초과 여부만 판정한다. COUNT(*)를 따로 세지 않는다(R3).
                 limit = viewportPolicy.maxSpotMarkers + 1,
             ),

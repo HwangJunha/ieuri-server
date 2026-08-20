@@ -12,7 +12,7 @@ import org.around.ieuri.community.application.exception.PostBodyRequiredExceptio
 import org.around.ieuri.community.application.exception.PostNotFoundException
 import org.around.ieuri.community.application.exception.PostTitleLengthInvalidException
 import org.around.ieuri.community.application.exception.PostTitleRequiredException
-import org.around.ieuri.community.application.exception.SpotNotFoundException
+import org.around.ieuri.community.application.exception.SpotNotFoundInLocaleException
 import org.around.ieuri.community.application.exception.TooManyPhotosException
 import org.around.ieuri.community.application.exception.TooManyTagsException
 import org.around.ieuri.community.application.port.`in`.command.PostCommandUseCase
@@ -20,7 +20,9 @@ import org.around.ieuri.community.application.port.out.client.ClockPort
 import org.around.ieuri.community.application.port.out.client.ObjectStoragePort
 import org.around.ieuri.community.application.port.out.client.SpotLookupPort
 import org.around.ieuri.community.application.port.out.persistence.PostRepositoryPort
+import org.around.ieuri.community.application.port.out.persistence.SpotCatalogLanguagePort
 import org.around.ieuri.community.domain.aggregate.Post
+import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.around.ieuri.community.domain.vo.PhotoObjectKey
 import org.around.ieuri.community.domain.vo.PostTag
 import org.around.ieuri.community.domain.vo.SpotPoint
@@ -41,12 +43,17 @@ import org.springframework.transaction.annotation.Transactional
 class PostCommandService(
     private val postRepositoryPort: PostRepositoryPort,
     private val spotLookupPort: SpotLookupPort,
+    private val spotCatalogLanguagePort: SpotCatalogLanguagePort,
     private val objectStoragePort: ObjectStoragePort,
     private val clockPort: ClockPort,
 ) : PostCommandUseCase {
 
     @Transactional
-    override fun createPost(command: CreatePostCommand, memberId: Long): Long {
+    override fun createPost(
+        command: CreatePostCommand,
+        memberId: Long,
+        language: ContentLanguage,
+    ): Long {
         // 본문 판정을 도메인보다 먼저 한다 — 도메인의 require는 IllegalArgumentException 하나로
         // 뭉뚱그려지는데, 계약은 빈 본문과 길이 초과를 서로 다른 코드로 구분한다.
         val title = command.title.trim()
@@ -61,8 +68,11 @@ class PostCommandService(
         // **장소는 선택이다.** 준 경우에만 존재를 확인한다 — 부재가 곧 유효성 판정이다.
         // 좌표를 여기서 함께 받아 글에 복사한다 — 지역 피드가 tourism에 spot 목록을
         // 되묻지 않게 하는 값이며, 그래야 목록 상한이 피드의 한계가 되지 않는다.
+        // 검사 기준은 **활성 언어다**(SPEC-0029 R-16) — 없는 카탈로그와 이 언어에 원본이
+        // 없는 카탈로그를 포트가 똑같이 null로 돌려주므로 한 코드로 응답한다.
         val spotPoint = command.catalogId?.let { catalogId ->
-            val summary = spotLookupPort.findSummary(catalogId) ?: throw SpotNotFoundException()
+            val summary = spotLookupPort.findSummary(catalogId, language)
+                ?: throw SpotNotFoundInLocaleException()
             SpotPoint(longitude = summary.longitude, latitude = summary.latitude)
         }
 
@@ -86,6 +96,8 @@ class PostCommandService(
             photoKeys = photoKeys,
         )
         val saved = postRepositoryPort.save(post)
+        // 방금 붙인 장소의 언어 사본을 같은 트랜잭션에서 맞춘다 — 이유는 [syncLanguages] 참조.
+        command.catalogId?.let { syncLanguages(it) }
         return requireNotNull(saved.id) { "저장된 글에는 id가 있어야 한다." }
     }
 
@@ -96,7 +108,7 @@ class PostCommandService(
      * 이미 ownedByViewer로 드러나 있어 숨길 것이 없고, 작성자에게는 왜 못 고치는지 알려야 한다.
      */
     @Transactional
-    override fun editPost(command: EditPostCommand, memberId: Long) {
+    override fun editPost(command: EditPostCommand, memberId: Long, language: ContentLanguage) {
         val title = command.title.trim()
         if (title.isEmpty()) throw PostTitleRequiredException()
         if (title.length > Post.TITLE_MAX_LENGTH) throw PostTitleLengthInvalidException()
@@ -120,8 +132,10 @@ class PostCommandService(
 
         // 장소를 바꾼다면 좌표를 함께 받아 둔다 — 좌표 없이 장소만 바꾸면 그 글이 지역
         // 피드의 거리순에서 조용히 사라진다.
+        // 생성과 같이 **활성 언어 기준으로** 확인한다(SPEC-0029 R-16).
         val newSpotPoint = command.catalogId?.let { catalogId ->
-            val summary = spotLookupPort.findSummary(catalogId) ?: throw SpotNotFoundException()
+            val summary = spotLookupPort.findSummary(catalogId, language)
+                ?: throw SpotNotFoundInLocaleException()
             SpotPoint(longitude = summary.longitude, latitude = summary.latitude)
         }
 
@@ -134,6 +148,24 @@ class PostCommandService(
         if (command.changeSpot) post.changeSpot(command.catalogId, newSpotPoint)
         tags?.let { post.replaceTags(it) }
         postRepositoryPort.save(post)
+        if (command.changeSpot) command.catalogId?.let { syncLanguages(it) }
+    }
+
+    /**
+     * 이 카탈로그가 해소되는 언어의 사본을 맞춘다(SPEC-0029 R-15).
+     *
+     * **쓰기 시점에도 맞추는 이유는 이벤트가 늦기 때문이다.** 사본은 배정 배치의 노출 갱신
+     * 이벤트가 유지하는데, 그 회차가 돌기 전이거나 리스너가 한 번 실패해 삼켜졌다면 방금 쓴
+     * 글이 **자기 언어의 목록에서도 빠진다** — 첨부는 성공했는데 글이 안 보이는 상태다.
+     * 여기서 한 번 맞춰 두면 그 창이 닫힌다.
+     *
+     * 존재 검사(`findSummary`)를 이미 통과한 뒤라 최소한 활성 언어 하나는 들어 있다.
+     *
+     * **덮어쓰기(replaceFor)여야 한다.** 더하기만 하면 그 사이 어떤 언어에서 사라진 카탈로그의
+     * 낡은 행이 남아, 그 언어에서 읽을 수 없는 글이 계속 목록에 뜬다.
+     */
+    private fun syncLanguages(catalogId: Long) {
+        spotCatalogLanguagePort.replaceFor(catalogId, spotLookupPort.findResolvedLanguages(catalogId))
     }
 
     /**

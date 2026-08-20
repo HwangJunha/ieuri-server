@@ -8,6 +8,7 @@ fun SpotReactionEntity.toDomain(): SpotReaction =
     SpotReaction.record(
         memberId = memberId,
         catalogId = catalogId,
+        language = language,
         reaction = reaction,
     )
 
@@ -16,5 +17,6 @@ fun SpotReaction.toNewEntity(): SpotReactionEntity =
     SpotReactionEntity(
         memberId = memberId,
         catalogId = catalogId,
+        language = language,
         reaction = reaction,
     )

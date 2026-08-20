@@ -4,6 +4,7 @@ import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.community.application.query.SpotAnswerReplyView
 import org.around.ieuri.community.application.query.SpotAnswerView
 import org.around.ieuri.community.application.query.SpotQuestionView
+import org.around.ieuri.community.domain.vo.ContentLanguage
 
 /**
  * 장소 질문/답변 읽기 아웃바운드 포트(SPEC-0026). 애그리게이트를 우회해 필요한 값만 프로젝션한다.
@@ -94,6 +95,12 @@ data class SpotQuestionsSearch(
     val authorId: Long? = null,
     /** 이 id들만. null이면 좁히지 않고, **빈 목록이면 결과가 없다.** */
     val ids: List<Long>? = null,
+    /**
+     * 요청의 활성 언어. **무조건 걸린다**(SPEC-0029 R-23) — 질문은 장소가 필수라(catalog_id
+     * NOT NULL) 글과 달리 "장소 없는 항목"이라는 예외가 없다. 이 언어에서 해소되지 않는
+     * 장소의 질문은 오류가 아니라 목록에서 빠진다.
+     */
+    val language: ContentLanguage,
     val first: Int,
     val after: String?,
     val viewer: ViewerContext,

@@ -1,8 +1,11 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.persistence
 
+import org.around.ieuri.tourism.application.port.out.persistence.CatalogLanguage
+import org.around.ieuri.tourism.application.port.out.persistence.CatalogVisibilityChanges
 import org.around.ieuri.tourism.application.port.out.persistence.SpotCatalogUpsertPort
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.jdbc.core.RowMapper
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
@@ -28,11 +31,10 @@ class SpotCatalogUpsertJdbcAdapter(
         language: DomainLocale,
         title: String,
         address: String?,
-        hasOrigin: Boolean,
     ) {
         jdbcTemplate.update(
             UPSERT_TRANSLATION_SQL,
-            catalogId, language.name, title, address, hasOrigin, catalogId,
+            catalogId, language.name, title, address, catalogId,
         )
     }
 
@@ -48,6 +50,23 @@ class SpotCatalogUpsertJdbcAdapter(
         jdbcTemplate.update(DELETE_ORPHAN_FESTIVAL_SQL, catalogId)
     }
 
+    /**
+     * 노출 여부를 원본 생존 상태에 맞추고, **맞춘 뒤의 노출 상태 전부를 돌려준다.**
+     *
+     * **`UPDATE ... RETURNING`이라 생 SQL이 필요하다.** QueryDSL의 `update().execute()`는
+     * 건수만 주고 JPQL에는 `RETURNING`이 없는데, 어떤 행이 바뀌었는지를 알아야 다른 도메인이
+     * 자기 사본을 맞출 수 있다. 읽기와 쓰기를 두 문장으로 나누면 READ COMMITTED에서 문장마다
+     * 스냅샷이 갈려, 그 사이 동시 upsert가 뒤집은 행을 놓친다 — 한 문장이어야 하는 이유다.
+     */
+    @Transactional
+    override fun refreshTranslationVisibility(): CatalogVisibilityChanges =
+        CatalogVisibilityChanges(
+            hidden = jdbcTemplate.query(HIDE_LOST_ORIGINS_SQL, CATALOG_LANGUAGE_ROW_MAPPER),
+            shown = jdbcTemplate.query(SHOW_RETURNED_ORIGINS_SQL, CATALOG_LANGUAGE_ROW_MAPPER),
+            // 위 두 문장 뒤에 읽으므로 방금 갱신분이 포함된다. 구독자는 이것을 정본으로 받는다.
+            visible = jdbcTemplate.query(SELECT_VISIBLE_SQL, CATALOG_LANGUAGE_ROW_MAPPER),
+        )
+
     private companion object {
         /**
          * 좌표·분류를 카탈로그에서 가져오므로 `catalog_id`가 두 번 들어간다 — 값 자리와
@@ -62,21 +81,21 @@ class SpotCatalogUpsertJdbcAdapter(
          * 없지만 낡은 채로 남지 않는다.
          */
         val UPSERT_TRANSLATION_SQL = """
-            INSERT INTO spot_catalog_translation (catalog_id, language, title, address, map_x, map_y, category, has_origin)
-            SELECT ?, ?, ?, ?, c.map_x, c.map_y, c.category, ?
+            INSERT INTO spot_catalog_translation (catalog_id, language, title, address, map_x, map_y, category, visible)
+            SELECT ?, ?, ?, ?, c.map_x, c.map_y, c.category, TRUE
             FROM spot_catalog c WHERE c.id = ?
             ON CONFLICT (catalog_id, language) DO UPDATE SET
                 map_x      = EXCLUDED.map_x,
                 map_y      = EXCLUDED.map_y,
                 category   = EXCLUDED.category,
-                -- **원문 보유는 참으로만 올라간다.** 번역 배치가 나중에 같은 쌍을 건드려도
-                -- 이미 원문이 있다는 사실을 지우면 안 된다.
-                has_origin = spot_catalog_translation.has_origin OR EXCLUDED.has_origin,
+                -- **행이 다시 생겼다는 것은 그 언어의 원본이 돌아왔다는 뜻이다.** 감춰져
+                -- 있었다면 여기서 되살린다 — 노출 갱신을 기다리지 않는다.
+                visible    = TRUE,
                 updated_at = now()
             WHERE spot_catalog_translation.map_x    IS DISTINCT FROM EXCLUDED.map_x
                OR spot_catalog_translation.map_y    IS DISTINCT FROM EXCLUDED.map_y
                OR spot_catalog_translation.category IS DISTINCT FROM EXCLUDED.category
-               OR (EXCLUDED.has_origin AND NOT spot_catalog_translation.has_origin)
+               OR NOT spot_catalog_translation.visible
         """.trimIndent()
 
         /**
@@ -117,5 +136,54 @@ class SpotCatalogUpsertJdbcAdapter(
                   WHERE s.catalog_id = cf.catalog_id
               )
         """.trimIndent()
+
+        /** 그 언어의 원본이 있는가 — 노출 판정의 유일한 기준이다(SPEC-0029). */
+        private const val ORIGIN_EXISTS = """
+            EXISTS (
+                SELECT 1 FROM spot s
+                WHERE s.catalog_id = t.catalog_id AND s.language = t.language
+            )
+        """
+
+        /**
+         * 원본을 잃은 행을 감추고 **감춘 행을 돌려준다.**
+         *
+         * `RETURNING`이 없으면 어떤 행이 바뀌었는지 알 수 없어 구독자가 사본을 맞출 수 없다.
+         * SELECT를 따로 두면 문장 사이에 스냅샷이 갈린다 — 한 문장이어야 한다.
+         */
+        val HIDE_LOST_ORIGINS_SQL = """
+            UPDATE spot_catalog_translation t
+            SET visible = FALSE, updated_at = now()
+            WHERE t.visible AND NOT $ORIGIN_EXISTS
+            RETURNING t.catalog_id, t.language
+        """.trimIndent()
+
+        /** 원본이 돌아온 행을 되살리고 되살린 행을 돌려준다. [HIDE_LOST_ORIGINS_SQL]의 반대다. */
+        val SHOW_RETURNED_ORIGINS_SQL = """
+            UPDATE spot_catalog_translation t
+            SET visible = TRUE, updated_at = now()
+            WHERE NOT t.visible AND $ORIGIN_EXISTS
+            RETURNING t.catalog_id, t.language
+        """.trimIndent()
+
+        /**
+         * 지금 노출 중인 (카탈로그, 언어) **전부**.
+         *
+         * **변경분이 아니라 이것이 구독자가 받는 정본이다.** 전량 초기화 후 재적재하면 모든
+         * 행이 신규 INSERT라 `visible`이 뒤집힌 적이 없다 — 변경분만 실으면 이벤트가 영원히
+         * 비어 구독자의 사본이 채워지지 않는다.
+         */
+        val SELECT_VISIBLE_SQL = """
+            SELECT t.catalog_id, t.language
+            FROM spot_catalog_translation t
+            WHERE t.visible
+        """.trimIndent()
+
+        val CATALOG_LANGUAGE_ROW_MAPPER = RowMapper { rs, _ ->
+            CatalogLanguage(
+                catalogId = rs.getLong("catalog_id"),
+                language = DomainLocale.valueOf(rs.getString("language")),
+            )
+        }
     }
 }

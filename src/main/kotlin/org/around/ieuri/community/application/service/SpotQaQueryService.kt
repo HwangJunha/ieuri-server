@@ -3,7 +3,7 @@ package org.around.ieuri.community.application.service
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.cursorPageOf
 import org.around.ieuri.community.application.exception.QuestionNotFoundException
-import org.around.ieuri.community.application.exception.SpotNotFoundException
+import org.around.ieuri.community.application.exception.SpotNotFoundInLocaleException
 import org.around.ieuri.community.application.policy.CommunityPolicy
 import org.around.ieuri.community.application.port.`in`.query.SpotQaQueryUseCase
 import org.around.ieuri.community.application.port.out.client.SpotLookupPort
@@ -17,6 +17,7 @@ import org.around.ieuri.community.application.query.SpotAnswerView
 import org.around.ieuri.community.application.query.SpotAnswersQuery
 import org.around.ieuri.community.application.query.SpotQuestionView
 import org.around.ieuri.community.application.query.SpotQuestionsQuery
+import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.springframework.stereotype.Service
 
 /**
@@ -39,8 +40,9 @@ class SpotQaQueryService(
     /**
      * 질문 목록. **세 필터가 독립적이며 함께 걸린다** — 장소·작성자·id다.
      *
-     * 장소를 준 경우에만 존재를 확인한다. 없는 장소는 빈 목록이 아니라 SPOT_NOT_FOUND이며
-     * (AC-1.3), 오타와 "질문 없음"은 구분되어야 한다.
+     * 장소를 준 경우에만 존재를 확인한다. 없는 장소는 빈 목록이 아니라 오류이며(AC-1.3),
+     * 오타와 "질문 없음"은 구분되어야 한다. 판정 기준은 **활성 언어다**(SPEC-0029 R-16) —
+     * 이 언어에서 해소되지 않는 장소도 SPOT_NOT_FOUND_IN_LOCALE로 거절한다(AC-15.3).
      *
      * `mine`은 **호출자 자신으로만 좁힌다** — 회원 id를 인자로 받지 않으므로 남의 목록을
      * 여는 경로가 없다. 비로그인은 좁힐 대상이 없어 리졸버가 미리 막는다.
@@ -48,15 +50,21 @@ class SpotQaQueryService(
     override fun spotQuestions(
         query: SpotQuestionsQuery,
         memberId: Long,
+        language: ContentLanguage,
     ): CursorPage<SpotQuestionView> {
         query.catalogId?.let {
-            if (spotLookupPort.findSummary(it) == null) throw SpotNotFoundException()
+            if (spotLookupPort.findSummary(it, language) == null) {
+                throw SpotNotFoundInLocaleException()
+            }
         }
         return spotQaQueryPort.findQuestions(
             SpotQuestionsSearch(
                 catalogId = query.catalogId,
                 authorId = if (query.mine) memberId else null,
                 ids = query.ids,
+                // 활성 언어에서 해소되지 않는 장소의 질문을 뺀다(R-23). 질문은 장소가 필수라
+                // 조건이 무조건 걸린다 — 글과 달리 "장소 없는 항목"이라는 예외가 없다.
+                language = language,
                 first = clampPageSize(query.first),
                 after = query.after,
                 viewer = viewerContext(memberId),

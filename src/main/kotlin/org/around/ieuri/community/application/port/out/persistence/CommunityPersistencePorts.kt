@@ -5,6 +5,7 @@ import org.around.ieuri.community.domain.aggregate.Comment
 import org.around.ieuri.community.domain.aggregate.Post
 import org.around.ieuri.community.domain.aggregate.PostLike
 import org.around.ieuri.community.domain.aggregate.Report
+import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.around.ieuri.community.domain.vo.ReportTargetType
 
 /**
@@ -116,6 +117,38 @@ interface PostSpotCleanupPort {
     /** 지운 연결 행 수. 한 장소를 여러 글이 참조하므로 단건이 아니다. */
     fun deleteByCatalogIds(catalogIds: List<Long>): Long
 }
+
+/**
+ * 카탈로그가 해소되는 언어의 커뮤니티 사본(SPEC-0029 R-15·R-23). 글·질문 목록이 활성 언어로
+ * 거를 때 보는 표이며, 원본은 tourism에 있다.
+ */
+interface SpotCatalogLanguagePort {
+    /**
+     * 표 **전체를** [entries]로 맞춘다 — 여기 없는 조합은 지운다.
+     *
+     * 배정 배치의 노출 갱신이 정본을 통째로 보내므로 델타를 적용하지 않는다. 델타 방식은
+     * 빈 표를 채울 수 없다(전량 재적재 직후에는 뒤집힌 행이 없어 델타가 빈다).
+     *
+     * 반영 후의 총 행 수를 돌려준다.
+     */
+    fun replaceAll(entries: List<CatalogLanguageEntry>): Int
+
+    /**
+     * 이 카탈로그의 기록을 [languages]로 **통째로 맞춘다**(빠진 언어는 지운다).
+     *
+     * 글·질문을 쓰는 시점에 부른다 — 이벤트가 아직 닿지 않았거나 놓친 카탈로그라도, 방금
+     * 첨부한 글이 자기 언어에서 곧바로 보여야 하기 때문이다.
+     *
+     * **[languages]가 비면 그 카탈로그의 기록이 전부 사라진다.**
+     */
+    fun replaceFor(catalogId: Long, languages: Set<ContentLanguage>)
+}
+
+/** 한 카탈로그가 한 언어에서 해소된다는 사실. 이벤트가 싣는 쌍과 같은 모양이다. */
+data class CatalogLanguageEntry(
+    val catalogId: Long,
+    val language: ContentLanguage,
+)
 
 /** 신고 유일성·집계. */
 interface ReportRepositoryPort {

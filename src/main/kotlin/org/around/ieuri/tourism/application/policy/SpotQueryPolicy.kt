@@ -24,8 +24,9 @@ import java.time.Duration
  * @param maxSearchPage `searchSpots`의 페이지 상한(= 500). 초과 시 PAGE_TOO_DEEP.
  *   OFFSET 비용이 깊이에 비례해 커져 두는 제약이며, 검색 엔진들이 공통으로 갖는다
  *   (Elasticsearch의 기본 결과 창이 10,000건). 크기 20 기준 10,000건에 해당한다.
- * @param minPopularLikeCount `popularSpots` 진입 하한(= 10). 표본이 적으면 순위가 사실상 잡음이라
+ * @param minPopularLikeCount `popularSpots` 진입 하한. 표본이 적으면 순위가 사실상 잡음이라
  *   집계 후 이 수 미만을 버린다(AC-18.2). 현재 실데이터로는 결과가 비는 것이 정상이다(AC-18.4).
+ *   설정값이며 코드에 값을 적지 않는다(POL-044).
  */
 data class SpotQueryPolicy(
     val maxRadiusMeters: Int,

@@ -42,9 +42,9 @@ interface SpotQueryUseCase {
     /**
      * 위와 같은 구성을, 도메인 타입 없이 **문자열 축으로** 돌려준다. 다른 도메인이 쓰는 진입점이다.
      *
-     * 언어 코드와 카테고리 코드를 문자열로 주고받는 이유는 `spotIdsWithin(categoryCode:)`와 같다 —
-     * 호출하는 도메인이 tourism의 `DomainLocale`·`SpotCategory`를 import하면 그 도메인만 따로
-     * 떼어낼 수 없게 된다. 모르는 언어 코드는 폴백 언어로 읽는다.
+     * 언어 코드와 카테고리 코드를 문자열로 주고받는다 — 호출하는 도메인이 tourism의
+     * `DomainLocale`·`SpotCategory`를 import하면 그 도메인만 따로 떼어낼 수 없게 된다.
+     * 모르는 언어 코드는 폴백 언어로 읽는다.
      */
     fun availableCategoryCodes(appKey: AppKey, languageCode: String): List<AppCategoryCode>
 
@@ -77,11 +77,15 @@ interface SpotQueryUseCase {
     /** 이용안내 항목(요청 시에만). 캐시 → 미스면 detailInfo2 1콜. */
     fun spotInfoItems(spotId: Long, category: SpotCategory, locale: DomainLocale): List<SpotInfoItemView>
 
-    /** 좋아요 수(요청 시에만). 캐시 비대상이며 매번 실시간 집계한다. */
-    fun spotLikeCount(spotId: Long): Long
+    /**
+     * 좋아요 수(요청 시에만). 캐시 비대상이며 매번 실시간 집계한다.
+     * **[locale] 안에서만 센다**(SPEC-0029 AC-13.5) — 다른 언어의 좋아요는 합산되지 않는다.
+     */
+    fun spotLikeCount(catalogId: Long, locale: DomainLocale): Long
 
     /**
-     * 이 회원이 이 장소에 남긴 **최신 반응 코드**(`LIKE`·`DISLIKE`). 반응한 적 없으면 null.
+     * 이 회원이 **[locale]에서** 이 장소에 남긴 최신 반응 코드(`LIKE`·`DISLIKE`).
+     * 반응한 적 없으면 null이며, 다른 언어에서 누른 것은 여기 보이지 않는다(AC-13.2).
      *
      * **문자열 축으로 돌려주는 이유는 [availableCategoryCodes]와 같다** — 호출하는 도메인이
      * tourism의 `ReactionType`을 import하면 그 도메인만 따로 떼어낼 수 없게 된다.
@@ -90,39 +94,40 @@ interface SpotQueryUseCase {
      * `reactToSpot`에는 취소 수단이 없어 null(반응 없음)과 DISLIKE는 서로 다른 상태이며,
      * 작성 자격 관점에서는 둘 다 자격 없음이다.
      */
-    fun spotViewerReaction(catalogId: Long, memberId: Long): String?
+    fun spotViewerReaction(catalogId: Long, memberId: Long, locale: DomainLocale): String?
 
     /**
      * 카탈로그가 보유한 최소 식별 정보. **upstream을 호출하지 않는다** — 한 행을 읽을 뿐이다.
      *
      * 다른 도메인이 장소 id의 유효성을 확인하고 칩·요약을 그릴 때 쓰는 진입점이다. 그 용도로
-     * [spotDetail]을 쓰면 검증 한 번에 TourAPI 왕복이 붙는다. 부재는 예외가 아니라 null이다.
+     * [spotDetail]을 쓰면 검증 한 번에 TourAPI 왕복이 붙는다.
+     *
+     * **[languageCode]에서 해소되지 않으면 null이다**(SPEC-0029 R-24). 부재는 예외가 아니며,
+     * 이 null이 곧 "활성 언어에 없는 장소"라는 뜻이다 — 존재 검사가 이 값으로 판정한다(R-25).
+     *
+     * 언어를 문자열로 받는 이유는 [availableCategoryCodes]와 같다 — 호출하는 도메인이
+     * tourism의 `DomainLocale`을 import하면 그 도메인만 따로 떼어낼 수 없게 된다.
+     * 모르는 언어 코드는 폴백 언어로 읽는다.
      */
-    fun spotSummary(catalogId: Long): SpotSummaryView?
-
-    /** 여러 카탈로그 요약을 **한 번에**. 목록을 그리는 호출자가 행마다 묻지 않게 한다. */
-    fun spotSummaries(catalogIds: List<Long>): Map<Long, SpotSummaryView>
+    fun spotSummary(catalogId: Long, languageCode: String): SpotSummaryView?
 
     /**
-     * 좌표 반경 안에 있는 **장소(카탈로그)의 id**. 다른 도메인이 "이 반경의 장소들"을 조건으로
-     * 쓸 때의 진입점이며, tourism의 테이블을 아는 코드가 tourism 안에 머물게 한다.
-     *
-     * **돌려주는 축은 `spot_catalog.id`다**(SPEC-0019 R-12) — 다른 도메인이 장소를 저장할 때
-     * 쓰는 축과 같다. 언어별 `spot.id`를 주면 호출자가 다시 환산해야 한다.
-     *
-     * **가까운 순으로 돌려준다.** [limit]을 넘는 결과는 조용히 잘리므로 — 반경이 넓으면 수만
-     * 건이 되어 호출자의 `IN` 절을 무너뜨린다 — 잘리는 쪽이 먼 spot이어야 한다.
-     *
-     * [categoryCode]를 주면 그 카테고리만. null이면 거르지 않는다. 도메인 enum이 아니라
-     * 문자열인 이유는 다른 도메인이 SpotCategory를 import하지 않게 하려는 것이다.
+     * 여러 카탈로그 요약을 **한 번에**. 목록을 그리는 호출자가 행마다 묻지 않게 한다.
+     * [languageCode]에서 해소되지 않는 id는 결과에 키가 없다.
      */
-    fun spotIdsWithin(
-        longitude: Double,
-        latitude: Double,
-        radiusMeters: Int,
-        limit: Int,
-        categoryCode: String? = null,
-    ): List<Long>
+    fun spotSummaries(catalogIds: List<Long>, languageCode: String): Map<Long, SpotSummaryView>
+
+    /**
+     * 이 카탈로그가 **해소되는 언어의 코드 전부**(SPEC-0029 R-15). 어느 언어에서도 해소되지
+     * 않거나 카탈로그가 없으면 빈 집합이다 — 두 경우를 구분하지 않는다.
+     *
+     * 다른 도메인이 "이 장소는 어느 언어에서 보이는가"의 사본을 유지할 때 쓴다. 그 사본이
+     * 있어야 목록 조회가 tourism을 조인하지 않고 활성 언어로 거를 수 있다(R-23).
+     *
+     * 코드를 **문자열로 돌려주는 이유는 [spotSummary]와 같다** — 호출하는 도메인이 tourism의
+     * `DomainLocale`을 import하면 그 도메인만 따로 떼어낼 수 없게 된다.
+     */
+    fun resolvedLanguageCodes(catalogId: Long): Set<String>
 
     /**
      * 회원이 좋아요한 spot 한 페이지. likedAt 내림차순, 동률은 spot.id로 타이브레이크.

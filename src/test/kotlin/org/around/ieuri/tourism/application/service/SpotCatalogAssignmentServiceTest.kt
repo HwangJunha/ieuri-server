@@ -1,16 +1,20 @@
 package org.around.ieuri.tourism.application.service
 
 import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
+import org.around.ieuri.tourism.application.port.out.persistence.CatalogLanguage
+import org.around.ieuri.tourism.application.port.out.persistence.CatalogVisibilityChanges
 import org.around.ieuri.tourism.application.port.out.persistence.SpotCatalogStorePort
 import org.around.ieuri.tourism.application.port.out.query.CatalogCandidate
 import org.around.ieuri.tourism.application.port.out.query.SpotCatalogQueryPort
 import org.around.ieuri.tourism.application.port.out.query.UnassignedSpot
-import org.around.ieuri.tourism.application.port.out.query.UntranslatedCatalog
 import org.around.ieuri.tourism.domain.aggregate.SpotCatalog
+import org.around.ieuri.tourism.domain.event.CatalogLanguageRef
+import org.around.ieuri.tourism.domain.event.SpotCatalogLanguagesChanged
 import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
@@ -49,8 +53,19 @@ class SpotCatalogAssignmentServiceTest {
     private fun koreanSpot(spotId: Long = 12, title: String = "마린시티", mapX: Double = this.mapX) =
         spot(spotId = spotId, language = DomainLocale.KO, title = title, address = "부산", mapX = mapX)
 
-    private fun service(query: StubQueryPort, store: RecordingStorePort) =
-        SpotCatalogService(query, store, NoEvents)
+    private fun service(
+        query: StubQueryPort,
+        store: RecordingStorePort,
+        events: RecordingEventPublisher = RecordingEventPublisher(),
+    ) = SpotCatalogService(query, store, events)
+
+    private class RecordingEventPublisher : TourismEventPublisherPort {
+        val published = mutableListOf<Any>()
+
+        override fun publish(event: Any) {
+            published += event
+        }
+    }
 
     @Test
     @DisplayName("비한국어는 괄호에서 뽑은 한국어로 KO 카탈로그를 찾는다")
@@ -116,7 +131,7 @@ class SpotCatalogAssignmentServiceTest {
         assertEquals(listOf(11L to RecordingStorePort.NEW_CATALOG_ID), store.assignments)
         val saved = store.saved.single()
         assertEquals("SM Entertainment", saved.translations[DomainLocale.EN]?.title)
-        assertTrue(saved.needsTranslation(DomainLocale.KO), "KO는 비어 있어야 번역 대상이 된다")
+        assertNull(saved.translations[DomainLocale.KO], "KO 원본이 없으면 슬롯은 비어 있다")
     }
 
     @Test
@@ -302,6 +317,37 @@ class SpotCatalogAssignmentServiceTest {
     }
 
     @Test
+    @DisplayName("뒤집힌 행이 없어도 노출 중인 전부를 이벤트로 알린다")
+    fun `visibility event carries the full resolved set`() {
+        // **이 슬라이스가 놓쳤던 결함의 회귀 방어다.** 이벤트가 변화분만 실으면, 전량 재적재
+        // 직후에는 모든 행이 신규 INSERT라 뒤집힌 것이 없어 이벤트가 비고 — 구독자(커뮤니티)의
+        // 사본이 빈 채로 남아 글·질문 목록이 spot 붙은 항목을 **전부 조용히** 걸러 낸다.
+        //
+        // 그래서 이벤트는 델타가 아니라 정본을 싣는다. hidden·shown이 비어도 발행해야 한다.
+        val store = RecordingStorePort()
+        store.visibilityResult = CatalogVisibilityChanges(
+            hidden = emptyList(),
+            shown = emptyList(),
+            visible = listOf(
+                CatalogLanguage(10L, DomainLocale.KO),
+                CatalogLanguage(10L, DomainLocale.EN),
+            ),
+        )
+        val events = RecordingEventPublisher()
+
+        service(StubQueryPort(), store, events).refreshCatalogVisibility()
+
+        val published = events.published.filterIsInstance<SpotCatalogLanguagesChanged>().single()
+        assertEquals(
+            listOf(
+                CatalogLanguageRef(10L, "KO"),
+                CatalogLanguageRef(10L, "EN"),
+            ),
+            published.resolved,
+        )
+    }
+
+    @Test
     @DisplayName("대상이 없으면 아무것도 하지 않는다")
     fun `empty target set does nothing`() {
         val store = RecordingStorePort()
@@ -332,11 +378,6 @@ class SpotCatalogAssignmentServiceTest {
         }
 
         override fun loadKoreanThumbnailIndex(): Map<String, Long> = thumbnailIndex
-
-        override fun findCatalogsMissingTranslation(
-            languages: Set<DomainLocale>,
-            limit: Int,
-        ): List<UntranslatedCatalog> = emptyList()
     }
 
     private class RecordingStorePort : SpotCatalogStorePort {
@@ -361,7 +402,6 @@ class SpotCatalogAssignmentServiceTest {
             language: DomainLocale,
             title: String,
             address: String?,
-            hasOrigin: Boolean,
         ) {
             translations += Triple(catalogId, language, title)
         }
@@ -373,17 +413,23 @@ class SpotCatalogAssignmentServiceTest {
         var visibilityRefreshes = 0
             private set
 
-        override fun refreshTranslationVisibility(): Int {
+        /**
+         * 갱신 결과. **기본값이 "뒤집힌 것은 없고 노출 중인 것은 있다"** — 전량 재적재 직후의
+         * 실제 상태이며, 이 슬라이스가 놓쳤던 경우다.
+         */
+        var visibilityResult = CatalogVisibilityChanges(
+            hidden = emptyList(),
+            shown = emptyList(),
+            visible = listOf(CatalogLanguage(NEW_CATALOG_ID, DomainLocale.KO)),
+        )
+
+        override fun refreshTranslationVisibility(): CatalogVisibilityChanges {
             visibilityRefreshes++
-            return 0
+            return visibilityResult
         }
 
         companion object {
             const val NEW_CATALOG_ID = 7777L
         }
-    }
-
-    private object NoEvents : TourismEventPublisherPort {
-        override fun publish(event: Any) = Unit
     }
 }

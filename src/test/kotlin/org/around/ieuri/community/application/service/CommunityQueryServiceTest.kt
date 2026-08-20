@@ -46,6 +46,7 @@ import kotlin.test.assertTrue
 class CommunityQueryServiceTest {
 
     private val memberId = 7L
+    private val language = ContentLanguage.EN
 
     private val queryPort = mockk<CommunityQueryPort>()
     private val spatialPort = mockk<PostSpatialQueryPort>()
@@ -114,6 +115,31 @@ class CommunityQueryServiceTest {
 
     // ---------- 피드 범위 ----------
 
+    /**
+     * R-23 — 활성 언어가 조회 조건으로 내려가야 목록이 그 언어로 걸러진다. 조회 뒤에 걸러내면
+     * `first: 20`을 요청했는데 15건만 남는다.
+     */
+    @Test
+    fun `활성 언어를 조회 조건으로 내려보낸다`() {
+        givenBlocked()
+        val search = captureSearch()
+
+        service.posts(query(), memberId, ContentLanguage.JA)
+
+        assertEquals(ContentLanguage.JA, search.captured.language)
+    }
+
+    /** 언어가 바뀌면 조건도 함께 바뀐다 — 한 언어로 고정되어 있지 않다는 것을 고정한다. */
+    @Test
+    fun `언어가 바뀌면 조회 조건의 언어도 바뀐다`() {
+        givenBlocked()
+        val search = captureSearch()
+
+        service.posts(query(), memberId, ContentLanguage.ZH)
+
+        assertEquals(ContentLanguage.ZH, search.captured.language)
+    }
+
     @Test
     fun `장소를 주면 그 장소 하나로 좁힌다`() {
         givenBlocked()
@@ -121,7 +147,7 @@ class CommunityQueryServiceTest {
 
         // **클라이언트가 카탈로그 id를 그대로 보낸다**(SPEC-0019 R-12) — 목록·상세가 이미 그
         // 축으로 id를 내려주므로 서버가 spot.id를 다시 해석할 것이 없다.
-        service.posts(query(catalogId = 420L), memberId)
+        service.posts(query(catalogId = 420L), memberId, language)
 
         assertEquals(420L, search.captured.catalogId)
         assertNull(search.captured.area)
@@ -132,7 +158,7 @@ class CommunityQueryServiceTest {
         givenBlocked()
         val search = captureSearch()
 
-        service.posts(query(), memberId)
+        service.posts(query(), memberId, language)
 
         assertNull(search.captured.catalogId)
         assertNull(search.captured.area)
@@ -143,7 +169,7 @@ class CommunityQueryServiceTest {
         givenBlocked()
         val search = captureSearch()
 
-        service.posts(query(latitude = 37.5, longitude = 127.0, radiusMeters = 5_000), memberId)
+        service.posts(query(latitude = 37.5, longitude = 127.0, radiusMeters = 5_000), memberId, language)
 
         // 이전에는 tourism에 spot id 목록을 물어 IN 절에 넣었고, 그 목록의 상한(2000)이
         // 곧 피드의 한계였다. 이제 반경 조건이 글 조회로 직접 간다.
@@ -157,7 +183,7 @@ class CommunityQueryServiceTest {
         givenBlocked()
         val search = captureSearch()
 
-        service.posts(query(latitude = 37.5), memberId)
+        service.posts(query(latitude = 37.5), memberId, language)
 
         assertNull(search.captured.area)
     }
@@ -167,7 +193,7 @@ class CommunityQueryServiceTest {
         givenBlocked()
         val search = captureSearch()
 
-        service.posts(query(catalogId = 420L, latitude = 37.5, longitude = 127.0), memberId)
+        service.posts(query(catalogId = 420L, latitude = 37.5, longitude = 127.0), memberId, language)
 
         // 서로 배타적이지 않다 — 둘 다 걸면 그 장소이면서 반경 안인 글이 나온다.
         assertEquals(420L, search.captured.catalogId)
@@ -179,7 +205,7 @@ class CommunityQueryServiceTest {
         givenBlocked()
         val search = captureSearch()
 
-        service.posts(query(latitude = 37.5, longitude = 127.0, radiusMeters = 999_999), memberId)
+        service.posts(query(latitude = 37.5, longitude = 127.0, radiusMeters = 999_999), memberId, language)
 
         assertEquals(100_000, search.captured.area?.radiusMeters)
     }
@@ -193,7 +219,7 @@ class CommunityQueryServiceTest {
         givenBlocked()
         val search = captureSearch()
 
-        service.posts(query(categories = setOf(TargetCategory.RESTAURANT)), memberId)
+        service.posts(query(categories = setOf(TargetCategory.RESTAURANT)), memberId, language)
 
         assertEquals(setOf(TargetCategory.RESTAURANT), search.captured.categories)
     }
@@ -203,7 +229,7 @@ class CommunityQueryServiceTest {
         givenBlocked()
         val search = captureSearch()
 
-        service.posts(query(), memberId)
+        service.posts(query(), memberId, language)
 
         assertTrue(search.captured.categories.isEmpty())
     }
@@ -215,7 +241,7 @@ class CommunityQueryServiceTest {
         givenBlocked(11L, 12L)
         val search = captureSearch()
 
-        service.posts(query(), memberId)
+        service.posts(query(), memberId, language)
 
         assertEquals(setOf(11L, 12L), search.captured.viewer.blockedMemberIds)
         assertEquals(memberId, search.captured.viewer.memberId)
@@ -250,7 +276,7 @@ class CommunityQueryServiceTest {
         givenBlocked()
         val search = captureSearch()
 
-        service.posts(query(first = 999), memberId)
+        service.posts(query(first = 999), memberId, language)
 
         assertEquals(50, search.captured.first)
     }
@@ -260,7 +286,7 @@ class CommunityQueryServiceTest {
         givenBlocked()
         val search = captureSearch()
 
-        service.posts(query(first = 0), memberId)
+        service.posts(query(first = 0), memberId, language)
 
         assertEquals(1, search.captured.first)
     }
@@ -386,7 +412,7 @@ class CommunityQueryServiceTest {
         givenBlocked()
         val search = captureSearch()
 
-        service.posts(query(latitude = 37.5, longitude = 127.0, categories = setOf(TargetCategory.RESTAURANT)), memberId)
+        service.posts(query(latitude = 37.5, longitude = 127.0, categories = setOf(TargetCategory.RESTAURANT)), memberId, language)
 
         // 목록을 경유하면 그 상한(2000)이 곧 피드의 한계가 된다 — 실측하면 기본 반경 20km에
         // spot이 12,000개가 넘어 대부분이 조용히 잘렸다. 이제 그 포트 자체가 없다.
@@ -399,7 +425,7 @@ class CommunityQueryServiceTest {
         givenBlocked()
         val search = captureSearch()
 
-        service.posts(query(sort = PostSortOrder.DISTANCE), memberId)
+        service.posts(query(sort = PostSortOrder.DISTANCE), memberId, language)
 
         // 거리를 잴 기준이 없다. 오류 대신 정렬만 바꿔 화면은 뜨게 한다.
         assertEquals(PostSortOrder.LATEST, search.captured.sort)
@@ -411,7 +437,7 @@ class CommunityQueryServiceTest {
         val search = slot<PostsSearch>()
         every { spatialPort.findPostsByDistance(capture(search)) } returns emptyPage()
 
-        service.posts(query(latitude = 37.5, longitude = 127.0, sort = PostSortOrder.DISTANCE), memberId)
+        service.posts(query(latitude = 37.5, longitude = 127.0, sort = PostSortOrder.DISTANCE), memberId, language)
 
         // PostGIS라 구현 기술이 갈린다 — 포트를 나눠 그 사실을 계약에 드러낸다.
         assertEquals(PostSortOrder.DISTANCE, search.captured.sort)
@@ -424,7 +450,7 @@ class CommunityQueryServiceTest {
         givenBlocked()
         captureSearch()
 
-        service.posts(query(latitude = 37.5, longitude = 127.0), memberId)
+        service.posts(query(latitude = 37.5, longitude = 127.0), memberId, language)
 
         verify(exactly = 0) { spatialPort.findPostsByDistance(any()) }
     }
@@ -437,7 +463,7 @@ class CommunityQueryServiceTest {
         givenHidden(5L, 7L)
         val search = captureSearch()
 
-        service.posts(query(), memberId)
+        service.posts(query(), memberId, language)
 
         // 필터가 쿼리 조건으로 들어가야 first만큼 채워진다 — 조회 후 걸러내면 모자란다.
         assertEquals(setOf(5L, 7L), search.captured.viewer.hiddenPostIds)
@@ -449,7 +475,7 @@ class CommunityQueryServiceTest {
         givenHidden(5L)
         val search = captureSearch()
 
-        service.posts(query(), memberId)
+        service.posts(query(), memberId, language)
 
         assertEquals(false, search.captured.hiddenByViewer)
     }
@@ -460,7 +486,7 @@ class CommunityQueryServiceTest {
         givenHidden(5L)
         val search = captureSearch()
 
-        service.posts(query(hiddenByViewer = true), memberId)
+        service.posts(query(hiddenByViewer = true), memberId, language)
 
         // 이 경로는 숨김 필터를 뒤집어야 한다 — 그러지 않으면 해제할 방법이 없다.
         assertEquals(true, search.captured.hiddenByViewer)
@@ -497,7 +523,7 @@ class CommunityQueryServiceTest {
         givenBlocked()
         every { queryPort.findPosts(any()) } returns emptyPage()
 
-        service.posts(query(), memberId)
+        service.posts(query(), memberId, language)
 
         // 카드가 스쳐 지나가는 것은 조회가 아니다. 세면 스크롤 한 번에 수십이 올라
         // 숫자가 의미를 잃는다.
@@ -527,7 +553,7 @@ class CommunityQueryServiceTest {
         givenBlocked()
         every { queryPort.findPosts(any()) } returns emptyPage()
 
-        service.posts(query(), memberId)
+        service.posts(query(), memberId, language)
 
         // 하나라도 불리면 그 필드를 고르지 않은 클라이언트가 값을 치르게 된다.
         verify(exactly = 0) { queryPort.findTagsOf(any()) }

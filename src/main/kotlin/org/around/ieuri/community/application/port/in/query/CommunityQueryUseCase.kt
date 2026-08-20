@@ -20,8 +20,14 @@ import org.around.ieuri.community.domain.vo.TargetCategory
  * 세 조회 경로(피드·단건·댓글)가 **같은 모더레이션 필터**를 거친다.
  */
 interface CommunityQueryUseCase {
-    /** 글 피드. 범위는 [PostsQuery]의 인자 조합이 정한다. */
-    fun posts(query: PostsQuery, memberId: Long): CursorPage<PostView>
+    /**
+     * 글 피드. 범위는 [PostsQuery]의 인자 조합이 정한다.
+     *
+     * [language]는 요청의 활성 언어이며 **무엇이 보이는지까지 정한다**(SPEC-0029 R-23) —
+     * 이 언어에서 해소되지 않는 장소가 붙은 글은 오류가 아니라 목록에서 빠진다. 장소가
+     * 붙지 않은 글은 언어와 무관하게 남는다(AC-15.4).
+     */
+    fun posts(query: PostsQuery, memberId: Long, language: ContentLanguage): CursorPage<PostView>
 
     /** 차단·숨김에 걸리면 오류가 아니라 null이다. 작성자 본인만 예외다. */
     fun post(postId: Long, memberId: Long): PostView?

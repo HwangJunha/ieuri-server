@@ -1,7 +1,7 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.persistence
 
-import com.querydsl.jpa.JPAExpressions
 import com.querydsl.jpa.impl.JPAQueryFactory
+import org.around.ieuri.tourism.application.port.out.persistence.CatalogVisibilityChanges
 import org.around.ieuri.tourism.application.port.out.persistence.SpotCatalogStorePort
 import org.around.ieuri.tourism.application.port.out.persistence.SpotCatalogUpsertPort
 import org.around.ieuri.tourism.domain.aggregate.SpotCatalog
@@ -67,55 +67,14 @@ class SpotCatalogStoreAdapter(
         language: DomainLocale,
         title: String,
         address: String?,
-        hasOrigin: Boolean,
-    ) = upsertPort.upsertTranslation(catalogId, language, title, address, hasOrigin)
+    ) = upsertPort.upsertTranslation(catalogId, language, title, address)
 
     override fun refreshFestivalPeriod(catalogId: Long) = upsertPort.refreshFestivalPeriod(catalogId)
 
     /**
-     * 원본 생존 여부를 번역 행의 `visible`에 반영한다. 양방향이다 — 사라진 것은 감추고
-     * 돌아온 것은 다시 보이게 한다.
-     *
-     * 벌크 갱신이라 영속성 컨텍스트를 우회한다. 이 트랜잭션에서 같은 엔티티를 다시 읽는
-     * 코드가 없으므로 안전하다. **상태가 실제로 바뀐 행만 건드린다** — 매 실행마다 전 행을
-     * 갱신하면 그 UPDATE가 전부 복제로 흘러가 검색 노드가 불필요하게 출렁인다.
+     * 노출 갱신은 `UPDATE ... RETURNING`이 필요해 [SpotCatalogUpsertPort]가 맡는다 —
+     * upsert와 같은 이유로 생 SQL이 그쪽에 모여 있다.
      */
-    @Transactional
-    override fun refreshTranslationVisibility(): Int {
-        // 카탈로그에 원본이 하나라도 있는가 — 노출 여부의 기준이다.
-        val anyOriginExists = JPAExpressions.selectOne().from(spot)
-            .where(spot.catalogId.eq(translation.catalogId))
-            .exists()
-
-        // **그 언어의** 원본이 있는가 — 정렬 1순위의 기준이라 판정 대상이 다르다.
-        val sameLanguageOriginExists = JPAExpressions.selectOne().from(spot)
-            .where(spot.catalogId.eq(translation.catalogId), spot.language.eq(translation.language))
-            .exists()
-
-        val hidden = queryFactory
-            .update(translation)
-            .set(translation.visible, false)
-            .where(translation.visible.isTrue, anyOriginExists.not())
-            .execute()
-
-        val shown = queryFactory
-            .update(translation)
-            .set(translation.visible, true)
-            .where(translation.visible.isFalse, anyOriginExists)
-            .execute()
-
-        val originGained = queryFactory
-            .update(translation)
-            .set(translation.hasOrigin, true)
-            .where(translation.hasOrigin.isFalse, sameLanguageOriginExists)
-            .execute()
-
-        val originLost = queryFactory
-            .update(translation)
-            .set(translation.hasOrigin, false)
-            .where(translation.hasOrigin.isTrue, sameLanguageOriginExists.not())
-            .execute()
-
-        return (hidden + shown + originGained + originLost).toInt()
-    }
+    override fun refreshTranslationVisibility(): CatalogVisibilityChanges =
+        upsertPort.refreshTranslationVisibility()
 }

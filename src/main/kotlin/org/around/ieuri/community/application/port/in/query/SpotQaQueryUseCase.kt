@@ -6,6 +6,7 @@ import org.around.ieuri.community.application.query.SpotAnswerView
 import org.around.ieuri.community.application.query.SpotAnswersQuery
 import org.around.ieuri.community.application.query.SpotQuestionView
 import org.around.ieuri.community.application.query.SpotQuestionsQuery
+import org.around.ieuri.community.domain.vo.ContentLanguage
 
 /**
  * 장소 질문/답변 조회(SPEC-0026).
@@ -17,8 +18,18 @@ import org.around.ieuri.community.application.query.SpotQuestionsQuery
  * 조회가 여러 번 붙어 지연 필드로 나눈 의미가 사라진다.
  */
 interface SpotQaQueryUseCase {
-    /** 정렬은 미해결 우선, 그 안에서 최신순이다(R2). 장소가 없으면 SPOT_NOT_FOUND. */
-    fun spotQuestions(query: SpotQuestionsQuery, memberId: Long): CursorPage<SpotQuestionView>
+    /**
+     * 정렬은 미해결 우선, 그 안에서 최신순이다(R2).
+     *
+     * [language]는 요청의 활성 언어이며 장소 필터의 존재 검사 기준이다(SPEC-0029 R-16) —
+     * 카탈로그가 없으면 SPOT_NOT_FOUND, 있으나 이 언어에 원본이 없으면
+     * SPOT_NOT_FOUND_IN_LOCALE이다(AC-15.3).
+     */
+    fun spotQuestions(
+        query: SpotQuestionsQuery,
+        memberId: Long,
+        language: ContentLanguage,
+    ): CursorPage<SpotQuestionView>
 
     /**
      * 질문 하나의 답변 목록. 최신순.

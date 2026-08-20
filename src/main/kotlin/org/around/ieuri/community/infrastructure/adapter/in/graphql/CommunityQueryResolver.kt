@@ -69,6 +69,7 @@ class CommunityQueryResolver(
         @InputArgument hiddenByViewer: Boolean?,
         @InputArgument first: Int?,
         @InputArgument after: String?,
+        dfe: DgsDataFetchingEnvironment,
     ): PostConnection {
         val memberId = currentMemberProvider.requireMemberId()
         val page = communityQueryUseCase.posts(
@@ -86,6 +87,7 @@ class CommunityQueryResolver(
                 after = after,
             ),
             memberId = memberId,
+            language = dfe.contentLanguage(),
         )
         return PostConnection(
             edges = page.edges.map { PostEdge(cursor = it.cursor, node = it.node) },
@@ -204,6 +206,10 @@ class CommunityQueryResolver(
     /**
      * 장소 칩. **장소는 선택이라 없으면 null이다.** 연결을 먼저 배치로 확인하고, 있을 때만
      * tourism을 배치로 묻는다 — 두 단계 모두 요청된 경우에만 돈다.
+     *
+     * **활성 언어에서 해소되지 않아도 null이다**(SPEC-0029 R-27). 다른 언어 이름으로 대신
+     * 채우지 않는다 — 클라이언트는 칩이 없는 것으로 렌더한다. 목록 자체가 활성 언어로
+     * 걸러지므로(R-23) 정상 경로에서는 여기가 null이 될 일이 거의 없다.
      */
     @DgsData(parentType = "Post", field = "spot")
     fun postSpot(dfe: DgsDataFetchingEnvironment): CompletableFuture<GqlPostSpot?> =
@@ -214,7 +220,7 @@ class CommunityQueryResolver(
                     CompletableFuture.completedFuture(null)
                 } else {
                     dfe.loader<PostSpotView>(PostSpotDataLoader.NAME)
-                        .load(catalogId)
+                        .load(catalogId, dfe.contentLanguage())
                         .thenApply { it?.toGql() }
                 }
             }

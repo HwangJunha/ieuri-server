@@ -15,14 +15,16 @@ import org.around.ieuri.community.application.exception.PostBodyRequiredExceptio
 import org.around.ieuri.community.application.exception.PostNotFoundException
 import org.around.ieuri.community.application.exception.PostTitleLengthInvalidException
 import org.around.ieuri.community.application.exception.PostTitleRequiredException
-import org.around.ieuri.community.application.exception.SpotNotFoundException
+import org.around.ieuri.community.application.exception.SpotNotFoundInLocaleException
 import org.around.ieuri.community.application.exception.TooManyPhotosException
 import org.around.ieuri.community.application.port.out.client.ClockPort
 import org.around.ieuri.community.application.port.out.client.ObjectStoragePort
 import org.around.ieuri.community.application.port.out.client.SpotLookupPort
 import org.around.ieuri.community.application.port.out.persistence.PostRepositoryPort
+import org.around.ieuri.community.application.port.out.persistence.SpotCatalogLanguagePort
 import org.around.ieuri.community.application.query.PostSpotView
 import org.around.ieuri.community.domain.aggregate.Post
+import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.around.ieuri.community.domain.vo.SpotPoint
 import org.around.ieuri.community.domain.vo.PostTag
 import org.around.ieuri.community.domain.vo.TargetCategory
@@ -40,18 +42,23 @@ class PostCommandServiceTest {
     private val memberId = 7L
     private val catalogId = 420L
     private val now = Instant.parse("2026-08-05T00:00:00Z")
+    private val language = ContentLanguage.EN
 
     private val postRepository = mockk<PostRepositoryPort>()
-    private val spotLookup = mockk<SpotLookupPort>()
+    private val spotLookup = mockk<SpotLookupPort> {
+        // 언어 사본 갱신이 쓰는 값. 이 테스트가 보는 것은 생성·수정 판정이라 활성 언어만 담는다.
+        every { findResolvedLanguages(any()) } returns setOf(language)
+    }
     private val storage = mockk<ObjectStoragePort>()
+    private val catalogLanguagePort = mockk<SpotCatalogLanguagePort>(relaxed = true)
     private val clock = mockk<ClockPort> { every { now() } returns now }
 
-    private val service = PostCommandService(postRepository, spotLookup, storage, clock)
+    private val service = PostCommandService(postRepository, spotLookup, catalogLanguagePort, storage, clock)
 
     private fun confirmedKey(owner: Long = memberId) = "images/community/$owner/${UUID.randomUUID()}"
 
     private fun givenValidSpotAndAuthor() {
-        every { spotLookup.findSummary(catalogId) } returns
+        every { spotLookup.findSummary(catalogId, language) } returns
             PostSpotView(
                 id = catalogId,
                 title = "경복궁",
@@ -95,6 +102,7 @@ class PostCommandServiceTest {
                 title = title, body = body, photoKeys = photoKeys,
             ),
             memberId,
+            language,
         )
 
     @Test
@@ -103,6 +111,46 @@ class PostCommandServiceTest {
         givenSaveEchoesBackWithId()
 
         assertEquals(1L, create())
+    }
+
+    // ── 카탈로그-언어 사본(SPEC-0029 R-15) ──────────────────────────
+
+    /**
+     * 쓰기 시점에도 사본을 맞춘다. 이벤트가 아직 닿지 않았거나 한 번 실패해 삼켜졌다면 방금
+     * 쓴 글이 **자기 언어의 목록에서도 빠지기** 때문이다 — 첨부는 성공했는데 글이 안 보인다.
+     */
+    @Test
+    fun `장소를 붙여 글을 쓰면 그 장소의 언어 사본을 맞춘다`() {
+        givenValidSpotAndAuthor()
+        givenSaveEchoesBackWithId()
+        every { spotLookup.findResolvedLanguages(catalogId) } returns
+            setOf(ContentLanguage.EN, ContentLanguage.KO)
+
+        create()
+
+        // **덮어쓰기여야 한다.** 더하기만 하면 그 사이 어떤 언어에서 사라진 카탈로그의 낡은
+        // 행이 남아, 그 언어에서 읽을 수 없는 글이 계속 목록에 뜬다.
+        verify(exactly = 1) {
+            catalogLanguagePort.replaceFor(catalogId, setOf(ContentLanguage.EN, ContentLanguage.KO))
+        }
+    }
+
+    /** 장소가 없는 글에는 맞출 사본도 없다 — 그 글은 언어와 무관하게 보인다(AC-15.4). */
+    @Test
+    fun `장소 없는 글은 언어 사본을 건드리지 않는다`() {
+        givenSaveEchoesBackWithId()
+
+        service.createPost(
+            CreatePostCommand(
+                category = TargetCategory.TOURIST_SPOT,
+                catalogId = null, tags = emptyList(),
+                title = "제목", body = "본문", photoKeys = emptyList(),
+            ),
+            memberId,
+            language,
+        )
+
+        verify(exactly = 0) { catalogLanguagePort.replaceFor(any(), any()) }
     }
 
     @Test
@@ -119,7 +167,7 @@ class PostCommandServiceTest {
     @Test
     fun `제목 검증이 대상 조회보다 먼저다 - 잘못된 입력에 외부 조회를 하지 않는다`() {
         assertFailsWith<PostTitleRequiredException> { create(title = "") }
-        verify(exactly = 0) { spotLookup.findSummary(any()) }
+        verify(exactly = 0) { spotLookup.findSummary(any(), any()) }
     }
 
     @Test
@@ -141,10 +189,10 @@ class PostCommandServiceTest {
     }
 
     @Test
-    fun `존재하지 않는 대상이면 SPOT_NOT_FOUND이고 글은 생성되지 않는다`() {
-        every { spotLookup.findSummary(catalogId) } returns null
+    fun `활성 언어에서 해소되지 않는 대상이면 SPOT_NOT_FOUND_IN_LOCALE이고 글은 생성되지 않는다`() {
+        every { spotLookup.findSummary(catalogId, language) } returns null
 
-        assertFailsWith<SpotNotFoundException> { create() }
+        assertFailsWith<SpotNotFoundInLocaleException> { create() }
         verify(exactly = 0) { postRepository.save(any()) }
     }
 
@@ -254,7 +302,7 @@ class PostCommandServiceTest {
         every { postRepository.findById(1L) } returns post
         every { postRepository.save(any()) } returns post
 
-        service.editPost(EditPostCommand(1L, "새 제목", "새 본문", null), memberId)
+        service.editPost(EditPostCommand(1L, "새 제목", "새 본문", null), memberId, language)
 
         // null은 "건드리지 않는다"는 뜻이다 — 빈 값과 다르다.
         assertEquals(TargetCategory.TOURIST_SPOT, post.category)
@@ -268,7 +316,7 @@ class PostCommandServiceTest {
         every { postRepository.findById(1L) } returns post
         every { postRepository.save(any()) } returns post
 
-        service.editPost(EditPostCommand(1L, "새 제목", "새 본문", null), memberId)
+        service.editPost(EditPostCommand(1L, "새 제목", "새 본문", null), memberId, language)
 
         // 좌표가 날아가면 연결 행이 지워져 그 글이 지역 피드에서 조용히 사라진다.
         assertEquals(SpotPoint(127.0, 37.5), post.spotPoint)
@@ -283,6 +331,7 @@ class PostCommandServiceTest {
         service.editPost(
             EditPostCommand(1L, "제목", "본문", null, category = TargetCategory.RESTAURANT),
             memberId,
+            language,
         )
 
         assertEquals(TargetCategory.RESTAURANT, post.category)
@@ -293,7 +342,7 @@ class PostCommandServiceTest {
         val post = storedPost()
         every { postRepository.findById(1L) } returns post
         every { postRepository.save(any()) } returns post
-        every { spotLookup.findSummary(990L) } returns PostSpotView(
+        every { spotLookup.findSummary(990L, language) } returns PostSpotView(
             id = 990L, title = "새 장소", thumbnailImageUrl = "url", category = null,
             longitude = 128.5, latitude = 35.5,
         )
@@ -301,6 +350,7 @@ class PostCommandServiceTest {
         service.editPost(
             EditPostCommand(1L, "제목", "본문", null, changeSpot = true, catalogId = 990L),
             memberId,
+            language,
         )
 
         assertEquals(990L, post.catalogId)
@@ -317,6 +367,7 @@ class PostCommandServiceTest {
         service.editPost(
             EditPostCommand(1L, "제목", "본문", null, changeSpot = true, catalogId = null),
             memberId,
+            language,
         )
 
         assertNull(post.catalogId)
@@ -324,13 +375,14 @@ class PostCommandServiceTest {
     }
 
     @Test
-    fun `없는 장소로 바꾸면 SPOT_NOT_FOUND다`() {
-        every { spotLookup.findSummary(990L) } returns null
+    fun `활성 언어에서 해소되지 않는 장소로 바꾸면 SPOT_NOT_FOUND_IN_LOCALE이다`() {
+        every { spotLookup.findSummary(990L, language) } returns null
 
-        assertFailsWith<SpotNotFoundException> {
+        assertFailsWith<SpotNotFoundInLocaleException> {
             service.editPost(
                 EditPostCommand(1L, "제목", "본문", null, changeSpot = true, catalogId = 990L),
                 memberId,
+                language,
             )
         }
         verify(exactly = 0) { postRepository.save(any()) }
@@ -345,6 +397,7 @@ class PostCommandServiceTest {
         service.editPost(
             EditPostCommand(1L, "제목", "본문", null, tags = listOf("야경", "#사진")),
             memberId,
+            language,
         )
 
         // 선행 #은 제거되고 원문 표기는 보존된다.
@@ -364,7 +417,7 @@ class PostCommandServiceTest {
         every { postRepository.findById(1L) } returns post
         every { postRepository.save(any()) } returns post
 
-        service.editPost(EditPostCommand(1L, "제목", "본문", null, tags = emptyList()), memberId)
+        service.editPost(EditPostCommand(1L, "제목", "본문", null, tags = emptyList()), memberId, language)
 
         // null(그대로 두기)과 빈 배열(전부 떼기)은 다르다.
         assertTrue(post.tags.isEmpty())
@@ -376,6 +429,7 @@ class PostCommandServiceTest {
             service.editPost(
                 EditPostCommand(1L, "제목", "본문", null, tags = listOf("맛집 추천")),
                 memberId,
+                language,
             )
         }
         verify(exactly = 0) { postRepository.save(any()) }
@@ -387,7 +441,7 @@ class PostCommandServiceTest {
         every { postRepository.findById(1L) } returns post
         every { postRepository.save(any()) } returns post
 
-        service.editPost(EditPostCommand(1L, "새 제목", "새 본문", null), memberId)
+        service.editPost(EditPostCommand(1L, "새 제목", "새 본문", null), memberId, language)
 
         assertEquals("새 제목", post.title)
         assertEquals("새 본문", post.body)
@@ -399,7 +453,7 @@ class PostCommandServiceTest {
         every { postRepository.findById(1L) } returns storedPost(authorId = memberId + 1)
 
         assertFailsWith<NotPostOwnerException> {
-            service.editPost(EditPostCommand(1L, "제목", "본문", null), memberId)
+            service.editPost(EditPostCommand(1L, "제목", "본문", null), memberId, language)
         }
         verify(exactly = 0) { postRepository.save(any()) }
     }
@@ -410,7 +464,7 @@ class PostCommandServiceTest {
         every { postRepository.findById(1L) } returns post
 
         assertFailsWith<HiddenPostNotEditableException> {
-            service.editPost(EditPostCommand(1L, "무해한 제목", "무해한 본문", null), memberId)
+            service.editPost(EditPostCommand(1L, "무해한 제목", "무해한 본문", null), memberId, language)
         }
         assertEquals("원래 본문", post.body)
         verify(exactly = 0) { postRepository.save(any()) }
@@ -418,11 +472,11 @@ class PostCommandServiceTest {
 
     @Test
     fun `수정도 제목과 본문 길이를 서로 다른 코드로 거부한다`() {
-        assertFailsWith<PostTitleRequiredException> { service.editPost(EditPostCommand(1L, " ", "본문", null), memberId) }
+        assertFailsWith<PostTitleRequiredException> { service.editPost(EditPostCommand(1L, " ", "본문", null), memberId, language) }
         assertFailsWith<PostTitleLengthInvalidException> {
-            service.editPost(EditPostCommand(1L, "가".repeat(51), "본문", null), memberId)
+            service.editPost(EditPostCommand(1L, "가".repeat(51), "본문", null), memberId, language)
         }
-        assertFailsWith<PostBodyRequiredException> { service.editPost(EditPostCommand(1L, "제목", " ", null), memberId) }
+        assertFailsWith<PostBodyRequiredException> { service.editPost(EditPostCommand(1L, "제목", " ", null), memberId, language) }
         // 형식 검증이 조회보다 먼저다.
         verify(exactly = 0) { postRepository.findById(any()) }
     }
@@ -431,7 +485,7 @@ class PostCommandServiceTest {
     fun `존재하지 않는 글 수정은 POST_NOT_FOUND다`() {
         every { postRepository.findById(1L) } returns null
         assertFailsWith<PostNotFoundException> {
-            service.editPost(EditPostCommand(1L, "제목", "본문", null), memberId)
+            service.editPost(EditPostCommand(1L, "제목", "본문", null), memberId, language)
         }
     }
 

@@ -21,7 +21,6 @@ interface SpotCatalogUpsertPort {
         language: DomainLocale,
         title: String,
         address: String?,
-        hasOrigin: Boolean,
     )
 
     /**
@@ -31,4 +30,12 @@ interface SpotCatalogUpsertPort {
      * 심지 않으면 그 축제는 기간을 갖지 못한다.
      */
     fun refreshFestivalPeriod(catalogId: Long)
+
+    /**
+     * 노출 여부를 원본 생존 상태에 맞추고 **맞춘 뒤의 노출 상태 전부**를 돌려준다.
+     *
+     * `UPDATE ... RETURNING`이 필요해 여기 있다 — JPQL에 `RETURNING`이 없고, 읽기와 쓰기를
+     * 두 문장으로 나누면 그 사이 스냅샷이 갈려 동시 갱신분을 놓친다.
+     */
+    fun refreshTranslationVisibility(): CatalogVisibilityChanges
 }

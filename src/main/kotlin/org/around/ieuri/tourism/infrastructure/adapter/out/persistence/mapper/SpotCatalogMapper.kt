@@ -66,8 +66,6 @@ fun SpotCatalog.toNewEntity(): SpotCatalogEntity =
  */
 fun SpotCatalog.toNewTranslationEntities(catalogId: Long): List<SpotCatalogTranslationEntity> =
     translations.map { (language, translation) ->
-        // **신규 카탈로그의 번역은 그 언어의 spot에서 왔다** — 정의상 원문이 있다.
-        // 번역 배치가 나중에 채우는 행만 hasOrigin=false로 들어간다(upsert 경로).
         translation.toNewEntity(catalogId, language, standard.mapX, standard.mapY, standard.category)
     }
 
@@ -87,8 +85,8 @@ fun CatalogTranslation.toNewEntity(
         mapX = mapX,
         mapY = mapY,
         category = category.code,
-        // 이 경로는 그 언어의 spot에서 카탈로그를 만드는 중이므로 정의상 원문이 있다.
-        hasOrigin = true,
+        // 이 경로는 그 언어의 spot에서 카탈로그를 만드는 중이라 정의상 그 언어에서 해소된다.
+        visible = true,
     )
 
 /** 축제 기간을 새 엔티티로. PK가 catalogId라 upsert 단위이기도 하다. */

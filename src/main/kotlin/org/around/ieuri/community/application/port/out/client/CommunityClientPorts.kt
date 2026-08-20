@@ -2,6 +2,7 @@ package org.around.ieuri.community.application.port.out.client
 
 import org.around.ieuri.community.application.query.PostAuthorView
 import org.around.ieuri.community.application.query.PostSpotView
+import org.around.ieuri.community.domain.vo.ContentLanguage
 import java.time.Instant
 
 /**
@@ -47,15 +48,29 @@ interface ObjectStoragePort {
  */
 interface SpotLookupPort {
     /**
-     * 피드 카드용 요약. 존재하지 않으면 null이며 그것이 대상 유효성 판정이다.
+     * 피드 카드용 요약. **[language]에서 해소되지 않으면 null이며, 그것이 대상 유효성 판정이다**
+     * (SPEC-0029 R-25). 활성 언어에 없는 장소는 존재하지 않는 것과 같게 다뤄진다 — 그래야
+     * 영어 사용자가 한국어에만 있는 spot을 첨부하지 못한다.
      *
      * 인자는 **카탈로그 id다**(SPEC-0019 R-12) — 언어별 `spot.id`를 받으면 같은 장소인데도
      * 요청 언어에 따라 다른 대상으로 판정된다.
      */
-    fun findSummary(catalogId: Long): PostSpotView?
+    fun findSummary(catalogId: Long, language: ContentLanguage): PostSpotView?
 
-    /** 여러 장소의 요약을 한 번에. 카테고리 칩 필터가 쓴다 — 행마다 물으면 조회가 20번 붙는다. */
-    fun findSummaries(catalogIds: List<Long>): Map<Long, PostSpotView>
+    /**
+     * 여러 장소의 요약을 한 번에. 카테고리 칩 필터가 쓴다 — 행마다 물으면 조회가 20번 붙는다.
+     * [language]에서 해소되지 않는 id는 결과에 키가 없다.
+     */
+    fun findSummaries(catalogIds: List<Long>, language: ContentLanguage): Map<Long, PostSpotView>
+
+    /**
+     * 이 카탈로그가 **해소되는 언어 전부**(SPEC-0029 R-15). 어느 언어에서도 해소되지 않거나
+     * 카탈로그가 없으면 빈 집합이다.
+     *
+     * [findSummary]는 한 언어만 답하므로 첨부 시점의 존재 검사에는 충분하지만, 목록 필터가
+     * 쓸 사본을 채우려면 전 언어가 필요하다.
+     */
+    fun findResolvedLanguages(catalogId: Long): Set<ContentLanguage>
 }
 
 /**

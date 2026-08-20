@@ -84,39 +84,3 @@ class SpotCatalogAssignmentTasklet(
         val ASSIGNMENT_ORDER = listOf(DomainLocale.KO, DomainLocale.EN, DomainLocale.JA, DomainLocale.ZH)
     }
 }
-
-/**
- * 번역 Step 본체(SPEC-0019 §5).
- *
- * **번역이 비어 있는 (카탈로그, 언어) 쌍만** 대상이며 재번역 경로가 없다(R-7).
- * 초기 34,622건은 시드가 적재하고 이 Step은 이후 신규분만 담당한다.
- */
-class SpotCatalogTranslationTasklet(
-    private val useCase: SpotCatalogUseCase,
-    private val batchSize: Int,
-) : Tasklet {
-
-    private val log = LoggerFactory.getLogger(javaClass)
-
-    override fun execute(contribution: StepContribution, chunkContext: ChunkContext): RepeatStatus {
-        val executionContext = chunkContext.stepContext.stepExecution.executionContext
-        val result = useCase.translateMissing(TARGET_LANGUAGES, batchSize)
-
-        val total = executionContext.getInt(KEY_TRANSLATED, 0) + result.translated
-        executionContext.putInt(KEY_TRANSLATED, total)
-        contribution.incrementWriteCount(result.translated.toLong())
-
-        if (result.translated == 0) {
-            log.info("catalog translation finished: translated={}", total)
-            return RepeatStatus.FINISHED
-        }
-        return RepeatStatus.CONTINUABLE
-    }
-
-    companion object {
-        const val KEY_TRANSLATED = "translated"
-
-        /** 번역은 KO → EN/JA/ZH 단방향이다. KO는 원문이므로 대상이 아니다(R-4). */
-        val TARGET_LANGUAGES = setOf(DomainLocale.EN, DomainLocale.JA, DomainLocale.ZH)
-    }
-}

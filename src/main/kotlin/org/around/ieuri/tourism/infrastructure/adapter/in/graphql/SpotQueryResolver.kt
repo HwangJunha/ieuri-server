@@ -51,7 +51,6 @@ class SpotQueryResolver(
         @InputArgument longitude: Double,
         @InputArgument radiusMeters: Int?,
         @InputArgument categories: List<String>?,
-        @InputArgument hasOrigin: Boolean?,
         @InputArgument page: Int?,
         @InputArgument size: Int?,
     ): GqlSpotPage {
@@ -61,7 +60,6 @@ class SpotQueryResolver(
                 longitude = longitude,
                 radiusMeters = radiusMeters ?: DEFAULT_RADIUS_METERS,
                 categories = toCategorySelection(categories),
-                hasOrigin = hasOrigin,
                 page = page ?: DEFAULT_PAGE,
                 size = size ?: DEFAULT_SIZE,
             ),
@@ -144,7 +142,7 @@ class SpotQueryResolver(
     @DgsData(parentType = "SpotDetail", field = "likeCount")
     fun likeCount(dfe: DgsDataFetchingEnvironment): Int =
         // GraphQL likeCount는 Int!. 반응 수가 Int 범위를 넘을 일은 없다.
-        spotQueryUseCase.spotLikeCount(dfe.spotId()).toInt()
+        spotQueryUseCase.spotLikeCount(dfe.spotId(), dfe.domainLocale()).toInt()
 
     /**
      * 호출자가 이 장소에 남긴 최신 반응. **비로그인이면 null이다** — 공개 조회라
@@ -156,7 +154,7 @@ class SpotQueryResolver(
     @DgsData(parentType = "SpotDetail", field = "viewerReaction")
     fun viewerReaction(dfe: DgsDataFetchingEnvironment): String? {
         val memberId = currentMemberProvider.currentMemberId() ?: return null
-        return spotQueryUseCase.spotViewerReaction(dfe.spotId(), memberId)
+        return spotQueryUseCase.spotViewerReaction(dfe.spotId(), memberId, dfe.domainLocale())
     }
 
     /**

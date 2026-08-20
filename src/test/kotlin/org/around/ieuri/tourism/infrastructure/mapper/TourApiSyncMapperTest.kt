@@ -29,6 +29,7 @@ class TourApiSyncMapperTest {
         mapy: Double? = 37.551169,
         contenttypeid: String? = "12",
         cpyrhtDivCd: String? = "Type1",
+        showflag: String? = "1",
     ) = TourApiResponse.Item(
         contentid = contentid,
         title = title,
@@ -39,6 +40,7 @@ class TourApiSyncMapperTest {
         mapy = mapy,
         contenttypeid = contenttypeid,
         cpyrhtDivCd = cpyrhtDivCd,
+        showflag = showflag,
     )
 
     private fun festivalItem(
@@ -152,6 +154,27 @@ class TourApiSyncMapperTest {
         assertNull(item(contentid = "  ").toSyncSpotCommandOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
         assertNull(item(title = "  ").toSyncSpotCommandOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
         assertNull(item(firstimage = "  ").toSyncSpotCommandOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
+    }
+
+    @Test
+    fun `showflag가 1이 아닌 항목은 적재하지 않는다`() {
+        // AC-2.2. 요청에 showflag=1을 넘기지만 그 보장에만 기대지 않는다(arrange=Q와 같은 규율).
+        assertNull(item(showflag = "0").toSyncSpotCommandOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
+    }
+
+    @Test
+    fun `showflag가 없는 항목은 적재하지 않는다`() {
+        // AC-2.3. **결측을 `"1"`로 간주하면 표출이 중단된 항목이 그대로 들어온다.**
+        // 이 스펙에서 가장 조용히 틀리기 쉬운 지점이라 별도로 고정한다.
+        assertNull(item(showflag = null).toSyncSpotCommandOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
+        assertNull(item(showflag = "  ").toSyncSpotCommandOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
+    }
+
+    @Test
+    fun `showflag 판정은 조회 경로에 걸리지 않는다`() {
+        // locationBasedList2 응답에는 showflag가 없다 — 조회 매퍼가 같은 판정을 하면
+        // 실시간 조회가 전량 빈 결과가 된다. 두 매퍼의 규칙이 다르다는 사실을 고정한다.
+        assertNotNull(item(showflag = null).toNearbySpotDataOrNull(SpotCategory.TOURIST_SPOT))
     }
 
     // ── toSyncFestivalCommandOrNull ─────────────────────────────────
