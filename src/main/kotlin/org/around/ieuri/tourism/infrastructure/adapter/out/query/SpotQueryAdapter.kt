@@ -5,11 +5,9 @@ import org.around.ieuri.common.pagination.CursorEdge
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.CursorPageInfo
 import org.around.ieuri.tourism.application.port.out.query.LikedSpotsSearch
-import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch
 import org.around.ieuri.tourism.application.port.out.query.SpotBasics
 import org.around.ieuri.tourism.application.port.out.query.SpotIdentity
 import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
-import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
 import org.around.ieuri.tourism.application.exception.InvalidCursorException
 import org.around.ieuri.tourism.application.query.LikedSpotView
 import org.around.ieuri.tourism.domain.vo.DomainLocale
@@ -27,28 +25,18 @@ import org.springframework.transaction.annotation.Transactional
  * 관광지 읽기 포트 구현(CQRS 읽기). 애그리거트를 우회해 필요한 값만 프로젝션한다.
  * 읽기 소스는 두 테이블이다: spot(관광지 본체) + spot_reaction(반응 필터·좋아요 집계).
  *
- * 반경 조회만 PostGIS가 필요해 [SpotSpatialQueryAdapter]에 위임한다 — 포트는 하나로 남고
- * 애플리케이션 계층은 이 분할을 알지 못한다.
+ * 반경 조회는 PostGIS가 필요해 생 SQL이며, `SpotSpatialQueryPort`(→ [SpotSpatialQueryAdapter])로
+ * 갈라져 있다 — 호출자가 두 포트를 함께 주입받는다.
  */
 @Component
 class SpotQueryAdapter(
     private val queryFactory: JPAQueryFactory,
-    private val spatialQueryAdapter: SpotSpatialQueryAdapter,
 ) : SpotQueryPort {
 
     private val spot = QSpotEntity.spotEntity
     private val reaction = QSpotReactionEntity.spotReactionEntity
     private val catalog = QSpotCatalogEntity.spotCatalogEntity
     private val translation = QSpotCatalogTranslationEntity.spotCatalogTranslationEntity
-
-
-    @Transactional(readOnly = true)
-    override fun searchNearby(query: NearbySpotSearch): List<SpotSearchResult> =
-        spatialQueryAdapter.searchNearby(query)
-
-    @Transactional(readOnly = true)
-    override fun countNearby(query: NearbySpotSearch): Int =
-        spatialQueryAdapter.countNearby(query)
 
     /**
      * 그 회원이 이미 반응한 **카탈로그 id**. 반경 조회가 이 집합을 제외 조건으로 쓴다.

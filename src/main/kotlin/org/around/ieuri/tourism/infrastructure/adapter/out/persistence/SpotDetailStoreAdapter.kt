@@ -4,11 +4,9 @@ import com.querydsl.jpa.impl.JPAQueryFactory
 import org.around.ieuri.tourism.application.port.out.persistence.SpotDetailStorePort
 import org.around.ieuri.tourism.application.port.out.persistence.StoredDetail
 import org.around.ieuri.tourism.application.port.out.persistence.StoredIntro
-import org.around.ieuri.tourism.domain.aggregate.SpotDetail
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.tourism.domain.vo.SpotImage
 import org.around.ieuri.tourism.domain.vo.SpotInfoItem
-import org.around.ieuri.tourism.domain.vo.SpotIntro
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotDetailEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotDetailImageEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotDetailInfoEntity
@@ -18,15 +16,15 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 /**
- * 상세 적재 포트 구현. 조회는 QueryDSL로 하고, 쓰기는 전부 upsert라
- * [SpotDetailUpsertJdbcAdapter]에 위임한다 — 포트는 하나로 남고 애플리케이션 계층은 분할을 알지 못한다.
+ * 상세 **조회** 포트 구현. 쓰기는 전부 `INSERT ... ON CONFLICT`라 생 SQL이며,
+ * `SpotDetailUpsertPort`(→ [SpotDetailUpsertJdbcAdapter])로 갈라져 있다 — 호출자가 두 포트를
+ * 함께 주입받는다.
  *
  * 모든 키가 `spot_id` 하나다 — 호출자가 이미 유효한 `spot.id`를 들고 온다.
  */
 @Component
 class SpotDetailStoreAdapter(
     private val queryFactory: JPAQueryFactory,
-    private val upsertAdapter: SpotDetailUpsertJdbcAdapter,
 ) : SpotDetailStorePort {
 
     private val detail = QSpotDetailEntity.spotDetailEntity
@@ -54,20 +52,6 @@ class SpotDetailStoreAdapter(
                 )
             }
 
-    @Transactional
-    override fun saveDetail(spotId: Long, detail: SpotDetail) {
-        upsertAdapter.upsertDetail(spotId, detail, bodyAbsent = false)
-    }
-
-    /**
-     * 본문 부재 적재. NOT NULL 컬럼은 `spot` 행에서 온 [fallback] 값으로 채우고
-     * overview·homepage·tel은 null로 남긴다.
-     */
-    @Transactional
-    override fun saveDetailAbsence(spotId: Long, fallback: SpotDetail) {
-        upsertAdapter.upsertDetail(spotId, fallback, bodyAbsent = true)
-    }
-
     // ---------- 갤러리 ----------
 
     /**
@@ -84,11 +68,6 @@ class SpotDetailStoreAdapter(
             .map { it.toDomain() }
             .ifEmpty { null }
 
-    @Transactional
-    override fun saveGallery(spotId: Long, gallery: List<SpotImage>) {
-        upsertAdapter.replaceGallery(spotId, gallery)
-    }
-
     // ---------- 운영 정보 ----------
 
     @Transactional(readOnly = true)
@@ -101,11 +80,6 @@ class SpotDetailStoreAdapter(
             // 값만 null로 돌려줘야 다음 조회가 미스로 오판하지 않는다.
             ?.let { StoredIntro(it.toDomain().takeUnless { value -> value.isEmpty() }) }
 
-    @Transactional
-    override fun saveIntro(spotId: Long, category: SpotCategory, intro: SpotIntro?) {
-        upsertAdapter.upsertIntro(spotId, category, intro)
-    }
-
     // ---------- 이용안내 ----------
 
     @Transactional(readOnly = true)
@@ -117,9 +91,4 @@ class SpotDetailStoreAdapter(
             .fetch()
             .map { it.toDomain() }
             .ifEmpty { null }
-
-    @Transactional
-    override fun saveInfoItems(spotId: Long, category: SpotCategory, items: List<SpotInfoItem>) {
-        upsertAdapter.replaceInfoItems(spotId, category, items)
-    }
 }

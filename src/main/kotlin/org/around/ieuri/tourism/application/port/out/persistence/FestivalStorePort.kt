@@ -1,29 +1,17 @@
 package org.around.ieuri.tourism.application.port.out.persistence
 
-import org.around.ieuri.tourism.application.command.SyncFestivalCommand
 import org.around.ieuri.tourism.domain.vo.DomainLocale
-import java.time.Instant
 import java.time.LocalDate
 
 /**
- * 축제 정보 적재 아웃바운드 포트. [SpotStorePort]와 같은 규율로 **쓰기 전용**이다.
+ * 축제 정보 조회·정리 아웃바운드 포트. [SpotStorePort]와 같은 규율로, 적재(upsert)는 생 SQL 경로라
+ * [FestivalUpsertPort]로 갈라져 있다.
  *
  * 삭제 메서드가 두 갈래인 것은 정리 대상이 두 갈래이기 때문이다 — 이미 종료된 행([deleteEnded])과
  * 이번 수집 결과에 없는 행([deleteMissing]). 두 경우 모두 `spot` 부모 행을 지우며 축제 정보는
  * CASCADE로 따라간다.
  */
 interface FestivalStorePort {
-    /**
-     * 한 페이지 분량을 upsert한다. 자연키 (contentId, language) 충돌 시 축제 전용 컬럼을 덮어쓴다.
-     * [syncedAt]은 `last_synced_at`에 기록된다.
-     *
-     * **대응하는 `spot` 행이 없는 항목은 조용히 건너뛴다** — 부모 없는 축제는 정상적으로 발생할 수
-     * 있으므로 FK 위반으로 Step을 실패시키지 않는다.
-     *
-     * @return 실제로 적재된 행 수(부모가 없어 건너뛴 항목은 제외).
-     */
-    fun upsertAll(festivals: List<SyncFestivalCommand>, syncedAt: Instant): Int
-
     /**
      * [language]에서 종료일이 [asOf]보다 **이전인** 축제를 삭제한다. 종료일 당일은 지우지 않으며,
      * 이 경계는 도메인 [org.around.ieuri.tourism.domain.vo.FestivalPeriod.isEndedAsOf]와 같아야 한다.

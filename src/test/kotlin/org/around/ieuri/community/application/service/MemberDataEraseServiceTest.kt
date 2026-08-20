@@ -5,6 +5,8 @@ import io.mockk.mockk
 import io.mockk.verify
 import io.mockk.verifyOrder
 import org.around.ieuri.community.application.port.out.persistence.MemberDataErasePort
+import org.around.ieuri.community.application.port.out.persistence.SpotAnswerEraseResult
+import org.around.ieuri.community.application.port.out.persistence.SpotQuestionCounterPort
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 
@@ -18,7 +20,8 @@ class MemberDataEraseServiceTest {
 
     private val memberId = 7L
     private val erasePort = mockk<MemberDataErasePort>(relaxed = true)
-    private val service = MemberDataEraseService(erasePort)
+    private val counterPort = mockk<SpotQuestionCounterPort>(relaxed = true)
+    private val service = MemberDataEraseService(erasePort, counterPort)
 
     @Test
     fun `글 댓글 좋아요 숨김 차단을 모두 지운다`() {
@@ -81,6 +84,45 @@ class MemberDataEraseServiceTest {
         every { erasePort.deleteBlocksInvolving(memberId) } returns 0
 
         service.eraseMemberData(memberId)
+    }
+
+    /**
+     * 답변을 지운 만큼 남는 질문의 `answerCount`를 내린다(SPEC-0026 R17).
+     *
+     * **감소는 어댑터가 아니라 이 서비스가 한다** — 어느 질문의 수를 내릴지는 비즈니스 규칙이지
+     * 저장 방식이 아니다. 어댑터는 대상 id만 돌려준다.
+     */
+    @Test
+    fun `지운 답변이 달렸던 질문의 답변 수를 내린다`() {
+        every { erasePort.deleteSpotAnswersByAuthor(memberId) } returns
+            SpotAnswerEraseResult(deletedCount = 3, affectedQuestionIds = listOf(11L, 11L, 22L))
+
+        service.eraseMemberData(memberId)
+
+        // 같은 질문에 두 건이면 두 번 내린다 — 중복을 접으면 수가 실제보다 크게 남는다.
+        verify(exactly = 2) { counterPort.decreaseAnswerCount(11L) }
+        verify(exactly = 1) { counterPort.decreaseAnswerCount(22L) }
+    }
+
+    /** 대상이 없으면 감소도 없다 — 숨겨진 답변은 애초에 수에 들어 있지 않다. */
+    @Test
+    fun `내릴 질문이 없으면 답변 수를 건드리지 않는다`() {
+        every { erasePort.deleteSpotAnswersByAuthor(memberId) } returns
+            SpotAnswerEraseResult(deletedCount = 2, affectedQuestionIds = emptyList())
+
+        service.eraseMemberData(memberId)
+
+        verify(exactly = 0) { counterPort.decreaseAnswerCount(any()) }
+    }
+
+    /** 삭제가 실패하면 수를 내리지 않는다 — 먼저 내리면 수만 줄어든 상태가 남는다. */
+    @Test
+    fun `답변 삭제가 실패하면 답변 수를 내리지 않는다`() {
+        every { erasePort.deleteSpotAnswersByAuthor(memberId) } throws RuntimeException("db down")
+
+        assertFailsWith<RuntimeException> { service.eraseMemberData(memberId) }
+
+        verify(exactly = 0) { counterPort.decreaseAnswerCount(any()) }
     }
 
     @Test

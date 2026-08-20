@@ -5,7 +5,7 @@ import org.around.ieuri.tourism.application.event.SpotDetailFetched
 import org.around.ieuri.tourism.application.event.SpotGalleryFetched
 import org.around.ieuri.tourism.application.event.SpotInfoItemsFetched
 import org.around.ieuri.tourism.application.event.SpotIntroFetched
-import org.around.ieuri.tourism.application.port.out.persistence.SpotDetailStorePort
+import org.around.ieuri.tourism.application.port.out.persistence.SpotDetailUpsertPort
 import org.slf4j.LoggerFactory
 import org.springframework.context.event.EventListener
 import org.springframework.scheduling.annotation.Async
@@ -25,10 +25,12 @@ import org.springframework.stereotype.Component
  *
  * **어떤 예외도 밖으로 내보내지 않는다.** 적재 실패는 캐시 충전 실패일 뿐이며 사용자에게 알릴
  * 일이 아니다(AC-40). 실패한 항목은 다음 조회 때 다시 이벤트로 들어온다.
+ *
+ * 트랜잭션은 포트 구현이 메서드마다 연다 — `@Async`로 스레드가 갈려도 여기서 열어 줄 것이 없다.
  */
 @Component
 class SpotDetailWriteBehindListener(
-    private val store: SpotDetailStorePort,
+    private val store: SpotDetailUpsertPort,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 

@@ -5,7 +5,9 @@ import org.around.ieuri.tourism.application.port.`in`.command.SpotCatalogUseCase
 import org.around.ieuri.tourism.application.port.out.client.FestivalSyncPort
 import org.around.ieuri.tourism.application.port.out.client.SpotSyncPort
 import org.around.ieuri.tourism.application.port.out.persistence.FestivalStorePort
+import org.around.ieuri.tourism.application.port.out.persistence.FestivalUpsertPort
 import org.around.ieuri.tourism.application.port.out.persistence.SpotStorePort
+import org.around.ieuri.tourism.application.port.out.persistence.SpotUpsertPort
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.infrastructure.batch.FestivalSyncProperties
 import org.around.ieuri.tourism.infrastructure.batch.SpotSyncJobConfig
@@ -33,9 +35,11 @@ class FestivalSyncOrderingTest {
         transactionManager = mockk<PlatformTransactionManager>(relaxed = true),
         syncPort = mockk<SpotSyncPort>(),
         storePort = mockk<SpotStorePort>(),
+        upsertPort = mockk<SpotUpsertPort>(),
         properties = SpotSyncProperties(),
         festivalSyncPort = mockk<FestivalSyncPort>(),
         festivalStorePort = mockk<FestivalStorePort>(),
+        festivalUpsertPort = mockk<FestivalUpsertPort>(),
         festivalProperties = FestivalSyncProperties(),
         catalogUseCase = mockk<SpotCatalogUseCase>(),
         objectMapper = mockk<ObjectMapper>(),

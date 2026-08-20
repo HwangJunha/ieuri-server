@@ -5,7 +5,9 @@ import org.around.ieuri.tourism.application.port.`in`.command.SpotCatalogUseCase
 import org.around.ieuri.tourism.application.port.out.client.FestivalSyncPort
 import org.around.ieuri.tourism.application.port.out.client.SpotSyncPort
 import org.around.ieuri.tourism.application.port.out.persistence.FestivalStorePort
+import org.around.ieuri.tourism.application.port.out.persistence.FestivalUpsertPort
 import org.around.ieuri.tourism.application.port.out.persistence.SpotStorePort
+import org.around.ieuri.tourism.application.port.out.persistence.SpotUpsertPort
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.springframework.batch.core.job.Job
 import org.springframework.batch.core.job.builder.JobBuilder
@@ -43,9 +45,11 @@ class SpotSyncJobConfig(
     private val transactionManager: PlatformTransactionManager,
     private val syncPort: SpotSyncPort,
     private val storePort: SpotStorePort,
+    private val upsertPort: SpotUpsertPort,
     private val properties: SpotSyncProperties,
     private val festivalSyncPort: FestivalSyncPort,
     private val festivalStorePort: FestivalStorePort,
+    private val festivalUpsertPort: FestivalUpsertPort,
     private val festivalProperties: FestivalSyncProperties,
     private val catalogUseCase: SpotCatalogUseCase,
     private val objectMapper: ObjectMapper,
@@ -81,6 +85,7 @@ class SpotSyncJobConfig(
                     language = language,
                     syncPort = syncPort,
                     storePort = storePort,
+                    upsertPort = upsertPort,
                     pageSize = properties.pageSize,
                     // 조회를 Step 실행 시점으로 미룬다 — 람다를 벗기면 부팅 때 잡은 낡은 집합으로
                     // 걸러 종료 축제가 되살아난다.
@@ -102,6 +107,7 @@ class SpotSyncJobConfig(
                     language = language,
                     syncPort = festivalSyncPort,
                     storePort = festivalStorePort,
+                    upsertPort = festivalUpsertPort,
                     pageSize = festivalProperties.pageSize,
                 ),
                 transactionManager,

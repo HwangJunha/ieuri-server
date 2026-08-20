@@ -1,33 +1,27 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.persistence
 
 import com.querydsl.jpa.impl.JPAQueryFactory
-import org.around.ieuri.tourism.application.command.SyncFestivalCommand
 import org.around.ieuri.tourism.application.port.out.persistence.FestivalStorePort
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotFestivalEntity
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
-import java.time.Instant
 import java.time.LocalDate
 
 /**
- * 축제 정보 적재 포트 구현. 조회·삭제는 QueryDSL로 하고, upsert만 [FestivalUpsertJdbcAdapter]에
- * 위임한다.
+ * 축제 정보 조회·정리 포트 구현. QueryDSL로 표현되는 것만 여기 있고, upsert는 생 SQL이라
+ * `FestivalUpsertPort`(→ [FestivalUpsertJdbcAdapter])로 갈라져 있다.
  *
  * 삭제는 전부 `spot`을 대상으로 한다 — `spot_festival` 행은 FK CASCADE로 따라간다.
  */
 @Component
 class FestivalStoreAdapter(
     private val queryFactory: JPAQueryFactory,
-    private val upsertAdapter: FestivalUpsertJdbcAdapter,
 ) : FestivalStorePort {
 
     private val spot = QSpotEntity.spotEntity
     private val festival = QSpotFestivalEntity.spotFestivalEntity
-
-    override fun upsertAll(festivals: List<SyncFestivalCommand>, syncedAt: Instant): Int =
-        upsertAdapter.upsertAll(festivals, syncedAt)
 
     /**
      * 종료된 축제 삭제. `event_end_date < asOf` — 종료일 당일은 아직 유효하다.

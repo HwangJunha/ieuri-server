@@ -8,8 +8,8 @@ import org.around.ieuri.tourism.domain.vo.SpotIntro
 import java.time.Instant
 
 /**
- * 관광지 상세의 DB 캐시 계층 포트. 조회가 미스일 때 그 자리에서 채우므로 읽기와 쓰기가 한 포트에
- * 있으며, 오퍼레이션(본문·갤러리·운영정보·이용안내) 단위로 나눠 필드별 지연 조회를 깨지 않는다.
+ * 관광지 상세의 DB 캐시 **조회** 포트. 오퍼레이션(본문·갤러리·운영정보·이용안내) 단위로 나눠
+ * 필드별 지연 조회를 깨지 않는다. 적재는 생 SQL 경로라 [SpotDetailUpsertPort]로 갈라져 있다.
  *
  * 조회 메서드는 **미스와 "값이 없음"을 구분**한다 — 값이 정상적으로 비어 있는 경우를 미스로 취급하면
  * 매 조회마다 upstream을 두드린다. 목록형은 nullable을, intro는 래퍼를 쓴다.
@@ -21,32 +21,20 @@ interface SpotDetailStorePort {
      */
     fun findDetail(spotId: Long): StoredDetail?
 
-    /** 본문이 존재하는 경우의 적재. */
-    fun saveDetail(spotId: Long, detail: SpotDetail)
-
-    /**
-     * 본문 부재의 적재. NOT NULL 컬럼을 채울 [fallback] 값(`spot` 행에서 온다)을 함께 받는다.
-     * 이미 부재 행이 있으면 `fetched_at`을 갱신해 다음 신선도 창을 새로 시작한다.
-     */
-    fun saveDetailAbsence(spotId: Long, fallback: SpotDetail)
-
     /**
      * 갤러리. 미적재면 null. **빈 갤러리는 미적재와 구분하지 않으므로** 이미지가 0장인 spot은
      * 조회마다 upstream에 한 번 더 묻는다.
      */
     fun findGallery(spotId: Long): List<SpotImage>?
-    fun saveGallery(spotId: Long, gallery: List<SpotImage>)
 
     /**
      * 운영 정보. 미적재면 null, 적재됐으나 값이 없으면 `StoredIntro(null)`.
      * intro는 정상적으로 null일 수 있어 래퍼 없이는 두 상태를 구분할 수 없다.
      */
     fun findIntro(spotId: Long, category: SpotCategory): StoredIntro?
-    fun saveIntro(spotId: Long, category: SpotCategory, intro: SpotIntro?)
 
     /** 이용안내. 미적재면 null. 빈 목록은 갤러리와 같은 이유로 미적재와 구분하지 않는다. */
     fun findInfoItems(spotId: Long, category: SpotCategory): List<SpotInfoItem>?
-    fun saveInfoItems(spotId: Long, category: SpotCategory, items: List<SpotInfoItem>)
 }
 
 /** 적재 여부와 "값이 null임"을 구분하기 위한 래퍼(intro 전용). */

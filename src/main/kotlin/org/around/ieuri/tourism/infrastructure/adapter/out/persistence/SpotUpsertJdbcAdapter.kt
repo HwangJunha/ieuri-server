@@ -1,6 +1,7 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.persistence
 
 import org.around.ieuri.tourism.application.command.SyncSpotCommand
+import org.around.ieuri.tourism.application.port.out.persistence.SpotUpsertPort
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.ParameterizedPreparedStatementSetter
 import org.springframework.stereotype.Component
@@ -18,11 +19,11 @@ import java.time.Instant
 @Component
 class SpotUpsertJdbcAdapter(
     private val jdbcTemplate: JdbcTemplate,
-) {
+) : SpotUpsertPort {
 
     /** [spots]를 한 번의 배치로 upsert하고 실제 반영된 행 수를 돌려준다. */
     @Transactional
-    fun upsertAll(spots: List<SyncSpotCommand>, syncedAt: Instant): Int {
+    override fun upsertAll(spots: List<SyncSpotCommand>, syncedAt: Instant): Int {
         if (spots.isEmpty()) return 0
         val syncedTimestamp = Timestamp.from(syncedAt)
         val setter = ParameterizedPreparedStatementSetter<SyncSpotCommand> { ps: PreparedStatement, spot ->

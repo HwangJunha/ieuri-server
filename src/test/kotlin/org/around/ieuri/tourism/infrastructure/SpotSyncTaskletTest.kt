@@ -8,6 +8,7 @@ import org.around.ieuri.tourism.application.port.out.client.SpotSyncPage
 import org.around.ieuri.tourism.application.port.out.client.SpotSyncPort
 import org.around.ieuri.tourism.application.command.SyncSpotCommand
 import org.around.ieuri.tourism.application.port.out.persistence.SpotStorePort
+import org.around.ieuri.tourism.application.port.out.persistence.SpotUpsertPort
 import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
@@ -39,6 +40,7 @@ class SpotSyncTaskletTest {
 
     private val syncPort = mockk<SpotSyncPort>()
     private val storePort = mockk<SpotStorePort>(relaxed = true)
+    private val upsertPort = mockk<SpotUpsertPort>(relaxed = true)
 
     private fun record(id: String) = SyncSpotCommand(
         contentId = id,
@@ -79,6 +81,7 @@ class SpotSyncTaskletTest {
         language = DomainLocale.KO,
         syncPort = syncPort,
         storePort = storePort,
+        upsertPort = upsertPort,
         pageSize = pageSize,
         endedFestivalIds = { endedFestivalIds },
     )
@@ -86,7 +89,7 @@ class SpotSyncTaskletTest {
     @Test
     fun `다음 페이지가 남으면 CONTINUABLE을 반환하고 페이지 번호를 올린다`() {
         every { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) } returns page(listOf(record("1")), totalCount = 2_500)
-        every { storePort.upsertAll(any(), any()) } returns 1
+        every { upsertPort.upsertAll(any(), any()) } returns 1
 
         val execution = stepExecution()
         val status = run(tasklet(), execution)
@@ -98,7 +101,7 @@ class SpotSyncTaskletTest {
     @Test
     fun `마지막 페이지면 FINISHED를 반환한다`() {
         every { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) } returns page(listOf(record("1")), totalCount = 1)
-        every { storePort.upsertAll(any(), any()) } returns 1
+        every { upsertPort.upsertAll(any(), any()) } returns 1
 
         val status = run(tasklet(), stepExecution())
 
@@ -109,7 +112,7 @@ class SpotSyncTaskletTest {
     fun `ExecutionContext에 남은 페이지 번호부터 재개한다`() {
         // AC-8: 3페이지에서 실패한 실행을 재실행하면 1페이지가 아니라 3페이지부터 처리한다.
         every { syncPort.fetchPage(DomainLocale.KO, 3, 1_000) } returns page(listOf(record("1")), totalCount = 3_000)
-        every { storePort.upsertAll(any(), any()) } returns 1
+        every { upsertPort.upsertAll(any(), any()) } returns 1
 
         val execution = stepExecution()
         execution.executionContext.putInt(SpotSyncTasklet.KEY_NEXT_PAGE, 3)
@@ -126,7 +129,7 @@ class SpotSyncTaskletTest {
         every { syncPort.fetchPage(DomainLocale.KO, any(), 1_000) } returns
             page(listOf(record("1")), totalCount = 3_000)
         val syncedAt = slot<Instant>()
-        every { storePort.upsertAll(any(), capture(syncedAt)) } returns 1
+        every { upsertPort.upsertAll(any(), capture(syncedAt)) } returns 1
 
         val execution = stepExecution()
         run(tasklet(), execution)
@@ -143,7 +146,7 @@ class SpotSyncTaskletTest {
         // AC-18: 실행 이력에서 언어별 처리 건수를 확인할 수 있어야 한다.
         every { syncPort.fetchPage(DomainLocale.KO, any(), 1_000) } returns
             page(listOf(record("1"), record("2")), totalCount = 3_000)
-        every { storePort.upsertAll(any(), any()) } returns 2
+        every { upsertPort.upsertAll(any(), any()) } returns 2
 
         val execution = stepExecution()
         run(tasklet(), execution)
@@ -160,7 +163,7 @@ class SpotSyncTaskletTest {
             droppedCount = 2,
             categoryFallbackCount = 5,
         )
-        every { storePort.upsertAll(any(), any()) } returns 1
+        every { upsertPort.upsertAll(any(), any()) } returns 1
 
         val execution = stepExecution()
         run(tasklet(), execution)
@@ -186,7 +189,7 @@ class SpotSyncTaskletTest {
     fun `수집 집합에 없는 행을 삭제한다`() {
         every { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) } returns
             page(listOf(record("a"), record("b")), totalCount = 2)
-        every { storePort.upsertAll(any(), any()) } returns 2
+        every { upsertPort.upsertAll(any(), any()) } returns 2
         every { storePort.deleteMissing(any(), any()) } returns 1
 
         run(tasklet(), stepExecution())
@@ -199,7 +202,7 @@ class SpotSyncTaskletTest {
     fun `수집이 0건이면 정리를 건너뛴다(AC-14)`() {
         // 업스트림 일시 오류로 빈 목록을 받았을 때 전량 삭제되면 안 된다.
         every { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) } returns page(emptyList(), totalCount = 0)
-        every { storePort.upsertAll(any(), any()) } returns 0
+        every { upsertPort.upsertAll(any(), any()) } returns 0
 
         val execution = stepExecution()
         run(tasklet(), execution)
@@ -213,7 +216,7 @@ class SpotSyncTaskletTest {
         // 3페이지부터 재개하면 1·2페이지 항목이 집합에 없어, 그대로 지우면 대량 오삭제가 된다.
         every { syncPort.fetchPage(DomainLocale.KO, 3, 1_000) } returns
             page(listOf(record("c")), totalCount = 3_000)
-        every { storePort.upsertAll(any(), any()) } returns 1
+        every { upsertPort.upsertAll(any(), any()) } returns 1
 
         val execution = stepExecution()
         execution.executionContext.putInt(SpotSyncTasklet.KEY_NEXT_PAGE, 3)
@@ -232,7 +235,7 @@ class SpotSyncTaskletTest {
     fun `정리는 마지막 페이지에서 한 번만 수행된다`() {
         every { syncPort.fetchPage(DomainLocale.KO, any(), 1_000) } returns
             page(listOf(record("a")), totalCount = 3_000)
-        every { storePort.upsertAll(any(), any()) } returns 1
+        every { upsertPort.upsertAll(any(), any()) } returns 1
         every { storePort.deleteMissing(any(), any()) } returns 0
 
         val execution = stepExecution()
@@ -248,12 +251,12 @@ class SpotSyncTaskletTest {
         // 제외하지 않으면 같은 잡의 축제 정리가 지운 행사를 이 Step이 되살린다.
         every { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) } returns
             page(listOf(record("ended"), record("alive")), totalCount = 2)
-        every { storePort.upsertAll(any(), any()) } returns 1
+        every { upsertPort.upsertAll(any(), any()) } returns 1
         every { storePort.deleteMissing(any(), any()) } returns 0
 
         run(tasklet(endedFestivalIds = setOf("ended")), stepExecution())
 
-        verify(exactly = 1) { storePort.upsertAll(match { it.map(SyncSpotCommand::contentId) == listOf("alive") }, any()) }
+        verify(exactly = 1) { upsertPort.upsertAll(match { it.map(SyncSpotCommand::contentId) == listOf("alive") }, any()) }
     }
 
     @Test
@@ -262,12 +265,12 @@ class SpotSyncTaskletTest {
         // 축제가 아닌 contentId는 애초에 제외 집합에 들어올 수 없다.
         every { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) } returns
             page(listOf(record("spot-1"), record("spot-2")), totalCount = 2)
-        every { storePort.upsertAll(any(), any()) } returns 2
+        every { upsertPort.upsertAll(any(), any()) } returns 2
         every { storePort.deleteMissing(any(), any()) } returns 0
 
         run(tasklet(endedFestivalIds = setOf("ended-festival")), stepExecution())
 
-        verify(exactly = 1) { storePort.upsertAll(match { it.size == 2 }, any()) }
+        verify(exactly = 1) { upsertPort.upsertAll(match { it.size == 2 }, any()) }
     }
 
     @Test
@@ -276,7 +279,7 @@ class SpotSyncTaskletTest {
         // 항목"으로 삭제 대상에 들어가 삭제 건수가 이중으로 잡힌다.
         every { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) } returns
             page(listOf(record("ended"), record("alive")), totalCount = 2)
-        every { storePort.upsertAll(any(), any()) } returns 1
+        every { upsertPort.upsertAll(any(), any()) } returns 1
         every { storePort.deleteMissing(any(), any()) } returns 0
 
         val execution = stepExecution()
@@ -292,13 +295,14 @@ class SpotSyncTaskletTest {
         // 필요하지도 않다. 부팅 시점이 아니라 실행 시점에 잡는 것이 요점이다.
         every { syncPort.fetchPage(DomainLocale.KO, any(), 1_000) } returns
             page(listOf(record("a")), totalCount = 3_000)
-        every { storePort.upsertAll(any(), any()) } returns 1
+        every { upsertPort.upsertAll(any(), any()) } returns 1
 
         var lookups = 0
         val tasklet = SpotSyncTasklet(
             language = DomainLocale.KO,
             syncPort = syncPort,
             storePort = storePort,
+            upsertPort = upsertPort,
             pageSize = 1_000,
             endedFestivalIds = { lookups++; emptySet() },
         )

@@ -11,18 +11,10 @@ import org.around.ieuri.tourism.domain.vo.SpotCategory
 
 /**
  * 관광지 관련 읽기 아웃바운드 포트(CQRS 읽기). 애그리거트를 우회해 필요한 값만 프로젝션한다.
- * spot 조회에 필요한 DB 읽기를 한 포트로 모은다(반경 조회, 반응 기록 기반 집계·필터).
+ * QueryDSL로 표현되는 읽기만 여기 있다 — 반경 조회는 PostGIS가 필요해 [SpotSpatialQueryPort]로
+ * 갈라져 있다.
  */
 interface SpotQueryPort {
-    /**
-     * 반경 안의 관광지를 **거리 오름차순**으로 한 페이지 조회한다. TourAPI를 호출하지 않고 적재된
-     * spot 테이블만 본다. [SpotSearchResult.distanceMeters]는 DB가 계산한 구면 거리다.
-     */
-    fun searchNearby(query: NearbySpotSearch): List<SpotSearchResult>
-
-    /** [query] 조건에 맞는 전체 건수(페이지 무관). SpotPage.totalCount 산출용. */
-    fun countNearby(query: NearbySpotSearch): Int
-
     /**
      * 이 회원이 **[language]에서** 이미 반응한 카탈로그 id 전체. 반경 조회의 제외 집합이다.
      *

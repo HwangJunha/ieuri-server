@@ -53,6 +53,24 @@ interface MessageReportRepositoryPort {
  * 같은 삭제를 두 포트가 각각 제공하면 한쪽만 고쳐졌을 때 두 경로가 조용히 갈린다.
  */
 interface MessagePurgePort {
-    /** [cutoff] 이전에 만들어진 메시지를 최대 [limit]건 지우고 삭제 건수를 돌려준다. */
-    fun deleteCreatedBefore(cutoff: Instant, limit: Int): Int
+    /**
+     * [cutoff] 이전에 만들어진 메시지 **행**을 최대 [limit]건 지운다.
+     *
+     * **첨부 오브젝트는 지우지 않는다** — 지워야 할 키를
+     * [ExpiredMessagePurgeResult.photoObjectKeys]로 돌려주고, 스토리지 삭제는 호출자가 한다.
+     * 원격 왕복을 이 트랜잭션 안에 두면 커넥션 보유 시간이 원격 레이턴시에 묶인다.
+     */
+    fun deleteCreatedBefore(cutoff: Instant, limit: Int): ExpiredMessagePurgeResult
 }
+
+/**
+ * 만료 메시지 행 삭제 결과.
+ *
+ * @property deletedCount 지운 메시지 행 수.
+ * @property photoObjectKeys 뒤이어 스토리지에서 지워야 할 첨부 오브젝트 키. 행이 이미 사라졌으므로
+ *   여기 담기지 않은 키는 되찾을 방법이 없다.
+ */
+data class ExpiredMessagePurgeResult(
+    val deletedCount: Int,
+    val photoObjectKeys: List<String>,
+)

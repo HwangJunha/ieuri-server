@@ -2,10 +2,12 @@ package org.around.ieuri.tourism.infrastructure.adapter.out.query
 
 import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch
 import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
+import org.around.ieuri.tourism.application.port.out.query.SpotSpatialQueryPort
 import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Component
+import org.springframework.transaction.annotation.Transactional
 
 /**
  * 반경 조회 전용 어댑터. PostGIS 함수(`ST_DWithin`·`ST_Distance`·`ST_MakePoint`)를 QueryDSL로
@@ -22,13 +24,14 @@ import org.springframework.stereotype.Component
 @Component
 class SpotSpatialQueryAdapter(
     private val jdbcTemplate: JdbcTemplate,
-) {
+) : SpotSpatialQueryPort {
 
     /**
      * 중심에서 반경 안의 관광지 한 페이지. 거리 오름차순, 등거리는 id 오름차순이다 —
      * `ORDER BY`의 `id`를 빼면 등거리 행의 순서가 요청마다 달라져 항목이 중복·누락된다.
      */
-    fun searchNearby(query: NearbySpotSearch): List<SpotSearchResult> {
+    @Transactional(readOnly = true)
+    override fun searchNearby(query: NearbySpotSearch): List<SpotSearchResult> {
         val (where, params) = whereClause(query)
         // 중심 좌표를 CTE로 한 번만 바인딩한다. SELECT·WHERE·ORDER BY 세 곳에서 쓰이는데
         // 그때마다 ST_MakePoint(?, ?)를 반복하면 위치 파라미터가 6개로 늘어 순서를 맞추기 어렵다.
@@ -67,7 +70,8 @@ class SpotSpatialQueryAdapter(
     }
 
     /** [searchNearby]와 같은 조건에 걸리는 전체 건수. */
-    fun countNearby(query: NearbySpotSearch): Int {
+    @Transactional(readOnly = true)
+    override fun countNearby(query: NearbySpotSearch): Int {
         val (where, params) = whereClause(query)
         return jdbcTemplate.queryForObject(
             "WITH c AS (SELECT $CENTER AS center) SELECT COUNT(*) FROM $CARD_SOURCE, c WHERE $where",

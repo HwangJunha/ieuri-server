@@ -7,6 +7,7 @@ import org.around.ieuri.tourism.application.command.SyncFestivalCommand
 import org.around.ieuri.tourism.application.port.out.client.FestivalSyncPage
 import org.around.ieuri.tourism.application.port.out.client.FestivalSyncPort
 import org.around.ieuri.tourism.application.port.out.persistence.FestivalStorePort
+import org.around.ieuri.tourism.application.port.out.persistence.FestivalUpsertPort
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.FestivalPeriod
 import org.around.ieuri.tourism.infrastructure.batch.FestivalSyncTasklet
@@ -36,6 +37,7 @@ class FestivalSyncTaskletTest {
     private val runDate = LocalDate.of(2026, 8, 3)
     private val syncPort = mockk<FestivalSyncPort>()
     private val storePort = mockk<FestivalStorePort>(relaxed = true)
+    private val upsertPort = mockk<FestivalUpsertPort>(relaxed = true)
 
     private fun record(id: String) = SyncFestivalCommand(
         contentId = id,
@@ -67,6 +69,7 @@ class FestivalSyncTaskletTest {
             language = language,
             syncPort = syncPort,
             storePort = storePort,
+            upsertPort = upsertPort,
             pageSize = pageSize,
         )
 
@@ -78,7 +81,7 @@ class FestivalSyncTaskletTest {
         // 그래야 수집 조건·종료 판정·재삽입 제외가 같은 날짜를 본다.
         every { syncPort.fetchPage(DomainLocale.KO, runDate, 1, 1_000) } returns
             page(listOf(record("1")), totalCount = 1)
-        every { storePort.upsertAll(any(), any()) } returns 1
+        every { upsertPort.upsertAll(any(), any()) } returns 1
 
         run(tasklet(), stepExecution())
 
@@ -89,7 +92,7 @@ class FestivalSyncTaskletTest {
     fun `다음 페이지가 남으면 CONTINUABLE을 반환하고 페이지 번호를 올린다`() {
         every { syncPort.fetchPage(DomainLocale.KO, runDate, 1, 1_000) } returns
             page(listOf(record("1")), totalCount = 2_500)
-        every { storePort.upsertAll(any(), any()) } returns 1
+        every { upsertPort.upsertAll(any(), any()) } returns 1
 
         val execution = stepExecution()
         val status = run(tasklet(), execution)
@@ -102,7 +105,7 @@ class FestivalSyncTaskletTest {
     fun `마지막 페이지면 FINISHED를 반환한다`() {
         every { syncPort.fetchPage(DomainLocale.KO, runDate, 1, 1_000) } returns
             page(listOf(record("1")), totalCount = 1)
-        every { storePort.upsertAll(any(), any()) } returns 1
+        every { upsertPort.upsertAll(any(), any()) } returns 1
 
         assertEquals(RepeatStatus.FINISHED, run(tasklet(), stepExecution()))
     }
@@ -124,20 +127,20 @@ class FestivalSyncTaskletTest {
         // AC-1·AC-23~25. upsert의 멱등성은 저장 포트의 계약이며, Step은 명령의 모양만 책임진다.
         val records = listOf(record("a"), record("b"))
         every { syncPort.fetchPage(DomainLocale.KO, runDate, 1, 1_000) } returns page(records, totalCount = 2)
-        every { storePort.upsertAll(any(), any()) } returns 2
+        every { upsertPort.upsertAll(any(), any()) } returns 2
         every { storePort.deleteEnded(any(), any()) } returns 0
         every { storePort.deleteMissing(any(), any()) } returns 0
 
         run(tasklet(), stepExecution())
 
-        verify(exactly = 1) { storePort.upsertAll(records, any()) }
+        verify(exactly = 1) { upsertPort.upsertAll(records, any()) }
     }
 
     @Test
     fun `언어별로 독립된 수집 호출과 정리가 이루어진다`() {
         // AC-20·AC-22. 삭제 대상은 그 언어의 행으로 한정된다.
         every { syncPort.fetchPage(any(), runDate, 1, 1_000) } returns page(listOf(record("a")), totalCount = 1)
-        every { storePort.upsertAll(any(), any()) } returns 1
+        every { upsertPort.upsertAll(any(), any()) } returns 1
         every { storePort.deleteEnded(any(), any()) } returns 0
         every { storePort.deleteMissing(any(), any()) } returns 0
 
@@ -159,7 +162,7 @@ class FestivalSyncTaskletTest {
         // AC-26~AC-30. 두 갈래 삭제가 모두 수행되고, 생존 집합은 이번에 수집한 것이다.
         every { syncPort.fetchPage(DomainLocale.KO, runDate, 1, 1_000) } returns
             page(listOf(record("a"), record("b")), totalCount = 2)
-        every { storePort.upsertAll(any(), any()) } returns 2
+        every { upsertPort.upsertAll(any(), any()) } returns 2
         every { storePort.deleteEnded(DomainLocale.KO, runDate) } returns 3
         every { storePort.deleteMissing(DomainLocale.KO, setOf("a", "b")) } returns 1
 
@@ -177,7 +180,7 @@ class FestivalSyncTaskletTest {
     fun `수집이 0건이면 정리를 건너뛰고 사유를 남긴다`() {
         // AC-35·AC-38. 업스트림 일시 오류로 빈 목록을 받으면 그 언어의 축제가 전량 삭제된다.
         every { syncPort.fetchPage(DomainLocale.KO, runDate, 1, 1_000) } returns page(emptyList(), totalCount = 0)
-        every { storePort.upsertAll(any(), any()) } returns 0
+        every { upsertPort.upsertAll(any(), any()) } returns 0
 
         val execution = stepExecution()
         run(tasklet(), execution)
@@ -200,7 +203,7 @@ class FestivalSyncTaskletTest {
         // 지워지는 것을 아무것도 막지 않는다.
         every { syncPort.fetchPage(DomainLocale.KO, runDate, 1, 1_000) } returns
             page(List(10) { record("f$it") }, totalCount = 10)
-        every { storePort.upsertAll(any(), any()) } returns 10
+        every { upsertPort.upsertAll(any(), any()) } returns 10
         every { storePort.deleteEnded(any(), any()) } returns 0
         every { storePort.deleteMissing(any(), any()) } returns 90
 
@@ -233,7 +236,7 @@ class FestivalSyncTaskletTest {
         // 수집 중간에 지우면 페이지 경계에서 방금 넣은 행을 지울 수 있다.
         every { syncPort.fetchPage(DomainLocale.KO, runDate, any(), 1_000) } returns
             page(listOf(record("a")), totalCount = 3_000)
-        every { storePort.upsertAll(any(), any()) } returns 1
+        every { upsertPort.upsertAll(any(), any()) } returns 1
 
         run(tasklet(), stepExecution())
 
@@ -248,7 +251,7 @@ class FestivalSyncTaskletTest {
         // AC-39·AC-41. 드랍이 적재에 섞이면 [TBD-2]를 판단할 근거가 사라진다.
         every { syncPort.fetchPage(DomainLocale.KO, runDate, any(), 1_000) } returns
             page(listOf(record("1"), record("2")), totalCount = 3_000, dropped = 3)
-        every { storePort.upsertAll(any(), any()) } returns 2
+        every { upsertPort.upsertAll(any(), any()) } returns 2
 
         val execution = stepExecution()
         run(tasklet(), execution)

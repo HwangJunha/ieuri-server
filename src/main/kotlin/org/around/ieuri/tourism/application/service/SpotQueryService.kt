@@ -24,6 +24,7 @@ import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch
 import org.around.ieuri.tourism.application.port.out.query.SpotIdentity
 import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
 import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
+import org.around.ieuri.tourism.application.port.out.query.SpotSpatialQueryPort
 import org.around.ieuri.common.context.AppKey
 import org.around.ieuri.tourism.application.port.out.query.AppCategoryQueryPort
 import org.around.ieuri.tourism.application.query.AppCategoryCode
@@ -61,6 +62,8 @@ import java.time.Instant
 class SpotQueryService(
     private val tourInfoPort: TourInfoPort,
     private val spotQueryPort: SpotQueryPort,
+    // 반경 조회만 PostGIS 생 SQL이라 포트가 갈린다 — 어느 읽기가 그쪽인지 여기서 보인다.
+    private val spotSpatialQueryPort: SpotSpatialQueryPort,
     private val spotCachePort: SpotCachePort,
     private val spotDetailStorePort: SpotDetailStorePort,
     private val eventPublisher: TourismEventPublisherPort,
@@ -95,8 +98,8 @@ class SpotQueryService(
             offset = (page - 1) * size,
         )
 
-        val results = spotQueryPort.searchNearby(search)
-        val totalCount = spotQueryPort.countNearby(search)
+        val results = spotSpatialQueryPort.searchNearby(search)
+        val totalCount = spotSpatialQueryPort.countNearby(search)
 
         return SpotPageView(
             items = results.map { it.toView() },

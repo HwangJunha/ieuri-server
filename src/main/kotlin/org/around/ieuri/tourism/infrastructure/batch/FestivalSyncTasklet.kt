@@ -2,6 +2,7 @@ package org.around.ieuri.tourism.infrastructure.batch
 
 import org.around.ieuri.tourism.application.port.out.client.FestivalSyncPort
 import org.around.ieuri.tourism.application.port.out.persistence.FestivalStorePort
+import org.around.ieuri.tourism.application.port.out.persistence.FestivalUpsertPort
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.slf4j.LoggerFactory
 import org.springframework.batch.core.scope.context.ChunkContext
@@ -27,6 +28,8 @@ class FestivalSyncTasklet(
     private val language: DomainLocale,
     private val syncPort: FestivalSyncPort,
     private val storePort: FestivalStorePort,
+    // 생 SQL(upsert) 경로는 포트가 갈린다 — 어느 쓰기가 그쪽인지 여기서 보인다.
+    private val upsertPort: FestivalUpsertPort,
     private val pageSize: Int,
 ) : Tasklet {
 
@@ -45,7 +48,7 @@ class FestivalSyncTasklet(
         val syncedAt = executionContext.getString(KEY_SYNCED_AT, Instant.now().toString()).let(Instant::parse)
 
         val page = syncPort.fetchPage(language, runDate, pageNo, pageSize)
-        val written = storePort.upsertAll(page.records, syncedAt)
+        val written = upsertPort.upsertAll(page.records, syncedAt)
         page.records.forEach { collectedIds += it.contentId }
 
         val totalWritten = executionContext.getInt(KEY_WRITTEN, 0) + written
