@@ -3,7 +3,10 @@ package org.around.ieuri.tourism.application.port.`in`.command
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 
 /**
- * 카탈로그 배정·번역 유스케이스(SPEC-0019). 배치가 호출한다.
+ * 카탈로그 배정 유스케이스(SPEC-0019). 배치가 호출한다.
+ *
+ * **번역 채움은 없다**(SPEC-0029 R-6). 언어 슬롯은 원본이 있는 언어에만 생기며, 비어 있는
+ * 언어는 비어 있는 채로 조회에서 빠진다.
  */
 interface SpotCatalogUseCase {
 
@@ -20,21 +23,12 @@ interface SpotCatalogUseCase {
     fun assignCatalogs(language: DomainLocale, afterSpotId: Long = 0L): CatalogAssignmentResult
 
     /**
-     * 번역이 비어 있는 (카탈로그, 언어) 쌍을 채운다(R-4).
-     *
-     * **재번역 경로가 없다**(R-7). 기존 `content_id`의 제목이 상류에서 바뀌어도 번역은 그대로
-     * 둔다. 이는 의도된 동작이며 결함이 아니다.
-     */
-    fun translateMissing(languages: Set<DomainLocale>, limit: Int): TranslationResult
-
-    /**
      * 원본이 사라진 카탈로그를 조회에서 감추고, 돌아온 것은 다시 보이게 한다.
-     * 상태가 바뀐 행 수를 돌려준다.
      *
      * **배정 뒤에 부른다** — 배정이 새 spot을 붙이고 나서야 "정말 원본이 없는" 카탈로그가
      * 확정된다. 앞에 두면 방금 들어온 장소를 잠시 감춘다.
      */
-    fun refreshCatalogVisibility(): Int
+    fun refreshCatalogVisibility()
 }
 
 /**
@@ -62,9 +56,3 @@ data class CatalogAssignmentResult(
     /** 이 회차가 무언가 읽었는가. 언어 소진 판정의 기준이다. */
     val processed: Int get() = assigned + skipped
 }
-
-/** 번역 결과. [skipped]는 이미 제목이 있어 건너뛴 쌍이다. */
-data class TranslationResult(
-    val translated: Int,
-    val skipped: Int,
-)

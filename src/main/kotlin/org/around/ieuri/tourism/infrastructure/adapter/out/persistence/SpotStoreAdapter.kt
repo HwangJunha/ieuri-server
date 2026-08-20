@@ -1,29 +1,22 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.persistence
 
 import com.querydsl.jpa.impl.JPAQueryFactory
-import org.around.ieuri.tourism.application.command.SyncSpotCommand
 import org.around.ieuri.tourism.application.port.out.persistence.SpotStorePort
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotEntity
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
-import java.time.Instant
 
 /**
- * 관광지 목록 적재 포트 구현. 조회·삭제는 QueryDSL로 하고, upsert만 [SpotUpsertJdbcAdapter]에
- * 위임한다 — 포트는 하나로 남고 애플리케이션 계층은 이 분할을 알지 못한다.
+ * 관광지 목록 정리 포트 구현. QueryDSL로 표현되는 삭제만 여기 있고, upsert는 생 SQL이라
+ * `SpotUpsertPort`(→ [SpotUpsertJdbcAdapter])로 갈라져 있다 — 호출자가 두 포트를 함께 주입받는다.
  */
 @Component
 class SpotStoreAdapter(
     private val queryFactory: JPAQueryFactory,
-    private val upsertAdapter: SpotUpsertJdbcAdapter,
 ) : SpotStorePort {
 
     private val spot = QSpotEntity.spotEntity
-
-    /** 트랜잭션은 위임 대상이 연다 — 여기 애노테이션을 중복으로 붙이지 않는다. */
-    override fun upsertAll(spots: List<SyncSpotCommand>, syncedAt: Instant): Int =
-        upsertAdapter.upsertAll(spots, syncedAt)
 
     /**
      * 이번 수집 결과에 없는 항목 삭제.

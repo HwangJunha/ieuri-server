@@ -38,9 +38,27 @@ interface MemberDataErasePort {
      */
     fun deleteSpotQuestionsByAuthor(memberId: Long): Long
 
-    /** 회원이 **남의 질문에** 단 답변. 자기 질문의 답변은 질문과 함께 사라진다. */
-    fun deleteSpotAnswersByAuthor(memberId: Long): Long
+    /**
+     * 회원이 **남의 질문에** 단 답변. 자기 질문의 답변은 질문과 함께 사라진다.
+     *
+     * **`answerCount`는 여기서 내리지 않는다** — 어느 질문의 수를 내려야 하는지만
+     * [SpotAnswerEraseResult.affectedQuestionIds]로 알리고, 실제 감소는 호출자가 한다.
+     */
+    fun deleteSpotAnswersByAuthor(memberId: Long): SpotAnswerEraseResult
 
     /** 회원이 **남의 답변에** 단 답글. */
     fun deleteSpotAnswerRepliesByAuthor(memberId: Long): Long
 }
+
+/**
+ * 답변 삭제 결과.
+ *
+ * @property deletedCount 지운 답변 행 수.
+ * @property affectedQuestionIds `answerCount`를 하나씩 내려야 할 질문 id. **중복이 그대로 담긴다** —
+ *   같은 질문에 이 회원의 답변이 여러 건이면 그 수만큼 내려야 하기 때문이다. 숨겨진 답변은
+ *   이미 수에서 빠져 있어 포함되지 않는다(두 번 내리면 수가 실제보다 작아진다).
+ */
+data class SpotAnswerEraseResult(
+    val deletedCount: Long,
+    val affectedQuestionIds: List<Long>,
+)

@@ -14,21 +14,27 @@ import org.around.ieuri.community.application.command.LikePostCommand
 import org.around.ieuri.community.application.command.ReportContentCommand
 import org.around.ieuri.community.application.query.PostImageConfirmResult
 import org.around.ieuri.community.application.query.PostImageUploadUrlView
+import org.around.ieuri.community.domain.vo.ContentLanguage
 
 /**
  * 글 쓰기 유스케이스. [memberId]는 인증된 회원이며 리졸버가 SecurityContext에서 확립한다.
+ *
+ * `language`는 요청의 활성 언어이며 **장소 존재 검사의 기준이다**(SPEC-0029 R-16) —
+ * 카탈로그가 아예 없으면 SPOT_NOT_FOUND, 있으나 이 언어에 원본이 없으면
+ * SPOT_NOT_FOUND_IN_LOCALE이다. 커맨드가 아니라 인자로 받는 이유는 커맨드가 클라이언트
+ * 입력만 들고 있기 때문이다(memberId와 같은 이유).
  */
 interface PostCommandUseCase {
     /**
      * 생성된 글의 id. 글 전체를 돌려주지 않는다 — 응답에 spot·작성자를 채우려면 다른 도메인을
      * 왕복해야 하는데, 클라이언트는 어차피 `post(id:)`로 다시 조회한다.
      */
-    fun createPost(command: CreatePostCommand, memberId: Long): Long
+    fun createPost(command: CreatePostCommand, memberId: Long, language: ContentLanguage): Long
 
     /**
      * 제목·본문 수정. 본인 글만, 숨겨지지 않은 글만 고칠 수 있다.
      */
-    fun editPost(command: EditPostCommand, memberId: Long)
+    fun editPost(command: EditPostCommand, memberId: Long, language: ContentLanguage)
 
     fun deletePost(command: DeletePostCommand, memberId: Long)
 }

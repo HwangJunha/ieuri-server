@@ -6,12 +6,13 @@ import org.around.ieuri.community.application.command.ResolveSpotQuestionCommand
 import org.around.ieuri.community.application.exception.InvalidInputException
 import org.around.ieuri.community.application.exception.NotQuestionOwnerException
 import org.around.ieuri.community.application.exception.QuestionNotFoundException
-import org.around.ieuri.community.application.exception.SpotNotFoundException
+import org.around.ieuri.community.application.exception.SpotNotFoundInLocaleException
 import org.around.ieuri.community.application.exception.TooManyPhotosException
 import org.around.ieuri.community.application.port.`in`.command.SpotQuestionCommandUseCase
 import org.around.ieuri.community.application.port.out.client.SpotLookupPort
 import org.around.ieuri.community.application.port.out.persistence.SpotQuestionRepositoryPort
 import org.around.ieuri.community.domain.aggregate.SpotQuestion
+import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -32,14 +33,21 @@ class SpotQuestionCommandService(
 ) : SpotQuestionCommandUseCase {
 
     @Transactional
-    override fun createQuestion(command: CreateSpotQuestionCommand, memberId: Long): Long {
+    override fun createQuestion(
+        command: CreateSpotQuestionCommand,
+        memberId: Long,
+        language: ContentLanguage,
+    ): Long {
         // 본문 판정을 도메인보다 먼저 한다 — 도메인의 require는 IllegalArgumentException 하나로
         // 뭉뚱그려지는데, 계약은 INVALID_INPUT에 field를 실어 위치를 알려야 한다.
         val body = requireValidBody(command.body)
         if (command.photoKeys.size > SpotQuestion.MAX_PHOTOS) throw TooManyPhotosException()
 
         // 없는 장소에는 질문을 붙일 수 없다. 부재가 곧 대상 유효성 판정이다.
-        if (spotLookupPort.findSummary(command.catalogId) == null) throw SpotNotFoundException()
+        // 기준은 **활성 언어다**(SPEC-0029 R-16) — 이 언어에 원본이 없는 장소도 붙일 수 없다.
+        if (spotLookupPort.findSummary(command.catalogId, language) == null) {
+            throw SpotNotFoundInLocaleException()
+        }
 
         // 하나라도 어긋나면 질문 전체를 만들지 않는다 — 부분 생성은 없다.
         val photoKeys = command.photoKeys.map { photoKeyVerifier.verify(it, memberId) }

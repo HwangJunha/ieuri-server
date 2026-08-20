@@ -1,6 +1,7 @@
 package org.around.ieuri.community.infrastructure.adapter.`in`.graphql
 
 import com.netflix.graphql.dgs.DgsComponent
+import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsMutation
 import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.common.graphql.generated.types.CreateSpotAnswerInput
@@ -21,6 +22,7 @@ import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.community.application.port.`in`.command.SpotAnswerCommandUseCase
 import org.around.ieuri.community.application.port.`in`.command.SpotQuestionCommandUseCase
 import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper.toCommand
+import org.around.ieuri.community.infrastructure.locale.contentLanguage
 import org.springframework.stereotype.Component
 
 /**
@@ -41,14 +43,23 @@ class SpotQaMutationResolver(
     private val currentMemberProvider: CurrentMemberProvider,
 ) {
 
+    /**
+     * **활성 언어에서 해소되는 장소에만** 질문을 달 수 있다(SPEC-0029 R-16) — 언어는
+     * Accept-Language에서 오며 GraphQL 인자가 아니다.
+     */
     @DgsMutation
     fun createSpotQuestion(
         @InputArgument input: CreateSpotQuestionInput,
+        dfe: DgsDataFetchingEnvironment,
     ): CreateSpotQuestionPayload = withCommunityUserErrors(
         onError = { CreateSpotQuestionPayload(success = false, userErrors = it, questionId = null) },
     ) {
         val memberId = currentMemberProvider.requireMemberId()
-        val questionId = questionCommandUseCase.createQuestion(input.toCommand(), memberId)
+        val questionId = questionCommandUseCase.createQuestion(
+            input.toCommand(),
+            memberId,
+            dfe.contentLanguage(),
+        )
         CreateSpotQuestionPayload(
             success = true,
             userErrors = emptyList(),

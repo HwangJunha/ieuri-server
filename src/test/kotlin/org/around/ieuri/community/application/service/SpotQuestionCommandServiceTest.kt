@@ -10,12 +10,13 @@ import org.around.ieuri.community.application.command.ResolveSpotQuestionCommand
 import org.around.ieuri.community.application.exception.InvalidInputException
 import org.around.ieuri.community.application.exception.NotQuestionOwnerException
 import org.around.ieuri.community.application.exception.QuestionNotFoundException
-import org.around.ieuri.community.application.exception.SpotNotFoundException
+import org.around.ieuri.community.application.exception.SpotNotFoundInLocaleException
 import org.around.ieuri.community.application.exception.TooManyPhotosException
 import org.around.ieuri.community.application.port.out.client.SpotLookupPort
 import org.around.ieuri.community.application.port.out.persistence.SpotQuestionRepositoryPort
 import org.around.ieuri.community.application.query.PostSpotView
 import org.around.ieuri.community.domain.aggregate.SpotQuestion
+import org.around.ieuri.community.domain.vo.ContentLanguage
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -33,6 +34,7 @@ class SpotQuestionCommandServiceTest {
     private val catalogId = 11L
     private val questionId = 2L
     private val now = Instant.parse("2026-08-18T00:00:00Z")
+    private val language = ContentLanguage.EN
 
     private val questionRepository = mockk<SpotQuestionRepositoryPort>(relaxed = true)
     private val spotLookupPort = mockk<SpotLookupPort>()
@@ -43,7 +45,7 @@ class SpotQuestionCommandServiceTest {
     )
 
     private fun givenSpotExists(exists: Boolean = true) {
-        every { spotLookupPort.findSummary(catalogId) } returns
+        every { spotLookupPort.findSummary(catalogId, language) } returns
             if (exists) {
                 PostSpotView(
                     id = catalogId, title = "경복궁", thumbnailImageUrl = "https://cdn/x.jpg",
@@ -82,7 +84,7 @@ class SpotQuestionCommandServiceTest {
         givenSpotExists()
         givenSaveReturnsWithId()
 
-        assertEquals(questionId, service.createQuestion(command(), memberId))
+        assertEquals(questionId, service.createQuestion(command(), memberId, language))
     }
 
     /**
@@ -90,21 +92,22 @@ class SpotQuestionCommandServiceTest {
      * 자체가 없으므로, 게이팅을 되살리려면 생성자가 바뀌어 이 테스트가 컴파일되지 않는다.
      */
     @Test
-    fun `장소 존재 외에는 어떤 외부 조회도 하지 않는다`() {
+    fun `장소 조회 외에는 어떤 외부 조회도 하지 않는다`() {
         givenSpotExists()
         givenSaveReturnsWithId()
 
-        service.createQuestion(command(), memberId)
+        service.createQuestion(command(), memberId, language)
 
-        verify(exactly = 1) { spotLookupPort.findSummary(catalogId) }
+        // 장소에 묻는 것은 존재 검사 하나뿐이다. 반응을 묻는 경로는 여전히 없다.
+        verify(exactly = 1) { spotLookupPort.findSummary(catalogId, language) }
         confirmVerified(spotLookupPort)
     }
 
     @Test
-    fun `없는 장소에는 질문할 수 없다`() {
+    fun `활성 언어에서 해소되지 않는 장소에는 질문할 수 없다`() {
         givenSpotExists(exists = false)
 
-        assertFailsWith<SpotNotFoundException> { service.createQuestion(command(), memberId) }
+        assertFailsWith<SpotNotFoundInLocaleException> { service.createQuestion(command(), memberId, language) }
         verify(exactly = 0) { questionRepository.save(any()) }
     }
 
@@ -112,21 +115,25 @@ class SpotQuestionCommandServiceTest {
 
     @Test
     fun `공백만 있는 본문은 장소를 조회하기 전에 거부된다`() {
-        assertFailsWith<InvalidInputException> { service.createQuestion(command(body = "   "), memberId) }
-        verify(exactly = 0) { spotLookupPort.findSummary(any()) }
+        assertFailsWith<InvalidInputException> { service.createQuestion(command(body = "   "), memberId, language) }
+        verify(exactly = 0) { spotLookupPort.findSummary(any(), any()) }
     }
 
     @Test
     fun `501자 본문은 거부된다`() {
         assertFailsWith<InvalidInputException> {
-            service.createQuestion(command(body = "가".repeat(501)), memberId)
+            service.createQuestion(command(body = "가".repeat(501)), memberId, language)
         }
     }
 
     @Test
     fun `사진 6장은 거부된다`() {
         assertFailsWith<TooManyPhotosException> {
-            service.createQuestion(command(photoKeys = List(6) { "images/community/$memberId/k$it" }), memberId)
+            service.createQuestion(
+                command(photoKeys = List(6) { "images/community/$memberId/k$it" }),
+                memberId,
+                language,
+            )
         }
     }
 

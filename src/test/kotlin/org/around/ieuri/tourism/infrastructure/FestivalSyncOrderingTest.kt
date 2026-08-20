@@ -1,14 +1,16 @@
 package org.around.ieuri.tourism.infrastructure
 
 import io.mockk.mockk
+import org.around.ieuri.tourism.application.port.`in`.command.SpotCatalogSplitUseCase
 import org.around.ieuri.tourism.application.port.`in`.command.SpotCatalogUseCase
 import org.around.ieuri.tourism.application.port.out.client.FestivalSyncPort
 import org.around.ieuri.tourism.application.port.out.client.SpotSyncPort
 import org.around.ieuri.tourism.application.port.out.persistence.FestivalStorePort
+import org.around.ieuri.tourism.application.port.out.persistence.FestivalUpsertPort
 import org.around.ieuri.tourism.application.port.out.persistence.SpotStorePort
+import org.around.ieuri.tourism.application.port.out.persistence.SpotUpsertPort
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.infrastructure.batch.FestivalSyncProperties
-import org.around.ieuri.tourism.infrastructure.batch.SpotCatalogProperties
 import org.around.ieuri.tourism.infrastructure.batch.SpotSyncJobConfig
 import org.around.ieuri.tourism.infrastructure.batch.SpotSyncProperties
 import org.springframework.batch.core.job.SimpleJob
@@ -34,12 +36,14 @@ class FestivalSyncOrderingTest {
         transactionManager = mockk<PlatformTransactionManager>(relaxed = true),
         syncPort = mockk<SpotSyncPort>(),
         storePort = mockk<SpotStorePort>(),
+        upsertPort = mockk<SpotUpsertPort>(),
         properties = SpotSyncProperties(),
         festivalSyncPort = mockk<FestivalSyncPort>(),
         festivalStorePort = mockk<FestivalStorePort>(),
+        festivalUpsertPort = mockk<FestivalUpsertPort>(),
         festivalProperties = FestivalSyncProperties(),
         catalogUseCase = mockk<SpotCatalogUseCase>(),
-        catalogProperties = SpotCatalogProperties(),
+        catalogSplitUseCase = mockk<SpotCatalogSplitUseCase>(),
         objectMapper = mockk<ObjectMapper>(),
     )
 
@@ -69,7 +73,17 @@ class FestivalSyncOrderingTest {
         // 스펙 §선행 조사·§비범위. 별도 잡이면 두 잡의 정리가 서로의 행을 지우고, 관광지 수집이
         // 종료 축제를 되살린다 — R-9가 성립하려면 한 잡 안에서 순서가 보장되어야 한다.
         assertEquals(SpotSyncJobConfig.JOB_NAME, config.spotSyncJob().name)
-        // 관광지 4 + 축제 4 + 카탈로그 배정·번역대상조회 2(SPEC-0019).
+        // 관광지 4 + 축제 4 + 카탈로그 배정 1 + 분할 1. 번역 대상 조회 Step은 SPEC-0029 R-6이 제거했다.
         assertEquals(10, stepNames.size)
+    }
+
+    @Test
+    fun `카탈로그 분할 Step이 배정 Step 뒤에 온다`() {
+        // SPEC-0029. 전량이 붙고 난 뒤라야 "이 카탈로그가 몇 장소인가"를 물을 수 있다 —
+        // 앞에 두면 아직 안 붙은 원본을 빼고 판정해 멀쩡한 카탈로그를 가른다.
+        assertTrue(
+            stepNames.indexOf("catalogSplitStep") > stepNames.indexOf("catalogAssignmentStep"),
+            "분할이 배정보다 먼저 온다: $stepNames",
+        )
     }
 }

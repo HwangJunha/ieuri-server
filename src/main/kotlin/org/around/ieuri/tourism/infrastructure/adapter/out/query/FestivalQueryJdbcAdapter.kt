@@ -107,10 +107,6 @@ class FestivalQueryJdbcAdapter(
             "f.event_end_date >= ?",
             "ST_DWithin(cat.location, c.center, ?)",
         )
-        // 원문 보유 필터. null이면 전체다 — 클라이언트가 원문을 먼저 소진한 뒤 false로 넘어온다.
-        val originCondition = query.hasOrigin?.let { "t.has_origin = ?" }
-        val allConditions = conditions + listOfNotNull(originCondition)
-
         val params = listOf<Any>(
             query.center.longitude, query.center.latitude, // CTE의 center
             query.language.name,                           // translation JOIN 조건
@@ -118,7 +114,7 @@ class FestivalQueryJdbcAdapter(
             Date.valueOf(query.asOf),
             query.radiusMeters.toDouble(),
         )
-        return allConditions.joinToString(" AND ") to (params + listOfNotNull(query.hasOrigin))
+        return conditions.joinToString(" AND ") to params
     }
 
     private companion object {

@@ -116,6 +116,14 @@ Uses the Gradle wrapper (`./gradlew`); Gradle 9.5.1, Java toolchain 25.
 - **Queries are QueryDSL or derived queries — raw SQL is the exception, and exceptions get their own adapter.** The whole point of JPA + QueryDSL is not being pinned to one database; a `JdbcTemplate` string throws that away silently. Order of preference: Spring Data **derived query** → **QueryDSL** → raw SQL. Do not use `@Query` at all — an annotation string splits the query definition across two places and is neither type-checked nor refactorable.
     - Only two things justify raw SQL today: **PostGIS spatial functions** (`ST_DWithin`, `ST_Distance` — QueryDSL cannot express them) and **`INSERT ... ON CONFLICT` upsert** (JPA has no portable upsert; `merge` semantics would introduce a select-then-insert race).
     - When you need one, **isolate it in a dedicated adapter** whose name says so (`SpotSpatialQueryAdapter`, `SpotUpsertJdbcAdapter`). The invariant to preserve: `JdbcTemplate` appears *only* in those adapters. Give that adapter its **own outbound port** so the application depends on the port, not on another adapter — `infrastructure → infrastructure` injection hides the split in the wrong layer.
+
+- **An outbound adapter never injects another adapter — including through a port whose only implementation is one.** The wrapper reads as "the application doesn't need to know about the split", but that is exactly the cost: which writes take raw SQL, and in what order two stores are touched, stop being visible where those decisions are made. **The application service injects both ports** and sequences them itself. A one-line `override` that forwards to another adapter is the tell.
+
+  Two things this is *not*. Injecting the other domain's inbound `port/in` from an `out/client` adapter is the sanctioned cross-domain path (`SpotLookupAdapter` → `SpotQueryUseCase`). And a port whose implementation is a thin shim over a `common/` utility is fine — `EmailEncryptorPort` resolves to three lines wrapping `common/security/AesGcmCipher`, and the encryption happens *inside* entity↔domain mapping, so hoisting it would push storage format up into the service.
+
+  Two exceptions stand today, both because hoisting makes it worse:
+    - **`TourApiClient`/`TourApiSyncClient` → `CategoryExternalMappingPort`.** The mapping resolves a domain category into TourAPI's `contentTypeId` *while building the request*. The service cannot sequence it without learning TourAPI's wire format.
+    - **`out/event` listeners injecting an outbound port** (`SpotDetailWriteBehindListener`, `VerificationEmailListener`, `NewMessageBroadcastListener`, `PostViewCountListener`). These are one-line event→port bridges with no service between them. The honest fix is to move them to `adapter/in/event/` — where the other domains' listeners already live — not to invent a forwarding use case. Left as a structural decision, not a wiring one.
     - **A column whose type JPA cannot express (PostGIS `geography`, …) is not mapped on the entity at all.** Mapping it — even as `String` to sneak it past the compiler — fails `ddl-auto: validate` at startup. An unmapped column is also invisible to HQL, so **any query touching it belongs in the raw-SQL adapter above.** Deriving the value from mapped columns instead (`ST_MakePoint(map_x, map_y)`) compiles but skips the index; measure before choosing it.
     - **JPQL has no row-value constructor.** Keyset paging written as `(a, b) < (?, ?)` in SQL becomes `a < ? OR (a = ? AND b < ?)` in QueryDSL. Equivalent result and ordering; verify the index is still used if the table is large.
     - Bulk `update()`/`delete()` bypass the persistence context. That is fine when nothing re-reads those entities in the same transaction — **check the callers before converting**, and note that DB-level `ON DELETE CASCADE` still fires (it is not a JPA cascade).
@@ -183,6 +191,31 @@ made — only the diff — so the bias does not carry over. This is why human co
 The reviewer reads only the domains the diff touches, plus `common/`. Narrowing what must be read is
 the practical payoff of the DDD split; if a change genuinely required reading another domain, that
 is itself a finding.
+
+**After applying the fixes, read them back together — once.** Findings arrive as a list, so they get
+fixed as a list, and that is the failure: one fix can remove the *reason* another fix exists, and
+nothing notices, because each was verified on its own and the suite is green either way. What
+survives is machinery whose premise is gone.
+
+Worked example (SPEC-0029): one finding said the event carried only changed rows, so an empty copy
+could never be filled; another said a `SELECT`-then-`UPDATE` pair could disagree under READ
+COMMITTED. The second was fixed with `UPDATE … RETURNING` — correct in isolation. But the first fix
+made the event carry the full authoritative set, so *which* rows changed stopped mattering at all.
+`RETURNING` existed to answer a question nobody asked anymore, and it cost raw SQL where QueryDSL had
+been. Two green fixes, one pile of dead complexity.
+
+This pass is **not another review**, and it is bounded so it cannot loop:
+
+- **Do not re-run the `reviewer` subagent.** It is your own read, no second opinion.
+- **Scope is only what you just changed** — you are not hunting for new defects.
+- **One question:** did any fix invalidate the premise of another? Follow-up: is anything now
+  unreferenced, over-general, or reaching for raw SQL / a config knob / a wrapper it no longer needs?
+- **The output is deletion, not design.** Machinery whose reason is gone comes out. If you find
+  yourself adding something, that is a new finding — note it and stop; do not start another cycle.
+- **Once.** Then run `simplify-review`, make the suite pass, and open the PR.
+
+A finding you deliberately did not fix is fine — say so in the PR with the reason. Silently leaving
+it is not.
 
 ## Layout
 

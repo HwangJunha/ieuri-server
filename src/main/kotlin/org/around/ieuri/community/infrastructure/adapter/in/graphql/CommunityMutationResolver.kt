@@ -1,6 +1,7 @@
 package org.around.ieuri.community.infrastructure.adapter.`in`.graphql
 
 import com.netflix.graphql.dgs.DgsComponent
+import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsMutation
 import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.common.graphql.generated.types.HidePostInput
@@ -58,6 +59,7 @@ import org.around.ieuri.community.application.port.`in`.command.ReportCommandUse
 import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.domain.vo.ReportReason
 import org.around.ieuri.community.domain.vo.ReportTargetType
+import org.around.ieuri.community.infrastructure.locale.contentLanguage
 import org.springframework.stereotype.Component
 
 /**
@@ -79,8 +81,15 @@ class CommunityMutationResolver(
     private val currentMemberProvider: CurrentMemberProvider,
 ) {
 
+    /**
+     * 장소를 붙이면 **활성 언어에서 해소되는 장소만** 허용된다(SPEC-0029 R-16) — 언어는
+     * Accept-Language에서 오며 GraphQL 인자가 아니다.
+     */
     @DgsMutation
-    fun createPost(@InputArgument input: CreatePostInput): CreatePostPayload = withCommunityUserErrors(
+    fun createPost(
+        @InputArgument input: CreatePostInput,
+        dfe: DgsDataFetchingEnvironment,
+    ): CreatePostPayload = withCommunityUserErrors(
         onError = { CreatePostPayload(success = false, userErrors = it, postId = null) },
     ) {
         val memberId = currentMemberProvider.requireMemberId()
@@ -94,6 +103,7 @@ class CommunityMutationResolver(
                 photoKeys = input.photoKeys,
             ),
             memberId = memberId,
+            language = dfe.contentLanguage(),
         )
         // **post는 항상 null이고 대신 postId를 준다.** 생성 타입 Post는 spot·author를 생성자에서
         // 요구하는데, 그 둘은 필드 리졸버가 요청 시에만 가져오는 지연 필드다 — 여기서 채우려면
@@ -103,7 +113,10 @@ class CommunityMutationResolver(
     }
 
     @DgsMutation
-    fun editPost(@InputArgument input: EditPostInput): EditPostPayload = withCommunityUserErrors(
+    fun editPost(
+        @InputArgument input: EditPostInput,
+        dfe: DgsDataFetchingEnvironment,
+    ): EditPostPayload = withCommunityUserErrors(
         onError = { EditPostPayload(success = false, userErrors = it) },
     ) {
         val memberId = currentMemberProvider.requireMemberId()
@@ -119,6 +132,7 @@ class CommunityMutationResolver(
                 tags = input.tags,
             ),
             memberId,
+            dfe.contentLanguage(),
         )
         EditPostPayload(success = true, userErrors = emptyList())
     }

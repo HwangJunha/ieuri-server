@@ -80,6 +80,14 @@ class PostSpatialQueryAdapter(
             conditions += "ps.catalog_id = ?"
             params += it
         }
+        // 활성 언어 필터(SPEC-0029 R-23). **최신순 피드와 달리 "장소 없는 글" 절이 없다** —
+        // 아래 FROM이 community_post_spot을 INNER JOIN하므로 거리순에는 장소 없는 글이 애초에
+        // 오지 않는다(AC-15.4의 예외가 도달할 수 없다). 조건은 EXISTS 하나로 끝난다.
+        conditions += """
+            EXISTS (SELECT 1 FROM community.community_spot_catalog_language l
+                     WHERE l.catalog_id = ps.catalog_id AND l.language = ?)
+        """.trimIndent()
+        params += search.language.name
         // 다중 선택은 OR이며 IN으로 표현한다(SPEC-0020). 비어 있으면 조건 자체를 걸지 않는다.
         search.categories.takeIf { it.isNotEmpty() }?.let { categories ->
             val placeholders = categories.joinToString(",") { "?" }

@@ -2,6 +2,7 @@ package org.around.ieuri.community.application.service
 
 import org.around.ieuri.community.application.port.`in`.command.MemberDataEraseUseCase
 import org.around.ieuri.community.application.port.out.persistence.MemberDataErasePort
+import org.around.ieuri.community.application.port.out.persistence.SpotQuestionCounterPort
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class MemberDataEraseService(
     private val erasePort: MemberDataErasePort,
+    private val questionCounterPort: SpotQuestionCounterPort,
 ) : MemberDataEraseUseCase {
 
     /**
@@ -42,8 +44,14 @@ class MemberDataEraseService(
         // 그 질문에 달린 남의 답변·답글이 cascade로 함께 사라지고(AC-17.2), 그 다음 남는
         // 것이 이 회원이 *남의 질문에* 남긴 흔적이다.
         val questions = erasePort.deleteSpotQuestionsByAuthor(memberId)
-        val answers = erasePort.deleteSpotAnswersByAuthor(memberId)
+        val answerErase = erasePort.deleteSpotAnswersByAuthor(memberId)
         val replies = erasePort.deleteSpotAnswerRepliesByAuthor(memberId)
+
+        // **삭제 뒤에 내린다** — 먼저 내리고 삭제가 실패하면 수만 줄어든 상태가 남는다.
+        // 지우기만 하면 답변 3개라고 표시된 질문에 2개만 보여, 유저가 세어 보고 버그라고
+        // 판단한다. 같은 질문에 여러 건이면 그 수만큼 내린다(id가 중복으로 담겨 온다).
+        answerErase.affectedQuestionIds.forEach(questionCounterPort::decreaseAnswerCount)
+        val answers = answerErase.deletedCount
 
         // 개인정보를 담지 않는다(POL-013) — 식별자와 건수만 남긴다.
         // DM 본문·수신자는 애초에 기록 대상이 아니다.

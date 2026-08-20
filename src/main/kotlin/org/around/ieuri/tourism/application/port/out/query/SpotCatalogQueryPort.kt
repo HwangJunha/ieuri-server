@@ -47,9 +47,6 @@ interface SpotCatalogQueryPort {
      * 97%다(실측).
      */
     fun loadKoreanThumbnailIndex(): Map<String, Long>
-
-    /** 번역이 비어 있는 (카탈로그, 언어) 쌍. */
-    fun findCatalogsMissingTranslation(languages: Set<DomainLocale>, limit: Int): List<UntranslatedCatalog>
 }
 
 /**
@@ -77,18 +74,13 @@ data class UnassignedSpot(
  *
  * 좌표를 담는 이유는 동명이인을 가르기 위해서다. `롯데마트`처럼 전국에 같은 이름이 여럿이면
  * 제목만으로는 정할 수 없다.
+ *
+ * **썸네일도 담는다.** 좌표만으로는 *같은 건물 안의 다른 매장*을 가르지 못한다 — 아울렛
+ * 입점 매장들은 좌표가 실제로 동일하다(실측: 카탈로그 108개가 이 경로로 잘못 뭉쳤다).
  */
 data class CatalogCandidate(
     val catalogId: Long,
     val mapX: Double,
     val mapY: Double,
-)
-
-/** 번역이 필요한 카탈로그. KO 번역 행이 번역 원문이다. */
-data class UntranslatedCatalog(
-    val catalogId: Long,
-    val koreanTitle: String,
-    /** 번역 원문이 되는 KO 주소. 원문에 주소가 없으면 null이다(R-4). */
-    val koreanAddress: String?,
-    val missingLanguages: Set<DomainLocale>,
+    val thumbnailImageUrl: String,
 )

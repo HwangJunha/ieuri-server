@@ -1,19 +1,15 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.query
 
-import com.querydsl.core.types.dsl.Expressions
 import com.querydsl.jpa.impl.JPAQueryFactory
 import org.around.ieuri.common.pagination.CursorEdge
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.CursorPageInfo
 import org.around.ieuri.tourism.application.port.out.query.LikedSpotsSearch
-import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch
 import org.around.ieuri.tourism.application.port.out.query.SpotBasics
 import org.around.ieuri.tourism.application.port.out.query.SpotIdentity
 import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
-import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
 import org.around.ieuri.tourism.application.exception.InvalidCursorException
 import org.around.ieuri.tourism.application.query.LikedSpotView
-import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.LikedSpotCursor
 import org.around.ieuri.tourism.domain.vo.ReactionType
@@ -29,38 +25,18 @@ import org.springframework.transaction.annotation.Transactional
  * 관광지 읽기 포트 구현(CQRS 읽기). 애그리거트를 우회해 필요한 값만 프로젝션한다.
  * 읽기 소스는 두 테이블이다: spot(관광지 본체) + spot_reaction(반응 필터·좋아요 집계).
  *
- * 반경 조회만 PostGIS가 필요해 [SpotSpatialQueryAdapter]에 위임한다 — 포트는 하나로 남고
- * 애플리케이션 계층은 이 분할을 알지 못한다.
+ * 반경 조회는 PostGIS가 필요해 생 SQL이며, `SpotSpatialQueryPort`(→ [SpotSpatialQueryAdapter])로
+ * 갈라져 있다 — 호출자가 두 포트를 함께 주입받는다.
  */
 @Component
 class SpotQueryAdapter(
     private val queryFactory: JPAQueryFactory,
-    private val spatialQueryAdapter: SpotSpatialQueryAdapter,
 ) : SpotQueryPort {
 
     private val spot = QSpotEntity.spotEntity
     private val reaction = QSpotReactionEntity.spotReactionEntity
     private val catalog = QSpotCatalogEntity.spotCatalogEntity
     private val translation = QSpotCatalogTranslationEntity.spotCatalogTranslationEntity
-
-
-    @Transactional(readOnly = true)
-    override fun searchNearby(query: NearbySpotSearch): List<SpotSearchResult> =
-        spatialQueryAdapter.searchNearby(query)
-
-    @Transactional(readOnly = true)
-    override fun countNearby(query: NearbySpotSearch): Int =
-        spatialQueryAdapter.countNearby(query)
-
-    @Transactional(readOnly = true)
-    override fun findSpotIdsWithin(
-        longitude: Double,
-        latitude: Double,
-        radiusMeters: Int,
-        limit: Int,
-        categoryCode: String?,
-    ): List<Long> =
-        spatialQueryAdapter.findIdsWithin(longitude, latitude, radiusMeters, limit, categoryCode)
 
     /**
      * 그 회원이 이미 반응한 **카탈로그 id**. 반경 조회가 이 집합을 제외 조건으로 쓴다.
@@ -70,44 +46,50 @@ class SpotQueryAdapter(
      * 위해 `spot`을 조인했으나, 그 조인은 그 언어의 spot 행이 없는 카탈로그를 제외 집합에서
      * 빠뜨려 이미 반응한 항목이 다시 나오게 만든다.
      *
-     * **언어를 받지 않는다** — 좋아요는 언어와 무관한 장소 단위 행위다.
+     * **[language]로 한정한다**(SPEC-0029 R-13). 반응이 언어별로 갈리므로 제외 집합도 같은
+     * 축이어야 한다 — 언어를 빼면 영어로 반응한 장소가 일본어 발견 큐에서도 사라진다.
      */
-    override fun findReactedSpotIds(memberId: Long): Set<Long> =
+    override fun findReactedSpotIds(memberId: Long, language: DomainLocale): Set<Long> =
         queryFactory
             .select(reaction.catalogId)
             .from(reaction)
-            .where(reaction.memberId.eq(memberId))
+            .where(reaction.memberId.eq(memberId), reaction.language.eq(language))
             .fetch()
             .toSet()
 
     /**
-     * LIKE 반응 수. **카탈로그 단위 집계다**(SPEC-0019 R-10) — 같은 장소의 언어별 좋아요가
-     * 합산되어 **응답값이 커진다.** 의도된 교정이며, 지금까지 장소당 좋아요 수를 실제보다
-     * 작게 보고하고 있었던 것이다.
+     * LIKE 반응 수. **활성 언어 안에서만 센다**(SPEC-0029 AC-13.5) — 다른 언어의 좋아요는
+     * 합산되지 않는다. SPEC-0019가 언어를 합쳤던 것을 이 스펙이 되돌린다.
      *
      * 인자는 카탈로그 id다 — 반응 테이블이 이미 그 축이라 `spot`을 경유할 이유가 없다.
      */
-    override fun countLikes(spotId: Long): Long =
+    override fun countLikes(catalogId: Long, language: DomainLocale): Long =
         queryFactory
             .select(reaction.count())
             .from(reaction)
             .where(
-                reaction.catalogId.eq(spotId),
+                reaction.catalogId.eq(catalogId),
+                reaction.language.eq(language),
                 reaction.reaction.eq(ReactionType.LIKE),
             )
             .fetchOne() ?: 0L
 
     /**
-     * 이 회원의 최신 반응. 반응한 적 없으면 null이며 그것이 정상적인 부재다.
+     * 이 회원이 이 언어에서 남긴 최신 반응. 반응한 적 없으면 null이며 그것이 정상적인 부재다.
      *
-     * `(member_id, catalog_id)`에 행이 하나뿐이라(덮어쓰기만 가능) 정렬 없이 단건으로 읽는다.
+     * `(member_id, catalog_id, language)`에 행이 하나뿐이라(덮어쓰기만 가능) 정렬 없이 단건으로
+     * 읽는다. 영어로 누른 좋아요를 일본어로 물으면 null이다(AC-13.2).
      */
     @Transactional(readOnly = true)
-    override fun findReaction(catalogId: Long, memberId: Long): ReactionType? =
+    override fun findReaction(catalogId: Long, memberId: Long, language: DomainLocale): ReactionType? =
         queryFactory
             .select(reaction.reaction)
             .from(reaction)
-            .where(reaction.catalogId.eq(catalogId), reaction.memberId.eq(memberId))
+            .where(
+                reaction.catalogId.eq(catalogId),
+                reaction.memberId.eq(memberId),
+                reaction.language.eq(language),
+            )
             .fetchFirst()
 
     /**
@@ -117,48 +99,50 @@ class SpotQueryAdapter(
      * 원본 행을 거쳐야만 상세를 물을 수 있다 — `idx_spot_catalog_language`
      * (spot 테이블의 `(catalog_id, language)` 복합 인덱스)가 이 조회를 받친다.
      *
-     * **요청 언어 원본이 없으면 다른 언어로 떨어진다.** 번역으로 격차를 메운 카탈로그는
-     * 그 언어의 원본이 없어(실측 36,000건 이상), 여기서 null을 돌려주면 목록에는 나오는데
-     * 상세만 막힌다 — 번역이 무의미해진다. 우선순위는 요청 언어 → KO → EN → JA → ZH이며
-     * KO가 2순위인 것은 원본 언어라 본문이 가장 충실하기 때문이다.
-     *
-     * 원본이 하나도 없는 카탈로그만 null이다.
+     * **[language] 원본만 본다 — 폴백하지 않는다**(SPEC-0029 R-10). 그 언어에 원본이 없으면
+     * null이며, 호출자가 그것을 `SPOT_NOT_FOUND_IN_LOCALE`로 옮긴다. 없는 것은 없는 것이지
+     * 다른 언어 값으로 대신할 것이 아니다(POL-043).
      *
      * **좌표는 원본 `spot`이 아니라 `spot_catalog`에서 읽는다**(SPEC-0027). 카탈로그 PK 조인이라
      * 조회가 늘지 않는다.
      *
      * 이 조인은 **nullable 컬럼(`spot.catalog_id`, ON DELETE SET NULL)에 건 INNER 조인이다.**
      * where가 `catalogId`(non-null)로 이미 좁혀 두어 안전하지만, 그 조건을 완화하면 조인이
-     * 필터로 바뀌어 배정되지 않은 spot이 조용히 null이 된다 — 클라이언트에는 좌표 누락이
-     * 아니라 SPOT_NOT_FOUND로 나타난다.
+     * 필터로 바뀌어 배정되지 않은 spot이 조용히 null이 된다.
      */
     override fun findIdentity(catalogId: Long, language: DomainLocale): SpotIdentity? =
         queryFactory
-            .select(spot.id, spot.contentId, spot.language, catalog.mapX, catalog.mapY)
+            .select(spot.id, spot.contentId, catalog.mapX, catalog.mapY)
             .from(spot)
             .join(catalog).on(catalog.id.eq(spot.catalogId))
-            .where(spot.catalogId.eq(catalogId))
-            .orderBy(preferredOriginOrder(language).asc())
+            .where(spot.catalogId.eq(catalogId), spot.language.eq(language))
             .fetchFirst()
             ?.let {
                 SpotIdentity(
                     spotId = requireNotNull(it.get(spot.id)),
                     contentId = requireNotNull(it.get(spot.contentId)),
-                    language = requireNotNull(it.get(spot.language)),
                     mapX = requireNotNull(it.get(catalog.mapX)),
                     mapY = requireNotNull(it.get(catalog.mapY)),
                 )
             }
 
     /**
+     * 카탈로그 존재 여부 — 언어와 무관하다. 두 오류 코드를 가르기 위해서만 쓴다(AC-12.3).
+     */
+    override fun existsCatalog(catalogId: Long): Boolean =
+        queryFactory
+            .selectOne()
+            .from(catalog)
+            .where(catalog.id.eq(catalogId))
+            .fetchFirst() != null
+
+    /**
      * 상세 본문이 부재할 때 응답을 구성할 카탈로그의 값. 인자는 **카탈로그 id**다(SPEC-0019).
      *
-     * 제목·주소는 [language] 번역을 우선하되, **없으면 다른 언어로 떨어진다.** 외국어에만
-     * 있는 장소는 KO 행이 없어(실측 4,196건) null을 돌려주면 그 장소에 글을 못 쓰고 이미
-     * 쓴 글의 칩도 사라진다 — 이름이 다른 언어인 편이 없는 것보다 낫다.
+     * 제목·주소는 **[language] 번역만 본다 — 폴백하지 않는다**(SPEC-0029 R-10). 그 언어에
+     * 원본이 없으면 null이고, 호출자가 그것을 "이 언어에 없는 장소"로 다룬다.
      *
-     * 카탈로그가 없으면 null이다. 번역이 하나도 없는 카탈로그는 원본이 사라진 것이며
-     * (배정 배치가 번역을 지운다) 그 역시 null이 되어 조회에서 빠진다.
+     * 카탈로그가 없어도 null이다 — 두 경우를 구분해야 하는 호출자는 [existsCatalog]를 함께 본다.
      */
     override fun findSpotBasics(catalogId: Long, language: DomainLocale): SpotBasics? =
         queryFactory
@@ -168,11 +152,7 @@ class SpotQueryAdapter(
             )
             .from(catalog)
             .join(translation).on(translation.catalogId.eq(catalog.id), translation.visible.isTrue)
-            .where(catalog.id.eq(catalogId))
-            // **요청 언어를 우선하되 없으면 다른 언어로 떨어진다.** 외국어에만 있는 장소를
-            // 한국어로 물으면 KO 행이 없는데(실측 4,196건), 그때 null을 돌려주면 그 장소에
-            // 글을 못 쓰고 이미 쓴 글의 칩도 사라진다 — 이름은 다른 언어라도 있는 편이 낫다.
-            .orderBy(preferredLanguageOrder(language).asc())
+            .where(catalog.id.eq(catalogId), translation.language.eq(language))
             .fetchFirst()
             ?.let {
                 SpotBasics(
@@ -187,38 +167,6 @@ class SpotQueryAdapter(
             }
 
     /**
-     * 원본 `spot` 선택 우선순위. [preferredLanguageOrder]와 같은 규칙이되 대상이 `spot`이다.
-     */
-    private fun preferredOriginOrder(language: DomainLocale) =
-        Expressions.cases()
-            .`when`(spot.language.eq(language)).then(0)
-            .`when`(spot.language.eq(DomainLocale.KO)).then(1)
-            .`when`(spot.language.eq(DomainLocale.EN)).then(2)
-            .`when`(spot.language.eq(DomainLocale.JA)).then(3)
-            .otherwise(4)
-
-    /**
-     * 언어 선택 우선순위: **요청 언어 → KO → EN → JA → ZH.**
-     *
-     * 요청 언어가 없을 때 무엇을 고를지 **한 곳에서 정한다.** 이 식이 없으면 단건과 목록이
-     * 서로 다른 폴백을 골라, 같은 장소가 목록에서는 `台北101`이고 상세에서는 `Taipei 101`이
-     * 된다 — enum 문자열 정렬(EN < JA < KO < ZH)이 각 조회의 정렬 방향에 따라 다르게
-     * 작동하기 때문이다.
-     *
-     * KO를 2순위에 두는 이유는 원본 언어라 값이 가장 정확하기 때문이다.
-     *
-     * CASE 식이라 인덱스를 타지 않지만, 대상이 카탈로그 하나(또는 IN 목록)로 이미 좁혀진
-     * 뒤라 비용이 없다.
-     */
-    private fun preferredLanguageOrder(language: DomainLocale) =
-        Expressions.cases()
-            .`when`(translation.language.eq(language)).then(0)
-            .`when`(translation.language.eq(DomainLocale.KO)).then(1)
-            .`when`(translation.language.eq(DomainLocale.EN)).then(2)
-            .`when`(translation.language.eq(DomainLocale.JA)).then(3)
-            .otherwise(4)
-
-    /**
      * 좋아요 목록 한 페이지. `spot`을 조인해 카드에 쓸 값과 언어·카테고리를 함께 판정한다.
      * `spot_detail`은 조인하지 않는다 — 상세가 부재한 spot도 목록에는 정상적으로 나타나야 한다.
      *
@@ -229,9 +177,8 @@ class SpotQueryAdapter(
      * 여러 카탈로그를 한 번에. 호출자가 목록을 들고 있을 때 행마다 묻지 않게 한다 —
      * 피드 한 페이지에 20번, 지역 피드에서는 수천 번이 될 수 있다.
      *
-     * [language] 번역을 우선하되 없으면 다른 언어로 떨어진다([findSpotBasics]와 같은 판단).
-     * 번역이 하나도 없는 카탈로그만 결과에서 빠지며, 호출자는 그것을 "유효하지 않은 id"와
-     * 같게 다룬다.
+     * **[language]에서 해소되지 않는 카탈로그는 결과에서 빠진다**(SPEC-0029 R-10·AC-24.3).
+     * 호출자는 빠진 id를 "이 언어에 없는 장소"로 다룬다 — 키가 없는 것이 곧 그 뜻이다.
      */
     @Transactional(readOnly = true)
     override fun findSpotBasicsIn(catalogIds: List<Long>, language: DomainLocale): Map<Long, SpotBasics> {
@@ -244,12 +191,7 @@ class SpotQueryAdapter(
             )
             .from(catalog)
             .join(translation).on(translation.catalogId.eq(catalog.id), translation.visible.isTrue)
-            .where(catalog.id.`in`(catalogIds))
-            // **[findSpotBasics]와 같은 우선순위 식을 쓴다** — 단건과 목록이 다른 언어를
-            // 고르면 같은 장소가 화면마다 다른 이름으로 보인다.
-            //
-            // associate가 뒤 값으로 덮으므로 **순위가 낮은 것부터** 오게 내림차순으로 읽는다.
-            .orderBy(preferredLanguageOrder(language).desc())
+            .where(catalog.id.`in`(catalogIds), translation.language.eq(language))
             .fetch()
             .associate { row ->
                 requireNotNull(row.get(catalog.id)) to SpotBasics(
@@ -304,6 +246,11 @@ class SpotQueryAdapter(
             .where(
                 reaction.memberId.eq(query.memberId),
                 reaction.reaction.eq(ReactionType.LIKE),
+                // **반응 자체가 언어를 품는다**(SPEC-0029 AC-14.1/14.2). 번역 조인의 언어와
+                // 같은 값이지만 역할이 다르다 — 저쪽은 "무슨 제목으로 보일지", 이쪽은
+                // "어느 언어에서 누른 것인지"다. 이 조건이 빠지면 다른 언어에서 누른
+                // 좋아요가 이 언어의 목록에 섞인다.
+                reaction.language.eq(query.language),
                 query.categories.takeIf { !it.isUnfiltered }?.let { catalog.category.`in`(it.codes()) },
                 // 정렬이 (updated_at DESC, catalog_id DESC)이므로 다음 페이지는 그 튜플보다 "작은" 행이다.
                 // 총계에는 붙이지 않는다 — 커서는 페이지 경계일 뿐 집합의 조건이 아니다.

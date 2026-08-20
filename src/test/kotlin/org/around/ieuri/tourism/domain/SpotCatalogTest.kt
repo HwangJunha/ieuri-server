@@ -63,7 +63,6 @@ class SpotCatalogTest {
         )
 
         assertNull(catalog.translations[DomainLocale.KO])
-        assertTrue(catalog.needsTranslation(DomainLocale.KO))
         assertEquals("SM Entertainment", catalog.translations[DomainLocale.EN]?.title)
     }
 
@@ -76,35 +75,27 @@ class SpotCatalogTest {
     }
 
     @Test
-    @DisplayName("번역이 없는 언어만 번역 대상이다")
-    fun `only missing languages need translation`() {
+    @DisplayName("원본이 없는 언어 슬롯은 비어 있는 채로 남는다")
+    fun `missing language slot stays empty`() {
+        // SPEC-0029 R-6·AC-6.1. 기계번역으로 채우던 동작을 걷어냈으므로, 원본이 없는 언어는
+        // 비어 있는 것이 올바른 상태다.
         val catalog = SpotCatalog.from(DomainLocale.KO, "마린시티", null, standard())
-
-        assertFalse(catalog.needsTranslation(DomainLocale.KO))
-        assertTrue(catalog.needsTranslation(DomainLocale.JA))
-    }
-
-    @Test
-    @DisplayName("번역을 채우면 그 언어는 더 이상 대상이 아니다")
-    fun `filling a translation clears the need`() {
-        val catalog = SpotCatalog.from(DomainLocale.KO, "마린시티", null, standard())
-
-        catalog.fillTranslation(DomainLocale.JA, "マリンシティ", "釜山広域市 海雲台区")
-
-        assertFalse(catalog.needsTranslation(DomainLocale.JA))
-        assertEquals("マリンシティ", catalog.translations[DomainLocale.JA]?.title)
-        assertEquals("釜山広域市 海雲台区", catalog.translations[DomainLocale.JA]?.address)
-    }
-
-    @Test
-    @DisplayName("이미 값이 있는 언어는 덮어쓰지 않는다")
-    fun `existing translation is never overwritten`() {
-        // 먼저 들어온 값이 TourAPI 원문이고 그것이 우리 번역보다 우선한다(R-4).
-        val catalog = SpotCatalog.from(DomainLocale.KO, "마린시티", null, standard())
-
-        catalog.fillTranslation(DomainLocale.KO, "덮어쓴 제목")
 
         assertEquals("마린시티", catalog.translations[DomainLocale.KO]?.title)
+        assertNull(catalog.translations[DomainLocale.JA])
+        assertNull(catalog.translations[DomainLocale.EN])
+        assertNull(catalog.translations[DomainLocale.ZH])
+    }
+
+    @Test
+    @DisplayName("번역을 채울 수단이 존재하지 않는다")
+    fun `no operation fills a translation`() {
+        // AC-6.2. 호출부만 지우면 다음 사람이 다시 부르므로 **연산 자체가 없어야 한다.**
+        // 이 테스트는 리플렉션으로 그 부재를 고정한다 — 다시 추가되면 여기서 깨진다.
+        val operations = SpotCatalog::class.java.methods.map { it.name }
+
+        assertFalse(operations.any { it == "fillTranslation" })
+        assertFalse(operations.any { it == "needsTranslation" })
     }
 
     @Test

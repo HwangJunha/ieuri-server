@@ -607,7 +607,6 @@ class SpotDiscoveryServiceTest {
         latitude = latitude,
         longitude = 127.0,
         radiusMeters = radiusMeters,
-        hasOrigin = null,
         first = first,
         after = after,
     )
@@ -623,7 +622,6 @@ class SpotDiscoveryServiceTest {
         longitude = 127.0,
         radiusMeters = radiusMeters,
         categories = selection(category),
-        hasOrigin = null,
         first = first,
         after = after,
     )

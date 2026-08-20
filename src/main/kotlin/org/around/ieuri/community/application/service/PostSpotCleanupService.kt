@@ -1,7 +1,10 @@
 package org.around.ieuri.community.application.service
 
+import org.around.ieuri.community.application.port.`in`.command.CatalogLanguage
 import org.around.ieuri.community.application.port.`in`.command.PostSpotCleanupUseCase
+import org.around.ieuri.community.application.port.out.persistence.CatalogLanguageEntry
 import org.around.ieuri.community.application.port.out.persistence.PostSpotCleanupPort
+import org.around.ieuri.community.application.port.out.persistence.SpotCatalogLanguagePort
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
@@ -20,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class PostSpotCleanupService(
     private val cleanupPort: PostSpotCleanupPort,
+    private val languagePort: SpotCatalogLanguagePort,
 ) : PostSpotCleanupUseCase {
 
     /**
@@ -36,6 +40,27 @@ class PostSpotCleanupService(
         val deleted = cleanupPort.deleteByCatalogIds(catalogIds)
         log.info("community post-spot links cleaned for {} deleted catalogs: links={}", catalogIds.size, deleted)
     }
+
+    /**
+     * 카탈로그-언어 사본을 **정본으로 덮어쓴다**(SPEC-0029 R-15).
+     *
+     * [resolved]에 없는 조합은 지운다 — 이벤트가 변화분이 아니라 현재 상태 전부를 싣기
+     * 때문이다. 델타를 적용하는 방식은 빈 표를 채우지 못한다: 전량 재적재 직후에는 모든
+     * 행이 신규라 뒤집힌 것이 없어 델타가 비고, 그러면 목록이 spot 붙은 글·질문을 전부
+     * 조용히 걸러 낸다.
+     *
+     * **비어 있어도 반영한다** — 원본이 정말 비었다는 뜻일 수 있고, 그때 사본만 남으면
+     * 사라진 장소의 글이 계속 보인다.
+     *
+     * [cleanupDeletedCatalogs]와 같은 이유로 REQUIRES_NEW다 — AFTER_COMMIT 리스너가 부른다.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    override fun syncCatalogLanguages(resolved: List<CatalogLanguage>) {
+        val total = languagePort.replaceAll(resolved.map { it.toEntry() })
+        log.info("community spot catalog languages synced: rows={}", total)
+    }
+
+    private fun CatalogLanguage.toEntry() = CatalogLanguageEntry(catalogId, language)
 
     private companion object {
         private val log = LoggerFactory.getLogger(PostSpotCleanupService::class.java)

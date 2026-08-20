@@ -8,6 +8,7 @@ import jakarta.persistence.Enumerated
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
+import jakarta.persistence.IdClass
 import jakarta.persistence.PrePersist
 import jakarta.persistence.PreUpdate
 import jakarta.persistence.Table
@@ -15,6 +16,7 @@ import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.domain.vo.ReportReason
 import org.around.ieuri.community.domain.vo.ReportTargetType
+import java.io.Serializable
 import java.time.Instant
 
 /**
@@ -359,3 +361,38 @@ class PostSpotEntity(
         if (createdAt == null) createdAt = Instant.now()
     }
 }
+
+/**
+ * 카탈로그가 해소되는 언어의 **커뮤니티 사본**(SPEC-0029 R-15·R-23). 원본은 tourism의
+ * `spot_catalog_translation`이며, `SpotCatalogLanguagesChanged` 구독이 이 표를 맞춘다.
+ *
+ * 글이 아니라 카탈로그를 키로 잡는 이유는 V72 주석에 있다 — 같은 사실이 글 수만큼 복제되지
+ * 않고, `community_post_spot`을 거치지 않는 질문도 같은 표를 본다.
+ */
+@Entity
+@Table(name = "community_spot_catalog_language", schema = DbSchema.COMMUNITY)
+@IdClass(SpotCatalogLanguageId::class)
+class SpotCatalogLanguageEntity(
+    @Id
+    @Column(name = "catalog_id")
+    var catalogId: Long,
+
+    @Id
+    @Enumerated(EnumType.STRING)
+    @Column(name = "language", length = 2)
+    var language: ContentLanguage,
+
+    @Column(name = "created_at", nullable = false)
+    var createdAt: Instant? = null,
+) {
+    @PrePersist
+    fun onCreate() {
+        if (createdAt == null) createdAt = Instant.now()
+    }
+}
+
+/** community_spot_catalog_language 복합키. JPA @IdClass 요구사항(no-arg 생성자 + equals/hashCode). */
+data class SpotCatalogLanguageId(
+    var catalogId: Long = 0,
+    var language: ContentLanguage = ContentLanguage.EN,
+) : Serializable

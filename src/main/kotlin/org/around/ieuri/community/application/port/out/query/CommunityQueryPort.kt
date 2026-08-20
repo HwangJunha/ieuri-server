@@ -179,6 +179,13 @@ data class PostsSearch(
      * 그러지 않으면 항상 빈 목록이라 사용자가 숨김을 되돌릴 방법이 없다.
      */
     val hiddenByViewer: Boolean,
+    /**
+     * 요청의 활성 언어. **무엇이 보이는지를 정한다**(SPEC-0029 R-23) — 이 언어에서 해소되지
+     * 않는 장소가 붙은 글은 오류가 아니라 목록에서 빠진다.
+     *
+     * **장소가 붙지 않은 글은 언어와 무관하게 남는다**(AC-15.4).
+     */
+    val language: ContentLanguage,
     val first: Int,
     val after: String?,
     val viewer: ViewerContext,

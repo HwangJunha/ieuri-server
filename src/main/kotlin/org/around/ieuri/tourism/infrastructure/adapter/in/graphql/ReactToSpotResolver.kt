@@ -3,7 +3,9 @@ package org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql
 import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsMutation
 import com.netflix.graphql.dgs.InputArgument
+import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import org.around.ieuri.tourism.application.command.ReactToSpotCommand
+import org.around.ieuri.tourism.infrastructure.locale.domainLocale
 import org.around.ieuri.tourism.application.port.`in`.command.ReactToSpotUseCase
 import org.around.ieuri.tourism.domain.vo.ReactionType
 import org.around.ieuri.common.security.CurrentMemberProvider
@@ -24,7 +26,10 @@ class ReactToSpotResolver(
     private val currentMemberProvider: CurrentMemberProvider,
 ) {
     @DgsMutation
-    fun reactToSpot(@InputArgument input: ReactToSpotInput): ReactToSpotPayload = withReactionUserErrors(
+    fun reactToSpot(
+        dfe: DgsDataFetchingEnvironment,
+        @InputArgument input: ReactToSpotInput,
+    ): ReactToSpotPayload = withReactionUserErrors(
         onError = { failure(it) },
     ) {
         // 비로그인 → UnauthorizedException. ReactionUserException이 아니므로 withReactionUserErrors가
@@ -38,6 +43,8 @@ class ReactToSpotResolver(
                 reaction = ReactionType.valueOf(input.reaction.name),
             ),
             memberId = memberId,
+            // 반응은 활성 언어별로 저장된다(SPEC-0029 R-13). 클라이언트는 언어를 보내지 않는다.
+            language = dfe.domainLocale(),
         )
         ReactToSpotPayload(success = true, userErrors = emptyList())
     }

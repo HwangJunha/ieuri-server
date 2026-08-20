@@ -2,16 +2,17 @@ package org.around.ieuri.tourism.application.service
 
 import org.around.ieuri.tourism.application.port.`in`.command.CatalogAssignmentResult
 import org.around.ieuri.tourism.application.port.`in`.command.SpotCatalogUseCase
-import org.around.ieuri.tourism.application.port.`in`.command.TranslationResult
-import org.around.ieuri.tourism.application.event.TranslationTarget
-import org.around.ieuri.tourism.application.event.TranslationTargetsFound
 import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
+import org.around.ieuri.tourism.application.port.out.persistence.CatalogLanguage
 import org.around.ieuri.tourism.application.port.out.persistence.SpotCatalogStorePort
+import org.around.ieuri.tourism.application.port.out.persistence.SpotCatalogUpsertPort
 import org.around.ieuri.tourism.application.port.out.query.CatalogCandidate
 import org.around.ieuri.tourism.application.port.out.query.SpotCatalogQueryPort
 import org.around.ieuri.tourism.application.port.out.query.UnassignedSpot
 import org.around.ieuri.tourism.domain.aggregate.CatalogStandardValues
 import org.around.ieuri.tourism.domain.aggregate.SpotCatalog
+import org.around.ieuri.tourism.domain.event.CatalogLanguageRef
+import org.around.ieuri.tourism.domain.event.SpotCatalogLanguagesChanged
 import org.around.ieuri.tourism.domain.specification.SpotTitleNormalizer
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.slf4j.LoggerFactory
@@ -19,7 +20,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 /**
- * 카탈로그 배정·번역 유스케이스 구현(SPEC-0019).
+ * 카탈로그 배정 유스케이스 구현(SPEC-0019).
  *
  * **KO를 먼저 전량 처리해 카탈로그를 만든 뒤, 나머지 언어를 그 위에 붙인다.** 배치 Step이
  * 언어 순서를 지키며 이 서비스를 호출한다.
@@ -35,6 +36,8 @@ import org.springframework.transaction.annotation.Transactional
 class SpotCatalogService(
     private val queryPort: SpotCatalogQueryPort,
     private val storePort: SpotCatalogStorePort,
+    // 생 SQL(upsert·RETURNING) 경로는 포트가 갈린다 — 어느 쓰기가 그쪽인지 여기서 보인다.
+    private val upsertPort: SpotCatalogUpsertPort,
     private val eventPublisher: TourismEventPublisherPort,
 ) : SpotCatalogUseCase {
 
@@ -82,9 +85,8 @@ class SpotCatalogService(
             val matched = candidates.pickFor(spot) ?: thumbnailIndex[spot.thumbnailImageUrl]
             if (matched != null) {
                 storePort.assign(spot.spotId, matched)
-                // 이 언어의 값은 TourAPI 원문이다 — 번역 대상이 되지 않게 지금 심는다.
-                // 이 언어의 spot 원본에서 왔으므로 원문 보유다 — 목록에서 앞에 온다.
-                storePort.upsertTranslation(matched, spot.language, displayTitle, spot.address, hasOrigin = true)
+                // 이 언어의 spot 원본에서 온 값이다. 행이 생기는 순간 그 언어에서 해소된다.
+                upsertPort.upsertTranslation(matched, spot.language, displayTitle, spot.address)
                 joined++
                 return@forEach
             }
@@ -100,14 +102,14 @@ class SpotCatalogService(
             storePort.assign(spot.spotId, catalogId)
             // **축제 기간은 저장한 행이 아니라 spot_festival에서 온다.** 여기서 빠뜨리면
             // 그 축제는 기간을 영영 갖지 못한다.
-            storePort.refreshFestivalPeriod(catalogId)
+            upsertPort.refreshFestivalPeriod(catalogId)
             created++
 
             // KO만 자기들끼리 접는다. 비한국어는 KO에 붙거나 독립하며, 서로 뭉치면 한국어
             // 이름이 없는 카탈로그가 여러 언어를 갖게 되어 어느 것이 대표인지 정할 수 없다.
             if (language.isKorean && key != null) {
                 localIndex.getOrPut(key) { mutableListOf() } +=
-                    CatalogCandidate(catalogId, spot.mapX, spot.mapY)
+                    CatalogCandidate(catalogId, spot.mapX, spot.mapY, spot.thumbnailImageUrl)
             }
         }
 
@@ -143,10 +145,15 @@ class SpotCatalogService(
      * 카탈로그를 만든다 — 잘못 붙이면 좋아요가 다른 장소로 딸려 간다.
      *
      * **KO와 비한국어의 기준이 다르다.**
-     *  - KO끼리는 **항상 좌표까지 같아야** 접는다. 같은 이름이 전국에 여럿이므로(`만두집`,
-     *    `롯데마트`) 제목만으로 접으면 무관한 가게가 한 장소가 된다.
+     *  - KO끼리는 **좌표와 썸네일이 모두 같아야** 접는다. 같은 이름이 전국에 여럿이므로
+     *    (`만두집`, `롯데마트`) 제목만으로 접으면 무관한 가게가 한 장소가 된다.
      *  - 비한국어는 후보가 유일하면 좌표를 묻지 않는다. 괄호 한국어가 이미 그 장소를
      *    지목하고 있고, 언어별로 좌표가 미세하게 다른 경우가 실재한다.
+     *
+     * **썸네일이 KO 판정에 들어가는 이유는 좌표가 같은 다른 장소가 실재하기 때문이다.**
+     * `K2 현대아울렛 동대문점`과 `NBA 현대아울렛 동대문점`은 브랜드명이 영문이라 제목 키가
+     * (한글만 남기므로) 같아지고, 같은 건물이라 좌표까지 같다. 썸네일은 매장마다 다르므로
+     * 이것이 유일한 구분자다 — 실측으로 카탈로그 108개가 이 경로로 잘못 뭉쳤다.
      *
      * **근사 비교를 하지 않는다.** 좌표가 미세하게 다른 두 spot이 실제로 다른 가게인 경우와
      * 같은 가게의 좌표가 갱신된 경우를 거리로는 구분할 수 없다.
@@ -154,7 +161,11 @@ class SpotCatalogService(
     private fun List<CatalogCandidate>.pickFor(spot: UnassignedSpot): Long? {
         if (isEmpty()) return null
         if (!spot.language.isKorean) singleOrNull()?.let { return it.catalogId }
-        return singleOrNull { it.mapX == spot.mapX && it.mapY == spot.mapY }?.catalogId
+        return singleOrNull {
+            it.mapX == spot.mapX &&
+                it.mapY == spot.mapY &&
+                it.thumbnailImageUrl == spot.thumbnailImageUrl
+        }?.catalogId
     }
 
     /**
@@ -170,59 +181,36 @@ class SpotCatalogService(
         )
 
     /**
-     * **번역이 비어 있는 (카탈로그, 언어) 쌍을 찾아 알린다**(R-4).
+     * 원본 상태를 번역 행의 `visible`에 반영한다 — 그 언어에 원본이 있는가.
      *
-     * 이 도메인은 번역하지 않고 **대상만 찾아 이벤트로 넘긴다** — 번역을 누가 어떻게 하는지는
-     * tourism의 관심사가 아니다. 구독자가 그 목록을 받아 처리한다.
-     *
-     * 제목 해시 컬럼도, 변경 감지도 두지 않는다 — 재번역 경로가 존재하지 않으므로 필요 없다(R-7).
-     * 기존 `content_id`의 값이 상류에서 바뀌어도 번역은 그대로 둔다. 의도된 동작이다.
-     *
-     * **KO 번역이 없는 카탈로그는 대상이 아니다**(포트가 제외한다) — 외국어에만 있는 장소이고,
-     * 번역할 원문이 없다. 그 장소는 자기 언어 사용자에게만 보이며 그것이 올바른 동작이다.
-     */
-    @Transactional(readOnly = true)
-    override fun translateMissing(languages: Set<DomainLocale>, limit: Int): TranslationResult {
-        val candidates = queryPort.findCatalogsMissingTranslation(languages, limit)
-
-        val targets = candidates.mapNotNull { catalog ->
-            val wanted = catalog.missingLanguages intersect languages
-            wanted.takeIf { it.isNotEmpty() }?.let {
-                TranslationTarget(
-                    catalogId = catalog.catalogId,
-                    koreanTitle = catalog.koreanTitle,
-                    koreanAddress = catalog.koreanAddress,
-                    missingLanguages = it,
-                )
-            }
-        }
-
-        // **빈 목록은 발행하지 않는다** — 구독자가 빈 알림을 거르지 않아도 되게 한다.
-        if (targets.isNotEmpty()) {
-            eventPublisher.publish(TranslationTargetsFound(targets))
-        }
-
-        log.info(
-            "catalog translation targets: found={} skipped={}",
-            targets.size, candidates.size - targets.size,
-        )
-        return TranslationResult(translated = targets.size, skipped = candidates.size - targets.size)
-    }
-
-    /**
-     * 원본 상태를 번역 행에 반영한다 — 노출 여부(`visible`)와 정렬 우선순위(`has_origin`).
-     *
-     * 사라진 것은 감추고 돌아온 것은 되살린다. 그 언어의 원문이 새로 생기면 목록 앞으로 온다.
+     * 사라진 것은 감추고 돌아온 것은 되살린다.
      *
      * 번역 행을 지우지 않는 이유는 지우면 배정의 KO 제목 맵이 그 카탈로그를 못 찾아,
      * 장소가 돌아왔을 때 좋아요가 달린 옛 카탈로그 대신 새 카탈로그가 생기기 때문이다.
+     *
+     * **바뀐 것을 이벤트로 알린다**(SPEC-0029 R-15·R-23). 다른 도메인이 장소를 참조할 때
+     * 활성 언어 해소 여부로 노출을 가르는데, 그 판정 값이 여기서만 바뀐다 — 이 발행이
+     * 없으면 구독자의 사본이 조용히 어긋난다. 빈 변경은 발행하지 않는다.
      */
     @Transactional
-    override fun refreshCatalogVisibility(): Int {
-        val changed = storePort.refreshTranslationVisibility()
-        if (changed > 0) log.info("catalog visibility refreshed: changed={}", changed)
-        return changed
+    override fun refreshCatalogVisibility() {
+        val changes = storePort.refreshTranslationVisibility()
+
+        log.info(
+            "catalog visibility refreshed: hidden={} shown={} visible={}",
+            changes.hiddenCount, changes.shownCount, changes.visible.size,
+        )
+        // **변경이 없어도 발행한다.** 구독자가 받는 것은 델타가 아니라 정본이며, 빈 상태에서
+        // 출발한 사본은 "아무것도 안 바뀐" 회차에 채워진다 — 전량 재적재 직후가 정확히 그
+        // 경우다(모든 행이 신규 INSERT라 뒤집힌 것이 없다).
+        eventPublisher.publish(
+            SpotCatalogLanguagesChanged(resolved = changes.visible.map { it.toRef() }),
+        )
     }
+
+    /** 이벤트는 도메인 간 계약이라 언어를 문자열로 싣는다 — 구독자가 `DomainLocale`을 알지 않게. */
+    private fun CatalogLanguage.toRef() =
+        CatalogLanguageRef(catalogId = catalogId, languageCode = language.name)
 
     private companion object {
         /**

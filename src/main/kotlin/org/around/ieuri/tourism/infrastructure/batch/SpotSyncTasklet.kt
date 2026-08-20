@@ -2,6 +2,7 @@ package org.around.ieuri.tourism.infrastructure.batch
 
 import org.around.ieuri.tourism.application.port.out.client.SpotSyncPort
 import org.around.ieuri.tourism.application.port.out.persistence.SpotStorePort
+import org.around.ieuri.tourism.application.port.out.persistence.SpotUpsertPort
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.slf4j.LoggerFactory
 import org.springframework.batch.core.scope.context.ChunkContext
@@ -25,6 +26,8 @@ class SpotSyncTasklet(
     private val language: DomainLocale,
     private val syncPort: SpotSyncPort,
     private val storePort: SpotStorePort,
+    // 생 SQL(upsert) 경로는 포트가 갈린다 — 어느 쓰기가 그쪽인지 여기서 보인다.
+    private val upsertPort: SpotUpsertPort,
     private val pageSize: Int,
     private val endedFestivalIds: (LocalDate) -> Set<String> = { emptySet() },
 ) : Tasklet {
@@ -60,7 +63,7 @@ class SpotSyncTasklet(
         val excluded = endedFestivalSnapshot
             ?: endedFestivalIds(chunkContext.runDate()).also { endedFestivalSnapshot = it }
         val toStore = if (excluded.isEmpty()) page.records else page.records.filterNot { it.contentId in excluded }
-        val written = storePort.upsertAll(toStore, syncedAt)
+        val written = upsertPort.upsertAll(toStore, syncedAt)
 
         // toStore가 아니라 page.records다 — 종료 축제 제외분까지 넣어야 한다. 이 집합은
         // deleteMissing의 생존 집합이라, 빠지면 그 항목이 "사라진 항목"으로 삭제된다.

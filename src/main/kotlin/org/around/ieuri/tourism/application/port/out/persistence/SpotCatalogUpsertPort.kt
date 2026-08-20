@@ -21,7 +21,6 @@ interface SpotCatalogUpsertPort {
         language: DomainLocale,
         title: String,
         address: String?,
-        hasOrigin: Boolean,
     )
 
     /**

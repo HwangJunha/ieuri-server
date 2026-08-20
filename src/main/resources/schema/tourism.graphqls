@@ -20,15 +20,6 @@ extend type Query {
         데이터로 늘어나는 축이라 서버가 아는 목록으로 요청을 막지 않는다.
         """
         categories: [String!]
-        """
-        원문 보유 필터. **생략하면 전체**, true면 요청 언어로 쓰인 원문만, false면 번역본만.
-        카테고리 필터와는 AND로 결합된다.
-
-        TourAPI가 언어마다 다른 장소를 주므로, 요청 언어의 원문이 없고 번역만 있는 장소가
-        있다(EN·JA·ZH 각 33,000건 안팎). 원문을 먼저 보여주고 소진된 뒤 번역본을 이어
-        받으려면 true로 한 바퀴 돌고 false로 다시 요청한다.
-        """
-        hasOrigin: Boolean
         "페이지 번호, 1부터."
         page: Int = 1
         "페이지 크기. 기본 100, 상한 100 — 초과 시 클램프된다."
@@ -118,11 +109,6 @@ extend type Query {
         longitude: Float!
         "검색 반경(미터). 기본 20000, 최대 100000 — 초과 시 RADIUS_TOO_LARGE."
         radiusMeters: Int = 20000
-        """
-        원문 보유 필터. **생략하면 전체**, true면 요청 언어로 쓰인 원문만, false면 번역본만.
-        원문을 먼저 소진한 뒤 번역본을 이어 받으려면 true로 한 바퀴 돌고 false로 다시 요청한다.
-        """
-        hasOrigin: Boolean
         "기본 20, 상한 50 — 초과 시 클램프된다."
         first: Int = 20
         after: String
@@ -131,8 +117,9 @@ extend type Query {
     """
     반경 내 spot을 누적 좋아요 수 내림차순으로 반환한다. 기간 제한 없이 전체를 집계한다.
 
-    좋아요가 10개 미만인 spot은 제외한다 — 표본이 적으면 순위가 사실상 잡음이다.
-    동점일 때 spot id 오름차순으로 확정된다.
+    **좋아요는 활성 언어에서 누른 것만 집계한다** — 다른 언어의 좋아요는 합산되지 않는다.
+    표본이 적으면 순위가 잡음이라 하한 미만인 spot은 제외하며, 그 하한은 운영 설정값이라
+    응답에서 알 수 없다. 동점일 때 spot id 오름차순으로 확정된다.
 
     조건을 만족하는 spot이 0건인 것은 정상 상태다 — 오류가 아니다.
     """
@@ -143,12 +130,6 @@ extend type Query {
         radiusMeters: Int = 20000
         "카테고리 코드 다중 필터. **유효한 코드는 availableSpotCategories로 조회한다**(스키마에 값 목록이 없다). OR 결합이며, 생략·null이면 전체다. 빈 배열은 EMPTY_CATEGORY_SET으로 거절되고, 없는 코드는 오류가 아니라 결과 0건이다."
         categories: [String!]
-        """
-        원문 보유 필터. **생략하면 전체**, true면 요청 언어로 쓰인 원문만, false면 번역본만.
-        카테고리 필터와는 AND로 결합된다.
-        원문을 먼저 소진한 뒤 번역본을 이어 받으려면 true로 한 바퀴 돌고 false로 다시 요청한다.
-        """
-        hasOrigin: Boolean
         "기본 20, 상한 50 — 초과 시 클램프된다."
         first: Int = 20
         after: String
@@ -215,7 +196,7 @@ enum SpotReaction {
 
 "요청 언어로 반환된 물리적 장소 1건."
 type Spot {
-    "안정적 식별자. **언어와 무관하다** — 언어를 바꿔도 같은 장소는 같은 id다. spotDetail(id:)·posts(catalogId:)·createPost(catalogId:)·reactToSpot(catalogId:)에 그대로 넘긴다."
+    "안정적 식별자. **id 자체는 언어와 무관하지만 열람 가능 여부는 아니다** — 목록에서 방금 받은 id는 현재 언어에서 안전하고 spotDetail(id:)·posts(catalogId:)·createPost(catalogId:)·reactToSpot(catalogId:)에 그대로 넘길 수 있다. 저장해 두었다가 언어를 바꾼 뒤 쓰면 SPOT_NOT_FOUND_IN_LOCALE로 실패한다."
     id: ID!
     title: String!
     "주소. 없을 수 있다."
@@ -247,7 +228,7 @@ type SpotPage {
 
 "language 인자를 받지 않는다 — 현재 요청 언어 기준으로 기록된다."
 input ReactToSpotInput {
-    "대상 장소의 id(Spot.id와 같은 값). **언어와 무관하다** — 어느 언어에서 누르든 같은 기록에 모인다."
+    "대상 장소의 id(Spot.id와 같은 값). **좋아요는 활성 언어별로 기록된다** — 다른 언어에서 누른 것은 여기 집계되지 않으며, 활성 언어에서 해소되지 않는 장소에는 누를 수 없다(SPOT_NOT_FOUND_IN_LOCALE)."
     catalogId: ID!
     reaction: SpotReaction!
 }
@@ -361,7 +342,7 @@ type SpotInfoItem {
 
 "목록 카드와 상세 진입에 필요한 값만 담는다. 거리와 좌표는 제공하지 않는다."
 type LikedSpot {
-    "장소 식별자. 언어와 무관하며 spotDetail(id:)에 그대로 넘긴다."
+    "장소 식별자. **id 자체는 언어와 무관하지만 열람 가능 여부는 아니다** — 목록에서 방금 받은 id는 현재 언어에서 안전하나, 저장해 두었다가 언어를 바꾼 뒤 쓰면 SPOT_NOT_FOUND_IN_LOCALE로 실패한다."
     id: ID!
     title: String!
     thumbnailImageUrl: String!
@@ -418,7 +399,7 @@ type SpotSearchConnection {
 상세 조회로 이어지므로 그 시점에 온전한 정보를 받는다.
 """
 type SpotSuggestion {
-    "장소 식별자. 언어와 무관하며 spotDetail(id:)에 그대로 넘긴다."
+    "장소 식별자. **id 자체는 언어와 무관하지만 열람 가능 여부는 아니다** — 목록에서 방금 받은 id는 현재 언어에서 안전하나, 저장해 두었다가 언어를 바꾼 뒤 쓰면 SPOT_NOT_FOUND_IN_LOCALE로 실패한다."
     id: ID!
     title: String!
     category: SpotCategory!
@@ -431,7 +412,7 @@ Spot을 재사용하지 않는 이유: eventStartDate/eventEndDate는 축제 행
 두면 대부분의 spot에서 영구히 null인 필드가 된다.
 """
 type Festival {
-    "장소 식별자. 언어와 무관하며 spotDetail(id:)에 그대로 넘긴다."
+    "장소 식별자. **id 자체는 언어와 무관하지만 열람 가능 여부는 아니다** — 목록에서 방금 받은 id는 현재 언어에서 안전하나, 저장해 두었다가 언어를 바꾼 뒤 쓰면 SPOT_NOT_FOUND_IN_LOCALE로 실패한다."
     id: ID!
     title: String!
     "주소. 없을 수 있다."

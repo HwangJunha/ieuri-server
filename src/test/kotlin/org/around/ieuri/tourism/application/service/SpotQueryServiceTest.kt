@@ -7,6 +7,7 @@ import io.mockk.verify
 import org.around.ieuri.tourism.application.exception.InvalidCoordinatesException
 import org.around.ieuri.tourism.application.exception.RadiusTooLargeException
 import org.around.ieuri.tourism.application.exception.SpotDetailNotFoundException
+import org.around.ieuri.tourism.application.exception.SpotNotFoundInLocaleQueryException
 import org.around.ieuri.tourism.application.exception.UnknownCategoryException
 import org.around.ieuri.tourism.application.exception.UpstreamUnavailableException
 import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
@@ -31,6 +32,7 @@ import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch
 import org.around.ieuri.tourism.application.port.out.query.SpotBasics
 import org.around.ieuri.tourism.application.port.out.query.SpotIdentity
 import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
+import org.around.ieuri.tourism.application.port.out.query.SpotSpatialQueryPort
 import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
 import org.around.ieuri.tourism.application.query.AppCategoryView
 import org.around.ieuri.tourism.application.query.CategoryDisplay
@@ -42,6 +44,7 @@ import org.around.ieuri.tourism.domain.vo.CategorySelection
 import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
+import org.around.ieuri.tourism.domain.vo.ReactionType
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.tourism.domain.vo.SpotImage
 import org.around.ieuri.tourism.domain.vo.SpotInfoItem
@@ -60,6 +63,7 @@ class SpotQueryServiceTest {
 
     private val tourInfoPort = mockk<TourInfoPort>()
     private val spotQueryPort = mockk<SpotQueryPort>()
+    private val spotSpatialQueryPort = mockk<SpotSpatialQueryPort>()
     private val spotCachePort = mockk<SpotCachePort>()
     private val spotDetailStorePort = mockk<SpotDetailStorePort>()
     private val eventPublisher = mockk<TourismEventPublisherPort>(relaxed = true)
@@ -76,13 +80,13 @@ class SpotQueryServiceTest {
     )
     private val appCategoryQueryPort = mockk<AppCategoryQueryPort>()
     private val service = SpotQueryService(
-        tourInfoPort, spotQueryPort, spotCachePort, spotDetailStorePort, eventPublisher,
-        appCategoryQueryPort, policy,
+        tourInfoPort, spotQueryPort, spotSpatialQueryPort, spotCachePort, spotDetailStorePort,
+        eventPublisher, appCategoryQueryPort, policy,
     )
 
     // 기본: 아무것도 반응하지 않음(빈 집합). 개별 테스트에서 override.
     init {
-        every { spotQueryPort.findReactedSpotIds(any()) } returns emptySet()
+        every { spotQueryPort.findReactedSpotIds(any(), any()) } returns emptySet()
         // 기본: 정의된 카테고리로 둔다. intro·infoItems가 코드 유효성을 확인한다(SPEC-0020).
         every { appCategoryQueryPort.exists(any()) } returns true
         // (카탈로그 id, 언어) → contentId 해석. 기본은 어느 언어로 물어도 원본이 있다고 둔다.
@@ -94,13 +98,15 @@ class SpotQueryServiceTest {
             SpotIdentity(
                 spotId = catalogId + SPOT_ID_OFFSET,
                 contentId = catalogId.toString(),
-                language = secondArg(),
                 mapX = CATALOG_MAP_X,
                 mapY = CATALOG_MAP_Y,
             )
         }
-        every { spotQueryPort.searchNearby(any()) } returns emptyList()
-        every { spotQueryPort.countNearby(any()) } returns 0
+        // 기본: 카탈로그 자체가 없다고 둔다 — 해석 실패의 기본 원인은 "그런 장소 없음"이다.
+        // "카탈로그는 있는데 이 언어에만 없음"을 주장하는 테스트가 개별로 override한다.
+        every { spotQueryPort.existsCatalog(any()) } returns false
+        every { spotSpatialQueryPort.searchNearby(any()) } returns emptyList()
+        every { spotSpatialQueryPort.countNearby(any()) } returns 0
         // 기본: 캐시 미스 + 저장 성공. 캐시 히트 검증은 개별 테스트에서 override.
         every { spotCachePort.getDetail(any()) } returns null
         every { spotCachePort.putDetail(any(), any()) } returns Unit
@@ -181,16 +187,16 @@ class SpotQueryServiceTest {
     private fun query(page: Int = 1, size: Int = 100, category: SpotCategory? = null, radius: Int = 20000) =
         SpotsQuery(
             latitude = 37.5665, longitude = 126.9780,
-            radiusMeters = radius, categories = selection(category), hasOrigin = null, page = page, size = size,
+            radiusMeters = radius, categories = selection(category), page = page, size = size,
         )
 
     @Test
     fun `DB가 돌려준 순서를 그대로 유지한다(AC-25)`() {
         // 정렬은 이제 DB(ORDER BY ST_Distance, id)가 담당한다. 서비스가 재정렬하면
         // DB의 타이브레이크가 무의미해지므로, 받은 순서를 보존하는 것이 올바른 동작이다.
-        every { spotQueryPort.searchNearby(any()) } returns
+        every { spotSpatialQueryPort.searchNearby(any()) } returns
             listOf(result(1L, 100.0), result(2L, 200.0), result(3L, 300.0))
-        every { spotQueryPort.countNearby(any()) } returns 3
+        every { spotSpatialQueryPort.countNearby(any()) } returns 3
 
         val result = service.spots(query(), DomainLocale.KO, memberId = null)
 
@@ -198,28 +204,9 @@ class SpotQueryServiceTest {
     }
 
     @Test
-    fun `hasOrigin이 조회 조건으로 전달된다`() {
-        // **정렬이 아니라 필터다**(SPEC-0019). 서버가 원문을 앞으로 당기면 거리순을 요청한
-        // 클라이언트가 이유를 알 수 없는 순서를 받고, 커서에도 그 축을 실어야 해 형식이 깨진다.
-        // 원문을 먼저 소진하고 번역본으로 넘어가는 판단은 클라이언트가 한다.
-        val captured = slot<NearbySpotSearch>()
-        every { spotQueryPort.searchNearby(capture(captured)) } returns emptyList()
-
-        service.spots(query().copy(hasOrigin = true), DomainLocale.JA, memberId = null)
-        assertEquals(true, captured.captured.hasOrigin)
-
-        service.spots(query().copy(hasOrigin = false), DomainLocale.JA, memberId = null)
-        assertEquals(false, captured.captured.hasOrigin)
-
-        // 생략하면 전체다 — 원문·번역본을 가리지 않는다.
-        service.spots(query(), DomainLocale.JA, memberId = null)
-        assertNull(captured.captured.hasOrigin)
-    }
-
-    @Test
     fun `page와 size를 limit·offset으로 변환한다`() {
         val captured = slot<NearbySpotSearch>()
-        every { spotQueryPort.searchNearby(capture(captured)) } returns emptyList()
+        every { spotSpatialQueryPort.searchNearby(capture(captured)) } returns emptyList()
 
         service.spots(query(page = 3, size = 50), DomainLocale.KO, memberId = null)
 
@@ -231,8 +218,8 @@ class SpotQueryServiceTest {
     fun `hasNext는 totalCount와 같은 조건에서 산출된다`() {
         // 둘이 다른 기준을 쓰면 hasNext=false인데 totalCount는 더 있다고 말하는 상태가 생긴다
         // (런타임 계약 위험 3번).
-        every { spotQueryPort.searchNearby(any()) } returns listOf(result(1L, 100.0))
-        every { spotQueryPort.countNearby(any()) } returns 200
+        every { spotSpatialQueryPort.searchNearby(any()) } returns listOf(result(1L, 100.0))
+        every { spotSpatialQueryPort.countNearby(any()) } returns 200
 
         val result = service.spots(query(page = 1, size = 100), DomainLocale.KO, memberId = null)
 
@@ -243,8 +230,8 @@ class SpotQueryServiceTest {
 
     @Test
     fun `마지막 페이지면 hasNext가 false다(AC-29)`() {
-        every { spotQueryPort.searchNearby(any()) } returns listOf(result(1L, 100.0))
-        every { spotQueryPort.countNearby(any()) } returns 100
+        every { spotSpatialQueryPort.searchNearby(any()) } returns listOf(result(1L, 100.0))
+        every { spotSpatialQueryPort.countNearby(any()) } returns 100
 
         val result = service.spots(query(page = 1, size = 100), DomainLocale.KO, memberId = null)
 
@@ -253,8 +240,8 @@ class SpotQueryServiceTest {
 
     @Test
     fun `distanceMeters는 DB 계산 값을 그대로 노출한다(AC-26)`() {
-        every { spotQueryPort.searchNearby(any()) } returns listOf(result(1L, 877.5))
-        every { spotQueryPort.countNearby(any()) } returns 1
+        every { spotSpatialQueryPort.searchNearby(any()) } returns listOf(result(1L, 877.5))
+        every { spotSpatialQueryPort.countNearby(any()) } returns 1
 
         val d = service.spots(query(), DomainLocale.KO, memberId = null).items.single().distanceMeters
 
@@ -264,7 +251,7 @@ class SpotQueryServiceTest {
     @Test
     fun `size가 상한(100)을 넘으면 클램프된다(AC-30)`() {
         val captured = slot<NearbySpotSearch>()
-        every { spotQueryPort.searchNearby(capture(captured)) } returns emptyList()
+        every { spotSpatialQueryPort.searchNearby(capture(captured)) } returns emptyList()
 
         service.spots(query(size = 500), DomainLocale.KO, memberId = null)
 
@@ -274,8 +261,8 @@ class SpotQueryServiceTest {
     @Test
     fun `spots 조회는 TourAPI를 호출하지 않는다(AC-21)`() {
         // 이 스펙의 핵심 주장 — 목록 조회 경로에서 upstream 의존이 완전히 사라진다.
-        every { spotQueryPort.searchNearby(any()) } returns listOf(result(1L, 100.0))
-        every { spotQueryPort.countNearby(any()) } returns 1
+        every { spotSpatialQueryPort.searchNearby(any()) } returns listOf(result(1L, 100.0))
+        every { spotSpatialQueryPort.countNearby(any()) } returns 1
 
         service.spots(query(), DomainLocale.KO, memberId = null)
 
@@ -293,7 +280,7 @@ class SpotQueryServiceTest {
     fun `위경도가 범위를 벗어나면 INVALID_COORDINATES`() {
         assertFailsWith<InvalidCoordinatesException> {
             service.spots(
-                SpotsQuery(latitude = 999.0, longitude = 0.0, radiusMeters = 20000, categories = CategorySelection.UNFILTERED, hasOrigin = null, page = 1, size = 100),
+                SpotsQuery(latitude = 999.0, longitude = 0.0, radiusMeters = 20000, categories = CategorySelection.UNFILTERED, page = 1, size = 100),
                 DomainLocale.EN,
                 memberId = null,
             )
@@ -303,7 +290,7 @@ class SpotQueryServiceTest {
     @Test
     fun `카테고리 필터가 조회 조건으로 전달된다(AC-33)`() {
         val captured = slot<NearbySpotSearch>()
-        every { spotQueryPort.searchNearby(capture(captured)) } returns emptyList()
+        every { spotSpatialQueryPort.searchNearby(capture(captured)) } returns emptyList()
 
         service.spots(query(category = SpotCategory("LODGING")), DomainLocale.KO, memberId = null)
 
@@ -314,8 +301,8 @@ class SpotQueryServiceTest {
     fun `로그인 회원이 이미 반응한 관광지는 DB 조회 단계에서 제외된다`() {
         // 조회 후 걸러내면 페이지가 요청한 size보다 작아지므로 쿼리 조건으로 넘긴다.
         val captured = slot<NearbySpotSearch>()
-        every { spotQueryPort.findReactedSpotIds(7L) } returns setOf(2L)
-        every { spotQueryPort.searchNearby(capture(captured)) } returns emptyList()
+        every { spotQueryPort.findReactedSpotIds(7L, DomainLocale.KO) } returns setOf(2L)
+        every { spotSpatialQueryPort.searchNearby(capture(captured)) } returns emptyList()
 
         service.spots(query(), DomainLocale.KO, memberId = 7L)
 
@@ -325,15 +312,15 @@ class SpotQueryServiceTest {
     @Test
     fun `비로그인은 반응 조회 없이 전부 반환한다`() {
         val captured = slot<NearbySpotSearch>()
-        every { spotQueryPort.searchNearby(capture(captured)) } returns
+        every { spotSpatialQueryPort.searchNearby(capture(captured)) } returns
             listOf(result(1L, 100.0), result(2L, 200.0))
-        every { spotQueryPort.countNearby(any()) } returns 2
+        every { spotSpatialQueryPort.countNearby(any()) } returns 2
 
         val result = service.spots(query(), DomainLocale.KO, memberId = null)
 
         assertEquals(listOf(1L, 2L), result.items.map { it.id })
         assertTrue(captured.captured.excludedSpotIds.isEmpty())
-        verify(exactly = 0) { spotQueryPort.findReactedSpotIds(any()) }
+        verify(exactly = 0) { spotQueryPort.findReactedSpotIds(any(), any()) }
     }
 
     // ---------- 3단 폴백: Valkey → DB → TourAPI (SPEC-0004 R-13) ----------
@@ -417,9 +404,9 @@ class SpotQueryServiceTest {
 
     @Test
     fun `likeCount는 3단 폴백 경로에 들어가지 않는다(AC-38)`() {
-        every { spotQueryPort.countLikes(100L) } returns 7L
+        every { spotQueryPort.countLikes(100L, DomainLocale.KO) } returns 7L
 
-        assertEquals(7L, service.spotLikeCount(100L))
+        assertEquals(7L, service.spotLikeCount(100L, DomainLocale.KO))
 
         verify(exactly = 0) { spotDetailStorePort.findDetail(any()) }
         verify(exactly = 0) { eventPublisher.publish(any()) }
@@ -547,7 +534,7 @@ class SpotQueryServiceTest {
         verify(exactly = 0) { tourInfoPort.findGallery(any()) }
         verify(exactly = 0) { tourInfoPort.findIntro(any(), any()) }
         verify(exactly = 0) { tourInfoPort.findInfoItems(any(), any()) }
-        verify(exactly = 0) { spotQueryPort.countLikes(any()) }
+        verify(exactly = 0) { spotQueryPort.countLikes(any(), any()) }
     }
 
     @Test
@@ -641,7 +628,6 @@ class SpotQueryServiceTest {
         every { spotQueryPort.findIdentity(100L, DomainLocale.KO) } returns SpotIdentity(
             spotId = spotIdOf(100L),
             contentId = "100",
-            language = DomainLocale.KO,
             mapX = 129.0756,
             mapY = 35.1796,
         )
@@ -661,7 +647,6 @@ class SpotQueryServiceTest {
             SpotIdentity(
                 spotId = 777L + SPOT_ID_OFFSET,
                 contentId = "ta-999",
-                language = DomainLocale.JA,
                 mapX = CATALOG_MAP_X,
                 mapY = CATALOG_MAP_Y,
             )
@@ -675,30 +660,8 @@ class SpotQueryServiceTest {
     }
 
     @Test
-    fun `원본 언어가 요청 언어와 달라도 그 원본의 언어로 upstream에 묻는다`() {
-        // **회귀 방지.** 번역으로 격차를 메운 카탈로그는 그 언어의 원본이 없다(실측 36,000건
-        // 이상) — 포트가 다른 언어 원본으로 폴백해 돌려준다. 그때 요청 언어로 upstream에
-        // 물으면 그 contentId가 없어 실패한다. **돌려받은 language로 물어야 한다.**
-        every { spotQueryPort.findIdentity(777L, DomainLocale.JA) } returns
-            SpotIdentity(
-                spotId = 777L + SPOT_ID_OFFSET,
-                contentId = "ko-123",
-                language = DomainLocale.KO,
-                mapX = CATALOG_MAP_X,
-                mapY = CATALOG_MAP_Y,
-            )
-        val captured = slot<SpotDetailQuery>()
-        every { tourInfoPort.findDetail(capture(captured)) } returns detail()
-
-        service.spotDetail(777L, DomainLocale.JA)
-
-        assertEquals("ko-123", captured.captured.contentId)
-        assertEquals(DomainLocale.KO, captured.captured.locale, "원본 언어로 물어야 한다")
-    }
-
-    @Test
     fun `원본이 하나도 없는 카탈로그는 거부한다`() {
-        // 폴백해도 원본이 없으면 상세를 물을 곳이 없다 — 상류에서 장소가 사라진 경우다.
+        // 활성 언어에 원본이 없으면 상세를 물을 곳이 없다 — 상류에서 장소가 사라진 경우다.
         every { spotQueryPort.findIdentity(777L, DomainLocale.KO) } returns null
 
         assertFailsWith<SpotDetailNotFoundException> { service.spotDetail(777L, DomainLocale.KO) }
@@ -711,10 +674,12 @@ class SpotQueryServiceTest {
         // 정작 가장 흔한 경로에서 교차 언어 콘텐츠가 나간다. spot_detail과 캐시 키 모두 언어를
         // 들지 않으므로(V20) 그 단계에서는 스스로 판별할 수 없다.
         every { spotQueryPort.findIdentity(777L, DomainLocale.KO) } returns null
+        // 카탈로그는 있고 이 언어에만 원본이 없다 — 두 부재를 다른 코드로 가른다(AC-12.3).
+        every { spotQueryPort.existsCatalog(777L) } returns true
         // 캐시 키가 어느 축이든 히트하도록 둔다 — 해석이 캐시보다 먼저 걸린다는 것이 요지다.
         every { spotCachePort.getDetail(any()) } returns CachedDetail(detail(), bodyAbsent = false)
 
-        assertFailsWith<SpotDetailNotFoundException> { service.spotDetail(777L, DomainLocale.KO) }
+        assertFailsWith<SpotNotFoundInLocaleQueryException> { service.spotDetail(777L, DomainLocale.KO) }
     }
 
     @Test
@@ -722,14 +687,15 @@ class SpotQueryServiceTest {
         // 갤러리·운영정보·이용안내가 각각 독립 진입점이라 전부 검증해야 한다 —
         // 하나라도 빠지면 그 필드만 교차 언어로 새어 나간다.
         every { spotQueryPort.findIdentity(777L, DomainLocale.KO) } returns null
+        every { spotQueryPort.existsCatalog(777L) } returns true
         // 캐시에 값이 있어도 해석 실패가 먼저 걸려야 한다 — 캐시 키가 어느 축이든 무관하게.
         every { spotCachePort.getGallery(any()) } returns emptyList()
 
-        assertFailsWith<SpotDetailNotFoundException> { service.spotGallery(777L, DomainLocale.KO) }
-        assertFailsWith<SpotDetailNotFoundException> {
+        assertFailsWith<SpotNotFoundInLocaleQueryException> { service.spotGallery(777L, DomainLocale.KO) }
+        assertFailsWith<SpotNotFoundInLocaleQueryException> {
             service.spotIntro(777L, SpotCategory.TOURIST_SPOT, DomainLocale.KO)
         }
-        assertFailsWith<SpotDetailNotFoundException> {
+        assertFailsWith<SpotNotFoundInLocaleQueryException> {
             service.spotInfoItems(777L, SpotCategory.TOURIST_SPOT, DomainLocale.KO)
         }
     }
@@ -818,17 +784,49 @@ class SpotQueryServiceTest {
 
     @Test
     fun `AC-14 - 좋아요 수는 캐시하지 않고 매번 집계한다`() {
-        every { spotQueryPort.countLikes(100L) } returns 3L
+        every { spotQueryPort.countLikes(100L, DomainLocale.KO) } returns 3L
 
-        assertEquals(3L, service.spotLikeCount(100L))
+        assertEquals(3L, service.spotLikeCount(100L, DomainLocale.KO))
         // 캐시 포트는 좋아요에 관여하지 않는다.
         verify(exactly = 0) { spotCachePort.getDetail(any()) }
     }
 
     @Test
     fun `AC-12 - 반응이 없으면 좋아요 수는 0`() {
-        every { spotQueryPort.countLikes(any()) } returns 0L
-        assertEquals(0L, service.spotLikeCount(100L))
+        every { spotQueryPort.countLikes(any(), any()) } returns 0L
+        assertEquals(0L, service.spotLikeCount(100L, DomainLocale.KO))
+    }
+
+    @Test
+    fun `AC-13_5 - 좋아요 수는 활성 언어 안에서만 센다`() {
+        // 언어가 집계 축의 일부다 — 같은 카탈로그라도 언어마다 다른 값이 나온다.
+        every { spotQueryPort.countLikes(100L, DomainLocale.EN) } returns 5L
+        every { spotQueryPort.countLikes(100L, DomainLocale.JA) } returns 1L
+
+        assertEquals(5L, service.spotLikeCount(100L, DomainLocale.EN))
+        assertEquals(1L, service.spotLikeCount(100L, DomainLocale.JA))
+    }
+
+    @Test
+    fun `AC-13_2 - 다른 언어에서 누른 반응은 이 언어에 보이지 않는다`() {
+        every { spotQueryPort.findReaction(100L, 7L, DomainLocale.EN) } returns ReactionType.LIKE
+        every { spotQueryPort.findReaction(100L, 7L, DomainLocale.JA) } returns null
+
+        assertEquals("LIKE", service.spotViewerReaction(100L, 7L, DomainLocale.EN))
+        assertNull(service.spotViewerReaction(100L, 7L, DomainLocale.JA))
+    }
+
+    @Test
+    fun `R-13 - 발견 큐의 제외 집합도 활성 언어 단위다`() {
+        // 영어로 반응한 장소가 일본어 큐에서도 빠지면 그 언어에서 한 번도 보지 못한 장소를 잃는다.
+        val captured = slot<NearbySpotSearch>()
+        every { spotQueryPort.findReactedSpotIds(7L, DomainLocale.JA) } returns setOf(9L)
+        every { spotSpatialQueryPort.searchNearby(capture(captured)) } returns emptyList()
+
+        service.spots(query(), DomainLocale.JA, memberId = 7L)
+
+        assertEquals(setOf(9L), captured.captured.excludedSpotIds)
+        verify { spotQueryPort.findReactedSpotIds(7L, DomainLocale.JA) }
     }
 
 
@@ -1179,7 +1177,6 @@ class SpotQueryServiceTest {
             SpotIdentity(
                 spotId = spotId,
                 contentId = "ta-999",
-                language = DomainLocale.JA,
                 mapX = CATALOG_MAP_X,
                 mapY = CATALOG_MAP_Y,
             )

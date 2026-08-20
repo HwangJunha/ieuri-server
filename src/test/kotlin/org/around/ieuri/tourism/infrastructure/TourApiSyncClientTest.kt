@@ -43,6 +43,7 @@ class TourApiSyncClientTest {
         cpyrht: String? = null,
         mapx: Double? = 126.98,
         mapy: Double? = 37.56,
+        showflag: String? = "1",
     ) = TourApiResponse.Item(
         contentid = contentId,
         title = title,
@@ -54,6 +55,7 @@ class TourApiSyncClientTest {
         contenttypeid = contentTypeId,
         lclsSystm2 = lcls2,
         cpyrhtDivCd = cpyrht,
+        showflag = showflag,
     )
 
     private fun response(items: List<TourApiResponse.Item>, totalCount: Int = items.size) =

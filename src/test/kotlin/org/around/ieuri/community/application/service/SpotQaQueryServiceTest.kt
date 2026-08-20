@@ -7,7 +7,7 @@ import io.mockk.verify
 import org.around.ieuri.common.pagination.CursorEdge
 import org.around.ieuri.common.pagination.cursorPageOf
 import org.around.ieuri.community.application.exception.QuestionNotFoundException
-import org.around.ieuri.community.application.exception.SpotNotFoundException
+import org.around.ieuri.community.application.exception.SpotNotFoundInLocaleException
 import org.around.ieuri.community.application.policy.CommunityPolicy
 import org.around.ieuri.community.application.port.out.client.SpotLookupPort
 import org.around.ieuri.community.application.port.out.query.CommunityQueryPort
@@ -19,6 +19,7 @@ import org.around.ieuri.community.application.query.SpotAnswerView
 import org.around.ieuri.community.application.query.SpotAnswersQuery
 import org.around.ieuri.community.application.query.SpotQuestionView
 import org.around.ieuri.community.application.query.SpotQuestionsQuery
+import org.around.ieuri.community.domain.vo.ContentLanguage
 import java.time.Duration
 import java.time.Instant
 import kotlin.test.Test
@@ -39,6 +40,7 @@ class SpotQaQueryServiceTest {
     private val catalogId = 11L
     private val questionId = 2L
     private val now = Instant.parse("2026-08-18T00:00:00Z")
+    private val language = ContentLanguage.EN
 
     private val spotQaQueryPort = mockk<SpotQaQueryPort>()
     private val communityQueryPort = mockk<CommunityQueryPort>()
@@ -58,7 +60,7 @@ class SpotQaQueryServiceTest {
     )
 
     private fun givenSpotExists(exists: Boolean = true) {
-        every { spotLookupPort.findSummary(catalogId) } returns
+        every { spotLookupPort.findSummary(catalogId, language) } returns
             if (exists) {
                 PostSpotView(
                     id = catalogId, title = "경복궁", thumbnailImageUrl = "https://cdn/x.jpg",
@@ -97,12 +99,42 @@ class SpotQaQueryServiceTest {
     // ── 질문 목록(R1, R16) ─────────────────────────────────────────
 
     @Test
-    fun `없는 장소는 빈 목록이 아니라 SPOT_NOT_FOUND다`() {
+    fun `활성 언어에서 해소되지 않는 장소는 빈 목록이 아니라 SPOT_NOT_FOUND_IN_LOCALE이다`() {
         givenSpotExists(exists = false)
 
-        assertFailsWith<SpotNotFoundException> {
-            service.spotQuestions(SpotQuestionsQuery(catalogId = catalogId, first = 20, after = null), memberId)
+        assertFailsWith<SpotNotFoundInLocaleException> {
+            service.spotQuestions(
+                SpotQuestionsQuery(catalogId = catalogId, first = 20, after = null),
+                memberId,
+                language,
+            )
         }
+    }
+
+    /**
+     * R-23 — 활성 언어가 조회 조건으로 내려가야 목록이 그 언어로 걸러진다. 질문은 장소가
+     * 필수라 이 조건이 무조건 걸린다(글과 달리 "장소 없는 항목"이라는 예외가 없다).
+     */
+    @Test
+    fun `활성 언어를 조회 조건으로 내려보낸다`() {
+        // 존재 검사도 그 언어로 간다 — 스텁을 JA로 둬야 통과한다는 것 자체가 R-16의 확인이다.
+        every { spotLookupPort.findSummary(catalogId, ContentLanguage.JA) } returns
+            PostSpotView(
+                id = catalogId, title = "景福宮", thumbnailImageUrl = "https://cdn/x.jpg",
+                category = null, longitude = 127.0, latitude = 37.5,
+            )
+        givenBlockedMembers()
+        val search = slot<SpotQuestionsSearch>()
+        every { spotQaQueryPort.findQuestions(capture(search)) } returns
+            cursorPageOf(emptyList(), hasNextPage = false, hasPreviousPage = false)
+
+        service.spotQuestions(
+            SpotQuestionsQuery(catalogId = catalogId, first = 20, after = null),
+            memberId,
+            ContentLanguage.JA,
+        )
+
+        assertEquals(ContentLanguage.JA, search.captured.language)
     }
 
     @Test
@@ -113,7 +145,11 @@ class SpotQaQueryServiceTest {
         every { spotQaQueryPort.findQuestions(capture(search)) } returns
             cursorPageOf(emptyList(), hasNextPage = false, hasPreviousPage = false)
 
-        service.spotQuestions(SpotQuestionsQuery(catalogId = catalogId, first = 100, after = null), memberId)
+        service.spotQuestions(
+            SpotQuestionsQuery(catalogId = catalogId, first = 100, after = null),
+            memberId,
+            language,
+        )
 
         assertEquals(50, search.captured.first)
     }
@@ -126,7 +162,11 @@ class SpotQaQueryServiceTest {
         every { spotQaQueryPort.findQuestions(capture(search)) } returns
             cursorPageOf(emptyList(), hasNextPage = false, hasPreviousPage = false)
 
-        service.spotQuestions(SpotQuestionsQuery(catalogId = catalogId, first = 20, after = null), memberId)
+        service.spotQuestions(
+            SpotQuestionsQuery(catalogId = catalogId, first = 20, after = null),
+            memberId,
+            language,
+        )
 
         assertEquals(setOf(42L), search.captured.viewer.blockedMemberIds)
     }
@@ -137,7 +177,11 @@ class SpotQaQueryServiceTest {
         every { spotQaQueryPort.findQuestions(any()) } returns
             cursorPageOf(emptyList(), hasNextPage = false, hasPreviousPage = false)
 
-        service.spotQuestions(SpotQuestionsQuery(catalogId = catalogId, first = 20, after = null), memberId = 0L)
+        service.spotQuestions(
+            SpotQuestionsQuery(catalogId = catalogId, first = 20, after = null),
+            memberId = 0L,
+            language = language,
+        )
 
         verify(exactly = 0) { communityQueryPort.findBlockedMemberIds(any()) }
     }
@@ -154,6 +198,7 @@ class SpotQaQueryServiceTest {
         service.spotQuestions(
             SpotQuestionsQuery(catalogId = null, mine = true, first = 20, after = null),
             memberId,
+            language,
         )
 
         // **호출자 자신이다.** 인자로 받은 남의 id가 들어갈 자리가 없다.
@@ -169,7 +214,11 @@ class SpotQaQueryServiceTest {
         every { spotQaQueryPort.findQuestions(capture(search)) } returns
             cursorPageOf(emptyList(), hasNextPage = false, hasPreviousPage = false)
 
-        service.spotQuestions(SpotQuestionsQuery(catalogId = catalogId, first = 20, after = null), memberId)
+        service.spotQuestions(
+            SpotQuestionsQuery(catalogId = catalogId, first = 20, after = null),
+            memberId,
+            language,
+        )
 
         assertNull(search.captured.authorId)
     }
@@ -185,6 +234,7 @@ class SpotQaQueryServiceTest {
         service.spotQuestions(
             SpotQuestionsQuery(catalogId = catalogId, mine = true, first = 20, after = null),
             memberId,
+            language,
         )
 
         assertEquals(catalogId, search.captured.catalogId)
@@ -201,6 +251,7 @@ class SpotQaQueryServiceTest {
         service.spotQuestions(
             SpotQuestionsQuery(catalogId = null, ids = listOf(5L), first = 20, after = null),
             memberId,
+            language,
         )
 
         assertEquals(listOf(5L), search.captured.ids)
@@ -216,9 +267,10 @@ class SpotQaQueryServiceTest {
         service.spotQuestions(
             SpotQuestionsQuery(catalogId = null, mine = true, first = 20, after = null),
             memberId,
+            language,
         )
 
-        verify(exactly = 0) { spotLookupPort.findSummary(any()) }
+        verify(exactly = 0) { spotLookupPort.findSummary(any(), any()) }
     }
 
     // ── 답변 목록과 숨김 종속(R11) ─────────────────────────────────

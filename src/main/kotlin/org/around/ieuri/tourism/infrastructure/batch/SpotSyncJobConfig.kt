@@ -1,11 +1,14 @@
 package org.around.ieuri.tourism.infrastructure.batch
 
 import tools.jackson.databind.ObjectMapper
+import org.around.ieuri.tourism.application.port.`in`.command.SpotCatalogSplitUseCase
 import org.around.ieuri.tourism.application.port.`in`.command.SpotCatalogUseCase
 import org.around.ieuri.tourism.application.port.out.client.FestivalSyncPort
 import org.around.ieuri.tourism.application.port.out.client.SpotSyncPort
 import org.around.ieuri.tourism.application.port.out.persistence.FestivalStorePort
+import org.around.ieuri.tourism.application.port.out.persistence.FestivalUpsertPort
 import org.around.ieuri.tourism.application.port.out.persistence.SpotStorePort
+import org.around.ieuri.tourism.application.port.out.persistence.SpotUpsertPort
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.springframework.batch.core.job.Job
 import org.springframework.batch.core.job.builder.JobBuilder
@@ -25,7 +28,7 @@ import org.springframework.transaction.PlatformTransactionManager
  * ├── syncLanguageStep       ×4 (KO → EN → JA → ZH, 순차)
  * ├── festivalSyncStep       ×4 (KO → EN → JA → ZH, 순차)
  * ├── catalogAssignmentStep  카탈로그 배정 (SPEC-0019)
- * └── catalogTranslationStep 신규분 번역
+ * └── catalogSplitStep       잘못 접힌 카탈로그 분할 (SPEC-0029)
  * ```
  *
  * **축제 Step이 관광지 Step 뒤에 와야 한다** — `spot_festival`이 `spot`에 FK를 걸므로 부모 행이
@@ -44,12 +47,14 @@ class SpotSyncJobConfig(
     private val transactionManager: PlatformTransactionManager,
     private val syncPort: SpotSyncPort,
     private val storePort: SpotStorePort,
+    private val upsertPort: SpotUpsertPort,
     private val properties: SpotSyncProperties,
     private val festivalSyncPort: FestivalSyncPort,
     private val festivalStorePort: FestivalStorePort,
+    private val festivalUpsertPort: FestivalUpsertPort,
     private val festivalProperties: FestivalSyncProperties,
     private val catalogUseCase: SpotCatalogUseCase,
-    private val catalogProperties: SpotCatalogProperties,
+    private val catalogSplitUseCase: SpotCatalogSplitUseCase,
     private val objectMapper: ObjectMapper,
 ) {
 
@@ -57,10 +62,10 @@ class SpotSyncJobConfig(
     fun spotSyncJob(): Job {
         val order = listOf(DomainLocale.KO, DomainLocale.EN, DomainLocale.JA, DomainLocale.ZH)
         // 관광지 4개 언어를 모두 마친 뒤 축제 4개 언어가 온다 — 부모 행이 먼저 있어야 한다.
-        // 카탈로그 배정·번역·보고는 그 뒤다(SPEC-0019 R-7).
+        // 카탈로그 배정은 그 뒤다(SPEC-0019 R-7).
         val steps = order.map(::syncStep) +
             order.map(::festivalStep) +
-            listOf(catalogAssignmentStep(), catalogTranslationStep())
+            listOf(catalogAssignmentStep(), catalogSplitStep())
         return steps.drop(1)
             .fold(JobBuilder(JOB_NAME, jobRepository).start(steps.first())) { acc, step -> acc.next(step) }
             .build()
@@ -72,14 +77,14 @@ class SpotSyncJobConfig(
             .tasklet(SpotCatalogAssignmentTasklet(catalogUseCase), transactionManager)
             .build()
 
-
-    /** 번역이 비어 있는 (카탈로그, 언어) 쌍을 채운다. 재번역 경로는 없다(R-7). */
-    private fun catalogTranslationStep(): Step =
-        StepBuilder("catalogTranslationStep", jobRepository)
-            .tasklet(
-                SpotCatalogTranslationTasklet(catalogUseCase, catalogProperties.translationBatchSize),
-                transactionManager,
-            )
+    /**
+     * 서로 다른 장소가 접힌 카탈로그를 가른다(SPEC-0029).
+     *
+     * **배정 뒤여야 한다** — 전량이 붙고 난 뒤라야 한 카탈로그가 몇 장소인지 물을 수 있다.
+     */
+    private fun catalogSplitStep(): Step =
+        StepBuilder("catalogSplitStep", jobRepository)
+            .tasklet(SpotCatalogSplitTasklet(catalogSplitUseCase, catalogUseCase), transactionManager)
             .build()
 
     /**
@@ -93,6 +98,7 @@ class SpotSyncJobConfig(
                     language = language,
                     syncPort = syncPort,
                     storePort = storePort,
+                    upsertPort = upsertPort,
                     pageSize = properties.pageSize,
                     // 조회를 Step 실행 시점으로 미룬다 — 람다를 벗기면 부팅 때 잡은 낡은 집합으로
                     // 걸러 종료 축제가 되살아난다.
@@ -114,6 +120,7 @@ class SpotSyncJobConfig(
                     language = language,
                     syncPort = festivalSyncPort,
                     storePort = festivalStorePort,
+                    upsertPort = festivalUpsertPort,
                     pageSize = festivalProperties.pageSize,
                 ),
                 transactionManager,

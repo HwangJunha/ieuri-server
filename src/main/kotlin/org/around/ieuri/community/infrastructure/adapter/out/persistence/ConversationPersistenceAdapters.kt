@@ -2,8 +2,8 @@ package org.around.ieuri.community.infrastructure.adapter.out.persistence
 
 import com.querydsl.jpa.impl.JPAQueryFactory
 import org.around.ieuri.common.security.AesGcmCipher
-import org.around.ieuri.community.application.port.out.client.ObjectStoragePort
 import org.around.ieuri.community.application.port.out.persistence.ConversationRepositoryPort
+import org.around.ieuri.community.application.port.out.persistence.ExpiredMessagePurgeResult
 import org.around.ieuri.community.application.port.out.persistence.MessagePurgePort
 import org.around.ieuri.community.application.port.out.persistence.MessageReportRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.MessageRepositoryPort
@@ -21,7 +21,6 @@ import org.around.ieuri.community.infrastructure.adapter.out.persistence.reposit
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.MessageQuoteJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.MessageReportItemJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.MessageReportJpaRepository
-import org.slf4j.LoggerFactory
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.domain.Limit
 import org.springframework.stereotype.Component
@@ -163,66 +162,28 @@ class MessageReportPersistenceAdapter(
 }
 
 /**
- * 보관 기간 만료·탈퇴 메시지 삭제. **물리 삭제다**(R16·R17).
+ * 만료 메시지의 **행 삭제만** 담당한다. **물리 삭제다**(R16).
  *
  * 선별과 삭제를 나누는 이유는 회차 상한을 실제로 지키기 위해서다 — 조건 하나로 지우면
  * 6개월치가 한 트랜잭션에 들어가 락과 WAL이 함께 커진다.
- */
-@Component
-class MessagePurgeAdapter(
-    private val rowPurger: ExpiredMessageRowPurger,
-    private val objectStoragePort: ObjectStoragePort,
-) : MessagePurgePort {
-
-    /**
-     * **오브젝트 삭제는 트랜잭션 밖이다.** 회차당 최대 limit건의 R2 왕복이 트랜잭션 안에 있으면
-     * DB 커넥션 보유 시간이 원격 레이턴시에 묶여, 1000건이면 한 커넥션을 수십 초 잡는다.
-     */
-    override fun deleteCreatedBefore(cutoff: Instant, limit: Int): Int {
-        val (deleted, photoKeys) = rowPurger.deleteRows(cutoff, limit)
-        if (deleted == 0) return 0
-
-        // **첨부 사진도 함께 지운다.** 행만 지우고 오브젝트를 남기면 "6개월 뒤 삭제"가
-        // 사진에 대해서는 거짓이 된다 — 보관 기간을 정한 의미가 없어진다.
-        //
-        // 행 삭제 **뒤에** 지운다. 먼저 지웠다가 트랜잭션이 롤백되면 메시지는 남고 사진만
-        // 사라져 깨진 첨부가 된다. 반대 순서에서는 최악이 고아 오브젝트인데, 그쪽이 낫다.
-        //
-        // 개별 실패를 삼키는 이유는 한 장의 삭제 실패로 회차 전체를 되돌릴 이유가 없어서다 —
-        // 스토리지에 이미 없는 키도 정상 경로다(멱등).
-        var photoFailures = 0
-        photoKeys.forEach { key ->
-            runCatching { objectStoragePort.delete(key) }.onFailure { photoFailures += 1 }
-        }
-        // 키에 memberId 구간이 있어 로그에 싣지 않는다(POL-013) — 건수만 남긴다.
-        if (photoFailures > 0) log.warn("failed to delete {} expired DM photo objects", photoFailures)
-        return deleted
-    }
-
-    private companion object {
-        private val log = LoggerFactory.getLogger(MessagePurgeAdapter::class.java)
-    }
-}
-
-/**
- * 만료 메시지의 **행 삭제만** 담당한다.
  *
- * [MessagePurgeAdapter]와 별도 빈인 이유는 프록시 때문이다 — 같은 클래스 안의 메서드를
- * 자기호출하면 프록시를 거치지 않아 `@Transactional`이 조용히 무시된다. 트랜잭션을 원격
- * 호출에서 떼어내려면 경계가 빈 밖에 있어야 한다.
+ * **첨부 오브젝트는 여기서 지우지 않는다.** 회차당 최대 limit건의 R2 왕복이 이 트랜잭션 안에
+ * 있으면 DB 커넥션 보유 시간이 원격 레이턴시에 묶여, 1000건이면 한 커넥션을 수십 초 잡는다.
+ * 키만 돌려주고 스토리지 삭제는 호출자(`MessageRetentionService`)가 트랜잭션 밖에서 한다.
  */
 @Component
 class ExpiredMessageRowPurger(
     private val repository: MessageJpaRepository,
-) {
-    /** 삭제 건수와, 뒤이어 스토리지에서 지워야 할 오브젝트 키를 함께 돌려준다. */
-    @Transactional
-    fun deleteRows(cutoff: Instant, limit: Int): Pair<Int, List<String>> {
-        val targets = repository.findByCreatedAtBefore(cutoff, Limit.of(limit))
-        if (targets.isEmpty()) return 0 to emptyList()
+) : MessagePurgePort {
 
+    @Transactional
+    override fun deleteCreatedBefore(cutoff: Instant, limit: Int): ExpiredMessagePurgeResult {
+        val targets = repository.findByCreatedAtBefore(cutoff, Limit.of(limit))
+        if (targets.isEmpty()) return ExpiredMessagePurgeResult(deletedCount = 0, photoObjectKeys = emptyList())
+
+        // 키를 **삭제 전에** 모은다 — 행이 사라지고 나면 어느 오브젝트를 지워야 하는지 알 수 없다.
         val photoKeys = targets.mapNotNull { it.photoObjectKey }
         val deleted = repository.deleteByIdIn(targets.mapNotNull { it.id }).toInt()
-        return deleted to photoKeys
+        return ExpiredMessagePurgeResult(deletedCount = deleted, photoObjectKeys = photoKeys)
     }
 }

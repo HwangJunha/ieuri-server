@@ -52,7 +52,7 @@ class CommunityQueryService(
      * 글 피드. **인자 조합이 범위를 정한다** — 장소 하나, 좌표 반경, 카테고리, 또는 전체다.
      * 정렬·페이징·모더레이션 필터는 모든 경우가 같다.
      */
-    override fun posts(query: PostsQuery, memberId: Long): CursorPage<PostView> {
+    override fun posts(query: PostsQuery, memberId: Long, language: ContentLanguage): CursorPage<PostView> {
         val search = PostsSearch(
             catalogId = query.catalogId,
             area = resolveArea(query),
@@ -61,6 +61,9 @@ class CommunityQueryService(
             normalizedTag = query.tag?.let { PostTag.parseOrNull(it)?.normalized },
             sort = effectiveSort(query),
             hiddenByViewer = query.hiddenByViewer,
+            // 활성 언어에서 해소되지 않는 장소가 붙은 글을 뺀다(R-23). 조회 단계에서 걸어야
+            // `first`가 곧 정확한 페이지 크기다 — 뒤에서 거르면 요청 개수를 채우지 못한다.
+            language = language,
             first = clampPageSize(query.first),
             after = query.after,
             viewer = viewerContext(memberId),

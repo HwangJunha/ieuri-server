@@ -17,12 +17,6 @@ data class SpotsQuery(
     val radiusMeters: Int,
     /** 카테고리 선택. 비어 있으면 전체이며, 값이 여럿이면 OR로 결합된다(SPEC-0020 R5). */
     val categories: CategorySelection,
-    /**
-     * 원문 보유 필터. **null이면 전체**, true면 그 언어 원문이 있는 것만, false면 번역본만.
-     *
-     * 원문을 먼저 소진한 뒤 번역본을 이어 받는 흐름을 클라이언트가 제어한다.
-     */
-    val hasOrigin: Boolean?,
     val page: Int,
     val size: Int,
 )
@@ -218,12 +212,6 @@ data class OngoingFestivalsQuery(
     val latitude: Double,
     val longitude: Double,
     val radiusMeters: Int,
-    /**
-     * 원문 보유 필터. **null이면 전체**, true면 그 언어 원문이 있는 것만, false면 번역본만.
-     *
-     * 원문을 먼저 소진한 뒤 번역본을 이어 받는 흐름을 클라이언트가 제어한다.
-     */
-    val hasOrigin: Boolean?,
     val first: Int,
     val after: String?,
 )
@@ -254,12 +242,6 @@ data class PopularSpotsQuery(
     val radiusMeters: Int,
     /** 카테고리 선택. 비어 있으면 전체이며, 값이 여럿이면 OR로 결합된다(SPEC-0020 R5). */
     val categories: CategorySelection,
-    /**
-     * 원문 보유 필터. **null이면 전체**, true면 그 언어 원문이 있는 것만, false면 번역본만.
-     *
-     * 원문을 먼저 소진한 뒤 번역본을 이어 받는 흐름을 클라이언트가 제어한다.
-     */
-    val hasOrigin: Boolean?,
     val first: Int,
     val after: String?,
 )

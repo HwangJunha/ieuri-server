@@ -1,6 +1,7 @@
 package org.around.ieuri.community.infrastructure.adapter.`in`.graphql
 
 import com.netflix.graphql.dgs.DgsComponent
+import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsMutation
 import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.common.graphql.generated.types.MarkConversationReadInput
@@ -19,6 +20,7 @@ import org.around.ieuri.community.application.command.StartConversationCommand
 import org.around.ieuri.community.application.port.`in`.command.ConversationCommandUseCase
 import org.around.ieuri.community.application.port.`in`.command.MessageReportCommandUseCase
 import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper.toCommand
+import org.around.ieuri.community.infrastructure.locale.contentLanguage
 import org.springframework.stereotype.Component
 
 /**
@@ -57,13 +59,21 @@ class ConversationMutationResolver(
         )
     }
 
+    /** 인용 스냅샷의 장소명은 **이 요청의 활성 언어로** 해소된다(SPEC-0029 AC-25.4). */
     @DgsMutation
-    fun sendMessage(@InputArgument input: SendMessageInput): SendMessagePayload =
+    fun sendMessage(
+        @InputArgument input: SendMessageInput,
+        dfe: DgsDataFetchingEnvironment,
+    ): SendMessagePayload =
         withCommunityUserErrors(
             onError = { SendMessagePayload(success = false, userErrors = it, messageId = null) },
         ) {
             val memberId = currentMemberProvider.requireMemberId()
-            val messageId = conversationCommandUseCase.sendMessage(input.toCommand(), memberId)
+            val messageId = conversationCommandUseCase.sendMessage(
+                input.toCommand(),
+                memberId,
+                dfe.contentLanguage(),
+            )
             SendMessagePayload(success = true, userErrors = emptyList(), messageId = messageId)
         }
 

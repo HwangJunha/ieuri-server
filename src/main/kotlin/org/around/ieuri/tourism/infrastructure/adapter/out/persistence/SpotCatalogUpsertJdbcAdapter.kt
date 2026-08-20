@@ -28,11 +28,10 @@ class SpotCatalogUpsertJdbcAdapter(
         language: DomainLocale,
         title: String,
         address: String?,
-        hasOrigin: Boolean,
     ) {
         jdbcTemplate.update(
             UPSERT_TRANSLATION_SQL,
-            catalogId, language.name, title, address, hasOrigin, catalogId,
+            catalogId, language.name, title, address, catalogId,
         )
     }
 
@@ -62,21 +61,21 @@ class SpotCatalogUpsertJdbcAdapter(
          * 없지만 낡은 채로 남지 않는다.
          */
         val UPSERT_TRANSLATION_SQL = """
-            INSERT INTO spot_catalog_translation (catalog_id, language, title, address, map_x, map_y, category, has_origin)
-            SELECT ?, ?, ?, ?, c.map_x, c.map_y, c.category, ?
+            INSERT INTO spot_catalog_translation (catalog_id, language, title, address, map_x, map_y, category, visible)
+            SELECT ?, ?, ?, ?, c.map_x, c.map_y, c.category, TRUE
             FROM spot_catalog c WHERE c.id = ?
             ON CONFLICT (catalog_id, language) DO UPDATE SET
                 map_x      = EXCLUDED.map_x,
                 map_y      = EXCLUDED.map_y,
                 category   = EXCLUDED.category,
-                -- **원문 보유는 참으로만 올라간다.** 번역 배치가 나중에 같은 쌍을 건드려도
-                -- 이미 원문이 있다는 사실을 지우면 안 된다.
-                has_origin = spot_catalog_translation.has_origin OR EXCLUDED.has_origin,
+                -- **행이 다시 생겼다는 것은 그 언어의 원본이 돌아왔다는 뜻이다.** 감춰져
+                -- 있었다면 여기서 되살린다 — 노출 갱신을 기다리지 않는다.
+                visible    = TRUE,
                 updated_at = now()
             WHERE spot_catalog_translation.map_x    IS DISTINCT FROM EXCLUDED.map_x
                OR spot_catalog_translation.map_y    IS DISTINCT FROM EXCLUDED.map_y
                OR spot_catalog_translation.category IS DISTINCT FROM EXCLUDED.category
-               OR (EXCLUDED.has_origin AND NOT spot_catalog_translation.has_origin)
+               OR NOT spot_catalog_translation.visible
         """.trimIndent()
 
         /**

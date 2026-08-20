@@ -116,25 +116,19 @@ class SpotCatalogTranslationEntity(
     var category: String,
 
     /**
-     * 원본 `spot`이 남아 있는가. **모든 조회가 이 값으로 거른다.**
+     * **이 언어의 원본 `spot`이 남아 있는가. 모든 조회가 이 값으로 거른다.**
      *
-     * 상류에서 장소가 사라지면 false가 되어 목록·지도·검색에서 빠지고, 돌아오면 true로
-     * 되살아난다. 행을 지우지 않는 이유는 배정 배치의 KO 제목 맵이 이 테이블에서
+     * 상류에서 그 언어의 장소가 사라지면 false가 되어 목록·지도·검색에서 빠지고, 돌아오면
+     * true로 되살아난다. 행을 지우지 않는 이유는 배정 배치의 KO 제목 맵이 이 테이블에서
      * 만들어지기 때문이다 — 지우면 장소가 돌아왔을 때 좋아요가 달린 옛 카탈로그를 찾지
      * 못하고 새 카탈로그가 생긴다.
+     *
+     * 예전에는 이 값이 카탈로그 단위(원본이 하나라도 있는가)였고 언어별 판정은 `has_origin`이
+     * 따로 들었다. 같은 사실을 두 단위로 말하는 컬럼이 둘이라 조회가 늘 둘을 AND 해야 했고
+     * 언어별 노출을 표현할 수 없어, SPEC-0029가 하나로 합쳤다.
      */
     @Column(name = "visible", nullable = false)
     var visible: Boolean = true,
-
-    /**
-     * **그 언어의 `spot` 원본이 있는가.** 목록 정렬의 1순위다 — 원문이 있는 장소가 먼저
-     * 나오고 번역으로 채운 장소는 뒤로 밀린다.
-     *
-     * [visible]과 판정 대상이 다르다. 저쪽은 카탈로그에 원본이 하나라도 있는가이고,
-     * 이쪽은 **이 언어의** 원본이 있는가다.
-     */
-    @Column(name = "has_origin", nullable = false)
-    var hasOrigin: Boolean = false,
 
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant? = null,

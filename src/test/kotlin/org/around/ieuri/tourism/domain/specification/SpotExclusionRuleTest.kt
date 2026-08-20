@@ -18,6 +18,11 @@ class SpotExclusionRuleTest {
             "CU", "씨유", "GS25", "세븐일레븐", "7-Eleven", "이마트24", "emart24", "E-Mart 24",
             "미니스톱", "MINISTOP", "스토리웨이",
             "의원", "한의원", "Clinic", "Dermatology", "병원", "Hospital", "치과", "Dental",
+            // SPEC-0029 R-1. 진료과는 한글 부분 일치라 `외과` 하나가 정형외과·성형외과를 덮는다.
+            "외과", "내과", "피부과", "안과", "이비인후과", "산부인과", "소아과", "정신과",
+            "비뇨기과", "재활의학과", "영상의학과", "마취통증의학과",
+            "보건소", "의료원", "요양원", "요양병원", "검진센터", "산후조리원", "동물병원",
+            "Medical Center", "Oriental Medicine", "Veterinary",
         ),
         branchNamePatterns = listOf(
             "병원점", "병원 지점", "Hospital Branch", "의원점", "약국점", "Clinic Branch",
@@ -162,5 +167,67 @@ class SpotExclusionRuleTest {
         // `7-Eleven`·`E-Mart 24`의 하이픈이 정규식 메타로 해석되면 조용히 어긋난다.
         assertTrue(excluded("7-Eleven 종로점"))
         assertTrue(excluded("E-Mart 24 강남"))
+    }
+
+    // ── SPEC-0029 R-1: 의료 시설 ────────────────────────────────────────────
+
+    @Test
+    fun `외과 한 항목이 모든 외과 진료과를 잡는다`() {
+        // AC-1.1. 한글이 부분 일치이므로 진료과를 개별 나열할 필요가 없다 — 이것이
+        // 목록에 `정형외과`·`성형외과`가 없는 이유다. 나열로 바뀌면 여기서 깨진다.
+        assertTrue(excluded("서울정형외과의원"))
+        assertTrue(excluded("강남성형외과"))
+        assertTrue(excluded("우리신경외과"))
+        assertTrue(excluded("부산흉부외과"))
+    }
+
+    @Test
+    fun `진료과와 의료 시설이 제외된다`() {
+        // AC-1.2
+        assertTrue(excluded("강남피부과"))
+        assertTrue(excluded("밝은안과"))
+        assertTrue(excluded("연세이비인후과"))
+        assertTrue(excluded("행복산부인과"))
+        assertTrue(excluded("종로구보건소"))
+        assertTrue(excluded("제주의료원"))
+        assertTrue(excluded("실버요양원"))
+        assertTrue(excluded("서울요양병원"))
+        assertTrue(excluded("강남종합검진센터"))
+        assertTrue(excluded("미소산후조리원"))
+        assertTrue(excluded("행복동물병원"))
+    }
+
+    @Test
+    fun `영문 의료 키워드는 단어 경계로 걸린다`() {
+        assertTrue(excluded("Seoul Medical Center"))
+        assertTrue(excluded("Korean Oriental Medicine Clinic"))
+        assertTrue(excluded("Happy Veterinary Hospital"))
+    }
+
+    @Test
+    fun `의료 키워드가 걸려도 관광 카테고리는 보호된다`() {
+        // AC-1.3. 서울대학교병원의학박물관은 실제 관광 대상이다 — 카테고리 보호가 1차 방어선이며,
+        // `안과`·`내과`의 오탐 위험을 감당하는 근거이기도 하다.
+        assertFalse(excluded("서울대학교병원의학박물관", SpotCategory("CULTURAL_FACILITY")))
+        assertFalse(excluded("제중원 한의원 전시관", SpotCategory.TOURIST_SPOT))
+    }
+
+    @Test
+    fun `의료 시설에 입점한 소매점은 지점명 보호로 살아난다`() {
+        // AC-1.4
+        assertFalse(excluded("올리브영 제주대학병원점"))
+        assertFalse(excluded("탠저비 한라병원점"))
+    }
+
+    @Test
+    fun `문서화된 오탐 위험이 실제로 존재한다`() {
+        // **이 테스트는 걸리는 것이 정상이다.** `안과`·`내과`가 학회관·대학을 잡는 것은
+        // 설정 주석과 스펙 §2.1이 사전에 인정한 위험이며, 실측 표본이 없어 지금은 좁히지
+        // 않기로 했다. 배포 후 전환 건수가 급증하면 그 키워드를 좁히고 이 테스트를 뒤집는다.
+        //
+        // 부작용을 테스트로 고정해 두는 이유는, 나중에 누군가 이 동작을 보고 "버그다"라고
+        // 판단하기 전에 그것이 알려진 선택이었음을 알 수 있게 하려는 것이다.
+        assertTrue(excluded("대한안과학회관"))
+        assertTrue(excluded("서울대학교 내과대학"))
     }
 }

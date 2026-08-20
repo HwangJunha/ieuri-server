@@ -21,6 +21,11 @@ import java.time.format.DateTimeFormatter
  *    그래서 지역·카테고리 필터를 아예 보내지 않는다.
  *  - `arrange`는 `spot` 적재와 **같은 값**을 쓴다. 대표이미지 필수 조건이 어긋나면 부모 `spot` 행이
  *    없는 축제만 잔뜩 나와 전부 건너뛰어진다(R-2).
+ *
+ * **`showflag`를 보내지 않는다.** `areaBasedSyncList2`에는 있는 파라미터지만 이 오퍼레이션에는
+ * 없고, 위의 구필드와 똑같이 **에러 없이 0건**을 돌려준다(실측: 4개 언어 전부 0건 적재).
+ * 표출 중단 항목을 거를 필요도 없다 — 부모 `spot` 행이 이미 `showflag=1`로 걸러졌고
+ * `spot_festival`이 FK로 매달리므로, 부모 없는 축제는 애초에 적재되지 않는다.
  */
 @Component
 class TourApiFestivalSyncClient(

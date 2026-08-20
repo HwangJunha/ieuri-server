@@ -1,6 +1,7 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.persistence
 
 import org.around.ieuri.tourism.application.command.SyncFestivalCommand
+import org.around.ieuri.tourism.application.port.out.persistence.FestivalUpsertPort
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.ParameterizedPreparedStatementSetter
 import org.springframework.stereotype.Component
@@ -16,11 +17,11 @@ import java.time.Instant
 @Component
 class FestivalUpsertJdbcAdapter(
     private val jdbcTemplate: JdbcTemplate,
-) {
+) : FestivalUpsertPort {
 
     /** [festivals]를 한 번의 배치로 upsert하고 실제 반영된 행 수를 돌려준다. */
     @Transactional
-    fun upsertAll(festivals: List<SyncFestivalCommand>, syncedAt: Instant): Int {
+    override fun upsertAll(festivals: List<SyncFestivalCommand>, syncedAt: Instant): Int {
         if (festivals.isEmpty()) return 0
         val syncedTimestamp = Timestamp.from(syncedAt)
         val setter = ParameterizedPreparedStatementSetter<SyncFestivalCommand> { ps: PreparedStatement, festival ->

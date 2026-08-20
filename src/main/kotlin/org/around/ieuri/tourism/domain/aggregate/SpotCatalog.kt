@@ -21,9 +21,11 @@ class SpotCatalog private constructor(
     translations: Map<DomainLocale, CatalogTranslation>,
     festivalPeriod: CatalogFestivalPeriod?,
 ) {
-    private val _translations: MutableMap<DomainLocale, CatalogTranslation> = translations.toMutableMap()
-
-    val translations: Map<DomainLocale, CatalogTranslation> get() = _translations.toMap()
+    /**
+     * 원본이 존재하는 언어의 표시값. **채워 넣는 연산이 없다** — 여기 없는 언어는 그 언어에
+     * 원본이 없다는 뜻이고, 빈 채로 남는 것이 올바른 상태다(SPEC-0029 R-6).
+     */
+    val translations: Map<DomainLocale, CatalogTranslation> = translations.toMap()
 
     /** 언어 무관 표준값. 조회가 카드에 쓰는 값이다. */
     var standard: CatalogStandardValues = standard
@@ -32,18 +34,6 @@ class SpotCatalog private constructor(
     /** 축제 기간. 축제가 아니면 null이다. */
     var festivalPeriod: CatalogFestivalPeriod? = festivalPeriod
         private set
-
-    /** 이 언어의 표시값이 비어 있는가 — 즉 번역 대상인가(R-4). */
-    fun needsTranslation(language: DomainLocale): Boolean = language !in _translations
-
-    /**
-     * 번역을 채운다. **이미 값이 있으면 아무것도 하지 않는다** — TourAPI가 제공한 원문이
-     * 우리 번역보다 우선한다(R-4).
-     */
-    fun fillTranslation(language: DomainLocale, title: String, address: String? = null) {
-        if (!needsTranslation(language)) return
-        _translations[language] = CatalogTranslation(title, address)
-    }
 
     /** 표준값을 갱신한다. 배치가 원본을 다시 훑어 확정할 때 쓴다. */
     fun updateStandard(values: CatalogStandardValues) {
@@ -123,10 +113,11 @@ data class CatalogStandardValues(
 /**
  * 카탈로그의 한 언어 표시값 — 제목과 주소.
  *
- * **주소가 함께 있어야 한다**(R-4). 제목만 있으면 사용자가 목록에서 이름은 읽어도 찾아갈 수
- * 없다. 원문에 주소가 없는 spot이 있어 [address]는 nullable이다.
+ * **이 행의 의미는 "이 언어에 원본이 존재한다는 증거"다**(SPEC-0029 R-6). 이전에는 "이 언어의
+ * 표시값"이었고 비어 있으면 기계번역으로 채웠으나, 그 채움을 걷어냈다. 이제 여기 있는 값은
+ * 전부 업스트림 원문이며, 없는 언어는 없는 채로 조회에서 빠진다.
  *
- * 출처(공식/기계번역)를 구분하지 않는다 — 그 값으로 분기할 시나리오가 확인되지 않았다.
+ * 원문에 주소가 없는 spot이 있어 [address]는 nullable이다.
  */
 data class CatalogTranslation(
     val title: String,

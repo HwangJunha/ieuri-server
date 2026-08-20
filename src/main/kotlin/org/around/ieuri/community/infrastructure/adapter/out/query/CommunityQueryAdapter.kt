@@ -39,6 +39,7 @@ import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostPhotoEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostChipEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostSpotEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QSpotCatalogLanguageEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostTagEntity
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -68,6 +69,7 @@ class CommunityQueryAdapter(
     private val tag = QPostTagEntity.postTagEntity
     private val postChip = QPostChipEntity.postChipEntity
     private val postSpot = QPostSpotEntity.postSpotEntity
+    private val catalogLanguage = QSpotCatalogLanguageEntity.spotCatalogLanguageEntity
     private val block = QBlockEntity.blockEntity
     private val postHide = QPostHideEntity.postHideEntity
 
@@ -92,11 +94,35 @@ class CommunityQueryAdapter(
             after = search.after,
             extraConditions = listOfNotNull(
                 spotCondition(search.catalogId),
+                languageCondition(search.language),
                 categoryCondition(search.categories),
                 tagCondition(search.normalizedTag),
                 hideCondition(search),
             ),
         )
+
+    /**
+     * 활성 언어 필터(SPEC-0029 R-23). 붙은 장소가 이 언어에서 해소되지 않는 글을 뺀다 —
+     * **오류가 아니라 부재다.**
+     *
+     * **장소가 없는 글은 남는다**(AC-15.4). 그래서 `NOT EXISTS(연결) OR EXISTS(언어)`이며,
+     * 앞 절을 빠뜨리면 카테고리만으로 쓴 글이 전 언어에서 사라진다.
+     *
+     * 언어 사본은 커뮤니티가 들고 있다 — tour 스키마를 조인하지 않으므로 이 쿼리 하나로
+     * 끝나고 `first`가 곧 정확한 페이지 크기다.
+     */
+    private fun languageCondition(language: ContentLanguage): BooleanExpression =
+        post.id.notIn(JPAExpressions.select(postSpot.postId).from(postSpot))
+            .or(
+                post.id.`in`(
+                    JPAExpressions.select(postSpot.postId).from(postSpot)
+                        .join(catalogLanguage)
+                        .on(
+                            catalogLanguage.catalogId.eq(postSpot.catalogId),
+                            catalogLanguage.language.eq(language),
+                        ),
+                ),
+            )
 
     /**
      * 개별 숨김 필터. **[PostsSearch.hiddenByViewer]가 true면 뒤집힌다** — 숨긴 글만 남긴다.

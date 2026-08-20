@@ -2,8 +2,9 @@ package org.around.ieuri.tourism.infrastructure.adapter.out.persistence
 
 import com.querydsl.jpa.JPAExpressions
 import com.querydsl.jpa.impl.JPAQueryFactory
+import org.around.ieuri.tourism.application.port.out.persistence.CatalogLanguage
 import org.around.ieuri.tourism.application.port.out.persistence.SpotCatalogStorePort
-import org.around.ieuri.tourism.application.port.out.persistence.SpotCatalogUpsertPort
+import org.around.ieuri.tourism.application.port.out.persistence.VisibilityRefreshResult
 import org.around.ieuri.tourism.domain.aggregate.SpotCatalog
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotCatalogTranslationEntity
@@ -18,15 +19,15 @@ import org.springframework.transaction.annotation.Transactional
 /**
  * 카탈로그 쓰기 포트 구현(SPEC-0019). 도메인↔엔티티 변환은 `mapper` 패키지가 담당한다.
  *
- * upsert가 필요한 두 경로(번역·축제기간)만 [SpotCatalogUpsertPort]에 위임한다 —
- * JPA에 이식 가능한 upsert가 없고, `merge` 의미로는 select-then-insert 경합이 생긴다.
+ * **여기에는 JPA·QueryDSL로 표현되는 쓰기만 있다.** upsert는 생 SQL이 필요해
+ * `SpotCatalogUpsertJdbcAdapter`가 맡으며, 서비스가 그 포트를 따로 주입받는다 —
+ * 이 어댑터가 저쪽을 주입받으면 어느 경로가 생 SQL을 쓰는지가 가려진다.
  */
 @Component
 class SpotCatalogStoreAdapter(
     private val queryFactory: JPAQueryFactory,
     private val catalogRepository: SpotCatalogJpaRepository,
     private val translationRepository: SpotCatalogTranslationJpaRepository,
-    private val upsertPort: SpotCatalogUpsertPort,
 ) : SpotCatalogStorePort {
 
     private val spot = QSpotEntity.spotEntity
@@ -62,60 +63,63 @@ class SpotCatalogStoreAdapter(
             .execute()
     }
 
-    override fun upsertTranslation(
-        catalogId: Long,
-        language: DomainLocale,
-        title: String,
-        address: String?,
-        hasOrigin: Boolean,
-    ) = upsertPort.upsertTranslation(catalogId, language, title, address, hasOrigin)
-
-    override fun refreshFestivalPeriod(catalogId: Long) = upsertPort.refreshFestivalPeriod(catalogId)
-
     /**
-     * 원본 생존 여부를 번역 행의 `visible`에 반영한다. 양방향이다 — 사라진 것은 감추고
-     * 돌아온 것은 다시 보이게 한다.
+     * 원본 생존 여부를 번역 행의 `visible`에 반영하고, **반영 후 노출 중인 것 전부**를 돌려준다.
      *
-     * 벌크 갱신이라 영속성 컨텍스트를 우회한다. 이 트랜잭션에서 같은 엔티티를 다시 읽는
-     * 코드가 없으므로 안전하다. **상태가 실제로 바뀐 행만 건드린다** — 매 실행마다 전 행을
-     * 갱신하면 그 UPDATE가 전부 복제로 흘러가 검색 노드가 불필요하게 출렁인다.
+     * `visible`은 **그 언어에 원본이 있는가**다(SPEC-0029). 상류에서 장소가 없어지면 동기화가
+     * `spot` 행을 지우지만 카탈로그와 번역은 남는데, 그대로 두면 목록에는 나오는데 상세를 열면
+     * 실패하는 장소가 된다. **지우지 않고 감추는 이유는** 번역 행을 지우면 배정 배치의 KO 제목
+     * 맵이 그 카탈로그를 못 찾아, 장소가 돌아왔을 때 좋아요가 달린 옛 카탈로그 대신 새 카탈로그가
+     * 생기기 때문이다. 그래서 양방향이다 — 사라진 것은 감추고 돌아온 것은 되살린다.
+     *
+     * **돌려주는 것은 변경분이 아니라 현재 상태 전부다.** 구독자(커뮤니티의 언어 사본)가 빈
+     * 상태에서 출발하기 때문이다 — 전량 재적재 후에는 모든 행이 신규 INSERT라 `visible`이
+     * 뒤집힌 적이 없고, 변경분만 주면 사본이 영원히 채워지지 않는다.
+     *
+     * **갱신 뒤에 새로 읽으므로** 두 UPDATE 사이에 동시 upsert가 끼어들었더라도 그 결과까지
+     * 반영된 최신 상태가 나온다.
+     *
+     * 벌크 갱신이라 영속성 컨텍스트를 우회한다. 이 트랜잭션에서 같은 엔티티를 다시 읽는 코드가
+     * 없으므로 안전하다. **상태가 실제로 바뀐 행만 건드린다** — 매 실행마다 전 행을 갱신하면
+     * 그 UPDATE가 전부 복제로 흘러가 검색 노드가 불필요하게 출렁인다.
      */
     @Transactional
-    override fun refreshTranslationVisibility(): Int {
-        // 카탈로그에 원본이 하나라도 있는가 — 노출 여부의 기준이다.
-        val anyOriginExists = JPAExpressions.selectOne().from(spot)
-            .where(spot.catalogId.eq(translation.catalogId))
-            .exists()
-
-        // **그 언어의** 원본이 있는가 — 정렬 1순위의 기준이라 판정 대상이 다르다.
-        val sameLanguageOriginExists = JPAExpressions.selectOne().from(spot)
+    override fun refreshTranslationVisibility(): VisibilityRefreshResult {
+        // **그 언어의** 원본이 있는가. 이것이 곧 노출 여부다.
+        val originExists = JPAExpressions.selectOne().from(spot)
             .where(spot.catalogId.eq(translation.catalogId), spot.language.eq(translation.language))
             .exists()
 
         val hidden = queryFactory
             .update(translation)
             .set(translation.visible, false)
-            .where(translation.visible.isTrue, anyOriginExists.not())
+            .where(translation.visible.isTrue, originExists.not())
             .execute()
 
         val shown = queryFactory
             .update(translation)
             .set(translation.visible, true)
-            .where(translation.visible.isFalse, anyOriginExists)
+            .where(translation.visible.isFalse, originExists)
             .execute()
 
-        val originGained = queryFactory
-            .update(translation)
-            .set(translation.hasOrigin, true)
-            .where(translation.hasOrigin.isFalse, sameLanguageOriginExists)
-            .execute()
-
-        val originLost = queryFactory
-            .update(translation)
-            .set(translation.hasOrigin, false)
-            .where(translation.hasOrigin.isTrue, sameLanguageOriginExists.not())
-            .execute()
-
-        return (hidden + shown + originGained + originLost).toInt()
+        return VisibilityRefreshResult(
+            hiddenCount = hidden.toInt(),
+            shownCount = shown.toInt(),
+            visible = findVisible(),
+        )
     }
+
+    /** 지금 노출 중인 (카탈로그, 언어) 전부. 구독자가 사본을 맞추는 정본이다. */
+    private fun findVisible(): List<CatalogLanguage> =
+        queryFactory
+            .select(translation.catalogId, translation.language)
+            .from(translation)
+            .where(translation.visible.isTrue)
+            .fetch()
+            .map {
+                CatalogLanguage(
+                    catalogId = requireNotNull(it.get(translation.catalogId)),
+                    language = requireNotNull(it.get(translation.language)),
+                )
+            }
 }

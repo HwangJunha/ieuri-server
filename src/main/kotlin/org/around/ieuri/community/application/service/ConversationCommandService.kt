@@ -27,6 +27,7 @@ import org.around.ieuri.community.application.query.TypingEventView
 import org.around.ieuri.community.domain.aggregate.Conversation
 import org.around.ieuri.community.domain.event.MessageNotificationTriggered
 import org.around.ieuri.community.domain.aggregate.Message
+import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.around.ieuri.community.domain.vo.PhotoObjectKey
 import org.around.ieuri.community.domain.vo.SpotQaOrigin
 import org.springframework.stereotype.Service
@@ -96,11 +97,18 @@ class ConversationCommandService(
      *
      * 장소명은 tourism이 소유한 값이라 자기 포트로 읽는다. 장소가 사라졌으면 스냅샷을
      * 만들지 않는다 — 이름 없는 인용 카드는 클라이언트가 그릴 수 없다.
+     *
+     * 제목은 **[language]로 해소한다**(SPEC-0029 AC-25.4) — 스냅샷을 쓰는 회원의 활성
+     * 언어다. 그 언어에 원본이 없으면 이 또한 스냅샷 없음이며 오류가 아니다.
      */
-    private fun resolveSpotQaOrigin(answerId: Long, counterpartId: Long): SpotQaOrigin? {
+    private fun resolveSpotQaOrigin(
+        answerId: Long,
+        counterpartId: Long,
+        language: ContentLanguage,
+    ): SpotQaOrigin? {
         val source = spotQaQueryPort.findAnswerOriginSource(answerId) ?: return null
         if (source.answerAuthorId != counterpartId) return null
-        val spot = spotLookupPort.findSummary(source.catalogId) ?: return null
+        val spot = spotLookupPort.findSummary(source.catalogId, language) ?: return null
 
         return SpotQaOrigin(
             catalogId = source.catalogId,
@@ -114,7 +122,11 @@ class ConversationCommandService(
     }
 
     @Transactional
-    override fun sendMessage(command: SendMessageCommand, memberId: Long): Long {
+    override fun sendMessage(
+        command: SendMessageCommand,
+        memberId: Long,
+        language: ContentLanguage,
+    ): Long {
         val conversation = requireParticipatingConversation(command.conversationId, memberId)
         // **대화 성립 이후의 차단도 막는다**(AC11-4). 여기서 다시 보지 않으면 이미 만들어진
         // 대화가 차단을 우회하는 통로가 된다.
@@ -126,7 +138,9 @@ class ConversationCommandService(
 
         // 인용은 **대화 상대의 답변만** 가능하다 — 남의 답변을 붙여 맥락을 위조할 수 없다.
         val counterpartId = conversation.counterpartOf(memberId)
-        val spotQaOrigin = command.sourceAnswerId?.let { resolveSpotQaOrigin(it, counterpartId) }
+        val spotQaOrigin = command.sourceAnswerId?.let {
+            resolveSpotQaOrigin(it, counterpartId, language)
+        }
 
         // 본문·사진·인용이 모두 비면 도메인이 거부한다. 상한을 넘어도 잘라 저장하지 않는다.
         val saved = messageRepositoryPort.save(
