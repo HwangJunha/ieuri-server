@@ -199,3 +199,86 @@ WHERE table_name='spot_catalog_translation' AND column_name='has_origin';  -- 0
 - **글 목록 언어 필터** — 글이 1건(spot 미첨부)뿐이라 필터가 발동할 대상이 없다.
 
 세 번째는 앱에서 직접 확인이 필요하다: 서로 다른 언어로 spot을 첨부해 글을 쓴 뒤, 언어를 바꿔 목록에서 빠지는지 본다.
+
+---
+
+## 10. 발견된 결함 — 같은 건물 다른 매장의 오매칭 (2026-08-21)
+
+첫 검증에서 **카탈로그 하나에 spot 40건**이 묶인 것을 발견했다. 검증이 카운트에 그쳤다면 못 봤을 것이고, `HAVING count(*) > 4`로 물어봤기에 드러났다.
+
+### 무엇이었나
+
+`현대아울렛 동대문점` 안의 K2·MLB·NBA·JDX·SJSJ 등 **열 개 매장이 한 장소**가 돼 있었다. 각각 다른 `content_id`와 썸네일을 가진 별개 spot이고, 4개 언어씩 있어 40건이었다.
+
+원인은 좌표가 아니라 **제목 정규화**다. `matchKey`가 한글만 남긴다:
+
+```
+"K2 현대아울렛 동대문점"  → "현대아울렛동대문점"
+"NBA 현대아울렛 동대문점" → "현대아울렛동대문점"   ← 같은 키
+```
+
+브랜드명이 영문이라 통째로 지워진다. 좌표 타이브레이크는 **같은 건물이라 좌표가 실제로 같아서** 무력했다.
+
+### 찾는 쿼리
+
+```sql
+-- 한 카탈로그에 spot이 5건 이상 = 오매칭 (언어가 4개뿐이므로)
+SELECT catalog_id, count(*) AS spot수,
+       string_agg(DISTINCT title, ' / ' ORDER BY title) FILTER (WHERE language='KO') AS KO제목들
+FROM tour.spot WHERE catalog_id IS NOT NULL
+GROUP BY catalog_id HAVING count(*) > 4
+ORDER BY count(*) DESC LIMIT 20;
+
+-- 같은 언어가 한 카탈로그에 2건 이상 = 확정 오매칭
+SELECT catalog_id, language, count(*) FROM tour.spot
+WHERE catalog_id IS NOT NULL
+GROUP BY catalog_id, language HAVING count(*) > 1
+ORDER BY count(*) DESC;
+```
+
+**둘 다 0이어야 정상이다.** 언어가 4개뿐이므로 한 카탈로그의 spot은 최대 4건이다.
+
+### 고친 방법
+
+`pickFor`의 KO 판정에 **썸네일 비교를 추가**했다. 매장마다 이미지가 다르므로 유일한 구분자다.
+
+안전성을 실측으로 확인한 쿼리 — 이 변경이 정상 매칭을 깨뜨리는지 본다:
+
+```sql
+SELECT
+  CASE WHEN spot_cnt > 4 THEN '오매칭(5건+)' ELSE '정상(4건 이하)' END AS 구분,
+  count(*) FILTER (WHERE ko_thumbs > 1) AS "KO썸네일_2종이상",
+  count(*) AS 카탈로그수
+FROM (
+  SELECT catalog_id, count(*) AS spot_cnt,
+         count(DISTINCT thumbnail_image_url) FILTER (WHERE language='KO') AS ko_thumbs
+  FROM tour.spot WHERE catalog_id IS NOT NULL GROUP BY catalog_id
+) t GROUP BY 1;
+```
+
+결과: 오매칭 103개 중 **91개(88%)가 갈라지고**, 정상 42,635개 중 영향받는 것은 **4개**뿐이었다. 그 4개도 대부분 원래 갈라져야 할 것들이었다(`[제주올레 15코스] A/B`, `[하영올레] 1코스/2코스`).
+
+### 기존 데이터 정정 — 배치 재실행만으로는 안 된다
+
+`findUnassigned`가 `catalog_id IS NULL`인 행만 보므로(증분 처리), **이미 배정된 80,863건은 다시 판정되지 않는다.** 코드를 고쳐도 기존 오매칭은 남는다.
+
+정정하려면 배정을 되돌려야 한다. 좋아요·글 연결이 아직 없는 지금이 적기다:
+
+```sql
+-- 1) 오매칭 카탈로그에 붙은 spot의 배정만 푼다
+UPDATE tour.spot SET catalog_id = NULL
+WHERE catalog_id IN (
+  SELECT catalog_id FROM tour.spot WHERE catalog_id IS NOT NULL
+  GROUP BY catalog_id HAVING count(*) FILTER (WHERE language='KO') > 1
+);
+
+-- 2) 빈 카탈로그를 지운다 (translation·festival은 CASCADE)
+DELETE FROM tour.spot_catalog c
+WHERE NOT EXISTS (SELECT 1 FROM tour.spot s WHERE s.catalog_id = c.id);
+
+-- 3) 배정 배치 재실행 → 고친 규칙으로 다시 묶인다
+```
+
+**주의**: 2번이 카탈로그를 지우므로 그 id에 달린 좋아요가 CASCADE로 사라진다. 운영 데이터가 생긴 뒤에는 이 방법을 쓸 수 없다 — 그때는 카탈로그를 살리고 spot만 옮기는 별도 절차가 필요하다.
+
+전량 초기화(V73 재실행)로 다시 쌓는 것이 가장 확실하지만, 재적재에 시간이 오래 걸린다.
