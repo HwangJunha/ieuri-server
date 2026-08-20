@@ -2,7 +2,6 @@ package org.around.ieuri.community.infrastructure.adapter.out.persistence
 
 import org.around.ieuri.community.application.port.out.persistence.CatalogLanguageEntry
 import org.around.ieuri.community.application.port.out.persistence.SpotCatalogLanguagePort
-import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -50,39 +49,7 @@ class SpotCatalogLanguageJdbcAdapter(
         return entries.size
     }
 
-    /**
-     * 한 카탈로그를 [languages]에 맞춘다. **지우기가 먼저다** — 넣고 지우면 방금 넣은 행이
-     * 삭제 조건에 걸리지 않게 조건을 복잡하게 써야 하고, 순서를 이렇게 두면 두 문장이 서로를
-     * 모른다. 같은 트랜잭션이라 중간 상태는 밖에서 보이지 않는다.
-     */
-    @Transactional
-    override fun replaceFor(catalogId: Long, languages: Set<ContentLanguage>) {
-        if (languages.isEmpty()) {
-            jdbcTemplate.update(DELETE_ALL_OF_CATALOG_SQL, catalogId)
-            return
-        }
-        jdbcTemplate.update(
-            "$DELETE_ALL_OF_CATALOG_SQL AND language NOT IN (${languages.joinToString(",") { "?" }})",
-            catalogId,
-            *languages.map { it.name }.toTypedArray(),
-        )
-        jdbcTemplate.batchUpdate(
-            INSERT_SQL,
-            languages.map { arrayOf<Any>(catalogId, it.name) },
-        )
-    }
-
     private companion object {
-        /**
-         * **스키마를 한정해 쓴다** — Flyway 커넥션과 달리 런타임 커넥션에는 search_path가
-         * 걸려 있지만, 생 SQL이 그것에 기대면 설정이 바뀔 때 조용히 다른 스키마를 친다.
-         */
-        const val INSERT_SQL = """
-            INSERT INTO community.community_spot_catalog_language (catalog_id, language)
-            VALUES (?, ?)
-            ON CONFLICT (catalog_id, language) DO NOTHING
-        """
-
         /**
          * 정본을 담을 임시 테이블. `ON COMMIT DROP`이라 트랜잭션이 끝나면 사라지고, 커넥션
          * 풀이 재사용하는 커넥션에 남지 않는다.
@@ -114,14 +81,7 @@ class SpotCatalogLanguageJdbcAdapter(
             ON CONFLICT (catalog_id, language) DO NOTHING
         """
 
-        /** 뒤에 `AND language NOT IN (...)`이 붙을 수 있어 WHERE가 열려 있다. */
-        const val DELETE_ALL_OF_CATALOG_SQL = """
-            DELETE FROM community.community_spot_catalog_language
-            WHERE catalog_id = ?
-        """
-
-        /** 뒤에 `WHERE ... NOT IN (...)`이 붙을 수 있어 WHERE 없이 끝난다. */
+        /** 정본이 비었을 때 표를 통째로 비운다 — 조건 없이 전부 지운다. */
         const val DELETE_ALL_SQL = "DELETE FROM community.community_spot_catalog_language"
-
     }
 }

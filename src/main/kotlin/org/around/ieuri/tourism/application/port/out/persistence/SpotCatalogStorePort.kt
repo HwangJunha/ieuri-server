@@ -52,6 +52,4 @@ data class VisibilityRefreshResult(
     val hiddenCount: Int,
     val shownCount: Int,
     val visible: List<CatalogLanguage>,
-) {
-    val changedCount: Int get() = hiddenCount + shownCount
-}
+)

@@ -118,18 +118,6 @@ interface SpotQueryUseCase {
     fun spotSummaries(catalogIds: List<Long>, languageCode: String): Map<Long, SpotSummaryView>
 
     /**
-     * 이 카탈로그가 **해소되는 언어의 코드 전부**(SPEC-0029 R-15). 어느 언어에서도 해소되지
-     * 않거나 카탈로그가 없으면 빈 집합이다 — 두 경우를 구분하지 않는다.
-     *
-     * 다른 도메인이 "이 장소는 어느 언어에서 보이는가"의 사본을 유지할 때 쓴다. 그 사본이
-     * 있어야 목록 조회가 tourism을 조인하지 않고 활성 언어로 거를 수 있다(R-23).
-     *
-     * 코드를 **문자열로 돌려주는 이유는 [spotSummary]와 같다** — 호출하는 도메인이 tourism의
-     * `DomainLocale`을 import하면 그 도메인만 따로 떼어낼 수 없게 된다.
-     */
-    fun resolvedLanguageCodes(catalogId: Long): Set<String>
-
-    /**
      * 회원이 좋아요한 spot 한 페이지. likedAt 내림차순, 동률은 spot.id로 타이브레이크.
      *
      * 요청 언어로 한정하며, [memberId] 본인 것만 조회한다 — 미인증 거부는 리졸버가 판정하고 이 포트는

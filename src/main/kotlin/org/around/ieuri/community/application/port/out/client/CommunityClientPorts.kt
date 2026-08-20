@@ -62,15 +62,6 @@ interface SpotLookupPort {
      * [language]에서 해소되지 않는 id는 결과에 키가 없다.
      */
     fun findSummaries(catalogIds: List<Long>, language: ContentLanguage): Map<Long, PostSpotView>
-
-    /**
-     * 이 카탈로그가 **해소되는 언어 전부**(SPEC-0029 R-15). 어느 언어에서도 해소되지 않거나
-     * 카탈로그가 없으면 빈 집합이다.
-     *
-     * [findSummary]는 한 언어만 답하므로 첨부 시점의 존재 검사에는 충분하지만, 목록 필터가
-     * 쓸 사본을 채우려면 전 언어가 필요하다.
-     */
-    fun findResolvedLanguages(catalogId: Long): Set<ContentLanguage>
 }
 
 /**

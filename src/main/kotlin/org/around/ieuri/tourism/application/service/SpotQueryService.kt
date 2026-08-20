@@ -171,7 +171,7 @@ class SpotQueryService(
 
         // 양쪽 미스(또는 부재 재조회 시점): upstream 조회 후 캐시 충전 + 적재 이벤트 발행(AC-36·AC-39).
         // 여기서 던져지는 예외는 **실패**이며 부재로 적재되지 않는다 — 이벤트 발행 전에 전파된다(AC-4·AC-16).
-        val fetched = tourInfoPort.findDetail(identity.toQuery())
+        val fetched = tourInfoPort.findDetail(identity.toQuery(locale))
 
         if (fetched == null) {
             // 부재 확정. `spot` 행의 값으로 응답을 구성하고(R-2) 부재 사실을 적재한다(R-3).
@@ -232,7 +232,7 @@ class SpotQueryService(
             return stored.map { it.toView() }
         }
 
-        val fetched = tourInfoPort.findGallery(identity.toQuery())
+        val fetched = tourInfoPort.findGallery(identity.toQuery(locale))
         spotCachePort.putGallery(spotId, fetched)
         eventPublisher.publish(SpotGalleryFetched(spotId, fetched))
         return fetched.map { it.toView() }
@@ -255,7 +255,7 @@ class SpotQueryService(
             return stored.value?.toView()
         }
 
-        val intro = tourInfoPort.findIntro(identity.toQuery(), category)
+        val intro = tourInfoPort.findIntro(identity.toQuery(locale), category)
         spotCachePort.putIntro(spotId, category, intro)
         eventPublisher.publish(SpotIntroFetched(spotId, category, intro))
         return intro?.toView()
@@ -278,7 +278,7 @@ class SpotQueryService(
             return stored.map { SpotInfoItemView(it.name, it.text) }
         }
 
-        val fetched = tourInfoPort.findInfoItems(identity.toQuery(), category)
+        val fetched = tourInfoPort.findInfoItems(identity.toQuery(locale), category)
         spotCachePort.putInfoItems(spotId, category, fetched)
         eventPublisher.publish(SpotInfoItemsFetched(spotId, category, fetched))
         return fetched.map { SpotInfoItemView(it.name, it.text) }
@@ -318,13 +318,6 @@ class SpotQueryService(
                     latitude = basics.latitude,
                 )
             }
-
-    /**
-     * 해소되는 언어의 코드 전부(SPEC-0029 R-15). 카탈로그가 없으면 빈 집합이며, 그것이
-     * "어느 언어에서도 보이지 않는다"와 같은 뜻이다 — 구독자는 두 경우에 같은 처리를 한다.
-     */
-    override fun resolvedLanguageCodes(catalogId: Long): Set<String> =
-        spotQueryPort.findResolvedLanguages(catalogId).mapTo(mutableSetOf()) { it.name }
 
     /**
      * 카탈로그 한 행만 읽는다. **[languageCode]에서 해소되지 않으면 null이다**(AC-24.2) — 다른 언어
@@ -394,12 +387,10 @@ class SpotQueryService(
 
     /**
      * upstream 조회 좌표. TourAPI는 우리 PK를 모르므로 해석된 contentId로 묻는다.
-     *
-     * [SpotIdentity.language]는 이제 항상 활성 언어와 같다 — 폴백이 없어졌기 때문이다.
-     * contentId가 언어별이므로 그 언어로 물어야 한다는 사실 자체는 그대로다.
+     * contentId가 언어별이라 [locale]은 이 contentId를 해석한 언어여야 한다.
      */
-    private fun SpotIdentity.toQuery() =
-        SpotDetailQuery(contentId = contentId, locale = language)
+    private fun SpotIdentity.toQuery(locale: DomainLocale) =
+        SpotDetailQuery(contentId = contentId, locale = locale)
 
     private fun validatedCenter(latitude: Double, longitude: Double): Coordinates =
         try {

@@ -10,7 +10,6 @@ import org.around.ieuri.community.application.exception.SpotNotFoundInLocaleExce
 import org.around.ieuri.community.application.exception.TooManyPhotosException
 import org.around.ieuri.community.application.port.`in`.command.SpotQuestionCommandUseCase
 import org.around.ieuri.community.application.port.out.client.SpotLookupPort
-import org.around.ieuri.community.application.port.out.persistence.SpotCatalogLanguagePort
 import org.around.ieuri.community.application.port.out.persistence.SpotQuestionRepositoryPort
 import org.around.ieuri.community.domain.aggregate.SpotQuestion
 import org.around.ieuri.community.domain.vo.ContentLanguage
@@ -30,7 +29,6 @@ import org.springframework.transaction.annotation.Transactional
 class SpotQuestionCommandService(
     private val questionRepositoryPort: SpotQuestionRepositoryPort,
     private val spotLookupPort: SpotLookupPort,
-    private val spotCatalogLanguagePort: SpotCatalogLanguagePort,
     private val photoKeyVerifier: SpotQaPhotoKeyVerifier,
 ) : SpotQuestionCommandUseCase {
 
@@ -61,13 +59,6 @@ class SpotQuestionCommandService(
             photoKeys = photoKeys,
         )
         val saved = questionRepositoryPort.save(question)
-        // 목록이 활성 언어로 거르므로(SPEC-0029 R-23), 방금 붙인 장소의 언어 사본을 같은
-        // 트랜잭션에서 맞춘다 — 이벤트가 아직 닿지 않았으면 방금 쓴 질문이 자기 언어의
-        // 목록에서도 빠진다. `PostCommandService.syncLanguages`와 같은 이유·같은 형태다.
-        spotCatalogLanguagePort.replaceFor(
-            command.catalogId,
-            spotLookupPort.findResolvedLanguages(command.catalogId),
-        )
         return requireNotNull(saved.id) { "저장된 질문에는 id가 있어야 한다." }
     }
 

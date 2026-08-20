@@ -44,7 +44,7 @@ interface SpotQueryPort {
      * (SPEC-0029 R-10). 그 언어에 원본이 없으면 null이다.
      *
      * **`spot`을 읽는 유일한 조회 경로다**(SPEC-0019). TourAPI가 contentId를 언어별로 발급하므로
-     * 상세를 물으려면 원본 행이 필요하다. 돌려받은 [SpotIdentity.language]는 항상 [language]다.
+     * 상세를 물으려면 원본 행이 필요하다.
      *
      * null은 **두 가지를 뜻한다** — 카탈로그가 없거나, 있어도 그 언어에 원본이 없거나.
      * 둘을 다른 오류 코드로 갈라야 하는 호출자는 [existsCatalog]를 함께 본다.
@@ -60,14 +60,6 @@ interface SpotQueryPort {
      * `SPOT_NOT_FOUND_IN_LOCALE`(언어에 원본 없음)로 가르는 데만 쓴다(AC-12.3).
      */
     fun existsCatalog(catalogId: Long): Boolean
-
-    /**
-     * 이 카탈로그가 **해소되는 언어 전부**(SPEC-0029 R-15). 어느 언어에서도 해소되지 않으면
-     * 빈 집합이며, 카탈로그가 없을 때와 같은 값이다 — 호출자에게 두 경우의 결과가 같다.
-     *
-     * 판정은 `spot_catalog_translation.visible`이다(V71 이후 "그 언어에 원본이 있다"는 뜻).
-     */
-    fun findResolvedLanguages(catalogId: Long): Set<DomainLocale>
 
     /**
      * 카탈로그가 [language]로 보유한 상세 표시 값. 상세 본문이 부재할 때 응답을 구성하고 부재
@@ -167,7 +159,6 @@ data class SpotIdentity(
      */
     val spotId: Long,
     val contentId: String,
-    val language: DomainLocale,
     /** 경도. **`spot_catalog`의 값이며 원본 `spot` 행의 값이 아니다**(SPEC-0027). */
     val mapX: Double,
     /** 위도. 출처는 [mapX]와 같다. */

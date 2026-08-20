@@ -3,7 +3,6 @@ package org.around.ieuri.community.infrastructure.adapter.out.client
 import org.around.ieuri.community.application.port.out.client.SpotLookupPort
 import org.around.ieuri.community.application.query.PostSpotView
 import org.around.ieuri.community.domain.vo.ContentLanguage
-import org.around.ieuri.community.infrastructure.adapter.out.client.mapper.toContentLanguages
 import org.around.ieuri.community.infrastructure.adapter.out.client.mapper.toPostSpotView
 import org.around.ieuri.tourism.application.port.`in`.query.SpotQueryUseCase
 import org.springframework.stereotype.Component
@@ -35,8 +34,4 @@ class SpotLookupAdapter(
     override fun findSummaries(catalogIds: List<Long>, language: ContentLanguage): Map<Long, PostSpotView> =
         spotQueryUseCase.spotSummaries(catalogIds.distinct(), language.name)
             .mapValues { (_, summary) -> summary.toPostSpotView() }
-
-    /** 코드가 문자열로 건너오므로 여기서 커뮤니티 타입으로 되돌린다 — 모르는 코드는 버린다. */
-    override fun findResolvedLanguages(catalogId: Long): Set<ContentLanguage> =
-        spotQueryUseCase.resolvedLanguageCodes(catalogId).toContentLanguages()
 }

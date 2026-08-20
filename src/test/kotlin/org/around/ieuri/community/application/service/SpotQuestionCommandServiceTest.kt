@@ -13,7 +13,6 @@ import org.around.ieuri.community.application.exception.QuestionNotFoundExceptio
 import org.around.ieuri.community.application.exception.SpotNotFoundInLocaleException
 import org.around.ieuri.community.application.exception.TooManyPhotosException
 import org.around.ieuri.community.application.port.out.client.SpotLookupPort
-import org.around.ieuri.community.application.port.out.persistence.SpotCatalogLanguagePort
 import org.around.ieuri.community.application.port.out.persistence.SpotQuestionRepositoryPort
 import org.around.ieuri.community.application.query.PostSpotView
 import org.around.ieuri.community.domain.aggregate.SpotQuestion
@@ -38,15 +37,11 @@ class SpotQuestionCommandServiceTest {
     private val language = ContentLanguage.EN
 
     private val questionRepository = mockk<SpotQuestionRepositoryPort>(relaxed = true)
-    private val spotLookupPort = mockk<SpotLookupPort> {
-        // 언어 사본 갱신이 쓰는 값. 이 테스트가 보는 것은 작성 판정이라 활성 언어만 담는다.
-        every { findResolvedLanguages(any()) } returns setOf(language)
-    }
-    private val catalogLanguagePort = mockk<SpotCatalogLanguagePort>(relaxed = true)
+    private val spotLookupPort = mockk<SpotLookupPort>()
     private val photoKeyVerifier = mockk<SpotQaPhotoKeyVerifier>()
 
     private val service = SpotQuestionCommandService(
-        questionRepository, spotLookupPort, catalogLanguagePort, photoKeyVerifier,
+        questionRepository, spotLookupPort, photoKeyVerifier,
     )
 
     private fun givenSpotExists(exists: Boolean = true) {
@@ -103,10 +98,8 @@ class SpotQuestionCommandServiceTest {
 
         service.createQuestion(command(), memberId, language)
 
-        // 두 호출 모두 장소에 관한 것이다 — 존재 검사와, 목록 필터가 볼 언어 사본 갱신
-        // (SPEC-0029 R-15). 반응을 묻는 경로는 여전히 없다.
+        // 장소에 묻는 것은 존재 검사 하나뿐이다. 반응을 묻는 경로는 여전히 없다.
         verify(exactly = 1) { spotLookupPort.findSummary(catalogId, language) }
-        verify(exactly = 1) { spotLookupPort.findResolvedLanguages(catalogId) }
         confirmVerified(spotLookupPort)
     }
 

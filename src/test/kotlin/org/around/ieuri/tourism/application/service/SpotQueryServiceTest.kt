@@ -98,7 +98,6 @@ class SpotQueryServiceTest {
             SpotIdentity(
                 spotId = catalogId + SPOT_ID_OFFSET,
                 contentId = catalogId.toString(),
-                language = secondArg(),
                 mapX = CATALOG_MAP_X,
                 mapY = CATALOG_MAP_Y,
             )
@@ -629,7 +628,6 @@ class SpotQueryServiceTest {
         every { spotQueryPort.findIdentity(100L, DomainLocale.KO) } returns SpotIdentity(
             spotId = spotIdOf(100L),
             contentId = "100",
-            language = DomainLocale.KO,
             mapX = 129.0756,
             mapY = 35.1796,
         )
@@ -649,7 +647,6 @@ class SpotQueryServiceTest {
             SpotIdentity(
                 spotId = 777L + SPOT_ID_OFFSET,
                 contentId = "ta-999",
-                language = DomainLocale.JA,
                 mapX = CATALOG_MAP_X,
                 mapY = CATALOG_MAP_Y,
             )
@@ -663,30 +660,8 @@ class SpotQueryServiceTest {
     }
 
     @Test
-    fun `원본 언어가 요청 언어와 달라도 그 원본의 언어로 upstream에 묻는다`() {
-        // **회귀 방지.** 번역으로 격차를 메운 카탈로그는 그 언어의 원본이 없다(실측 36,000건
-        // 이상) — 포트가 다른 언어 원본으로 폴백해 돌려준다. 그때 요청 언어로 upstream에
-        // 물으면 그 contentId가 없어 실패한다. **돌려받은 language로 물어야 한다.**
-        every { spotQueryPort.findIdentity(777L, DomainLocale.JA) } returns
-            SpotIdentity(
-                spotId = 777L + SPOT_ID_OFFSET,
-                contentId = "ko-123",
-                language = DomainLocale.KO,
-                mapX = CATALOG_MAP_X,
-                mapY = CATALOG_MAP_Y,
-            )
-        val captured = slot<SpotDetailQuery>()
-        every { tourInfoPort.findDetail(capture(captured)) } returns detail()
-
-        service.spotDetail(777L, DomainLocale.JA)
-
-        assertEquals("ko-123", captured.captured.contentId)
-        assertEquals(DomainLocale.KO, captured.captured.locale, "원본 언어로 물어야 한다")
-    }
-
-    @Test
     fun `원본이 하나도 없는 카탈로그는 거부한다`() {
-        // 폴백해도 원본이 없으면 상세를 물을 곳이 없다 — 상류에서 장소가 사라진 경우다.
+        // 활성 언어에 원본이 없으면 상세를 물을 곳이 없다 — 상류에서 장소가 사라진 경우다.
         every { spotQueryPort.findIdentity(777L, DomainLocale.KO) } returns null
 
         assertFailsWith<SpotDetailNotFoundException> { service.spotDetail(777L, DomainLocale.KO) }
@@ -1202,7 +1177,6 @@ class SpotQueryServiceTest {
             SpotIdentity(
                 spotId = spotId,
                 contentId = "ta-999",
-                language = DomainLocale.JA,
                 mapX = CATALOG_MAP_X,
                 mapY = CATALOG_MAP_Y,
             )

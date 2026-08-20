@@ -21,7 +21,6 @@ import org.around.ieuri.community.application.port.out.client.ClockPort
 import org.around.ieuri.community.application.port.out.client.ObjectStoragePort
 import org.around.ieuri.community.application.port.out.client.SpotLookupPort
 import org.around.ieuri.community.application.port.out.persistence.PostRepositoryPort
-import org.around.ieuri.community.application.port.out.persistence.SpotCatalogLanguagePort
 import org.around.ieuri.community.application.query.PostSpotView
 import org.around.ieuri.community.domain.aggregate.Post
 import org.around.ieuri.community.domain.vo.ContentLanguage
@@ -45,15 +44,11 @@ class PostCommandServiceTest {
     private val language = ContentLanguage.EN
 
     private val postRepository = mockk<PostRepositoryPort>()
-    private val spotLookup = mockk<SpotLookupPort> {
-        // 언어 사본 갱신이 쓰는 값. 이 테스트가 보는 것은 생성·수정 판정이라 활성 언어만 담는다.
-        every { findResolvedLanguages(any()) } returns setOf(language)
-    }
+    private val spotLookup = mockk<SpotLookupPort>()
     private val storage = mockk<ObjectStoragePort>()
-    private val catalogLanguagePort = mockk<SpotCatalogLanguagePort>(relaxed = true)
     private val clock = mockk<ClockPort> { every { now() } returns now }
 
-    private val service = PostCommandService(postRepository, spotLookup, catalogLanguagePort, storage, clock)
+    private val service = PostCommandService(postRepository, spotLookup, storage, clock)
 
     private fun confirmedKey(owner: Long = memberId) = "images/community/$owner/${UUID.randomUUID()}"
 
@@ -113,31 +108,9 @@ class PostCommandServiceTest {
         assertEquals(1L, create())
     }
 
-    // ── 카탈로그-언어 사본(SPEC-0029 R-15) ──────────────────────────
-
-    /**
-     * 쓰기 시점에도 사본을 맞춘다. 이벤트가 아직 닿지 않았거나 한 번 실패해 삼켜졌다면 방금
-     * 쓴 글이 **자기 언어의 목록에서도 빠지기** 때문이다 — 첨부는 성공했는데 글이 안 보인다.
-     */
+    /** 장소가 없는 글은 장소를 묻지도 않는다 — 그 글은 언어와 무관하게 보인다(AC-15.4). */
     @Test
-    fun `장소를 붙여 글을 쓰면 그 장소의 언어 사본을 맞춘다`() {
-        givenValidSpotAndAuthor()
-        givenSaveEchoesBackWithId()
-        every { spotLookup.findResolvedLanguages(catalogId) } returns
-            setOf(ContentLanguage.EN, ContentLanguage.KO)
-
-        create()
-
-        // **덮어쓰기여야 한다.** 더하기만 하면 그 사이 어떤 언어에서 사라진 카탈로그의 낡은
-        // 행이 남아, 그 언어에서 읽을 수 없는 글이 계속 목록에 뜬다.
-        verify(exactly = 1) {
-            catalogLanguagePort.replaceFor(catalogId, setOf(ContentLanguage.EN, ContentLanguage.KO))
-        }
-    }
-
-    /** 장소가 없는 글에는 맞출 사본도 없다 — 그 글은 언어와 무관하게 보인다(AC-15.4). */
-    @Test
-    fun `장소 없는 글은 언어 사본을 건드리지 않는다`() {
+    fun `장소 없는 글은 장소를 조회하지 않는다`() {
         givenSaveEchoesBackWithId()
 
         service.createPost(
@@ -150,7 +123,7 @@ class PostCommandServiceTest {
             language,
         )
 
-        verify(exactly = 0) { catalogLanguagePort.replaceFor(any(), any()) }
+        verify(exactly = 0) { spotLookup.findSummary(any(), any()) }
     }
 
     @Test

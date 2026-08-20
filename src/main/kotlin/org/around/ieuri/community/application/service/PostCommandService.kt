@@ -20,7 +20,6 @@ import org.around.ieuri.community.application.port.out.client.ClockPort
 import org.around.ieuri.community.application.port.out.client.ObjectStoragePort
 import org.around.ieuri.community.application.port.out.client.SpotLookupPort
 import org.around.ieuri.community.application.port.out.persistence.PostRepositoryPort
-import org.around.ieuri.community.application.port.out.persistence.SpotCatalogLanguagePort
 import org.around.ieuri.community.domain.aggregate.Post
 import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.around.ieuri.community.domain.vo.PhotoObjectKey
@@ -43,7 +42,6 @@ import org.springframework.transaction.annotation.Transactional
 class PostCommandService(
     private val postRepositoryPort: PostRepositoryPort,
     private val spotLookupPort: SpotLookupPort,
-    private val spotCatalogLanguagePort: SpotCatalogLanguagePort,
     private val objectStoragePort: ObjectStoragePort,
     private val clockPort: ClockPort,
 ) : PostCommandUseCase {
@@ -96,8 +94,6 @@ class PostCommandService(
             photoKeys = photoKeys,
         )
         val saved = postRepositoryPort.save(post)
-        // 방금 붙인 장소의 언어 사본을 같은 트랜잭션에서 맞춘다 — 이유는 [syncLanguages] 참조.
-        command.catalogId?.let { syncLanguages(it) }
         return requireNotNull(saved.id) { "저장된 글에는 id가 있어야 한다." }
     }
 
@@ -148,24 +144,6 @@ class PostCommandService(
         if (command.changeSpot) post.changeSpot(command.catalogId, newSpotPoint)
         tags?.let { post.replaceTags(it) }
         postRepositoryPort.save(post)
-        if (command.changeSpot) command.catalogId?.let { syncLanguages(it) }
-    }
-
-    /**
-     * 이 카탈로그가 해소되는 언어의 사본을 맞춘다(SPEC-0029 R-15).
-     *
-     * **쓰기 시점에도 맞추는 이유는 이벤트가 늦기 때문이다.** 사본은 배정 배치의 노출 갱신
-     * 이벤트가 유지하는데, 그 회차가 돌기 전이거나 리스너가 한 번 실패해 삼켜졌다면 방금 쓴
-     * 글이 **자기 언어의 목록에서도 빠진다** — 첨부는 성공했는데 글이 안 보이는 상태다.
-     * 여기서 한 번 맞춰 두면 그 창이 닫힌다.
-     *
-     * 존재 검사(`findSummary`)를 이미 통과한 뒤라 최소한 활성 언어 하나는 들어 있다.
-     *
-     * **덮어쓰기(replaceFor)여야 한다.** 더하기만 하면 그 사이 어떤 언어에서 사라진 카탈로그의
-     * 낡은 행이 남아, 그 언어에서 읽을 수 없는 글이 계속 목록에 뜬다.
-     */
-    private fun syncLanguages(catalogId: Long) {
-        spotCatalogLanguagePort.replaceFor(catalogId, spotLookupPort.findResolvedLanguages(catalogId))
     }
 
     /**

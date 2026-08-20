@@ -132,16 +132,6 @@ interface SpotCatalogLanguagePort {
      * 반영 후의 총 행 수를 돌려준다.
      */
     fun replaceAll(entries: List<CatalogLanguageEntry>): Int
-
-    /**
-     * 이 카탈로그의 기록을 [languages]로 **통째로 맞춘다**(빠진 언어는 지운다).
-     *
-     * 글·질문을 쓰는 시점에 부른다 — 이벤트가 아직 닿지 않았거나 놓친 카탈로그라도, 방금
-     * 첨부한 글이 자기 언어에서 곧바로 보여야 하기 때문이다.
-     *
-     * **[languages]가 비면 그 카탈로그의 기록이 전부 사라진다.**
-     */
-    fun replaceFor(catalogId: Long, languages: Set<ContentLanguage>)
 }
 
 /** 한 카탈로그가 한 언어에서 해소된다는 사실. 이벤트가 싣는 쌍과 같은 모양이다. */

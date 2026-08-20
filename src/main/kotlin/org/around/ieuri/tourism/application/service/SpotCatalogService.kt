@@ -184,7 +184,7 @@ class SpotCatalogService(
      * 없으면 구독자의 사본이 조용히 어긋난다. 빈 변경은 발행하지 않는다.
      */
     @Transactional
-    override fun refreshCatalogVisibility(): Int {
+    override fun refreshCatalogVisibility() {
         val changes = storePort.refreshTranslationVisibility()
 
         log.info(
@@ -197,7 +197,6 @@ class SpotCatalogService(
         eventPublisher.publish(
             SpotCatalogLanguagesChanged(resolved = changes.visible.map { it.toRef() }),
         )
-        return changes.changedCount
     }
 
     /** 이벤트는 도메인 간 계약이라 언어를 문자열로 싣는다 — 구독자가 `DomainLocale`을 알지 않게. */

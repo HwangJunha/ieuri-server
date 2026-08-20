@@ -112,7 +112,7 @@ class SpotQueryAdapter(
      */
     override fun findIdentity(catalogId: Long, language: DomainLocale): SpotIdentity? =
         queryFactory
-            .select(spot.id, spot.contentId, spot.language, catalog.mapX, catalog.mapY)
+            .select(spot.id, spot.contentId, catalog.mapX, catalog.mapY)
             .from(spot)
             .join(catalog).on(catalog.id.eq(spot.catalogId))
             .where(spot.catalogId.eq(catalogId), spot.language.eq(language))
@@ -121,7 +121,6 @@ class SpotQueryAdapter(
                 SpotIdentity(
                     spotId = requireNotNull(it.get(spot.id)),
                     contentId = requireNotNull(it.get(spot.contentId)),
-                    language = requireNotNull(it.get(spot.language)),
                     mapX = requireNotNull(it.get(catalog.mapX)),
                     mapY = requireNotNull(it.get(catalog.mapY)),
                 )
@@ -136,21 +135,6 @@ class SpotQueryAdapter(
             .from(catalog)
             .where(catalog.id.eq(catalogId))
             .fetchFirst() != null
-
-    /**
-     * 해소되는 언어 전부. **번역 행만 읽는다** — 카탈로그 본체는 값이 필요 없다.
-     *
-     * 카탈로그가 없으면 행도 없어 빈 집합이다. `visible`이 V71 이후 "그 언어에 원본이 있다"는
-     * 뜻이라 조건이 이 하나로 끝난다.
-     */
-    @Transactional(readOnly = true)
-    override fun findResolvedLanguages(catalogId: Long): Set<DomainLocale> =
-        queryFactory
-            .select(translation.language)
-            .from(translation)
-            .where(translation.catalogId.eq(catalogId), translation.visible.isTrue)
-            .fetch()
-            .toSet()
 
     /**
      * 상세 본문이 부재할 때 응답을 구성할 카탈로그의 값. 인자는 **카탈로그 id**다(SPEC-0019).
