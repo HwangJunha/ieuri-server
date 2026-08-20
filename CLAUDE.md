@@ -192,6 +192,31 @@ The reviewer reads only the domains the diff touches, plus `common/`. Narrowing 
 the practical payoff of the DDD split; if a change genuinely required reading another domain, that
 is itself a finding.
 
+**After applying the fixes, read them back together — once.** Findings arrive as a list, so they get
+fixed as a list, and that is the failure: one fix can remove the *reason* another fix exists, and
+nothing notices, because each was verified on its own and the suite is green either way. What
+survives is machinery whose premise is gone.
+
+Worked example (SPEC-0029): one finding said the event carried only changed rows, so an empty copy
+could never be filled; another said a `SELECT`-then-`UPDATE` pair could disagree under READ
+COMMITTED. The second was fixed with `UPDATE … RETURNING` — correct in isolation. But the first fix
+made the event carry the full authoritative set, so *which* rows changed stopped mattering at all.
+`RETURNING` existed to answer a question nobody asked anymore, and it cost raw SQL where QueryDSL had
+been. Two green fixes, one pile of dead complexity.
+
+This pass is **not another review**, and it is bounded so it cannot loop:
+
+- **Do not re-run the `reviewer` subagent.** It is your own read, no second opinion.
+- **Scope is only what you just changed** — you are not hunting for new defects.
+- **One question:** did any fix invalidate the premise of another? Follow-up: is anything now
+  unreferenced, over-general, or reaching for raw SQL / a config knob / a wrapper it no longer needs?
+- **The output is deletion, not design.** Machinery whose reason is gone comes out. If you find
+  yourself adding something, that is a new finding — note it and stop; do not start another cycle.
+- **Once.** Then run `simplify-review`, make the suite pass, and open the PR.
+
+A finding you deliberately did not fix is fine — say so in the PR with the reason. Silently leaving
+it is not.
+
 ## Layout
 
 Package root: `org.around.ieuri`. Organized **by domain first, then hexagonal layer**, with a **CQRS split** in the application layer. Dependencies point inward only: `infrastructure → application → domain`. `domain` imports nothing external (no Spring/JPA/DGS); `application` depends only on `domain`; `infrastructure` implements `application` ports.
