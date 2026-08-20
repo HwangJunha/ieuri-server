@@ -20,6 +20,18 @@ interface SpotCatalogStorePort {
 
     /** spot 행을 카탈로그에 배정한다. 이미 배정된 행은 덮어쓰지 않는다. */
     fun assign(spotId: Long, catalogId: Long)
+
+    /**
+     * 원본 생존 여부를 번역 행의 `visible`에 반영하고, **반영 후 노출 중인 것 전부**를 돌려준다.
+     *
+     * 상류에서 장소가 없어지면 `spot` 행은 지워지지만 카탈로그와 번역은 남는다. 그대로 두면
+     * 목록에는 나오는데 상세를 열면 실패하는 장소가 되므로, 지우지 않고 감춘다 — 번역 행을
+     * 지우면 배정 배치가 그 카탈로그를 못 찾아 좋아요가 달린 옛 카탈로그가 고아가 된다.
+     *
+     * **돌려주는 것은 변경분이 아니라 현재 상태 전부다.** 구독자가 이 값으로 자기 사본을
+     * 통째로 맞춘다 — 변경분만 주면 빈 사본을 채울 수 없다(전량 재적재 후에는 뒤집힌 행이 없다).
+     */
+    fun refreshTranslationVisibility(): VisibilityRefreshResult
 }
 
 /** 노출 여부가 바뀐 (카탈로그, 언어). 다른 도메인이 자기 사본을 맞추는 근거다. */
@@ -31,16 +43,15 @@ data class CatalogLanguage(
 /**
  * 노출 갱신의 결과.
  *
- * [hidden]·[shown]은 이번에 **상태가 뒤집힌** 행이고, [visible]은 갱신 후 **노출 중인 전부**다.
- *
- * **구독자에게는 [visible]이 정본이다.** 뒤집힌 것만 실으면 사본을 채울 수 없다 — 전량
- * 초기화 후 재적재하면 모든 행이 신규 INSERT라 뒤집힌 적이 없고, 그러면 이벤트가 영원히
- * 비어 사본이 빈 채로 남는다. [hidden]·[shown]은 로그와 관측용이다.
+ * [visible]이 **구독자가 받는 정본**이다 — 갱신 후 노출 중인 (카탈로그, 언어) 전부.
+ * [hiddenCount]·[shownCount]는 이번 회차에 뒤집힌 행 수이며 **로그·관측용일 뿐**이라
+ * 어떤 행인지는 담지 않는다. 그것까지 알아내려면 `UPDATE ... RETURNING`이 필요한데,
+ * 정본을 그대로 싣는 이상 쓸 데가 없다.
  */
-data class CatalogVisibilityChanges(
-    val hidden: List<CatalogLanguage>,
-    val shown: List<CatalogLanguage>,
+data class VisibilityRefreshResult(
+    val hiddenCount: Int,
+    val shownCount: Int,
     val visible: List<CatalogLanguage>,
 ) {
-    val changedCount: Int get() = hidden.size + shown.size
+    val changedCount: Int get() = hiddenCount + shownCount
 }

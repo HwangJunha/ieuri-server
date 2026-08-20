@@ -185,11 +185,11 @@ class SpotCatalogService(
      */
     @Transactional
     override fun refreshCatalogVisibility(): Int {
-        val changes = upsertPort.refreshTranslationVisibility()
+        val changes = storePort.refreshTranslationVisibility()
 
         log.info(
             "catalog visibility refreshed: hidden={} shown={} visible={}",
-            changes.hidden.size, changes.shown.size, changes.visible.size,
+            changes.hiddenCount, changes.shownCount, changes.visible.size,
         )
         // **변경이 없어도 발행한다.** 구독자가 받는 것은 델타가 아니라 정본이며, 빈 상태에서
         // 출발한 사본은 "아무것도 안 바뀐" 회차에 채워진다 — 전량 재적재 직후가 정확히 그

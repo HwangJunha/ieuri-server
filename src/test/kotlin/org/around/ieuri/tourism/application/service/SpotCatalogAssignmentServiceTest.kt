@@ -2,7 +2,7 @@ package org.around.ieuri.tourism.application.service
 
 import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
 import org.around.ieuri.tourism.application.port.out.persistence.CatalogLanguage
-import org.around.ieuri.tourism.application.port.out.persistence.CatalogVisibilityChanges
+import org.around.ieuri.tourism.application.port.out.persistence.VisibilityRefreshResult
 import org.around.ieuri.tourism.application.port.out.persistence.SpotCatalogStorePort
 import org.around.ieuri.tourism.application.port.out.persistence.SpotCatalogUpsertPort
 import org.around.ieuri.tourism.application.port.out.query.CatalogCandidate
@@ -318,7 +318,7 @@ class SpotCatalogAssignmentServiceTest {
 
         service(query, store, upsert).refreshCatalogVisibility()
 
-        assertEquals(1, upsert.visibilityRefreshes)
+        assertEquals(1, store.visibilityRefreshes)
     }
 
     @Test
@@ -331,9 +331,9 @@ class SpotCatalogAssignmentServiceTest {
         // 그래서 이벤트는 델타가 아니라 정본을 싣는다. hidden·shown이 비어도 발행해야 한다.
         val store = RecordingStorePort()
         val upsert = RecordingUpsertPort()
-        upsert.visibilityResult = CatalogVisibilityChanges(
-            hidden = emptyList(),
-            shown = emptyList(),
+        store.visibilityResult = VisibilityRefreshResult(
+            hiddenCount = 0,
+            shownCount = 0,
             visible = listOf(
                 CatalogLanguage(10L, DomainLocale.KO),
                 CatalogLanguage(10L, DomainLocale.EN),
@@ -401,6 +401,24 @@ class SpotCatalogAssignmentServiceTest {
             assignments += spotId to catalogId
         }
 
+        var visibilityRefreshes = 0
+            private set
+
+        /**
+         * 갱신 결과. **기본값이 "뒤집힌 것은 없고 노출 중인 것은 있다"** — 전량 재적재 직후의
+         * 실제 상태이며, 이 슬라이스가 놓쳤던 경우다.
+         */
+        var visibilityResult = VisibilityRefreshResult(
+            hiddenCount = 0,
+            shownCount = 0,
+            visible = listOf(CatalogLanguage(NEW_CATALOG_ID, DomainLocale.KO)),
+        )
+
+        override fun refreshTranslationVisibility(): VisibilityRefreshResult {
+            visibilityRefreshes++
+            return visibilityResult
+        }
+
         companion object {
             const val NEW_CATALOG_ID = 7777L
         }
@@ -410,19 +428,6 @@ class SpotCatalogAssignmentServiceTest {
     private class RecordingUpsertPort : SpotCatalogUpsertPort {
         val translations = mutableListOf<Triple<Long, DomainLocale, String>>()
         val festivalRefreshed = mutableListOf<Long>()
-
-        var visibilityRefreshes = 0
-            private set
-
-        /**
-         * 갱신 결과. **기본값이 "뒤집힌 것은 없고 노출 중인 것은 있다"** — 전량 재적재 직후의
-         * 실제 상태이며, 이 슬라이스가 놓쳤던 경우다.
-         */
-        var visibilityResult = CatalogVisibilityChanges(
-            hidden = emptyList(),
-            shown = emptyList(),
-            visible = listOf(CatalogLanguage(RecordingStorePort.NEW_CATALOG_ID, DomainLocale.KO)),
-        )
 
         override fun upsertTranslation(
             catalogId: Long,
@@ -437,9 +442,5 @@ class SpotCatalogAssignmentServiceTest {
             festivalRefreshed += catalogId
         }
 
-        override fun refreshTranslationVisibility(): CatalogVisibilityChanges {
-            visibilityRefreshes++
-            return visibilityResult
-        }
     }
 }
