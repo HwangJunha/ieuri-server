@@ -84,7 +84,7 @@ class SpotCatalogQueryAdapter(
     @Transactional(readOnly = true)
     override fun loadKoreanTitleIndex(): Map<String, List<CatalogCandidate>> =
         queryFactory
-            .select(catalog.id, catalog.mapX, catalog.mapY, translation.title)
+            .select(catalog.id, catalog.mapX, catalog.mapY, catalog.thumbnailImageUrl, translation.title)
             .from(translation)
             .join(catalog).on(catalog.id.eq(translation.catalogId))
             .where(translation.language.eq(DomainLocale.KO))
@@ -97,6 +97,7 @@ class SpotCatalogQueryAdapter(
                     catalogId = requireNotNull(row.get(catalog.id)),
                     mapX = requireNotNull(row.get(catalog.mapX)),
                     mapY = requireNotNull(row.get(catalog.mapY)),
+                    thumbnailImageUrl = requireNotNull(row.get(catalog.thumbnailImageUrl)),
                 )
             }
             .groupBy({ it.first }) { it.second }

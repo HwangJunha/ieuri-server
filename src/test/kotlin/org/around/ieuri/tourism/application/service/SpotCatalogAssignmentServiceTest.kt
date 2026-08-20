@@ -29,6 +29,7 @@ import org.junit.jupiter.api.Test
  */
 class SpotCatalogAssignmentServiceTest {
 
+    private val thumb = "https://img/1.jpg"
     private val mapX = 129.1234
     private val mapY = 35.5678
 
@@ -44,7 +45,7 @@ class SpotCatalogAssignmentServiceTest {
         language = language,
         title = title,
         address = address,
-        thumbnailImageUrl = "https://img/1.jpg",
+        thumbnailImageUrl = thumb,
         mapX = mapX,
         mapY = mapY,
         category = SpotCategory.TOURIST_SPOT,
@@ -77,7 +78,7 @@ class SpotCatalogAssignmentServiceTest {
         val store = RecordingStorePort()
         val query = StubQueryPort(
             unassigned = listOf(spot()),
-            koreanIndex = mapOf("마린시티" to listOf(CatalogCandidate(900, mapX, mapY))),
+            koreanIndex = mapOf("마린시티" to listOf(CatalogCandidate(900, mapX, mapY, thumb))),
         )
 
         val result = service(query, store).assignCatalogs(DomainLocale.EN)
@@ -111,7 +112,7 @@ class SpotCatalogAssignmentServiceTest {
         val store = RecordingStorePort()
         val query = StubQueryPort(
             unassigned = listOf(spot()),
-            koreanIndex = mapOf("마린시티" to listOf(CatalogCandidate(900, mapX, mapY))),
+            koreanIndex = mapOf("마린시티" to listOf(CatalogCandidate(900, mapX, mapY, thumb))),
             thumbnailIndex = mapOf("https://img/1.jpg" to 777L),
         )
 
@@ -143,7 +144,7 @@ class SpotCatalogAssignmentServiceTest {
         val store = RecordingStorePort()
         val query = StubQueryPort(
             unassigned = listOf(spot()),
-            koreanIndex = mapOf("마린시티" to listOf(CatalogCandidate(900, mapX, mapY))),
+            koreanIndex = mapOf("마린시티" to listOf(CatalogCandidate(900, mapX, mapY, thumb))),
         )
         val upsert = RecordingUpsertPort()
 
@@ -172,8 +173,8 @@ class SpotCatalogAssignmentServiceTest {
             unassigned = listOf(spot()),
             koreanIndex = mapOf(
                 "마린시티" to listOf(
-                    CatalogCandidate(900, 127.0, 37.5),
-                    CatalogCandidate(901, mapX, mapY),
+                    CatalogCandidate(900, 127.0, 37.5, thumb),
+                    CatalogCandidate(901, mapX, mapY, thumb),
                 ),
             ),
         )
@@ -181,6 +182,46 @@ class SpotCatalogAssignmentServiceTest {
         service(query, store).assignCatalogs(DomainLocale.EN)
 
         assertEquals(listOf(11L to 901L), store.assignments)
+    }
+
+    @Test
+    @DisplayName("좌표가 같아도 썸네일이 다르면 다른 장소다")
+    fun `same coordinates but different thumbnail is a different place`() {
+        // **실측 회귀 방어.** `K2 현대아울렛 동대문점`과 `NBA 현대아울렛 동대문점`은
+        // 브랜드명이 영문이라 제목 키가 같아지고(한글만 남긴다), 같은 건물이라 좌표까지
+        // 같다. 좌표만 보면 열 매장이 한 카탈로그로 뭉친다 — 실측 카탈로그 108개가
+        // 이 경로로 잘못 묶였고, 그중 하나는 40건이었다.
+        //
+        // 썸네일은 매장마다 다르므로 이것이 유일한 구분자다.
+        val store = RecordingStorePort()
+        val query = StubQueryPort(
+            unassigned = listOf(koreanSpot()),
+            koreanIndex = mapOf(
+                "마린시티" to listOf(CatalogCandidate(900, mapX, mapY, "https://img/other.jpg")),
+            ),
+        )
+
+        service(query, store).assignCatalogs(DomainLocale.KO)
+
+        // 붙지 않고 새 카탈로그가 생긴다.
+        assertEquals(1, store.saved.size)
+        assertEquals(listOf(12L to RecordingStorePort.NEW_CATALOG_ID), store.assignments)
+    }
+
+    @Test
+    @DisplayName("좌표와 썸네일이 모두 같으면 같은 장소로 접는다")
+    fun `same coordinates and thumbnail folds into one catalog`() {
+        // 위 테스트의 반대편 — 썸네일 조건이 정상 매칭까지 막아 버리면 안 된다.
+        val store = RecordingStorePort()
+        val query = StubQueryPort(
+            unassigned = listOf(koreanSpot()),
+            koreanIndex = mapOf("마린시티" to listOf(CatalogCandidate(900, mapX, mapY, thumb))),
+        )
+
+        service(query, store).assignCatalogs(DomainLocale.KO)
+
+        assertEquals(0, store.saved.size)
+        assertEquals(listOf(12L to 900L), store.assignments)
     }
 
     @Test
@@ -192,8 +233,8 @@ class SpotCatalogAssignmentServiceTest {
             unassigned = listOf(spot()),
             koreanIndex = mapOf(
                 "마린시티" to listOf(
-                    CatalogCandidate(900, 127.0, 37.5),
-                    CatalogCandidate(901, 128.0, 36.5),
+                    CatalogCandidate(900, 127.0, 37.5, thumb),
+                    CatalogCandidate(901, 128.0, 36.5, thumb),
                 ),
             ),
         )
@@ -243,7 +284,7 @@ class SpotCatalogAssignmentServiceTest {
         val standard = store.saved.single().standard
         assertEquals(129.1234, standard.mapX)
         assertEquals(35.5678, standard.mapY)
-        assertEquals("https://img/1.jpg", standard.thumbnailImageUrl)
+        assertEquals(thumb, standard.thumbnailImageUrl)
         assertEquals(SpotCategory.TOURIST_SPOT, standard.category)
         assertEquals(CopyrightType.TYPE1, standard.copyright)
     }
@@ -269,7 +310,7 @@ class SpotCatalogAssignmentServiceTest {
         val store = RecordingStorePort()
         val query = StubQueryPort(
             unassigned = listOf(koreanSpot(spotId = 12)),
-            koreanIndex = mapOf("마린시티" to listOf(CatalogCandidate(900, mapX, mapY))),
+            koreanIndex = mapOf("마린시티" to listOf(CatalogCandidate(900, mapX, mapY, thumb))),
         )
 
         val result = service(query, store).assignCatalogs(DomainLocale.KO)

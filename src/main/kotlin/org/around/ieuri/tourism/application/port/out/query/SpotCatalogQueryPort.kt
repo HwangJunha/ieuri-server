@@ -74,9 +74,13 @@ data class UnassignedSpot(
  *
  * 좌표를 담는 이유는 동명이인을 가르기 위해서다. `롯데마트`처럼 전국에 같은 이름이 여럿이면
  * 제목만으로는 정할 수 없다.
+ *
+ * **썸네일도 담는다.** 좌표만으로는 *같은 건물 안의 다른 매장*을 가르지 못한다 — 아울렛
+ * 입점 매장들은 좌표가 실제로 동일하다(실측: 카탈로그 108개가 이 경로로 잘못 뭉쳤다).
  */
 data class CatalogCandidate(
     val catalogId: Long,
     val mapX: Double,
     val mapY: Double,
+    val thumbnailImageUrl: String,
 )

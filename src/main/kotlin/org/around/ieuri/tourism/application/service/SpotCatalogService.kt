@@ -109,7 +109,7 @@ class SpotCatalogService(
             // 이름이 없는 카탈로그가 여러 언어를 갖게 되어 어느 것이 대표인지 정할 수 없다.
             if (language.isKorean && key != null) {
                 localIndex.getOrPut(key) { mutableListOf() } +=
-                    CatalogCandidate(catalogId, spot.mapX, spot.mapY)
+                    CatalogCandidate(catalogId, spot.mapX, spot.mapY, spot.thumbnailImageUrl)
             }
         }
 
@@ -145,10 +145,15 @@ class SpotCatalogService(
      * 카탈로그를 만든다 — 잘못 붙이면 좋아요가 다른 장소로 딸려 간다.
      *
      * **KO와 비한국어의 기준이 다르다.**
-     *  - KO끼리는 **항상 좌표까지 같아야** 접는다. 같은 이름이 전국에 여럿이므로(`만두집`,
-     *    `롯데마트`) 제목만으로 접으면 무관한 가게가 한 장소가 된다.
+     *  - KO끼리는 **좌표와 썸네일이 모두 같아야** 접는다. 같은 이름이 전국에 여럿이므로
+     *    (`만두집`, `롯데마트`) 제목만으로 접으면 무관한 가게가 한 장소가 된다.
      *  - 비한국어는 후보가 유일하면 좌표를 묻지 않는다. 괄호 한국어가 이미 그 장소를
      *    지목하고 있고, 언어별로 좌표가 미세하게 다른 경우가 실재한다.
+     *
+     * **썸네일이 KO 판정에 들어가는 이유는 좌표가 같은 다른 장소가 실재하기 때문이다.**
+     * `K2 현대아울렛 동대문점`과 `NBA 현대아울렛 동대문점`은 브랜드명이 영문이라 제목 키가
+     * (한글만 남기므로) 같아지고, 같은 건물이라 좌표까지 같다. 썸네일은 매장마다 다르므로
+     * 이것이 유일한 구분자다 — 실측으로 카탈로그 108개가 이 경로로 잘못 뭉쳤다.
      *
      * **근사 비교를 하지 않는다.** 좌표가 미세하게 다른 두 spot이 실제로 다른 가게인 경우와
      * 같은 가게의 좌표가 갱신된 경우를 거리로는 구분할 수 없다.
@@ -156,7 +161,11 @@ class SpotCatalogService(
     private fun List<CatalogCandidate>.pickFor(spot: UnassignedSpot): Long? {
         if (isEmpty()) return null
         if (!spot.language.isKorean) singleOrNull()?.let { return it.catalogId }
-        return singleOrNull { it.mapX == spot.mapX && it.mapY == spot.mapY }?.catalogId
+        return singleOrNull {
+            it.mapX == spot.mapX &&
+                it.mapY == spot.mapY &&
+                it.thumbnailImageUrl == spot.thumbnailImageUrl
+        }?.catalogId
     }
 
     /**
