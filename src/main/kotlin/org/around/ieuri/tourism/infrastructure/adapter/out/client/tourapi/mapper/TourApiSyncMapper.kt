@@ -3,6 +3,7 @@ package org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi.mappe
 import org.around.ieuri.tourism.application.command.SyncFestivalCommand
 import org.around.ieuri.tourism.application.command.SyncSpotCommand
 import org.around.ieuri.tourism.application.port.out.client.NearbySpotData
+import org.around.ieuri.tourism.domain.aggregate.CatalogStandardValues
 import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
@@ -81,9 +82,18 @@ fun TourApiFestivalResponse.Item.toSyncFestivalCommandOrNull(
     )
 }
 
-/** 좌표 범위를 벗어나면 null. 도메인이 던지는 예외를 항목 드랍으로 흡수한다. */
-private fun coordinatesOrNull(latitude: Double, longitude: Double): Coordinates? =
-    runCatching { Coordinates(latitude = latitude, longitude = longitude) }.getOrNull()
+/**
+ * 적재 가능한 좌표만 통과시킨다. 아니면 null — 도메인이 던지는 예외도 항목 드랍으로 흡수한다.
+ *
+ * **한국 범위를 여기서 본다.** [Coordinates]는 지구 전체를 유효로 보므로 `(0,0)`(기니만)이나
+ * 상류가 좌표를 모를 때 넣는 플레이스홀더 `(117.99, 19.69)`(남중국해)가 그대로 통과한다.
+ * 그런 행은 적재해 봐야 배정에서 빠져 "존재하지만 아무 데도 안 나오는" spot이 될 뿐이라,
+ * 애초에 들이지 않는다(실측 79건).
+ */
+private fun coordinatesOrNull(latitude: Double, longitude: Double): Coordinates? {
+    if (!CatalogStandardValues.isValidCoordinate(mapX = longitude, mapY = latitude)) return null
+    return runCatching { Coordinates(latitude = latitude, longitude = longitude) }.getOrNull()
+}
 
 /**
  * `YYYYMMDD` 파싱. 다른 형식이나 존재하지 않는 날짜는 null이다 — 관대하게 보정하면 잘못 해석된
