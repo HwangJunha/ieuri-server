@@ -1,0 +1,271 @@
+package org.around.ieuri.tourism.application.service
+
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.verify
+import org.around.ieuri.tourism.application.exception.MapCellNotFoundException
+import org.around.ieuri.tourism.application.exception.ShareLinkBlockedException
+import org.around.ieuri.tourism.application.exception.ShareLinkNotFoundException
+import org.around.ieuri.tourism.application.exception.TooManyCoordinatesException
+import org.around.ieuri.tourism.application.policy.NationwideMapPolicy
+import org.around.ieuri.tourism.application.port.out.client.MapOwnerLookupPort
+import org.around.ieuri.tourism.application.port.out.client.MapViewerBlockPort
+import org.around.ieuri.tourism.application.port.out.persistence.MapShareLinkPort
+import org.around.ieuri.tourism.application.port.out.persistence.MapShareLinkRecord
+import org.around.ieuri.tourism.application.port.out.query.CellImageQueryPort
+import org.around.ieuri.tourism.application.port.out.query.DistrictVisitQueryPort
+import org.around.ieuri.tourism.application.port.out.query.MapCellDistrictQueryPort
+import org.around.ieuri.tourism.application.port.out.query.MapCellQueryPort
+import org.around.ieuri.tourism.application.query.CellSpotView
+import org.around.ieuri.tourism.application.query.CellSpotsQuery
+import org.around.ieuri.tourism.domain.vo.AreaName
+import org.around.ieuri.tourism.domain.vo.Coordinates
+import org.around.ieuri.tourism.domain.vo.DomainLocale
+import org.around.ieuri.tourism.domain.vo.LikeCountCursor
+import org.around.ieuri.tourism.domain.vo.MapCellDistrictRow
+import java.time.Instant
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+/** 전국 지도 조회(SPEC-0030 R1·R2·R6·R8·R11·R13·R15·R16). */
+class NationwideMapServiceTest {
+
+    private val mapCellQueryPort = mockk<MapCellQueryPort>()
+    private val mapCellDistrictQueryPort = mockk<MapCellDistrictQueryPort>()
+    private val districtVisitQueryPort = mockk<DistrictVisitQueryPort>()
+    private val cellImageQueryPort = mockk<CellImageQueryPort>(relaxed = true)
+    private val mapShareLinkPort = mockk<MapShareLinkPort>()
+    private val mapOwnerLookupPort = mockk<MapOwnerLookupPort>()
+    private val mapViewerBlockPort = mockk<MapViewerBlockPort>()
+
+    private val service = NationwideMapService(
+        mapCellQueryPort = mapCellQueryPort,
+        mapCellDistrictQueryPort = mapCellDistrictQueryPort,
+        districtVisitQueryPort = districtVisitQueryPort,
+        cellImageQueryPort = cellImageQueryPort,
+        mapShareLinkPort = mapShareLinkPort,
+        mapOwnerLookupPort = mapOwnerLookupPort,
+        mapViewerBlockPort = mapViewerBlockPort,
+        policy = NationwideMapPolicy(
+            maxResolveCoordinates = 500,
+            maxCellSpotPageSize = 50,
+        ),
+    )
+
+    // ── 칸 목록과 방문 여부 ────────────────────────────────────────────
+
+    @Test
+    fun `방문한 칸만 viewerVisited가 참이다`() {
+        every { mapCellQueryPort.findAllCellDistricts() } returns listOf(
+            row("11", "11110"), row("41111", "41111"), row("41210", "41210"),
+        )
+        every { districtVisitQueryPort.findVisitedDistrictCodes(7L) } returns setOf("11110")
+
+        val cells = service.mapCells(DomainLocale.KO, memberId = 7L)
+
+        assertEquals(mapOf("11" to true, "41111" to false, "41210" to false), cells.associate { it.code to it.viewerVisited })
+    }
+
+    @Test
+    fun `비인증 조회는 모든 칸이 미방문이고 방문 기록을 읽지 않는다`() {
+        every { mapCellQueryPort.findAllCellDistricts() } returns listOf(row("11", "11110"))
+
+        val cells = service.mapCells(DomainLocale.KO, memberId = null)
+
+        assertTrue(cells.none { it.viewerVisited })
+        verify(exactly = 0) { districtVisitQueryPort.findVisitedDistrictCodes(any()) }
+    }
+
+    @Test
+    fun `활성 언어가 없으면 EN, EN도 없으면 KO로 폴백한다`() {
+        every { districtVisitQueryPort.findVisitedDistrictCodes(any()) } returns emptySet()
+        every { mapCellQueryPort.findAllCellDistricts() } returns listOf(
+            row("11", "11110", name = AreaName(ko = "서울", en = "Seoul", ja = null, zh = null)),
+        )
+
+        assertEquals("Seoul", service.mapCells(DomainLocale.JA, 1L).single().name)
+
+        every { mapCellQueryPort.findAllCellDistricts() } returns listOf(
+            row("11", "11110", name = AreaName(ko = "서울", en = "  ", ja = null, zh = null)),
+        )
+        assertEquals("서울", service.mapCells(DomainLocale.JA, 1L).single().name)
+    }
+
+    @Test
+    fun `없는 칸을 조회하면 MAP_CELL_NOT_FOUND다`() {
+        every { mapCellQueryPort.findCellDistricts("99999") } returns emptyList()
+
+        assertFailsWith<MapCellNotFoundException> { service.mapCell("99999", DomainLocale.KO, null) }
+    }
+
+    // ── 좌표 판정 ──────────────────────────────────────────────────────
+
+    @Test
+    fun `판정되지 않은 좌표는 오류가 아니라 결과에서 빠지고 개수로 센다`() {
+        // 국내 3건 + 바다·해외 2건. 판정은 3건만 돌아온다.
+        val coordinates = listOf(
+            Coordinates(37.5665, 126.9780), Coordinates(38.0, 130.0),
+            Coordinates(37.3040, 127.0104), Coordinates(35.6895, 139.6917),
+            Coordinates(35.1796, 129.0756),
+        )
+        every { mapCellQueryPort.resolveDistrictCodes(coordinates) } returns listOf("11140", "41111", "26110")
+        every { mapCellDistrictQueryPort.findCellCodesByDistrictCodes(any()) } returns listOf("11", "41111", "26")
+
+        val result = service.resolveDistricts(coordinates)
+
+        assertEquals(listOf("11140", "26110", "41111"), result.districtCodes)
+        assertEquals(2, result.unresolvedCount)
+    }
+
+    @Test
+    fun `같은 시군구의 좌표 여러 건은 코드 1건으로 줄어든다`() {
+        val coordinates = List(4) { Coordinates(37.5665, 126.9780) }
+        every { mapCellQueryPort.resolveDistrictCodes(coordinates) } returns List(4) { "11140" }
+        every { mapCellDistrictQueryPort.findCellCodesByDistrictCodes(any()) } returns listOf("11")
+
+        val result = service.resolveDistricts(coordinates)
+
+        assertEquals(listOf("11140"), result.districtCodes)
+        assertEquals(0, result.unresolvedCount)
+    }
+
+    @Test
+    fun `상한을 넘는 좌표는 잘리지 않고 거절된다`() {
+        val tooMany = List(501) { Coordinates(37.5, 127.0) }
+
+        assertFailsWith<TooManyCoordinatesException> { service.resolveDistricts(tooMany) }
+        verify(exactly = 0) { mapCellQueryPort.resolveDistrictCodes(any()) }
+    }
+
+    @Test
+    fun `좌표가 없으면 빈 결과이고 오류가 아니다`() {
+        // 빈 입력을 걸러 내는 일은 어댑터가 한다(빈 배열이 SQL에 들어가지 않게).
+        every { mapCellQueryPort.resolveDistrictCodes(emptyList()) } returns emptyList()
+        every { mapCellDistrictQueryPort.findCellCodesByDistrictCodes(emptyList()) } returns emptyList()
+
+        val result = service.resolveDistricts(emptyList())
+
+        assertEquals(emptyList(), result.districtCodes)
+        assertEquals(emptyList(), result.cellCodes)
+        assertEquals(0, result.unresolvedCount)
+    }
+
+    // ── 칸 상세 spot ───────────────────────────────────────────────────
+
+    @Test
+    fun `상한을 넘는 first는 오류가 아니라 상한으로 잘린다`() {
+        every { mapCellQueryPort.findCellSpots("11", DomainLocale.KO, 51, null) } returns emptyList()
+
+        service.cellSpots(CellSpotsQuery("11", first = 999, after = null), DomainLocale.KO)
+
+        // 상한 50 + 1 = 51건을 읽는다.
+        verify { mapCellQueryPort.findCellSpots("11", DomainLocale.KO, 51, null) }
+    }
+
+    @Test
+    fun `first보다 한 건 더 읽어 다음 페이지를 판정한다`() {
+        val rows = (1L..21L).map { spot(it, likeCount = 100 - it) }
+        every { mapCellQueryPort.findCellSpots("11", DomainLocale.KO, 21, null) } returns rows
+
+        val page = service.cellSpots(CellSpotsQuery("11", first = 20, after = null), DomainLocale.KO)
+
+        assertEquals(20, page.edges.size)
+        assertTrue(page.pageInfo.hasNextPage)
+        assertFalse(page.pageInfo.hasPreviousPage)
+    }
+
+    // ── 공유 ───────────────────────────────────────────────────────────
+
+    @Test
+    fun `폐기되거나 없는 토큰은 SHARE_LINK_NOT_FOUND다`() {
+        every { mapShareLinkPort.findActiveByToken("gone") } returns null
+
+        assertFailsWith<ShareLinkNotFoundException> { service.sharedMap("gone", viewerMemberId = null) }
+    }
+
+    @Test
+    fun `차단 관계면 SHARE_LINK_BLOCKED다`() {
+        every { mapShareLinkPort.findActiveByToken("t") } returns link(ownerId = 1L)
+        every { mapViewerBlockPort.isBlockedBetween(2L, 1L) } returns true
+
+        assertFailsWith<ShareLinkBlockedException> { service.sharedMap("t", viewerMemberId = 2L) }
+    }
+
+    @Test
+    fun `비인증 조회는 겹침이 null이고 차단을 묻지 않는다`() {
+        every { mapShareLinkPort.findActiveByToken("t") } returns link(ownerId = 1L)
+        every { mapOwnerLookupPort.findNickname(1L) } returns "여행자"
+        every { districtVisitQueryPort.findVisitedDistrictCodes(1L) } returns setOf("11110")
+        every { mapCellDistrictQueryPort.findCellCodesByDistrictCodes(setOf("11110")) } returns listOf("CELL_11")
+
+        val view = service.sharedMap("t", viewerMemberId = null)
+
+        assertEquals("여행자", view.ownerNickname)
+        assertEquals(listOf("CELL_11"), view.visitedCellCodes)
+        assertEquals(1, view.visitedCount)
+        // 빈 배열(겹치는 칸 없음)과 구분된다.
+        assertNull(view.overlappingCellCodes)
+        verify(exactly = 0) { mapViewerBlockPort.isBlockedBetween(any(), any()) }
+    }
+
+    @Test
+    fun `인증 조회는 겹치는 칸을 함께 준다`() {
+        every { mapShareLinkPort.findActiveByToken("t") } returns link(ownerId = 1L)
+        every { mapViewerBlockPort.isBlockedBetween(2L, 1L) } returns false
+        every { mapOwnerLookupPort.findNickname(1L) } returns "여행자"
+        every { districtVisitQueryPort.findVisitedDistrictCodes(1L) } returns setOf("11110", "41111", "26110")
+        every { districtVisitQueryPort.findVisitedDistrictCodes(2L) } returns setOf("11110", "50110")
+        // 포트가 중복 제거·정렬을 보장한다(계약) — 스텁도 그 형태로 준다.
+        every { mapCellDistrictQueryPort.findCellCodesByDistrictCodes(setOf("11110", "41111", "26110")) } returns
+            listOf("CELL_11", "CELL_26", "CELL_41110")
+        every { mapCellDistrictQueryPort.findCellCodesByDistrictCodes(setOf("11110", "50110")) } returns
+            listOf("CELL_11", "CELL_50110")
+
+        val view = service.sharedMap("t", viewerMemberId = 2L)
+
+        assertEquals(listOf("CELL_11", "CELL_26", "CELL_41110"), view.visitedCellCodes)
+        assertEquals(listOf("CELL_11"), view.overlappingCellCodes)
+    }
+
+    @Test
+    fun `본인 링크는 차단을 묻지 않는다`() {
+        every { mapShareLinkPort.findActiveByToken("t") } returns link(ownerId = 1L)
+        every { mapOwnerLookupPort.findNickname(1L) } returns "나"
+        every { districtVisitQueryPort.findVisitedDistrictCodes(1L) } returns emptySet()
+
+        val view = service.sharedMap("t", viewerMemberId = 1L)
+
+        assertEquals(emptyList(), view.visitedCellCodes)
+        assertEquals(emptyList(), view.overlappingCellCodes)
+        verify(exactly = 0) { mapViewerBlockPort.isBlockedBetween(any(), any()) }
+    }
+
+    private fun row(
+        cellCode: String,
+        districtCode: String,
+        name: AreaName = AreaName(ko = "칸", en = "cell", ja = null, zh = null),
+    ) = MapCellDistrictRow(
+        cellCode = cellCode,
+        districtCode = districtCode,
+        cellName = name,
+        provinceName = AreaName(ko = "시도", en = "province", ja = null, zh = null),
+        provinceCode = cellCode.take(2),
+        center = Coordinates(37.5, 127.0),
+    )
+
+    private fun spot(id: Long, likeCount: Long) = CellSpotView(
+        id = id,
+        title = "장소$id",
+        thumbnailImageUrl = "https://img/$id.jpg",
+        categoryCode = "TOURIST_SPOT",
+        coordinates = Coordinates(37.5, 127.0),
+        likeCount = likeCount,
+    )
+
+    private fun link(ownerId: Long) =
+        MapShareLinkRecord(memberId = ownerId, token = "t", createdAt = Instant.parse("2026-08-21T00:00:00Z"))
+}

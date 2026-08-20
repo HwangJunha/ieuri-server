@@ -151,3 +151,30 @@ class InvalidCursorException(message: String = "유효하지 않은 커서입니
  */
 class InvalidLimitException(message: String = "요청 개수가 올바르지 않습니다.") :
     SpotQueryException("INVALID_LIMIT", Classification.BAD_REQUEST, message)
+
+/**
+ * 좌표 판정 요청의 좌표 수가 상한 초과(SPEC-0030 R1).
+ *
+ * **클램프가 아니라 거절이다.** 잘라서 판정하면 클라이언트는 보낸 좌표가 전부 처리된 줄 알고
+ * 나머지를 다시 보내지 않는다 — 판정에서 빠진 지역이 조용히 미방문으로 남는다. 개수는 계약에
+ * 명시되어 있으므로(POL-018) 나눠 보내는 것이 클라이언트의 몫이다.
+ */
+class TooManyCoordinatesException(message: String = "한 번에 판정할 수 있는 좌표 수를 초과했습니다.") :
+    SpotQueryException("TOO_MANY_COORDINATES", Classification.BAD_REQUEST, message)
+
+/** 칸 코드가 존재하지 않는다(SPEC-0030 R7). 시군구 코드를 넣은 경우도 여기로 온다. */
+class MapCellNotFoundException(message: String = "해당 지역을 찾을 수 없습니다.") :
+    SpotQueryException("MAP_CELL_NOT_FOUND", Classification.NOT_FOUND, message)
+
+/**
+ * 공유 토큰이 없거나 폐기됐다(SPEC-0030 R14).
+ *
+ * **둘을 구분해 응답하지 않는다.** 구분하면 토큰을 넣어 보며 "존재하지만 폐기됨"을 가려낼 수
+ * 있고, 그것만으로도 그 회원이 공유를 했었다는 사실이 새어 나간다.
+ */
+class ShareLinkNotFoundException(message: String = "더 이상 볼 수 없는 지도입니다.") :
+    SpotQueryException("SHARE_LINK_NOT_FOUND", Classification.NOT_FOUND, message)
+
+/** 차단 관계라 공유 지도를 볼 수 없다(SPEC-0030 R16, POL-041의 양방향 차단). */
+class ShareLinkBlockedException(message: String = "볼 수 없는 지도입니다.") :
+    SpotQueryException("SHARE_LINK_BLOCKED", Classification.FAILED_PRECONDITION, message)

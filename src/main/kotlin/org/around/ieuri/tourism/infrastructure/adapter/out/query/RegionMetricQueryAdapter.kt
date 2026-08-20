@@ -38,7 +38,7 @@ class RegionMetricQueryAdapter(
     override fun findDistrictAt(origin: Coordinates): OriginDistrict? =
         jdbcTemplate.query(
             """
-            SELECT code, province_code
+            SELECT code, area_cd AS province_code
             FROM district
             WHERE ST_Intersects(boundary, ST_MakePoint(?, ?)::geography)
             LIMIT 1
@@ -66,17 +66,19 @@ class RegionMetricQueryAdapter(
     override fun findRegions(provinceCode: String): List<RegionRow> =
         jdbcTemplate.query(
             """
-            SELECT code, province_code,
-                   name_ko, name_en, name_ja, name_zh,
-                   province_name_ko, province_name_en, province_name_ja, province_name_zh,
-                   ST_Y(representative_location::geometry) AS center_lat,
-                   ST_X(representative_location::geometry) AS center_lng
-            FROM district
-            WHERE province_code = ?
+            SELECT d.code, d.area_cd AS province_code,
+                   d.name_ko, d.name_en, d.name_ja, d.name_zh,
+                   a.name_ko AS province_name_ko, a.name_en AS province_name_en,
+                   a.name_ja AS province_name_ja, a.name_zh AS province_name_zh,
+                   ST_Y(d.representative_location::geometry) AS center_lat,
+                   ST_X(d.representative_location::geometry) AS center_lng
+            FROM district d
+            JOIN area a ON a.area_cd = d.area_cd
+            WHERE d.area_cd = ?
             -- 대표 위치가 없는 시군구는 후보에서 아예 뺀다. 추천해 놓고 그 지역에 갈 곳이
             -- 없으면 추천이 성립하지 않는다. NULL은 배치가 선정에 실패했다는 뜻이다.
-              AND representative_location IS NOT NULL
-            ORDER BY code
+              AND d.representative_location IS NOT NULL
+            ORDER BY d.code
             """.trimIndent(),
             { rs, _ ->
                 RegionRow(
@@ -108,7 +110,7 @@ class RegionMetricQueryAdapter(
             SELECT k.district_code, AVG(k.cnctr_rate) AS value
             FROM kto_concentration_rate k
             JOIN district d ON d.code = k.district_code
-            WHERE d.province_code = ?
+            WHERE d.area_cd = ?
               AND k.target_date = (now() AT TIME ZONE 'Asia/Seoul')::date
             GROUP BY k.district_code
             """.trimIndent(),
@@ -134,7 +136,7 @@ class RegionMetricQueryAdapter(
                 SELECT k.district_code, k.base_date, SUM(k.tou_num) AS day_total
                 FROM kto_visitor_count k
                 JOIN district d ON d.code = k.district_code
-                WHERE d.province_code = ?
+                WHERE d.area_cd = ?
                   AND k.visitor_type IN ('2', '3')
                   AND k.base_date > (
                       SELECT MAX(m.base_date) - INTERVAL '7 days'
@@ -176,7 +178,7 @@ class RegionMetricQueryAdapter(
                    k.district_code, k.indicator_value AS value
             FROM $table k
             JOIN district d ON d.code = k.district_code
-            WHERE d.province_code = ?
+            WHERE d.area_cd = ?
             ORDER BY k.district_code, k.base_month DESC
             """.trimIndent(),
             { rs, _ -> rs.getString("district_code") to rs.metric() },

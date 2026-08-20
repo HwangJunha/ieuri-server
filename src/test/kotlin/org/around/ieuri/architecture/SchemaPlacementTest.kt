@@ -44,6 +44,10 @@ class SchemaPlacementTest {
             "spot_detail_image", "spot_detail_intro", "spot_detail_info", "spot_festival", "spot_reaction",
             "congestion_area", "district", "kto_visitor_count", "kto_concentration_rate",
             "kto_stay_intensity", "kto_spending_intensity",
+            // 전국 지도(SPEC-0030). map_cell은 JPA 엔티티가 없다 — geography를 읽는 질의와 함께
+            // 생 SQL 어댑터에서만 다룬다.
+            "member_district_visit", "map_share_link", "map_cell_image",
+            "area", "map_cell", "map_cell_district",
         ).forEach { put(it, "tour") }
 
         listOf("category", "category_translation", "category_external_mapping", "app_category")
@@ -60,8 +64,10 @@ class SchemaPlacementTest {
      * `search_path`가 맡는다 — 이 목록은 AC-6의 완전성 계산에서 빠지는 몫을 명시한다.
      */
     private val tablesWithoutEntity = setOf(
-        "congestion_area", "district",
+        "congestion_area",
         "kto_visitor_count", "kto_concentration_rate", "kto_stay_intensity", "kto_spending_intensity",
+        // 칸 목록·상세가 district.center를 ST_X/ST_Y로 뽑아 읽으므로 생 SQL 전용이다(SPEC-0030).
+        "map_cell",
     )
 
     private val entities: List<JavaClass> = ClassFileImporter()
@@ -72,8 +78,9 @@ class SchemaPlacementTest {
     /** AC-6 — 전량 배정, 중복 0, 미배정 0. Map이므로 중복 키는 구조적으로 불가능하다. */
     @Test
     fun `배치표는 애플리케이션 테이블을 빠짐없이 배정한다`() {
-        // 스펙 §4의 46개 + 장소 질문/답변 4개 + 메시지 인용 1개(SPEC-0026) + 알림 3개(SPEC-0028).
-        assertEquals(55, placement.size, "배치표에 등록된 애플리케이션 테이블 수")
+        // 스펙 §4의 46개 + 장소 질문/답변 4개 + 메시지 인용 1개(SPEC-0026) + 알림 3개(SPEC-0028)
+        // + 전국 지도 6개(SPEC-0030: 방문 기록·공유 링크·칸 이미지·시도·칸·칸매핑).
+        assertEquals(61, placement.size, "배치표에 등록된 애플리케이션 테이블 수")
         assertEquals(
             setOf("auth", "community", "tour", "category", "alarm"),
             placement.values.toSet(),
@@ -115,7 +122,7 @@ class SchemaPlacementTest {
      * *존재하는* 엔티티만 보기 때문이다. 엔티티 없는 테이블을 명시 목록으로 고정해 그 구멍을 막는다.
      */
     @Test
-    fun `엔티티 없는 테이블은 raw SQL 전용 6개뿐이다`() {
+    fun `엔티티 없는 테이블은 raw SQL 전용뿐이다`() {
         val mappedTables = entities.map { tableOf(it) }.toSet()
         val actuallyMissing = placement.keys - mappedTables
 
