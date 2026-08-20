@@ -1,9 +1,7 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.persistence
 
 import com.querydsl.jpa.impl.JPAQueryFactory
-import org.around.ieuri.tourism.application.port.out.persistence.CatalogVisibilityChanges
 import org.around.ieuri.tourism.application.port.out.persistence.SpotCatalogStorePort
-import org.around.ieuri.tourism.application.port.out.persistence.SpotCatalogUpsertPort
 import org.around.ieuri.tourism.domain.aggregate.SpotCatalog
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotCatalogTranslationEntity
@@ -18,15 +16,15 @@ import org.springframework.transaction.annotation.Transactional
 /**
  * 카탈로그 쓰기 포트 구현(SPEC-0019). 도메인↔엔티티 변환은 `mapper` 패키지가 담당한다.
  *
- * upsert가 필요한 두 경로(번역·축제기간)만 [SpotCatalogUpsertPort]에 위임한다 —
- * JPA에 이식 가능한 upsert가 없고, `merge` 의미로는 select-then-insert 경합이 생긴다.
+ * **여기에는 JPA·QueryDSL로 표현되는 쓰기만 있다.** upsert와 `UPDATE ... RETURNING`은
+ * 생 SQL이 필요해 `SpotCatalogUpsertJdbcAdapter`가 맡으며, 서비스가 그 포트를 따로
+ * 주입받는다 — 이 어댑터가 저쪽을 주입받으면 어느 경로가 생 SQL을 쓰는지가 가려진다.
  */
 @Component
 class SpotCatalogStoreAdapter(
     private val queryFactory: JPAQueryFactory,
     private val catalogRepository: SpotCatalogJpaRepository,
     private val translationRepository: SpotCatalogTranslationJpaRepository,
-    private val upsertPort: SpotCatalogUpsertPort,
 ) : SpotCatalogStorePort {
 
     private val spot = QSpotEntity.spotEntity
@@ -61,20 +59,4 @@ class SpotCatalogStoreAdapter(
             .where(spot.id.eq(spotId), spot.catalogId.isNull)
             .execute()
     }
-
-    override fun upsertTranslation(
-        catalogId: Long,
-        language: DomainLocale,
-        title: String,
-        address: String?,
-    ) = upsertPort.upsertTranslation(catalogId, language, title, address)
-
-    override fun refreshFestivalPeriod(catalogId: Long) = upsertPort.refreshFestivalPeriod(catalogId)
-
-    /**
-     * 노출 갱신은 `UPDATE ... RETURNING`이 필요해 [SpotCatalogUpsertPort]가 맡는다 —
-     * upsert와 같은 이유로 생 SQL이 그쪽에 모여 있다.
-     */
-    override fun refreshTranslationVisibility(): CatalogVisibilityChanges =
-        upsertPort.refreshTranslationVisibility()
 }

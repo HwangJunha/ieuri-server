@@ -4,6 +4,7 @@ import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisher
 import org.around.ieuri.tourism.application.port.out.persistence.CatalogLanguage
 import org.around.ieuri.tourism.application.port.out.persistence.CatalogVisibilityChanges
 import org.around.ieuri.tourism.application.port.out.persistence.SpotCatalogStorePort
+import org.around.ieuri.tourism.application.port.out.persistence.SpotCatalogUpsertPort
 import org.around.ieuri.tourism.application.port.out.query.CatalogCandidate
 import org.around.ieuri.tourism.application.port.out.query.SpotCatalogQueryPort
 import org.around.ieuri.tourism.application.port.out.query.UnassignedSpot
@@ -56,8 +57,9 @@ class SpotCatalogAssignmentServiceTest {
     private fun service(
         query: StubQueryPort,
         store: RecordingStorePort,
+        upsert: RecordingUpsertPort = RecordingUpsertPort(),
         events: RecordingEventPublisher = RecordingEventPublisher(),
-    ) = SpotCatalogService(query, store, events)
+    ) = SpotCatalogService(query, store, upsert, events)
 
     private class RecordingEventPublisher : TourismEventPublisherPort {
         val published = mutableListOf<Any>()
@@ -143,10 +145,11 @@ class SpotCatalogAssignmentServiceTest {
             unassigned = listOf(spot()),
             koreanIndex = mapOf("마린시티" to listOf(CatalogCandidate(900, mapX, mapY))),
         )
+        val upsert = RecordingUpsertPort()
 
-        service(query, store).assignCatalogs(DomainLocale.EN)
+        service(query, store, upsert).assignCatalogs(DomainLocale.EN)
 
-        assertEquals(listOf(Triple(900L, DomainLocale.EN, "Marine City")), store.translations)
+        assertEquals(listOf(Triple(900L, DomainLocale.EN, "Marine City")), upsert.translations)
     }
 
     @Test
@@ -251,10 +254,11 @@ class SpotCatalogAssignmentServiceTest {
         // 축제 기간은 저장한 행이 아니라 spot_festival에서 온다. 여기서 빠뜨리면 영영 비어 있다.
         val store = RecordingStorePort()
         val query = StubQueryPort(unassigned = listOf(koreanSpot()))
+        val upsert = RecordingUpsertPort()
 
-        service(query, store).assignCatalogs(DomainLocale.KO)
+        service(query, store, upsert).assignCatalogs(DomainLocale.KO)
 
-        assertEquals(listOf(RecordingStorePort.NEW_CATALOG_ID), store.festivalRefreshed)
+        assertEquals(listOf(RecordingStorePort.NEW_CATALOG_ID), upsert.festivalRefreshed)
     }
 
     @Test
@@ -310,10 +314,11 @@ class SpotCatalogAssignmentServiceTest {
         // 장소가 돌아왔을 때 좋아요가 달린 옛 카탈로그 대신 새 카탈로그가 생긴다.
         val store = RecordingStorePort()
         val query = StubQueryPort()
+        val upsert = RecordingUpsertPort()
 
-        service(query, store).refreshCatalogVisibility()
+        service(query, store, upsert).refreshCatalogVisibility()
 
-        assertEquals(1, store.visibilityRefreshes)
+        assertEquals(1, upsert.visibilityRefreshes)
     }
 
     @Test
@@ -325,7 +330,8 @@ class SpotCatalogAssignmentServiceTest {
         //
         // 그래서 이벤트는 델타가 아니라 정본을 싣는다. hidden·shown이 비어도 발행해야 한다.
         val store = RecordingStorePort()
-        store.visibilityResult = CatalogVisibilityChanges(
+        val upsert = RecordingUpsertPort()
+        upsert.visibilityResult = CatalogVisibilityChanges(
             hidden = emptyList(),
             shown = emptyList(),
             visible = listOf(
@@ -335,7 +341,7 @@ class SpotCatalogAssignmentServiceTest {
         )
         val events = RecordingEventPublisher()
 
-        service(StubQueryPort(), store, events).refreshCatalogVisibility()
+        service(StubQueryPort(), store, upsert, events).refreshCatalogVisibility()
 
         val published = events.published.filterIsInstance<SpotCatalogLanguagesChanged>().single()
         assertEquals(
@@ -383,8 +389,6 @@ class SpotCatalogAssignmentServiceTest {
     private class RecordingStorePort : SpotCatalogStorePort {
         val saved = mutableListOf<SpotCatalog>()
         val assignments = mutableListOf<Pair<Long, Long>>()
-        val translations = mutableListOf<Triple<Long, DomainLocale, String>>()
-        val festivalRefreshed = mutableListOf<Long>()
 
         private var nextId = NEW_CATALOG_ID
 
@@ -396,6 +400,29 @@ class SpotCatalogAssignmentServiceTest {
         override fun assign(spotId: Long, catalogId: Long) {
             assignments += spotId to catalogId
         }
+
+        companion object {
+            const val NEW_CATALOG_ID = 7777L
+        }
+    }
+
+    /** 생 SQL 경로(upsert·RETURNING)의 스텁. 포트가 갈려 있으니 스텁도 갈린다. */
+    private class RecordingUpsertPort : SpotCatalogUpsertPort {
+        val translations = mutableListOf<Triple<Long, DomainLocale, String>>()
+        val festivalRefreshed = mutableListOf<Long>()
+
+        var visibilityRefreshes = 0
+            private set
+
+        /**
+         * 갱신 결과. **기본값이 "뒤집힌 것은 없고 노출 중인 것은 있다"** — 전량 재적재 직후의
+         * 실제 상태이며, 이 슬라이스가 놓쳤던 경우다.
+         */
+        var visibilityResult = CatalogVisibilityChanges(
+            hidden = emptyList(),
+            shown = emptyList(),
+            visible = listOf(CatalogLanguage(RecordingStorePort.NEW_CATALOG_ID, DomainLocale.KO)),
+        )
 
         override fun upsertTranslation(
             catalogId: Long,
@@ -410,26 +437,9 @@ class SpotCatalogAssignmentServiceTest {
             festivalRefreshed += catalogId
         }
 
-        var visibilityRefreshes = 0
-            private set
-
-        /**
-         * 갱신 결과. **기본값이 "뒤집힌 것은 없고 노출 중인 것은 있다"** — 전량 재적재 직후의
-         * 실제 상태이며, 이 슬라이스가 놓쳤던 경우다.
-         */
-        var visibilityResult = CatalogVisibilityChanges(
-            hidden = emptyList(),
-            shown = emptyList(),
-            visible = listOf(CatalogLanguage(NEW_CATALOG_ID, DomainLocale.KO)),
-        )
-
         override fun refreshTranslationVisibility(): CatalogVisibilityChanges {
             visibilityRefreshes++
             return visibilityResult
-        }
-
-        companion object {
-            const val NEW_CATALOG_ID = 7777L
         }
     }
 }

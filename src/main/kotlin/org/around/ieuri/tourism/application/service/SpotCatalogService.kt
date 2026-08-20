@@ -5,6 +5,7 @@ import org.around.ieuri.tourism.application.port.`in`.command.SpotCatalogUseCase
 import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
 import org.around.ieuri.tourism.application.port.out.persistence.CatalogLanguage
 import org.around.ieuri.tourism.application.port.out.persistence.SpotCatalogStorePort
+import org.around.ieuri.tourism.application.port.out.persistence.SpotCatalogUpsertPort
 import org.around.ieuri.tourism.application.port.out.query.CatalogCandidate
 import org.around.ieuri.tourism.application.port.out.query.SpotCatalogQueryPort
 import org.around.ieuri.tourism.application.port.out.query.UnassignedSpot
@@ -35,6 +36,8 @@ import org.springframework.transaction.annotation.Transactional
 class SpotCatalogService(
     private val queryPort: SpotCatalogQueryPort,
     private val storePort: SpotCatalogStorePort,
+    // 생 SQL(upsert·RETURNING) 경로는 포트가 갈린다 — 어느 쓰기가 그쪽인지 여기서 보인다.
+    private val upsertPort: SpotCatalogUpsertPort,
     private val eventPublisher: TourismEventPublisherPort,
 ) : SpotCatalogUseCase {
 
@@ -83,7 +86,7 @@ class SpotCatalogService(
             if (matched != null) {
                 storePort.assign(spot.spotId, matched)
                 // 이 언어의 spot 원본에서 온 값이다. 행이 생기는 순간 그 언어에서 해소된다.
-                storePort.upsertTranslation(matched, spot.language, displayTitle, spot.address)
+                upsertPort.upsertTranslation(matched, spot.language, displayTitle, spot.address)
                 joined++
                 return@forEach
             }
@@ -99,7 +102,7 @@ class SpotCatalogService(
             storePort.assign(spot.spotId, catalogId)
             // **축제 기간은 저장한 행이 아니라 spot_festival에서 온다.** 여기서 빠뜨리면
             // 그 축제는 기간을 영영 갖지 못한다.
-            storePort.refreshFestivalPeriod(catalogId)
+            upsertPort.refreshFestivalPeriod(catalogId)
             created++
 
             // KO만 자기들끼리 접는다. 비한국어는 KO에 붙거나 독립하며, 서로 뭉치면 한국어
@@ -182,7 +185,7 @@ class SpotCatalogService(
      */
     @Transactional
     override fun refreshCatalogVisibility(): Int {
-        val changes = storePort.refreshTranslationVisibility()
+        val changes = upsertPort.refreshTranslationVisibility()
 
         log.info(
             "catalog visibility refreshed: hidden={} shown={} visible={}",
