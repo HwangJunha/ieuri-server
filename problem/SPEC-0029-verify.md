@@ -282,3 +282,77 @@ WHERE NOT EXISTS (SELECT 1 FROM tour.spot s WHERE s.catalog_id = c.id);
 **주의**: 2번이 카탈로그를 지우므로 그 id에 달린 좋아요가 CASCADE로 사라진다. 운영 데이터가 생긴 뒤에는 이 방법을 쓸 수 없다 — 그때는 카탈로그를 살리고 spot만 옮기는 별도 절차가 필요하다.
 
 전량 초기화(V73 재실행)로 다시 쌓는 것이 가장 확실하지만, 재적재에 시간이 오래 걸린다.
+
+---
+
+## 11. 축제 데이터 결함 — 두 API의 집합이 다르다 (2026-08-21)
+
+첫 검증에서 `festivalSyncStep` 4개가 전부 **0건 적재**하고 0.1초 만에 끝난 것을 발견했다. Step은 `COMPLETED`였고 오류도 없었다 — 배치 상태만 봤으면 못 봤을 결함이다.
+
+### 결함 1 — `searchFestival2`는 `showflag`를 지원하지 않는다
+
+`areaBasedSyncList2`에 `showflag=1`을 넣으면서, `arrange`와 같은 논리("spot 적재와 같은 값을 써야 부모 없는 축제가 안 쌓인다")로 축제 API에도 넣었다. **그 논리는 두 오퍼레이션이 같은 파라미터를 지원할 때만 성립한다.**
+
+이 API는 지원하지 않는 파라미터에 **에러 없이 0건**을 준다 — 클라이언트 KDoc이 구필드(`areaCode`·`cat1~3`)에 대해 이미 기록해 둔 함정과 같다. 확인 없이 대칭을 가정한 것이 원인이다.
+
+빼고 나니 379건이 정상 적재됐다.
+
+### 결함 2 — 끝난 축제는 축제 API에 아예 없다
+
+더 근본적인 문제다. 두 API가 주는 집합이 다르다:
+
+| API | 주는 것 |
+|---|---|
+| `areaBasedSyncList2` | 축제 카테고리 spot **1,369건** — 끝난 것 포함 |
+| `searchFestival2` | **진행 중인 것만 379건** |
+
+기존 정리는 `deleteEnded`(기간이 지난 행 삭제)와 `deleteMissing`(수집에 없는 행 삭제) 둘인데, **양쪽 다 `spot_festival` 기준**이었다. 끝난 축제는 축제 API가 주지 않으므로 애초에 그 테이블에 행이 없고, 따라서 **어느 경로로도 정리되지 않았다.**
+
+실측: `spot_festival`의 379건이 전부 종료일이 미래였다. 지울 대상이 하나도 없었던 것이다. 그 사이 `2025 로맨틱 한강 크리스마스 마켓` 같은 축제 990건이 홈·지도·검색에 그대로 노출되고 있었다.
+
+**`deleteMissing`의 대상을 축제 카테고리 `spot` 전체로 넓혀 고쳤다.** 판정 근거가 뒤집힌다 — "기간이 지났다"가 아니라 **"축제인데 이번 축제 수집에 없다 = 끝났다"** 이다. `deleteEnded`는 기간을 아는 경우의 조기 정리로 남는다.
+
+### 확인 쿼리
+
+```sql
+-- 축제 카테고리 spot과 기간 정보가 1:1인가 (둘이 같아야 정상)
+SELECT (SELECT count(*) FROM tour.spot WHERE category='FESTIVAL_EVENT') AS 축제spot,
+       (SELECT count(*) FROM tour.spot_festival) AS 기간정보,
+       (SELECT count(*) FROM tour.spot s WHERE category='FESTIVAL_EVENT'
+        AND NOT EXISTS (SELECT 1 FROM tour.spot_festival f WHERE f.spot_id=s.id)) AS 기간없음;
+
+-- 지난 연도가 제목에 박힌 축제 (0이어야 한다)
+SELECT substring(title from '20\d\d') AS 연도, count(*) FROM tour.spot
+WHERE category='FESTIVAL_EVENT' AND language='KO' AND title ~ '20\d\d'
+GROUP BY 1 ORDER BY 1;
+```
+
+**`기간없음`이 0이 아니면 정리가 동작하지 않은 것이다.** 실측 후 379/379/0.
+
+### 정리 후 남는 것 — 원본 없는 카탈로그
+
+축제 990건이 지워지면서 **원본이 하나도 없는 카탈로그 766개**가 남는다. 이것은 결함이 아니라 설계다(SPEC-0019) — 지우면 좋아요가 매달린 행이 사라지므로 감추기만 한다. 실측으로 그 카탈로그들의 translation 969행이 전부 `visible=false`이며 조회에 나오지 않음을 확인했다.
+
+```sql
+SELECT count(*) FILTER (WHERE visible) AS 노출중, count(*) FILTER (WHERE NOT visible) AS 감춰짐
+FROM tour.spot_catalog_translation t
+WHERE NOT EXISTS (SELECT 1 FROM tour.spot s WHERE s.catalog_id=t.catalog_id);
+```
+
+`노출중`이 0이어야 한다.
+
+---
+
+## 12. 최종 실측 (2026-08-21, 수정 반영 후)
+
+| 항목 | 값 |
+|---|---|
+| spot 총계 | 80,208 |
+| 카탈로그 | 43,216 (그중 원본 없는 것 766 — 전부 감춰짐) |
+| 언어별 노출 | KO 40,857 / EN 13,266 / JA 13,198 / ZH 12,872 |
+| 미배정 spot | **2** (ZH 제목이 한국어인 것 — §10 참조) |
+| 축제 | 379 (기간 정보 1:1 일치) |
+| 지난 연도 축제 | **0** |
+| `visible` 정합성 | 0 / 0 |
+| 커뮤니티 사본 불일치 | **0** |
+| 원본 5개 이상 카탈로그 | 7 (전부 3km 이내 = 상류 중복 발행, 알려진 한계) |

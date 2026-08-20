@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.infrastructure.batch
 
+import org.around.ieuri.tourism.application.port.`in`.command.SpotCatalogSplitUseCase
 import org.around.ieuri.tourism.application.port.`in`.command.SpotCatalogUseCase
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.slf4j.LoggerFactory
@@ -81,5 +82,39 @@ class SpotCatalogAssignmentTasklet(
 
         /** KO가 먼저다. 나머지 순서는 서로 독립이라 의미가 없다. */
         val ASSIGNMENT_ORDER = listOf(DomainLocale.KO, DomainLocale.EN, DomainLocale.JA, DomainLocale.ZH)
+    }
+}
+
+/**
+ * 잘못 접힌 카탈로그를 가르는 Step 본체(SPEC-0029).
+ *
+ * **배정 Step 뒤에 온다** — 전량이 붙고 난 뒤라야 "이 카탈로그가 실제로 몇 장소인가"를 물을 수
+ * 있다. 배정 중에 물으면 아직 안 붙은 원본을 빼고 판정한다.
+ *
+ * 회차를 반복하지 않는다. 후보가 한 자릿수(실측 2건)라 한 번에 끝나며, `CONTINUABLE`로 돌면
+ * 이미 가른 카탈로그가 다음 회차에 다시 후보로 걸리지 않는다는 보장을 따로 세워야 한다.
+ *
+ * **가른 뒤 노출 갱신을 다시 부른다.** 배정 Step의 마지막이 이미 한 번 불렀지만, 분할이
+ * 번역 행을 옮기고 지웠으므로 그때의 정본은 낡았다 — 다시 부르지 않으면 구독자의 사본이
+ * 갈라져 나간 카탈로그를 모른 채 남는다. 가른 것이 없으면 부르지 않는다.
+ */
+class SpotCatalogSplitTasklet(
+    private val splitUseCase: SpotCatalogSplitUseCase,
+    private val catalogUseCase: SpotCatalogUseCase,
+) : Tasklet {
+
+    private val log = LoggerFactory.getLogger(javaClass)
+
+    override fun execute(contribution: StepContribution, chunkContext: ChunkContext): RepeatStatus {
+        val result = splitUseCase.splitMismatchedCatalogs()
+        contribution.incrementWriteCount(result.spotsMoved.toLong())
+
+        if (result.catalogsCreated > 0) catalogUseCase.refreshCatalogVisibility()
+
+        log.info(
+            "catalog split finished: split={} created={} moved={}",
+            result.catalogsSplit, result.catalogsCreated, result.spotsMoved,
+        )
+        return RepeatStatus.FINISHED
     }
 }

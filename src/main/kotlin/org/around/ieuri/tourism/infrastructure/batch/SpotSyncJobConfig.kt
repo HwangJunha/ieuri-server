@@ -1,6 +1,7 @@
 package org.around.ieuri.tourism.infrastructure.batch
 
 import tools.jackson.databind.ObjectMapper
+import org.around.ieuri.tourism.application.port.`in`.command.SpotCatalogSplitUseCase
 import org.around.ieuri.tourism.application.port.`in`.command.SpotCatalogUseCase
 import org.around.ieuri.tourism.application.port.out.client.FestivalSyncPort
 import org.around.ieuri.tourism.application.port.out.client.SpotSyncPort
@@ -26,7 +27,8 @@ import org.springframework.transaction.PlatformTransactionManager
  * spotSyncJob
  * ├── syncLanguageStep       ×4 (KO → EN → JA → ZH, 순차)
  * ├── festivalSyncStep       ×4 (KO → EN → JA → ZH, 순차)
- * └── catalogAssignmentStep  카탈로그 배정 (SPEC-0019)
+ * ├── catalogAssignmentStep  카탈로그 배정 (SPEC-0019)
+ * └── catalogSplitStep       잘못 접힌 카탈로그 분할 (SPEC-0029)
  * ```
  *
  * **축제 Step이 관광지 Step 뒤에 와야 한다** — `spot_festival`이 `spot`에 FK를 걸므로 부모 행이
@@ -52,6 +54,7 @@ class SpotSyncJobConfig(
     private val festivalUpsertPort: FestivalUpsertPort,
     private val festivalProperties: FestivalSyncProperties,
     private val catalogUseCase: SpotCatalogUseCase,
+    private val catalogSplitUseCase: SpotCatalogSplitUseCase,
     private val objectMapper: ObjectMapper,
 ) {
 
@@ -62,7 +65,7 @@ class SpotSyncJobConfig(
         // 카탈로그 배정은 그 뒤다(SPEC-0019 R-7).
         val steps = order.map(::syncStep) +
             order.map(::festivalStep) +
-            listOf(catalogAssignmentStep())
+            listOf(catalogAssignmentStep(), catalogSplitStep())
         return steps.drop(1)
             .fold(JobBuilder(JOB_NAME, jobRepository).start(steps.first())) { acc, step -> acc.next(step) }
             .build()
@@ -72,6 +75,16 @@ class SpotSyncJobConfig(
     private fun catalogAssignmentStep(): Step =
         StepBuilder("catalogAssignmentStep", jobRepository)
             .tasklet(SpotCatalogAssignmentTasklet(catalogUseCase), transactionManager)
+            .build()
+
+    /**
+     * 서로 다른 장소가 접힌 카탈로그를 가른다(SPEC-0029).
+     *
+     * **배정 뒤여야 한다** — 전량이 붙고 난 뒤라야 한 카탈로그가 몇 장소인지 물을 수 있다.
+     */
+    private fun catalogSplitStep(): Step =
+        StepBuilder("catalogSplitStep", jobRepository)
+            .tasklet(SpotCatalogSplitTasklet(catalogSplitUseCase, catalogUseCase), transactionManager)
             .build()
 
     /**

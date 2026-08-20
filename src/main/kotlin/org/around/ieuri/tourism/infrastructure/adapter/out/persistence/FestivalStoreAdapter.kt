@@ -3,6 +3,7 @@ package org.around.ieuri.tourism.infrastructure.adapter.out.persistence
 import com.querydsl.jpa.impl.JPAQueryFactory
 import org.around.ieuri.tourism.application.port.out.persistence.FestivalStorePort
 import org.around.ieuri.tourism.domain.vo.DomainLocale
+import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.QSpotFestivalEntity
 import org.springframework.stereotype.Component
@@ -35,8 +36,17 @@ class FestivalStoreAdapter(
         deleteSpotsInChunks(language, endedContentIds(language, asOf).toList())
 
     /**
-     * 이번 수집 결과에 없는 축제 삭제. `spot_festival`에 있는 행만 대상으로 한다 —
-     * 관광지 전반을 건드리면 축제 정리가 관광지 정리를 덮어쓴다.
+     * 이번 수집 결과에 없는 축제 삭제.
+     *
+     * **대상은 `spot_festival`이 아니라 축제 카테고리 `spot` 전체다.** 두 API가 주는 집합이
+     * 다르기 때문이다 — `areaBasedSyncList2`는 끝난 축제도 계속 주는데 `searchFestival2`는
+     * **진행 중인 것만** 준다(실측: 카테고리 1,369건 vs 축제 API 379건). 그래서 끝난 축제는
+     * 애초에 `spot_festival` 행을 갖지 못하고, 그 테이블만 훑으면 영영 정리되지 않는다.
+     *
+     * 뒤집어 보면 **"축제인데 이번 축제 수집에 없다 = 그 축제는 끝났다"** 이고, 그것이
+     * 이 삭제의 근거다. [deleteEnded]는 기간을 아는 경우의 조기 정리로 남는다.
+     *
+     * 축제 카테고리로 한정하므로 관광지 전반은 건드리지 않는다.
      */
     @Transactional
     override fun deleteMissing(language: DomainLocale, survivingContentIds: Set<String>): Int {
@@ -45,9 +55,8 @@ class FestivalStoreAdapter(
 
         val doomed = queryFactory
             .select(spot.contentId)
-            .from(festival)
-            .join(spot).on(spot.id.eq(festival.spotId))
-            .where(spot.language.eq(language))
+            .from(spot)
+            .where(spot.language.eq(language), spot.category.eq(FESTIVAL_CATEGORY))
             .fetch()
             .filterNot { it in survivingContentIds }
 
@@ -92,5 +101,8 @@ class FestivalStoreAdapter(
     private companion object {
         /** 삭제 `IN` 절 하나에 넣을 최대 id 수. 드라이버 파라미터 한도를 넘지 않기 위한 분할 단위다. */
         const val DELETE_CHUNK_SIZE = 1_000
+
+        /** 정리 대상 카테고리. 엔티티가 코드를 문자열로 들고 있어 값으로 비교한다. */
+        val FESTIVAL_CATEGORY: String = SpotCategory.FESTIVAL_EVENT.code
     }
 }

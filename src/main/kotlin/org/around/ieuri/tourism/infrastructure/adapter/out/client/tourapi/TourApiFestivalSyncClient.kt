@@ -22,8 +22,10 @@ import java.time.format.DateTimeFormatter
  *  - `arrange`는 `spot` 적재와 **같은 값**을 쓴다. 대표이미지 필수 조건이 어긋나면 부모 `spot` 행이
  *    없는 축제만 잔뜩 나와 전부 건너뛰어진다(R-2).
  *
- * `showflag`도 같은 이유로 `spot` 적재와 같은 값을 쓴다 — 표출이 중단된 항목은 부모 `spot` 행이
- * 적재되지 않으므로, 여기서만 넓게 가져오면 부모 없는 축제가 쌓인다(SPEC-0029 R-2).
+ * **`showflag`를 보내지 않는다.** `areaBasedSyncList2`에는 있는 파라미터지만 이 오퍼레이션에는
+ * 없고, 위의 구필드와 똑같이 **에러 없이 0건**을 돌려준다(실측: 4개 언어 전부 0건 적재).
+ * 표출 중단 항목을 거를 필요도 없다 — 부모 `spot` 행이 이미 `showflag=1`로 걸러졌고
+ * `spot_festival`이 FK로 매달리므로, 부모 없는 축제는 애초에 적재되지 않는다.
  */
 @Component
 class TourApiFestivalSyncClient(
@@ -46,7 +48,6 @@ class TourApiFestivalSyncClient(
             .queryParam("numOfRows", numOfRows)
             .queryParam("pageNo", pageNo)
             .queryParam("arrange", properties.arrange)
-            .queryParam("showflag", properties.showflag)
             // 필수 파라미터. "그 날짜에 시작하는 행사"가 아니라 **"그 날짜 기준 유효한 행사"** 를
             // 뜻하므로, 실행일을 넣는 것만으로 별도의 기간 윈도우 설계가 필요 없다(AC-8).
             .queryParam("eventStartDate", eventStartDate.format(YYYYMMDD))
