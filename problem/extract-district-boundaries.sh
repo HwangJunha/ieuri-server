@@ -14,9 +14,18 @@
 # 출력: problem/out/district-boundaries.geojson
 set -euo pipefail
 
+# direnv가 로드하는 것과 같은 파일을 읽는다 — 셸 밖에서 실행해도 동작하게.
+SECRETS="${IEURI_SECRETS_FILE:-$HOME/.config/ieuri/secrets.env}"
+if [ -f "$SECRETS" ]; then
+    set -a
+    # shellcheck disable=SC1090
+    . "$SECRETS"
+    set +a
+fi
+
 DB_URL="${IEURI_DB_URL:-jdbc:postgresql://localhost:5432/ieuri}"
 DB_USER="${IEURI_DB_USERNAME:-ieuri}"
-DB_PASS="${IEURI_DB_PASSWORD:?IEURI_DB_PASSWORD 환경변수가 필요합니다}"
+DB_PASS="${IEURI_DB_PASSWORD:?IEURI_DB_PASSWORD가 없습니다 — $SECRETS 를 확인하십시오}"
 
 OUT_DIR="$(cd "$(dirname "$0")" && pwd)/out"
 OUT_FILE="$OUT_DIR/district-boundaries.geojson"
