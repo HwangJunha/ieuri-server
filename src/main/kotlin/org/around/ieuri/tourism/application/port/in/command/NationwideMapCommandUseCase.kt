@@ -24,9 +24,9 @@ interface NationwideMapCommandUseCase {
     fun createShareLink(memberId: Long): MapShareLinkView
 
     /**
-     * 공유 링크를 폐기한다(R14).
+     * 공유 링크를 폐기한다(R14). 발급 때 받은 URL을 그대로 넘긴다 — 토큰 추출은 서버가 한다.
      *
      * @return 실제로 폐기했으면 true. 본인 것이 아니거나 이미 폐기됐으면 false다.
      */
-    fun revokeShareLink(memberId: Long, token: String): Boolean
+    fun revokeShareLink(memberId: Long, shareUrl: String): Boolean
 }

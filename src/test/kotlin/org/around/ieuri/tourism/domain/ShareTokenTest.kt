@@ -27,4 +27,21 @@ class ShareTokenTest {
 
         assertEquals(1_000, tokens.toSet().size)
     }
+
+    @Test
+    fun `공유 URL에서 토큰을 꺼낸다`() {
+        assertEquals("kJ3xQ9", ShareToken.extractFrom("ieuri://shared/kJ3xQ9"))
+    }
+
+    @Test
+    fun `스킴이 웹으로 바뀌어도 같은 토큰이 나온다`() {
+        // 딥링크 → Universal Link 전환에 서버가 바뀌지 않아야 한다.
+        assertEquals("kJ3xQ9", ShareToken.extractFrom("https://ieuri.app/shared/kJ3xQ9"))
+    }
+
+    @Test
+    fun `쿼리 문자열이 붙어도 토큰만 꺼낸다`() {
+        // 공유 시트나 메신저가 추적 파라미터를 붙이는 경우가 있다.
+        assertEquals("kJ3xQ9", ShareToken.extractFrom("https://ieuri.app/shared/kJ3xQ9?utm_source=kakao"))
+    }
 }

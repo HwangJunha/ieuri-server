@@ -7,6 +7,7 @@ import org.around.ieuri.tourism.application.command.RecordVisitsCommand
 import org.around.ieuri.tourism.application.command.RemoveVisitCommand
 import org.around.ieuri.tourism.application.port.out.persistence.DistrictVisitStorePort
 import org.around.ieuri.tourism.application.port.out.persistence.DistrictVisitUpsertPort
+import org.around.ieuri.tourism.application.policy.NationwideMapPolicy
 import org.around.ieuri.tourism.application.port.out.persistence.MapShareLinkIssuePort
 import org.around.ieuri.tourism.application.port.out.persistence.MapShareLinkPort
 import org.around.ieuri.tourism.application.port.out.persistence.MapShareLinkRecord
@@ -42,6 +43,7 @@ class NationwideMapCommandServiceTest {
         mapCellDistrictQueryPort = mapCellDistrictQueryPort,
         mapShareLinkPort = shareLinkPort,
         mapShareLinkIssuePort = shareLinkIssuePort,
+        policy = NationwideMapPolicy(maxCellSpotPageSize = 50, shareUrlBase = "ieuri://shared"),
     )
 
     @Test
@@ -133,13 +135,23 @@ class NationwideMapCommandServiceTest {
     }
 
     @Test
-    fun `공유 링크는 발급을 반복해도 같은 토큰이다`() {
+    fun `공유 링크는 발급을 반복해도 같은 URL이다`() {
         val existing = MapShareLinkRecord(7L, "already-issued", Instant.parse("2026-08-01T00:00:00Z"))
         // 새 토큰을 만들어 넘겨도 저장소가 기존 행을 돌려준다.
         every { shareLinkIssuePort.findOrCreate(eq(7L), any()) } returns existing
 
-        assertEquals("already-issued", service.createShareLink(7L).token)
-        assertEquals("already-issued", service.createShareLink(7L).token)
+        assertEquals("ieuri://shared/already-issued", service.createShareLink(7L).shareUrl)
+        assertEquals("ieuri://shared/already-issued", service.createShareLink(7L).shareUrl)
+    }
+
+    @Test
+    fun `폐기는 URL에서 토큰을 꺼내 넘긴다`() {
+        every { shareLinkPort.revoke(7L, "kJ3xQ9") } returns true
+
+        assertTrue(service.revokeShareLink(7L, "ieuri://shared/kJ3xQ9"))
+
+        // 스킴이 웹으로 바뀌어도 같은 토큰이 나온다 — 전환에 서버 변경이 없다.
+        assertTrue(service.revokeShareLink(7L, "https://ieuri.app/shared/kJ3xQ9"))
     }
 
     private fun row(cellId: Long, districtCode: String) = MapCellDistrictRow(

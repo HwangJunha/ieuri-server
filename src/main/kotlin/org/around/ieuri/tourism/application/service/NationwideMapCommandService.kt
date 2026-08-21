@@ -4,6 +4,7 @@ import org.around.ieuri.tourism.application.command.RecordVisitsCommand
 import org.around.ieuri.tourism.application.command.RecordVisitsResult
 import org.around.ieuri.tourism.application.command.RemoveVisitCommand
 import org.around.ieuri.tourism.application.command.RemoveVisitResult
+import org.around.ieuri.tourism.application.policy.NationwideMapPolicy
 import org.around.ieuri.tourism.application.port.`in`.command.NationwideMapCommandUseCase
 import org.around.ieuri.tourism.application.port.out.persistence.DistrictVisitStorePort
 import org.around.ieuri.tourism.application.port.out.persistence.DistrictVisitUpsertPort
@@ -35,6 +36,7 @@ class NationwideMapCommandService(
     private val mapCellDistrictQueryPort: MapCellDistrictQueryPort,
     private val mapShareLinkPort: MapShareLinkPort,
     private val mapShareLinkIssuePort: MapShareLinkIssuePort,
+    private val policy: NationwideMapPolicy,
 ) : NationwideMapCommandUseCase {
 
     @Transactional
@@ -77,13 +79,23 @@ class NationwideMapCommandService(
         )
     }
 
+    /** 발급된 토큰을 설정된 앞부분에 붙여 완성한다 — 클라이언트는 조립하지 않는다. */
     @Transactional
     override fun createShareLink(memberId: Long): MapShareLinkView {
         val record = mapShareLinkIssuePort.findOrCreate(memberId, ShareToken.generate())
-        return MapShareLinkView(token = record.token, createdAt = record.createdAt)
+        return MapShareLinkView(
+            shareUrl = "${policy.shareUrlBase}/${record.token}",
+            createdAt = record.createdAt,
+        )
     }
 
+    /**
+     * 발급 때 내보낸 URL을 그대로 받아 토큰을 꺼낸다.
+     *
+     * **URL 형태를 검사하지 않는다** — 스킴이 바뀌어도(딥링크 → 웹) 마지막 경로 조각은 같고,
+     * 엉뚱한 값이면 폐기 대상을 못 찾아 false가 된다. 그것으로 충분하다.
+     */
     @Transactional
-    override fun revokeShareLink(memberId: Long, token: String): Boolean =
-        mapShareLinkPort.revoke(memberId, token)
+    override fun revokeShareLink(memberId: Long, shareUrl: String): Boolean =
+        mapShareLinkPort.revoke(memberId, ShareToken.extractFrom(shareUrl))
 }

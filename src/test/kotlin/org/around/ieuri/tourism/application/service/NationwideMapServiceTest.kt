@@ -51,6 +51,7 @@ class NationwideMapServiceTest {
         mapViewerBlockPort = mapViewerBlockPort,
         policy = NationwideMapPolicy(
             maxCellSpotPageSize = 50,
+            shareUrlBase = "ieuri://shared",
         ),
     )
 

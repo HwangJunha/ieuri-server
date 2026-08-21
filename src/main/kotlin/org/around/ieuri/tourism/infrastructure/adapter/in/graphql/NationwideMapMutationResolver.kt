@@ -95,7 +95,7 @@ class NationwideMapMutationResolver(
         return GqlCreateMapShareLinkPayload(
             success = true,
             userErrors = emptyList(),
-            shareLink = GqlMapShareLink(token = link.token, createdAt = link.createdAt.toString()),
+            shareLink = GqlMapShareLink(shareUrl = link.shareUrl, createdAt = link.createdAt.toString()),
         )
     }
 
@@ -104,7 +104,7 @@ class NationwideMapMutationResolver(
         @InputArgument input: GqlRevokeMapShareLinkInput,
     ): GqlRevokeMapShareLinkPayload {
         val memberId = currentMemberProvider.requireMemberId()
-        val revoked = commandUseCase.revokeShareLink(memberId, input.token)
+        val revoked = commandUseCase.revokeShareLink(memberId, input.shareUrl)
 
         // 남의 토큰을 넣었을 때와 이미 폐기됐을 때를 구분하지 않는다 — 구분하면 토큰을
         // 넣어 보며 남의 링크가 유효한지 가려낼 수 있다.
@@ -117,7 +117,7 @@ class NationwideMapMutationResolver(
                     GqlUserError(
                         code = "SHARE_LINK_NOT_FOUND",
                         message = "더 이상 볼 수 없는 링크입니다.",
-                        field = "token",
+                        field = "shareUrl",
                     ),
                 )
             },

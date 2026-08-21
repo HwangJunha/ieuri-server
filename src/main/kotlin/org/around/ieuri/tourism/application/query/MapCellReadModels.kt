@@ -69,8 +69,13 @@ data class SharedMapView(
     val visitedCount: Int,
 )
 
-/** 발급된 공유 링크(R12). */
+/**
+ * 발급된 공유 링크(R12).
+ *
+ * **토큰이 아니라 완성된 URL을 담는다.** 링크 형태(커스텀 스킴 → 웹 URL)가 바뀔 예정이고,
+ * 서버가 조립하면 그 전환에 앱 배포가 필요 없다.
+ */
 data class MapShareLinkView(
-    val token: String,
+    val shareUrl: String,
     val createdAt: java.time.Instant,
 )

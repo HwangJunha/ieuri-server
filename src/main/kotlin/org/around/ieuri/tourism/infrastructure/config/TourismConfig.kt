@@ -87,6 +87,7 @@ class TourismConfig {
     fun nationwideMapPolicy(properties: NationwideMapProperties): NationwideMapPolicy =
         NationwideMapPolicy(
             maxCellSpotPageSize = properties.maxCellSpotPageSize,
+            shareUrlBase = properties.shareUrlBase,
         )
 
     @Bean
