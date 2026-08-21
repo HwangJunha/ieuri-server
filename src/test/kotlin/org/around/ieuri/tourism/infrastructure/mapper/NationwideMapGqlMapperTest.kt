@@ -61,4 +61,14 @@ class NationwideMapGqlMapperTest {
 
         assertEquals(emptyList(), command.districtCodes)
     }
+
+    @Test
+    fun `도메인 좌표는 lat lng으로 이름이 바뀌어 나간다`() {
+        // 도메인은 latitude/longitude, 스키마는 lat/lng — 이름이 달라 변환이 필수다.
+        // 이 변환을 빠뜨리면 DGS가 필드를 못 찾아 응답 전체가 null이 된다(실측으로 겪었다).
+        val gql = Coordinates(latitude = 37.5665, longitude = 126.9780).toGql()
+
+        assertEquals(37.5665, gql.lat)
+        assertEquals(126.9780, gql.lng)
+    }
 }

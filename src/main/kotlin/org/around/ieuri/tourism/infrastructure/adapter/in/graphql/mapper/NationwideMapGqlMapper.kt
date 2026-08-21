@@ -1,6 +1,7 @@
 package org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper
 
 import org.around.ieuri.common.graphql.generated.types.CellSpot as GqlCellSpot
+import org.around.ieuri.common.graphql.generated.types.Coordinates as GqlCoordinates
 import org.around.ieuri.common.graphql.generated.types.PageInfo as GqlPageInfo
 import org.around.ieuri.common.graphql.generated.types.RecordVisitsInput as GqlRecordVisitsInput
 import org.around.ieuri.common.graphql.generated.types.RemoveVisitInput as GqlRemoveVisitInput
@@ -9,6 +10,7 @@ import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.tourism.application.command.RecordVisitsCommand
 import org.around.ieuri.tourism.application.command.RemoveVisitCommand
 import org.around.ieuri.tourism.application.query.CellSpotView
+import org.around.ieuri.tourism.domain.vo.Coordinates
 
 /**
  * 전국 지도 GraphQL 경계 변환(POL-033).
@@ -51,3 +53,12 @@ fun CursorPage<*>.toGqlPageInfo(): GqlPageInfo = GqlPageInfo(
     startCursor = pageInfo.startCursor,
     endCursor = pageInfo.endCursor,
 )
+
+/**
+ * 도메인 좌표 → 응답 좌표.
+ *
+ * **필드명이 다르다** — 도메인은 `latitude`/`longitude`, 스키마는 `lat`/`lng`이다. 변환을
+ * 빠뜨리고 도메인 값 객체를 그대로 노출하면 DGS가 필드를 찾지 못해 null이 되고,
+ * `Coordinates!`가 non-null이라 응답 전체가 무너진다(실측으로 겪었다).
+ */
+fun Coordinates.toGql(): GqlCoordinates = GqlCoordinates(lat = latitude, lng = longitude)

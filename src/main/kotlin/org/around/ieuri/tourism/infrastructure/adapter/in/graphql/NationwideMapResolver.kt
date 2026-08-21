@@ -9,6 +9,7 @@ import org.around.ieuri.common.graphql.generated.types.CellImage as GqlCellImage
 import org.around.ieuri.common.graphql.generated.types.CellImageKind as GqlCellImageKind
 import org.around.ieuri.common.graphql.generated.types.CellSpotConnection as GqlCellSpotConnection
 import org.around.ieuri.common.graphql.generated.types.CellSpotEdge as GqlCellSpotEdge
+import org.around.ieuri.common.graphql.generated.types.Coordinates as GqlCoordinates
 import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
 import org.around.ieuri.common.graphql.generated.types.SharedMap as GqlSharedMap
 import org.around.ieuri.common.security.CurrentMemberProvider
@@ -68,6 +69,18 @@ class NationwideMapResolver(
             visitedCount = view.visitedCount,
         )
     }
+
+    /**
+     * 칸의 대표 좌표.
+     *
+     * **도메인 `Coordinates`를 그대로 노출할 수 없다.** 그 값 객체는 `latitude`/`longitude`인데
+     * 스키마는 `lat`/`lng`이라, DTO를 그냥 내보내면 DGS가 필드를 찾지 못해 null이 되고
+     * `Coordinates!`가 non-null이라 **응답 전체가 null로 무너진다**(실측: 161칸 × 2필드 = 322 오류).
+     *
+     * 조회를 하지 않으므로 지연 필드는 아니다 — 이름이 어긋난 변환을 태우려고 여기 둔다.
+     */
+    @DgsData(parentType = "MapCell", field = "center")
+    fun center(dfe: DgsDataFetchingEnvironment): GqlCoordinates = dfe.mapCell().center.toGql()
 
     /**
      * 칸의 대표 이미지(R9). **선택했을 때만 조회한다.**
