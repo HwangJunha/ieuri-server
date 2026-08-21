@@ -2,7 +2,7 @@ extend type Query {
     """
     전국 지도의 표시 칸 전체. 161개 고정이며 페이지네이션하지 않는다.
 
-    정렬은 시도 코드 오름차순, 같은 시도 안에서는 칸 코드 오름차순으로 고정이다.
+    정렬은 시도 코드 오름차순, 같은 시도 안에서는 칸 id 오름차순으로 고정이다.
 
     인증은 선택이다. 비인증 조회에서는 모든 칸의 viewerVisited가 false다.
     """
@@ -21,7 +21,7 @@ extend type Query {
     """
     공유 링크로 다른 회원의 지도를 조회한다. 인증 없이 열 수 있다.
 
-    조회자가 인증된 회원이면 overlappingCellCodes가 채워진다.
+    조회자가 인증된 회원이면 overlappingCellIds가 채워진다.
 
     오류: SHARE_LINK_NOT_FOUND(없거나 폐기됨) · SHARE_LINK_BLOCKED(차단 관계).
     """
