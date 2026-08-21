@@ -37,7 +37,6 @@ import org.around.ieuri.tourism.infrastructure.locale.domainLocale
 class NationwideMapResolver(
     private val nationwideMapUseCase: NationwideMapUseCase,
     private val currentMemberProvider: CurrentMemberProvider,
-    private val policy: NationwideMapPolicy,
 ) {
 
     @DgsQuery

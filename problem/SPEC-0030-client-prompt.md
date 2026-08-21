@@ -133,19 +133,25 @@ type MapCell {
 
 ```graphql
 type MapShareLink {
-  shareUrl: String!    # ieuri://shared/kJ3xQ9mR7wZ2pL8vN4tY6cH1sB5dF0gA
+  shareUrl: String!    # https://www.ieuri.co.kr/tour/korea-map/kJ3xQ9mR7wZ2...
   createdAt: String!
 }
 ```
 
-### 2단계 전환 계획
+### 링크 형태
 
 ```
-1단계 (지금): ieuri://shared/<token>        ← 커스텀 스킴. 앱 설치자만 열림
-2단계 (웹 후): https://<도메인>/shared/<token> ← Universal Link. 미설치자도 열림
+https://www.ieuri.co.kr/tour/korea-map/<token>
 ```
 
-전환은 **서버 설정만 바꾸면 되고 앱 배포가 필요 없습니다.** 그래서 조립을 서버가 합니다.
+**커스텀 스킴(`ieuri://`)을 쓰지 않습니다.** 카카오톡을 비롯한 메신저가 `http`/`https`만
+링크로 인식해 커스텀 스킴은 눌리지 않기 때문입니다. 공유가 카톡으로 이뤄지는 이상 의미가
+없습니다.
+
+**앱은 이 경로를 App Link(Android) / Universal Link(iOS)로 가로채야 합니다.** 웹 페이지는
+아직 없지만 나중에 같은 경로가 미설치자를 받게 됩니다 — 같은 링크로 두 경우가 처리됩니다.
+
+도메인·경로가 바뀌어도 서버 설정만 바꾸면 되고 앱 배포가 필요 없습니다.
 
 ### 클라이언트가 할 일
 
@@ -159,8 +165,8 @@ type MapShareLink {
 
 **딥링크 라우팅이 필요합니다** — SPEC-0028에서 만든 기존 인프라에 경로를 추가하십시오.
 
-**1단계의 한계:** 앱 미설치자는 카톡에서 `ieuri://` 링크를 못 엽니다. 공유 텍스트에
-"이으리 앱이 필요합니다" 같은 안내를 넣는 것을 검토하십시오.
+**현재 한계:** 웹 페이지가 아직 없어, 앱 미설치자가 링크를 열면 해당 URL에서 404를 봅니다.
+링크 자체는 카톡에서 정상적으로 눌립니다. 웹 페이지가 생기면 그때 해소됩니다.
 
 ### SharedMap — null과 빈 배열이 다릅니다
 
@@ -232,7 +238,7 @@ type SharedMap {
 | 좌표 판정 | 서버 `resolveDistricts` | **클라이언트 로컬** |
 | 경계 데이터 | 서버 보유 | **앱 에셋** |
 | 칸 식별자 | `code: String!` (`"11"`) | **`id: ID!`** (`1`) |
-| 공유 링크 | `token` | **`shareUrl`** (완성된 URL) |
+| 공유 링크 | `token` | **`shareUrl`** (`https://www.ieuri.co.kr/tour/korea-map/<token>`) |
 | 폐기 입력 | `token` | **`shareUrl`** |
 | 해제 입력 | `cellCode` | **`cellId`** |
 | 공유 응답 | `visitedCellCodes` | **`visitedCellIds`** |

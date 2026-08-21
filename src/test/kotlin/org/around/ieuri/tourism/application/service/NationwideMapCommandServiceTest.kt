@@ -43,7 +43,10 @@ class NationwideMapCommandServiceTest {
         mapCellDistrictQueryPort = mapCellDistrictQueryPort,
         mapShareLinkPort = shareLinkPort,
         mapShareLinkIssuePort = shareLinkIssuePort,
-        policy = NationwideMapPolicy(maxCellSpotPageSize = 50, shareUrlBase = "ieuri://shared"),
+        policy = NationwideMapPolicy(
+            maxCellSpotPageSize = 50,
+            shareUrlBase = "https://www.ieuri.co.kr/tour/korea-map",
+        ),
     )
 
     @Test
@@ -140,18 +143,19 @@ class NationwideMapCommandServiceTest {
         // 새 토큰을 만들어 넘겨도 저장소가 기존 행을 돌려준다.
         every { shareLinkIssuePort.findOrCreate(eq(7L), any()) } returns existing
 
-        assertEquals("ieuri://shared/already-issued", service.createShareLink(7L).shareUrl)
-        assertEquals("ieuri://shared/already-issued", service.createShareLink(7L).shareUrl)
+        val expected = "https://www.ieuri.co.kr/tour/korea-map/already-issued"
+        assertEquals(expected, service.createShareLink(7L).shareUrl)
+        assertEquals(expected, service.createShareLink(7L).shareUrl)
     }
 
     @Test
     fun `폐기는 URL에서 토큰을 꺼내 넘긴다`() {
         every { shareLinkPort.revoke(7L, "kJ3xQ9") } returns true
 
-        assertTrue(service.revokeShareLink(7L, "ieuri://shared/kJ3xQ9"))
+        assertTrue(service.revokeShareLink(7L, "https://www.ieuri.co.kr/tour/korea-map/kJ3xQ9"))
 
-        // 스킴이 웹으로 바뀌어도 같은 토큰이 나온다 — 전환에 서버 변경이 없다.
-        assertTrue(service.revokeShareLink(7L, "https://ieuri.app/shared/kJ3xQ9"))
+        // 도메인·경로가 바뀌어도 마지막 조각이 토큰이라 그대로 동작한다.
+        assertTrue(service.revokeShareLink(7L, "https://ieuri.co.kr/shared/kJ3xQ9"))
     }
 
     private fun row(cellId: Long, districtCode: String) = MapCellDistrictRow(
