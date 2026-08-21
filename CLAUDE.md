@@ -14,6 +14,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Ask before inventing.** When a decision is the user's to make — infrastructure choice with no precedent, a spec `[TBD]`, a tradeoff with no obviously right answer — stop and ask rather than guessing. Do everything that does not depend on the answer first, then ask once with the options and your recommendation.
 
+- **Never write code without the user's approval. This is absolute.** Investigate, read, run read-only queries, and report — but do not create, edit, or delete a file until the user has said to proceed. This holds even when the fix looks obvious, even when you just found a real defect, and even when you are mid-task and the change seems like a natural continuation of work already approved. **Approval is per change, not a standing permit**; finishing an approved edit does not authorize the next one.
+
+  When you find something wrong, the response is a report, not a patch:
+
+    1. State what is wrong and what it breaks, with the evidence you actually gathered.
+    2. Give the options, including doing nothing, and say which you would choose and why.
+    3. Stop. Wait.
+
+  **The failure this prevents is not a wasted edit — it is losing the user's decision.** Fixing something before it is discussed means the user never gets to weigh in on their own system, and reviewing a diff after the fact is a far worse position to reason from than deciding beforehand. It also buries what was found: a defect described in prose invites a decision, while the same defect silently patched invites nothing.
+
+  Two things this is *not*. Running the build, the tests, or read-only queries to check a hypothesis is investigation and needs no approval — it changes nothing. And once the user approves a piece of work, carrying it out completely is expected; do not stop mid-edit to re-ask about steps that plainly belong to what was agreed.
+
 ## Overview
 
 `ieuri` is a Spring Boot 4 application written in Kotlin, exposing a GraphQL API via Netflix DGS backed by PostgreSQL through Spring Data JPA (with QueryDSL for reads), and Spring Security on the request path. Two bounded contexts are implemented today — `auth` (members, tokens, RBAC) and `tourism` (spots, details, reactions, festival sync) — plus a Spring Batch job that syncs TourAPI data.
