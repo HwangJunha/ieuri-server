@@ -168,3 +168,13 @@ class ShareLinkNotFoundException(message: String = "더 이상 볼 수 없는 �
 /** 차단 관계라 공유 지도를 볼 수 없다(SPEC-0030 R16, POL-041의 양방향 차단). */
 class ShareLinkBlockedException(message: String = "볼 수 없는 지도입니다.") :
     SpotQueryException("SHARE_LINK_BLOCKED", Classification.FAILED_PRECONDITION, message)
+
+/**
+ * 자기 자신과 관계를 맺으려 했다(SPEC-0030 확장).
+ *
+ * 자기 링크를 자기가 여는 것은 정상이지만(자기 지도를 보는 것), 거기서 등록까지 하면
+ * 목록에 자기가 나타난다. DB CHECK가 최후 방어선이지만 서비스가 먼저 막아 의미 있는
+ * 오류를 준다.
+ */
+class CannotRelateSelfException(message: String = "자기 자신과는 관계를 맺을 수 없습니다.") :
+    SpotQueryException("CANNOT_RELATE_SELF", Classification.BAD_REQUEST, message)

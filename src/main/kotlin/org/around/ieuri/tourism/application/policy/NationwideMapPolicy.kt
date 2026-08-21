@@ -11,8 +11,10 @@ package org.around.ieuri.tourism.application.policy
  *   `ieuri://`는 눌리지 않는다(실측). 앱은 이 경로를 App Link/Universal Link로 가로채고,
  *   웹 페이지가 생기면 같은 경로가 미설치자를 받는다. 조립을 서버가 하므로 도메인이나
  *   경로가 바뀌어도 앱 배포가 필요 없다.
+ * @param maxRelationPageSize 관계 목록의 first 상한(= 50). 초과는 클램프다(POL-018).
  */
 data class NationwideMapPolicy(
     val maxCellSpotPageSize: Int,
     val shareUrlBase: String,
+    val maxRelationPageSize: Int,
 )

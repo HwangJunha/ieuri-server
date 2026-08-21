@@ -9,7 +9,9 @@ import org.around.ieuri.common.graphql.generated.types.SpotCategory as GqlSpotCa
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.tourism.application.command.RecordVisitsCommand
 import org.around.ieuri.tourism.application.command.RemoveVisitCommand
+import org.around.ieuri.common.graphql.generated.types.MapRelation as GqlMapRelation
 import org.around.ieuri.tourism.application.query.CellSpotView
+import org.around.ieuri.tourism.application.query.MapRelationView
 import org.around.ieuri.tourism.domain.vo.Coordinates
 
 /**
@@ -62,3 +64,13 @@ fun CursorPage<*>.toGqlPageInfo(): GqlPageInfo = GqlPageInfo(
  * `Coordinates!`가 non-null이라 응답 전체가 무너진다(실측으로 겪었다).
  */
 fun Coordinates.toGql(): GqlCoordinates = GqlCoordinates(lat = latitude, lng = longitude)
+
+/** 관계 1건 → 응답 타입. */
+fun MapRelationView.toGql(): GqlMapRelation = GqlMapRelation(
+    memberId = memberId,
+    nickname = nickname,
+    overlappingCount = overlappingCount,
+    overlappingCellIds = overlappingCellIds,
+    theirVisitedCount = theirVisitedCount,
+    createdAt = createdAt.toString(),
+)

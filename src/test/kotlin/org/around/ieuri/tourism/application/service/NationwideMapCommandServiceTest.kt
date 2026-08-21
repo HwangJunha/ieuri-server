@@ -46,6 +46,7 @@ class NationwideMapCommandServiceTest {
         policy = NationwideMapPolicy(
             maxCellSpotPageSize = 50,
             shareUrlBase = "https://www.ieuri.co.kr/tour/korea-map",
+            maxRelationPageSize = 50,
         ),
     )
 

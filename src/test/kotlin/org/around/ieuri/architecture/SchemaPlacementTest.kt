@@ -47,7 +47,7 @@ class SchemaPlacementTest {
             // 전국 지도(SPEC-0030). map_cell은 JPA 엔티티가 없다 — geography를 읽는 질의와 함께
             // 생 SQL 어댑터에서만 다룬다.
             "member_district_visit", "map_share_link", "map_cell_image",
-            "area", "map_cell", "map_cell_district",
+            "area", "map_cell", "map_cell_district", "map_relation",
         ).forEach { put(it, "tour") }
 
         listOf("category", "category_translation", "category_external_mapping", "app_category")
@@ -77,8 +77,8 @@ class SchemaPlacementTest {
     @Test
     fun `배치표는 애플리케이션 테이블을 빠짐없이 배정한다`() {
         // 스펙 §4의 46개 + 장소 질문/답변 4개 + 메시지 인용 1개(SPEC-0026) + 알림 3개(SPEC-0028)
-        // + 전국 지도 6개(SPEC-0030: 방문 기록·공유 링크·칸 이미지·시도·칸·칸매핑).
-        assertEquals(61, placement.size, "배치표에 등록된 애플리케이션 테이블 수")
+        // + 전국 지도 7개(SPEC-0030: 방문 기록·공유 링크·칸 이미지·시도·칸·칸매핑·관계).
+        assertEquals(62, placement.size, "배치표에 등록된 애플리케이션 테이블 수")
         assertEquals(
             setOf("auth", "community", "tour", "category", "alarm"),
             placement.values.toSet(),

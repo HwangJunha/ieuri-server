@@ -4,6 +4,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import org.around.ieuri.tourism.application.port.out.persistence.DistrictVisitStorePort
+import org.around.ieuri.tourism.application.port.out.persistence.MapRelationPort
 import org.around.ieuri.tourism.application.port.out.persistence.MapShareLinkPort
 import org.around.ieuri.tourism.application.port.out.persistence.SpotReactionPort
 import kotlin.test.Test
@@ -16,7 +17,8 @@ class MemberReactionEraseServiceTest {
     private val reactionPort = mockk<SpotReactionPort>(relaxed = true)
     private val visitPort = mockk<DistrictVisitStorePort>(relaxed = true)
     private val shareLinkPort = mockk<MapShareLinkPort>(relaxed = true)
-    private val service = MemberReactionEraseService(reactionPort, visitPort, shareLinkPort)
+    private val relationPort = mockk<MapRelationPort>(relaxed = true)
+    private val service = MemberReactionEraseService(reactionPort, visitPort, shareLinkPort, relationPort)
 
     @Test
     fun `회원의 좋아요 기록을 지운다`() {
@@ -52,6 +54,8 @@ class MemberReactionEraseServiceTest {
         verify { visitPort.removeAll(memberId) }
         // 링크가 남으면 탈퇴한 회원의 지도를 계속 열 수 있다.
         verify { shareLinkPort.deleteAll(memberId) }
+        // 관계는 양방향이라 상대 목록의 이 회원까지 지운다 — 남으면 닉네임 없는 행이 된다.
+        verify { relationPort.deleteAllInvolving(memberId) }
     }
 
     @Test

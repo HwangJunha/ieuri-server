@@ -63,6 +63,20 @@ class NationwideMapService(
     }
 
     @Transactional(readOnly = true)
+    override fun mapCellsByIds(
+        cellIds: Collection<Long>,
+        locale: DomainLocale,
+        memberId: Long?,
+    ): List<MapCellView> {
+        if (cellIds.isEmpty()) return emptyList()
+
+        val cells = MapCellGrouping.fold(mapCellQueryPort.findCellDistrictsIn(cellIds))
+        val visited = visitedDistrictCodes(memberId)
+        val byId = cells.associateBy { it.id }
+        return cellIds.mapNotNull { byId[it] }.map { it.toView(locale, visited) }
+    }
+
+    @Transactional(readOnly = true)
     override fun allCellImages(): Map<Long, CellImageView> =
         cellImageQueryPort.findAllRepresentativeImages()
 

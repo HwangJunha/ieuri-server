@@ -2,6 +2,7 @@ package org.around.ieuri.tourism.domain
 
 import org.around.ieuri.tourism.domain.vo.DistanceCursor
 import org.around.ieuri.tourism.domain.vo.LikeCountCursor
+import org.around.ieuri.tourism.domain.vo.RelationCursor
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -46,4 +47,19 @@ class SearchCursorsTest {
 
 
 
+
+    @Test
+    fun `관계 커서는 왕복해도 같다`() {
+        val original = RelationCursor(
+            createdAt = java.time.Instant.parse("2026-08-20T01:02:03Z"),
+            counterpartId = 42L,
+        )
+        assertEquals(original, RelationCursor.decode(original.encode()))
+    }
+
+    @Test
+    fun `관계 커서는 다른 종류를 거부한다`() {
+        val like = LikeCountCursor(likeCount = 1L, spotId = 1L).encode()
+        assertFailsWith<IllegalArgumentException> { RelationCursor.decode(like) }
+    }
 }

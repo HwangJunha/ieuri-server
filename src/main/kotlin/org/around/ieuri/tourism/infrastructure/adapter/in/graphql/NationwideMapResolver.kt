@@ -11,12 +11,12 @@ import org.around.ieuri.common.graphql.generated.types.CellSpotConnection as Gql
 import org.around.ieuri.common.graphql.generated.types.CellSpotEdge as GqlCellSpotEdge
 import org.around.ieuri.common.graphql.generated.types.Coordinates as GqlCoordinates
 import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
-import org.around.ieuri.common.graphql.generated.types.SharedMap as GqlSharedMap
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.tourism.application.policy.NationwideMapPolicy
 import org.around.ieuri.tourism.application.port.`in`.query.NationwideMapUseCase
 import org.around.ieuri.tourism.application.query.CellSpotsQuery
 import org.around.ieuri.tourism.application.query.MapCellView
+import org.around.ieuri.tourism.application.query.SharedMapView
 import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toGql
 import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toGqlPageInfo
 import org.around.ieuri.tourism.infrastructure.locale.domainLocale
@@ -55,17 +55,30 @@ class NationwideMapResolver(
             memberId = currentMemberProvider.currentMemberId(),
         )
 
+    /**
+     * 생성 타입이 아니라 읽기 DTO를 돌려준다 — `overlappingCells`가 지연 필드이기 때문이다.
+     * 생성 타입은 그 필드까지 생성자에서 요구해서 비워 둘 수 없다.
+     */
     @DgsQuery
-    fun sharedMap(@InputArgument token: String): GqlSharedMap {
-        val view = nationwideMapUseCase.sharedMap(
+    fun sharedMap(@InputArgument token: String): SharedMapView =
+        nationwideMapUseCase.sharedMap(
             token = token,
             viewerMemberId = currentMemberProvider.currentMemberId(),
         )
-        return GqlSharedMap(
-            ownerNickname = view.ownerNickname,
-            visitedCellIds = view.visitedCellIds,
-            overlappingCellIds = view.overlappingCellIds,
-            visitedCount = view.visitedCount,
+
+    /**
+     * 겹치는 칸의 이름까지 필요한 화면을 위한 필드. **선택했을 때만 조회한다.**
+     *
+     * 비인증이면 null이다 — `overlappingCellIds`와 같은 규약이라, 빈 배열(겹침 없음)과
+     * 구분된다.
+     */
+    @DgsData(parentType = "SharedMap", field = "overlappingCells")
+    fun overlappingCells(dfe: DgsDataFetchingEnvironment): List<MapCellView>? {
+        val ids = dfe.getSource<SharedMapView>()?.overlappingCellIds ?: return null
+        return nationwideMapUseCase.mapCellsByIds(
+            cellIds = ids,
+            locale = dfe.domainLocale(),
+            memberId = currentMemberProvider.currentMemberId(),
         )
     }
 

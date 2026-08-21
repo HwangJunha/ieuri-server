@@ -30,6 +30,23 @@ extend type Query {
         token: String!
     ): SharedMap!
 
+    """
+    내 관계 목록. 공유 링크로 맺은 상대들이며, 각자와 겹친 칸을 함께 준다.
+
+    **겹침은 조회 시점에 재계산된 값이다** — 서로 여행을 더 다니면 다음 조회에서 늘어난다.
+
+    정렬은 관계를 맺은 시각 내림차순으로 고정이다. 겹침 수로 정렬하지 않는 이유는 그 값이
+    조회마다 바뀌어 커서가 불안정해지기 때문이다 — 겹침 순으로 보려면 받은 페이지 안에서
+    클라이언트가 정렬한다.
+
+    인증 필수(UNAUTHENTICATED).
+    """
+    mapRelations(
+        "기본 20, 상한 50. 상한을 넘는 값은 오류가 아니라 상한으로 잘린다."
+        first: Int = 20
+        "이전 페이지의 endCursor. 형식이 어긋나면 INVALID_CURSOR."
+        after: String
+    ): MapRelationConnection!
 }
 
 extend type Mutation {
@@ -64,6 +81,27 @@ extend type Mutation {
     인증 필수(UNAUTHENTICATED).
     """
     revokeMapShareLink(input: RevokeMapShareLinkInput!): RevokeMapShareLinkPayload!
+
+    """
+    공유 링크로 관계를 맺는다. **양쪽 목록에 서로 추가된다.**
+
+    등록하는 쪽이 자기 기록을 자기 의사로 내놓는 것이라 링크 주인의 허락이 필요 없다.
+    이미 맺어진 상대면 오류가 아니라 그대로 성공한다(멱등).
+
+    인증 필수(UNAUTHENTICATED).
+    오류: SHARE_LINK_NOT_FOUND · SHARE_LINK_BLOCKED · CANNOT_RELATE_SELF.
+    """
+    createMapRelation(input: CreateMapRelationInput!): CreateMapRelationPayload!
+
+    """
+    관계를 **내 목록에서만** 지운다. 상대 목록의 나는 남는다 —
+    내 화면에서 누굴 안 볼지는 내가 정하고, 상대 화면은 건드리지 않는다.
+
+    없는 관계의 삭제는 오류가 아니다.
+
+    인증 필수(UNAUTHENTICATED).
+    """
+    removeMapRelation(input: RemoveMapRelationInput!): RemoveMapRelationPayload!
 }
 
 """
@@ -256,6 +294,67 @@ type SharedMap {
     """
     overlappingCellIds: [ID!]
 
+    """
+    겹치는 칸의 이름까지 담은 목록. "강원·부산이 겹쳐요"처럼 쓸 때 고른다.
+
+    **비인증이면 null이다**(overlappingCellIds와 같은 규약). 고르지 않으면 칸을 조회하지
+    않으므로, id만 필요하면 overlappingCellIds를 쓴다.
+    """
+    overlappingCells: [MapCell!]
+
     "지도 주인이 방문한 칸 수. 클라이언트가 목록 길이를 세지 않아도 되게 함께 준다."
     visitedCount: Int!
+}
+
+"관계 목록의 커서 연결. 관계를 맺은 시각 내림차순이다."
+type MapRelationConnection {
+    edges: [MapRelationEdge!]!
+    pageInfo: PageInfo!
+}
+
+type MapRelationEdge {
+    node: MapRelation!
+    cursor: String!
+}
+
+"공유 링크로 맺은 상대 1명."
+type MapRelation {
+    "상대 회원 id."
+    memberId: ID!
+    "상대 닉네임. 이메일 등 다른 개인정보는 제공하지 않는다."
+    nickname: String!
+    "겹친 칸 수. **조회 시점 재계산값이다.**"
+    overlappingCount: Int!
+    """
+    겹친 칸 id 목록. 지도에 표시할 때 쓴다.
+
+    이름은 오지 않는다 — 이 조회는 인증이 필요하므로 클라이언트가 mapCells를 이미 갖고 있다.
+    """
+    overlappingCellIds: [ID!]!
+    "상대가 방문한 전체 칸 수. 겹침 비율을 보여줄 때 쓴다."
+    theirVisitedCount: Int!
+    "관계를 맺은 시각. ISO-8601."
+    createdAt: String!
+}
+
+input CreateMapRelationInput {
+    "공유받은 링크. 발급된 shareUrl을 그대로 넣는다 — 토큰 추출은 서버가 한다."
+    shareUrl: String!
+}
+
+type CreateMapRelationPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
+    "맺어진 상대의 회원 id. 실패하면 null이다."
+    counterpartMemberId: ID
+}
+
+input RemoveMapRelationInput {
+    "목록에서 지울 상대의 회원 id."
+    memberId: ID!
+}
+
+type RemoveMapRelationPayload implements BaseResponse {
+    success: Boolean!
+    userErrors: [UserError!]!
 }

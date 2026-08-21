@@ -3,7 +3,9 @@ package org.around.ieuri.tourism.infrastructure.mapper
 import org.around.ieuri.common.graphql.generated.types.RecordVisitsInput
 import org.around.ieuri.common.graphql.generated.types.RemoveVisitInput
 import org.around.ieuri.tourism.application.query.CellSpotView
+import org.around.ieuri.tourism.application.query.MapRelationView
 import org.around.ieuri.tourism.domain.vo.Coordinates
+import java.time.Instant
 import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toCommand
 import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toGql
 import kotlin.test.Test
@@ -70,5 +72,39 @@ class NationwideMapGqlMapperTest {
 
         assertEquals(37.5665, gql.lat)
         assertEquals(126.9780, gql.lng)
+    }
+
+    @Test
+    fun `관계 1건은 필드마다 다른 값으로 옮겨진다`() {
+        val gql = MapRelationView(
+            memberId = 11L,
+            nickname = "여울",
+            overlappingCount = 3,
+            overlappingCellIds = listOf(21L, 22L, 23L),
+            theirVisitedCount = 9,
+            createdAt = Instant.parse("2026-08-20T01:02:03Z"),
+        ).toGql()
+
+        assertEquals(11L, gql.memberId)
+        assertEquals("여울", gql.nickname)
+        assertEquals(3, gql.overlappingCount)
+        assertEquals(listOf(21L, 22L, 23L), gql.overlappingCellIds)
+        assertEquals(9, gql.theirVisitedCount)
+        assertEquals("2026-08-20T01:02:03Z", gql.createdAt)
+    }
+
+    @Test
+    fun `겹치는 칸이 없으면 빈 목록으로 나간다`() {
+        val gql = MapRelationView(
+            memberId = 12L,
+            nickname = "바다",
+            overlappingCount = 0,
+            overlappingCellIds = emptyList(),
+            theirVisitedCount = 0,
+            createdAt = Instant.parse("2026-08-20T00:00:00Z"),
+        ).toGql()
+
+        assertEquals(0, gql.overlappingCount)
+        assertEquals(emptyList(), gql.overlappingCellIds)
     }
 }

@@ -35,6 +35,14 @@ interface NationwideMapUseCase {
      */
     fun allCellImages(): Map<Long, CellImageView>
 
+    /**
+     * 칸 여러 개를 한 번에 읽는다. 겹친 칸의 이름을 보여줄 때 쓴다.
+     *
+     * 칸마다 [mapCell]을 부르지 않는다 — 겹침이 수십 칸이면 그만큼 질의가 나간다.
+     * 없는 id는 결과에서 빠지며 오류가 아니다. 순서는 인자 순서를 따른다.
+     */
+    fun mapCellsByIds(cellIds: Collection<Long>, locale: DomainLocale, memberId: Long?): List<MapCellView>
+
     /** 칸에 속한 장소(R11). 좋아요 수 내림차순. */
     fun cellSpots(query: CellSpotsQuery, locale: DomainLocale): CursorPage<CellSpotView>
 

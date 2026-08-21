@@ -17,4 +17,5 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 data class NationwideMapProperties(
     val maxCellSpotPageSize: Int = 50,
     val shareUrlBase: String = "https://www.ieuri.co.kr/tour/korea-map",
+    val maxRelationPageSize: Int = 50,
 )

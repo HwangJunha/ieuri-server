@@ -15,6 +15,14 @@ interface MapOwnerLookupPort {
 
     /** 없는 회원(탈퇴 등)이면 null이다 — 그 경우 링크는 열리지 않는다. */
     fun findNickname(memberId: Long): String?
+
+    /**
+     * 여러 회원의 닉네임을 **한 번에**. 관계 목록이 한 페이지에 20명을 그리므로 건별로
+     * 물으면 왕복이 20번이 된다.
+     *
+     * 없는 회원은 결과에 키가 없다 — 호출자가 그 항목을 건너뛴다.
+     */
+    fun findNicknames(memberIds: Collection<Long>): Map<Long, String>
 }
 
 /** 차단 판정(R16). **양방향이라 누가 걸었는지는 묻지 않는다**(POL-041). */

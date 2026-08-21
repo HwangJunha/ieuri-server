@@ -5,6 +5,7 @@ import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.Di
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.MapCellDistrictEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.MapCellDistrictId
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.MapCellImageEntity
+import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.MapRelationEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.MapShareLinkEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.MemberDistrictVisitEntity
 import org.springframework.data.jpa.repository.JpaRepository
@@ -78,4 +79,30 @@ interface DistrictJpaRepository : JpaRepository<DistrictEntity, String> {
 interface MapCellDistrictJpaRepository : JpaRepository<MapCellDistrictEntity, MapCellDistrictId> {
 
     fun findAllByDistrictCodeIn(districtCodes: Collection<String>): List<MapCellDistrictEntity>
+}
+
+/**
+ * 지도 관계 레포지토리(SPEC-0030 확장).
+ *
+ * **등록은 여기 없다** — 멱등성이 `ON CONFLICT DO NOTHING`에서 나오고, 목록 조회는 겹침
+ * 재계산이 붙은 집계라 둘 다 생 SQL 어댑터가 담당한다. 삭제만 파생 쿼리다.
+ */
+interface MapRelationJpaRepository : JpaRepository<MapRelationEntity, Long> {
+
+    /**
+     * 내 목록에서만 지운다. 상대 행은 남는다.
+     *
+     * 파생 삭제라 행마다 DELETE가 나간다(한 문장 벌크가 아니다) — 한 건씩 지우는 경로라
+     * 문제가 되지 않는다.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    fun deleteByOwnerIdAndCounterpartId(ownerId: Long, counterpartId: Long): Int
+
+    /**
+     * 탈퇴 정리 — 양쪽 방향을 모두 지운다.
+     *
+     * 위와 같이 행마다 DELETE가 나간다. 관계 수가 회원당 수백 수준이라 그대로 둔다.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    fun deleteByOwnerIdOrCounterpartId(ownerId: Long, counterpartId: Long): Int
 }

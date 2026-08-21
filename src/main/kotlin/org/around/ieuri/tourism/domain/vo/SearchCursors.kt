@@ -64,3 +64,22 @@ private fun decodeCursor(prefix: String, cursor: String, label: String): Pair<St
     } catch (e: RuntimeException) {
         throw IllegalArgumentException("유효하지 않은 커서입니다.", e)
     }
+
+/**
+ * 관계 목록 커서(SPEC-0030 확장). 등록 시각 내림차순이므로 다음 페이지는 이 값보다 **이전**이다.
+ *
+ * **겹침 수를 정렬 키로 쓸 수 없다** — 조회할 때마다 재계산되는 값이라 페이지를 넘기는 사이
+ * 순위가 바뀌면 항목이 중복되거나 누락된다. 그래서 불변인 등록 시각을 쓴다.
+ */
+data class RelationCursor(val createdAt: java.time.Instant, val counterpartId: Long) {
+    fun encode(): String = encodeCursor(PREFIX, createdAt.toString(), counterpartId)
+
+    companion object {
+        private const val PREFIX = "r"
+
+        fun decode(cursor: String): RelationCursor {
+            val (key, id) = decodeCursor(PREFIX, cursor, "관계 목록")
+            return RelationCursor(createdAt = java.time.Instant.parse(key), counterpartId = id)
+        }
+    }
+}
