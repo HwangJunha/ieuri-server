@@ -37,17 +37,6 @@ data class CellImageView(
     val attributionText: String,
 )
 
-/**
- * 좌표 판정 결과(R1·R2).
- *
- * **입력 좌표 개수와 [districtCodes]의 길이는 다를 수 있다** — 중복이 제거되고, 어느 시군구에도
- * 속하지 않은 좌표는 빠지기 때문이다. 빠진 개수가 [unresolvedCount]다.
- */
-data class ResolveDistrictsResult(
-    val districtCodes: List<String>,
-    val cellIds: List<Long>,
-    val unresolvedCount: Int,
-)
 
 /** 칸에 속한 장소 목록 조회 입력(R11). */
 data class CellSpotsQuery(

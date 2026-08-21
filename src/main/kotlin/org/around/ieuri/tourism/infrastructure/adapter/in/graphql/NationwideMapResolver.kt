@@ -9,17 +9,13 @@ import org.around.ieuri.common.graphql.generated.types.CellImage as GqlCellImage
 import org.around.ieuri.common.graphql.generated.types.CellImageKind as GqlCellImageKind
 import org.around.ieuri.common.graphql.generated.types.CellSpotConnection as GqlCellSpotConnection
 import org.around.ieuri.common.graphql.generated.types.CellSpotEdge as GqlCellSpotEdge
-import org.around.ieuri.common.graphql.generated.types.CoordinatesInput as GqlCoordinatesInput
 import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
-import org.around.ieuri.common.graphql.generated.types.ResolveDistrictsResult as GqlResolveDistrictsResult
 import org.around.ieuri.common.graphql.generated.types.SharedMap as GqlSharedMap
 import org.around.ieuri.common.security.CurrentMemberProvider
-import org.around.ieuri.tourism.application.exception.InvalidCoordinatesException
 import org.around.ieuri.tourism.application.policy.NationwideMapPolicy
 import org.around.ieuri.tourism.application.port.`in`.query.NationwideMapUseCase
 import org.around.ieuri.tourism.application.query.CellSpotsQuery
 import org.around.ieuri.tourism.application.query.MapCellView
-import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toGql
 import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toGqlPageInfo
 import org.around.ieuri.tourism.infrastructure.locale.domainLocale
@@ -34,7 +30,7 @@ import org.around.ieuri.tourism.infrastructure.locale.domainLocale
  * 생성 타입이 아니라 [MapCellView]를 돌려주는 이유도 같다: 생성 타입은 non-null 필드를 생성자
  * 필수 인자로 요구해서 지연 필드를 비워 둘 수 없다.
  *
- * `mapCells`·`mapCell`·`sharedMap`·`resolveDistricts` 중 앞 셋은 비인증을 허용한다.
+ * `mapCells`·`mapCell`·`sharedMap` 셋 다 비인증을 허용한다 — 지도 자체는 로그인 없이 보인다.
  */
 @DgsComponent
 class NationwideMapResolver(
@@ -58,27 +54,6 @@ class NationwideMapResolver(
             locale = dfe.domainLocale(),
             memberId = currentMemberProvider.currentMemberId(),
         )
-
-    /**
-     * 좌표 판정(R1). **인증 필수다** — 판정 자체가 사진첩·현재위치에서 나온 개인의 이동 흔적을
-     * 서버에 보내는 행위라, 익명에게 열어 둘 이유가 없다.
-     */
-    @DgsQuery
-    fun resolveDistricts(
-        @InputArgument coordinates: List<GqlCoordinatesInput>,
-    ): GqlResolveDistrictsResult {
-        currentMemberProvider.requireMemberId()
-
-        // 상한을 서비스에 넘기기 전에 좌표를 도메인 VO로 만든다 — 범위 위반이 여기서 걸린다.
-        val domain = coordinates.map { it.toDomain() }
-        val result = nationwideMapUseCase.resolveDistricts(domain)
-
-        return GqlResolveDistrictsResult(
-            districtCodes = result.districtCodes,
-            cellIds = result.cellIds,
-            unresolvedCount = result.unresolvedCount,
-        )
-    }
 
     @DgsQuery
     fun sharedMap(@InputArgument token: String): GqlSharedMap {
@@ -161,8 +136,4 @@ class NationwideMapResolver(
         const val DEFAULT_CELL_SPOT_PAGE_SIZE = 20
     }
 
-    /** 좌표 범위 위반은 INVALID_COORDINATES다. **예외 메시지에 좌표를 담지 않는다**(POL-013). */
-    private fun GqlCoordinatesInput.toDomain(): Coordinates =
-        runCatching { Coordinates(latitude = lat, longitude = lng) }
-            .getOrElse { throw InvalidCoordinatesException("좌표가 올바르지 않습니다.") }
 }

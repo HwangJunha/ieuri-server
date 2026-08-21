@@ -5,9 +5,7 @@ import org.around.ieuri.tourism.application.query.CellImageView
 import org.around.ieuri.tourism.application.query.CellSpotView
 import org.around.ieuri.tourism.application.query.CellSpotsQuery
 import org.around.ieuri.tourism.application.query.MapCellView
-import org.around.ieuri.tourism.application.query.ResolveDistrictsResult
 import org.around.ieuri.tourism.application.query.SharedMapView
-import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 
 /**
@@ -40,12 +38,6 @@ interface NationwideMapUseCase {
     /** 칸에 속한 장소(R11). 좋아요 수 내림차순. */
     fun cellSpots(query: CellSpotsQuery, locale: DomainLocale): CursorPage<CellSpotView>
 
-    /**
-     * 좌표를 시군구로 판정한다(R1·R2). **좌표를 저장하지 않으며 로그에도 남기지 않는다.**
-     *
-     * 판정되지 않은 좌표는 오류가 아니라 결과에서 빠진다.
-     */
-    fun resolveDistricts(coordinates: List<Coordinates>): ResolveDistrictsResult
 
     /**
      * 공유 토큰으로 다른 회원의 지도를 본다(R13·R15·R16).

@@ -1,7 +1,6 @@
 package org.around.ieuri.tourism.application.port.out.query
 
 import org.around.ieuri.tourism.application.query.CellSpotView
-import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.LikeCountCursor
 import org.around.ieuri.tourism.domain.vo.MapCellDistrictRow
@@ -33,17 +32,6 @@ interface MapCellQueryPort {
      */
     fun findCellDistrictsIn(cellIds: Collection<Long>): List<MapCellDistrictRow>
 
-    /**
-     * 좌표가 속한 시군구 코드(R1). **한 번의 질의로 전량을 판정한다** — 좌표 500건에 대해
-     * 건별 질의를 던지면 왕복이 500번이 된다.
-     *
-     * 어느 시군구에도 속하지 않는 좌표는 결과에서 빠지므로 **입력보다 짧을 수 있다**(R2).
-     * 반환값은 중복이 제거되지 않은 원시 판정 결과이며, 축약은 서비스가 한다.
-     *
-     * **좌표 1건은 최대 1건을 낳는다.** 경계에 걸쳐 두 시군구에 걸리는 좌표도 하나로 정한다 —
-     * 호출자가 `입력 수 - 결과 수`로 판정 실패 수를 세기 때문이다.
-     */
-    fun resolveDistrictCodes(coordinates: List<Coordinates>): List<String>
 
     /**
      * 칸에 속한 장소(R11). 좋아요 수 내림차순, 같은 수는 id 오름차순이다.

@@ -152,16 +152,6 @@ class InvalidCursorException(message: String = "유효하지 않은 커서입니
 class InvalidLimitException(message: String = "요청 개수가 올바르지 않습니다.") :
     SpotQueryException("INVALID_LIMIT", Classification.BAD_REQUEST, message)
 
-/**
- * 좌표 판정 요청의 좌표 수가 상한 초과(SPEC-0030 R1).
- *
- * **클램프가 아니라 거절이다.** 잘라서 판정하면 클라이언트는 보낸 좌표가 전부 처리된 줄 알고
- * 나머지를 다시 보내지 않는다 — 판정에서 빠진 지역이 조용히 미방문으로 남는다. 개수는 계약에
- * 명시되어 있으므로(POL-018) 나눠 보내는 것이 클라이언트의 몫이다.
- */
-class TooManyCoordinatesException(message: String = "한 번에 판정할 수 있는 좌표 수를 초과했습니다.") :
-    SpotQueryException("TOO_MANY_COORDINATES", Classification.BAD_REQUEST, message)
-
 /** 칸 코드가 존재하지 않는다(SPEC-0030 R7). 시군구 코드를 넣은 경우도 여기로 온다. */
 class MapCellNotFoundException(message: String = "해당 지역을 찾을 수 없습니다.") :
     SpotQueryException("MAP_CELL_NOT_FOUND", Classification.NOT_FOUND, message)

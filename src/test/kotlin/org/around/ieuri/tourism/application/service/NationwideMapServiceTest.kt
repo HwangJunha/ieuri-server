@@ -6,7 +6,6 @@ import io.mockk.verify
 import org.around.ieuri.tourism.application.exception.MapCellNotFoundException
 import org.around.ieuri.tourism.application.exception.ShareLinkBlockedException
 import org.around.ieuri.tourism.application.exception.ShareLinkNotFoundException
-import org.around.ieuri.tourism.application.exception.TooManyCoordinatesException
 import org.around.ieuri.tourism.application.policy.NationwideMapPolicy
 import org.around.ieuri.tourism.application.port.out.client.MapOwnerLookupPort
 import org.around.ieuri.tourism.application.port.out.client.MapViewerBlockPort
@@ -31,7 +30,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/** 전국 지도 조회(SPEC-0030 R1·R2·R6·R8·R11·R13·R15·R16). */
+/** 전국 지도 조회(SPEC-0030 R6·R8·R11·R13·R15·R16). */
 class NationwideMapServiceTest {
 
     private val mapCellQueryPort = mockk<MapCellQueryPort>()
@@ -51,7 +50,6 @@ class NationwideMapServiceTest {
         mapOwnerLookupPort = mapOwnerLookupPort,
         mapViewerBlockPort = mapViewerBlockPort,
         policy = NationwideMapPolicy(
-            maxResolveCoordinates = 500,
             maxCellSpotPageSize = 50,
         ),
     )
@@ -100,58 +98,6 @@ class NationwideMapServiceTest {
         every { mapCellQueryPort.findCellDistricts(999L) } returns emptyList()
 
         assertFailsWith<MapCellNotFoundException> { service.mapCell(999L, DomainLocale.KO, null) }
-    }
-
-    // ── 좌표 판정 ──────────────────────────────────────────────────────
-
-    @Test
-    fun `판정되지 않은 좌표는 오류가 아니라 결과에서 빠지고 개수로 센다`() {
-        // 국내 3건 + 바다·해외 2건. 판정은 3건만 돌아온다.
-        val coordinates = listOf(
-            Coordinates(37.5665, 126.9780), Coordinates(38.0, 130.0),
-            Coordinates(37.3040, 127.0104), Coordinates(35.6895, 139.6917),
-            Coordinates(35.1796, 129.0756),
-        )
-        every { mapCellQueryPort.resolveDistrictCodes(coordinates) } returns listOf("11140", "41111", "26110")
-        every { mapCellDistrictQueryPort.findCellIdsByDistrictCodes(any()) } returns listOf(1L, 2L, 3L)
-
-        val result = service.resolveDistricts(coordinates)
-
-        assertEquals(listOf("11140", "26110", "41111"), result.districtCodes)
-        assertEquals(2, result.unresolvedCount)
-    }
-
-    @Test
-    fun `같은 시군구의 좌표 여러 건은 코드 1건으로 줄어든다`() {
-        val coordinates = List(4) { Coordinates(37.5665, 126.9780) }
-        every { mapCellQueryPort.resolveDistrictCodes(coordinates) } returns List(4) { "11140" }
-        every { mapCellDistrictQueryPort.findCellIdsByDistrictCodes(any()) } returns listOf(1L)
-
-        val result = service.resolveDistricts(coordinates)
-
-        assertEquals(listOf("11140"), result.districtCodes)
-        assertEquals(0, result.unresolvedCount)
-    }
-
-    @Test
-    fun `상한을 넘는 좌표는 잘리지 않고 거절된다`() {
-        val tooMany = List(501) { Coordinates(37.5, 127.0) }
-
-        assertFailsWith<TooManyCoordinatesException> { service.resolveDistricts(tooMany) }
-        verify(exactly = 0) { mapCellQueryPort.resolveDistrictCodes(any()) }
-    }
-
-    @Test
-    fun `좌표가 없으면 빈 결과이고 오류가 아니다`() {
-        // 빈 입력을 걸러 내는 일은 어댑터가 한다(빈 배열이 SQL에 들어가지 않게).
-        every { mapCellQueryPort.resolveDistrictCodes(emptyList()) } returns emptyList()
-        every { mapCellDistrictQueryPort.findCellIdsByDistrictCodes(emptyList()) } returns emptyList()
-
-        val result = service.resolveDistricts(emptyList())
-
-        assertEquals(emptyList(), result.districtCodes)
-        assertEquals(emptyList(), result.cellIds)
-        assertEquals(0, result.unresolvedCount)
     }
 
     // ── 칸 상세 spot ───────────────────────────────────────────────────

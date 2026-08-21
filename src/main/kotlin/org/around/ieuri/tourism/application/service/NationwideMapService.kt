@@ -6,7 +6,6 @@ import org.around.ieuri.tourism.application.exception.InvalidCursorException
 import org.around.ieuri.tourism.application.exception.MapCellNotFoundException
 import org.around.ieuri.tourism.application.exception.ShareLinkBlockedException
 import org.around.ieuri.tourism.application.exception.ShareLinkNotFoundException
-import org.around.ieuri.tourism.application.exception.TooManyCoordinatesException
 import org.around.ieuri.tourism.application.policy.NationwideMapPolicy
 import org.around.ieuri.tourism.application.port.`in`.query.NationwideMapUseCase
 import org.around.ieuri.tourism.application.port.out.client.MapOwnerLookupPort
@@ -20,10 +19,8 @@ import org.around.ieuri.tourism.application.query.CellImageView
 import org.around.ieuri.tourism.application.query.CellSpotView
 import org.around.ieuri.tourism.application.query.CellSpotsQuery
 import org.around.ieuri.tourism.application.query.MapCellView
-import org.around.ieuri.tourism.application.query.ResolveDistrictsResult
 import org.around.ieuri.tourism.application.query.SharedMapView
 import org.around.ieuri.tourism.application.query.toView
-import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.LikeCountCursor
 import org.around.ieuri.tourism.domain.vo.MapCellGrouping
@@ -33,9 +30,9 @@ import org.springframework.transaction.annotation.Transactional
 /**
  * 전국 지도 조회 유스케이스 구현(SPEC-0030, CQRS 읽기).
  *
- * **좌표는 이 서비스를 통과할 뿐 어디에도 남지 않는다**(R1, POL-045). 판정 입력으로만 쓰고
- * 결과(시군구 코드)만 밖으로 나간다. 로그에 좌표를 찍지 않으며, `Coordinates.toString()`이
- * 마스킹되어 있어 실수로 문자열에 섞여도 새지 않는다(POL-013).
+ * **좌표를 아예 받지 않는다**(POL-045). 좌표→시군구 판정은 클라이언트가 로컬 경계 데이터로
+ * 하고, 서버는 그 결과(시군구 코드)만 받는다 — 저장하지 않겠다는 약속이 아니라 구조로
+ * 보장되는 형태다.
  */
 @Service
 class NationwideMapService(
@@ -89,29 +86,6 @@ class NationwideMapService(
         return keysetPageOf(rows = rows, first = first, after = query.after) {
             LikeCountCursor(it.likeCount, it.id).encode()
         }
-    }
-
-    @Transactional(readOnly = true)
-    override fun resolveDistricts(coordinates: List<Coordinates>): ResolveDistrictsResult {
-        if (coordinates.size > policy.maxResolveCoordinates) {
-            // 개수만 말한다 — 좌표 자체는 메시지에도 담지 않는다(POL-013).
-            throw TooManyCoordinatesException(
-                "한 번에 판정할 수 있는 좌표는 최대 ${policy.maxResolveCoordinates}건입니다.",
-            )
-        }
-        val resolved = mapCellQueryPort.resolveDistrictCodes(coordinates)
-
-        // 판정 실패는 결과에서 빠질 뿐 오류가 아니다(R2). 포트가 좌표당 최대 1건을 보장하므로
-        // (경계에 걸친 좌표도 한 시군구로 정한다) 뺄셈이 음수가 되지 않는다.
-        val unresolvedCount = (coordinates.size - resolved.size).coerceAtLeast(0)
-        val districtCodes = resolved.distinct().sorted()
-        val cellIds = mapCellDistrictQueryPort.findCellIdsByDistrictCodes(districtCodes)
-
-        return ResolveDistrictsResult(
-            districtCodes = districtCodes,
-            cellIds = cellIds,
-            unresolvedCount = unresolvedCount,
-        )
     }
 
     @Transactional(readOnly = true)

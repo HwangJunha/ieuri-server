@@ -86,7 +86,6 @@ class TourismConfig {
     @Bean
     fun nationwideMapPolicy(properties: NationwideMapProperties): NationwideMapPolicy =
         NationwideMapPolicy(
-            maxResolveCoordinates = properties.maxResolveCoordinates,
             maxCellSpotPageSize = properties.maxCellSpotPageSize,
         )
 

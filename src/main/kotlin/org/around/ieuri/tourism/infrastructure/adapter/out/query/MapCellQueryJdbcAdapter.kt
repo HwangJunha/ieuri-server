@@ -19,8 +19,6 @@ import java.sql.ResultSet
  * `district.boundary`·`center`가 `geography`라 JPA에 매핑되어 있지 않고, 그래서 이 테이블을
  * 읽는 질의는 생 SQL로 남는다([RegionMetricQueryAdapter]와 같은 선례).
  *
- * **`ST_MakePoint`는 (경도, 위도) 순서다.** 뒤집으면 전 국토가 남극 근처로 간다.
- *
  * **컬럼을 캐스팅하지 않는다.** `boundary`가 geography GiST 인덱스라 리터럴 쪽을 geography로
  * 맞춰야 인덱스를 탄다 — 반대로 컬럼을 `::geometry`로 바꾸면 인덱스가 죽는다(실측 선례).
  * `ST_X`/`ST_Y`는 geography를 받지 않아 `::geometry`가 불가피하지만 SELECT 목록이라 무해하다.
@@ -52,37 +50,6 @@ class MapCellQueryJdbcAdapter(
             "$CELL_DISTRICT_SELECT WHERE mc.id = ANY(?::bigint[]) ORDER BY mc.id, d.code",
             { rs, _ -> rs.toCellDistrictRow() },
             cellIds.toTypedArray(),
-        )
-    }
-
-    /**
-     * 좌표 배열을 한 번에 판정한다(R1). 건별 질의를 던지면 좌표 500건이 왕복 500번이 된다.
-     *
-     * `unnest`로 좌표 두 배열을 나란히 펼쳐 한 문장에서 조인한다. **`DISTINCT ON (ord)`가
-     * 좌표 1건당 결과 1건을 보장한다** — 경계에 걸쳐 두 시군구에 걸리는 좌표가 두 줄이 되면
-     * 호출자의 판정 실패 개수 계산(`입력 수 - 결과 수`)이 음수로 무너진다.
-     *
-     * **좌표는 바인딩 파라미터로만 들어가고 어디에도 남지 않는다**(POL-045). 로그도 남기지 않는다.
-     */
-    @Transactional(readOnly = true)
-    override fun resolveDistrictCodes(coordinates: List<Coordinates>): List<String> {
-        if (coordinates.isEmpty()) return emptyList()
-
-        val longitudes = coordinates.map { it.longitude }.toTypedArray()
-        val latitudes = coordinates.map { it.latitude }.toTypedArray()
-
-        return jdbcTemplate.query(
-            """
-            SELECT DISTINCT ON (p.ord) d.code
-            FROM unnest(?::double precision[], ?::double precision[])
-                 WITH ORDINALITY AS p(lng, lat, ord)
-            JOIN tour.district d
-              ON ST_Intersects(d.boundary, ST_SetSRID(ST_MakePoint(p.lng, p.lat), 4326)::geography)
-            ORDER BY p.ord, d.code
-            """.trimIndent(),
-            { rs, _ -> rs.getString("code") },
-            longitudes,
-            latitudes,
         )
     }
 

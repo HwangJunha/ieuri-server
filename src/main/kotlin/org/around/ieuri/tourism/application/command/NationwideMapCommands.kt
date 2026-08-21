@@ -5,8 +5,8 @@ import org.around.ieuri.tourism.application.query.MapCellView
 /**
  * 방문 등록 입력(SPEC-0030 R3).
  *
- * **칸 코드가 아니라 시군구 코드다** — `resolveDistricts`가 반환한 값을 그대로 넣는다.
- * 칸으로 받으면 광역시 칸 하나가 25개 시군구 전체를 방문 처리해 버린다.
+ * **칸 id가 아니라 시군구 코드다** — 클라이언트가 로컬 경계 데이터로 판정한 결과를 그대로
+ * 넣는다. 칸으로 받으면 광역시 칸 하나가 25개 시군구 전체를 방문 처리해 버린다.
  */
 data class RecordVisitsCommand(
     val memberId: Long,
