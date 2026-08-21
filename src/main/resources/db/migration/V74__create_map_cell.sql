@@ -66,18 +66,16 @@ CREATE INDEX idx_district_area_cd ON tour.district (area_cd);
 -- 한다. KO는 공백 앞, EN은 쉼표 뒤('Jangan-gu, Suwon-si')를 자르면 되지만 **JA/ZH는
 -- 구분자가 없다** — '水原市長安区'는 한 덩어리다.
 -- ---------------------------------------------------------------------------
+-- **상위 시도를 컬럼으로 두지 않는다.** 칸에 속한 시군구가 전부 같은 시도이므로
+-- (실측: 시도가 섞인 칸 0개) `map_cell_district → district.area_cd`로 얻을 수 있는 파생값이다.
+-- 저장하면 두 곳이 어긋날 여지만 생긴다.
 CREATE TABLE tour.map_cell (
     id      bigint       GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
 
     name_ko varchar(128) NOT NULL,
     name_en varchar(128) NOT NULL,
     name_ja varchar(128),
-    name_zh varchar(128),
-
-    -- 상위 시도. 시도 단위로 묶어 진척을 계산할 때 쓴다(R21).
-    area_cd varchar(2)   NOT NULL,
-
-    CONSTRAINT fk_map_cell_area FOREIGN KEY (area_cd) REFERENCES tour.area (area_cd)
+    name_zh varchar(128)
 );
 
 /**
@@ -102,43 +100,47 @@ CREATE TABLE tour.map_cell_district (
 CREATE INDEX idx_map_cell_district_district ON tour.map_cell_district (district_code);
 
 -- ---------------------------------------------------------------------------
--- 4. 칸 적재와 매핑. **칸과 매핑을 한 문장에서 함께 만든다** — 대리키라 INSERT 전에는
--- id를 알 수 없으므로, `RETURNING`으로 받은 id를 그대로 매핑에 쓴다. 칸을 먼저 넣고 나중에
--- 이름으로 다시 찾아 매핑하면 동명이인(예: 고성군)에서 어긋난다.
+-- 4. 칸 적재와 매핑.
+--
+-- **칸을 만들면서 그 자리에서 매핑까지 끝낸다.** 대리키라 INSERT 전에는 id를 알 수 없는데,
+-- 넣고 나서 이름으로 되찾으면 동명이인에서 어긋난다 — 고성군이 강원·경남 둘 다 있어서
+-- `name_ko`만으로 이으면 두 칸이 서로의 시군구를 가져간다(실측). 그래서 되찾지 않고
+-- **적재 대상을 먼저 확정한 뒤 그 행에 id를 붙이는** 형태로 쓴다.
 --
 -- 세 규칙이 겹치지 않고 252개 시군구를 모두 덮는다.
 -- ---------------------------------------------------------------------------
 
 -- 4-1. 광역시·특별시·특별자치시 → 시도 전체가 1칸. 이름은 시도 이름을 쓴다.
-WITH inserted AS (
-    INSERT INTO tour.map_cell (name_ko, name_en, name_ja, name_zh, area_cd)
-    SELECT a.name_ko, a.name_en, a.name_ja, a.name_zh, a.area_cd
+WITH target AS (
+    SELECT a.area_cd, a.name_ko, a.name_en, a.name_ja, a.name_zh
     FROM tour.area a
     WHERE a.name_ko ~ '(광역시|특별시|특별자치시)$'
-    RETURNING id, area_cd
+),
+inserted AS (
+    INSERT INTO tour.map_cell (name_ko, name_en, name_ja, name_zh)
+    SELECT name_ko, name_en, name_ja, name_zh FROM target
+    RETURNING id, name_ko
 )
 INSERT INTO tour.map_cell_district (cell_id, district_code)
 SELECT i.id, d.code
 FROM inserted i
-JOIN tour.district d ON d.area_cd = i.area_cd;
+JOIN target t ON t.name_ko = i.name_ko
+JOIN tour.district d ON d.area_cd = t.area_cd;
 
--- 4-2. 구를 가진 일반시 12곳 → 시 단위 1칸.
---
--- 묶음 키는 **시 이름 + 시도**다. '고성군'처럼 다른 시도에 같은 이름이 있을 수 있어 시도를
--- 함께 봐야 한다(일반시에는 현재 그런 사례가 없지만 규칙이 그래야 한다).
+-- 4-2. 구를 가진 일반시 12곳 → 시 단위로 1칸.
 --
 -- 이름은 값으로 적는다(위 헤더 참조). ZH는 번체다 — 우리가 서비스하는 ZH 독자는 대만·홍콩이다.
-WITH city AS (
-    SELECT split_part(d.name_ko, ' ', 1) AS city_name, d.area_cd
-    FROM tour.district d
-    JOIN tour.area a ON a.area_cd = d.area_cd
-    WHERE a.name_ko !~ '(광역시|특별시|특별자치시)$'
-      AND d.name_ko LIKE '% %구'
-    GROUP BY split_part(d.name_ko, ' ', 1), d.area_cd
-),
-named AS (
+-- 일반시 12곳은 시 이름이 시도를 걸쳐 겹치지 않는다(실측).
+WITH target AS (
     SELECT c.city_name, c.area_cd, n.name_en, n.name_ja, n.name_zh
-    FROM city c
+    FROM (
+        SELECT split_part(d.name_ko, ' ', 1) AS city_name, d.area_cd
+        FROM tour.district d
+        JOIN tour.area a ON a.area_cd = d.area_cd
+        WHERE a.name_ko !~ '(광역시|특별시|특별자치시)$'
+          AND d.name_ko LIKE '% %구'
+        GROUP BY split_part(d.name_ko, ' ', 1), d.area_cd
+    ) c
     JOIN (
         VALUES
             ('수원시', 'Suwon-si',    '水原市', '水原市'),
@@ -156,35 +158,45 @@ named AS (
     ) AS n(name_ko, name_en, name_ja, name_zh) ON n.name_ko = c.city_name
 ),
 inserted AS (
-    INSERT INTO tour.map_cell (name_ko, name_en, name_ja, name_zh, area_cd)
-    SELECT city_name, name_en, name_ja, name_zh, area_cd FROM named
-    RETURNING id, name_ko, area_cd
+    INSERT INTO tour.map_cell (name_ko, name_en, name_ja, name_zh)
+    SELECT city_name, name_en, name_ja, name_zh FROM target
+    RETURNING id, name_ko
 )
 INSERT INTO tour.map_cell_district (cell_id, district_code)
 SELECT i.id, d.code
 FROM inserted i
+JOIN target t ON t.city_name = i.name_ko
 JOIN tour.district d
-  ON d.area_cd = i.area_cd
- AND split_part(d.name_ko, ' ', 1) = i.name_ko
+  ON d.area_cd = t.area_cd
+ AND split_part(d.name_ko, ' ', 1) = t.city_name
  AND d.name_ko LIKE '% %구';
 
--- 4-3. 나머지 시군 → 시군구 1개가 1칸. 이름도 자기 이름 그대로다.
+-- 4-3. 나머지 시군 → 시군구 1개가 1칸.
 --
--- 여기서는 칸과 시군구가 1:1이라 `name_ko`로 되찾아도 어긋나지 않는다 — 같은 시도 안에
--- 같은 이름의 시군구는 없다.
-WITH inserted AS (
-    INSERT INTO tour.map_cell (name_ko, name_en, name_ja, name_zh, area_cd)
-    SELECT d.name_ko, d.name_en, d.name_ja, d.name_zh, d.area_cd
-    FROM tour.district d
-    JOIN tour.area a ON a.area_cd = d.area_cd
-    WHERE a.name_ko !~ '(광역시|특별시|특별자치시)$'
-      AND d.name_ko NOT LIKE '% %구'
-    RETURNING id, name_ko, area_cd
-)
-INSERT INTO tour.map_cell_district (cell_id, district_code)
-SELECT i.id, d.code
-FROM inserted i
-JOIN tour.district d ON d.area_cd = i.area_cd AND d.name_ko = i.name_ko;
+-- **칸을 하나씩 넣으며 그 자리에서 매핑한다.** 141행이라 반복 비용이 문제되지 않고,
+-- 집합 연산으로 쓰면 "INSERT가 SELECT 순서대로 id를 준다"는 보장되지 않는 가정에 기대야
+-- 한다. 이름으로 되찾는 방법은 고성군(강원·경남)에서 어긋난다.
+DO $$
+DECLARE
+    r         record;
+    new_id    bigint;
+BEGIN
+    FOR r IN
+        SELECT d.code, d.name_ko, d.name_en, d.name_ja, d.name_zh
+        FROM tour.district d
+        JOIN tour.area a ON a.area_cd = d.area_cd
+        WHERE a.name_ko !~ '(광역시|특별시|특별자치시)$'
+          AND d.name_ko NOT LIKE '% %구'
+        ORDER BY d.code
+    LOOP
+        INSERT INTO tour.map_cell (name_ko, name_en, name_ja, name_zh)
+        VALUES (r.name_ko, r.name_en, r.name_ja, r.name_zh)
+        RETURNING id INTO new_id;
+
+        INSERT INTO tour.map_cell_district (cell_id, district_code)
+        VALUES (new_id, r.code);
+    END LOOP;
+END $$;
 
 -- ---------------------------------------------------------------------------
 -- 6. 검증. **어긋나면 기동을 막는다** — 칸 수와 덮개는 계약(R7)이고, 경계 데이터가 바뀌면

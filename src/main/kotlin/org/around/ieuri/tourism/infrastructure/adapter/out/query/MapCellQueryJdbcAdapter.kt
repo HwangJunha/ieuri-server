@@ -32,7 +32,7 @@ class MapCellQueryJdbcAdapter(
 
     @Transactional(readOnly = true)
     override fun findAllCellDistricts(): List<MapCellDistrictRow> =
-        jdbcTemplate.query("$CELL_DISTRICT_SELECT ORDER BY mc.area_cd, mc.id, d.code") { rs, _ ->
+        jdbcTemplate.query("$CELL_DISTRICT_SELECT ORDER BY mc.id, d.code") { rs, _ ->
             rs.toCellDistrictRow()
         }
 
@@ -49,7 +49,7 @@ class MapCellQueryJdbcAdapter(
         if (cellIds.isEmpty()) return emptyList()
 
         return jdbcTemplate.query(
-            "$CELL_DISTRICT_SELECT WHERE mc.id = ANY(?::bigint[]) ORDER BY mc.area_cd, mc.id, d.code",
+            "$CELL_DISTRICT_SELECT WHERE mc.id = ANY(?::bigint[]) ORDER BY mc.id, d.code",
             { rs, _ -> rs.toCellDistrictRow() },
             cellIds.toTypedArray(),
         )
@@ -171,9 +171,16 @@ class MapCellQueryJdbcAdapter(
         /**
          * 칸 대표 좌표는 `center`를 쓴다 — `representative_location`은 26개 시군구에서 null이라
          * 그 칸이 지도에서 사라진다. 추천(관광지 밀집 지점)과 지도(칸을 가리키는 점)는 다른 요구다.
+         *
+         * **시도는 `district`에서 온다.** 한 칸의 시군구가 전부 같은 시도라(실측) 어느 행을
+         * 골라도 같으며, 칸이 시도를 따로 들고 있을 이유가 없다.
+         *
+         * **정렬은 여기서 하지 않는다.** 칸의 최종 순서는 도메인(`MapCellGrouping.fold`)이
+         * 정한다 — `groupBy`가 입력 순서를 보존하지 않으므로 SQL에서 정렬해도 무의미하다.
+         * `ORDER BY`가 남아 있는 것은 한 칸의 시군구가 붙어 나오게 하기 위함이다.
          */
         const val CELL_DISTRICT_SELECT = """
-            SELECT d.code, mcd.cell_id, mc.area_cd,
+            SELECT d.code, mcd.cell_id, d.area_cd,
                    mc.name_ko AS cell_name_ko, mc.name_en AS cell_name_en,
                    mc.name_ja AS cell_name_ja, mc.name_zh AS cell_name_zh,
                    a.name_ko AS area_name_ko, a.name_en AS area_name_en,
@@ -183,7 +190,7 @@ class MapCellQueryJdbcAdapter(
             FROM tour.map_cell mc
             JOIN tour.map_cell_district mcd ON mcd.cell_id = mc.id
             JOIN tour.district d ON d.code = mcd.district_code
-            JOIN tour.area a ON a.area_cd = mc.area_cd
+            JOIN tour.area a ON a.area_cd = d.area_cd
         """
     }
 }

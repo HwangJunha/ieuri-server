@@ -74,6 +74,9 @@ class DistrictEntity(
  *
  * **식별자가 대리키인 것이 의도다.** 칸은 우리가 만든 표시 단위라 대응하는 공식 코드가 없고,
  * 행정구역 코드를 재활용하면 같은 문자열이 문맥에 따라 두 뜻이 된다(41111 = 수원시? 장안구?).
+ *
+ * **상위 시도 컬럼이 없다.** 칸에 속한 시군구가 전부 같은 시도이므로 `district.area_cd`로
+ * 얻는 파생값이다 — 저장하면 두 곳이 어긋날 여지만 생긴다.
  */
 @Entity
 @Table(name = "map_cell", schema = DbSchema.TOUR)
@@ -93,9 +96,6 @@ class MapCellEntity(
 
     @Column(name = "name_zh", length = 128)
     var nameZh: String? = null,
-
-    @Column(name = "area_cd", nullable = false, length = 2)
-    var areaCd: String,
 )
 
 /**

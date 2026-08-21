@@ -410,11 +410,13 @@ SELECT c.cell_id, s.display_order, s.image_url, s.thumbnail_url,
        s.caption, s.kind, s.copyright, s.content_id
 FROM map_cell_image_seed s
 JOIN (
-    SELECT mc.id AS cell_id,
+    SELECT DISTINCT mc.id AS cell_id,
            CASE WHEN a.name_ko ~ '(광역시|특별시|특별자치시)$' THEN mc.name_ko
                 ELSE a.name_ko || ' ' || mc.name_ko END AS region_label
     FROM tour.map_cell mc
-    JOIN tour.area a ON a.area_cd = mc.area_cd
+    JOIN tour.map_cell_district mcd ON mcd.cell_id = mc.id
+    JOIN tour.district d ON d.code = mcd.district_code
+    JOIN tour.area a ON a.area_cd = d.area_cd
 ) c ON c.region_label = s.region_label;
 
 -- **한 건도 유실되지 않아야 한다.** 조인이 어긋나면 그 칸만 조용히 이미지가 없어지고,
