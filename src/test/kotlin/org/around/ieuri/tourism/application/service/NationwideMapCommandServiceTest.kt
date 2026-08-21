@@ -49,13 +49,13 @@ class NationwideMapCommandServiceTest {
         every { visitQueryPort.filterExistingDistrictCodes(any()) } returns setOf("11110", "41111")
         // 11110은 이미 있어 삽입되지 않았다 — 저장소가 새로 들어간 것만 돌려준다.
         every { upsertPort.record(7L, setOf("11110", "41111")) } returns setOf("41111")
-        every { mapCellDistrictQueryPort.findCellCodesByDistrictCodes(setOf("41111")) } returns listOf("41111")
+        every { mapCellDistrictQueryPort.findCellIdsByDistrictCodes(setOf("41111")) } returns listOf(2L)
         every { visitQueryPort.findVisitedDistrictCodes(7L) } returns setOf("11110", "41111")
-        every { mapCellQueryPort.findCellDistrictsIn(listOf("41111")) } returns listOf(row("41111", "41111"))
+        every { mapCellQueryPort.findCellDistrictsIn(listOf(2L)) } returns listOf(row(2L, "41111"))
 
         val result = service.recordVisits(RecordVisitsCommand(7L, listOf("11110", "41111")), DomainLocale.KO)
 
-        assertEquals(listOf("41111"), result.updatedCells.map { it.code })
+        assertEquals(listOf(2L), result.updatedCells.map { it.id })
         assertTrue(result.unknownDistrictCodes.isEmpty())
     }
 
@@ -63,9 +63,9 @@ class NationwideMapCommandServiceTest {
     fun `같은 코드를 두 번 등록해도 두 번째는 갱신된 칸이 없다`() {
         every { visitQueryPort.filterExistingDistrictCodes(any()) } returns setOf("11110")
         every { upsertPort.record(7L, setOf("11110")) } returns emptySet()
-        every { mapCellDistrictQueryPort.findCellCodesByDistrictCodes(emptySet()) } returns emptyList()
+        every { mapCellDistrictQueryPort.findCellIdsByDistrictCodes(emptySet()) } returns emptyList()
         every { visitQueryPort.findVisitedDistrictCodes(7L) } returns setOf("11110")
-        every { mapCellQueryPort.findCellDistrictsIn(emptyList()) } returns emptyList()
+        every { mapCellQueryPort.findCellDistrictsIn(emptyList<Long>()) } returns emptyList()
 
         val result = service.recordVisits(RecordVisitsCommand(7L, listOf("11110")), DomainLocale.KO)
 
@@ -78,24 +78,24 @@ class NationwideMapCommandServiceTest {
     fun `없는 시군구 코드는 조용히 버리지 않고 알린다`() {
         every { visitQueryPort.filterExistingDistrictCodes(any()) } returns setOf("11110")
         every { upsertPort.record(7L, setOf("11110")) } returns setOf("11110")
-        every { mapCellDistrictQueryPort.findCellCodesByDistrictCodes(setOf("11110")) } returns listOf("11")
+        every { mapCellDistrictQueryPort.findCellIdsByDistrictCodes(setOf("11110")) } returns listOf(1L)
         every { visitQueryPort.findVisitedDistrictCodes(7L) } returns setOf("11110")
-        every { mapCellQueryPort.findCellDistrictsIn(listOf("11")) } returns listOf(row("11", "11110"))
+        every { mapCellQueryPort.findCellDistrictsIn(listOf(1L)) } returns listOf(row(1L, "11110"))
 
         val result = service.recordVisits(RecordVisitsCommand(7L, listOf("11110", "99999")), DomainLocale.KO)
 
         assertEquals(listOf("99999"), result.unknownDistrictCodes)
         // 나머지는 정상 기록된다 — 코드 하나 때문에 전체가 실패하지 않는다.
-        assertEquals(listOf("11"), result.updatedCells.map { it.code })
+        assertEquals(listOf(1L), result.updatedCells.map { it.id })
     }
 
     @Test
     fun `중복 코드는 한 번만 저장된다`() {
         every { visitQueryPort.filterExistingDistrictCodes(any()) } returns setOf("11110")
         every { upsertPort.record(7L, setOf("11110")) } returns setOf("11110")
-        every { mapCellDistrictQueryPort.findCellCodesByDistrictCodes(any()) } returns listOf("11")
+        every { mapCellDistrictQueryPort.findCellIdsByDistrictCodes(any()) } returns listOf(1L)
         every { visitQueryPort.findVisitedDistrictCodes(7L) } returns setOf("11110")
-        every { mapCellQueryPort.findCellDistrictsIn(listOf("11")) } returns listOf(row("11", "11110"))
+        every { mapCellQueryPort.findCellDistrictsIn(listOf(1L)) } returns listOf(row(1L, "11110"))
 
         service.recordVisits(RecordVisitsCommand(7L, listOf("11110", "11110", "11110")), DomainLocale.KO)
 
@@ -112,21 +112,21 @@ class NationwideMapCommandServiceTest {
 
     @Test
     fun `칸을 해제하면 그 칸의 시군구 전부가 지워진다`() {
-        every { mapCellQueryPort.findCellDistricts("41111") } returns
-            listOf("41111", "41113", "41115", "41117").map { row("41111", it) }
+        every { mapCellQueryPort.findCellDistricts(2L) } returns
+            listOf("41111", "41113", "41115", "41117").map { row(2L, it) }
         every { storePort.remove(7L, any()) } returns Unit
         every { visitQueryPort.findVisitedDistrictCodes(7L) } returns emptySet()
 
-        service.removeVisit(RemoveVisitCommand(7L, "41111"), DomainLocale.KO)
+        service.removeVisit(RemoveVisitCommand(7L, 2L), DomainLocale.KO)
 
         verify { storePort.remove(7L, listOf("41111", "41113", "41115", "41117")) }
     }
 
     @Test
     fun `없는 칸의 해제는 오류가 아니라 갱신된 칸이 null이다`() {
-        every { mapCellQueryPort.findCellDistricts("99999") } returns emptyList()
+        every { mapCellQueryPort.findCellDistricts(999L) } returns emptyList()
 
-        val result = service.removeVisit(RemoveVisitCommand(7L, "99999"), DomainLocale.KO)
+        val result = service.removeVisit(RemoveVisitCommand(7L, 999L), DomainLocale.KO)
 
         assertNull(result.updatedCell)
         verify(exactly = 0) { storePort.remove(any(), any()) }
@@ -142,12 +142,12 @@ class NationwideMapCommandServiceTest {
         assertEquals("already-issued", service.createShareLink(7L).token)
     }
 
-    private fun row(cellCode: String, districtCode: String) = MapCellDistrictRow(
-        cellCode = cellCode,
+    private fun row(cellId: Long, districtCode: String) = MapCellDistrictRow(
+        cellId = cellId,
         districtCode = districtCode,
         cellName = AreaName("칸", "cell", null, null),
         provinceName = AreaName("시도", "province", null, null),
-        provinceCode = cellCode.take(2),
+        provinceCode = districtCode.take(2),
         center = Coordinates(37.5, 127.0),
     )
 }

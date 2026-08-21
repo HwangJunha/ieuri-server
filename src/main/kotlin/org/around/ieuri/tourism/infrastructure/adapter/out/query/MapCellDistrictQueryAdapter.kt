@@ -17,11 +17,11 @@ class MapCellDistrictQueryAdapter(
 ) : MapCellDistrictQueryPort {
 
     @Transactional(readOnly = true)
-    override fun findCellCodesByDistrictCodes(districtCodes: Collection<String>): List<String> {
+    override fun findCellIdsByDistrictCodes(districtCodes: Collection<String>): List<Long> {
         if (districtCodes.isEmpty()) return emptyList()
 
         return repository.findAllByDistrictCodeIn(districtCodes)
-            .map { it.cellCode }
+            .map { it.cellId }
             .distinct()
             .sorted()
     }

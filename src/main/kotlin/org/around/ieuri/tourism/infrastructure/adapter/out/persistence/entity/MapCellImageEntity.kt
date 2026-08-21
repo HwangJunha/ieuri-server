@@ -31,8 +31,8 @@ class MapCellImageEntity(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long? = null,
 
-    @Column(name = "cell_code", nullable = false, length = 5)
-    var cellCode: String,
+    @Column(name = "cell_id", nullable = false)
+    var cellId: Long,
 
     /** 0이 대표. 칸 안에서 유일하다. */
     @Column(name = "display_order", nullable = false)

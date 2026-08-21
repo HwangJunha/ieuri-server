@@ -13,13 +13,13 @@
 -- 대표 이미지가 없는 칸도 조회에서 빠지지 않는다(R10). 그 경우 이 표에 행이 없을 뿐이고,
 -- 특산품 이미지 14건이 아직 확보되지 않아 실제로 그런 칸이 생긴다.
 --
--- **cell_code는 map_cell을 참조한다.** 칸이 161행짜리 표라 참조 대상이 되며(V74), 같은
+-- **cell_id는 map_cell을 참조한다.** 칸이 161행짜리 표라 참조 대상이 되며(V74), 같은
 -- tourism 컨텍스트 안이라 물리 FK를 건다 — 없는 칸의 이미지가 적재되는 일이 구조적으로 막힌다.
 
 CREATE TABLE tour.map_cell_image (
     id            bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
 
-    cell_code     varchar(20)  NOT NULL,
+    cell_id       bigint       NOT NULL,
 
     -- 0이 대표. 칸 안에서 유일하다.
     display_order integer      NOT NULL,
@@ -43,12 +43,12 @@ CREATE TABLE tour.map_cell_image (
     updated_at    timestamptz  NOT NULL DEFAULT now(),
 
     CONSTRAINT fk_map_cell_image_cell
-        FOREIGN KEY (cell_code) REFERENCES tour.map_cell (cell_code) ON DELETE CASCADE,
-    CONSTRAINT uq_map_cell_image_order UNIQUE (cell_code, display_order),
+        FOREIGN KEY (cell_id) REFERENCES tour.map_cell (id) ON DELETE CASCADE,
+    CONSTRAINT uq_map_cell_image_order UNIQUE (cell_id, display_order),
     CONSTRAINT ck_map_cell_image_kind CHECK (kind IN ('LANDMARK', 'SPECIALTY')),
     CONSTRAINT ck_map_cell_image_copyright CHECK (copyright IN ('TYPE1', 'TYPE3', 'UNSPECIFIED')),
     CONSTRAINT ck_map_cell_image_display_order CHECK (display_order >= 0)
 );
 
 -- 칸 목록(161행)과 칸 상세가 모두 "이 칸의 대표 이미지"를 찾는다.
--- uq_map_cell_image_order가 (cell_code, display_order) 선행이라 그 조회를 그대로 커버한다.
+-- uq_map_cell_image_order가 (cell_id, display_order) 선행이라 그 조회를 그대로 커버한다.

@@ -61,18 +61,18 @@ class NationwideMapServiceTest {
     @Test
     fun `방문한 칸만 viewerVisited가 참이다`() {
         every { mapCellQueryPort.findAllCellDistricts() } returns listOf(
-            row("11", "11110"), row("41111", "41111"), row("41210", "41210"),
+            row(1L, "11110"), row(2L, "41111"), row(3L, "41210"),
         )
         every { districtVisitQueryPort.findVisitedDistrictCodes(7L) } returns setOf("11110")
 
         val cells = service.mapCells(DomainLocale.KO, memberId = 7L)
 
-        assertEquals(mapOf("11" to true, "41111" to false, "41210" to false), cells.associate { it.code to it.viewerVisited })
+        assertEquals(mapOf(1L to true, 2L to false, 3L to false), cells.associate { it.id to it.viewerVisited })
     }
 
     @Test
     fun `비인증 조회는 모든 칸이 미방문이고 방문 기록을 읽지 않는다`() {
-        every { mapCellQueryPort.findAllCellDistricts() } returns listOf(row("11", "11110"))
+        every { mapCellQueryPort.findAllCellDistricts() } returns listOf(row(1L, "11110"))
 
         val cells = service.mapCells(DomainLocale.KO, memberId = null)
 
@@ -84,22 +84,22 @@ class NationwideMapServiceTest {
     fun `활성 언어가 없으면 EN, EN도 없으면 KO로 폴백한다`() {
         every { districtVisitQueryPort.findVisitedDistrictCodes(any()) } returns emptySet()
         every { mapCellQueryPort.findAllCellDistricts() } returns listOf(
-            row("11", "11110", name = AreaName(ko = "서울", en = "Seoul", ja = null, zh = null)),
+            row(1L, "11110", name = AreaName(ko = "서울", en = "Seoul", ja = null, zh = null)),
         )
 
         assertEquals("Seoul", service.mapCells(DomainLocale.JA, 1L).single().name)
 
         every { mapCellQueryPort.findAllCellDistricts() } returns listOf(
-            row("11", "11110", name = AreaName(ko = "서울", en = "  ", ja = null, zh = null)),
+            row(1L, "11110", name = AreaName(ko = "서울", en = "  ", ja = null, zh = null)),
         )
         assertEquals("서울", service.mapCells(DomainLocale.JA, 1L).single().name)
     }
 
     @Test
     fun `없는 칸을 조회하면 MAP_CELL_NOT_FOUND다`() {
-        every { mapCellQueryPort.findCellDistricts("99999") } returns emptyList()
+        every { mapCellQueryPort.findCellDistricts(999L) } returns emptyList()
 
-        assertFailsWith<MapCellNotFoundException> { service.mapCell("99999", DomainLocale.KO, null) }
+        assertFailsWith<MapCellNotFoundException> { service.mapCell(999L, DomainLocale.KO, null) }
     }
 
     // ── 좌표 판정 ──────────────────────────────────────────────────────
@@ -113,7 +113,7 @@ class NationwideMapServiceTest {
             Coordinates(35.1796, 129.0756),
         )
         every { mapCellQueryPort.resolveDistrictCodes(coordinates) } returns listOf("11140", "41111", "26110")
-        every { mapCellDistrictQueryPort.findCellCodesByDistrictCodes(any()) } returns listOf("11", "41111", "26")
+        every { mapCellDistrictQueryPort.findCellIdsByDistrictCodes(any()) } returns listOf(1L, 2L, 3L)
 
         val result = service.resolveDistricts(coordinates)
 
@@ -125,7 +125,7 @@ class NationwideMapServiceTest {
     fun `같은 시군구의 좌표 여러 건은 코드 1건으로 줄어든다`() {
         val coordinates = List(4) { Coordinates(37.5665, 126.9780) }
         every { mapCellQueryPort.resolveDistrictCodes(coordinates) } returns List(4) { "11140" }
-        every { mapCellDistrictQueryPort.findCellCodesByDistrictCodes(any()) } returns listOf("11")
+        every { mapCellDistrictQueryPort.findCellIdsByDistrictCodes(any()) } returns listOf(1L)
 
         val result = service.resolveDistricts(coordinates)
 
@@ -145,12 +145,12 @@ class NationwideMapServiceTest {
     fun `좌표가 없으면 빈 결과이고 오류가 아니다`() {
         // 빈 입력을 걸러 내는 일은 어댑터가 한다(빈 배열이 SQL에 들어가지 않게).
         every { mapCellQueryPort.resolveDistrictCodes(emptyList()) } returns emptyList()
-        every { mapCellDistrictQueryPort.findCellCodesByDistrictCodes(emptyList()) } returns emptyList()
+        every { mapCellDistrictQueryPort.findCellIdsByDistrictCodes(emptyList()) } returns emptyList()
 
         val result = service.resolveDistricts(emptyList())
 
         assertEquals(emptyList(), result.districtCodes)
-        assertEquals(emptyList(), result.cellCodes)
+        assertEquals(emptyList(), result.cellIds)
         assertEquals(0, result.unresolvedCount)
     }
 
@@ -158,20 +158,20 @@ class NationwideMapServiceTest {
 
     @Test
     fun `상한을 넘는 first는 오류가 아니라 상한으로 잘린다`() {
-        every { mapCellQueryPort.findCellSpots("11", DomainLocale.KO, 51, null) } returns emptyList()
+        every { mapCellQueryPort.findCellSpots(1L, DomainLocale.KO, 51, null) } returns emptyList()
 
-        service.cellSpots(CellSpotsQuery("11", first = 999, after = null), DomainLocale.KO)
+        service.cellSpots(CellSpotsQuery(1L, first = 999, after = null), DomainLocale.KO)
 
         // 상한 50 + 1 = 51건을 읽는다.
-        verify { mapCellQueryPort.findCellSpots("11", DomainLocale.KO, 51, null) }
+        verify { mapCellQueryPort.findCellSpots(1L, DomainLocale.KO, 51, null) }
     }
 
     @Test
     fun `first보다 한 건 더 읽어 다음 페이지를 판정한다`() {
         val rows = (1L..21L).map { spot(it, likeCount = 100 - it) }
-        every { mapCellQueryPort.findCellSpots("11", DomainLocale.KO, 21, null) } returns rows
+        every { mapCellQueryPort.findCellSpots(1L, DomainLocale.KO, 21, null) } returns rows
 
-        val page = service.cellSpots(CellSpotsQuery("11", first = 20, after = null), DomainLocale.KO)
+        val page = service.cellSpots(CellSpotsQuery(1L, first = 20, after = null), DomainLocale.KO)
 
         assertEquals(20, page.edges.size)
         assertTrue(page.pageInfo.hasNextPage)
@@ -200,15 +200,15 @@ class NationwideMapServiceTest {
         every { mapShareLinkPort.findActiveByToken("t") } returns link(ownerId = 1L)
         every { mapOwnerLookupPort.findNickname(1L) } returns "여행자"
         every { districtVisitQueryPort.findVisitedDistrictCodes(1L) } returns setOf("11110")
-        every { mapCellDistrictQueryPort.findCellCodesByDistrictCodes(setOf("11110")) } returns listOf("CELL_11")
+        every { mapCellDistrictQueryPort.findCellIdsByDistrictCodes(setOf("11110")) } returns listOf(1L)
 
         val view = service.sharedMap("t", viewerMemberId = null)
 
         assertEquals("여행자", view.ownerNickname)
-        assertEquals(listOf("CELL_11"), view.visitedCellCodes)
+        assertEquals(listOf(1L), view.visitedCellIds)
         assertEquals(1, view.visitedCount)
         // 빈 배열(겹치는 칸 없음)과 구분된다.
-        assertNull(view.overlappingCellCodes)
+        assertNull(view.overlappingCellIds)
         verify(exactly = 0) { mapViewerBlockPort.isBlockedBetween(any(), any()) }
     }
 
@@ -220,15 +220,13 @@ class NationwideMapServiceTest {
         every { districtVisitQueryPort.findVisitedDistrictCodes(1L) } returns setOf("11110", "41111", "26110")
         every { districtVisitQueryPort.findVisitedDistrictCodes(2L) } returns setOf("11110", "50110")
         // 포트가 중복 제거·정렬을 보장한다(계약) — 스텁도 그 형태로 준다.
-        every { mapCellDistrictQueryPort.findCellCodesByDistrictCodes(setOf("11110", "41111", "26110")) } returns
-            listOf("CELL_11", "CELL_26", "CELL_41110")
-        every { mapCellDistrictQueryPort.findCellCodesByDistrictCodes(setOf("11110", "50110")) } returns
-            listOf("CELL_11", "CELL_50110")
+        every { mapCellDistrictQueryPort.findCellIdsByDistrictCodes(setOf("11110", "41111", "26110")) } returns listOf(1L, 3L, 2L)
+        every { mapCellDistrictQueryPort.findCellIdsByDistrictCodes(setOf("11110", "50110")) } returns listOf(1L, 9L)
 
         val view = service.sharedMap("t", viewerMemberId = 2L)
 
-        assertEquals(listOf("CELL_11", "CELL_26", "CELL_41110"), view.visitedCellCodes)
-        assertEquals(listOf("CELL_11"), view.overlappingCellCodes)
+        assertEquals(listOf(1L, 3L, 2L), view.visitedCellIds)
+        assertEquals(listOf(1L), view.overlappingCellIds)
     }
 
     @Test
@@ -239,21 +237,21 @@ class NationwideMapServiceTest {
 
         val view = service.sharedMap("t", viewerMemberId = 1L)
 
-        assertEquals(emptyList(), view.visitedCellCodes)
-        assertEquals(emptyList(), view.overlappingCellCodes)
+        assertEquals(emptyList(), view.visitedCellIds)
+        assertEquals(emptyList(), view.overlappingCellIds)
         verify(exactly = 0) { mapViewerBlockPort.isBlockedBetween(any(), any()) }
     }
 
     private fun row(
-        cellCode: String,
+        cellId: Long,
         districtCode: String,
         name: AreaName = AreaName(ko = "칸", en = "cell", ja = null, zh = null),
     ) = MapCellDistrictRow(
-        cellCode = cellCode,
+        cellId = cellId,
         districtCode = districtCode,
         cellName = name,
         provinceName = AreaName(ko = "시도", en = "province", ja = null, zh = null),
-        provinceCode = cellCode.take(2),
+        provinceCode = districtCode.take(2),
         center = Coordinates(37.5, 127.0),
     )
 

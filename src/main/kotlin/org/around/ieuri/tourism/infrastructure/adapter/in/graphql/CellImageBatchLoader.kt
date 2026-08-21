@@ -29,14 +29,14 @@ object CellImageBatchLoader {
 
     fun load(
         dfe: DgsDataFetchingEnvironment,
-        cellCode: String,
+        cellId: Long,
         useCase: NationwideMapUseCase,
     ): CellImageView? {
         @Suppress("UNCHECKED_CAST")
         val cache = dfe.graphQlContext.computeIfAbsent(CACHE_KEY) {
             useCase.allCellImages()
-        } as Map<String, CellImageView>
+        } as Map<Long, CellImageView>
 
-        return cache[cellCode]
+        return cache[cellId]
     }
 }

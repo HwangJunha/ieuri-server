@@ -27,7 +27,7 @@ interface NationwideMapUseCase {
     fun mapCells(locale: DomainLocale, memberId: Long?): List<MapCellView>
 
     /** 칸 1개. 없는 칸이면 MAP_CELL_NOT_FOUND다. */
-    fun mapCell(cellCode: String, locale: DomainLocale, memberId: Long?): MapCellView
+    fun mapCell(cellId: Long, locale: DomainLocale, memberId: Long?): MapCellView
 
     /**
      * 모든 칸의 대표 이미지(R9). 칸 코드로 찾아 쓴다.
@@ -35,7 +35,7 @@ interface NationwideMapUseCase {
      * **이미지가 없는 칸은 결과에 키가 없다**(R10) — 그 칸도 조회에서 빠지지 않으며 필드만
      * null이 된다. 칸이 161개로 고정된 작은 집합이라 부분 조회를 두지 않는다.
      */
-    fun allCellImages(): Map<String, CellImageView>
+    fun allCellImages(): Map<Long, CellImageView>
 
     /** 칸에 속한 장소(R11). 좋아요 수 내림차순. */
     fun cellSpots(query: CellSpotsQuery, locale: DomainLocale): CursorPage<CellSpotView>

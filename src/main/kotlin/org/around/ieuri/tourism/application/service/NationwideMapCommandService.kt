@@ -54,9 +54,9 @@ class NationwideMapCommandService(
         //
         // 칸마다 mapCell을 부르지 않는다 — 사진 동기화가 한 번에 수십 칸을 방문으로 바꾸면
         // 그 수만큼 질의가 두 배로 나간다. 시군구를 한 번에 읽고 도메인이 접는다.
-        val updatedCellCodes = mapCellDistrictQueryPort.findCellCodesByDistrictCodes(added)
+        val updatedCellIds = mapCellDistrictQueryPort.findCellIdsByDistrictCodes(added)
         val visited = districtVisitQueryPort.findVisitedDistrictCodes(command.memberId)
-        val updatedCells = MapCellGrouping.fold(mapCellQueryPort.findCellDistrictsIn(updatedCellCodes))
+        val updatedCells = MapCellGrouping.fold(mapCellQueryPort.findCellDistrictsIn(updatedCellIds))
             .map { it.toView(locale, visited) }
 
         return RecordVisitsResult(updatedCells = updatedCells, unknownDistrictCodes = unknown)
@@ -65,7 +65,7 @@ class NationwideMapCommandService(
     @Transactional
     override fun removeVisit(command: RemoveVisitCommand, locale: DomainLocale): RemoveVisitResult {
         // 칸에 속한 시군구 전부를 지운다(R4) — 광역시 칸이면 25개가 한 번에 지워진다.
-        val rows = mapCellQueryPort.findCellDistricts(command.cellCode)
+        val rows = mapCellQueryPort.findCellDistricts(command.cellId)
         if (rows.isEmpty()) return RemoveVisitResult(updatedCell = null)
 
         districtVisitStorePort.remove(command.memberId, rows.map { it.districtCode })

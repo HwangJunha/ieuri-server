@@ -2,6 +2,8 @@ package org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity
 
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.GeneratedValue
+import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.IdClass
 import jakarta.persistence.Table
@@ -68,19 +70,48 @@ class DistrictEntity(
 )
 
 /**
+ * 전국 지도의 표시 칸(V74). 161행.
+ *
+ * **식별자가 대리키인 것이 의도다.** 칸은 우리가 만든 표시 단위라 대응하는 공식 코드가 없고,
+ * 행정구역 코드를 재활용하면 같은 문자열이 문맥에 따라 두 뜻이 된다(41111 = 수원시? 장안구?).
+ */
+@Entity
+@Table(name = "map_cell", schema = DbSchema.TOUR)
+class MapCellEntity(
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    var id: Long? = null,
+
+    @Column(name = "name_ko", nullable = false, length = 128)
+    var nameKo: String,
+
+    @Column(name = "name_en", nullable = false, length = 128)
+    var nameEn: String,
+
+    @Column(name = "name_ja", length = 128)
+    var nameJa: String? = null,
+
+    @Column(name = "name_zh", length = 128)
+    var nameZh: String? = null,
+
+    @Column(name = "area_cd", nullable = false, length = 2)
+    var areaCd: String,
+)
+
+/**
  * 칸이 묶는 시군구(V74). 한 칸이 1~25개를 묶는다.
  *
- * **자연키가 곧 PK다.** 두 코드의 조합 외에 이 표에 담을 것이 없어 대리키를 얹을 이유가 없다 —
- * `member_district_visit`이 대리키를 쓴 것과 다른 판단인데, 그쪽은 멱등 등록이 자연키 UNIQUE를
- * 필요로 해 PK와 별개의 제약이 생겼고 이쪽은 그렇지 않다.
+ * **자연키가 곧 PK다.** 칸 id와 시군구 코드의 조합 외에 이 표에 담을 것이 없어 대리키를
+ * 얹을 이유가 없다 — `member_district_visit`이 대리키를 쓴 것과 다른 판단인데, 그쪽은 멱등
+ * 등록이 자연키 UNIQUE를 필요로 해 PK와 별개의 제약이 생겼고 이쪽은 그렇지 않다.
  */
 @Entity
 @Table(name = "map_cell_district", schema = DbSchema.TOUR)
 @IdClass(MapCellDistrictId::class)
 class MapCellDistrictEntity(
     @Id
-    @Column(name = "cell_code", nullable = false, length = 20)
-    var cellCode: String,
+    @Column(name = "cell_id", nullable = false)
+    var cellId: Long,
 
     @Id
     @Column(name = "district_code", nullable = false, length = 5)
@@ -89,6 +120,6 @@ class MapCellDistrictEntity(
 
 /** [MapCellDistrictEntity]의 복합 식별자. JPA가 요구하는 형태이며 값은 엔티티와 같다. */
 data class MapCellDistrictId(
-    var cellCode: String = "",
+    var cellId: Long = 0,
     var districtCode: String = "",
 ) : Serializable

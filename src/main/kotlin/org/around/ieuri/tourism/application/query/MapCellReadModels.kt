@@ -14,7 +14,7 @@ import org.around.ieuri.tourism.domain.vo.CopyrightType
  * 대응시켜야 하기 때문이다.
  */
 data class MapCellView(
-    val code: String,
+    val id: Long,
     val districtCodes: List<String>,
     val name: String,
     val provinceName: String,
@@ -45,13 +45,13 @@ data class CellImageView(
  */
 data class ResolveDistrictsResult(
     val districtCodes: List<String>,
-    val cellCodes: List<String>,
+    val cellIds: List<Long>,
     val unresolvedCount: Int,
 )
 
 /** 칸에 속한 장소 목록 조회 입력(R11). */
 data class CellSpotsQuery(
-    val cellCode: String,
+    val cellId: Long,
     val first: Int,
     val after: String?,
 )
@@ -74,9 +74,9 @@ data class CellSpotView(
 /** 공유 지도 조회 결과(R13·R15). */
 data class SharedMapView(
     val ownerNickname: String,
-    val visitedCellCodes: List<String>,
+    val visitedCellIds: List<Long>,
     /** 비인증 조회면 null이다 — 빈 목록(겹치는 칸 없음)과 구분된다. */
-    val overlappingCellCodes: List<String>?,
+    val overlappingCellIds: List<Long>?,
     val visitedCount: Int,
 )
 

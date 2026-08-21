@@ -57,8 +57,8 @@ class NationwideMapService(
     }
 
     @Transactional(readOnly = true)
-    override fun mapCell(cellCode: String, locale: DomainLocale, memberId: Long?): MapCellView {
-        val rows = mapCellQueryPort.findCellDistricts(cellCode)
+    override fun mapCell(cellId: Long, locale: DomainLocale, memberId: Long?): MapCellView {
+        val rows = mapCellQueryPort.findCellDistricts(cellId)
         if (rows.isEmpty()) throw MapCellNotFoundException()
 
         val cell = MapCellGrouping.fold(rows).single()
@@ -66,7 +66,7 @@ class NationwideMapService(
     }
 
     @Transactional(readOnly = true)
-    override fun allCellImages(): Map<String, CellImageView> =
+    override fun allCellImages(): Map<Long, CellImageView> =
         cellImageQueryPort.findAllRepresentativeImages()
 
     @Transactional(readOnly = true)
@@ -81,7 +81,7 @@ class NationwideMapService(
         }
 
         val rows = mapCellQueryPort.findCellSpots(
-            cellCode = query.cellCode,
+            cellId = query.cellId,
             language = locale,
             limit = first + 1,
             after = after,
@@ -105,11 +105,11 @@ class NationwideMapService(
         // (경계에 걸친 좌표도 한 시군구로 정한다) 뺄셈이 음수가 되지 않는다.
         val unresolvedCount = (coordinates.size - resolved.size).coerceAtLeast(0)
         val districtCodes = resolved.distinct().sorted()
-        val cellCodes = mapCellDistrictQueryPort.findCellCodesByDistrictCodes(districtCodes)
+        val cellIds = mapCellDistrictQueryPort.findCellIdsByDistrictCodes(districtCodes)
 
         return ResolveDistrictsResult(
             districtCodes = districtCodes,
-            cellCodes = cellCodes,
+            cellIds = cellIds,
             unresolvedCount = unresolvedCount,
         )
     }
@@ -130,16 +130,16 @@ class NationwideMapService(
         val ownerNickname = mapOwnerLookupPort.findNickname(link.memberId)
             ?: throw ShareLinkNotFoundException()
 
-        val ownerCells = visitedCellCodes(link.memberId)
+        val ownerCells = visitedCellIds(link.memberId)
         val overlapping = viewerMemberId?.let { viewer ->
-            val viewerCells = visitedCellCodes(viewer)
+            val viewerCells = visitedCellIds(viewer)
             ownerCells.filter { it in viewerCells }
         }
 
         return SharedMapView(
             ownerNickname = ownerNickname,
-            visitedCellCodes = ownerCells,
-            overlappingCellCodes = overlapping,
+            visitedCellIds = ownerCells,
+            overlappingCellIds = overlapping,
             visitedCount = ownerCells.size,
         )
     }
@@ -149,13 +149,13 @@ class NationwideMapService(
         memberId?.let { districtVisitQueryPort.findVisitedDistrictCodes(it) } ?: emptySet()
 
     /**
-     * 회원이 방문한 **칸** 코드. 시군구 하나만 방문해도 그 칸은 방문이다.
+     * 회원이 방문한 **칸** id. 시군구 하나만 방문해도 그 칸은 방문이다.
      *
      * 정렬을 고정한다 — 공유 지도의 목록 순서가 호출마다 달라지면 클라이언트가 비교할 수 없다.
      */
-    private fun visitedCellCodes(memberId: Long): List<String> {
+    private fun visitedCellIds(memberId: Long): List<Long> {
         val visited = districtVisitQueryPort.findVisitedDistrictCodes(memberId)
         if (visited.isEmpty()) return emptyList()
-        return mapCellDistrictQueryPort.findCellCodesByDistrictCodes(visited)
+        return mapCellDistrictQueryPort.findCellIdsByDistrictCodes(visited)
     }
 }

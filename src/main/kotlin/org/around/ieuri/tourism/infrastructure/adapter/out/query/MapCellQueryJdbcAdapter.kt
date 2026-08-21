@@ -32,26 +32,26 @@ class MapCellQueryJdbcAdapter(
 
     @Transactional(readOnly = true)
     override fun findAllCellDistricts(): List<MapCellDistrictRow> =
-        jdbcTemplate.query("$CELL_DISTRICT_SELECT ORDER BY mc.area_cd, mc.cell_code, d.code") { rs, _ ->
+        jdbcTemplate.query("$CELL_DISTRICT_SELECT ORDER BY mc.area_cd, mc.id, d.code") { rs, _ ->
             rs.toCellDistrictRow()
         }
 
     @Transactional(readOnly = true)
-    override fun findCellDistricts(cellCode: String): List<MapCellDistrictRow> =
+    override fun findCellDistricts(cellId: Long): List<MapCellDistrictRow> =
         jdbcTemplate.query(
-            "$CELL_DISTRICT_SELECT WHERE mc.cell_code = ? ORDER BY d.code",
+            "$CELL_DISTRICT_SELECT WHERE mc.id = ? ORDER BY d.code",
             { rs, _ -> rs.toCellDistrictRow() },
-            cellCode,
+            cellId,
         )
 
     @Transactional(readOnly = true)
-    override fun findCellDistrictsIn(cellCodes: Collection<String>): List<MapCellDistrictRow> {
-        if (cellCodes.isEmpty()) return emptyList()
+    override fun findCellDistrictsIn(cellIds: Collection<Long>): List<MapCellDistrictRow> {
+        if (cellIds.isEmpty()) return emptyList()
 
         return jdbcTemplate.query(
-            "$CELL_DISTRICT_SELECT WHERE mc.cell_code = ANY(?::varchar[]) ORDER BY mc.area_cd, mc.cell_code, d.code",
+            "$CELL_DISTRICT_SELECT WHERE mc.id = ANY(?::bigint[]) ORDER BY mc.area_cd, mc.id, d.code",
             { rs, _ -> rs.toCellDistrictRow() },
-            cellCodes.toTypedArray(),
+            cellIds.toTypedArray(),
         )
     }
 
@@ -97,12 +97,12 @@ class MapCellQueryJdbcAdapter(
      */
     @Transactional(readOnly = true)
     override fun findCellSpots(
-        cellCode: String,
+        cellId: Long,
         language: DomainLocale,
         limit: Int,
         after: LikeCountCursor?,
     ): List<CellSpotView> {
-        val params = mutableListOf<Any>(language.name, ReactionType.LIKE.name, language.name, cellCode)
+        val params = mutableListOf<Any>(language.name, ReactionType.LIKE.name, language.name, cellId)
 
         val seek = if (after != null) {
             params += -after.likeCount
@@ -124,7 +124,7 @@ class MapCellQueryJdbcAdapter(
                 LEFT JOIN tour.spot_reaction r
                   ON r.catalog_id = cat.id AND r.reaction = ? AND r.language = ?
                 JOIN tour.map_cell_district mcd ON mcd.district_code = cat.district_code
-                WHERE mcd.cell_code = ?
+                WHERE mcd.cell_id = ?
                 GROUP BY cat.id, t.title, cat.thumbnail_image_url, cat.category, cat.map_x, cat.map_y
             ) ranked
             $seek
@@ -149,7 +149,7 @@ class MapCellQueryJdbcAdapter(
     }
 
     private fun ResultSet.toCellDistrictRow(): MapCellDistrictRow = MapCellDistrictRow(
-        cellCode = getString("cell_code"),
+        cellId = getLong("cell_id"),
         districtCode = getString("code"),
         cellName = AreaName(
             ko = getString("cell_name_ko"),
@@ -173,7 +173,7 @@ class MapCellQueryJdbcAdapter(
          * 그 칸이 지도에서 사라진다. 추천(관광지 밀집 지점)과 지도(칸을 가리키는 점)는 다른 요구다.
          */
         const val CELL_DISTRICT_SELECT = """
-            SELECT d.code, mcd.cell_code, mc.area_cd,
+            SELECT d.code, mcd.cell_id, mc.area_cd,
                    mc.name_ko AS cell_name_ko, mc.name_en AS cell_name_en,
                    mc.name_ja AS cell_name_ja, mc.name_zh AS cell_name_zh,
                    a.name_ko AS area_name_ko, a.name_en AS area_name_en,
@@ -181,7 +181,7 @@ class MapCellQueryJdbcAdapter(
                    ST_Y(d.center::geometry) AS center_lat,
                    ST_X(d.center::geometry) AS center_lng
             FROM tour.map_cell mc
-            JOIN tour.map_cell_district mcd ON mcd.cell_code = mc.cell_code
+            JOIN tour.map_cell_district mcd ON mcd.cell_id = mc.id
             JOIN tour.district d ON d.code = mcd.district_code
             JOIN tour.area a ON a.area_cd = mc.area_cd
         """

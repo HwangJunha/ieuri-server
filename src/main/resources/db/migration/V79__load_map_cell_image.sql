@@ -405,12 +405,12 @@ INSERT INTO map_cell_image_seed VALUES
 -- 지역 이름 → 칸 코드. 칸 이름은 map_cell이, 시도 이름은 area가 갖는다.
 -- 광역시 칸은 이름 하나('서울특별시'), 그 외는 '시도 + 칸 이름'이다.
 INSERT INTO tour.map_cell_image
-    (cell_code, display_order, image_url, thumbnail_url, caption, kind, copyright, content_id)
-SELECT c.cell_code, s.display_order, s.image_url, s.thumbnail_url,
+    (cell_id, display_order, image_url, thumbnail_url, caption, kind, copyright, content_id)
+SELECT c.cell_id, s.display_order, s.image_url, s.thumbnail_url,
        s.caption, s.kind, s.copyright, s.content_id
 FROM map_cell_image_seed s
 JOIN (
-    SELECT mc.cell_code,
+    SELECT mc.id AS cell_id,
            CASE WHEN a.name_ko ~ '(광역시|특별시|특별자치시)$' THEN mc.name_ko
                 ELSE a.name_ko || ' ' || mc.name_ko END AS region_label
     FROM tour.map_cell mc

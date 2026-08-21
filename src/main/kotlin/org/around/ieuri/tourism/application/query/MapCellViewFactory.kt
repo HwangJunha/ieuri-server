@@ -13,7 +13,7 @@ import org.around.ieuri.tourism.domain.vo.MapCell
  * 다국어 해소(활성 언어 → EN → KO)는 도메인의 `AreaName.resolve`가 하고 여기서는 부르기만 한다.
  */
 fun MapCell.toView(locale: DomainLocale, visitedDistrictCodes: Set<String>): MapCellView = MapCellView(
-    code = code,
+    id = id,
     districtCodes = districtCodes.sorted(),
     name = name.resolve(locale),
     provinceName = provinceName.resolve(locale),

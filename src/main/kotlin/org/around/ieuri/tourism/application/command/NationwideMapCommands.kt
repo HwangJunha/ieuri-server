@@ -27,7 +27,7 @@ data class RecordVisitsResult(
 /** 방문 해제 입력(R4). 칸 코드이며, 그 칸에 속한 시군구 기록이 전부 지워진다. */
 data class RemoveVisitCommand(
     val memberId: Long,
-    val cellCode: String,
+    val cellId: Long,
 )
 
 /** 방문 해제 결과. 없는 칸이면 [updatedCell]이 null이다. */

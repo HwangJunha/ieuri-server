@@ -66,8 +66,6 @@ class SchemaPlacementTest {
     private val tablesWithoutEntity = setOf(
         "congestion_area",
         "kto_visitor_count", "kto_concentration_rate", "kto_stay_intensity", "kto_spending_intensity",
-        // 칸 목록·상세가 district.center를 ST_X/ST_Y로 뽑아 읽으므로 생 SQL 전용이다(SPEC-0030).
-        "map_cell",
     )
 
     private val entities: List<JavaClass> = ClassFileImporter()

@@ -23,7 +23,7 @@ interface MapCellQueryPort {
     fun findAllCellDistricts(): List<MapCellDistrictRow>
 
     /** 칸 1개를 이루는 시군구. 없는 칸이면 빈 목록이다. */
-    fun findCellDistricts(cellCode: String): List<MapCellDistrictRow>
+    fun findCellDistricts(cellId: Long): List<MapCellDistrictRow>
 
     /**
      * 여러 칸을 이루는 시군구를 **한 번에** 읽는다.
@@ -31,7 +31,7 @@ interface MapCellQueryPort {
      * 칸마다 [findCellDistricts]를 부르지 않는다 — 사진 동기화가 좌표 500건을 보내면 한 번에
      * 수십 칸이 방문으로 바뀌고, 그만큼 질의가 나간다.
      */
-    fun findCellDistrictsIn(cellCodes: Collection<String>): List<MapCellDistrictRow>
+    fun findCellDistrictsIn(cellIds: Collection<Long>): List<MapCellDistrictRow>
 
     /**
      * 좌표가 속한 시군구 코드(R1). **한 번의 질의로 전량을 판정한다** — 좌표 500건에 대해
@@ -51,7 +51,7 @@ interface MapCellQueryPort {
      * `first + 1`건을 읽어 다음 페이지 존재를 판정한다 — 호출자가 [org.around.ieuri.common.pagination.keysetPageOf]에 넘긴다.
      */
     fun findCellSpots(
-        cellCode: String,
+        cellId: Long,
         language: DomainLocale,
         limit: Int,
         after: LikeCountCursor?,
@@ -68,11 +68,11 @@ interface MapCellQueryPort {
 interface MapCellDistrictQueryPort {
 
     /**
-     * 시군구 코드 → 그 코드가 속한 칸 코드.
+     * 시군구 코드 → 그 코드가 속한 칸 id.
      *
-     * **중복이 제거되고 칸 코드 오름차순으로 정렬된다** — 광역시 칸은 시군구 여러 개가 같은
+     * **중복이 제거되고 칸 id 오름차순으로 정렬된다** — 광역시 칸은 시군구 여러 개가 같은
      * 칸을 가리키므로 중복이 실제로 발생하고, 순서가 호출마다 달라지면 공유 지도의 목록을
      * 클라이언트가 비교할 수 없다. 없는 코드는 결과에서 빠진다.
      */
-    fun findCellCodesByDistrictCodes(districtCodes: Collection<String>): List<String>
+    fun findCellIdsByDistrictCodes(districtCodes: Collection<String>): List<Long>
 }

@@ -10,7 +10,7 @@ package org.around.ieuri.tourism.domain.vo
  * 집합을 통해 이뤄지므로 **비어 있을 수 없다** — 시군구가 하나도 없는 칸은 칸이 아니다.
  */
 data class MapCell(
-    val code: String,
+    val id: Long,
     val districtCodes: Set<String>,
     val name: AreaName,
     val provinceName: AreaName,
@@ -18,7 +18,6 @@ data class MapCell(
     val center: Coordinates,
 ) {
     init {
-        require(code.isNotBlank()) { "칸 코드는 비어 있을 수 없습니다." }
         require(districtCodes.isNotEmpty()) { "칸은 시군구를 하나 이상 포함해야 합니다." }
     }
 
@@ -49,11 +48,11 @@ object MapCellGrouping {
      * 이름을 그대로 칸 이름으로 삼는 것을 전제한다(§adapter).
      */
     fun fold(rows: List<MapCellDistrictRow>): List<MapCell> =
-        rows.groupBy { it.cellCode }
-            .map { (cellCode, group) ->
+        rows.groupBy { it.cellId }
+            .map { (cellId, group) ->
                 val representative = group.minBy { it.districtCode }
                 MapCell(
-                    code = cellCode,
+                    id = cellId,
                     districtCodes = group.mapTo(LinkedHashSet()) { it.districtCode },
                     name = representative.cellName,
                     provinceName = representative.provinceName,
@@ -61,7 +60,7 @@ object MapCellGrouping {
                     center = representative.center,
                 )
             }
-            .sortedWith(compareBy({ it.provinceCode }, { it.code }))
+            .sortedWith(compareBy({ it.provinceCode }, { it.id }))
 }
 
 /**
@@ -71,7 +70,7 @@ object MapCellGrouping {
  * 칸이면 '수원시'이며, 그 판단은 조회 어댑터가 한다(칸 코드 길이가 판단 근거다).
  */
 data class MapCellDistrictRow(
-    val cellCode: String,
+    val cellId: Long,
     val districtCode: String,
     val cellName: AreaName,
     val provinceName: AreaName,

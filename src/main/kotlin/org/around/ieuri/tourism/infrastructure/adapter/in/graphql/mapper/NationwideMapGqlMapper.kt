@@ -27,7 +27,7 @@ fun GqlRecordVisitsInput.toCommand(memberId: Long): RecordVisitsCommand = Record
 
 fun GqlRemoveVisitInput.toCommand(memberId: Long): RemoveVisitCommand = RemoveVisitCommand(
     memberId = memberId,
-    cellCode = cellCode,
+    cellId = cellId,
 )
 
 /**

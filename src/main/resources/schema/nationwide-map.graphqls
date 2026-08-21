@@ -14,8 +14,8 @@ extend type Query {
     오류: MAP_CELL_NOT_FOUND.
     """
     mapCell(
-        "칸 코드. mapCells가 반환한 값이다. 시군구 코드가 아니다."
-        code: String!
+        "칸 id. mapCells가 반환한 값이다. 시군구 코드가 아니다."
+        id: ID!
     ): MapCell!
 
     """
@@ -94,8 +94,11 @@ extend type Mutation {
 12곳)도 시 단위로 1칸이다. 그 외에는 시군 1개가 1칸이다. 전국 252개 시군구가 161칸이 된다.
 """
 type MapCell {
-    "칸 코드. 이 칸을 가리키는 안정 식별자다."
-    code: String!
+    """
+    칸 id. 이 칸을 가리키는 식별자이며 **행정구역 코드가 아니다** — 칸은 서버가 정한 표시
+    단위라 대응하는 공식 코드가 없다. 시군구 코드는 districtCodes에 따로 온다.
+    """
+    id: ID!
 
     """
     이 칸이 포함하는 시군구 행정표준코드 5자리 목록.
@@ -209,11 +212,11 @@ type ResolveDistrictsResult {
     districtCodes: [String!]!
 
     """
-    판정된 코드가 속하는 칸 코드 목록. 중복이 제거되어 있다.
+    판정된 코드가 속하는 칸 id 목록. 중복이 제거되어 있다.
 
     클라이언트가 districtCodes를 다시 칸에 대응시키지 않아도 되게 함께 준다.
     """
-    cellCodes: [String!]!
+    cellIds: [ID!]!
 
     "판정에 실패한(어느 시군구에도 속하지 않은) 좌표 개수. 사용자 안내에 쓴다."
     unresolvedCount: Int!
@@ -241,8 +244,8 @@ type RecordVisitsPayload implements BaseResponse {
 }
 
 input RemoveVisitInput {
-    "해제할 칸 코드. 그 칸에 속한 모든 시군구의 기록이 함께 해제된다."
-    cellCode: String!
+    "해제할 칸 id. 그 칸에 속한 모든 시군구의 기록이 함께 해제된다."
+    cellId: ID!
 }
 
 type RemoveVisitPayload implements BaseResponse {
@@ -280,15 +283,15 @@ type SharedMap {
     "지도 주인의 닉네임. 이메일 등 다른 개인정보는 제공하지 않는다."
     ownerNickname: String!
 
-    "지도 주인이 방문한 칸 코드 목록. 칸 코드 오름차순이다."
-    visitedCellCodes: [String!]!
+    "지도 주인이 방문한 칸 id 목록. 오름차순이다."
+    visitedCellIds: [ID!]!
 
     """
-    조회자와 겹치는 칸 코드 목록.
+    조회자와 겹치는 칸 id 목록.
 
     **조회자가 비인증이면 null이다** — 빈 배열(겹치는 칸이 없음)과 구분된다.
     """
-    overlappingCellCodes: [String!]
+    overlappingCellIds: [ID!]
 
     "지도 주인이 방문한 칸 수. 클라이언트가 목록 길이를 세지 않아도 되게 함께 준다."
     visitedCount: Int!

@@ -48,11 +48,11 @@ class NationwideMapGqlMapperTest {
     }
 
     @Test
-    fun `방문 해제 입력은 칸 코드를 그대로 옮긴다`() {
-        val command = RemoveVisitInput(cellCode = "41111").toCommand(memberId = 9L)
+    fun `방문 해제 입력은 칸 id를 그대로 옮긴다`() {
+        val command = RemoveVisitInput(cellId = 2L).toCommand(memberId = 9L)
 
         assertEquals(9L, command.memberId)
-        assertEquals("41111", command.cellCode)
+        assertEquals(2L, command.cellId)
     }
 
     @Test

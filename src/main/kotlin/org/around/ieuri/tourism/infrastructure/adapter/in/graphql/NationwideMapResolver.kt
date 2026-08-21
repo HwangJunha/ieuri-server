@@ -52,9 +52,9 @@ class NationwideMapResolver(
         )
 
     @DgsQuery
-    fun mapCell(dfe: DgsDataFetchingEnvironment, @InputArgument code: String): MapCellView =
+    fun mapCell(dfe: DgsDataFetchingEnvironment, @InputArgument id: Long): MapCellView =
         nationwideMapUseCase.mapCell(
-            cellCode = code,
+            cellId = id,
             locale = dfe.domainLocale(),
             memberId = currentMemberProvider.currentMemberId(),
         )
@@ -75,7 +75,7 @@ class NationwideMapResolver(
 
         return GqlResolveDistrictsResult(
             districtCodes = result.districtCodes,
-            cellCodes = result.cellCodes,
+            cellIds = result.cellIds,
             unresolvedCount = result.unresolvedCount,
         )
     }
@@ -88,8 +88,8 @@ class NationwideMapResolver(
         )
         return GqlSharedMap(
             ownerNickname = view.ownerNickname,
-            visitedCellCodes = view.visitedCellCodes,
-            overlappingCellCodes = view.overlappingCellCodes,
+            visitedCellIds = view.visitedCellIds,
+            overlappingCellIds = view.overlappingCellIds,
             visitedCount = view.visitedCount,
         )
     }
@@ -103,7 +103,7 @@ class NationwideMapResolver(
     @DgsData(parentType = "MapCell", field = "representativeImage")
     fun representativeImage(dfe: DgsDataFetchingEnvironment): GqlCellImage? {
         val cell = dfe.mapCell()
-        return CellImageBatchLoader.load(dfe, cell.code, nationwideMapUseCase)?.let {
+        return CellImageBatchLoader.load(dfe, cell.id, nationwideMapUseCase)?.let {
             GqlCellImage(
                 imageUrl = it.imageUrl,
                 thumbnailUrl = it.thumbnailUrl,
@@ -124,7 +124,7 @@ class NationwideMapResolver(
     ): GqlCellSpotConnection {
         val page = nationwideMapUseCase.cellSpots(
             CellSpotsQuery(
-                cellCode = dfe.mapCell().code,
+                cellId = dfe.mapCell().id,
                 first = first ?: DEFAULT_CELL_SPOT_PAGE_SIZE,
                 after = after,
             ),
