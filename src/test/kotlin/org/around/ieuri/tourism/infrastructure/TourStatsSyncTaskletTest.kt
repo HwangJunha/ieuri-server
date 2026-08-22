@@ -50,6 +50,7 @@ class TourStatsSyncTaskletTest {
             .addString(RUN_DATE_PARAMETER, runDate.toString())
             .toJobParameters()
         return StepExecution(
+            1L,
             "tourStatsSyncStep",
             JobExecution(1L, JobInstance(1L, "tourStatsConcentrationRateSyncJob"), parameters),
         )

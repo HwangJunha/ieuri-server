@@ -65,7 +65,7 @@ class SpotSyncTaskletTest {
         val parameters = JobParametersBuilder()
             .addString(RUN_DATE_PARAMETER, RUN_DATE.toString())
             .toJobParameters()
-        return StepExecution("syncLanguageStep-KO", JobExecution(1L, JobInstance(1L, "spotSyncJob"), parameters))
+        return StepExecution(1L, "syncLanguageStep-KO", JobExecution(1L, JobInstance(1L, "spotSyncJob"), parameters))
     }
 
     private fun run(tasklet: SpotSyncTasklet, stepExecution: StepExecution): RepeatStatus? {

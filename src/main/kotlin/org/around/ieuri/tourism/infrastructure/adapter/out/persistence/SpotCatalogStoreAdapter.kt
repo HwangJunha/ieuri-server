@@ -39,11 +39,11 @@ class SpotCatalogStoreAdapter(
      * **부모를 먼저 flush해야 한다** — 자식이 들고 갈 `catalog_id`가 그때 정해진다.
      */
     @Transactional
-    override fun save(catalogToSave: SpotCatalog): Long {
-        val saved = catalogRepository.saveAndFlush(catalogToSave.toNewEntity())
+    override fun save(catalog: SpotCatalog): Long {
+        val saved = catalogRepository.saveAndFlush(catalog.toNewEntity())
         val catalogId = requireNotNull(saved.id) { "저장 직후 카탈로그 id가 없다." }
 
-        translationRepository.saveAll(catalogToSave.toNewTranslationEntities(catalogId))
+        translationRepository.saveAll(catalog.toNewTranslationEntities(catalogId))
         return catalogId
     }
 
