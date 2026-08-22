@@ -70,64 +70,80 @@ V79는 이 슬라이스의 미병합 마이그레이션이라 파일을 직접 �
 
 ---
 
-## 판정을 보류한 37건 (고치지 않았다)
+## 보류했던 37건의 처리 (2026-08-22)
 
-검수에서 `SUSPECT`로 분류한 것들이다. **오매칭 17건과 성격이 다르다** — 저쪽은 아예 다른
-곳(음식점·리조트)의 사진이었지만, 이쪽은 대체로 **그 장소가 맞거나 바로 인접한 곳인데
-명명된 대상 자체가 프레임에 없는** 경우다. 관촉사에 은진미륵 대신 대웅전이, 해인사
-장경판전에 해인사 전경이 온 식이다.
+사진을 붙여 다시 검토한 결과 **30건을 교체하고 7건만 남기기로** 했다.
 
-고치지 않은 이유는 셋이다.
+남긴 7건은 사진이 그 장소를 충분히 대표한다고 본 것들이다.
 
-1. **틀렸다고 단정할 수 없다.** 태안해안국립공원 사무소 간판은 간판 문구가 실제로 그
-   공원이고, 지리산 천왕봉의 '智異山第一門'도 지리산 관문이다. 지도 칸의 대표 이미지로서
-   완전히 부적절하다고 보기 어렵다.
-2. **업스트림이 그렇다.** 대부분 TourAPI가 그 `contentid`에 물려 둔 공식 대표 이미지다.
-   바꾸려면 갤러리에서 다른 컷을 골라야 하는데, 그건 취향 판단이지 결함 수정이 아니다.
-3. **판정 기준을 보수적으로 뒀다.** 검수 지침이 "확신이 없으면 SUSPECT"였으므로, 이 목록에는
-   실제로는 정상인 것이 섞여 있다.
+| 칸 | 이름 | 남긴 이유 |
+|---|---|---|
+| 경기도 부천시 | 상동호수공원 | 호수는 안 보이나 공원 광장 자체가 그 장소다 |
+| 경기도 광명시 | 광명동굴 | 동굴 입구 광장의 야간 조명은 실제 관람 동선의 일부다 |
+| 경상북도 구미시 | 금오산 도립공원 | 겹벚꽃 산책로가 도립공원 내 실제 경관이다 |
+| 경상남도 함안군 | 무진정 | 낙화놀이는 무진정에서 열리는 대표 행사다 |
+| 강원특별자치도 태백시 | 검룡소 | 계류 사진이 검룡소 물길과 어긋나지 않는다 |
+| 강원특별자치도 삼척시 | 삼척 죽서루 | 관아형 전각이 죽서루 경내 건물이다 |
+| 강원특별자치도 철원군 | 고석정 | 고석정꽃밭은 고석정 관광지의 일부다 |
 
-★는 그 칸의 대표 이미지(`display_order` 0)라 화면에 실제로 나가는 것이다.
+교체한 30건의 경위는 아래 "다시 고른 30건"에 있다.
 
-| 칸 | 이름 | 대표 | 사진 | 무엇이 걸리는가 |
-|---|---|---|---|---|
-| 경기도 부천시 | 상동호수공원 |  | [열기](https://tong.visitkorea.or.kr/cms/resource/95/3037395_image2_1.jpg) | 아파트 앞 광장·잔디밭·푸드트럭만 보이고 호수가 화면에 없음 |
-| 경기도 광명시 | 광명동굴 | ★ | [열기](https://tong.visitkorea.or.kr/cms/resource/27/4095727_image2_1.jpg) | 야외 보행로의 야간 LED 조명 정원 — 동굴 내부 암반이 없음 |
-| 경기도 김포시 | 김포 장릉 | ★ | [열기](https://tong.visitkorea.or.kr/cms/resource/50/3361650_image2_1.jpg) | 능침·정자각 없이 한옥 정자 건물만(재실로 추정) |
-| 충청북도 영동군 | 영동 영국사 은행나무 |  | [열기](https://tong.visitkorea.or.kr/cms/resource/44/3059844_image2_1.JPG) | 영국사 대웅전만 보이고 명명 대상인 은행나무가 없음 |
-| 충청남도 논산시 | 관촉사 석조미륵보살입상 | ★ | [열기](https://tong.visitkorea.or.kr/cms/resource/30/3533430_image2_1.jpg) | 관촉사 대웅전 건물 — 은진미륵 석조입상 자체는 안 보임 |
-| 충청남도 청양군 | 청양 고추·구기자 | ★ | [열기](https://tong.visitkorea.or.kr/cms/resource/76/4091576_image2_1.jpg) | 실사진이 아니라 축제 홍보 포스터 이미지 |
-| 충청남도 청양군 | 칠갑산 도립공원 |  | [열기](https://tong.visitkorea.or.kr/cms/resource/67/3027467_image2_1.jpg) | 도립공원사무소 건물 간판 — 산 경관 없음(간판 문구는 일치) |
-| 충청남도 태안군 | 태안해안국립공원 | ★ | [열기](https://tong.visitkorea.or.kr/cms/resource/94/1962094_image2_1.jpg) | 공원 사무소 입구 간판만 — 해안 경관 없음(간판 문구는 일치) |
-| 전라남도 여수시 | 여수 엑스포해양공원 |  | [열기](https://tong.visitkorea.or.kr/cms/resource/13/3499913_image2_1.jpg) | 등대가 선 해안 절벽 — 엑스포 시설물이 없고 오동도 쪽에 가까움 |
-| 전라남도 순천시 | 선암사 |  | [열기](https://tong.visitkorea.or.kr/cms/resource/71/3460071_image2_1.jpg) | 단풍철 등산로 인파만 보이고 사찰 건물이 프레임에 없음 |
-| 전라남도 고흥군 | 팔영산 | ★ | [열기](https://tong.visitkorea.or.kr/cms/resource/44/3532744_image2_1.jpg) | 삼나무·편백 숲길 — 팔영산 특징인 여덟 암봉이 안 보임 |
-| 전라남도 화순군 | 운주사 |  | [열기](https://tong.visitkorea.or.kr/cms/resource/35/4094535_image2_1.jpg) | 간판이 '화순군립 운주사문화관' — 사찰이 아니라 인근 문화관 |
-| 전라남도 영광군 | 영광 굴비 | ★ | [열기](https://tong.visitkorea.or.kr/cms/resource/32/2876932_image2_1.jpg) | '영광굴비정식' 식당 외관 — 굴비 자체나 덕장이 아님 |
-| 전라남도 진도군 | 진도 신비의 바닷길 | ★ | [열기](https://tong.visitkorea.or.kr/cms/resource/20/3569920_image2_1.JPG) | 해안 축제장 항공뷰 — 바닷길 갈라짐 장면은 없음 |
-| 전라남도 신안군 | 신안 갯벌 | ★ | [열기](https://tong.visitkorea.or.kr/cms/resource/86/3573086_image2_1.jpg) | 갯벌 자체가 아니라 '신안 갯벌박물관' 건물 정면 |
-| 경상북도 안동시 | 하회마을 | ★ | [열기](https://tong.visitkorea.or.kr/cms/resource/67/3585467_image2_1.jpg) | 한옥 대문 근접샷 — 하회마을 특유 전경이 없어 단정 불가 |
-| 경상북도 구미시 | 금오산 도립공원 | ★ | [열기](https://tong.visitkorea.or.kr/cms/resource/01/3566301_image2_1.jpg) | 겹벚꽃 산책로만 — 금오산 산세 식별 요소 없음 |
-| 경상북도 의성군 | 금성산 고분군 | ★ | [열기](https://tong.visitkorea.or.kr/cms/resource/21/3542321_image2_1.jpg) | 배롱나무꽃 너머 2층 정자만 — 고분(봉분) 확인 불가 |
-| 경상북도 영덕군 | 영덕 블루로드 | ★ | [열기](https://tong.visitkorea.or.kr/cms/resource/07/3042707_image2_1.JPG) | 풍력발전기와 도로 — 블루로드 트레일 표식·해안길 없음 |
-| 경상남도 사천시 | 사천 선진리성 |  | [열기](https://tong.visitkorea.or.kr/cms/resource/24/3564424_image2_1.jpg) | 벚꽃 산책로만 보이고 성곽·토성 흔적이 없음 |
-| 경상남도 밀양시 | 표충사 |  | [열기](https://tong.visitkorea.or.kr/cms/resource/23/3501023_image2_1.jpg) | 물놀이하는 계곡 사진 — 사찰 건물 없음(표충사 앞 계곡 추정) |
-| 경상남도 의령군 | 의령 솥바위 |  | [열기](https://tong.visitkorea.or.kr/cms/resource/96/4088096_image2_1.jpg) | 정암루 정자만 보이고 강 속 솥바위 자체는 안 보임 |
-| 경상남도 함안군 | 무진정 |  | [열기](https://tong.visitkorea.or.kr/cms/resource/62/3318062_image2_1.jpg) | 함안 낙화놀이 야경만 — 무진정 정자 건물이 안 보임 |
-| 경상남도 산청군 | 지리산 국립공원 천왕봉 | ★ | [열기](https://tong.visitkorea.or.kr/cms/resource/08/3538308_image2_1.jpg) | 천왕봉 정상이 아니라 도로 위 '智異山第一門' 문루 |
-| 경상남도 함양군 | 함양 상림 | ★ | [열기](https://tong.visitkorea.or.kr/cms/resource_photo/08/3522408_image2_1.jpg) | 상림 숲이 아니라 인접 꽃단지 풍경 |
-| 경상남도 합천군 | 해인사 장경판전 | ★ | [열기](https://tong.visitkorea.or.kr/cms/resource/27/4092527_image2_1.jpg) | 해인사 전각 조감 — 지정 대상인 장경판전이 특정되지 않음 |
-| 경상남도 합천군 | 황매산 철쭉군락 |  | [열기](https://tong.visitkorea.or.kr/cms/resource/46/3525746_image2_1.jpg) | 황매산 능선은 맞으나 철쭉이 아닌 가을 억새 |
-| 제주특별자치도 제주시 | 협재해수욕장 |  | [열기](https://tong.visitkorea.or.kr/cms/resource/66/3096066_image2_1.jpg) | 배후에 도심 스카이라인·야자수 — 비양도가 보이는 협재가 아님 |
-| 강원특별자치도 태백시 | 검룡소 |  | [열기](https://tong.visitkorea.or.kr/cms/resource/56/4057456_image2_1.jpg) | 검룡소 특유의 석회암 소·물길이 아니라 평범한 가을 계류 |
-| 강원특별자치도 삼척시 | 삼척 죽서루 | ★ | [열기](https://tong.visitkorea.or.kr/cms/resource/16/4060716_image2_1.jpg) | 절벽 위 단일 누각이 아니라 담장 두른 관아형 전각·마당 |
-| 강원특별자치도 횡성군 | 횡성호수길 | ★ | [열기](https://tong.visitkorea.or.kr/cms/resource/06/4063806_image2_1.jpg) | 우비 입은 단체가 숲길을 걷는 사진 — 호수가 안 보임 |
-| 강원특별자치도 철원군 | 고석정 | ★ | [열기](https://tong.visitkorea.or.kr/cms/resource_photo/76/4062476_image2_1.jpg) | 항공 촬영 꽃밭(고석정꽃밭 추정) — 고석 바위·정자는 안 보임 |
-| 강원특별자치도 화천군 | 화천천 | ★ | [열기](https://tong.visitkorea.or.kr/cms/resource/46/4071246_image2_1.jpg) | 산천어축제 마스코트 인형이 대부분 — 하천 자체는 배경 |
-| 강원특별자치도 인제군 | 내린천 |  | [열기](https://tong.visitkorea.or.kr/cms/resource/52/3502852_image2_1.jpg) | 래프팅 보트·천막만 있고 강물은 프레임 밖 |
-| 전북특별자치도 군산시 | 군산 근대역사문화거리 | ★ | [열기](https://tong.visitkorea.or.kr/cms/resource/13/3304813_image2_1.jpg) | 근대역사박물관 현대식 건물 — 거리 자체는 안 나옴 |
-| 전북특별자치도 익산시 | 미륵사지 | ★ | [열기](https://tong.visitkorea.or.kr/cms/resource/70/3563870_image2_1.jpg) | 절터 초석 하나 클로즈업 — 미륵사지 석탑 등 식별 근거 없음 |
-| 전북특별자치도 임실군 | 사선대 |  | [열기](https://tong.visitkorea.or.kr/cms/resource/84/3536784_image2_1.jpg) | 조각품 놓인 잔디 공원 — 사선대 정자·섬진강 없어 특정 불가 |
+---
 
-바꾸기로 한다면 TourAPI `detailImage2`로 같은 `contentid`의 갤러리를 받아 고르면 된다 —
-오매칭 정정 때 바람의 언덕·채석강을 그렇게 교체했다.
+## 다시 고른 30건 (2026-08-22)
+
+**24건 교체 · 6건 삭제.** 전부 사진을 실제로 열어 확인한 뒤 확정했다.
+
+교체본은 대부분 **대표 이미지가 아니라 갤러리에서 고른 컷**이다. 대표 이미지가 곧 반려 사유였던
+경우가 많아(관촉사 대표 = 대웅전, 금성산 고분군 대표 = 정자) `detailImage2`로 갤러리를 받아
+대상이 실제로 보이는 컷을 찾았다.
+
+| 이름 | 새 contentid | 바뀐 사진 |
+|---|---|---|
+| 김포 장릉 | `126542` | [홍살문·참도·정자각이 이어지는 왕릉 정면](https://tong.visitkorea.or.kr/cms/resource/51/3361651_image2_1.jpg) |
+| 여수 엑스포해양공원 | `2037308` | [엑스포 전시관 곡면 지붕과 빅오 구조물](https://tong.visitkorea.or.kr/cms/resource/67/3587267_image2_1.jpg) |
+| 신안 갯벌 | `1279369` | [간조에 드러난 갯벌과 짱뚱어다리](https://tong.visitkorea.or.kr/cms/resource/13/3559113_image2_1.jpg) |
+| 지리산 국립공원 천왕봉 | `250411` | [정상부 바위·상고대와 겹겹의 능선·운해](https://tong.visitkorea.or.kr/cms/resource/25/3076925_image2_1.jpg) |
+| 횡성호수길 | `2774026` | [산 그림자가 반사된 횡성호 수면](https://tong.visitkorea.or.kr/cms/resource/91/4096191_image2_1.jpg) |
+| 선암사 | `126369` | [「太古叢林 曹溪山 仙巖寺」 현판이 걸린 사찰 누각](https://tong.visitkorea.or.kr/cms/resource/62/4054662_image2_1.jpg) |
+| 하회마을 | `894027` | [초가 군락과 기와집·돌담의 마을 전경](https://tong.visitkorea.or.kr/cms/resource/33/3542033_image2_1.jpg) |
+| 의령 솥바위 | `126193` | [남강 물 속에 솟은 솥 모양 바위](https://tong.visitkorea.or.kr/cms/resource/34/3490034_image2_1.jpg) |
+| 화천천 | `128101` | [하천 본류 항공뷰와 붕어섬](https://tong.visitkorea.or.kr/cms/resource/41/3484941_image2_1.JPG) |
+| 관촉사 석조미륵보살입상 | `125905` | [은진미륵 석조입상 전신(보개·합장한 손)](https://tong.visitkorea.or.kr/cms/resource/36/3533436_image2_1.jpg) |
+| 팔영산 | `2734251` | [능선에 톱니처럼 솟은 여덟 암봉](https://tong.visitkorea.or.kr/cms/resource/14/3450514_image2_1.jpg) |
+| 금성산 고분군 | `2629038` | [잔디밭의 봉분 5~6기와 금성산 능선](https://tong.visitkorea.or.kr/cms/resource/18/3542318_image2_1.jpg) |
+| 함양 상림 | `126861` | [노거수가 우거진 상림 숲길](https://tong.visitkorea.or.kr/cms/resource_photo/64/3522564_image2_1.jpg) |
+| 내린천 | `125627` | [계곡 사이를 흐르는 강물과 하천 바위](https://tong.visitkorea.or.kr/cms/resource/25/4101925_image2_1.jpg) |
+| 진도 신비의 바닷길 | `126433` | [갈라진 바닷길을 줄지어 건너는 사람들](https://tong.visitkorea.or.kr/cms/resource/23/3569923_image2_1.JPG) |
+| 표충사 | `126174` | [편액 表忠祠가 판독되는 사찰 전각](https://tong.visitkorea.or.kr/cms/resource/72/3534972_image2_1.jpg) |
+| 협재해수욕장 | `127490` | [야자수·현무암·백사장 너머 비양도](https://tong.visitkorea.or.kr/cms/resource/67/3011867_image2_1.jpg) |
+| 운주사 | `126359` | [암벽 앞에 늘어선 운주사 특유의 석불군](https://tong.visitkorea.or.kr/cms/resource/62/1637362_image2_1.jpg) |
+| 영덕 블루로드 | `1041317` | [바다를 낀 해안 트레일 목재 계단길](https://tong.visitkorea.or.kr/cms/resource/35/1968635_image2_1.jpg) |
+| 해인사 장경판전 | `126175` | [판전 두 동과 살창이 보이는 마당](https://tong.visitkorea.or.kr/cms/resource/20/4092520_image2_1.jpg) |
+| 군산 근대역사문화거리 | `2469034` | [구 조선은행 군산지점과 그 앞 거리](https://tong.visitkorea.or.kr/cms/resource/19/3351519_image2_1.jpg) |
+| 사천 선진리성 | `126197` | [경사진 왜성 석축 성벽과 벚꽃길](https://tong.visitkorea.or.kr/cms/resource/27/3564427_image2_1.jpg) |
+| 황매산 철쭉군락 | `126041` | [만개한 분홍 철쭉과 황매산 암봉](https://tong.visitkorea.or.kr/cms/resource/13/3532313_image2_1.JPG) |
+| 미륵사지 | `127977` | [복원된 미륵사지 석탑 전체](https://tong.visitkorea.or.kr/cms/resource/07/4070307_image2_1.jpg) |
+
+### 지운 6건 — 업스트림에 그런 사진이 아예 없다
+
+| 이름 | 확인한 것 |
+|---|---|
+| 영동 영국사 은행나무 | 영국사(337518) 갤러리 전량이 대웅전·요사채·석탑. 은행나무 단독 콘텐츠가 TourAPI에 없다 |
+| 청양 고추·구기자 | 은골구기자마을(762817) 갤러리는 논·나무·표지석뿐. 축제 콘텐츠의 유일한 이미지가 문제의 그 포스터다 |
+| 칠갑산 도립공원 | 유일한 산 경관 컷이 `.bmp` 827KB이고 썸네일이 404. 나머지는 사무소 간판·데크 계단 |
+| 태안해안국립공원 | 125818이 유일 등록이고 이미지가 그 사무소 간판 하나뿐, 갤러리 없음 |
+| 영광 굴비 | 법성포 굴비거리(4058627) 등 11장 확인 — 굴비정식 상차림·조형물·표지판뿐, 굴비나 덕장 없음 |
+| 사선대 | 126315 대표+갤러리 5장 전부 조각공원. 사선대 정자나 하천 경관 컷이 없다 |
+
+**지운 뒤에도 161칸 전부 대표 이미지를 갖는다**(365건). 태안 칸은 신두리 해안사구가 대표로
+올라오는데, 사무소 간판보다 낫다.
+
+### 판단이 갈릴 수 있는 것 세 가지
+
+- **팔영산** — TourAPI에 산 단독 항목이 없어 야영장 콘텐츠(2734251)의 갤러리 컷을 썼다.
+  사진 내용은 암봉 능선이라 기준을 충족하지만 `content_id`는 야영장이다.
+- **황매산 철쭉군락** — 합천 쪽 콘텐츠 갤러리가 전량 겨울 촬영이라 철쭉이 없다. 철쭉 만개 컷이
+  있는 산청 쪽(126041)을 썼다. 같은 산이지만 등록 주소의 행정구역이 다르다.
+- **하회마을** — 고른 컷에 개인 촬영자 워터마크(ⓒ더남 9기)가 있다. TYPE1이라 이용은 문제없다.
+
