@@ -14,7 +14,7 @@ import java.util.UUID
  *
  * 글과 달리 프로필 이미지는 1장이라 순서·다중 발급 개념이 없다.
  */
-data class ProfileImageObjectKey private constructor(
+data class ProfileImageObjectKey(
     val value: String,
     val memberId: Long,
     val confirmed: Boolean,
@@ -27,8 +27,7 @@ data class ProfileImageObjectKey private constructor(
         if (confirmed) {
             this
         } else {
-            // copy()가 아니라 생성자를 부른다 — 접두어와 confirmed는 함께 움직여야 하는 값이라
-            // 한 자리에서 전부 지정하는 편이 어긋날 여지가 없다.
+            // 접두어(value)와 confirmed는 함께 움직여야 하는 값이라 한 자리에서 전부 지정한다.
             ProfileImageObjectKey(
                 value = value.replaceFirst("$PENDING_PREFIX/", "$CONFIRMED_PREFIX/"),
                 memberId = memberId,

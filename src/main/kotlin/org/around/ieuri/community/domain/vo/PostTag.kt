@@ -6,7 +6,7 @@ package org.around.ieuri.community.domain.vo
  * [name]은 유저가 친 그대로 보존하고 [normalized]로 매칭한다. "Seoul"과 "seoul"이 같은
  * 태그여야 하지만, 화면에는 유저가 쓴 대로 보여야 하기 때문이다.
  */
-data class PostTag private constructor(
+data class PostTag(
     val name: String,
     val normalized: String,
 ) {
