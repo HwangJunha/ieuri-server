@@ -28,6 +28,9 @@ extra["netflixDgsVersion"] = "11.1.0"
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    // k8s readiness·liveness 프로브용 health 엔드포인트. 프로브 경로만 열고 나머지
+    // actuator 엔드포인트는 노출하지 않는다(application.yaml의 management 블록).
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
     // refresh 토큰 저장소를 Valkey(Redis 프로토콜 호환)로 이관. Lettuce 클라이언트 기본.
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.boot:spring-boot-starter-security")

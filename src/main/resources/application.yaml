@@ -120,6 +120,31 @@ spring:
       mail.smtp.starttls.enable: true
       mail.smtp.starttls.required: true
 
+management:
+  endpoints:
+    web:
+      exposure:
+        # health만 연다. 나머지 actuator 엔드포인트(env·beans·heapdump 등)는 노출하지 않는다 —
+        # Spring Security가 전 경로 permitAll이라(SecurityConfig) 여기서 닫지 않으면 그대로 공개된다.
+        include: health
+  endpoint:
+    health:
+      # k8s 프로브용 /actuator/health/{readiness,liveness} 하위 경로를 만든다.
+      probes:
+        enabled: true
+      # 상세는 인증 없이 노출하지 않는다 — DB 호스트·드라이버 같은 내부 정보가 실린다.
+      show-details: never
+      group:
+        # **liveness에는 외부 의존성을 넣지 않는다.** liveness 실패는 재시작이라, DB나
+        # Valkey가 흔들릴 때 파드를 재시작해도 나아지는 것이 없고 재시작 루프만 된다.
+        liveness:
+          include: livenessState
+        # readiness에서도 db·redis를 뺀다. 둘 다 켜 두면 일시적 DB 단절에 전 파드가 동시에
+        # NotReady로 떨어져 부분 장애가 전면 장애가 된다. 지금은 "프로세스가 요청을 받을
+        # 준비가 됐는가"만 본다 — 의존성 기반 readiness는 필요해지면 그때 별도로 판단한다.
+        readiness:
+          include: readinessState
+
 server:
   # 배포 환경(dev·운영)의 포트. 로컬은 application-local.yaml에서 8888로 덮어쓴다.
   port: 8080
