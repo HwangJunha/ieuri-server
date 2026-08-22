@@ -1,7 +1,13 @@
 -- tourism 도메인: 칸 대표 이미지 seed 적재(SPEC-0030 R9·R10).
 --
--- planner가 산출한 landmarks-161-with-images.json에서 옮긴 375건이다. 칸당 1~4건이며
+-- planner가 산출한 landmarks-161-with-images.json에서 옮긴 371건이다. 칸당 1~4건이며
 -- display_order 0이 대표다.
+--
+-- **원본 375건 중 17건은 사진이 다른 곳의 것이었다.** planner가 TourAPI를 이름으로 검색해
+-- 첫 결과를 썼는데, "성산일출봉"에 성산흑돼지두루치기 성산일출봉점이, "불국사"에 불국사밀면이
+-- 걸린 식이다(원본 JSON의 tour.title에 그 상호가 남아 있다). 375장을 전부 열어 확인한 뒤
+-- 13건은 올바른 contentid의 이미지로 바꾸고, 대체할 사진이 없는 4건(함평 한우·의령 망개떡·
+-- 운문사·동피랑 벽화마을)은 행을 지웠다. 지운 자리는 display_order를 당겨 메웠다.
 --
 -- **칸 코드를 값으로 적지 않고 지역 이름으로 조인해 얻는다.** seed의 region은 '경기도 수원시'
 -- 형태이고 칸 코드는 V74가 정하므로, 코드를 여기 베껴 두면 두 곳이 어긋날 수 있다. 조인이
@@ -26,7 +32,7 @@ CREATE TEMP TABLE map_cell_image_seed (
 
 INSERT INTO map_cell_image_seed VALUES
     ('서울특별시', 0, 'https://tong.visitkorea.or.kr/cms/resource/98/3487598_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/98/3487598_image3_1.jpg', '경복궁', 'LANDMARK', 'TYPE1', '126508'),
-    ('서울특별시', 1, 'https://tong.visitkorea.or.kr/cms/resource/04/4020504_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/04/4020504_image3_1.jpg', '창덕궁', 'LANDMARK', 'TYPE3', '2910025'),
+    ('서울특별시', 1, 'https://tong.visitkorea.or.kr/cms/resource_photo/09/3511909_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource_photo/09/3511909_image3_1.jpg', '창덕궁', 'LANDMARK', 'TYPE1', '127642'),
     ('서울특별시', 2, 'https://tong.visitkorea.or.kr/cms/resource/04/3304404_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/04/3304404_image3_1.jpg', '북촌한옥마을', 'LANDMARK', 'TYPE3', '126537'),
     ('부산광역시', 0, 'https://tong.visitkorea.or.kr/cms/resource/77/3368477_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/77/3368477_image3_1.jpg', '광안대교', 'LANDMARK', 'TYPE1', '128164'),
     ('부산광역시', 1, 'https://tong.visitkorea.or.kr/cms/resource/34/3090534_image2_1.JPG', 'https://tong.visitkorea.or.kr/cms/resource/34/3090534_image3_1.JPG', '해운대해수욕장', 'LANDMARK', 'TYPE1', '126081'),
@@ -63,7 +69,7 @@ INSERT INTO map_cell_image_seed VALUES
     ('경기도 안산시', 0, 'https://tong.visitkorea.or.kr/cms/resource/18/3489718_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/18/3489718_image3_1.jpg', '대부도', 'LANDMARK', 'TYPE3', '126844'),
     ('경기도 안산시', 1, 'https://tong.visitkorea.or.kr/cms/resource/77/2862677_image2_1.JPG', 'https://tong.visitkorea.or.kr/cms/resource/77/2862677_image3_1.JPG', '시화나래조력공원', 'LANDMARK', 'TYPE3', '2862693'),
     ('경기도 고양시', 0, 'https://tong.visitkorea.or.kr/cms/resource/20/4075820_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/20/4075820_image3_1.jpg', '행주산성', 'LANDMARK', 'TYPE1', '125562'),
-    ('경기도 고양시', 1, 'https://tong.visitkorea.or.kr/cms/resource/21/2925021_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/21/2925021_image3_1.jpg', '서오릉', 'LANDMARK', 'TYPE3', '2925027'),
+    ('경기도 고양시', 1, 'https://tong.visitkorea.or.kr/cms/resource/69/4075769_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/69/4075769_image3_1.jpg', '서오릉', 'LANDMARK', 'TYPE1', '125552'),
     ('경기도 과천시', 0, 'https://tong.visitkorea.or.kr/cms/resource_photo/23/3539123_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource_photo/23/3539123_image3_1.jpg', '서울대공원', 'LANDMARK', 'TYPE1', '126712'),
     ('경기도 과천시', 1, 'https://tong.visitkorea.or.kr/cms/resource/92/4065392_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/92/4065392_image3_1.jpg', '국립과천과학관', 'LANDMARK', 'TYPE1', '660722'),
     ('경기도 구리시', 0, 'https://tong.visitkorea.or.kr/cms/resource/04/4066104_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/04/4066104_image3_1.jpg', '동구릉', 'LANDMARK', 'TYPE1', '125545'),
@@ -95,7 +101,7 @@ INSERT INTO map_cell_image_seed VALUES
     ('경기도 광주시', 0, 'https://tong.visitkorea.or.kr/cms/resource/56/3350256_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/56/3350256_image3_1.jpg', '남한산성', 'LANDMARK', 'TYPE3', '2751248'),
     ('경기도 광주시', 1, 'https://tong.visitkorea.or.kr/cms/resource_photo/52/3404852_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource_photo/52/3404852_image3_1.jpg', '곤지암 도자공원', 'LANDMARK', 'TYPE1', '1903260'),
     ('경기도 양주시', 0, 'https://tong.visitkorea.or.kr/cms/resource/65/3350065_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/65/3350065_image3_1.jpg', '양주 회암사지', 'LANDMARK', 'TYPE3', '126544'),
-    ('경기도 양주시', 1, 'https://tong.visitkorea.or.kr/cms/resource/01/3476001_image2_1.JPG', 'https://tong.visitkorea.or.kr/cms/resource/01/3476001_image3_1.JPG', '양주 별산대놀이', 'LANDMARK', 'TYPE3', '129880'),
+    ('경기도 양주시', 1, 'https://tong.visitkorea.or.kr/cms/resource/70/4093670_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/70/4093670_image3_1.jpg', '양주 별산대놀이', 'LANDMARK', 'TYPE3', '2754295'),
     ('경기도 포천시', 0, 'https://tong.visitkorea.or.kr/cms/resource/12/3496512_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/12/3496512_image3_1.jpg', '한탄강 유네스코 세계지질공원', 'LANDMARK', 'TYPE3', '2569475'),
     ('경기도 포천시', 1, 'https://tong.visitkorea.or.kr/cms/resource/83/3496483_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/83/3496483_image3_1.jpg', '비둘기낭 폭포', 'LANDMARK', 'TYPE3', '2569476'),
     ('경기도 포천시', 2, 'https://tong.visitkorea.or.kr/cms/resource/47/3022447_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/47/3022447_image3_1.jpg', '산정호수', 'LANDMARK', 'TYPE3', '125523'),
@@ -144,7 +150,7 @@ INSERT INTO map_cell_image_seed VALUES
     ('충청남도 보령시', 0, 'https://tong.visitkorea.or.kr/cms/resource/66/3513866_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/66/3513866_image3_1.jpg', '대천해수욕장', 'LANDMARK', 'TYPE1', '127866'),
     ('충청남도 보령시', 1, 'https://tong.visitkorea.or.kr/cms/resource/13/3513913_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/13/3513913_image3_1.jpg', '무창포 신비의 바닷길', 'LANDMARK', 'TYPE1', '125841'),
     ('충청남도 아산시', 0, 'https://tong.visitkorea.or.kr/cms/resource_photo/40/3473040_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource_photo/40/3473040_image3_1.jpg', '현충사', 'LANDMARK', 'TYPE1', '125945'),
-    ('충청남도 아산시', 1, 'https://tong.visitkorea.or.kr/cms/resource/90/4062790_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/90/4062790_image3_1.jpg', '외암마을', 'LANDMARK', 'TYPE3', '2823481'),
+    ('충청남도 아산시', 1, 'https://tong.visitkorea.or.kr/cms/resource_photo/59/4071759_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource_photo/59/4071759_image3_1.jpg', '외암마을', 'LANDMARK', 'TYPE1', '126001'),
     ('충청남도 서산시', 0, 'https://tong.visitkorea.or.kr/cms/resource/01/2671501_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/01/2671501_image3_1.jpg', '해미읍성', 'LANDMARK', 'TYPE3', '125990'),
     ('충청남도 논산시', 0, 'https://tong.visitkorea.or.kr/cms/resource/30/3533430_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/30/3533430_image3_1.jpg', '관촉사 석조미륵보살입상', 'LANDMARK', 'TYPE1', '125905'),
     ('충청남도 논산시', 1, 'https://tong.visitkorea.or.kr/cms/resource/01/3588401_image2_1.JPG', 'https://tong.visitkorea.or.kr/cms/resource/01/3588401_image3_1.JPG', '돈암서원', 'LANDMARK', 'TYPE1', '125974'),
@@ -189,7 +195,7 @@ INSERT INTO map_cell_image_seed VALUES
     ('전라남도 고흥군', 0, 'https://tong.visitkorea.or.kr/cms/resource/44/3532744_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/44/3532744_image3_1.jpg', '팔영산', 'LANDMARK', 'TYPE1', '2760781'),
     ('전라남도 고흥군', 1, 'https://tong.visitkorea.or.kr/cms/resource/90/3522090_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/90/3522090_image3_1.jpg', '소록도', 'LANDMARK', 'TYPE1', '126285'),
     ('전라남도 보성군', 0, 'https://tong.visitkorea.or.kr/cms/resource/20/4061220_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/20/4061220_image3_1.jpg', '보성 녹차밭', 'LANDMARK', 'TYPE1', '127869'),
-    ('전라남도 화순군', 0, 'https://tong.visitkorea.or.kr/cms/resource/74/3536174_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/74/3536174_image3_1.jpg', '화순 고인돌 유적', 'LANDMARK', 'TYPE1', '132098'),
+    ('전라남도 화순군', 0, 'https://tong.visitkorea.or.kr/cms/resource/35/3534435_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/35/3534435_image3_1.jpg', '화순 고인돌 유적', 'LANDMARK', 'TYPE1', '127190'),
     ('전라남도 화순군', 1, 'https://tong.visitkorea.or.kr/cms/resource/35/4094535_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/35/4094535_image3_1.jpg', '운주사', 'LANDMARK', 'TYPE1', '3489556'),
     ('전라남도 장흥군', 0, 'https://tong.visitkorea.or.kr/cms/resource/25/4096825_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/25/4096825_image3_1.jpg', '정남진 편백숲 우드랜드', 'LANDMARK', 'TYPE1', '2033464'),
     ('전라남도 장흥군', 1, 'https://tong.visitkorea.or.kr/cms/resource/21/4096821_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/21/4096821_image3_1.jpg', '보림사', 'LANDMARK', 'TYPE1', '126367'),
@@ -203,9 +209,8 @@ INSERT INTO map_cell_image_seed VALUES
     ('전라남도 영암군', 2, 'https://tong.visitkorea.or.kr/cms/resource/11/3588811_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/11/3588811_image3_1.jpg', '왕인박사 유적지', 'LANDMARK', 'TYPE1', '126413'),
     ('전라남도 무안군', 0, 'https://tong.visitkorea.or.kr/cms/resource/09/3535609_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/09/3535609_image3_1.jpg', '회산 백련지', 'LANDMARK', 'TYPE1', '127603'),
     ('전라남도 무안군', 1, 'https://tong.visitkorea.or.kr/cms/resource/91/3535791_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/91/3535791_image3_1.jpg', '무안 갯벌', 'LANDMARK', 'TYPE1', '1330332'),
-    ('전라남도 함평군', 0, 'https://tong.visitkorea.or.kr/cms/resource/12/3502712_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/12/3502712_image3_1.jpg', '함평 한우', 'LANDMARK', 'TYPE1', '132274'),
-    ('전라남도 함평군', 1, 'https://tong.visitkorea.or.kr/cms/resource/63/4065063_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/63/4065063_image3_1.jpg', '함평엑스포공원', 'LANDMARK', 'TYPE1', '130864'),
-    ('전라남도 함평군', 2, 'https://tong.visitkorea.or.kr/cms/resource/55/3381355_image2_1.JPG', 'https://tong.visitkorea.or.kr/cms/resource/55/3381355_image3_1.JPG', '돌머리해수욕장', 'LANDMARK', 'TYPE3', '126291'),
+    ('전라남도 함평군', 0, 'https://tong.visitkorea.or.kr/cms/resource/63/4065063_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/63/4065063_image3_1.jpg', '함평엑스포공원', 'LANDMARK', 'TYPE1', '130864'),
+    ('전라남도 함평군', 1, 'https://tong.visitkorea.or.kr/cms/resource/55/3381355_image2_1.JPG', 'https://tong.visitkorea.or.kr/cms/resource/55/3381355_image3_1.JPG', '돌머리해수욕장', 'LANDMARK', 'TYPE3', '126291'),
     ('전라남도 영광군', 0, 'https://tong.visitkorea.or.kr/cms/resource/32/2876932_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/32/2876932_image3_1.jpg', '영광 굴비', 'LANDMARK', 'TYPE3', '2876939'),
     ('전라남도 영광군', 1, 'https://tong.visitkorea.or.kr/cms/resource/34/4057234_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/34/4057234_image3_1.jpg', '불갑사', 'LANDMARK', 'TYPE3', '126349'),
     ('전라남도 영광군', 2, 'https://tong.visitkorea.or.kr/cms/resource/04/4057304_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/04/4057304_image3_1.jpg', '백수해안도로', 'LANDMARK', 'TYPE1', '1874060'),
@@ -223,8 +228,8 @@ INSERT INTO map_cell_image_seed VALUES
     ('전라남도 신안군', 2, 'https://tong.visitkorea.or.kr/cms/resource/75/2662675_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/75/2662675_image3_1.jpg', '퍼플섬(반월도·박지도)', 'LANDMARK', 'TYPE3', '578024'),
     ('경상북도 포항시', 0, 'https://tong.visitkorea.or.kr/cms/resource/52/4056752_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/52/4056752_image3_1.jpg', '호미곶 해맞이광장', 'LANDMARK', 'TYPE3', '127131'),
     ('경상북도 포항시', 1, 'https://tong.visitkorea.or.kr/cms/resource/72/3520372_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/72/3520372_image3_1.jpg', '내연산 12폭포', 'LANDMARK', 'TYPE3', '126067'),
-    ('경상북도 포항시', 2, 'https://tong.visitkorea.or.kr/cms/resource/85/2908485_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/85/2908485_image3_1.jpg', '상생의 손', 'LANDMARK', 'TYPE3', '2908527'),
-    ('경상북도 경주시', 0, 'https://tong.visitkorea.or.kr/cms/resource/86/2736886_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/86/2736886_image3_1.jpg', '불국사', 'LANDMARK', 'TYPE3', '2736657'),
+    ('경상북도 포항시', 2, 'https://tong.visitkorea.or.kr/cms/resource/52/4056752_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/52/4056752_image3_1.jpg', '상생의 손', 'LANDMARK', 'TYPE3', '127131'),
+    ('경상북도 경주시', 0, 'https://tong.visitkorea.or.kr/cms/resource/70/3506170_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/70/3506170_image3_1.jpg', '불국사', 'LANDMARK', 'TYPE1', '126166'),
     ('경상북도 경주시', 1, 'https://tong.visitkorea.or.kr/cms/resource/69/3581269_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/69/3581269_image3_1.jpg', '석굴암', 'LANDMARK', 'TYPE1', '126216'),
     ('경상북도 경주시', 2, 'https://tong.visitkorea.or.kr/cms/resource/35/4097535_image2_1.JPG', 'https://tong.visitkorea.or.kr/cms/resource/35/4097535_image3_1.JPG', '첨성대', 'LANDMARK', 'TYPE1', '126207'),
     ('경상북도 김천시', 0, 'https://tong.visitkorea.or.kr/cms/resource/58/4057958_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/58/4057958_image3_1.jpg', '직지사', 'LANDMARK', 'TYPE1', '126155'),
@@ -255,8 +260,7 @@ INSERT INTO map_cell_image_seed VALUES
     ('경상북도 영덕군', 0, 'https://tong.visitkorea.or.kr/cms/resource/07/3042707_image2_1.JPG', 'https://tong.visitkorea.or.kr/cms/resource/07/3042707_image3_1.JPG', '영덕 블루로드', 'LANDMARK', 'TYPE3', '1041317'),
     ('경상북도 영덕군', 1, 'https://tong.visitkorea.or.kr/cms/resource/97/3014897_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/97/3014897_image3_1.jpg', '강구항', 'LANDMARK', 'TYPE1', '988459'),
     ('경상북도 청도군', 0, 'https://tong.visitkorea.or.kr/cms/resource/26/3544326_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/26/3544326_image3_1.jpg', '청도 반시', 'LANDMARK', 'TYPE3', '1399407'),
-    ('경상북도 청도군', 1, 'https://tong.visitkorea.or.kr/cms/resource/13/4094013_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/13/4094013_image3_1.jpg', '운문사', 'LANDMARK', 'TYPE3', '2743807'),
-    ('경상북도 청도군', 2, 'https://tong.visitkorea.or.kr/cms/resource/52/3572752_image2_1.JPG', 'https://tong.visitkorea.or.kr/cms/resource/52/3572752_image3_1.JPG', '운문댐', 'LANDMARK', 'TYPE1', '126555'),
+    ('경상북도 청도군', 1, 'https://tong.visitkorea.or.kr/cms/resource/52/3572752_image2_1.JPG', 'https://tong.visitkorea.or.kr/cms/resource/52/3572752_image3_1.JPG', '운문댐', 'LANDMARK', 'TYPE1', '126555'),
     ('경상북도 고령군', 0, 'https://tong.visitkorea.or.kr/cms/resource_photo/82/3516782_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource_photo/82/3516782_image3_1.jpg', '지산동 고분군', 'LANDMARK', 'TYPE1', '128038'),
     ('경상북도 성주군', 0, 'https://tong.visitkorea.or.kr/cms/resource/13/4081713_image2_1.JPG', 'https://tong.visitkorea.or.kr/cms/resource/13/4081713_image3_1.JPG', '성주 참외', 'LANDMARK', 'TYPE3', '2816651'),
     ('경상북도 성주군', 1, 'https://tong.visitkorea.or.kr/cms/resource/25/4062525_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/25/4062525_image3_1.jpg', '성주 세종대왕자 태실', 'LANDMARK', 'TYPE1', '126190'),
@@ -274,12 +278,11 @@ INSERT INTO map_cell_image_seed VALUES
     ('경상북도 울릉군', 1, 'https://tong.visitkorea.or.kr/cms/resource/33/3516833_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/33/3516833_image3_1.jpg', '성인봉', 'LANDMARK', 'TYPE3', '127503'),
     ('경상북도 울릉군', 2, 'https://tong.visitkorea.or.kr/cms/resource/31/3589631_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/31/3589631_image3_1.jpg', '도동 해안산책로', 'LANDMARK', 'TYPE1', '2614583'),
     ('경상남도 창원시', 0, 'https://tong.visitkorea.or.kr/cms/resource/07/3304707_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/07/3304707_image3_1.jpg', '진해 군항제 벚꽃길(여좌천)', 'LANDMARK', 'TYPE3', '128792'),
-    ('경상남도 창원시', 1, 'https://tong.visitkorea.or.kr/cms/resource/79/2796679_image2_1.JPG', 'https://tong.visitkorea.or.kr/cms/resource/79/2796679_image3_1.JPG', '주남저수지', 'LANDMARK', 'TYPE3', '2795821'),
+    ('경상남도 창원시', 1, 'https://tong.visitkorea.or.kr/cms/resource/16/4059616_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/16/4059616_image3_1.jpg', '주남저수지', 'LANDMARK', 'TYPE1', '126117'),
     ('경상남도 진주시', 0, 'https://tong.visitkorea.or.kr/cms/resource/65/4062165_image2_1.JPG', 'https://tong.visitkorea.or.kr/cms/resource/65/4062165_image3_1.JPG', '진주성', 'LANDMARK', 'TYPE1', '126833'),
     ('경상남도 진주시', 1, 'https://tong.visitkorea.or.kr/cms/resource/29/3349329_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/29/3349329_image3_1.jpg', '촉석루', 'LANDMARK', 'TYPE3', '126217'),
     ('경상남도 통영시', 0, 'https://tong.visitkorea.or.kr/cms/resource/51/3513751_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/51/3513751_image3_1.jpg', '한산도', 'LANDMARK', 'TYPE1', '127105'),
-    ('경상남도 통영시', 1, 'https://tong.visitkorea.or.kr/cms/resource/59/2756859_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/59/2756859_image3_1.jpg', '동피랑 벽화마을', 'LANDMARK', 'TYPE3', '2756584'),
-    ('경상남도 통영시', 2, 'https://tong.visitkorea.or.kr/cms/resource/74/3557774_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/74/3557774_image3_1.jpg', '한려해상 국립공원', 'LANDMARK', 'TYPE1', '126659'),
+    ('경상남도 통영시', 1, 'https://tong.visitkorea.or.kr/cms/resource/74/3557774_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/74/3557774_image3_1.jpg', '한려해상 국립공원', 'LANDMARK', 'TYPE1', '126659'),
     ('경상남도 사천시', 0, 'https://tong.visitkorea.or.kr/cms/resource/31/3515531_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/31/3515531_image3_1.jpg', '삼천포대교', 'LANDMARK', 'TYPE1', '2514738'),
     ('경상남도 사천시', 1, 'https://tong.visitkorea.or.kr/cms/resource/24/3564424_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/24/3564424_image3_1.jpg', '사천 선진리성', 'LANDMARK', 'TYPE1', '126197'),
     ('경상남도 김해시', 0, 'https://tong.visitkorea.or.kr/cms/resource/93/4090393_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/93/4090393_image3_1.jpg', '대성동 고분군', 'LANDMARK', 'TYPE1', '127128'),
@@ -288,13 +291,12 @@ INSERT INTO map_cell_image_seed VALUES
     ('경상남도 밀양시', 1, 'https://tong.visitkorea.or.kr/cms/resource/23/3501023_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/23/3501023_image3_1.jpg', '표충사', 'LANDMARK', 'TYPE3', '2782605'),
     ('경상남도 밀양시', 2, 'https://tong.visitkorea.or.kr/cms/resource/16/4087816_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/16/4087816_image3_1.jpg', '밀양 얼음골', 'LANDMARK', 'TYPE1', '126063'),
     ('경상남도 거제시', 0, 'https://tong.visitkorea.or.kr/cms/resource_photo/24/3543324_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource_photo/24/3543324_image3_1.jpg', '외도 보타니아', 'LANDMARK', 'TYPE1', '126581'),
-    ('경상남도 거제시', 1, 'https://tong.visitkorea.or.kr/cms/resource/81/3368081_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/81/3368081_image3_1.jpg', '바람의 언덕', 'LANDMARK', 'TYPE3', '129479'),
+    ('경상남도 거제시', 1, 'https://tong.visitkorea.or.kr/cms/resource/34/4099834_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/34/4099834_image3_1.jpg', '바람의 언덕', 'LANDMARK', 'TYPE1', '129479'),
     ('경상남도 거제시', 2, 'https://tong.visitkorea.or.kr/cms/resource/71/3519171_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/71/3519171_image3_1.jpg', '해금강', 'LANDMARK', 'TYPE1', '126224'),
     ('경상남도 양산시', 0, 'https://tong.visitkorea.or.kr/cms/resource/55/3490255_image2_1.JPG', 'https://tong.visitkorea.or.kr/cms/resource/55/3490255_image3_1.JPG', '통도사', 'LANDMARK', 'TYPE3', '126186'),
     ('경상남도 양산시', 1, 'https://tong.visitkorea.or.kr/cms/resource/40/3502940_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/40/3502940_image3_1.jpg', '영축산', 'LANDMARK', 'TYPE3', '126923'),
-    ('경상남도 의령군', 0, 'https://tong.visitkorea.or.kr/cms/resource/55/3522055_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/55/3522055_image3_1.jpg', '의령 망개떡', 'LANDMARK', 'TYPE1', '132279'),
-    ('경상남도 의령군', 1, 'https://tong.visitkorea.or.kr/cms/resource/86/4068286_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/86/4068286_image3_1.jpg', '충익사', 'LANDMARK', 'TYPE1', '127296'),
-    ('경상남도 의령군', 2, 'https://tong.visitkorea.or.kr/cms/resource/96/4088096_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/96/4088096_image3_1.jpg', '의령 솥바위', 'LANDMARK', 'TYPE1', '126193'),
+    ('경상남도 의령군', 0, 'https://tong.visitkorea.or.kr/cms/resource/86/4068286_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/86/4068286_image3_1.jpg', '충익사', 'LANDMARK', 'TYPE1', '127296'),
+    ('경상남도 의령군', 1, 'https://tong.visitkorea.or.kr/cms/resource/96/4088096_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/96/4088096_image3_1.jpg', '의령 솥바위', 'LANDMARK', 'TYPE1', '126193'),
     ('경상남도 함안군', 0, 'https://tong.visitkorea.or.kr/cms/resource/21/4002121_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/21/4002121_image3_1.jpg', '말이산 고분군', 'LANDMARK', 'TYPE1', '126835'),
     ('경상남도 함안군', 1, 'https://tong.visitkorea.or.kr/cms/resource/62/3318062_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/62/3318062_image3_1.jpg', '무진정', 'LANDMARK', 'TYPE1', '250417'),
     ('경상남도 창녕군', 0, 'https://tong.visitkorea.or.kr/cms/resource_photo/53/3590653_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource_photo/53/3590653_image3_1.jpg', '우포늪', 'LANDMARK', 'TYPE1', '126737'),
@@ -321,7 +323,7 @@ INSERT INTO map_cell_image_seed VALUES
     ('제주특별자치도 제주시', 0, 'https://tong.visitkorea.or.kr/cms/resource_photo/41/3460441_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource_photo/41/3460441_image3_1.jpg', '한라산국립공원', 'LANDMARK', 'TYPE1', '127635'),
     ('제주특별자치도 제주시', 1, 'https://tong.visitkorea.or.kr/cms/resource/55/3354155_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/55/3354155_image3_1.jpg', '만장굴', 'LANDMARK', 'TYPE3', '126452'),
     ('제주특별자치도 제주시', 2, 'https://tong.visitkorea.or.kr/cms/resource/66/3096066_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/66/3096066_image3_1.jpg', '협재해수욕장', 'LANDMARK', 'TYPE1', '127490'),
-    ('제주특별자치도 서귀포시', 0, 'https://tong.visitkorea.or.kr/cms/resource/36/2839736_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/36/2839736_image3_1.jpg', '성산일출봉', 'LANDMARK', 'TYPE3', '2839742'),
+    ('제주특별자치도 서귀포시', 0, 'https://tong.visitkorea.or.kr/cms/resource/86/2653586_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/86/2653586_image3_1.jpg', '성산일출봉', 'LANDMARK', 'TYPE3', '126435'),
     ('제주특별자치도 서귀포시', 1, 'https://tong.visitkorea.or.kr/cms/resource_photo/32/3052932_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource_photo/32/3052932_image3_1.jpg', '정방폭포', 'LANDMARK', 'TYPE1', '126437'),
     ('강원특별자치도 춘천시', 0, 'https://tong.visitkorea.or.kr/cms/resource/45/4067545_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/45/4067545_image3_1.jpg', '남이섬', 'LANDMARK', 'TYPE3', '128019'),
     ('강원특별자치도 춘천시', 1, 'https://tong.visitkorea.or.kr/cms/resource/19/2742919_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/19/2742919_image3_1.jpg', '소양강댐', 'LANDMARK', 'TYPE3', '127476'),
@@ -346,7 +348,7 @@ INSERT INTO map_cell_image_seed VALUES
     ('강원특별자치도 홍천군', 2, 'https://tong.visitkorea.or.kr/cms/resource/74/2739274_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/74/2739274_image3_1.jpg', '구룡령 옛길', 'LANDMARK', 'TYPE3', '2702327'),
     ('강원특별자치도 횡성군', 0, 'https://tong.visitkorea.or.kr/cms/resource/06/4063806_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/06/4063806_image3_1.jpg', '횡성호수길', 'LANDMARK', 'TYPE3', '3489648'),
     ('강원특별자치도 횡성군', 1, 'https://tong.visitkorea.or.kr/cms/resource/96/4093896_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/96/4093896_image3_1.jpg', '풍수원성당', 'LANDMARK', 'TYPE1', '125807'),
-    ('강원특별자치도 영월군', 0, 'https://tong.visitkorea.or.kr/cms/resource/76/3442776_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/76/3442776_image3_1.jpg', '장릉', 'LANDMARK', 'TYPE1', '3442721'),
+    ('강원특별자치도 영월군', 0, 'https://tong.visitkorea.or.kr/cms/resource/15/4041415_image2_1.png', 'https://tong.visitkorea.or.kr/cms/resource/15/4041415_image3_1.png', '장릉', 'LANDMARK', 'TYPE1', '125794'),
     ('강원특별자치도 영월군', 1, 'https://tong.visitkorea.or.kr/cms/resource/65/4041365_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/65/4041365_image3_1.jpg', '청령포', 'LANDMARK', 'TYPE1', '125785'),
     ('강원특별자치도 영월군', 2, 'https://tong.visitkorea.or.kr/cms/resource/61/3051461_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/61/3051461_image3_1.jpg', '한반도지형', 'LANDMARK', 'TYPE3', '3072217'),
     ('강원특별자치도 평창군', 0, 'https://tong.visitkorea.or.kr/cms/resource/35/3569635_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/35/3569635_image3_1.jpg', '월정사', 'LANDMARK', 'TYPE1', '2799163'),
@@ -387,7 +389,7 @@ INSERT INTO map_cell_image_seed VALUES
     ('전북특별자치도 완주군', 2, 'https://tong.visitkorea.or.kr/cms/resource/87/3396487_image2_1.JPG', 'https://tong.visitkorea.or.kr/cms/resource/87/3396487_image3_1.JPG', '대둔산도립공원', 'LANDMARK', 'TYPE1', '127673'),
     ('전북특별자치도 진안군', 0, 'https://tong.visitkorea.or.kr/cms/resource/38/4080038_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/38/4080038_image3_1.jpg', '마이산', 'LANDMARK', 'TYPE1', '128972'),
     ('전북특별자치도 진안군', 1, 'https://tong.visitkorea.or.kr/cms/resource/38/4080038_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/38/4080038_image3_1.jpg', '탑사', 'LANDMARK', 'TYPE1', '128972'),
-    ('전북특별자치도 무주군', 0, 'https://tong.visitkorea.or.kr/cms/resource/88/3040088_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/88/3040088_image3_1.jpg', '덕유산국립공원', 'LANDMARK', 'TYPE3', '2737304'),
+    ('전북특별자치도 무주군', 0, 'https://tong.visitkorea.or.kr/cms/resource/44/3533344_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/44/3533344_image3_1.jpg', '덕유산국립공원', 'LANDMARK', 'TYPE1', '126238'),
     ('전북특별자치도 무주군', 1, 'https://tong.visitkorea.or.kr/cms/resource/75/3536275_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/75/3536275_image3_1.jpg', '무주 구천동 계곡', 'LANDMARK', 'TYPE1', '127742'),
     ('전북특별자치도 장수군', 0, 'https://tong.visitkorea.or.kr/cms/resource/91/4098491_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/91/4098491_image3_1.jpg', '논개사당(의암사)', 'LANDMARK', 'TYPE1', '126408'),
     ('전북특별자치도 장수군', 1, 'https://tong.visitkorea.or.kr/cms/resource/96/4002796_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/96/4002796_image3_1.jpg', '장안산군립공원', 'LANDMARK', 'TYPE3', '126258'),
@@ -398,7 +400,7 @@ INSERT INTO map_cell_image_seed VALUES
     ('전북특별자치도 고창군', 1, 'https://tong.visitkorea.or.kr/cms/resource/91/4094591_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/91/4094591_image3_1.jpg', '고창읍성(모양성)', 'LANDMARK', 'TYPE1', '126398'),
     ('전북특별자치도 고창군', 2, 'https://tong.visitkorea.or.kr/cms/resource_photo/72/3587072_image2_1.JPG', 'https://tong.visitkorea.or.kr/cms/resource_photo/72/3587072_image3_1.JPG', '선운사', 'LANDMARK', 'TYPE1', '147548'),
     ('전북특별자치도 부안군', 0, 'https://tong.visitkorea.or.kr/cms/resource/48/3351048_image2_1.jpeg', 'https://tong.visitkorea.or.kr/cms/resource/48/3351048_image3_1.jpeg', '변산반도국립공원', 'LANDMARK', 'TYPE3', '126239'),
-    ('전북특별자치도 부안군', 1, 'https://tong.visitkorea.or.kr/cms/resource/61/584761_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/61/584761_image3_1.jpg', '채석강', 'LANDMARK', 'TYPE3', '138675'),
+    ('전북특별자치도 부안군', 1, 'https://tong.visitkorea.or.kr/cms/resource/47/3356647_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/47/3356647_image3_1.jpg', '채석강', 'LANDMARK', 'TYPE1', '128982'),
     ('전북특별자치도 부안군', 2, 'https://tong.visitkorea.or.kr/cms/resource/87/4090587_image2_1.jpg', 'https://tong.visitkorea.or.kr/cms/resource/87/4090587_image3_1.jpg', '내소사', 'LANDMARK', 'TYPE1', '126352')
 ;
 
