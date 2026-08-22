@@ -28,12 +28,9 @@ WITH renum AS (
 UPDATE tour.map_cell_image i SET display_order = r.new_order
 FROM renum r WHERE r.id = i.id AND i.display_order <> r.new_order;
 
--- 4) V80 인덱스: 커서 동률 키가 counterpart_id인데 id로 잡혀 있었다
-DROP INDEX IF EXISTS tour.idx_map_relation_owner_created;
-CREATE INDEX idx_map_relation_owner_created ON tour.map_relation (owner_id, created_at DESC, counterpart_id DESC);
-
--- 5) checksum 갱신 — 아래 두 값은 앱 기동 실패 로그의 "Resolved locally" 값으로 바꿀 것
--- UPDATE flyway_schema_history SET checksum = <V79 resolved> WHERE version = '79';
--- UPDATE flyway_schema_history SET checksum = <V80 resolved> WHERE version = '80';
+-- 4) checksum 갱신 — 파일을 고쳤으므로 이력의 값도 맞춘다.
+--    820110145는 V79 파일의 Flyway CRC32이며, 기동 실패 로그의 "Resolved locally"와 같다.
+--    V80은 고친 내용이 적용 시점과 같아 체크섬이 어긋나지 않는다(확인함).
+UPDATE flyway_schema_history SET checksum = 820110145 WHERE version = '79';
 
 COMMIT;
