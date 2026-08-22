@@ -151,3 +151,30 @@ class InvalidCursorException(message: String = "유효하지 않은 커서입니
  */
 class InvalidLimitException(message: String = "요청 개수가 올바르지 않습니다.") :
     SpotQueryException("INVALID_LIMIT", Classification.BAD_REQUEST, message)
+
+/** 칸 코드가 존재하지 않는다(SPEC-0030 R7). 시군구 코드를 넣은 경우도 여기로 온다. */
+class MapCellNotFoundException(message: String = "해당 지역을 찾을 수 없습니다.") :
+    SpotQueryException("MAP_CELL_NOT_FOUND", Classification.NOT_FOUND, message)
+
+/**
+ * 공유 토큰이 없거나 폐기됐다(SPEC-0030 R14).
+ *
+ * **둘을 구분해 응답하지 않는다.** 구분하면 토큰을 넣어 보며 "존재하지만 폐기됨"을 가려낼 수
+ * 있고, 그것만으로도 그 회원이 공유를 했었다는 사실이 새어 나간다.
+ */
+class ShareLinkNotFoundException(message: String = "더 이상 볼 수 없는 지도입니다.") :
+    SpotQueryException("SHARE_LINK_NOT_FOUND", Classification.NOT_FOUND, message)
+
+/** 차단 관계라 공유 지도를 볼 수 없다(SPEC-0030 R16, POL-041의 양방향 차단). */
+class ShareLinkBlockedException(message: String = "볼 수 없는 지도입니다.") :
+    SpotQueryException("SHARE_LINK_BLOCKED", Classification.FAILED_PRECONDITION, message)
+
+/**
+ * 자기 자신과 관계를 맺으려 했다(SPEC-0030 확장).
+ *
+ * 자기 링크를 자기가 여는 것은 정상이지만(자기 지도를 보는 것), 거기서 등록까지 하면
+ * 목록에 자기가 나타난다. DB CHECK가 최후 방어선이지만 서비스가 먼저 막아 의미 있는
+ * 오류를 준다.
+ */
+class CannotRelateSelfException(message: String = "자기 자신과는 관계를 맺을 수 없습니다.") :
+    SpotQueryException("CANNOT_RELATE_SELF", Classification.BAD_REQUEST, message)

@@ -4,6 +4,7 @@ import tools.jackson.databind.DeserializationFeature
 import tools.jackson.databind.json.JsonMapper
 import tools.jackson.module.kotlin.kotlinModule
 import org.around.ieuri.tourism.application.policy.MapViewportPolicy
+import org.around.ieuri.tourism.application.policy.NationwideMapPolicy
 import org.around.ieuri.tourism.application.policy.RegionRecommendationPolicy
 import org.around.ieuri.tourism.application.policy.SeoulOpenDataPolicy
 import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
@@ -38,6 +39,7 @@ import java.time.Duration
     TourStatsSyncProperties::class,
     DistrictRepresentativeProperties::class,
     SpotExclusionProperties::class,
+    NationwideMapProperties::class,
 )
 class TourismConfig {
 
@@ -80,6 +82,14 @@ class TourismConfig {
         }
         return builder.requestFactory(requestFactory).build()
     }
+
+    @Bean
+    fun nationwideMapPolicy(properties: NationwideMapProperties): NationwideMapPolicy =
+        NationwideMapPolicy(
+            maxCellSpotPageSize = properties.maxCellSpotPageSize,
+            shareUrlBase = properties.shareUrlBase,
+            maxRelationPageSize = properties.maxRelationPageSize,
+        )
 
     @Bean
     fun mapViewportPolicy(properties: MapViewportProperties): MapViewportPolicy =

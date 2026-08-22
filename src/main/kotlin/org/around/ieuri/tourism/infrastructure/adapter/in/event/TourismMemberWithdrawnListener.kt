@@ -8,7 +8,10 @@ import org.springframework.transaction.event.TransactionPhase
 import org.springframework.transaction.event.TransactionalEventListener
 
 /**
- * 탈퇴 이벤트를 받아 좋아요/싫어요를 지운다(SPEC-0011 R17).
+ * 탈퇴 이벤트를 받아 이 도메인의 회원 데이터를 지운다(SPEC-0011 R17, SPEC-0030 §9.1).
+ *
+ * 좋아요/싫어요와 전국 지도 데이터(방문 기록·공유 링크)를 **각각 독립된 트랜잭션으로** 지운다 —
+ * 한쪽이 실패해도 다른 쪽은 지워져야 한다. 그래서 try가 둘이다.
  *
  * 클래스 이름에 도메인을 붙이는 이유는 커뮤니티 리스너와 빈 이름이 겹치지 않게 하기 위함이다 —
  * Spring은 단순 클래스명으로 빈 이름을 지어 패키지가 달라도 충돌한다.
@@ -27,6 +30,11 @@ class TourismMemberWithdrawnListener(
             memberReactionEraseUseCase.eraseMemberReactions(event.memberId)
         } catch (e: Exception) {
             log.error("failed to erase tourism reactions for withdrawn member {}", event.memberId, e)
+        }
+        try {
+            memberReactionEraseUseCase.eraseMemberMapData(event.memberId)
+        } catch (e: Exception) {
+            log.error("failed to erase tourism map data for withdrawn member {}", event.memberId, e)
         }
     }
 
