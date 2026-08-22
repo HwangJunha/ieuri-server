@@ -41,7 +41,7 @@ class MemberLifecycleMutationResolver(
     ) {
         val result = memberLifecycleUseCase.suspend(
             SuspendMemberCommand(
-                memberId = input.memberId.toLong(),
+                memberId = input.memberId,
                 reason = input.reason,
                 suspendedUntil = input.suspendedUntil?.let { Instant.parse(it) },
             ),
@@ -54,7 +54,7 @@ class MemberLifecycleMutationResolver(
     fun reactivateMember(@InputArgument input: ReactivateMemberInput): AdminActionPayload = withUserErrors(
         onError = { AdminActionPayload(success = false, userErrors = it) },
     ) {
-        val result = memberLifecycleUseCase.reactivate(ReactivateMemberCommand(input.memberId.toLong()))
+        val result = memberLifecycleUseCase.reactivate(ReactivateMemberCommand(input.memberId))
         AdminActionPayload(success = result.success, userErrors = emptyList())
     }
 }

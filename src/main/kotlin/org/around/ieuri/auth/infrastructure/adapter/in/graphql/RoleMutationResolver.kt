@@ -31,7 +31,7 @@ class RoleMutationResolver(
         val result = roleUseCase.assign(
             AssignRoleCommand(
                 actorMemberId = actorId,
-                targetMemberId = input.memberId.toLong(),
+                targetMemberId = input.memberId,
                 roleCode = input.roleCode,
             ),
         )
@@ -47,7 +47,7 @@ class RoleMutationResolver(
         val result = roleUseCase.revoke(
             RevokeRoleCommand(
                 actorMemberId = actorId,
-                targetMemberId = input.memberId.toLong(),
+                targetMemberId = input.memberId,
                 roleCode = input.roleCode,
             ),
         )

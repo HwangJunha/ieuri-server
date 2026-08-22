@@ -14,6 +14,7 @@ import java.util.UUID
  *
  * 글과 달리 프로필 이미지는 1장이라 순서·다중 발급 개념이 없다.
  */
+@ConsistentCopyVisibility
 data class ProfileImageObjectKey private constructor(
     val value: String,
     val memberId: Long,
