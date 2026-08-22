@@ -323,7 +323,11 @@ type MapRelation {
     memberId: ID!
     "상대 닉네임. 이메일 등 다른 개인정보는 제공하지 않는다."
     nickname: String!
-    "겹친 칸 수. **조회 시점 재계산값이다.**"
+    """
+    겹친 칸 수. **조회 시점 재계산값이다.**
+
+    overlappingCellIds의 길이와 항상 같다 — 그 목록은 잘리지 않는다.
+    """
     overlappingCount: Int!
     """
     겹친 칸 id 목록. 지도에 표시할 때 쓴다.

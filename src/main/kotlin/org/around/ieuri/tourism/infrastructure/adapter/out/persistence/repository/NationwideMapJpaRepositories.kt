@@ -44,8 +44,6 @@ interface MapShareLinkJpaRepository : JpaRepository<MapShareLinkEntity, Long> {
     /** 유효한 링크만. 폐기됐거나 없으면 null이며 호출자는 둘을 구분하지 않는다. */
     fun findByTokenAndRevokedAtIsNull(token: String): MapShareLinkEntity?
 
-    fun findByMemberIdAndRevokedAtIsNull(memberId: Long): MapShareLinkEntity?
-
     /** 본인 것이 아니거나 이미 폐기됐으면 null이다 — 폐기 대상을 못 찾은 것과 같게 다룬다. */
     fun findByMemberIdAndTokenAndRevokedAtIsNull(memberId: Long, token: String): MapShareLinkEntity?
 
