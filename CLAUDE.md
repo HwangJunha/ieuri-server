@@ -37,7 +37,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Uses the Gradle wrapper (`./gradlew`); Gradle 9.5.1, Java toolchain 25.
 
 - Build: `./gradlew build`
-- Run the app: `./gradlew bootRun` (serves on port **8888**, not 8080)
+- Run the app: `./gradlew bootRun` (local profile serves on port **8888**; deployed environments use 8080)
 - Run all tests: `./gradlew test`
 - Run a single test class: `./gradlew test --tests "org.around.ieuri.IeuriApplicationTests"`
 - Run a single test method: `./gradlew test --tests "org.around.ieuri.IeuriApplicationTests.contextLoads"`
