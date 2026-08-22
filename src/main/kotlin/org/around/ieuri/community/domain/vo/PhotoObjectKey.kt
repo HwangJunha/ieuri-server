@@ -21,7 +21,6 @@ import java.util.UUID
  * 뒤다) 글 id를 알 수 없고, 회원 id는 분포가 넓어 오브젝트 스토리지의 파티션 분산에도
  * 유리하다. 글 단위 관리는 community_post_photo.post_id가 맡는다.
  */
-@ConsistentCopyVisibility
 data class PhotoObjectKey private constructor(
     val value: String,
     val memberId: Long,
@@ -75,8 +74,11 @@ data class PhotoObjectKey private constructor(
         if (confirmed) {
             this
         } else {
-            copy(
+            // copy()가 아니라 생성자를 부른다 — 접두어와 confirmed는 함께 움직여야 하는 값이라
+            // 한 자리에서 전부 지정하는 편이 어긋날 여지가 없다.
+            PhotoObjectKey(
                 value = value.replaceFirst("$PENDING_PREFIX/", "$CONFIRMED_PREFIX/"),
+                memberId = memberId,
                 confirmed = true,
             )
         }
