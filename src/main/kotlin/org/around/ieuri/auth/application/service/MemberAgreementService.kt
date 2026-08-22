@@ -131,7 +131,7 @@ class MemberAgreementService(
                 termsCode = terms.code,
                 required = terms.required,
                 agreed = agreed,
-                agreedAt = if (agreed) record?.agreedAt else null,
+                agreedAt = if (agreed) record.agreedAt else null,
                 version = terms.version,
             )
         }

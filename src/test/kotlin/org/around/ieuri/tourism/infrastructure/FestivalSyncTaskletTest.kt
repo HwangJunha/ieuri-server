@@ -56,6 +56,7 @@ class FestivalSyncTaskletTest {
             .addString(RUN_DATE_PARAMETER, runDate.toString())
             .toJobParameters()
         return StepExecution(
+            1L,
             "festivalSyncStep-${language.name}",
             JobExecution(1L, JobInstance(1L, "spotSyncJob"), parameters),
         )

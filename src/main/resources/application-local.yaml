@@ -1,5 +1,10 @@
 # 로컬(local) 프로파일 전용 값. 여기 값들은 개발 전용이며 운영 값과 반드시 다르다.
 # 주의: DB 비밀번호는 여기 두지 않는다(셸 환경변수 IEURI_DB_PASSWORD로 주입).
+
+# 로컬 개발 편의를 위해 8888을 유지한다. 배포 환경은 application.yaml의 8080을 쓴다.
+server:
+  port: 8888
+
 ieuri:
   # 검색 노드도 로컬에서는 같은 port-forward 터널 위에 있어, 메인과 같은 이유로 SSL을 끈다
   # (아래 spring.datasource 주석 참조).

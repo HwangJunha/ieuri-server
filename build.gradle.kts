@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "org.around"
-version = "0.0.1-SNAPSHOT"
+version = "0.0.1"
 description = "ieuri"
 
 java {
@@ -150,4 +150,11 @@ sourceSets {
 tasks.named("compileKotlin") {
     dependsOn(tasks.withType<com.netflix.graphql.dgs.codegen.gradle.GenerateJavaTask>())
 }
+
+// plain jar는 라이브러리로 배포할 때 쓰는 산출물이라 이 프로젝트에는 쓸모가 없다. 켜 두면
+// build/libs에 실행 불가한 jar(Main-Class 없음)가 함께 생겨 이미지에 잘못 실릴 수 있다.
+tasks.jar { enabled = false }
+
+// 파일명을 고정해 버전이 바뀌어도 Dockerfile을 손대지 않게 한다. 배포 식별은 이미지 태그가 맡는다.
+tasks.bootJar { archiveFileName.set("app.jar") }
 

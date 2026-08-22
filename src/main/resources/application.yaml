@@ -121,7 +121,8 @@ spring:
       mail.smtp.starttls.required: true
 
 server:
-  port: 8888
+  # 배포 환경(dev·운영)의 포트. 로컬은 application-local.yaml에서 8888로 덮어쓴다.
+  port: 8080
   # 종료 시 처리 중인 요청을 마무리하고 내려간다(SPEC-0004 R-16). 무한 대기가 아니라
   # timeout-per-shutdown-phase 안에서만 기다린다 — 배포·재시작을 붙잡으면 안 된다.
   shutdown: graceful

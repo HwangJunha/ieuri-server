@@ -453,7 +453,7 @@ class CommunityQueryAdapter(
     private fun visibleToViewer(viewer: ViewerContext): BooleanExpression {
         var condition = post.deletedAt.isNull
         blockExclusion(viewer, post.authorId)?.let { condition = condition.and(it) }
-        hiddenExclusion(viewer, post.hidden, post.authorId)?.let { condition = condition.and(it) }
+        condition = condition.and(hiddenExclusion(viewer, post.hidden, post.authorId))
         return condition
     }
 

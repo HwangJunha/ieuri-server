@@ -156,7 +156,9 @@ class TourismConfig {
             .build()
         return builder
             .requestFactory(requestFactory)
-            .messageConverters { it.add(0, JacksonJsonHttpMessageConverter(mapper)) }
+            // 기본 JSON 컨버터를 위 mapper로 갈아 끼운다. 목록 앞에 끼워 넣어 우선순위를 조작하던
+            // messageConverters(Consumer<List>)는 deprecated이며, 이쪽이 의도를 그대로 말한다.
+            .configureMessageConverters { it.withJsonConverter(JacksonJsonHttpMessageConverter(mapper)) }
             .build()
     }
 

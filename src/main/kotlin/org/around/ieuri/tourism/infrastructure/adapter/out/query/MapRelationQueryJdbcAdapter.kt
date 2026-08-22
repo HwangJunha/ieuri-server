@@ -76,9 +76,10 @@ class MapRelationQueryJdbcAdapter(
             ORDER BY t.created_at DESC, t.counterpart_id DESC
             """.trimIndent(),
             { rs, _ ->
-                @Suppress("UNCHECKED_CAST")
-                val ids = (rs.getArray("overlap_cell_ids").array as Array<java.lang.Long>)
-                    .map { it.toLong() }
+                // JDBC 배열은 박싱된 원소를 담아 온다(PostgreSQL 드라이버는 Long[]). Array<Long>으로
+                // 캐스팅하면 코틀린 Long으로 해석돼 런타임에 깨지므로, Number로 받아 내린다.
+                val ids = (rs.getArray("overlap_cell_ids").array as Array<*>)
+                    .map { (it as Number).toLong() }
                 MapRelationOverlap(
                     counterpartId = rs.getLong("counterpart_id"),
                     overlappingCellIds = ids.sorted(),

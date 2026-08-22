@@ -63,19 +63,19 @@ interface SpotQueryUseCase {
      * **본문이 upstream에 없어도 성공한다** — `spot` 행이 보유한 값으로 응답을 구성하고
      * overview·homepage·tel만 null이 된다. `SPOT_NOT_FOUND`는 id 자체가 해석되지 않을 때만 발생한다.
      *
-     * **[locale]은 식별이 아니라 검증에 쓴다** — [spotId]가 이미 언어를 품고 있으며, 요청 언어와 다른
+     * **[locale]은 식별이 아니라 검증에 쓴다** — [catalogId]가 이미 언어를 품고 있으며, 요청 언어와 다른
      * 언어의 id가 오면 SpotDetailNotFoundException으로 거부한다.
      */
-    fun spotDetail(spotId: Long, locale: DomainLocale): SpotDetailView
+    fun spotDetail(catalogId: Long, locale: DomainLocale): SpotDetailView
 
     /** 갤러리(요청 시에만). 캐시 → 미스면 detailImage2 1콜. */
-    fun spotGallery(spotId: Long, locale: DomainLocale): List<SpotImageView>
+    fun spotGallery(catalogId: Long, locale: DomainLocale): List<SpotImageView>
 
     /** 운영 정보(요청 시에만). 캐시 → 미스면 detailIntro2 1콜. 표시할 값이 없으면 null. */
-    fun spotIntro(spotId: Long, category: SpotCategory, locale: DomainLocale): SpotIntroView?
+    fun spotIntro(catalogId: Long, category: SpotCategory, locale: DomainLocale): SpotIntroView?
 
     /** 이용안내 항목(요청 시에만). 캐시 → 미스면 detailInfo2 1콜. */
-    fun spotInfoItems(spotId: Long, category: SpotCategory, locale: DomainLocale): List<SpotInfoItemView>
+    fun spotInfoItems(catalogId: Long, category: SpotCategory, locale: DomainLocale): List<SpotInfoItemView>
 
     /**
      * 좋아요 수(요청 시에만). 캐시 비대상이며 매번 실시간 집계한다.

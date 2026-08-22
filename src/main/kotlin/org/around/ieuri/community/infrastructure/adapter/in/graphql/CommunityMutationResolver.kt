@@ -128,7 +128,7 @@ class CommunityMutationResolver(
                 photoKeys = input.photoKeys,
                 category = input.category?.let { TargetCategory.valueOf(it.name) },
                 changeSpot = input.changeSpot ?: false,
-                catalogId = input.catalogId?.toLong(),
+                catalogId = input.catalogId,
                 tags = input.tags,
             ),
             memberId,
@@ -158,7 +158,7 @@ class CommunityMutationResolver(
                 CreateCommentCommand(
                     postId = input.postId,
                     body = input.body,
-                    parentCommentId = input.parentCommentId?.toLong(),
+                    parentCommentId = input.parentCommentId,
                 ),
                 memberId,
             )

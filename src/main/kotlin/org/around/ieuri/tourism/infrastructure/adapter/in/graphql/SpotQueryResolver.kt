@@ -100,7 +100,7 @@ class SpotQueryResolver(
         dfe: DgsDataFetchingEnvironment,
         @InputArgument id: Long,
     ): SpotDetailView =
-        spotQueryUseCase.spotDetail(spotId = id, locale = dfe.domainLocale())
+        spotQueryUseCase.spotDetail(catalogId = id, locale = dfe.domainLocale())
 
     /**
      * 갤러리(SPEC-0008 R-5). **nullable이다** — 이 필드의 조회가 실패하면 DGS가 실패를 이 필드에
@@ -113,7 +113,7 @@ class SpotQueryResolver(
      */
     @DgsData(parentType = "SpotDetail", field = "gallery")
     fun gallery(dfe: DgsDataFetchingEnvironment): List<GqlSpotImage>? =
-        spotQueryUseCase.spotGallery(dfe.spotId(), dfe.domainLocale())
+        spotQueryUseCase.spotGallery(dfe.catalogId(), dfe.domainLocale())
             .map { it.toGql() }
 
     @DgsData(parentType = "SpotDetail", field = "intro")
@@ -122,7 +122,7 @@ class SpotQueryResolver(
         @InputArgument categoryCode: String,
     ): GqlSpotIntro? =
         spotQueryUseCase.spotIntro(
-            spotId = dfe.spotId(),
+            catalogId = dfe.catalogId(),
             category = SpotCategory(categoryCode),
             locale = dfe.domainLocale(),
         )?.toGql()
@@ -134,7 +134,7 @@ class SpotQueryResolver(
         @InputArgument categoryCode: String,
     ): List<GqlSpotInfoItem>? =
         spotQueryUseCase.spotInfoItems(
-            spotId = dfe.spotId(),
+            catalogId = dfe.catalogId(),
             category = SpotCategory(categoryCode),
             locale = dfe.domainLocale(),
         ).map { GqlSpotInfoItem(name = it.name, text = it.text) }
@@ -142,7 +142,7 @@ class SpotQueryResolver(
     @DgsData(parentType = "SpotDetail", field = "likeCount")
     fun likeCount(dfe: DgsDataFetchingEnvironment): Int =
         // GraphQL likeCount는 Int!. 반응 수가 Int 범위를 넘을 일은 없다.
-        spotQueryUseCase.spotLikeCount(dfe.spotId(), dfe.domainLocale()).toInt()
+        spotQueryUseCase.spotLikeCount(dfe.catalogId(), dfe.domainLocale()).toInt()
 
     /**
      * 호출자가 이 장소에 남긴 최신 반응. **비로그인이면 null이다** — 공개 조회라
@@ -154,7 +154,7 @@ class SpotQueryResolver(
     @DgsData(parentType = "SpotDetail", field = "viewerReaction")
     fun viewerReaction(dfe: DgsDataFetchingEnvironment): String? {
         val memberId = currentMemberProvider.currentMemberId() ?: return null
-        return spotQueryUseCase.spotViewerReaction(dfe.spotId(), memberId, dfe.domainLocale())
+        return spotQueryUseCase.spotViewerReaction(dfe.catalogId(), memberId, dfe.domainLocale())
     }
 
     /**
@@ -259,13 +259,13 @@ class SpotQueryResolver(
     }
 
     /**
-     * 부모 `spotDetail`이 돌려준 read DTO에서 `spot.id`를 꺼낸다.
+     * 부모 `spotDetail`이 돌려준 read DTO에서 카탈로그 id를 꺼낸다(`SpotDetailView.id`는 카탈로그 id다).
      *
      * `!!` 대신 명시적으로 실패시킨다 — 부모 리졸버가 반환한 값이라 실제로 null이 될 수 없지만,
      * 그 보장은 DGS의 실행 순서에 달려 있어 타입이 증명하지 못한다. 단언 연산자는 그 사실을
      * 숨기는 반면 이 쪽은 왜 안전한지를 남긴다.
      */
-    private fun DgsDataFetchingEnvironment.spotId(): Long =
+    private fun DgsDataFetchingEnvironment.catalogId(): Long =
         getSource<SpotDetailView>()?.id
             ?: error("SpotDetail 필드 리졸버는 부모가 반환한 SpotDetailView를 소스로 받아야 한다.")
 }

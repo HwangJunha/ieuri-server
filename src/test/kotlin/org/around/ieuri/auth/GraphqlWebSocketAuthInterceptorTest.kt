@@ -57,6 +57,8 @@ class GraphqlWebSocketAuthInterceptorTest {
             URI.create("ws://localhost:8888/graphql"),
             HttpHeaders(),
             LinkedMultiValueMap(),
+            // 원격 주소. 위 sessionInfo.getRemoteAddress()와 맞춰 null이다.
+            null,
             emptyMap(),
             mapOf("query" to "subscription { newMessage(conversationId: 1) { id } }"),
             "1",
