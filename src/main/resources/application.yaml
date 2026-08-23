@@ -195,7 +195,11 @@ ieuri:
     s3-endpoint: ${IERUI_R2_ENDPOINT:}
     access-key: ${IEURI_R2_ACCESS_KEY:}
     secret-access-key: ${IEURI_R2_SECRET_ACCESS_KEY:}
-    bucket: ${IEURI_R2_BUCKET:ieuri-dev}
+    # **기본값을 두지 않는다.** 버킷 이름은 환경마다 다르고(운영 ieuri-images, 개발
+    # ieuri-images-dev) 서버가 옳게 추측할 수 있는 값이 아니다. 기본값을 두면 주입을
+    # 빠뜨렸을 때 부팅은 되고 업로드만 실패하는데, 그 실패가 "버킷 없음"으로 나와
+    # 설정 누락이 아니라 R2 장애처럼 보인다. 없으면 즉시 기동을 막는 편이 낫다.
+    bucket: ${IEURI_R2_BUCKET}
     # 여러 장을 연달아 올리는 동안 만료되지 않아야 한다. 모바일에서 대용량 사진은 느리다.
     upload-url-ttl: 30m
     max-upload-bytes: 10485760
@@ -205,7 +209,8 @@ ieuri:
       - image/webp
   # 프로필 이미지(SPEC-0011 R6). 버킷은 r2와 같아도 되며 경로가 profile/ 구간으로 갈린다.
   profile-image:
-    bucket: ${IEURI_R2_BUCKET:ieuri-dev}
+    # r2.bucket과 같은 이유로 기본값을 두지 않는다.
+    bucket: ${IEURI_R2_BUCKET}
     upload-url-ttl: 30m
     max-upload-bytes: 10485760
     allowed-content-types:
