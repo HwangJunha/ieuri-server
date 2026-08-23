@@ -39,8 +39,22 @@ jobs:
 
       # 실제로 체크아웃된 커밋을 읽어 태그에 쓴다. 수동 실행에서 github.sha는 워크플로 파일을
       # 고른 브랜치의 커밋이라 빌드한 코드와 다를 수 있고, 그러면 sha- 태그가 거짓말을 한다.
+      #
+      # **환경 접두사를 함께 낸다.** 태그가 어느 환경 것인지 스스로 말하지 않으면 Image
+      # Updater가 가릴 수 없다 — 커밋 해시만으로는 dev에서 나온 이미지와 master에서 나온
+      # 이미지가 구분되지 않아, 개발에 머지한 코드가 운영의 "가장 최근 빌드"로 뽑힌다.
       - id: rev
-        run: echo "sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          branch="${{ inputs.branch || github.ref_name }}"
+          case "$branch" in
+            master) echo "env=prod" >> "$GITHUB_OUTPUT" ;;
+            dev)    echo "env=dev"  >> "$GITHUB_OUTPUT" ;;
+            # 워크플로 트리거가 dev·master로 한정되어 여기 오지 않는다. 그래도 빈 접두사로
+            # 흘려보내면 `-sha-`가 되어 두 환경의 정규식에 모두 걸리지 않는 태그가 조용히
+            # 쌓이므로, 이름을 그대로 써서 눈에 띄게 둔다.
+            *)      echo "env=$branch" >> "$GITHUB_OUTPUT" ;;
+          esac
 
       - uses: actions/setup-java@v5
         with:
@@ -69,11 +83,19 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ghcr.io/hwangjunha/ieuri-server
-          # sha- 태그는 불변이라 롤백 대상을 정확히 가리키고, 브랜치 태그는 그 브랜치의 최신을 가리킨다.
+          # **환경 접두사를 붙인다**(dev-sha-… / prod-sha-…). Image Updater가 두 환경에서
+          # 모두 도는데, 접두사가 없으면 `newest-build`가 브랜치를 가리지 못해 dev에 머지한
+          # 커밋이 운영의 최신 빌드로 뽑힌다. 접두사가 곧 필터의 근거다
+          # (매니페스트의 server.allow-tags 정규식과 짝을 이룬다).
+          #
+          # sha- 부분은 그대로 불변이라 롤백 대상을 정확히 가리킨다. 브랜치 태그는 그 브랜치의
+          # 최신을 가리키며, 사람이 `docker pull ieuri-server:dev`로 쓰라고 남긴다 —
+          # Image Updater는 이 태그를 보지 않는다(정규식이 sha 형태만 받는다).
+          #
           # 브랜치명을 직접 지정한다 — 수동 실행에서 github.ref는 워크플로 파일을 고른 브랜치라
           # inputs.branch로 체크아웃한 브랜치와 어긋날 수 있다.
           tags: |
-            type=raw,value=sha-${{ steps.rev.outputs.sha }}
+            type=raw,value=${{ steps.rev.outputs.env }}-sha-${{ steps.rev.outputs.sha }}
             type=raw,value=${{ inputs.branch || github.ref_name }}
 
       - uses: docker/build-push-action@v7
