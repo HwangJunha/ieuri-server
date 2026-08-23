@@ -42,7 +42,7 @@
 -- Name: tour; Type: SCHEMA; Schema: -; Owner: -
 --
 
-CREATE SCHEMA tour;
+CREATE SCHEMA IF NOT EXISTS tour;
 
 --
 -- Name: spot; Type: TABLE; Schema: tour; Owner: -

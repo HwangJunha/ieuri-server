@@ -21,8 +21,12 @@
 -- 확장이 이미 있는 DB를 전제하며, geography 컬럼이 그 전제 위에 선다.
 --
 -- 스키마 생성(`CREATE SCHEMA`)은 반대로 여기 있다 — 접기 전에도 V62·V68이 만들었고,
--- 앱 롤로 만들 수 있다. 매니페스트도 auth·community·tour·category·batch를 보장하지만
--- alarm은 목록에 없어, 그릇을 보장하는 쪽은 이 파일이다.
+-- 앱 롤로 만들 수 있다.
+--
+-- **`IF NOT EXISTS`가 반드시 붙어야 한다.** CNPG 매니페스트(`database.schemas`)도 같은
+-- 스키마를 만들며, 어느 쪽이 먼저 도착해도 성립해야 한다. pg_dump는 이 절을 붙이지 않고
+-- 내보내므로 접을 때 손으로 되살렸다 — 빼면 CNPG가 있는 환경에서 첫 기동이
+-- `schema "alarm" already exists`로 깨진다(실측 2026-08-24, 운영 첫 배포).
 --
 -- 논리 복제(search_pub)도 여기 없다. 접속 정보가 환경마다 달라 마이그레이션이 소유할 수
 -- 없다 — 클러스터 구축 절차가 소유한다.
@@ -31,37 +35,37 @@
 -- Name: alarm; Type: SCHEMA; Schema: -; Owner: -
 --
 
-CREATE SCHEMA alarm;
+CREATE SCHEMA IF NOT EXISTS alarm;
 
 --
 -- Name: auth; Type: SCHEMA; Schema: -; Owner: -
 --
 
-CREATE SCHEMA auth;
+CREATE SCHEMA IF NOT EXISTS auth;
 
 --
 -- Name: batch; Type: SCHEMA; Schema: -; Owner: -
 --
 
-CREATE SCHEMA batch;
+CREATE SCHEMA IF NOT EXISTS batch;
 
 --
 -- Name: category; Type: SCHEMA; Schema: -; Owner: -
 --
 
-CREATE SCHEMA category;
+CREATE SCHEMA IF NOT EXISTS category;
 
 --
 -- Name: community; Type: SCHEMA; Schema: -; Owner: -
 --
 
-CREATE SCHEMA community;
+CREATE SCHEMA IF NOT EXISTS community;
 
 --
 -- Name: tour; Type: SCHEMA; Schema: -; Owner: -
 --
 
-CREATE SCHEMA tour;
+CREATE SCHEMA IF NOT EXISTS tour;
 
 --
 -- Name: community_post_spot_sync_location(); Type: FUNCTION; Schema: community; Owner: -
