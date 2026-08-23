@@ -79,11 +79,15 @@ class DataSourceConfig {
      * 자동구성과 동작을 맞춘다 — `baseline-on-migrate`·`baseline-version`·
      * `ignore-migration-patterns`가 거기 있고, 그 의미는 application.yaml의 주석이 설명한다.
      *
-     * **[javaMigrations]를 반드시 넘겨야 한다.** V39(`ProtectEmailLoginIdentifier`)는 pepper가
-     * 필요해 SQL로 쓸 수 없는 Java 마이그레이션이고, 의존성을 주입받는 `@Component`라
-     * 클래스패스 스캔으로는 만들어지지 않는다. 자동구성은 `JavaMigration` 빈을 모아 넘겨
-     * 주는데 그것을 빠뜨리면 Flyway가 **이미 적용된 39를 로컬에서 못 찾아**
-     * `Detected applied migration not resolved locally: 39`로 검증이 깨진다.
+     * **[javaMigrations]를 넘긴다.** 자동구성이라면 `JavaMigration` 빈을 모아 Flyway에
+     * 넘겨 주는데, 이 설정이 자동구성을 물러나게 했으므로 그 일을 대신한다. 빠뜨리면
+     * 의존성을 주입받는 Java 마이그레이션(pepper가 필요해 SQL로 쓸 수 없는 것들)이
+     * 클래스패스 스캔으로 만들어지지 않아, Flyway가 이미 적용된 버전을 로컬에서 못 찾고
+     * `Detected applied migration not resolved locally`로 검증이 깨진다.
+     *
+     * **지금 `JavaMigration` 빈은 하나도 없다** — 유일했던 것이 베이스라인 스쿼시로
+     * 접혔다. 배선을 남기는 이유는 다음에 하나라도 생기는 순간 위 고장이 되살아나고,
+     * 그때 원인이 이 파일이라는 것을 알아보기 어렵기 때문이다.
      *
      * **JPA보다 먼저 돌아야 한다.** `ddl-auto: validate`가 마이그레이션이 끝난 스키마를
      * 봐야 하므로 [entityManagerFactoryDependsOnFlyway]로 순서를 명시한다 — 자동구성이
@@ -116,15 +120,13 @@ class DataSourceConfig {
             // V62는 이력 테이블을 옮기지 않는다. 옮기면 기존 환경이 이력을 잃는다.
             //
             // **`schemas(...)`로 5개를 나열하지 않는다.** 그 목록은 Flyway가 소유를 주장하는
-            // 대상이라 없으면 만들고 `clean`에서 지운다 — 스키마 생성은 V62와 CNPG
+            // 대상이라 없으면 만들고 `clean`에서 지운다 — 스키마 생성은 V1 베이스라인과 CNPG
             // 매니페스트가 이미 나눠 갖고 있으므로 소유자를 셋으로 늘릴 이유가 없다.
             //
             // **주의: `spring.datasource.hikari.connection-init-sql`이 여기 닿지 않는다.**
             // 위에 적었듯 Flyway는 풀을 쓰지 않고 자체 커넥션을 만들기 때문이다. 그래서
-            // **V62 이후의 마이그레이션은 스키마 한정으로 써야 한다** — `ALTER TABLE
-            // community_post`가 아니라 `ALTER TABLE community.community_post`. V62 이전에는
-            // 테이블이 전부 `public`에 있어 한정 없이 써도 맞았으므로, 기존 파일들을 보고
-            // 같은 방식을 따르기 쉽다.
+            // **모든 마이그레이션은 스키마 한정으로 써야 한다** — `ALTER TABLE community_post`가
+            // 아니라 `ALTER TABLE community.community_post`.
             .defaultSchema("public")
             .baselineOnMigrate(properties.baselineOnMigrate)
             .baselineVersion(properties.baselineVersion)

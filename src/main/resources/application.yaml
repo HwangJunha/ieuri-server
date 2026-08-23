@@ -76,16 +76,21 @@ spring:
   # 저장소는 BatchInfrastructureConfig의 @EnableJdbcJobRepository가, 스키마는 Flyway가 소유한다(V14).
   flyway:
     enabled: true
-    # Java 마이그레이션(V39)은 여기 없어도 된다 — Boot가 JavaMigration 빈을 주입해 등록한다.
-    # 오히려 여기 패키지를 더하면 컴파일된 클래스 디렉터리를 중복 스캔해 "more than one migration"으로 부팅이 깨진다.
+    # **Java 마이그레이션 패키지를 여기 더하지 않는다.** 컴파일된 클래스 디렉터리를 중복
+    # 스캔해 "more than one migration"으로 부팅이 깨진다 — 빈 주입으로 등록하는 것이
+    # 정상 경로다(DataSourceConfig.flyway의 javaMigrations).
     locations: classpath:db/migration
     # 공유 DB의 public 스키마에 무관한 기존 객체가 있을 수 있어, v0로 baseline 후 V1부터 전부 적용한다
     # (기존 DB에 Flyway를 도입하는 표준 방식). baseline-version=0이라 V1 마이그레이션이 스킵되지 않는다.
     baseline-on-migrate: true
     baseline-version: 0
     # 적용된 적 있는 R__ 파일을 지우면 validate가 APPLIED_REPEATABLE_MIGRATION_NOT_RESOLVED로
-    # 막는다. 시드용 R__은 의도적으로 지울 수 있으므로(R__seed_test_account를 시드더로 옮겼다)
-    # 그 경우만 무시한다. 버전 마이그레이션(V__)의 누락·체크섬 변경은 그대로 잡힌다.
+    # 막는다. 시드 R__은 의도적으로 지울 수 있으므로 그 경우만 무시한다.
+    #
+    # **지금은 아무 일도 하지 않는다** — R__ 세 개를 V1로 접으면서 지웠지만, 그 이력을
+    # 가졌던 개발 DB는 리페어(problem/DB-BASELINE-2-repair.sql)가 이력을 V1 한 줄로
+    # 치환하므로 걸릴 행 자체가 남지 않는다. 남겨 두는 것은 앞으로 R__을 다시 도입했다가
+    # 지울 때를 위한 것이다. 버전 마이그레이션(V__)의 누락·체크섬 변경은 그대로 잡힌다.
     ignore-migration-patterns: "repeatable:missing"
   graphql:
     websocket:

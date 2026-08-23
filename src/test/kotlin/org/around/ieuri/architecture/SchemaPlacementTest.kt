@@ -14,8 +14,6 @@ import kotlin.test.assertTrue
  *
  * **배치표가 곧 명세다.** 스펙 §4의 표를 여기 상수로 옮기고 엔티티 메타데이터와 대조하는 것이
  * 가장 값싼 검증이며, 실제 DB 배치는 부팅 시 `ddl-auto: validate`가 잡는다.
- *
- * 마이그레이션 정적 검사(AC-3·AC-4·AC-5·AC-10)는 [MigrationRuleTest]에 있다.
  */
 class SchemaPlacementTest {
 

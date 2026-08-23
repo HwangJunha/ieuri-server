@@ -41,9 +41,12 @@ class MemberDeletionCoverageTest {
                     referencing += match.groupValues[1].lowercase()
                 }
             }
-            // ALTER TABLE <t> ADD CONSTRAINT ... REFERENCES member(id)
+            // ALTER TABLE [ONLY] <t> ADD CONSTRAINT ... REFERENCES member(id)
+            //
+            // **`ONLY`를 건너뛰어야 한다** — pg_dump가 항상 붙이며(V1 베이스라인이 그 산출물이다),
+            // 없으면 `only`가 테이블 이름으로 잡혀 참조 목록이 통째로 어긋난다.
             Regex(
-                """ALTER\s+TABLE\s+(?:auth\.)?(\w+)[^;]*?REFERENCES\s+(?:auth\.)?member\s*\(""",
+                """ALTER\s+TABLE\s+(?:ONLY\s+)?(?:auth\.)?(\w+)[^;]*?REFERENCES\s+(?:auth\.)?member\s*\(""",
                 setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
             ).findAll(sql).forEach { referencing += it.groupValues[1].lowercase() }
         }
