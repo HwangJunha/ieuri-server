@@ -75,12 +75,12 @@ class SearchDataSourceConfig {
             // 돌고 끝나므로 자체 커넥션으로 충분하다.
             .dataSource(properties.url, properties.username, properties.password)
             .locations("classpath:db/search-node")
-            // **flyway_schema_history를 `public`에 유지한다**(SPEC-0023). V8이 테이블을
-            // `tour`로 옮겨도 이력 테이블은 따라가지 않는다 — 옮기면 기존 노드가 이력을 잃고
-            // V1부터 다시 적용하려 든다.
+            // **flyway_schema_history를 `public`에 유지한다**(SPEC-0023). 테이블은 `tour`에
+            // 있지만 이력 테이블은 따라가지 않는다 — 옮기면 기존 노드가 이력을 잃고 V1부터
+            // 다시 적용하려 든다.
             //
             // `schemas("public", "tour")`로 적지 않는다 — 그 목록은 Flyway가 소유를 주장하는
-            // 대상이라 없으면 만들고 `clean`에서 지운다. `tour`는 V8이 만든다.
+            // 대상이라 없으면 만들고 `clean`에서 지운다. `tour`는 V1이 만든다.
             .defaultSchema("public")
             // 메인과 이력이 섞이지 않게 테이블 이름을 명시한다. 기본값과 같지만, 이 DB에
             // 두 이력이 공존할 여지를 남기지 않으려는 의도를 드러낸다.
