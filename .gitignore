@@ -1,10 +1,9 @@
 HELP.md
 .gradle
 build/
-!gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/
-
+.claude/worktrees
 ### STS ###
 .apt_generated
 .classpath
@@ -170,6 +169,9 @@ fabric.properties
 
 # Package Files #
 *.jar
+# Gradle wrapper jar는 커밋한다 — CI는 clone만 하므로 이 파일이 없으면 ./gradlew가 죽는다.
+# 예외는 반드시 *.jar 뒤에 와야 한다. .gitignore는 마지막에 매칭된 규칙이 이긴다.
+!gradle/wrapper/gradle-wrapper.jar
 *.war
 *.nar
 *.ear
@@ -229,12 +231,13 @@ Temporary Items
 
 # End of https://www.toptal.com/developers/gitignore/api/macos,kotlin,java,intellij
 
-./claude/last-test-status
+# 훅이 쓰는 세션 로컬 상태. `./claude/`로 적혀 있어 실제로는 무시되지 않고 있었다.
+.claude/last-test-status
+# "작업 완료" 단계 표시. 훅이 이 파일로 테스트 실행 여부를 판정한다.
+.claude/finalizing
 .claude/settings.local.json
 
 # 헥사고날 구조의 소스 패키지 'out'(adapter/out/...)은 IntelliJ 빌드 출력 'out/'과 이름이 겹친다.
 # 위 IntelliJ 규칙(out/)이 소스까지 무시하므로, 소스 트리의 out 패키지는 다시 추적한다(마지막 매치 우선).
 !**/src/main/**/out/
 !**/src/test/**/out/
-# 로컬 환경변수(direnv). DB 비밀번호 등 비밀값 포함 — 커밋 금지.
-.envrc

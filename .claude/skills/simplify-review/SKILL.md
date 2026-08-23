@@ -1,46 +1,60 @@
 ---
 name: simplify-review
-description: Review ieuri code against the "Simple is Best" principle — flag dead code, needless abstraction, premature generalization, and indirection that doesn't earn its keep, while respecting that the hexagonal structure itself is deliberately complex. Use when the user asks to simplify, clean up, or sanity-check a change for over-engineering. Reports only.
+description: Review ieuri code for forced-fit implementations and accidental complexity — machinery built to fake a capability the upstream doesn't have, abstractions that don't earn their keep, comments that outlived the code. Use before a PR, or when a change feels bigger than the problem. Reports only.
 license: MIT
 metadata:
   author: junha
-  version: "1.0"
-# --- Claude Code extensions (ignored by other agents) ---
-allowed-tools: Read, Glob, Grep      # review-only
-context: fork                        # isolated subagent
+  version: "2.0"
+allowed-tools: Read, Glob, Grep
+context: fork
 argument-hint: "<path or diff>"
 ---
 
 # simplify-review
 
-Reviews `ieuri` code for accidental complexity — the kind that hurts readability — while **respecting the intentional structural complexity** of hexagonal architecture and the project's deliberate rules.
+Read `CLAUDE.md` first. This skill catches what ArchUnit cannot: code that compiles, passes,
+and still has the wrong shape.
 
-Read the repository `CLAUDE.md` first. The point is to simplify the *code*, not to fight the *architecture*.
+## Never flag these — they are deliberate
 
-## The line this skill must not cross
+Domain ↔ JPA entity separation and its mappers. Port/adapter indirection. The CQRS split.
+Cross-domain isolation via ports/events. Never recommend collapsing them.
 
-"Simple is Best" applies to code (clean, readable, minimal), **not** to structure. The following are deliberate and are NOT to be flagged as complexity:
-- Domain ≠ JPA entity separation and its mappers (a chosen trade for purity + consistency).
-- port/adapter indirection, CQRS split, per-domain layering.
-- Cross-domain isolation through ports/events.
+Duplication is also acceptable here. Readability beats line count — a bit of repeated code that
+reads straight is better than an abstraction that couples two callers together.
 
-Do not recommend "just use the JPA entity as the domain model" or "merge the layers to save files." Those are settled decisions.
+## Flag these
 
-## Flag these (accidental complexity)
+1. **Forced-fit implementation** — the highest-value flag. Machinery emulating a capability the
+   upstream/library/data does not actually provide. Ask: *does the source support this natively?*
+   If not, the honest simpler model is right, and the client is told.
+   *Tell-tales:* a cursor synthesized over an offset-only API, with re-fetch/merge to fake stability;
+   repeated calls to "fill in" values the contract demands but the source won't give; retry/backfill
+   loops layered onto a source with no such guarantee.
 
-- Dead code: unused functions, params, classes, unreachable branches.
-- Premature generalization: interfaces with one implementation and no extraction plan (distinct from ports, which are intentional); config for cases that don't exist yet.
-- Needless indirection: pass-through wrappers, a service that only forwards to another, a mapper that does nothing.
-- Over-abstraction: generics/inheritance where a plain function or data class would do.
-- Redundant validation duplicated across layers (belongs once — see CLAUDE.md validation rule).
-- Clever code where obvious code reads better; deep nesting that a guard clause flattens.
-- Reinvented stdlib/Kotlin/Spring functionality.
-- Fat read DTOs reused where a small per-query projection is clearer.
+2. **Contract-driven overreach** — building machinery to satisfy the *shape* of a planner's
+   `contract.graphql` rather than the acceptance criteria. The repo owns the final schema: change
+   the contract, don't implement the fiction.
 
-## How to judge
+3. **Dead code** — unused functions, params, branches, and orphaned config knobs. Grep callers
+   before rewriting: a "migrate this" task sometimes turns out to be "delete it".
 
-For each candidate, ask: does removing it lose a real capability or invariant? If not, it's accidental complexity — recommend removal. If it protects an invariant or is a deliberate architectural seam, leave it.
+4. **Comments that outlived the code** — a KDoc naming a renamed class, or stating a convention
+   since reversed. Worse than no comment; the next reader trusts them.
 
-## Output format
+5. **Over-abstraction** — one-implementation interfaces with no extraction plan (ports excepted),
+   pass-through wrappers, generics where a data class would do, config for cases that don't exist.
 
-`path:line — what's over-built — simpler form — what (if anything) is lost`. Group by "safe to remove" vs "consider". End with a one-line read on whether the change is proportionate to the problem it solves.
+6. **Reinvented framework behavior** — hand-rolled parsing/serialization/HTTP a library already does.
+
+7. **Defensive branches for unobserved cases** — null checks and fallbacks for inputs a typed
+   contract guarantees or that have never been seen. Speculative defense is complexity.
+
+## Judging
+
+Does removing it lose a real capability or invariant? If not, recommend removal.
+
+## Output
+
+`path:line — what's over-built — simpler form — what is lost`. Group "safe to remove" vs "consider".
+End with one line on whether the change is proportionate to the problem.

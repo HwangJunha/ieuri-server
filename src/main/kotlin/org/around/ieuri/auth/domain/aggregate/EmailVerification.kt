@@ -1,5 +1,6 @@
 package org.around.ieuri.auth.domain.aggregate
 
+import org.around.ieuri.auth.domain.vo.VerificationPurpose
 import java.time.Duration
 import java.time.Instant
 import java.util.UUID
@@ -36,7 +37,29 @@ class EmailVerification private constructor(
     consumedInitial: Boolean,
     verifiedAtInitial: Instant?,
     val createdAt: Instant,
+    /** 무엇을 확인하는 챌린지인가. 코드를 보낼 주소와 통과 후 처리가 갈린다(SPEC-0011 R7). */
+    val purpose: VerificationPurpose,
+    /**
+     * 이메일 변경 시 확정할 새 주소의 **암호문**. 검증 통과 전이라도 개인정보라 평문으로
+     * 두지 않는다(POL-012). 가입 검증에는 없다(null).
+     *
+     * 도메인이 복호화하지 않는다 — 암호화는 인프라 관심사이고, 여기서는 옮기기만 한다.
+     */
+    val targetEmailEncrypted: String?,
 ) {
+    init {
+        // purpose와 대상의 짝이 맞는지는 DB 제약(V63)과 같은 규칙이다. 도메인에서도 막아
+        // 잘못 만든 챌린지가 저장소까지 가지 않게 한다.
+        //
+        // **가입 챌린지도 대상을 가질 수 있다**(SPEC-0024 R7). 인증 주소를 정정하면 새 주소는
+        // 소유를 증명하기 전까지 회원 행이 아니라 이 챌린지가 들고 있다 — 즉시 반영하면
+        // 증명되지 않은 주소가 `(provider, email)` 유니크를 선점한다. 정정하지 않은 최초 가입·
+        // 단순 재발송은 회원이 이미 그 주소를 갖고 있어 null이다.
+        require(purpose != VerificationPurpose.EMAIL_CHANGE || targetEmailEncrypted != null) {
+            "이메일 변경 챌린지는 대상 주소가 있어야 합니다."
+        }
+    }
+
     var attempts: Int = attemptsInitial
         private set
     var consumed: Boolean = consumedInitial
@@ -68,6 +91,10 @@ class EmailVerification private constructor(
     companion object {
         const val DEFAULT_MAX_ATTEMPTS: Int = 5
 
+        /**
+         * 새 챌린지 발급. [purpose]를 주지 않으면 가입 검증이다 — 기존 호출부의 의미가 그것이다.
+         * 이메일 변경은 [targetEmailEncrypted]를 반드시 함께 준다.
+         */
         fun issue(
             publicId: UUID,
             memberId: Long,
@@ -75,6 +102,8 @@ class EmailVerification private constructor(
             ttl: Duration,
             now: Instant,
             maxAttempts: Int = DEFAULT_MAX_ATTEMPTS,
+            purpose: VerificationPurpose = VerificationPurpose.REGISTRATION,
+            targetEmailEncrypted: String? = null,
         ): EmailVerification = EmailVerification(
             id = null,
             publicId = publicId,
@@ -86,6 +115,8 @@ class EmailVerification private constructor(
             consumedInitial = false,
             verifiedAtInitial = null,
             createdAt = now,
+            purpose = purpose,
+            targetEmailEncrypted = targetEmailEncrypted,
         )
 
         /** 영속 상태에서 도메인 모델 재구성(매퍼 전용). */
@@ -100,6 +131,8 @@ class EmailVerification private constructor(
             consumed: Boolean,
             verifiedAt: Instant?,
             createdAt: Instant,
+            purpose: VerificationPurpose,
+            targetEmailEncrypted: String?,
         ): EmailVerification = EmailVerification(
             id = id,
             publicId = publicId,
@@ -111,6 +144,8 @@ class EmailVerification private constructor(
             consumedInitial = consumed,
             verifiedAtInitial = verifiedAt,
             createdAt = createdAt,
+            purpose = purpose,
+            targetEmailEncrypted = targetEmailEncrypted,
         )
     }
 }

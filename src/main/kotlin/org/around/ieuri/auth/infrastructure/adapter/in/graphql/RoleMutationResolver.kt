@@ -7,10 +7,10 @@ import org.around.ieuri.auth.application.command.AssignRoleCommand
 import org.around.ieuri.auth.application.command.RevokeRoleCommand
 import org.around.ieuri.auth.application.port.`in`.command.RoleUseCase
 import org.around.ieuri.auth.domain.vo.Permission
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.AssignRoleInput
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.RevokeRoleInput
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.RoleChangePayload
-import org.around.ieuri.auth.infrastructure.security.CurrentMemberProvider
+import org.around.ieuri.common.graphql.generated.types.AssignRoleInput
+import org.around.ieuri.common.graphql.generated.types.RevokeRoleInput
+import org.around.ieuri.common.graphql.generated.types.RoleChangePayload
+import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.auth.infrastructure.security.RequiresPermission
 
 /**
@@ -31,7 +31,7 @@ class RoleMutationResolver(
         val result = roleUseCase.assign(
             AssignRoleCommand(
                 actorMemberId = actorId,
-                targetMemberId = input.memberId.toLong(),
+                targetMemberId = input.memberId,
                 roleCode = input.roleCode,
             ),
         )
@@ -47,7 +47,7 @@ class RoleMutationResolver(
         val result = roleUseCase.revoke(
             RevokeRoleCommand(
                 actorMemberId = actorId,
-                targetMemberId = input.memberId.toLong(),
+                targetMemberId = input.memberId,
                 roleCode = input.roleCode,
             ),
         )

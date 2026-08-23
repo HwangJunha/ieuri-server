@@ -1,6 +1,7 @@
 package org.around.ieuri.auth.application.query
 
 import org.around.ieuri.auth.domain.vo.MemberStatus
+import org.around.ieuri.auth.domain.vo.Provider
 import java.time.Instant
 
 /**
@@ -16,10 +17,17 @@ data class MeView(
     val profileImageUrl: String?,
     val status: MemberStatus,
     val emailVerified: Boolean,
+    val provider: Provider,
     val roles: List<String>,
     val permissions: List<String>,
     val createdAt: Instant,
-)
+) {
+    /**
+     * 이메일 변경 가능 여부(SPEC-0024 R6). **저장하지 않고 provider에서 파생한다** —
+     * 저장하면 provider와 어긋날 수 있는 두 번째 진실이 생긴다.
+     */
+    val canChangeEmail: Boolean get() = provider == Provider.EMAIL
+}
 
 /** 관리자 회원 단건 상세(member). member:read 권한 필요. 단건이므로 이메일 평문 노출. */
 data class MemberDetailView(
@@ -34,6 +42,16 @@ data class MemberDetailView(
     val suspensionReason: String?,
     val roles: List<String>,
     val createdAt: Instant,
+)
+
+/**
+ * 표시용 최소 회원 정보. 권한 불요이며 **이메일을 담지 않는다**(복호화도 하지 않는다).
+ * 다른 도메인이 작성자·대상 회원을 표시할 때 쓰는 형태다.
+ */
+data class MemberPublicProfileView(
+    val memberId: Long,
+    val nickname: String,
+    val profileImageUrl: String?,
 )
 
 /** 관리자 회원 목록 항목. 최소수집: 대량 복호화 회피를 위해 이메일은 포함하지 않는다. */

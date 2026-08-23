@@ -7,12 +7,12 @@ import org.around.ieuri.auth.application.command.ReactivateMemberCommand
 import org.around.ieuri.auth.application.command.SuspendMemberCommand
 import org.around.ieuri.auth.application.command.WithdrawMemberCommand
 import org.around.ieuri.auth.application.port.`in`.command.MemberLifecycleUseCase
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.AdminActionPayload
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.ReactivateMemberInput
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.SuspendMemberInput
+import org.around.ieuri.common.graphql.generated.types.AdminActionPayload
+import org.around.ieuri.common.graphql.generated.types.ReactivateMemberInput
+import org.around.ieuri.common.graphql.generated.types.SuspendMemberInput
 import org.around.ieuri.auth.domain.vo.Permission
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.WithdrawMemberPayload
-import org.around.ieuri.auth.infrastructure.security.CurrentMemberProvider
+import org.around.ieuri.common.graphql.generated.types.WithdrawMemberPayload
+import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.auth.infrastructure.security.RequiresPermission
 import java.time.Instant
 
@@ -41,7 +41,7 @@ class MemberLifecycleMutationResolver(
     ) {
         val result = memberLifecycleUseCase.suspend(
             SuspendMemberCommand(
-                memberId = input.memberId.toLong(),
+                memberId = input.memberId,
                 reason = input.reason,
                 suspendedUntil = input.suspendedUntil?.let { Instant.parse(it) },
             ),
@@ -54,7 +54,7 @@ class MemberLifecycleMutationResolver(
     fun reactivateMember(@InputArgument input: ReactivateMemberInput): AdminActionPayload = withUserErrors(
         onError = { AdminActionPayload(success = false, userErrors = it) },
     ) {
-        val result = memberLifecycleUseCase.reactivate(ReactivateMemberCommand(input.memberId.toLong()))
+        val result = memberLifecycleUseCase.reactivate(ReactivateMemberCommand(input.memberId))
         AdminActionPayload(success = result.success, userErrors = emptyList())
     }
 }

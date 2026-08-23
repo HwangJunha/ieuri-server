@@ -1,35 +1,23 @@
 {
-  "// note": "Merge this into .claude/settings.json at the repo root. Make every script executable: chmod +x .claude/hooks/*.sh",
+  "// note": "팀 공유 설정. 개인 오버라이드는 .claude/settings.local.json(gitignore). 우선순위: deny > ask > allow, 먼저 맞는 규칙이 이긴다.",
+  "env": { "IEURI_VAULT": "/Users/junha/Documents/Obsidian Vault" },
+
+  "permissions": {
+    "allow": [
+      "Bash(git commit:*)"
+    ],
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(gh pr:*)"
+    ]
+  },
 
   "hooks": {
     "PreToolUse": [
       {
         "matcher": "Write|Edit|MultiEdit",
         "hooks": [
-          { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-sensitive-paths.sh" },
-          { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-architecture-violations.sh" }
-        ]
-      }
-    ],
-
-    "PostToolUse": [
-      {
-        "matcher": "Write|Edit|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/run-tests-after-edit-gradle.sh",
-            "async": true,
-            "timeout": 300
-          }
-        ]
-      }
-    ],
-
-    "Stop": [
-      {
-        "hooks": [
-          { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-stop-without-tests.sh" }
+          { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-sensitive-paths.sh" }
         ]
       }
     ]

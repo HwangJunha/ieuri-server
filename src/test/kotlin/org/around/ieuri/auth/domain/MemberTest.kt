@@ -3,7 +3,9 @@ package org.around.ieuri.auth.domain
 import org.around.ieuri.auth.domain.aggregate.Member
 import org.around.ieuri.auth.domain.vo.Agreement
 import org.around.ieuri.auth.domain.vo.Email
+import org.around.ieuri.auth.domain.vo.MemberStatus
 import org.around.ieuri.auth.domain.vo.Nickname
+import org.around.ieuri.auth.domain.vo.PasswordHash
 import org.around.ieuri.auth.domain.vo.Provider
 import org.around.ieuri.auth.domain.vo.ProviderUserId
 import java.time.Instant
@@ -23,17 +25,15 @@ class MemberTest {
         agreed.mapIndexed { idx, (code, ok) -> Agreement((idx + 1).toLong(), code, "1.0", ok, now) }
 
     private fun register(
-        submittedEmail: String = "user@example.com",
+        fallbackEmail: String = "user@example.com",
         providerEmail: String? = "user@example.com",
-        providerEmailVerified: Boolean = true,
         ageVerified: Boolean = true,
         agreements: List<Agreement> = agreements("SERVICE" to true, "PRIVACY" to true, "MARKETING" to false),
     ): Member = Member.register(
         provider = Provider.GOOGLE,
         providerUserId = ProviderUserId("google-sub-1"),
-        submittedEmail = Email(submittedEmail),
         providerEmail = providerEmail?.let { Email(it) },
-        providerEmailVerified = providerEmailVerified,
+        fallbackEmail = Email(fallbackEmail),
         nickname = Nickname("여행자"),
         profileImageUrl = null,
         ageVerified = ageVerified,
@@ -64,38 +64,134 @@ class MemberTest {
 
     @Test
     fun `이메일이 비어 있으면 가입이 거부된다`() {
-        assertFailsWith<IllegalArgumentException> { register(submittedEmail = "") }
+        assertFailsWith<IllegalArgumentException> { register(providerEmail = null, fallbackEmail = "") }
+    }
+
+    // --- 인증 면제 판정 (SPEC-0024 R2·R3·R12) ---
+
+    @Test
+    fun `provider가 이메일을 주면 email_verified가 true다`() {
+        assertTrue(register(providerEmail = "same@example.com").emailVerified)
+    }
+
+    /**
+     * **이 슬라이스 변경의 핵심이다**(R2-2). 이전에는 provider의 검증 플래그가 거짓이면
+     * 미검증으로 시작했다. 이제 플래그를 보지 않으므로 참이 된다 — provider의 서명을 검증해
+     * 신원을 위임하는 이상(POL-030) 같은 provider가 준 이메일을 따로 의심할 근거가 없다.
+     */
+    @Test
+    fun `provider의 검증 플래그와 무관하게 이메일만 주면 email_verified가 true다`() {
+        // 판정에 플래그가 아예 쓰이지 않으므로 파라미터 자체가 사라졌다.
+        assertTrue(register(providerEmail = "unverified-by-provider@example.com").emailVerified)
     }
 
     @Test
-    fun `제출 이메일이 provider 검증 이메일과 같으면 email_verified가 true다`() {
-        val member = register(submittedEmail = "SAME@Example.com", providerEmail = "same@example.com", providerEmailVerified = true)
+    fun `provider가 이메일을 주지 않으면 email_verified가 false다`() {
+        val member = register(providerEmail = null, fallbackEmail = "typed@example.com")
+        assertFalse(member.emailVerified)
+        assertEquals("typed@example.com", member.email.value)
+    }
+
+    /** R12-1·R12-2 — 제출값과 provider 값이 갈리면 **provider 값이 저장된다.** */
+    @Test
+    fun `provider가 이메일을 주면 제출값을 무시하고 provider 값을 저장한다`() {
+        val member = register(providerEmail = "from-provider@example.com", fallbackEmail = "typed-by-user@example.com")
+        assertEquals("from-provider@example.com", member.email.value)
         assertTrue(member.emailVerified)
-    }
-
-    @Test
-    fun `사용자가 이메일을 수정했으면 email_verified가 false로 시작한다`() {
-        val member = register(submittedEmail = "edited@example.com", providerEmail = "original@example.com", providerEmailVerified = true)
-        assertFalse(member.emailVerified)
-    }
-
-    @Test
-    fun `provider가 이메일을 검증하지 않았으면 email_verified가 false다`() {
-        val member = register(providerEmailVerified = false)
-        assertFalse(member.emailVerified)
-    }
-
-    @Test
-    fun `provider가 이메일을 주지 않았으면 email_verified가 false다`() {
-        val member = register(submittedEmail = "typed@example.com", providerEmail = null, providerEmailVerified = false)
-        assertFalse(member.emailVerified)
     }
 
     @Test
     fun `markEmailVerified 호출 시 검증 상태로 전이된다`() {
-        val member = register(providerEmailVerified = false)
+        val member = register(providerEmail = null)
         assertFalse(member.emailVerified)
         member.markEmailVerified()
         assertTrue(member.emailVerified)
+    }
+
+    // --- 이메일 변경 가능 여부 (SPEC-0024 R6) ---
+
+    @Test
+    fun `SNS 회원은 이메일을 변경할 수 없다`() {
+        assertFalse(register().canChangeEmail())
+    }
+
+    @Test
+    fun `EMAIL 회원은 이메일을 변경할 수 있다`() {
+        assertTrue(registerByEmail().canChangeEmail())
+    }
+
+    // --- 인증 주소 재입력 (SPEC-0024 R7) ---
+
+    /** 정정 자체는 도메인이 하지 않는다 — 통과 여부만 판정하고 주소는 챌린지가 들고 있는다. */
+    @Test
+    fun `미인증 회원은 인증 대상 주소를 정정할 수 있다`() {
+        val member = register(providerEmail = null, fallbackEmail = "wrong@example.com")
+
+        member.ensureCanRetargetPendingEmail()
+
+        // 회원의 주소는 그대로다 — 소유를 증명하기 전에는 바뀌지 않는다.
+        assertEquals("wrong@example.com", member.email.value)
+        assertFalse(member.emailVerified)
+    }
+
+    @Test
+    fun `인증을 마친 회원의 주소 정정은 거부된다`() {
+        val member = register(providerEmail = "verified@example.com")
+        assertTrue(member.emailVerified)
+
+        assertFailsWith<IllegalArgumentException> { member.ensureCanRetargetPendingEmail() }
+    }
+
+    // --- registerByEmail (SPEC-0012 R1) ---
+
+    private fun registerByEmail(
+        email: String = "user@example.com",
+        providerUserId: String = "protected-value",
+    ): Member = Member.registerByEmail(
+        email = Email(email),
+        providerUserId = ProviderUserId(providerUserId),
+        passwordHash = PasswordHash("hashed-pw"),
+        nickname = Nickname("여행자"),
+        ageVerified = true,
+        agreements = agreements("SERVICE" to true, "PRIVACY" to true),
+        requiredTermsCodes = requiredCodes,
+        now = now,
+    )
+
+    @Test
+    fun `이메일 가입은 넘겨받은 식별자를 그대로 쓰고 이메일에서 파생하지 않는다`() {
+        val member = registerByEmail(email = "user@example.com", providerUserId = "protected-value")
+
+        assertEquals(Provider.EMAIL, member.provider)
+        assertEquals("protected-value", member.providerUserId.value)
+        assertEquals("user@example.com", member.email.value)
+        assertFalse(member.emailVerified)
+    }
+
+    @Test
+    fun `이메일 가입도 필수 약관 미동의면 거부된다`() {
+        assertFailsWith<IllegalArgumentException> {
+            Member.registerByEmail(
+                email = Email("user@example.com"),
+                providerUserId = ProviderUserId("protected-value"),
+                passwordHash = PasswordHash("hashed-pw"),
+                nickname = Nickname("여행자"),
+                ageVerified = true,
+                agreements = agreements("SERVICE" to true),
+                requiredTermsCodes = requiredCodes,
+                now = now,
+            )
+        }
+    }
+
+    // --- 상태값 집합 (SPEC-0012 R12) ---
+
+    @Test
+    fun `회원 상태는 ACTIVE와 SUSPENDED 둘뿐이다`() {
+        // 탈퇴는 행 삭제라 WITHDRAWN 같은 상태값이 존재해선 안 된다.
+        assertEquals(
+            listOf(MemberStatus.ACTIVE, MemberStatus.SUSPENDED),
+            MemberStatus.entries.toList(),
+        )
     }
 }

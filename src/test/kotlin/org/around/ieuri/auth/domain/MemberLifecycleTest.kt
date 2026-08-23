@@ -22,9 +22,8 @@ class MemberLifecycleTest {
     private fun activeMember(): Member = Member.register(
         provider = Provider.GOOGLE,
         providerUserId = ProviderUserId("google-sub-1"),
-        submittedEmail = Email("u@example.com"),
         providerEmail = Email("u@example.com"),
-        providerEmailVerified = true,
+        fallbackEmail = Email("u@example.com"),
         nickname = Nickname("여행자"),
         profileImageUrl = null,
         ageVerified = true,

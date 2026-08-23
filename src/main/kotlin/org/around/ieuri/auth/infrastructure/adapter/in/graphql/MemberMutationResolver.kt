@@ -10,21 +10,25 @@ import org.around.ieuri.auth.application.command.RegisterMemberCommand
 import org.around.ieuri.auth.application.command.RequestPasswordResetCommand
 import org.around.ieuri.auth.application.command.ResendVerificationCommand
 import org.around.ieuri.auth.application.command.ResetPasswordCommand
+import org.around.ieuri.auth.application.command.RetargetEmailVerificationCommand
 import org.around.ieuri.auth.application.command.VerifyEmailCommand
 import org.around.ieuri.auth.application.port.`in`.command.MemberRegistrationUseCase
 import org.around.ieuri.auth.domain.vo.Provider
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.RegisterEmailMemberInput
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.RegisterEmailMemberPayload
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.RegisterSnsMemberInput
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.RegisterSnsMemberPayload
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.RequestPasswordResetInput
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.RequestPasswordResetPayload
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.ResendVerificationInput
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.ResendVerificationPayload
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.ResetPasswordInput
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.ResetPasswordPayload
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.VerifyEmailInput
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.VerifyEmailPayload
+import org.around.ieuri.common.graphql.generated.types.RegisterEmailMemberInput
+import org.around.ieuri.common.graphql.generated.types.RegisterEmailMemberPayload
+import org.around.ieuri.common.graphql.generated.types.RegisterSnsMemberInput
+import org.around.ieuri.common.graphql.generated.types.RegisterSnsMemberPayload
+import org.around.ieuri.common.graphql.generated.types.RequestPasswordResetInput
+import org.around.ieuri.common.graphql.generated.types.RequestPasswordResetPayload
+import org.around.ieuri.common.graphql.generated.types.ResendVerificationInput
+import org.around.ieuri.common.graphql.generated.types.ResendVerificationPayload
+import org.around.ieuri.common.graphql.generated.types.ResetPasswordInput
+import org.around.ieuri.common.graphql.generated.types.ResetPasswordPayload
+import org.around.ieuri.common.graphql.generated.types.RetargetEmailVerificationInput
+import org.around.ieuri.common.graphql.generated.types.RetargetEmailVerificationPayload
+import org.around.ieuri.common.graphql.generated.types.VerifyEmailInput
+import org.around.ieuri.common.graphql.generated.types.VerifyEmailPayload
+import org.around.ieuri.common.security.CurrentMemberProvider
 import java.util.UUID
 
 /**
@@ -35,7 +39,39 @@ import java.util.UUID
 @DgsComponent
 class MemberMutationResolver(
     private val memberRegistrationUseCase: MemberRegistrationUseCase,
+    private val currentMemberProvider: CurrentMemberProvider,
 ) {
+    /**
+     * 인증 대기 주소 정정(SPEC-0024 R7). **본인 대상이라 인증이 필요하다** — 검증 핸들이 아니라
+     * 인증 주체로 회원을 정하므로, 핸들을 잃은 회원도 주소를 고칠 수 있다.
+     *
+     * 미인증 회원이 호출하는 오퍼레이션이므로 게이트의 허용 목록에 들어 있다(R9).
+     */
+    @DgsMutation
+    fun retargetEmailVerification(
+        @InputArgument input: RetargetEmailVerificationInput,
+    ): RetargetEmailVerificationPayload = withUserErrors(
+        onError = {
+            RetargetEmailVerificationPayload(
+                success = false,
+                userErrors = it,
+                verificationId = null,
+                expiresAt = null,
+            )
+        },
+    ) {
+        val memberId = currentMemberProvider.requireMemberId()
+        val result = memberRegistrationUseCase.retargetEmailVerification(
+            RetargetEmailVerificationCommand(memberId, input.newEmail),
+        )
+        RetargetEmailVerificationPayload(
+            success = true,
+            userErrors = emptyList(),
+            verificationId = result.verificationPublicId.toString(),
+            expiresAt = result.expiresAt.toString(),
+        )
+    }
+
     @DgsQuery
     fun authHealth(): String = "ok"
 
@@ -51,6 +87,7 @@ class MemberMutationResolver(
             ageVerified = input.ageVerified,
             // 생성된 TermsCode enum → String (도메인/커맨드는 데이터주도로 String 유지)
             agreements = input.agreements.map { AgreementInput(it.termsCode.name, it.agreed) },
+            authorizationCode = input.authorizationCode,
         )
         val result = memberRegistrationUseCase.registerBySns(command)
         RegisterSnsMemberPayload(

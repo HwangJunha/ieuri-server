@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "org.around"
-version = "0.0.1-SNAPSHOT"
+version = "0.0.1"
 description = "ieuri"
 
 java {
@@ -28,12 +28,21 @@ extra["netflixDgsVersion"] = "11.1.0"
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    // k8s readiness·liveness 프로브용 health 엔드포인트. 프로브 경로만 열고 나머지
+    // actuator 엔드포인트는 노출하지 않는다(application.yaml의 management 블록).
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
+    // refresh 토큰 저장소를 Valkey(Redis 프로토콜 호환)로 이관. Lettuce 클라이언트 기본.
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.boot:spring-boot-starter-security")
     // @RequiresPermission 선언적 인가(애스펙트)용 AspectJ 위버. spring-aop는 전이 의존이나,
     // 위버는 명시해 두어 프록시 파싱(@Aspect) 요건을 드러낸다. 프록시 활성화는 @EnableAspectJAutoProxy(AopConfig).
     implementation("org.aspectj:aspectjweaver")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-mail")
+    // Spring Boot 4는 자동구성을 모듈로 분리했다. RestClient.Builder 자동구성(RestClientAutoConfiguration)은
+    // 이 모듈에 있으므로, TourAPI 호출용 RestClient 빈을 자동구성 빌더로 만들려면 명시적으로 추가해야 한다.
+    // (Flyway 자동구성을 spring-boot-flyway로 별도 추가하는 것과 동일한 패턴.)
+    implementation("org.springframework.boot:spring-boot-restclient")
     implementation("com.netflix.graphql.dgs:graphql-dgs-spring-graphql-starter")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("tools.jackson.module:jackson-module-kotlin")
@@ -42,15 +51,35 @@ dependencies {
     kapt("io.github.openfeign.querydsl:querydsl-apt:6.11:jakarta")
     kapt("jakarta.persistence:jakarta.persistence-api")
     kapt("jakarta.annotation:jakarta.annotation-api")
+    // 관광지 목록 일 1회 동기화 잡(SPEC-0004). 메타 테이블(BATCH_*)은 Flyway 마이그레이션으로 소유하고
+    // spring.batch.jdbc.initialize-schema=never로 둔다 — 스키마 형상 관리를 Flyway로 일원화하기 위함.
+    implementation("org.springframework.boot:spring-boot-starter-batch")
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
     // Spring Boot 4는 자동구성을 모듈로 분리했다. Flyway 자동구성(FlywayAutoConfiguration)은
     // flyway-core가 아니라 이 모듈에 있으므로 명시적으로 추가해야 마이그레이션이 부팅 시 실행된다.
     implementation("org.springframework.boot:spring-boot-flyway")
+    // Cloudflare R2(S3 호환) presigned URL 발급과 확인 단계의 오브젝트 조작(SPEC-0010 R18·R19).
+    // 서명을 손으로 만들지 않는다 — SigV4는 정본 요청 문자열 한 글자만 어긋나도 조용히 실패하고,
+    // Content-Type·Content-Length를 서명 항목에 넣는 일까지 SDK가 네이티브로 지원한다.
+    // S3Presigner도 이 아티팩트에 들어 있다 — 별도의 s3-presigner 모듈은 존재하지 않는다.
+    implementation("software.amazon.awssdk:s3:2.31.77")
     // JWT (JVM 표준 라이브러리 jjwt). api만 컴파일 의존, 구현/직렬화는 런타임.
+    // 자체 발급 HS256 토큰 전용.
     implementation("io.jsonwebtoken:jjwt-api:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
+    // 외부 SNS id_token(RS256/ES256) 서명 검증 + JWKS 원격 조회/캐시. jjwt는 JWKS 조회를
+    // 지원하지 않아 별도 라이브러리를 쓴다. Google/Apple/Kakao 공개키로 서명·iss·aud·exp 검증.
+    implementation("com.nimbusds:nimbus-jose-jwt:9.40")
+    // FCM 앱 푸시 발송(SPEC-0028, POL-027). sendEach()가 토큰별 성공/실패와 MessagingErrorCode를
+    // 돌려주므로 무효 토큰만 골라 지우는 R4를 응답 파싱 없이 구현할 수 있다.
+    // Jackson 2를 전이로 끌고 오지만 Jackson 3(tools.jackson)와 좌표가 달라 서로 무관하게 공존한다.
+    implementation("com.google.firebase:firebase-admin:9.4.3")
+    // 애플 revoke용 .p8(PEM) 개인키 파싱. 손으로 헤더를 떼고 Base64를 디코드하는 대신
+    // 표준 PEM 파서를 쓴다. nimbus의 JWK.parseFromPEMEncodedObjects는 쓸 수 없다 —
+    // .p8은 개인키만 담고 있는데 그 API는 JWK 조립에 공개키를 함께 요구한다.
+    implementation("org.bouncycastle:bcpkix-jdk18on:1.80")
     runtimeOnly("org.postgresql:postgresql")
     testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")
     testImplementation("io.mockk:mockk:1.13.13")
@@ -85,11 +114,50 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
-// auth.graphqls → Kotlin GraphQL 타입 생성(입력/출력/enum). 서버 전용이라 client 코드는 생성하지 않는다.
-// 생성 패키지는 Kotlin 하드 키워드('in')를 피하려고 keyword-free 경로를 사용한다.
+// schema/*.graphqls → Kotlin GraphQL 타입 생성(입력/출력/enum). 서버 전용이라 client 코드는 생성하지 않는다.
+// 생성 타입은 특정 도메인 소유가 아니라 스키마 전체의 공유 커널이므로 common 하위에 둔다(도메인 간 격리 규칙 준수).
 tasks.withType<com.netflix.graphql.dgs.codegen.gradle.GenerateJavaTask> {
     schemaPaths = mutableListOf("${projectDir}/src/main/resources/schema")
-    packageName = "org.around.ieuri.auth.infrastructure.graphql.generated"
+    packageName = "org.around.ieuri.common.graphql.generated"
     generateClient = false
     language = "kotlin"
+    // GraphQL ID 스칼라를 Long으로 생성한다. codegen 기본값은 String이라 리졸버마다 toString/toLong
+    // 변환과 파싱 실패 분기가 생기는데, 이 스키마의 ID는 **전부 서버가 부여한 BIGINT PK**다
+    // (spot.id, member.id, terms.id …). 문자열로 받아 곧바로 되돌리는 왕복이 순수한 잡음이었다.
+    //
+    // 매핑을 두면 생성 타입까지 Long이 되어 **경계에서 한 번만 검증된다** — 형식이 틀린 id는
+    // 리졸버에 도달하기 전에 GraphQL이 자체 오류로 거부한다.
+    typeMapping = mutableMapOf("ID" to "kotlin.Long")
 }
+
+// 생성된 GraphQL 타입을 **소스 디렉터리로 등록한다.**
+//
+// 등록하지 않아도 Gradle 빌드는 통과한다 — codegen 플러그인이 컴파일 태스크에 출력을 직접
+// 얹기 때문이다. 문제는 IDE다: IntelliJ는 이 디렉터리가 소스인 줄 모르므로 생성 타입
+// (CreatePostInput, PostTopic …)과 @InputArgument를 전부 미해결로 표시한다. 빌드는 되는데
+// 에디터만 빨갛게 되는 상태이며, build/를 지우고 다시 임포트하면 잠깐 낫다가 재발한다.
+//
+// srcDir로 명시하면 Gradle 임포트가 이 경로를 IDE에 알려 준다.
+sourceSets {
+    main {
+        kotlin.srcDir(layout.buildDirectory.dir("generated/sources/dgs-codegen"))
+    }
+}
+
+// 컴파일 전에 코드 생성이 끝나 있도록 한다. 위 srcDir만 두면 IDE 임포트 시점에 디렉터리가
+// 비어 있을 수 있고, 그러면 등록해 놓고도 미해결로 남는다.
+//
+// **IDE에서 빨간 줄이 보이면 `./gradlew generateJava`를 먼저 돌린 뒤 Gradle sync를 한다.**
+// generateJava는 출력이 지워져도 UP-TO-DATE로 건너뛸 수 있어(빌드 캐시), 그 상태로 임포트하면
+// 소스 루트는 등록돼 있는데 안이 비어 미해결로 보인다.
+tasks.named("compileKotlin") {
+    dependsOn(tasks.withType<com.netflix.graphql.dgs.codegen.gradle.GenerateJavaTask>())
+}
+
+// plain jar는 라이브러리로 배포할 때 쓰는 산출물이라 이 프로젝트에는 쓸모가 없다. 켜 두면
+// build/libs에 실행 불가한 jar(Main-Class 없음)가 함께 생겨 이미지에 잘못 실릴 수 있다.
+tasks.jar { enabled = false }
+
+// 파일명을 고정해 버전이 바뀌어도 Dockerfile을 손대지 않게 한다. 배포 식별은 이미지 태그가 맡는다.
+tasks.bootJar { archiveFileName.set("app.jar") }
+

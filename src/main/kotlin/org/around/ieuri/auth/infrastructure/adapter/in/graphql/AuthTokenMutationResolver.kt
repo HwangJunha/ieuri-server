@@ -10,13 +10,13 @@ import org.around.ieuri.auth.application.command.RefreshTokenCommand
 import org.around.ieuri.auth.application.port.`in`.command.AuthTokenUseCase
 import org.around.ieuri.auth.application.port.`in`.command.TokenPairResult
 import org.around.ieuri.auth.domain.vo.Provider
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.AuthTokenPayload
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.LoginEmailInput
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.LoginSnsInput
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.LogoutInput
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.LogoutPayload
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.RefreshTokenInput
-import org.around.ieuri.auth.infrastructure.graphql.generated.types.UserError
+import org.around.ieuri.common.graphql.generated.types.AuthTokenPayload
+import org.around.ieuri.common.graphql.generated.types.LoginEmailInput
+import org.around.ieuri.common.graphql.generated.types.LoginSnsInput
+import org.around.ieuri.common.graphql.generated.types.LogoutInput
+import org.around.ieuri.common.graphql.generated.types.LogoutPayload
+import org.around.ieuri.common.graphql.generated.types.RefreshTokenInput
+import org.around.ieuri.common.graphql.generated.types.UserError
 
 /**
  * 로그인/토큰 GraphQL 뮤테이션 리졸버(인바운드 어댑터). 유스케이스에 위임하고 응답 페이로드로 매핑한다.
@@ -31,7 +31,11 @@ class AuthTokenMutationResolver(
         onError = { authTokenErrorPayload(it) },
     ) {
         authTokenUseCase.loginBySns(
-            LoginCommand(provider = Provider.valueOf(input.provider.name), idToken = input.idToken),
+            LoginCommand(
+                provider = Provider.valueOf(input.provider.name),
+                idToken = input.idToken,
+                authorizationCode = input.authorizationCode,
+            ),
         ).toPayload()
     }
 

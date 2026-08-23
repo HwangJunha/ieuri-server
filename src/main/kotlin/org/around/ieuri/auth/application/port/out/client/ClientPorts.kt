@@ -17,12 +17,25 @@ interface SnsIdentityVerifierPort {
 data class SnsIdentity(
     val providerUserId: String,
     val email: String?,
-    val emailVerified: Boolean,
     val nickname: String?,
     val profileImageUrl: String?,
 )
 
-/** 이메일 발송 포트. 현재 Gmail SMTP 구현, 추후 Resend로 교체. */
+/**
+ * SNS authorization code를 provider와 교환해 폐기용 refresh token을 얻는 포트(SPEC-0012 R5).
+ *
+ * code는 일회용이고 짧게 만료된다. 교환 실패는 예외가 아니라 null로 알린다 —
+ * 실패가 로그인·가입을 막아서는 안 되기 때문이다(R7).
+ * Kakao는 어드민 키로 해제하므로 교환 대상이 아니며 구현이 null을 반환한다.
+ */
+interface SnsTokenExchangerPort {
+    fun exchangeForRefreshToken(provider: Provider, authorizationCode: String): String?
+}
+
+/**
+ * 이메일 발송 포트. 발송 수단은 어댑터가 정한다.
+ * 발송 실패는 예외로 알리지 않는다 — 호출부는 이미 커밋된 트랜잭션의 뒷정리 경로다.
+ */
 interface EmailSenderPort {
     fun sendVerificationCode(toEmail: String, code: String)
 

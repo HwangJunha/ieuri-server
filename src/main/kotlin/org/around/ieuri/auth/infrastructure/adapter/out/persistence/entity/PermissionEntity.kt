@@ -1,5 +1,6 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity
 
+import org.around.ieuri.common.persistence.DbSchema
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.GeneratedValue
@@ -11,7 +12,7 @@ import java.time.Instant
 
 /** 권한 JPA 엔티티. 인가의 최소 단위를 코드로 식별한다. */
 @Entity
-@Table(name = "permission")
+@Table(name = "permission", schema = DbSchema.AUTH)
 class PermissionEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

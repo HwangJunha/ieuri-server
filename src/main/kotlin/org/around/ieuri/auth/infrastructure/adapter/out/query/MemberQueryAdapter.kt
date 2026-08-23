@@ -9,6 +9,7 @@ import org.around.ieuri.auth.application.port.out.security.EmailEncryptorPort
 import org.around.ieuri.auth.application.query.MembersQuery
 import org.around.ieuri.auth.application.query.MeView
 import org.around.ieuri.auth.application.query.MemberDetailView
+import org.around.ieuri.auth.application.query.MemberPublicProfileView
 import org.around.ieuri.auth.application.query.MemberSummaryView
 import org.around.ieuri.common.pagination.CursorEdge
 import org.around.ieuri.common.pagination.CursorPage
@@ -43,7 +44,7 @@ class MemberQueryAdapter(
         val row = queryFactory
             .select(
                 member.emailEncrypted, member.emailVerified, member.status, member.createdAt,
-                profile.nickname, profile.profileImageUrl,
+                member.provider, profile.nickname, profile.profileImageUrl,
             )
             .from(member)
             .leftJoin(profile).on(profile.memberId.eq(member.id))
@@ -57,6 +58,8 @@ class MemberQueryAdapter(
             profileImageUrl = row.get(profile.profileImageUrl),
             status = requireNotNull(row.get(member.status)),
             emailVerified = requireNotNull(row.get(member.emailVerified)),
+            // canChangeEmail은 저장하지 않고 이 값에서 파생한다(SPEC-0024 R6).
+            provider = requireNotNull(row.get(member.provider)),
             roles = roleCodesOf(memberId),
             permissions = permissionCodesOf(memberId),
             createdAt = requireNotNull(row.get(member.createdAt)),
@@ -88,6 +91,48 @@ class MemberQueryAdapter(
             roles = roleCodesOf(memberId),
             createdAt = requireNotNull(row.get(member.createdAt)),
         )
+    }
+
+    /**
+     * 표시용 최소 정보. `member` 존재를 확인하고 프로필을 얹는다 — 프로필이 없어도 회원은
+     * 존재하므로 leftJoin이며, 닉네임은 기존 조회와 같은 기본값으로 채운다.
+     */
+    override fun findPublicProfile(memberId: Long): MemberPublicProfileView? =
+        queryFactory
+            .select(profile.nickname, profile.profileImageUrl)
+            .from(member)
+            .leftJoin(profile).on(profile.memberId.eq(member.id))
+            .where(member.id.eq(memberId))
+            .fetchOne()
+            ?.let {
+                MemberPublicProfileView(
+                    memberId = memberId,
+                    nickname = it.get(profile.nickname) ?: DEFAULT_NICKNAME,
+                    profileImageUrl = it.get(profile.profileImageUrl),
+                )
+            }
+
+    /**
+     * 여러 회원을 한 번에. 목록을 그리는 호출자가 행마다 묻지 않게 한다 —
+     * 피드 카드 20장이면 조회가 20번이 된다.
+     */
+    override fun findPublicProfilesIn(memberIds: List<Long>): Map<Long, MemberPublicProfileView> {
+        if (memberIds.isEmpty()) return emptyMap()
+
+        return queryFactory
+            .select(member.id, profile.nickname, profile.profileImageUrl)
+            .from(member)
+            .leftJoin(profile).on(profile.memberId.eq(member.id))
+            .where(member.id.`in`(memberIds))
+            .fetch()
+            .associate { row ->
+                val id = requireNotNull(row.get(member.id))
+                id to MemberPublicProfileView(
+                    memberId = id,
+                    nickname = row.get(profile.nickname) ?: DEFAULT_NICKNAME,
+                    profileImageUrl = row.get(profile.profileImageUrl),
+                )
+            }
     }
 
     override fun findMembers(query: MembersQuery): CursorPage<MemberSummaryView> {

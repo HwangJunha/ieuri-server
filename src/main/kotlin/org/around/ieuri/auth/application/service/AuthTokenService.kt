@@ -4,7 +4,6 @@ import org.around.ieuri.auth.application.command.LoginCommand
 import org.around.ieuri.auth.application.command.LoginEmailCommand
 import org.around.ieuri.auth.application.command.LogoutCommand
 import org.around.ieuri.auth.application.command.RefreshTokenCommand
-import org.around.ieuri.auth.application.exception.EmailNotVerifiedException
 import org.around.ieuri.auth.application.exception.InactiveMemberException
 import org.around.ieuri.auth.application.exception.InvalidCredentialsException
 import org.around.ieuri.auth.application.exception.InvalidTokenException
@@ -15,6 +14,7 @@ import org.around.ieuri.auth.application.port.`in`.command.LogoutResult
 import org.around.ieuri.auth.application.port.`in`.command.TokenPairResult
 import org.around.ieuri.auth.application.port.out.client.SnsIdentityVerifierPort
 import org.around.ieuri.auth.application.port.out.persistence.MemberRepositoryPort
+import org.around.ieuri.auth.application.port.out.security.LoginIdentifierProtectorPort
 import org.around.ieuri.auth.application.port.out.security.PasswordEncoderPort
 import org.around.ieuri.auth.application.port.out.token.RefreshTokenStorePort
 import org.around.ieuri.auth.application.port.out.token.TokenProviderPort
@@ -38,6 +38,8 @@ class AuthTokenService(
     private val refreshTokenStore: RefreshTokenStorePort,
     private val tokenIssuer: TokenIssuer,
     private val passwordEncoder: PasswordEncoderPort,
+    private val identifierProtector: LoginIdentifierProtectorPort,
+    private val providerTokenCollector: ProviderTokenCollector,
     private val clock: Clock,
 ) : AuthTokenUseCase {
 
@@ -58,11 +60,15 @@ class AuthTokenService(
         ensureLoginable(
             authentication.memberId, authentication.status, authentication.suspendedUntil, authentication.suspensionReason, now,
         )
+
+        // 탈퇴 시 연결 해제용 토큰 보충. 실패해도 로그인은 성공한다(R7).
+        providerTokenCollector.collect(authentication.memberId, command.provider, command.authorizationCode)
+
         return tokenIssuer.issueFor(authentication.memberId)
     }
 
     /**
-     * 자체(EMAIL) 로그인. 이메일로 회원을 찾아 비밀번호를 검증하고, 이메일 인증 완료·상태를 확인한 뒤 토큰을 발급한다.
+     * 자체(EMAIL) 로그인. 이메일로 회원을 찾아 비밀번호와 상태를 확인한 뒤 토큰을 발급한다.
      * 계정 존재 여부를 드러내지 않도록 실패 메시지는 통일한다(InvalidCredentials).
      */
     @Transactional
@@ -70,7 +76,7 @@ class AuthTokenService(
         val now = clock.instant()
         val email = Email(command.email).value
 
-        val auth = memberRepository.findEmailAuthentication(email)
+        val auth = memberRepository.findEmailAuthentication(identifierProtector.protect(email))
             ?: throw InvalidCredentialsException("이메일 또는 비밀번호가 올바르지 않습니다.")
         // passwordHash가 없으면 SNS 계정 → 이메일 로그인 불가(존재 여부는 드러내지 않음).
         val passwordHash = auth.passwordHash
@@ -78,10 +84,9 @@ class AuthTokenService(
         if (!passwordEncoder.matches(command.password, passwordHash)) {
             throw InvalidCredentialsException("이메일 또는 비밀번호가 올바르지 않습니다.")
         }
-        if (!auth.emailVerified) {
-            throw EmailNotVerifiedException("이메일 인증이 필요합니다. 메일함의 인증 코드를 확인해 주세요.")
-        }
-
+        // **이메일 미인증을 여기서 막지 않는다**(SPEC-0024 R8). 미인증 회원도 토큰을 받고,
+        // 차단은 오퍼레이션 단계의 게이트가 맡는다(R9) — 그래야 인증 화면에 머무는 동안
+        // 세션이 유지된다. SNS 로그인에는 원래 이 검사가 없었으므로 두 경로가 같아진다.
         ensureLoginable(auth.memberId, auth.status, auth.suspendedUntil, auth.suspensionReason, now)
         return tokenIssuer.issueFor(auth.memberId)
     }

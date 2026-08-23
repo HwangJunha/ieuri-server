@@ -1,9 +1,5 @@
 {
-  "// note": "Personal, gitignored overrides for THIS repo (.claude/settings.local.json). Team-shared rules go in .claude/settings.json. Precedence: deny > ask > allow, first match wins. A deny can't carry allow exceptions — narrow the deny instead.",
-
   "permissions": {
-    "defaultMode": "acceptEdits",
-
     "allow": [
       "Read(./**)",
       "Read(//**/*.kt)",
@@ -11,35 +7,90 @@
       "Read(//**/*.graphqls)",
       "Read(//**/*.yaml)",
       "Read(//**/*.yml)",
-
       "Bash(./gradlew build)",
       "Bash(./gradlew test:*)",
       "Bash(./gradlew bootRun)",
       "Bash(./gradlew compileKotlin:*)",
       "Bash(./gradlew compileTestKotlin:*)",
       "Bash(./gradlew bootJar)",
-
       "Bash(git status)",
       "Bash(git diff:*)",
       "Bash(git log:*)",
       "Bash(git branch:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "mcp__obsidian__search_simple",
+      "mcp__obsidian__vault_read",
+      "mcp__github__list_issues",
+      "WebFetch(domain:github.com)",
+      "mcp__github__get_file_contents",
+      "Bash(rg -rn \"errors|TokenReuse|InvalidToken|getErrors\" src/test/kotlin/org/around/ieuri/auth --no-heading -l)",
+      "Bash(rg -rln \"SpringBootTest|Testcontainers|GenericContainer|@Container\" src/test)",
+      "Bash(rg -rn \"fun clock|Clock\" src/main/kotlin --no-heading -g \"*Config*.kt\")",
+      "Bash(git rm *)",
+      "Bash(xargs cat)",
+      "Bash(export DOCKER_HOST=\"unix:///Users/junha/.rd/docker.sock\")",
+      "Bash(export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=\"/var/run/docker.sock\")",
+      "Bash(rg -rn \"InMemoryRefreshTokenStore\" src)",
+      "Bash(rg -rln \"ArchUnit|analyzeClasses|SpringBootTest|contextLoads\" src/test)",
+      "Bash(rg -rln \"archunit|ArchRule|com.tngtech|classes\\\\\\(\\\\\\)|@AnalyzeClasses|contextLoads|ApplicationTests\" src/test)",
+      "Read(//Users/junha/git/ieuri/.claude/hooks/**)",
+      "Read(//Users/junha/git/ieuri/.claude/**)",
+      "Read(//Users/junha/git/codecraft-harness-lab/.claude/hooks/**)",
+      "Bash(cat)",
+      "Bash(chmod +x /Users/junha/git/ieuri/.claude/hooks/block-stop-without-tests.sh /Users/junha/git/ieuri/.claude/hooks/block-sensitive-paths.sh)",
+      "Bash(sed 's#.*ieuri/##')",
+      "Bash(rg -rn \"import org.around.ieuri.common\" src/main/kotlin/org/around/ieuri/auth/domain)",
+      "Bash(rg -rl \"@Entity\" src/main/kotlin)",
+      "Bash(.claude/hooks/block-sensitive-paths.sh)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(.claude/hooks/block-stop-without-tests.sh)",
+      "Bash(git check-ignore *)",
+      "WebSearch",
+      "Read(//Users/junha/git/ieuri-k-trip-spot/**)",
+      "Read(//Users/junha/git/ieuri-k-trip-spot/problem/**)",
+      "Bash(flutter pub *)",
+      "Bash(flutter gen-l10n *)",
+      "Bash(dart run *)",
+      "Bash(flutter analyze *)",
+      "Bash(python3 *)",
+      "Bash(flutter test *)",
+      "mcp__stitch__list_design_systems",
+      "mcp__stitch__list_projects",
+      "mcp__stitch__list_screens",
+      "WebFetch(domain:contribution.usercontent.google.com)",
+      "Bash(flutter devices *)",
+      "Bash(xcrun simctl *)",
+      "Bash(pkill -f \"flutter_tools.snapshot\")",
+      "WebFetch(domain:lh3.googleusercontent.com)",
+      "Bash(gh issue create --title 'Step1 후속 작업 \\(follow-ups\\)' --body ' *)",
+      "mcp__obsidian__vault_list",
+      "mcp__obsidian__vault_patch",
+      "mcp__obsidian__vault_get_document_map",
+      "Bash(./gradlew cleanTest test)",
+      "Bash(pkill -f \"server.port=8899\")",
+      "Bash(echo \"test-exit=$?\")",
+      "Read(//Users/junha/git/ieuri/ieuri-manifest/**)",
+      "Bash(helm template *)",
+      "Bash(nerdctl --namespace default ps -a)",
+      "Bash(python3 -)",
+      "Bash(echo \"PASS $\\(date -u +\"%Y-%m-%dT%H:%M:%SZ\"\\)\")",
+      "Bash(git add *)",
+      "Bash(./gradlew test *)",
+      "Read(//Users/junha/git/ieuri/**)",
+      "Read(//Users/junha/git/ieuri/ieuri-planner/out/**)",
+      "Bash(git restore *)",
+      "Bash(./gradlew build *)",
+      "Bash(/usr/bin/sed -n '240,300p' /Users/junha/git/ieuri/ieuri-server/src/main/resources/schema/community.graphqls)",
+      "Bash(/usr/bin/sed -n '1,60p' /Users/junha/git/ieuri/ieuri-server/src/main/resources/schema/community.graphqls)",
+      "Bash(echo \"push rc=$?\")",
+      "Read(//Users/junha/git/ieuri/ieuri-recorder/problem/**)",
+      "Read(//Users/junha/**)",
+      "Read(//Users/junha/git/ieuri/ieuri-server/**)",
+      "Bash(gh issue *)",
+      "Bash(./gradlew compileKotlin --console=plain)",
+      "Bash(python3 -c \"import yaml; yaml.safe_load\\(open\\('.github/workflows/build.yml'\\)\\); print\\('YAML 파싱: OK'\\)\")",
+      "Bash(gh run *)"
     ],
-
-    "ask": [
-      "Read(./.env)",
-      "Read(./.env.*)",
-      "Read(//**/*.pem)",
-      "Read(//**/*.key)",
-      "Read(//**/application-*.yaml)",
-
-      "Bash(git push:*)",
-      "Bash(git commit:*)",
-      "Bash(gh pr:*)",
-      "Bash(docker:*)",
-      "Bash(kubectl:*)"
-    ],
-
     "deny": [
       "Bash(rm -rf:*)",
       "Bash(rm -r:*)",
@@ -56,6 +107,21 @@
       "Read(//**/*secret*)",
       "Edit(./.env)",
       "Edit(./.env.*)"
-    ]
-  }
+    ],
+    "ask": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(//**/*.pem)",
+      "Read(//**/*.key)",
+      "Read(//**/application-*.yaml)",
+      "Bash(docker:*)",
+      "Bash(kubectl:*)"
+    ],
+    "defaultMode": "acceptEdits"
+  },
+  "worktree": {
+    "bgIsolation": "worktree",
+    "baseRef": "origin/dev"
+  },
+  "// note": "Personal, gitignored overrides for THIS repo (.claude/settings.local.json). Team-shared rules go in .claude/settings.json. Precedence: deny > ask > allow, first match wins. A deny can't carry allow exceptions — narrow the deny instead."
 }

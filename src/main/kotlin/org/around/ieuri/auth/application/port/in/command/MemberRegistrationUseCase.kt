@@ -5,6 +5,7 @@ import org.around.ieuri.auth.application.command.RegisterMemberCommand
 import org.around.ieuri.auth.application.command.RequestPasswordResetCommand
 import org.around.ieuri.auth.application.command.ResendVerificationCommand
 import org.around.ieuri.auth.application.command.ResetPasswordCommand
+import org.around.ieuri.auth.application.command.RetargetEmailVerificationCommand
 import org.around.ieuri.auth.application.command.VerifyEmailCommand
 import java.time.Instant
 import java.util.UUID
@@ -25,6 +26,12 @@ interface MemberRegistrationUseCase {
 
     /** 이메일 검증 코드 재발송. */
     fun resendVerification(command: ResendVerificationCommand): ResendVerificationResult
+
+    /**
+     * 인증 대기 주소 정정(SPEC-0024 R7). 인증을 마친 회원은 쓸 수 없고, 그 경우는
+     * 이메일 변경([EmailChangeUseCase])의 몫이다. 쿨다운은 [resendVerification]과 같은 창을 쓴다.
+     */
+    fun retargetEmailVerification(command: RetargetEmailVerificationCommand): RetargetEmailVerificationResult
 
     /** 비밀번호 재설정 요청. 이메일로 재설정 코드를 발송한다(계정 유무는 드러내지 않음). */
     fun requestPasswordReset(command: RequestPasswordResetCommand)
@@ -49,6 +56,12 @@ data class VerifyEmailResult(
 )
 
 data class ResendVerificationResult(
+    val verificationPublicId: UUID,
+    val expiresAt: Instant,
+)
+
+/** 인증 주소 재입력 결과. 새 주소로 재발급된 검증 핸들과 만료 시각. */
+data class RetargetEmailVerificationResult(
     val verificationPublicId: UUID,
     val expiresAt: Instant,
 )
