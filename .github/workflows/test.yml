@@ -31,4 +31,6 @@ jobs:
       # bootJar는 돌리지 않는다. 169MB 패키징은 머지 후 build.yml이 어차피 다시 하므로
       # 여기서 하면 같은 일을 두 번 하는 셈이다.
       - name: Test
-        run: ./gradlew test --no-daemon
+        # --no-daemon을 쓰지 않는 이유는 build.yml과 같다 — 데몬이 없으면 Kotlin
+        # 컴파일러가 별도 JVM으로 돌아 gradle.properties의 in-process 전략이 무력화된다.
+        run: ./gradlew test --build-cache
