@@ -197,7 +197,7 @@ ieuri:
   # 자격증명은 환경변수로만 주입한다 — 없어도 부팅은 되고 발급 시점에 실패한다.
   # DB에는 object key만 저장하므로 조회용 공개 도메인은 서버가 알 필요가 없다.
   r2:
-    s3-endpoint: ${IERUI_R2_ENDPOINT:}
+    s3-endpoint: ${IEURI_R2_ENDPOINT:}
     access-key: ${IEURI_R2_ACCESS_KEY:}
     secret-access-key: ${IEURI_R2_SECRET_ACCESS_KEY:}
     # **기본값을 두지 않는다.** 버킷 이름은 환경마다 다르고(운영 ieuri-images, 개발
