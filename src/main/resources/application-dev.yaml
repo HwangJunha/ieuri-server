@@ -11,6 +11,15 @@ spring:
   jpa:
     # 질의를 눈으로 확인한다. prod에서는 끈다 — 파라미터가 로그로 나가고 양도 많다.
     show-sql: true
+  graphql:
+    schema:
+      introspection:
+        # **스키마 전문 공개를 막는다.** 인트로스펙션이 열려 있으면 누구나 모든 쿼리·뮤테이션과
+        # 필드 목록을 덤프할 수 있어, 공격자에게 API 지도를 그려 주는 셈이 된다.
+        #
+        # 정상 클라이언트는 스키마를 이미 알고 호출하므로 꺼도 동작에 지장이 없다. 스키마를
+        # 훑어봐야 하는 개발은 local에서 한다 — 기본값이 true라 local은 그대로 켜져 있다.
+        enabled: false
 
 logging:
   level:
