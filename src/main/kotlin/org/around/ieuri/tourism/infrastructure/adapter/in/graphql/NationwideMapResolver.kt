@@ -20,7 +20,12 @@ import org.around.ieuri.tourism.application.query.MapCellView
 import org.around.ieuri.tourism.application.query.SharedMapView
 import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toGql
 import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toGqlPageInfo
+import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.tourism.application.query.CellImageView
+import org.around.ieuri.tourism.application.query.CellSpotView
 import org.around.ieuri.tourism.infrastructure.locale.domainLocale
+import org.around.ieuri.common.graphql.loader
+import java.util.concurrent.CompletableFuture
 
 /**
  * 전국 지도 조회 리졸버(SPEC-0030).
@@ -111,46 +116,62 @@ class NationwideMapResolver(
      * 이 필드를 포함하면 칸 전체의 이미지를 한 질의로 읽고 그 뒤로는 맵에서 꺼낸다.
      */
     @DgsData(parentType = "MapCell", field = "representativeImage")
-    fun representativeImage(dfe: DgsDataFetchingEnvironment): GqlCellImage? {
-        val cell = dfe.mapCell()
-        return CellImageBatchLoader.load(dfe, cell.id, nationwideMapUseCase)?.let {
-            GqlCellImage(
-                imageUrl = it.imageUrl,
-                thumbnailUrl = it.thumbnailUrl,
-                caption = it.caption,
-                kind = GqlCellImageKind.valueOf(it.kind.name),
-                copyright = GqlCopyrightType.valueOf(it.copyright.name),
-                attributionText = it.attributionText,
-            )
-        }
-    }
+    fun representativeImage(dfe: DgsDataFetchingEnvironment): CompletableFuture<GqlCellImage?> =
+        dfe.loader<CellImageView>(CellImageDataLoader.NAME)
+            .load(dfe.mapCell().id)
+            // 이미지가 없는 칸은 로더가 키를 채우지 않는다 — 필드가 null이 된다(SPEC-0030 R10).
+            .thenApply { it?.toGqlCellImage() }
 
-    /** 칸에 속한 장소(R11). **선택했을 때만 조회한다.** */
+    /**
+     * 칸에 속한 장소(R11). **선택했을 때만 조회한다.**
+     *
+     * **첫 페이지는 배치로 읽는다**(SPEC-0032 R24) — `mapCells`가 161칸을 돌려주므로 칸마다
+     * 질의가 따로 나가면 161회가 된다. 커서를 넘긴 호출은 칸이 하나로 좁혀져 있어 모을 것이
+     * 없으므로 단건 경로로 간다.
+     */
     @DgsData(parentType = "MapCell", field = "spots")
     fun spots(
         dfe: DgsDataFetchingEnvironment,
         @InputArgument first: Int?,
         @InputArgument after: String?,
-    ): GqlCellSpotConnection {
-        val page = nationwideMapUseCase.cellSpots(
-            CellSpotsQuery(
-                cellId = dfe.mapCell().id,
-                first = first ?: DEFAULT_CELL_SPOT_PAGE_SIZE,
-                after = after,
-            ),
-            locale = dfe.domainLocale(),
-        )
-        return GqlCellSpotConnection(
-            edges = page.edges.map {
+    ): CompletableFuture<GqlCellSpotConnection> {
+        val size = first ?: DEFAULT_CELL_SPOT_PAGE_SIZE
+        val cellId = dfe.mapCell().id
+
+        if (after != null) {
+            val page = nationwideMapUseCase.cellSpots(
+                CellSpotsQuery(cellId = cellId, first = size, after = after),
+                locale = dfe.domainLocale(),
+            )
+            return CompletableFuture.completedFuture(page.toGqlConnection())
+        }
+
+        return dfe.loader<CursorPage<CellSpotView>>(CellSpotsDataLoader.NAME)
+            .load(cellId, CellSpotsLoaderContext(locale = dfe.domainLocale(), first = size))
+            .thenApply { it.toGqlConnection() }
+    }
+
+    private fun CellImageView.toGqlCellImage(): GqlCellImage = GqlCellImage(
+        imageUrl = imageUrl,
+        thumbnailUrl = thumbnailUrl,
+        caption = caption,
+        kind = GqlCellImageKind.valueOf(kind.name),
+        copyright = GqlCopyrightType.valueOf(copyright.name),
+        attributionText = attributionText,
+    )
+
+    private fun CursorPage<CellSpotView>.toGqlConnection(): GqlCellSpotConnection =
+        GqlCellSpotConnection(
+            edges = edges.map {
                 GqlCellSpotEdge(
                     node = it.node.toGql(),
                     cursor = it.cursor,
                     likeCount = it.node.likeCount.toInt(),
                 )
             },
-            pageInfo = page.toGqlPageInfo(),
+            pageInfo = toGqlPageInfo(),
         )
-    }
+
 
     /**
      * 부모가 돌려준 읽기 DTO를 꺼낸다.

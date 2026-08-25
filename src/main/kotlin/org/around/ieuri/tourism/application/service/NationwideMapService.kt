@@ -102,6 +102,34 @@ class NationwideMapService(
         }
     }
 
+    /**
+     * 여러 칸의 첫 페이지(SPEC-0032 R24). 상한 규칙은 [cellSpots]와 같다.
+     *
+     * 커서가 없으므로 `after`는 언제나 null이다 — 첫 페이지의 `hasPreviousPage`가 false인 것이
+     * 단건 경로와 같은 판정이다.
+     */
+    @Transactional(readOnly = true)
+    override fun firstCellSpotsOf(
+        cellIds: Collection<Long>,
+        first: Int,
+        locale: DomainLocale,
+    ): Map<Long, CursorPage<CellSpotView>> {
+        val limit = first.coerceIn(1, policy.maxCellSpotPageSize)
+
+        // 다음 페이지 존재 판정을 위해 칸마다 한 건씩 더 읽는다 — 단건 경로와 같은 규약이다.
+        val byCell = mapCellQueryPort.findFirstCellSpotsIn(
+            cellIds = cellIds,
+            language = locale,
+            limit = limit + 1,
+        )
+
+        return byCell.mapValues { (_, rows) ->
+            keysetPageOf(rows = rows, first = limit, after = null) {
+                LikeCountCursor(it.likeCount, it.id).encode()
+            }
+        }
+    }
+
     @Transactional(readOnly = true)
     override fun sharedMap(token: String, viewerMemberId: Long?): SharedMapView {
         val link = mapShareLinkPort.findActiveByToken(token) ?: throw ShareLinkNotFoundException()

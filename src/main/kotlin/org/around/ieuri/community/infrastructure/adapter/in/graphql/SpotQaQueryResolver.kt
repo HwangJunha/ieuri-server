@@ -18,7 +18,7 @@ import org.around.ieuri.community.application.query.SpotQuestionsQuery
 import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper.toGql
 import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper.toGqlOrPlaceholder
 import org.around.ieuri.community.infrastructure.locale.contentLanguage
-import org.dataloader.DataLoader
+import org.around.ieuri.common.graphql.loader
 import org.springframework.stereotype.Component
 import java.util.concurrent.CompletableFuture
 import org.around.ieuri.common.graphql.generated.types.PostAuthor as GqlPostAuthor
@@ -136,13 +136,18 @@ class SpotQaQueryResolver(
     fun answerPhotoKeys(dfe: DgsDataFetchingEnvironment): CompletableFuture<List<String>> =
         dfe.loader<List<String>>(SpotAnswerPhotoDataLoader.NAME).load(dfe.answerSource().id)
 
-    /** 답글. **요청된 경우에만** 배치로 읽는다 — 목록만 그리는 화면은 조회가 붙지 않는다. */
+    /**
+     * 답글. **요청된 경우에만** 배치로 읽는다 — 목록만 그리는 화면은 조회가 붙지 않는다.
+     *
+     * **뷰어를 여기서 확정해 실어 보낸다**(SPEC-0032 R27) — 로더가 자기 스레드에서 읽으면
+     * 가상 스레드 전환에 신원을 잃고 조용히 비로그인으로 강등된다.
+     */
     @DgsData(parentType = "SpotAnswer", field = "replies")
     fun answerReplies(
         dfe: DgsDataFetchingEnvironment,
     ): CompletableFuture<List<SpotAnswerReplyView>> =
         dfe.loader<List<SpotAnswerReplyView>>(SpotAnswerReplyDataLoader.NAME)
-            .load(dfe.answerSource().id)
+            .load(dfe.answerSource().id, ViewerId(viewerId(dfe)))
 
     // ── SpotAnswerReply 지연 필드 ────────────────────────────────────
 
@@ -177,10 +182,6 @@ class SpotQaQueryResolver(
         loader<PostAuthorView>(PostAuthorDataLoader.NAME)
             .load(memberId)
             .thenApply { it.toGqlOrPlaceholder(memberId) }
-
-    /** 이름이 어긋난 로더를 조용히 넘기면 필드가 빈 채로 뜬다 — 명시적으로 실패시킨다. */
-    private fun <V : Any> DgsDataFetchingEnvironment.loader(name: String): DataLoader<Long, V> =
-        getDataLoader<Long, V>(name) ?: error("DataLoader '$name'가 등록되지 않았다.")
 
     /**
      * 부모 리졸버가 돌려준 read DTO를 꺼낸다.

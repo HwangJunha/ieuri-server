@@ -27,11 +27,19 @@ class CategoryDisplayResolver(
 
     @DgsData(parentType = "SpotCategory", field = "label")
     fun label(dfe: DgsDataFetchingEnvironment): String =
-        display(dfe, dfe.getSource<GqlSpotCategory>()!!.code).label
+        display(dfe, dfe.categorySource().code).label
 
     @DgsData(parentType = "SpotCategory", field = "iconUrl")
     fun iconUrl(dfe: DgsDataFetchingEnvironment): String? =
-        display(dfe, dfe.getSource<GqlSpotCategory>()!!.code).iconUrl
+        display(dfe, dfe.categorySource().code).iconUrl
+
+    /**
+     * 부모가 돌려준 값. `!!` 대신 명시적으로 실패시킨다 — 나머지 전 리졸버의 규약이고,
+     * 실패했을 때 어느 리졸버의 문제인지가 메시지에 남는다.
+     */
+    private fun DgsDataFetchingEnvironment.categorySource(): GqlSpotCategory =
+        getSource<GqlSpotCategory>()
+            ?: error("SpotCategory 필드 리졸버는 부모가 반환한 SpotCategory를 소스로 받아야 한다.")
 
     /**
      * 요청 안에서 코드당 한 번만 읽는다. 정의가 없는 코드는 코드 자체가 라벨이 된다.
