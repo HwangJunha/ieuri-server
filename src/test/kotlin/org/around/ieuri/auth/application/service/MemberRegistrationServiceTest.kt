@@ -106,16 +106,13 @@ class MemberRegistrationServiceTest {
 
     private val clock = Clock.fixed(Instant.parse("2026-07-16T00:00:00Z"), ZoneOffset.UTC)
 
-    /** 가입 시 닉네임은 자동 생성된다(SPEC-0011 R20). 기본은 충돌 없음. */
-    private val profileRepository = mockk<MemberProfileRepositoryPort> {
-        every { existsByNicknameExcludingMember(any(), any()) } returns false
-    }
+    /** provider가 닉네임을 주지 않았을 때의 폴백 생성기(SPEC-0032 R30). */
     private val nicknameGenerator = NicknameGenerator(Random(20260807))
 
     private val service = MemberRegistrationService(
         snsVerifier, memberRepository, roleRepository, termsRepository, verificationRepository,
         passwordResetRepository, refreshTokenStore, codeGenerator, auditLog, eventPublisher, policy, passwordEncoder,
-        profileRepository, nicknameGenerator, identifierProtector, emailEncryptor, providerTokenCollector,
+        nicknameGenerator, identifierProtector, emailEncryptor, providerTokenCollector,
         emailUniqueness, clock,
     )
 
@@ -125,8 +122,8 @@ class MemberRegistrationServiceTest {
         TermsView(3, "MARKETING", "1.0", required = false),
     )
 
-    private fun identity(email: String? = "user@example.com") =
-        SnsIdentity("google-sub-1", email, "여행자", null)
+    private fun identity(email: String? = "user@example.com", nickname: String? = "여행자") =
+        SnsIdentity("google-sub-1", email, nickname, null)
 
     private fun command(email: String = "user@example.com") = RegisterMemberCommand(
         provider = Provider.GOOGLE,
@@ -139,6 +136,60 @@ class MemberRegistrationServiceTest {
             AgreementInput("MARKETING", false),
         ),
     )
+
+    // --- registerBySns: 닉네임 결정 (SPEC-0032 R29·R30) ---
+
+    /**
+     * 가입 시 저장된 닉네임을 꺼낸다. provider 값 채택 여부는 저장된 회원에만 나타나므로
+     * `save`에 실린 애그리거트를 잡아 읽는다.
+     */
+    private fun registerAndCaptureNickname(providerNickname: String?): String {
+        val saved = slot<Member>()
+        every { snsVerifier.verify(any(), any()) } returns identity(nickname = providerNickname)
+        every { memberRepository.existsByProviderAndProviderUserId(any(), any()) } returns false
+        every { termsRepository.findActiveTerms(any()) } returns activeTerms
+        every { memberRepository.save(capture(saved)) } returns 100L
+
+        service.registerBySns(command())
+
+        return saved.captured.profile.nickname.value
+    }
+
+    @Test
+    fun `provider가 준 닉네임을 그대로 쓴다`() {
+        assertEquals("여행자", registerAndCaptureNickname("여행자"))
+    }
+
+    /** 클레임에 닉네임이 실릴지는 동의 항목 설정에 달려 있어 서버가 통제하지 못한다. */
+    @Test
+    fun `provider 닉네임이 없으면 생성기로 물러난다`() {
+        val nickname = registerAndCaptureNickname(null)
+
+        assertEquals(nickname, Nickname(nickname).value, "생성값이 닉네임 규칙을 벗어났다: $nickname")
+        assertTrue(nickname != "여행자")
+    }
+
+    /**
+     * R30. **잘라내지 않는다** — 잘린 이름은 사용자가 의도하지 않은 값이고, 생성 닉네임은
+     * 언제든 바꿀 수 있다. 범위를 벗어나면 통째로 생성기로 물러난다.
+     */
+    @Test
+    fun `provider 닉네임이 길이 규칙을 벗어나면 자르지 않고 생성기로 물러난다`() {
+        listOf("가", "가".repeat(21)).forEach { raw ->
+            val nickname = registerAndCaptureNickname(raw)
+
+            assertEquals(nickname, Nickname(nickname).value)
+            assertTrue(!nickname.startsWith(raw), "provider 값을 잘라 썼다: $nickname")
+        }
+    }
+
+    /** 공백만 있는 값도 규칙을 만족하지 않으므로 폴백 대상이다. */
+    @Test
+    fun `provider 닉네임이 공백뿐이면 생성기로 물러난다`() {
+        val nickname = registerAndCaptureNickname("   ")
+
+        assertEquals(nickname, Nickname(nickname).value)
+    }
 
     // --- registerBySns ---
 

@@ -32,9 +32,6 @@ interface MemberJpaRepository : JpaRepository<MemberEntity, Long> {
 interface MemberProfileJpaRepository : JpaRepository<MemberProfileEntity, Long> {
     fun findByMemberId(memberId: Long): MemberProfileEntity?
     fun deleteByMemberId(memberId: Long)
-
-    /** 닉네임 중복 판정. 본인은 제외한다 — 같은 값 재제출은 중복이 아니다(SPEC-0011 R5). */
-    fun existsByNicknameAndMemberIdNot(nickname: String, memberId: Long): Boolean
 }
 
 interface MemberTermsAgreementJpaRepository : JpaRepository<MemberTermsAgreementEntity, Long> {

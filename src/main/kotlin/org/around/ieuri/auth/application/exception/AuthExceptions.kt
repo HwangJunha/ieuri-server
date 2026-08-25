@@ -87,10 +87,6 @@ class AuthStoreUnavailableException(message: String, cause: Throwable? = null) :
     }
 }
 
-/** 다른 회원이 이미 쓰는 닉네임일 때(SPEC-0011 R5). 상대의 정보는 담지 않는다(POL-013). */
-class NicknameAlreadyTakenException(message: String) :
-    UserFacingException("NICKNAME_ALREADY_TAKEN", message)
-
 /** 닉네임 길이·형식이 규칙을 벗어날 때(R5). */
 class InvalidNicknameException(message: String) :
     UserFacingException("INVALID_NICKNAME", message)

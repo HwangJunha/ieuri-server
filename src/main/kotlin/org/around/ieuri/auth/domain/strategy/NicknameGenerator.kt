@@ -9,39 +9,24 @@ import kotlin.random.Random
  * 목록을 키우는 대신 숫자로 충돌을 흡수한다 — 단어를 늘리면 검수할 어휘가 함께 늘지만
  * 숫자 구간은 공짜다. [COMBINATIONS]가 요구치(100만)를 넘는지는 단위 테스트가 고정한다.
  *
- * 조합만으로는 고유성이 보장되지 않는다. 중복 회피는 저장소를 아는 호출자의 몫이며
- * [generate]에 `isTaken`을 넘겨 재시도시킨다.
+ * **고유성을 보장하지 않는다**(SPEC-0032 R31) — 닉네임 중복이 허용되므로 재시도할 이유가
+ * 없다. 그럼에도 조합 수를 유지하는 이유는 같은 이름이 우연히 쏟아지는 것이 여전히 나쁘기
+ * 때문이다. 고유성이 아니라 다양성이 근거다.
  */
 class NicknameGenerator(private val random: Random = Random.Default) {
 
-    /**
-     * 사용 중이지 않은 닉네임을 만든다. [isTaken]이 참이면 다시 뽑고, [MAX_ATTEMPTS]를
-     * 넘기면 숫자 구간을 넓혀 물러난다 — 가입을 실패시키는 것보다 낫다.
-     *
-     * 물러난 값도 충돌할 수 있으므로 여전히 저장소 유니크 제약이 최종 판정자다.
-     */
-    fun generate(isTaken: (String) -> Boolean): Nickname {
-        repeat(MAX_ATTEMPTS) {
-            val candidate = compose(random.nextInt(NUMBER_BOUND))
-            if (!isTaken(candidate)) return Nickname(candidate)
-        }
-        return Nickname(compose(random.nextInt(FALLBACK_NUMBER_BOUND), digits = FALLBACK_DIGITS))
-    }
+    /** 닉네임을 하나 만든다. 중복이 허용되므로 저장소를 묻지 않는다. */
+    fun generate(): Nickname = Nickname(compose(random.nextInt(NUMBER_BOUND)))
 
-    private fun compose(number: Int, digits: Int = DIGITS): String {
+    private fun compose(number: Int): String {
         val adjective = ADJECTIVES[random.nextInt(ADJECTIVES.size)]
         val noun = NOUNS[random.nextInt(NOUNS.size)]
-        return adjective + noun + number.toString().padStart(digits, '0')
+        return adjective + noun + number.toString().padStart(DIGITS, '0')
     }
 
     companion object {
         const val DIGITS = 4
         private const val NUMBER_BOUND = 10_000
-        private const val MAX_ATTEMPTS = 5
-
-        /** 상한을 넘겼을 때의 물러설 자리. 숫자를 넓혀 충돌 확률을 100분의 1로 낮춘다. */
-        private const val FALLBACK_DIGITS = 6
-        private const val FALLBACK_NUMBER_BOUND = 1_000_000
 
         /** 조합 가능한 경우의 수. R20이 100만 이상을 요구한다. */
         val COMBINATIONS: Long

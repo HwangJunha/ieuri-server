@@ -28,7 +28,6 @@ private val FIELD_BY_CODE: Map<String, String> = mapOf(
     "INVALID_EMAIL_FORMAT" to "input.newEmail",
     "SAME_AS_CURRENT_EMAIL" to "input.newEmail",
     "INVALID_NICKNAME" to "input.nickname",
-    "NICKNAME_ALREADY_TAKEN" to "input.nickname",
 )
 
 /**

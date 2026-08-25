@@ -9,14 +9,12 @@ import org.around.ieuri.auth.application.command.IssueProfileImageUploadUrlComma
 import org.around.ieuri.auth.application.command.RemoveProfileImageCommand
 import org.around.ieuri.auth.application.exception.ImageTooLargeException
 import org.around.ieuri.auth.application.exception.InvalidNicknameException
-import org.around.ieuri.auth.application.exception.NicknameAlreadyTakenException
 import org.around.ieuri.auth.application.exception.ObjectKeyNotFoundException
 import org.around.ieuri.auth.application.exception.PhotoNotUploadedException
 import org.around.ieuri.auth.application.exception.UnsupportedImageTypeException
 import org.around.ieuri.auth.application.policy.ProfileImagePolicy
 import org.around.ieuri.auth.application.port.out.client.ProfileImageStoragePort
 import org.around.ieuri.auth.application.port.out.persistence.MemberProfileRepositoryPort
-import org.around.ieuri.auth.application.port.out.persistence.NicknameConflictException
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -30,7 +28,7 @@ import kotlin.test.assertTrue
 /**
  * 프로필 수정(SPEC-0011 R5·R6).
  *
- * 고정하는 계약: 닉네임은 **중복이면 거절하고 자기 값 재제출은 성공**하며, 이미지는
+ * 고정하는 계약: 닉네임은 **중복을 허용하고 형식만 본다**(SPEC-0032 R31). 이미지는
  * **키 발급 전에 형식·크기를 보고**, 확인 단계는 **소유권 → 존재 → 크기 → 매직바이트**
  * 순으로 판정한다. 제거는 멱등이다.
  */
@@ -61,9 +59,7 @@ class MemberProfileServiceTest {
     // --- R5 닉네임 ---
 
     @Test
-    fun `쓰이지 않는 닉네임이면 변경에 성공한다`() {
-        every { repository.existsByNicknameExcludingMember("여행하는곰", memberId) } returns false
-
+    fun `닉네임을 바꾸면 저장한다`() {
         val result = service.changeNickname(ChangeNicknameCommand(memberId, "여행하는곰"))
 
         assertEquals("여행하는곰", result)
@@ -72,53 +68,23 @@ class MemberProfileServiceTest {
 
     @Test
     fun `앞뒤 공백은 제거된 값으로 저장한다`() {
-        every { repository.existsByNicknameExcludingMember("여행하는곰", memberId) } returns false
-
         val result = service.changeNickname(ChangeNicknameCommand(memberId, "  여행하는곰  "))
 
         assertEquals("여행하는곰", result)
         verify { repository.updateNickname(memberId, "여행하는곰") }
     }
 
+    /**
+     * SPEC-0032 R31. 이전에는 두 번째 호출을 거절했다 — 그 동작이 사라진 것이 이 요구다.
+     * 고유성 판정이 없으므로 서로를 막지 않는다.
+     */
     @Test
-    fun `다른 회원이 쓰는 닉네임이면 거절하고 저장하지 않는다`() {
-        every { repository.existsByNicknameExcludingMember("여행하는곰", memberId) } returns true
+    fun `두 회원이 같은 닉네임을 가질 수 있다`() {
+        service.changeNickname(ChangeNicknameCommand(memberId, "여행하는곰"))
+        service.changeNickname(ChangeNicknameCommand(otherMemberId, "여행하는곰"))
 
-        assertFailsWith<NicknameAlreadyTakenException> {
-            service.changeNickname(ChangeNicknameCommand(memberId, "여행하는곰"))
-        }
-        verify(exactly = 0) { repository.updateNickname(any(), any()) }
-    }
-
-    @Test
-    fun `중복 실패 메시지에 상대 정보를 담지 않는다`() {
-        every { repository.existsByNicknameExcludingMember(any(), any()) } returns true
-
-        val e = assertFailsWith<NicknameAlreadyTakenException> {
-            service.changeNickname(ChangeNicknameCommand(memberId, "여행하는곰"))
-        }
-
-        assertEquals("NICKNAME_ALREADY_TAKEN", e.code)
-        assertTrue(e.message!!.none { it.isDigit() }, "메시지에 식별자가 들어갔다: ${e.message}")
-    }
-
-    @Test
-    fun `경합으로 유니크 제약이 터져도 같은 실패로 옮긴다`() {
-        // 사전 확인은 통과했는데 저장에서 제약이 터지는 경우 — 동시 요청 둘이 함께 통과한 상황이다.
-        every { repository.existsByNicknameExcludingMember(any(), any()) } returns false
-        every { repository.updateNickname(any(), any()) } throws NicknameConflictException("dup")
-
-        assertFailsWith<NicknameAlreadyTakenException> {
-            service.changeNickname(ChangeNicknameCommand(memberId, "여행하는곰"))
-        }
-    }
-
-    @Test
-    fun `자기 현재 닉네임과 같은 값은 성공한다`() {
-        // 중복 판정이 본인을 제외하므로 사용 중이 아니라고 답한다.
-        every { repository.existsByNicknameExcludingMember("여행하는곰", memberId) } returns false
-
-        assertEquals("여행하는곰", service.changeNickname(ChangeNicknameCommand(memberId, "여행하는곰")))
+        verify { repository.updateNickname(memberId, "여행하는곰") }
+        verify { repository.updateNickname(otherMemberId, "여행하는곰") }
     }
 
     @Test

@@ -293,8 +293,6 @@ enum ErrorCode {
     # ── 프로필 ──
     "닉네임 길이·형식 규칙 위반."
     INVALID_NICKNAME
-    "다른 회원이 이미 쓰는 닉네임."
-    NICKNAME_ALREADY_TAKEN
     "허용하지 않는 이미지 형식."
     UNSUPPORTED_IMAGE_TYPE
     "선언한 이미지 크기가 상한을 넘는다."
@@ -627,7 +625,12 @@ type MemberDetail {
 
 "관리자 회원 목록 항목. 최소수집: 이메일 미포함."
 type MemberSummary {
+    """
+    회원 식별자. **닉네임은 중복될 수 있으므로 동명이인을 이 값으로 구별한다** —
+    목록은 최소수집으로 이메일을 담지 않아 다른 식별 수단이 없다.
+    """
     id: ID!
+    "표시용 닉네임. 회원 간 고유하지 않다."
     nickname: String!
     status: MemberStatus!
     roles: [String!]!

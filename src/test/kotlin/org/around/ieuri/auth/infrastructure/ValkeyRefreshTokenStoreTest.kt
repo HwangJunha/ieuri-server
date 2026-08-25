@@ -3,6 +3,7 @@ package org.around.ieuri.auth.infrastructure
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import org.around.ieuri.auth.application.exception.AuthStoreUnavailableException
 import org.around.ieuri.auth.infrastructure.adapter.out.token.ValkeyRefreshTokenStore
 import org.springframework.data.redis.RedisConnectionFailureException
 import org.springframework.data.redis.core.SetOperations
@@ -13,6 +14,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
@@ -20,7 +22,8 @@ import kotlin.test.assertTrue
  * ValkeyRefreshTokenStore — 외부 Valkey 없이 StringRedisTemplate을 대역으로 검증하는 순수 단위 테스트.
  * 실제 저장/TTL 축출은 Valkey 책임이므로 스코프에서 제외하고, 어댑터 자체 로직만 본다:
  *   - 만료 토큰 저장 스킵, 남은 TTL로 SET
- *   - 인프라 예외는 잡지 않고 그대로 전파 → existsActive는 장애를 false로 삼키지 않는다(fail-closed, 요건 #5)
+ *   - 인프라 예외를 삼키지 않는다 → existsActive는 장애를 false로 만들지 않는다(fail-closed).
+ *     예외는 AuthStoreUnavailableException으로 옮겨 올라간다(SPEC-0032 R6).
  */
 class ValkeyRefreshTokenStoreTest {
 
@@ -58,11 +61,30 @@ class ValkeyRefreshTokenStoreTest {
         assertTrue(store.existsActive("jti-1"))
     }
 
+    /**
+     * fail-closed는 그대로다 — 장애를 false로 삼키면 재사용 감지가 무력화된다.
+     * 바뀐 것은 **예외의 종류**뿐이다(SPEC-0032 R6): 클라이언트가 "잠시 후 재시도"와
+     * "재로그인"을 구분할 수 있도록 코드를 실어 올린다.
+     */
     @Test
-    fun `existsActive는 연결 장애를 false로 삼키지 않고 예외를 그대로 전파한다`() {
+    fun `existsActive는 연결 장애를 false로 삼키지 않고 저장소 장애로 올린다`() {
         every { redis.hasKey(any()) } throws RedisConnectionFailureException("down")
 
-        assertFailsWith<RedisConnectionFailureException> { store.existsActive("jti-1") }
+        val e = assertFailsWith<AuthStoreUnavailableException> { store.existsActive("jti-1") }
+
+        assertEquals("AUTH_STORE_UNAVAILABLE", e.code)
+        // 원인은 cause로만 남긴다 — 메시지에 키나 내부 정보를 담지 않는다(POL-013).
+        assertTrue(e.cause is RedisConnectionFailureException)
+    }
+
+    /** 쓰기 경로도 같은 코드로 올라온다 — 회전 중 저장 실패가 INTERNAL_ERROR가 되지 않는다. */
+    @Test
+    fun `save도 연결 장애를 저장소 장애로 올린다`() {
+        every { valueOps.set(any(), any(), any<Duration>()) } throws RedisConnectionFailureException("down")
+
+        assertFailsWith<AuthStoreUnavailableException> {
+            store.save("jti-1", 100L, now.plusSeconds(600))
+        }
     }
 
     @Test
