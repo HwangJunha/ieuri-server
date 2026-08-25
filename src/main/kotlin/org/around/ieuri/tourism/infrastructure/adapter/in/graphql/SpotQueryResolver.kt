@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql
 
+import org.around.ieuri.tourism.application.port.out.client.LocationAuditPort
 import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsData
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
@@ -44,6 +45,7 @@ import org.around.ieuri.common.graphql.generated.types.SpotPage as GqlSpotPage
 class SpotQueryResolver(
     private val spotQueryUseCase: SpotQueryUseCase,
     private val currentMemberProvider: CurrentMemberProvider,
+    private val locationAuditPort: LocationAuditPort,
 ) {
     @DgsQuery
     fun spots(
@@ -57,6 +59,8 @@ class SpotQueryResolver(
     ): GqlSpotPage {
         // 만료 토큰을 비로그인으로 강등하지 않는다(R1) — 이미 반응한 항목이 조용히 되살아난다.
         dfe.rejectStaleToken()
+        // 좌표를 받는 연산이므로 조회 사실을 남긴다(R19). **좌표는 넘기지 않는다.**
+        locationAuditPort.recordAccess(currentMemberProvider.currentMemberId(), "spots")
         val result = spotQueryUseCase.spots(
             SpotsQuery(
                 latitude = latitude,

@@ -5,10 +5,12 @@ import org.around.ieuri.auth.domain.vo.VerificationPurpose
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.EmailVerificationEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberAuditLogEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberEntity
+import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberLocationAccessLogEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberProfileEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberTermsAgreementEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.PasswordResetEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.TermsEntity
+import org.springframework.data.domain.Limit
 import org.springframework.data.jpa.repository.JpaRepository
 import java.time.Instant
 import java.util.UUID
@@ -75,4 +77,24 @@ interface PasswordResetJpaRepository : JpaRepository<PasswordResetEntity, Long> 
     fun deleteByMemberId(memberId: Long)
 }
 
-interface MemberAuditLogJpaRepository : JpaRepository<MemberAuditLogEntity, Long>
+interface MemberAuditLogJpaRepository : JpaRepository<MemberAuditLogEntity, Long> {
+
+    /**
+     * 보관 기간이 지난 기록을 최대 [limit]건 고른다(SPEC-0032 R22).
+     *
+     * **대상을 먼저 골라 지운다** — 벌크 삭제에는 LIMIT을 걸 수 없어, 한 회차에 지울 양을
+     * 제한하려면 대상을 먼저 추려야 한다. 회차 단위로 끊어야 락과 WAL이 커지지 않는다.
+     * (`messageRetentionJob`의 선례와 같은 형태다.)
+     */
+    fun findByCreatedAtBefore(cutoff: Instant, limit: Limit): List<MemberAuditLogEntity>
+
+    fun deleteByIdIn(ids: Collection<Long>): Long
+}
+
+interface MemberLocationAccessLogJpaRepository : JpaRepository<MemberLocationAccessLogEntity, Long> {
+
+    /** 규약은 [MemberAuditLogJpaRepository.findByCreatedAtBefore]와 같다. */
+    fun findByCreatedAtBefore(cutoff: Instant, limit: Limit): List<MemberLocationAccessLogEntity>
+
+    fun deleteByIdIn(ids: Collection<Long>): Long
+}

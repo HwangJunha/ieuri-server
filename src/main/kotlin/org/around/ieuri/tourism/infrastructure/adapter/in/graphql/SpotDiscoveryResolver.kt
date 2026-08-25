@@ -1,5 +1,7 @@
 package org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql
 
+import org.around.ieuri.common.security.CurrentMemberProvider
+import org.around.ieuri.tourism.application.port.out.client.LocationAuditPort
 import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
@@ -41,7 +43,14 @@ import org.around.ieuri.common.graphql.generated.types.UserError as GqlUserError
 @DgsComponent
 class SpotDiscoveryResolver(
     private val spotDiscoveryUseCase: SpotDiscoveryUseCase,
+    private val currentMemberProvider: CurrentMemberProvider,
+    private val locationAuditPort: LocationAuditPort,
 ) {
+
+    /** 좌표를 받는 연산의 조회 사실을 남긴다(SPEC-0032 R19). **좌표는 넘기지 않는다.** */
+    private fun auditLocationAccess(operation: String) {
+        locationAuditPort.recordAccess(currentMemberProvider.currentMemberId(), operation)
+    }
     @DgsQuery
     fun searchSpots(
         dfe: DgsDataFetchingEnvironment,
@@ -53,6 +62,7 @@ class SpotDiscoveryResolver(
         @InputArgument page: Int?,
         @InputArgument size: Int?,
     ): GqlSpotSearchPayload {
+        auditLocationAccess("searchSpots")
         val result = spotDiscoveryUseCase.searchSpots(
             SearchSpotsQuery(
                 query = query,
@@ -89,8 +99,9 @@ class SpotDiscoveryResolver(
         @InputArgument longitude: Double,
         @InputArgument radiusMeters: Int?,
         @InputArgument limit: Int?,
-    ): List<GqlSpotSuggestion> =
-        spotDiscoveryUseCase.spotSearchSuggestions(
+    ): List<GqlSpotSuggestion> {
+        auditLocationAccess("spotSearchSuggestions")
+        return spotDiscoveryUseCase.spotSearchSuggestions(
             query = query,
             latitude = latitude,
             longitude = longitude,
@@ -104,6 +115,7 @@ class SpotDiscoveryResolver(
                 category = GqlSpotCategory(code = it.category.code, label = it.category.code, iconUrl = null),
             )
         }
+    }
 
     @DgsQuery
     fun ongoingFestivals(
@@ -114,6 +126,7 @@ class SpotDiscoveryResolver(
         @InputArgument first: Int?,
         @InputArgument after: String?,
     ): GqlFestivalConnection {
+        auditLocationAccess("ongoingFestivals")
         val page = spotDiscoveryUseCase.ongoingFestivals(
             OngoingFestivalsQuery(
                 latitude = latitude,
@@ -140,6 +153,7 @@ class SpotDiscoveryResolver(
         @InputArgument first: Int?,
         @InputArgument after: String?,
     ): GqlPopularSpotConnection {
+        auditLocationAccess("popularSpots")
         val page = spotDiscoveryUseCase.popularSpots(
             PopularSpotsQuery(
                 latitude = latitude,

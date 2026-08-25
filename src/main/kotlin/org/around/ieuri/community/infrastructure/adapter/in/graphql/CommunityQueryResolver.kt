@@ -1,5 +1,6 @@
 package org.around.ieuri.community.infrastructure.adapter.`in`.graphql
 
+import org.around.ieuri.community.application.port.out.client.LocationAuditPort
 import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsData
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
@@ -52,6 +53,7 @@ class CommunityQueryResolver(
     private val communityQueryUseCase: CommunityQueryUseCase,
     private val memberLookupPort: MemberLookupPort,
     private val currentMemberProvider: CurrentMemberProvider,
+    private val locationAuditPort: LocationAuditPort,
 ) {
 
     /**
@@ -72,6 +74,11 @@ class CommunityQueryResolver(
         dfe: DgsDataFetchingEnvironment,
     ): PostConnection {
         val memberId = currentMemberProvider.requireMemberId()
+        // **좌표를 실제로 보낸 호출만** 남긴다(SPEC-0032 R19) — 이 연산은 좌표가 선택이라
+        // 전체 피드 조회는 위치 조회가 아니다. 좌표 자체는 넘기지 않는다.
+        if (latitude != null && longitude != null) {
+            locationAuditPort.recordAccess(memberId, "posts")
+        }
         val page = communityQueryUseCase.posts(
             PostsQuery(
                 catalogId = catalogId,
