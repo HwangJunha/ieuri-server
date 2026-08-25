@@ -8,9 +8,23 @@
 ALTER TABLE community.community_message
     ADD COLUMN deleted_at timestamp with time zone;
 
--- 대화 화면의 주 조회 경로(conversation_id, created_at DESC, id DESC)에 삭제 필터가 붙는다.
--- 부분 인덱스로 두어 살아 있는 행만 담는다 — 지워진 행은 어차피 조회 대상이 아니고,
--- 보관 기간이 지나면 물리 삭제되므로 인덱스가 무한히 커지지 않는다.
-CREATE INDEX idx_community_message_conversation_live
+-- 읽기 경로 전부에 `deleted_at IS NULL`이 붙으므로 두 인덱스를 **부분 인덱스로 교체한다.**
+-- 조건을 담지 않은 인덱스를 그대로 두면 어느 질의도 쓰지 않으면서 INSERT마다 갱신되고
+-- 테이블과 함께 자란다. 지워진 행은 조회 대상이 아니고 보관 기간이 지나면 물리 삭제되므로
+-- 부분 인덱스가 무한히 커지지도 않는다.
+
+-- 1) 대화 화면의 주 조회 경로(findMessages·findLastMessagesOf).
+DROP INDEX IF EXISTS community.idx_community_message_conversation;
+CREATE INDEX idx_community_message_conversation
     ON community.community_message USING btree (conversation_id, created_at DESC, id DESC)
     WHERE deleted_at IS NULL;
+
+-- 2) 안 읽은 수(countUnreadOf). **대화 목록을 그릴 때마다 도는 경로다** — 조건을 담지 않으면
+--    후보 행마다 heap을 뒤져 deleted_at을 확인하게 되어 커버링 스캔을 잃는다.
+DROP INDEX IF EXISTS community.idx_community_message_unread;
+CREATE INDEX idx_community_message_unread
+    ON community.community_message USING btree (conversation_id, id, sender_id)
+    WHERE deleted_at IS NULL;
+
+-- `idx_community_message_created`(created_at)는 그대로 둔다 — 보관 정리 배치가 쓰는데,
+-- 그쪽은 **지워진 행도 골라야 하므로** 조건을 담으면 안 된다.
