@@ -143,14 +143,17 @@ class MemberRegistrationServiceTest {
      * 가입 시 저장된 닉네임을 꺼낸다. provider 값 채택 여부는 저장된 회원에만 나타나므로
      * `save`에 실린 애그리거트를 잡아 읽는다.
      */
-    private fun registerAndCaptureNickname(providerNickname: String?): String {
+    private fun registerAndCaptureNickname(
+        providerNickname: String?,
+        clientNickname: String? = null,
+    ): String {
         val saved = slot<Member>()
         every { snsVerifier.verify(any(), any()) } returns identity(nickname = providerNickname)
         every { memberRepository.existsByProviderAndProviderUserId(any(), any()) } returns false
         every { termsRepository.findActiveTerms(any()) } returns activeTerms
         every { memberRepository.save(capture(saved)) } returns 100L
 
-        service.registerBySns(command())
+        service.registerBySns(command().copy(nickname = clientNickname))
 
         return saved.captured.profile.nickname.value
     }
@@ -158,6 +161,52 @@ class MemberRegistrationServiceTest {
     @Test
     fun `provider가 준 닉네임을 그대로 쓴다`() {
         assertEquals("여행자", registerAndCaptureNickname("여행자"))
+    }
+
+    /**
+     * 클라이언트가 넘긴 값이 클레임보다 앞선다 — 카카오는 `/v2/user/me`에서만 주는 닉네임이
+     * 있어 클라이언트 쪽이 더 정확할 수 있다.
+     */
+    @Test
+    fun `클라이언트가 넘긴 닉네임이 클레임보다 우선한다`() {
+        val nickname = registerAndCaptureNickname(
+            providerNickname = "클레임값",
+            clientNickname = "클라이언트값",
+        )
+
+        assertEquals("클라이언트값", nickname)
+    }
+
+    @Test
+    fun `클라이언트가 넘기지 않으면 클레임을 쓴다`() {
+        assertEquals("클레임값", registerAndCaptureNickname("클레임값", clientNickname = null))
+    }
+
+    /**
+     * **R30의 요지다.** provider가 주는 값이라 클라이언트가 고칠 수 없으므로, 규칙(2~20자)을
+     * 벗어나도 오류가 아니라 조용히 다음 후보로 넘어간다 — 사용자가 손쓸 수 없는 이유로
+     * 가입을 막지 않는다.
+     */
+    @Test
+    fun `클라이언트 닉네임이 한 글자여도 오류가 아니라 다음 후보로 넘어간다`() {
+        val nickname = registerAndCaptureNickname(
+            providerNickname = "클레임값",
+            clientNickname = "가",
+        )
+
+        // 1글자는 규칙 위반이라 버려지고 클레임이 받는다.
+        assertEquals("클레임값", nickname)
+    }
+
+    @Test
+    fun `클라이언트와 클레임이 모두 규칙을 벗어나면 생성기로 물러난다`() {
+        val nickname = registerAndCaptureNickname(
+            providerNickname = "가".repeat(21),
+            clientNickname = "나",
+        )
+
+        assertEquals(nickname, Nickname(nickname).value, "생성값이 닉네임 규칙을 벗어났다: $nickname")
+        assertTrue(nickname != "나")
     }
 
     /** 클레임에 닉네임이 실릴지는 동의 항목 설정에 달려 있어 서버가 통제하지 못한다. */

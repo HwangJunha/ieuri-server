@@ -88,6 +88,9 @@ class MemberMutationResolver(
             // 생성된 TermsCode enum → String (도메인/커맨드는 데이터주도로 String 유지)
             agreements = input.agreements.map { AgreementInput(it.termsCode.name, it.agreed) },
             authorizationCode = input.authorizationCode,
+            // 형식 검사를 여기서 하지 않는다 — 규칙을 벗어나면 서버가 조용히 자동 생성으로
+            // 대체한다(R30). provider가 주는 값이라 클라이언트가 고칠 수 없다.
+            nickname = input.nickname,
         )
         val result = memberRegistrationUseCase.registerBySns(command)
         RegisterSnsMemberPayload(

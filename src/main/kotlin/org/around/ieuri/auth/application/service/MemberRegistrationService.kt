@@ -103,9 +103,13 @@ class MemberRegistrationService(
      * 클레임에 닉네임이 실릴지는 provider 동의 항목 설정에 달려 있어 서버가 통제하지 못한다 —
      * 실리지 않아도 이 폴백으로 가입은 성공한다.
      */
-    private fun nicknameFrom(providerNickname: String?): Nickname =
-        providerNickname
-            ?.let { runCatching { Nickname(it) }.getOrNull() }
+    private fun nicknameFrom(vararg candidates: String?): Nickname =
+        candidates.asSequence()
+            .filterNotNull()
+            // **형식을 벗어나면 조용히 다음 후보로 넘어간다.** provider가 주는 값이라
+            // 사용자가 고칠 수 없고, 가입을 막을 이유가 없다(SPEC-0032 R30).
+            .mapNotNull { runCatching { Nickname(it) }.getOrNull() }
+            .firstOrNull()
             ?: generateNickname()
 
     @Transactional
@@ -122,7 +126,11 @@ class MemberRegistrationService(
         val submittedEmail = Email(command.submittedEmail)
         val providerEmail = identity.email?.let { Email(it) }
         // provider가 준 값을 먼저 본다(SPEC-0032 R29) — 쓸 수 없으면 생성기로 물러난다.
-        val nickname = nicknameFrom(identity.nickname)
+        //
+        // **클라이언트가 넘긴 값이 클레임보다 앞선다.** 카카오는 `/v2/user/me`에서만 주는
+        // 닉네임이 있어 클라이언트 쪽이 더 정확할 수 있고, 없으면 클레임이 받는다.
+        // 임의 값을 넣어도 표시용 닉네임이라 다른 회원에게 해가 없다(중복도 허용된다).
+        val nickname = nicknameFrom(command.nickname, identity.nickname)
 
         val (agreements, requiredCodes) = buildAgreements(command.agreements, now)
 
