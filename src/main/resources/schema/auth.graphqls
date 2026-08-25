@@ -44,7 +44,7 @@ type Mutation {
     assignRole(input: AssignRoleInput!): RoleChangePayload!
     "역할 회수(관리자). role:revoke 권한 필요. 본인의 마지막 관리 역할 회수는 거부된다."
     revokeRole(input: RevokeRoleInput!): RoleChangePayload!
-    "닉네임 변경. 회원 간 고유해야 하며 중복 시 실패한다."
+    "닉네임 변경. **회원 간 고유하지 않다** — 다른 회원이 쓰는 값이어도 성공한다. 길이·형식만 검사한다."
     changeNickname(input: ChangeNicknameInput!): ChangeNicknamePayload!
     "프로필 이미지 업로드용 presigned PUT URL 발급. profile 네임스페이스의 단일 오브젝트 키를 쓴다(게시물 이미지 키와 분리된다). 실제 업로드는 클라이언트가 오브젝트 스토리지로 직접 PUT하며 GraphQL을 거치지 않는다."
     createProfileImageUploadUrl(input: CreateProfileImageUploadUrlInput!): CreateProfileImageUploadUrlPayload!
