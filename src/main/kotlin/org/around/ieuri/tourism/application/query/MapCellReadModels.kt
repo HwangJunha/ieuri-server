@@ -38,18 +38,10 @@ data class CellImageView(
 )
 
 
-/** 칸에 속한 장소 목록 조회 입력(R11). */
-data class CellSpotsQuery(
-    val cellId: Long,
-    val first: Int,
-    val after: String?,
-)
-
 /**
  * 칸에 속한 장소 1건.
  *
- * [likeCount]는 **정렬 근거라 노드가 아니라 엣지의 값이다** — 순위와 무관한 다른 조회에서는
- * 같은 장소에 대해 의미가 없다(`popularSpots`의 선례).
+ * [likeCount]는 정렬 근거이며 **활성 언어 기준이다** — 같은 장소라도 언어가 다르면 값이 다르다.
  */
 data class CellSpotView(
     val id: Long,

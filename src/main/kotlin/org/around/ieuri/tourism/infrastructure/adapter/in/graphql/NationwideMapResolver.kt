@@ -6,19 +6,15 @@ import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.common.graphql.generated.types.CellImage as GqlCellImage
-import org.around.ieuri.common.graphql.generated.types.CellSpotConnection as GqlCellSpotConnection
-import org.around.ieuri.common.graphql.generated.types.CellSpotEdge as GqlCellSpotEdge
+import org.around.ieuri.common.graphql.generated.types.CellSpot as GqlCellSpot
 import org.around.ieuri.common.graphql.generated.types.Coordinates as GqlCoordinates
 import org.around.ieuri.common.graphql.tokenPresentation
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.tourism.application.policy.NationwideMapPolicy
 import org.around.ieuri.tourism.application.port.`in`.query.NationwideMapUseCase
-import org.around.ieuri.tourism.application.query.CellSpotsQuery
 import org.around.ieuri.tourism.application.query.MapCellView
 import org.around.ieuri.tourism.application.query.SharedMapView
 import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toGql
-import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toGqlPageInfo
-import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.tourism.application.query.CellImageView
 import org.around.ieuri.tourism.application.query.CellSpotView
 import org.around.ieuri.tourism.infrastructure.locale.domainLocale
@@ -114,33 +110,22 @@ class NationwideMapResolver(
             // 이미지가 없는 칸은 로더가 키를 채우지 않는다 — 필드가 null이 된다(SPEC-0030 R10).
             .thenApply { it?.toGql() }
 
-    /** 칸에 속한 장소(R11). **선택했을 때만 조회한다.** */
+    /**
+     * 칸에 속한 장소(R11). **선택했을 때만 조회한다.**
+     *
+     * 페이지네이션이 없다 — 한 칸의 장소는 한 화면에 담기는 양이라 나눌 이유가 없고,
+     * 칸마다 커서를 들고 다니면 클라이언트가 161칸분의 커서를 관리하게 된다.
+     */
     @DgsData(parentType = "MapCell", field = "spots")
     fun spots(
         dfe: DgsDataFetchingEnvironment,
         @InputArgument first: Int?,
-        @InputArgument after: String?,
-    ): GqlCellSpotConnection =
+    ): List<GqlCellSpot> =
         nationwideMapUseCase.cellSpots(
-            CellSpotsQuery(
-                cellId = dfe.mapCell().id,
-                first = first ?: DEFAULT_CELL_SPOT_PAGE_SIZE,
-                after = after,
-            ),
+            cellId = dfe.mapCell().id,
+            first = first ?: DEFAULT_CELL_SPOT_PAGE_SIZE,
             locale = dfe.domainLocale(),
-        ).toGqlConnection()
-
-    private fun CursorPage<CellSpotView>.toGqlConnection(): GqlCellSpotConnection =
-        GqlCellSpotConnection(
-            edges = edges.map {
-                GqlCellSpotEdge(
-                    node = it.node.toGql(),
-                    cursor = it.cursor,
-                    likeCount = it.node.likeCount.toInt(),
-                )
-            },
-            pageInfo = toGqlPageInfo(),
-        )
+        ).map { it.toGql() }
 
 
     /**

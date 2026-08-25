@@ -5,7 +5,6 @@ import org.around.ieuri.tourism.application.query.CellSpotView
 import org.around.ieuri.tourism.domain.vo.AreaName
 import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.domain.vo.DomainLocale
-import org.around.ieuri.tourism.domain.vo.LikeCountCursor
 import org.around.ieuri.tourism.domain.vo.MapCellDistrictRow
 import org.around.ieuri.tourism.domain.vo.ReactionType
 import org.springframework.jdbc.core.JdbcTemplate
@@ -56,8 +55,7 @@ class MapCellQueryJdbcAdapter(
     /**
      * 칸에 속한 장소(R11). 좋아요 내림차순 + id 오름차순.
      *
-     * 정렬 두 축의 방향이 달라 `like_count`에 -1을 곱해 부호를 맞추면 seek이 행 값 비교 한
-     * 줄이 된다(`popularSpots`의 선례). 부호 반전은 여기서만 하며 커서에는 원래 값이 실린다.
+     * 정렬 두 축의 방향이 달라 `like_count`에 -1을 곱해 부호를 맞춘다 — 한 줄로 정렬된다.
      *
      * 집계값이라 별칭을 WHERE에서 참조할 수 없어 서브쿼리로 한 겹 감싼다. 좋아요가 0건인
      * 장소도 나와야 하므로 `LEFT JOIN`이다 — INNER면 아무도 누르지 않은 장소가 통째로 빠진다.
@@ -67,18 +65,8 @@ class MapCellQueryJdbcAdapter(
         cellId: Long,
         language: DomainLocale,
         limit: Int,
-        after: LikeCountCursor?,
     ): List<CellSpotView> {
-        val params = mutableListOf<Any>(language.name, ReactionType.LIKE.name, language.name, cellId)
-
-        val seek = if (after != null) {
-            params += -after.likeCount
-            params += after.spotId
-            "WHERE (-like_count, id) > (?, ?)"
-        } else {
-            ""
-        }
-        params += limit
+        val params = mutableListOf<Any>(language.name, ReactionType.LIKE.name, language.name, cellId, limit)
 
         return jdbcTemplate.query(
             """
@@ -94,7 +82,6 @@ class MapCellQueryJdbcAdapter(
                 WHERE mcd.cell_id = ?
                 GROUP BY cat.id, t.title, cat.thumbnail_image_url, cat.category, cat.map_x, cat.map_y
             ) ranked
-            $seek
             ORDER BY -like_count, id
             LIMIT ?
             """.trimIndent(),

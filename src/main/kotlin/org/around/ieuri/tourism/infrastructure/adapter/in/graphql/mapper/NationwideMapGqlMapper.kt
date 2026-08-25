@@ -51,6 +51,8 @@ fun CellSpotView.toGql(): GqlCellSpot = GqlCellSpot(
     category = GqlSpotCategory(code = categoryCode, label = categoryCode, iconUrl = null),
     lat = coordinates.latitude,
     lng = coordinates.longitude,
+    // GraphQL likeCount는 Int!. 한 칸의 좋아요 수가 Int 범위를 넘을 일은 없다.
+    likeCount = likeCount.toInt(),
 )
 
 fun CursorPage<*>.toGqlPageInfo(): GqlPageInfo = GqlPageInfo(

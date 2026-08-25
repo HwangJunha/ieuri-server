@@ -16,17 +16,14 @@ import org.around.ieuri.tourism.application.port.out.query.DistrictVisitQueryPor
 import org.around.ieuri.tourism.application.port.out.query.MapCellDistrictQueryPort
 import org.around.ieuri.tourism.application.port.out.query.MapCellQueryPort
 import org.around.ieuri.tourism.application.query.CellSpotView
-import org.around.ieuri.tourism.application.query.CellSpotsQuery
 import org.around.ieuri.tourism.domain.vo.AreaName
 import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.domain.vo.DomainLocale
-import org.around.ieuri.tourism.domain.vo.LikeCountCursor
 import org.around.ieuri.tourism.domain.vo.MapCellDistrictRow
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -106,24 +103,34 @@ class NationwideMapServiceTest {
 
     @Test
     fun `상한을 넘는 first는 오류가 아니라 상한으로 잘린다`() {
-        every { mapCellQueryPort.findCellSpots(1L, DomainLocale.KO, 51, null) } returns emptyList()
+        every { mapCellQueryPort.findCellSpots(1L, DomainLocale.KO, 50) } returns emptyList()
 
-        service.cellSpots(CellSpotsQuery(1L, first = 999, after = null), DomainLocale.KO)
+        service.cellSpots(cellId = 1L, first = 999, locale = DomainLocale.KO)
 
-        // 상한 50 + 1 = 51건을 읽는다.
-        verify { mapCellQueryPort.findCellSpots(1L, DomainLocale.KO, 51, null) }
+        // 상한 50으로 잘린다(POL-018) — 페이지네이션이 없으니 +1을 읽지 않는다.
+        verify { mapCellQueryPort.findCellSpots(1L, DomainLocale.KO, 50) }
     }
 
+    /** 0 이하도 상한과 같은 방향으로 다룬다 — 오류가 아니라 최소 1건이다. */
     @Test
-    fun `first보다 한 건 더 읽어 다음 페이지를 판정한다`() {
-        val rows = (1L..21L).map { spot(it, likeCount = 100 - it) }
-        every { mapCellQueryPort.findCellSpots(1L, DomainLocale.KO, 21, null) } returns rows
+    fun `0 이하의 first는 1로 올라간다`() {
+        every { mapCellQueryPort.findCellSpots(1L, DomainLocale.KO, 1) } returns emptyList()
 
-        val page = service.cellSpots(CellSpotsQuery(1L, first = 20, after = null), DomainLocale.KO)
+        service.cellSpots(cellId = 1L, first = 0, locale = DomainLocale.KO)
 
-        assertEquals(20, page.edges.size)
-        assertTrue(page.pageInfo.hasNextPage)
-        assertFalse(page.pageInfo.hasPreviousPage)
+        verify { mapCellQueryPort.findCellSpots(1L, DomainLocale.KO, 1) }
+    }
+
+    /** 조회 결과를 그대로 돌려준다 — 페이지 조립이 없다. */
+    @Test
+    fun `읽은 장소를 그대로 돌려준다`() {
+        val rows = (1L..20L).map { spot(it, likeCount = 100 - it) }
+        every { mapCellQueryPort.findCellSpots(1L, DomainLocale.KO, 20) } returns rows
+
+        val spots = service.cellSpots(cellId = 1L, first = 20, locale = DomainLocale.KO)
+
+        assertEquals(20, spots.size)
+        assertEquals(1L, spots.first().id)
     }
 
     // ── 공유 ───────────────────────────────────────────────────────────
