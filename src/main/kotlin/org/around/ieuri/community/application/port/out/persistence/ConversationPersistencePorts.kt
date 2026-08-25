@@ -49,8 +49,10 @@ interface MessageReportRepositoryPort {
  * **물리 삭제다.** 소프트 삭제로 두면 보관 기간을 정한 의미가 없다 — 지웠다고 하면서
  * 데이터는 남아 있게 된다.
  *
- * 탈퇴 회원의 메시지 삭제(R17)는 [MemberDataErasePort.deleteMessagesBySender]가 맡는다 —
- * 같은 삭제를 두 포트가 각각 제공하면 한쪽만 고쳐졌을 때 두 경로가 조용히 갈린다.
+ * 탈퇴(R17)는 이 경로가 아니라 소프트 삭제다
+ * ([MemberContentSoftDeletePort.softDeleteMessagesBySender]) — 지우면 상대가 자기 말만 남은
+ * 독백을 보게 되기 때문이다. **둘은 서로를 대체하지 않는다**: 탈퇴가 가린 행도 생성 시각이
+ * 보관 기간을 넘기면 여기서 행째로 사라진다(선별이 `created_at`만 보므로 자동으로 그렇다).
  */
 interface MessagePurgePort {
     /**

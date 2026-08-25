@@ -2,7 +2,6 @@ package org.around.ieuri.tourism.application.port.out.query
 
 import org.around.ieuri.tourism.application.query.CellSpotView
 import org.around.ieuri.tourism.domain.vo.DomainLocale
-import org.around.ieuri.tourism.domain.vo.LikeCountCursor
 import org.around.ieuri.tourism.domain.vo.MapCellDistrictRow
 
 /**
@@ -36,14 +35,14 @@ interface MapCellQueryPort {
     /**
      * 칸에 속한 장소(R11). 좋아요 수 내림차순, 같은 수는 id 오름차순이다.
      *
-     * `first + 1`건을 읽어 다음 페이지 존재를 판정한다 — 호출자가 [org.around.ieuri.common.pagination.keysetPageOf]에 넘긴다.
+     * **페이지네이션이 없다** — 상위 [limit]건만 읽는다.
      */
     fun findCellSpots(
         cellId: Long,
         language: DomainLocale,
         limit: Int,
-        after: LikeCountCursor?,
     ): List<CellSpotView>
+
 }
 
 /**

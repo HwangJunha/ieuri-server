@@ -32,6 +32,7 @@ import java.time.Duration
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -261,12 +262,45 @@ class CommunityQueryServiceTest {
     @Test
     fun `댓글 조회도 같은 차단 컨텍스트를 거친다`() {
         givenBlocked(11L)
+        every { queryPort.findPost(1L, any()) } returns postView(id = 1L)
         val search = slot<PostCommentsSearch>()
         every { queryPort.findComments(capture(search)) } returns emptyPage()
 
         service.comments(PostCommentsQuery(1L, 20, null), memberId)
 
         assertEquals(setOf(11L), search.captured.viewer.blockedMemberIds)
+    }
+
+    /**
+     * 지워진 글의 댓글은 읽히지 않는다.
+     *
+     * **댓글은 자기 `deleted_at`만 본다** — 부모 글이 지워져도 댓글 행은 그대로 남으므로,
+     * 이 검사가 없으면 `post(id:)`는 null인데 `comments(postId:)`는 목록을 주는 상태가 된다.
+     * 글 id는 순번이라 추측도 쉽다. 예전에는 글을 물리 삭제해 FK CASCADE가 댓글까지 지웠기
+     * 때문에 이 구멍이 드러나지 않았다(탈퇴 소프트 삭제 전환).
+     */
+    @Test
+    fun `못 보는 글의 댓글은 조회하지 않는다`() {
+        givenBlocked()
+        every { queryPort.findPost(1L, any()) } returns null
+
+        val page = service.comments(PostCommentsQuery(1L, 20, null), memberId)
+
+        assertTrue(page.edges.isEmpty())
+        // 저장소를 아예 묻지 않는다 — 존재 여부가 응답 시간으로도 새지 않는다.
+        verify(exactly = 0) { queryPort.findComments(any()) }
+    }
+
+    /** 차단·숨김으로 걸린 글과 구분되지 않아야 존재 여부가 새지 않는다 — 오류가 아니라 빈 페이지다. */
+    @Test
+    fun `못 보는 글의 댓글 조회는 오류가 아니다`() {
+        givenBlocked()
+        every { queryPort.findPost(1L, any()) } returns null
+
+        val page = service.comments(PostCommentsQuery(1L, 20, null), memberId)
+
+        assertFalse(page.pageInfo.hasNextPage)
+        assertFalse(page.pageInfo.hasPreviousPage)
     }
 
     // ---------- 상한 ----------

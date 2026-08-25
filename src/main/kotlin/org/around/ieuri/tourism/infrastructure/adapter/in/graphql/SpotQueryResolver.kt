@@ -1,5 +1,7 @@
 package org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql
 
+import org.around.ieuri.common.event.LocationAccessed
+import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
 import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsData
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
@@ -20,6 +22,7 @@ import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toCat
 import org.around.ieuri.tourism.infrastructure.locale.domainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.common.graphql.appKey
+import org.around.ieuri.common.graphql.tokenPresentation
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
 import org.around.ieuri.common.graphql.generated.types.LikedSpot as GqlLikedSpot
@@ -43,6 +46,7 @@ import org.around.ieuri.common.graphql.generated.types.SpotPage as GqlSpotPage
 class SpotQueryResolver(
     private val spotQueryUseCase: SpotQueryUseCase,
     private val currentMemberProvider: CurrentMemberProvider,
+    private val eventPublisher: TourismEventPublisherPort,
 ) {
     @DgsQuery
     fun spots(
@@ -54,6 +58,11 @@ class SpotQueryResolver(
         @InputArgument page: Int?,
         @InputArgument size: Int?,
     ): GqlSpotPage {
+        // 만료 토큰을 비로그인으로 강등하지 않는다(R1) — 이미 반응한 항목이 조용히 되살아난다.
+        val memberId = dfe.viewerMemberId()
+        // 좌표를 받는 연산이므로 조회 사실을 남긴다(R19). **좌표는 넘기지 않는다.**
+        // 비로그인은 남길 "누구"가 없어 발행하지 않는다.
+        memberId?.let { eventPublisher.publish(LocationAccessed(it, "spots")) }
         val result = spotQueryUseCase.spots(
             SpotsQuery(
                 latitude = latitude,
@@ -65,7 +74,7 @@ class SpotQueryResolver(
             ),
             locale = dfe.domainLocale(),
             // 비로그인 허용 쿼리 — memberId가 있으면 이미 반응한 항목을 제외한다(requireMemberId 아님).
-            memberId = currentMemberProvider.currentMemberId(),
+            memberId = memberId,
         )
         return result.toGql()
     }
@@ -153,9 +162,17 @@ class SpotQueryResolver(
      */
     @DgsData(parentType = "SpotDetail", field = "viewerReaction")
     fun viewerReaction(dfe: DgsDataFetchingEnvironment): String? {
-        val memberId = currentMemberProvider.currentMemberId() ?: return null
+        // 만료 토큰이면 null(=반응 없음)이 아니라 오류다 — 그래야 클라이언트가 갱신한다(R1).
+        val memberId = dfe.viewerMemberId() ?: return null
         return spotQueryUseCase.spotViewerReaction(dfe.catalogId(), memberId, dfe.domainLocale())
     }
+
+    /**
+     * 뷰어 신원. **비로그인은 null이지만 만료 토큰은 오류다**(SPEC-0032 R1) — 공개 조회라
+     * 비로그인을 허용하되, 만료를 비로그인으로 다루면 이미 누른 반응이 조용히 되살아난다.
+     */
+    private fun DgsDataFetchingEnvironment.viewerMemberId(): Long? =
+        currentMemberProvider.optionalMemberId(tokenPresentation())
 
     /**
      * 인증된 회원이 좋아요한 spot 커넥션. 미인증이면 빈 목록이 아니라 UNAUTHENTICATED 오류다.

@@ -5,7 +5,6 @@ import org.around.ieuri.tourism.application.query.CellSpotView
 import org.around.ieuri.tourism.domain.vo.AreaName
 import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.domain.vo.DomainLocale
-import org.around.ieuri.tourism.domain.vo.LikeCountCursor
 import org.around.ieuri.tourism.domain.vo.MapCellDistrictRow
 import org.around.ieuri.tourism.domain.vo.ReactionType
 import org.springframework.jdbc.core.JdbcTemplate
@@ -54,48 +53,37 @@ class MapCellQueryJdbcAdapter(
     }
 
     /**
-     * 칸에 속한 장소(R11). 좋아요 내림차순 + id 오름차순.
+     * 칸에 속한 장소(R11). 좋아요 내림차순, 같은 수는 id 오름차순.
      *
-     * 정렬 두 축의 방향이 달라 `like_count`에 -1을 곱해 부호를 맞추면 seek이 행 값 비교 한
-     * 줄이 된다(`popularSpots`의 선례). 부호 반전은 여기서만 하며 커서에는 원래 값이 실린다.
+     * **번역은 `JOIN`, 반응은 `LEFT JOIN`이다.** 활성 언어에 보이지 않는 장소는 통째로
+     * 빠져야 하고(계약), 아무도 좋아요를 누르지 않은 장소는 0으로 남아야 한다 — 반응을
+     * INNER로 바꾸면 후자가 목록에서 사라진다.
      *
-     * 집계값이라 별칭을 WHERE에서 참조할 수 없어 서브쿼리로 한 겹 감싼다. 좋아요가 0건인
-     * 장소도 나와야 하므로 `LEFT JOIN`이다 — INNER면 아무도 누르지 않은 장소가 통째로 빠진다.
+     * **반응의 조건이 `ON`에 있는 것도 같은 이유다.** `WHERE`로 내리면 `LEFT JOIN`이
+     * INNER처럼 동작해 좋아요 0건인 장소가 걸러진다.
+     *
+     * `COUNT(*)`가 아니라 `COUNT(r.id)`인 것도 그 연장이다 — 조인이 맞지 않으면 `r.id`가
+     * null이고 `COUNT`는 null을 세지 않아 0이 된다. `COUNT(*)`는 행이 하나라 1을 준다.
      */
     @Transactional(readOnly = true)
     override fun findCellSpots(
         cellId: Long,
         language: DomainLocale,
         limit: Int,
-        after: LikeCountCursor?,
-    ): List<CellSpotView> {
-        val params = mutableListOf<Any>(language.name, ReactionType.LIKE.name, language.name, cellId)
-
-        val seek = if (after != null) {
-            params += -after.likeCount
-            params += after.spotId
-            "WHERE (-like_count, id) > (?, ?)"
-        } else {
-            ""
-        }
-        params += limit
-
-        return jdbcTemplate.query(
+    ): List<CellSpotView> =
+        jdbcTemplate.query(
             """
-            SELECT * FROM (
-                SELECT cat.id, t.title, cat.thumbnail_image_url, cat.category, cat.map_x, cat.map_y,
-                       COUNT(r.id) AS like_count
-                FROM tour.spot_catalog cat
-                JOIN tour.spot_catalog_translation t
-                  ON t.catalog_id = cat.id AND t.language = ? AND t.visible
-                LEFT JOIN tour.spot_reaction r
-                  ON r.catalog_id = cat.id AND r.reaction = ? AND r.language = ?
-                JOIN tour.map_cell_district mcd ON mcd.district_code = cat.district_code
-                WHERE mcd.cell_id = ?
-                GROUP BY cat.id, t.title, cat.thumbnail_image_url, cat.category, cat.map_x, cat.map_y
-            ) ranked
-            $seek
-            ORDER BY -like_count, id
+            SELECT cat.id, t.title, cat.thumbnail_image_url, cat.category, cat.map_x, cat.map_y,
+                   COUNT(r.id) AS like_count
+            FROM tour.spot_catalog cat
+            JOIN tour.spot_catalog_translation t
+              ON t.catalog_id = cat.id AND t.language = ? AND t.visible
+            LEFT JOIN tour.spot_reaction r
+              ON r.catalog_id = cat.id AND r.reaction = ? AND r.language = ?
+            JOIN tour.map_cell_district mcd ON mcd.district_code = cat.district_code
+            WHERE mcd.cell_id = ?
+            GROUP BY cat.id, t.title, cat.thumbnail_image_url, cat.category, cat.map_x, cat.map_y
+            ORDER BY like_count DESC, cat.id ASC
             LIMIT ?
             """.trimIndent(),
             { rs, _ ->
@@ -111,9 +99,12 @@ class MapCellQueryJdbcAdapter(
                     likeCount = rs.getLong("like_count"),
                 )
             },
-            *params.toTypedArray(),
+            language.name,
+            ReactionType.LIKE.name,
+            language.name,
+            cellId,
+            limit,
         )
-    }
 
     private fun ResultSet.toCellDistrictRow(): MapCellDistrictRow = MapCellDistrictRow(
         cellId = getLong("cell_id"),

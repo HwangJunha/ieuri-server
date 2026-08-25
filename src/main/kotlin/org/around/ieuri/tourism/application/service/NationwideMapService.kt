@@ -1,8 +1,5 @@
 package org.around.ieuri.tourism.application.service
 
-import org.around.ieuri.common.pagination.CursorPage
-import org.around.ieuri.common.pagination.keysetPageOf
-import org.around.ieuri.tourism.application.exception.InvalidCursorException
 import org.around.ieuri.tourism.application.exception.MapCellNotFoundException
 import org.around.ieuri.tourism.application.exception.ShareLinkBlockedException
 import org.around.ieuri.tourism.application.exception.ShareLinkNotFoundException
@@ -17,12 +14,10 @@ import org.around.ieuri.tourism.application.port.out.query.MapCellDistrictQueryP
 import org.around.ieuri.tourism.application.port.out.query.MapCellQueryPort
 import org.around.ieuri.tourism.application.query.CellImageView
 import org.around.ieuri.tourism.application.query.CellSpotView
-import org.around.ieuri.tourism.application.query.CellSpotsQuery
 import org.around.ieuri.tourism.application.query.MapCellView
 import org.around.ieuri.tourism.application.query.SharedMapView
 import org.around.ieuri.tourism.application.query.toView
 import org.around.ieuri.tourism.domain.vo.DomainLocale
-import org.around.ieuri.tourism.domain.vo.LikeCountCursor
 import org.around.ieuri.tourism.domain.vo.MapCellGrouping
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -81,26 +76,13 @@ class NationwideMapService(
         cellImageQueryPort.findAllRepresentativeImages()
 
     @Transactional(readOnly = true)
-    override fun cellSpots(query: CellSpotsQuery, locale: DomainLocale): CursorPage<CellSpotView> {
-        val first = query.first.coerceIn(1, policy.maxCellSpotPageSize)
-        val after = query.after?.let {
-            try {
-                LikeCountCursor.decode(it)
-            } catch (e: IllegalArgumentException) {
-                throw InvalidCursorException(cause = e)
-            }
-        }
-
-        val rows = mapCellQueryPort.findCellSpots(
-            cellId = query.cellId,
+    override fun cellSpots(cellId: Long, first: Int, locale: DomainLocale): List<CellSpotView> =
+        // 상한 초과는 오류가 아니라 절삭이다(POL-018).
+        mapCellQueryPort.findCellSpots(
+            cellId = cellId,
             language = locale,
-            limit = first + 1,
-            after = after,
+            limit = first.coerceIn(1, policy.maxCellSpotPageSize),
         )
-        return keysetPageOf(rows = rows, first = first, after = query.after) {
-            LikeCountCursor(it.likeCount, it.id).encode()
-        }
-    }
 
     @Transactional(readOnly = true)
     override fun sharedMap(token: String, viewerMemberId: Long?): SharedMapView {

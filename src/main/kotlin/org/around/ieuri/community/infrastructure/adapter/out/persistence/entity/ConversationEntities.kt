@@ -94,6 +94,18 @@ class MessageEntity(
     @Column(name = "photo_object_key", length = 512)
     var photoObjectKey: String? = null,
 
+    /**
+     * 탈퇴 회원의 메시지를 가리는 표시(SPEC-0011 R17). null이면 살아 있다.
+     *
+     * **도메인 `Message`에는 없다** — 글·댓글과 같은 취급이다. 도메인이 이 값으로 분기하지
+     * 않고, 읽기 계층이 조회에서 거른다.
+     *
+     * **보관 기간 물리 삭제와 무관하다** — 정리 배치는 `created_at`으로만 고르므로 지워진
+     * 표시가 있어도 180일 뒤 행 자체가 사라진다.
+     */
+    @Column(name = "deleted_at")
+    var deletedAt: Instant? = null,
+
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant? = null,
 ) {

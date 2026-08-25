@@ -19,10 +19,12 @@ interface ConversationJpaRepository : JpaRepository<ConversationEntity, Long> {
 }
 
 interface MessageJpaRepository : JpaRepository<MessageEntity, Long> {
-    fun findByIdIn(ids: List<Long>): List<MessageEntity>
+    /**
+     * 신고 대상 메시지 조회. **지워진 것은 오지 않는다** — 화면에 없는 메시지를 id로만
+     * 신고할 수 있으면 안 된다. 예전에는 탈퇴가 행을 지워 자연히 막혔다.
+     */
+    fun findByIdInAndDeletedAtIsNull(ids: List<Long>): List<MessageEntity>
 
-    /** 탈퇴 회원이 보낸 메시지 전량 삭제(R17). 대화 자체는 남긴다(AC17-2). */
-    fun deleteBySenderId(senderId: Long): Long
 
     /**
      * 보관 기간이 지난 메시지를 회차 상한만큼 고른다(R16). **한 번에 다 지우지 않는다** —

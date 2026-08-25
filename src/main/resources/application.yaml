@@ -222,6 +222,15 @@ ieuri:
       - image/jpeg
       - image/png
       - image/webp
+  auth:
+    # 회원 감사 로그(1년, POL-014) 만료 삭제 배치(SPEC-0032 R22).
+    # 보관 기간 자체는 정책이라 도메인(AuditRetention.MEMBER_AUDIT)이 소유하며 설정에 없다.
+    # **실측 전까지 확정값이 아니다**(POL-044) — 회차 크기는 락·WAL 관측 후 조정한다.
+    audit-retention:
+      # 한 회차에 지울 최대 건수. 트랜잭션이 회차 단위로 끊긴다.
+      batch-size: 1000
+      # 한 번의 잡 실행에서 돌 최대 회차 수. 남은 것은 다음 실행이 이어 지운다.
+      max-batches-per-run: 100
   community:
     # 커넥션 first 상한. 초과 요청은 오류가 아니라 절삭된다.
     max-page-size: 50

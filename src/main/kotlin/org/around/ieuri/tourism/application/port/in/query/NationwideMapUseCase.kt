@@ -1,9 +1,7 @@
 package org.around.ieuri.tourism.application.port.`in`.query
 
-import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.tourism.application.query.CellImageView
 import org.around.ieuri.tourism.application.query.CellSpotView
-import org.around.ieuri.tourism.application.query.CellSpotsQuery
 import org.around.ieuri.tourism.application.query.MapCellView
 import org.around.ieuri.tourism.application.query.SharedMapView
 import org.around.ieuri.tourism.domain.vo.DomainLocale
@@ -43,9 +41,13 @@ interface NationwideMapUseCase {
      */
     fun mapCellsByIds(cellIds: Collection<Long>, locale: DomainLocale, memberId: Long?): List<MapCellView>
 
-    /** 칸에 속한 장소(R11). 좋아요 수 내림차순. */
-    fun cellSpots(query: CellSpotsQuery, locale: DomainLocale): CursorPage<CellSpotView>
-
+    /**
+     * 칸에 속한 장소(R11). 좋아요 수 내림차순, 같은 수는 id 오름차순.
+     *
+     * **페이지네이션이 없다** — 한 칸의 장소는 한 화면에 담기는 양이라 나눌 이유가 없다.
+     * [first]는 상한에 맞춰 잘린다(POL-018).
+     */
+    fun cellSpots(cellId: Long, first: Int, locale: DomainLocale): List<CellSpotView>
 
     /**
      * 공유 토큰으로 다른 회원의 지도를 본다(R13·R15·R16).

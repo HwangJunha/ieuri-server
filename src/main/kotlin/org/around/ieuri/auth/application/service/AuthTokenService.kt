@@ -122,6 +122,15 @@ class AuthTokenService(
     /**
      * refresh 토큰으로 accessToken 재발급(회전).
      * 저장소에 살아있는 jti만 통과시키고, 이미 회전/폐기된 refresh 재사용은 탈취로 보고 회원 전체를 폐기한다.
+     *
+     * **발급이 폐기보다 먼저다**(SPEC-0032 R5). 순서가 이 방향인 것이 이 메서드의 정확성을
+     * 좌우한다 — 리프레시 저장소는 Valkey이고 회원 정보는 PostgreSQL이라 `@Transactional`이
+     * Valkey 연산을 되돌리지 못하므로, 원자성을 트랜잭션이 아니라 **순서**로 확보한다.
+     *
+     * 폐기를 먼저 하면 발급이 실패했을 때 **구 토큰은 죽고 신 토큰은 없는** 상태가 되고,
+     * 사용자가 재시도하면 `existsActive`가 false라 탈취로 오판되어 전 기기가 로그아웃된다.
+     * 반대로 이 순서에서는 중간 실패 시 두 토큰이 잠시 함께 유효하지만, 구 토큰은 TTL로
+     * 만료된다 — 세션이 영구히 죽는 것보다 낫다.
      */
     override fun refresh(command: RefreshTokenCommand): TokenPairResult {
         // 서명/만료/타입 검증 실패 시 InvalidTokenException.
@@ -133,9 +142,10 @@ class AuthTokenService(
             throw TokenReuseDetectedException("재사용된 리프레시 토큰입니다. 다시 로그인해 주세요.")
         }
 
-        // 회전: 이전 refresh 폐기 후 새 토큰 쌍 발급.
+        // 회전: 신 토큰을 먼저 저장하고(issueFor가 저장까지 한다), 성공한 뒤에 구 토큰을 폐기한다.
+        val issued = tokenIssuer.issueFor(claims.memberId)
         refreshTokenStore.revoke(claims.jti)
-        return tokenIssuer.issueFor(claims.memberId)
+        return issued
     }
 
     /**

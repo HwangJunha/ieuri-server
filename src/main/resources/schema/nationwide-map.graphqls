@@ -155,15 +155,14 @@ type MapCell {
 
     거리 정렬이 아니다. 활성 언어에 표시할 수 없는 장소는 빠진다.
 
-    **칸 상세(mapCell)에서 고르는 필드다.** mapCells에서 함께 고르면 칸마다 질의가 따로
-    나가 161회가 된다 — 지도를 그릴 때는 고르지 않는다.
+    **페이지네이션이 없다.** 한 칸의 장소는 한 화면에 담기는 양이라 나눌 이유가 없고,
+    칸마다 커서를 들고 다니면 클라이언트가 161칸분의 커서를 관리하게 된다.
+    상한을 넘는 칸은 좋아요 수 상위로 잘린다.
     """
     spots(
         "기본 20, 상한 50. 상한을 넘는 값은 오류가 아니라 상한으로 잘린다."
         first: Int = 20
-        "이전 페이지의 endCursor. 형식이 어긋나면 INVALID_CURSOR."
-        after: String
-    ): CellSpotConnection!
+    ): [CellSpot!]!
 }
 
 """
@@ -193,19 +192,6 @@ enum CellImageKind {
     SPECIALTY
 }
 
-"칸에 속한 장소의 커서 연결. 좋아요 수 내림차순이다."
-type CellSpotConnection {
-    edges: [CellSpotEdge!]!
-    pageInfo: PageInfo!
-}
-
-type CellSpotEdge {
-    node: CellSpot!
-    cursor: String!
-    "이 장소의 좋아요 수. 정렬 근거이며 활성 언어 기준이다."
-    likeCount: Int!
-}
-
 "칸에 속한 장소 1건."
 type CellSpot {
     "장소 id. 기존 상세 조회에 그대로 쓴다."
@@ -216,6 +202,8 @@ type CellSpot {
     category: SpotCategory!
     lat: Float!
     lng: Float!
+    "이 장소의 좋아요 수. 정렬 근거이며 활성 언어 기준이다."
+    likeCount: Int!
 }
 
 input RecordVisitsInput {

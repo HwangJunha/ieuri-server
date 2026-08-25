@@ -126,6 +126,7 @@ class SpotAnswerCommandServiceTest {
 
     @Test
     fun `로그인 회원은 반응과 무관하게 답변에 답글을 단다`() {
+        givenQuestion()
         every { answerRepository.findById(answerId) } returns answer(authorId = 99L)
         givenReplySaveReturnsWithId()
 
@@ -137,6 +138,27 @@ class SpotAnswerCommandServiceTest {
         assertEquals(replyId, created)
         // 답글은 답변 수에 잡히지 않는다.
         verify(exactly = 0) { counterPort.increaseAnswerCount(any()) }
+    }
+
+    /**
+     * 지워진 질문 아래에는 답글을 달 수 없다.
+     *
+     * **답변은 질문이 지워져도 행으로 남는다** — 자식을 훑지 않는 것이 설계이기 때문이다
+     * (탈퇴 소프트 삭제). 그래서 답변만 보고 통과시키면 읽을 수 없는 스레드에 답글이 쌓이고,
+     * 알림만 열리지 않는 화면으로 나간다. 답변 작성이 질문을 확인하는 것과 같은 규율이다.
+     */
+    @Test
+    fun `부모 질문이 지워졌으면 답글을 달 수 없다`() {
+        every { questionRepository.findById(questionId) } returns null
+        every { answerRepository.findById(answerId) } returns answer(authorId = 99L)
+
+        assertFailsWith<QuestionNotFoundException> {
+            service.createReply(
+                CreateSpotAnswerReplyCommand(parentAnswerId = answerId, body = "답글", photoKeys = emptyList()),
+                memberId,
+            )
+        }
+        verify(exactly = 0) { replyRepository.save(any()) }
     }
 
     @Test

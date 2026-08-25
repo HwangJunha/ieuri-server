@@ -5,6 +5,7 @@ import com.netflix.graphql.dgs.DgsData
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
+import org.around.ieuri.common.graphql.tokenPresentation
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.community.application.port.`in`.query.SpotQaQueryUseCase
 import org.around.ieuri.community.application.query.PostAuthorView
@@ -17,7 +18,7 @@ import org.around.ieuri.community.application.query.SpotQuestionsQuery
 import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper.toGql
 import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper.toGqlOrPlaceholder
 import org.around.ieuri.community.infrastructure.locale.contentLanguage
-import org.dataloader.DataLoader
+import org.around.ieuri.common.graphql.loader
 import org.springframework.stereotype.Component
 import java.util.concurrent.CompletableFuture
 import org.around.ieuri.common.graphql.generated.types.PostAuthor as GqlPostAuthor
@@ -68,7 +69,7 @@ class SpotQaQueryResolver(
                 first = first ?: DEFAULT_PAGE_SIZE,
                 after = after,
             ),
-            memberId = if (onlyMine) currentMemberProvider.requireMemberId() else viewerId(),
+            memberId = if (onlyMine) currentMemberProvider.requireMemberId() else viewerId(dfe),
             language = dfe.contentLanguage(),
         )
         return SpotQuestionConnection(
@@ -82,6 +83,7 @@ class SpotQaQueryResolver(
         @InputArgument questionId: Long,
         @InputArgument first: Int?,
         @InputArgument after: String?,
+        dfe: DgsDataFetchingEnvironment,
     ): SpotAnswerConnection {
         val page = spotQaQueryUseCase.spotAnswers(
             SpotAnswersQuery(
@@ -89,7 +91,7 @@ class SpotQaQueryResolver(
                 first = first ?: DEFAULT_PAGE_SIZE,
                 after = after,
             ),
-            memberId = viewerId(),
+            memberId = viewerId(dfe),
         )
         return SpotAnswerConnection(
             edges = page.edges.map { SpotAnswerEdge(cursor = it.cursor, node = it.node) },
@@ -134,13 +136,18 @@ class SpotQaQueryResolver(
     fun answerPhotoKeys(dfe: DgsDataFetchingEnvironment): CompletableFuture<List<String>> =
         dfe.loader<List<String>>(SpotAnswerPhotoDataLoader.NAME).load(dfe.answerSource().id)
 
-    /** 답글. **요청된 경우에만** 배치로 읽는다 — 목록만 그리는 화면은 조회가 붙지 않는다. */
+    /**
+     * 답글. **요청된 경우에만** 배치로 읽는다 — 목록만 그리는 화면은 조회가 붙지 않는다.
+     *
+     * **뷰어를 여기서 확정해 실어 보낸다**(SPEC-0032 R27) — 로더가 자기 스레드에서 읽으면
+     * 가상 스레드 전환에 신원을 잃고 조용히 비로그인으로 강등된다.
+     */
     @DgsData(parentType = "SpotAnswer", field = "replies")
     fun answerReplies(
         dfe: DgsDataFetchingEnvironment,
     ): CompletableFuture<List<SpotAnswerReplyView>> =
         dfe.loader<List<SpotAnswerReplyView>>(SpotAnswerReplyDataLoader.NAME)
-            .load(dfe.answerSource().id)
+            .load(dfe.answerSource().id, ViewerId(viewerId(dfe)))
 
     // ── SpotAnswerReply 지연 필드 ────────────────────────────────────
 
@@ -154,8 +161,14 @@ class SpotQaQueryResolver(
 
     // ── 공통 ─────────────────────────────────────────────────────────
 
-    /** 비로그인은 0이다 — 차단 집합도 소유 관계도 없는 호출자를 뜻한다. */
-    private fun viewerId(): Long = currentMemberProvider.currentMemberId() ?: ANONYMOUS
+    /**
+     * 뷰어 신원. 비로그인은 0이다 — 차단 집합도 소유 관계도 없는 호출자를 뜻한다.
+     *
+     * **거절된 토큰은 0으로 흘리지 않는다**(SPEC-0032 R1). 만료를 비로그인으로 다루면 차단
+     * 관계와 소유 관계가 조용히 사라져 **그럴듯한 오답**이 나간다 — 오류보다 나쁘다.
+     */
+    private fun viewerId(dfe: DgsDataFetchingEnvironment): Long =
+        currentMemberProvider.optionalMemberId(dfe.tokenPresentation()) ?: ANONYMOUS
 
     /**
      * 작성자를 배치로 읽는다. 회원 정보가 없어도 질문·답변은 남으므로(탈퇴해도 보존한다)
@@ -167,10 +180,6 @@ class SpotQaQueryResolver(
         loader<PostAuthorView>(PostAuthorDataLoader.NAME)
             .load(memberId)
             .thenApply { it.toGqlOrPlaceholder(memberId) }
-
-    /** 이름이 어긋난 로더를 조용히 넘기면 필드가 빈 채로 뜬다 — 명시적으로 실패시킨다. */
-    private fun <V : Any> DgsDataFetchingEnvironment.loader(name: String): DataLoader<Long, V> =
-        getDataLoader<Long, V>(name) ?: error("DataLoader '$name'가 등록되지 않았다.")
 
     /**
      * 부모 리졸버가 돌려준 read DTO를 꺼낸다.
