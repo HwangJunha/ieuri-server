@@ -110,6 +110,10 @@ class SpotAnswerCommandService(
 
         val answer = answerRepositoryPort.findById(command.parentAnswerId)
             ?: throw parentNotAnswerException(command.parentAnswerId)
+        // **부모 질문이 살아 있어야 한다.** 답변은 질문이 지워져도 행으로 남으므로(자식을 훑지
+        // 않는 것이 설계다) 이 검사가 없으면 읽을 수 없는 스레드에 답글이 쌓이고, 알림만
+        // 열리지 않는 화면으로 나간다. 답변 작성이 질문을 확인하는 것과 같은 규율이다.
+        questionRepositoryPort.findById(answer.questionId) ?: throw QuestionNotFoundException()
 
         val photoKeys = command.photoKeys.map { photoKeyVerifier.verify(it, memberId) }
 

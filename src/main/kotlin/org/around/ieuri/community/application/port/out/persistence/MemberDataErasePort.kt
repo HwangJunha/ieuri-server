@@ -25,17 +25,4 @@ interface MemberDataErasePort {
      * 실패하면 안 된다(AC17-2).
      */
     fun deleteMessagesBySender(memberId: Long): Long
-
-    /**
-     * `answerCount`를 내려야 할 질문 id를 모은다(SPEC-0026 R17).
-     *
-     * **삭제하지 않는다** — 답변 자체는 소프트 삭제로 처리되고, 이 메서드는 세는 일만 한다.
-     * 수를 내리지 않으면 답변 3개라고 표시된 질문에 2개만 보여 유저가 세어 보고 버그라고
-     * 판단한다.
-     *
-     * **중복이 그대로 담긴다** — 같은 질문에 이 회원의 답변이 여러 건이면 그 수만큼 내려야
-     * 한다. 숨겨진 답변은 이미 수에서 빠져 있어 포함되지 않는다(두 번 내리면 수가 실제보다
-     * 작아진다).
-     */
-    fun findQuestionIdsToDecrease(memberId: Long): List<Long>
 }

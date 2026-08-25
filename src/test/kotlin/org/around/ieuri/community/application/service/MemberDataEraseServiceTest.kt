@@ -7,9 +7,9 @@ import io.mockk.verifyOrder
 import org.around.ieuri.community.application.port.out.persistence.MemberContentSoftDeletePort
 import org.around.ieuri.community.application.port.out.persistence.MemberDataErasePort
 import org.around.ieuri.community.application.port.out.persistence.SpotQuestionCounterPort
-import java.time.Clock
+import org.around.ieuri.community.application.port.out.client.ClockPort
 import java.time.Instant
-import java.time.ZoneOffset
+
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 
@@ -33,7 +33,7 @@ class MemberDataEraseServiceTest {
         erasePort,
         softDeletePort,
         counterPort,
-        Clock.fixed(now, ZoneOffset.UTC),
+        mockk<ClockPort> { every { now() } returns now },
     )
 
     // ── 콘텐츠: 소프트 삭제 ──
@@ -125,19 +125,19 @@ class MemberDataEraseServiceTest {
      */
     @Test
     fun `답변을 칠하기 전에 대상 질문을 먼저 센다`() {
-        every { erasePort.findQuestionIdsToDecrease(memberId) } returns listOf(11L)
+        every { softDeletePort.findQuestionIdsToDecrease(memberId) } returns listOf(11L)
 
         service.eraseMemberData(memberId)
 
         verifyOrder {
-            erasePort.findQuestionIdsToDecrease(memberId)
+            softDeletePort.findQuestionIdsToDecrease(memberId)
             softDeletePort.softDeleteSpotAnswersByAuthor(memberId, now)
         }
     }
 
     @Test
     fun `지운 답변이 달렸던 질문의 답변 수를 내린다`() {
-        every { erasePort.findQuestionIdsToDecrease(memberId) } returns listOf(11L, 11L, 22L)
+        every { softDeletePort.findQuestionIdsToDecrease(memberId) } returns listOf(11L, 11L, 22L)
 
         service.eraseMemberData(memberId)
 
@@ -149,7 +149,7 @@ class MemberDataEraseServiceTest {
     /** 대상이 없으면 감소도 없다 — 숨겨진 답변은 애초에 수에 들어 있지 않다. */
     @Test
     fun `내릴 질문이 없으면 답변 수를 건드리지 않는다`() {
-        every { erasePort.findQuestionIdsToDecrease(memberId) } returns emptyList()
+        every { softDeletePort.findQuestionIdsToDecrease(memberId) } returns emptyList()
 
         service.eraseMemberData(memberId)
 
@@ -159,7 +159,7 @@ class MemberDataEraseServiceTest {
     /** 칠하기가 실패하면 수를 내리지 않는다 — 먼저 내리면 수만 줄어든 상태가 남는다. */
     @Test
     fun `답변 소프트 삭제가 실패하면 답변 수를 내리지 않는다`() {
-        every { erasePort.findQuestionIdsToDecrease(memberId) } returns listOf(11L)
+        every { softDeletePort.findQuestionIdsToDecrease(memberId) } returns listOf(11L)
         every { softDeletePort.softDeleteSpotAnswersByAuthor(memberId, now) } throws
             RuntimeException("db down")
 
@@ -172,7 +172,7 @@ class MemberDataEraseServiceTest {
 
     @Test
     fun `정리할 것이 없어도 오류가 아니다`() {
-        every { erasePort.findQuestionIdsToDecrease(memberId) } returns emptyList()
+        every { softDeletePort.findQuestionIdsToDecrease(memberId) } returns emptyList()
         every { softDeletePort.softDeletePostsByAuthor(memberId, now) } returns 0
         every { softDeletePort.softDeleteCommentsByAuthor(memberId, now) } returns 0
         every { erasePort.deleteLikesByMember(memberId) } returns 0

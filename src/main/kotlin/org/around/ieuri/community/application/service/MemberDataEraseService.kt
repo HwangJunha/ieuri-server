@@ -3,12 +3,12 @@ package org.around.ieuri.community.application.service
 import org.around.ieuri.community.application.port.`in`.command.MemberDataEraseUseCase
 import org.around.ieuri.community.application.port.out.persistence.MemberContentSoftDeletePort
 import org.around.ieuri.community.application.port.out.persistence.MemberDataErasePort
+import org.around.ieuri.community.application.port.out.client.ClockPort
 import org.around.ieuri.community.application.port.out.persistence.SpotQuestionCounterPort
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
-import java.time.Clock
 
 /**
  * 탈퇴 회원의 커뮤니티 데이터 정리(SPEC-0011 R17).
@@ -26,7 +26,7 @@ class MemberDataEraseService(
     private val erasePort: MemberDataErasePort,
     private val softDeletePort: MemberContentSoftDeletePort,
     private val questionCounterPort: SpotQuestionCounterPort,
-    private val clock: Clock,
+    private val clockPort: ClockPort,
 ) : MemberDataEraseUseCase {
 
     /**
@@ -38,10 +38,10 @@ class MemberDataEraseService(
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     override fun eraseMemberData(memberId: Long) {
         // 한 번의 탈퇴가 남기는 시각은 하나여야 한다 — 표마다 갈리면 나중에 한 값으로 읽을 수 없다.
-        val now = clock.instant()
+        val now = clockPort.now()
 
         // **칠하기 전에 세어 둔다.** 소프트 삭제 후에는 어느 질문의 수를 내려야 하는지 알 수 없다.
-        val questionIdsToDecrease = erasePort.findQuestionIdsToDecrease(memberId)
+        val questionIdsToDecrease = softDeletePort.findQuestionIdsToDecrease(memberId)
 
         // ── 콘텐츠: 소프트 삭제 ──
         //

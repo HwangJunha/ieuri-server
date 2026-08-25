@@ -1,6 +1,7 @@
 package org.around.ieuri.community.application.service
 
 import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.common.pagination.cursorPageOf
 import org.around.ieuri.community.application.event.PostViewed
 import org.around.ieuri.community.application.policy.CommunityPolicy
 import org.around.ieuri.community.application.port.`in`.query.CommunityQueryUseCase
@@ -116,15 +117,36 @@ class CommunityQueryService(
         return view
     }
 
-    override fun comments(query: PostCommentsQuery, memberId: Long): CursorPage<CommentView> =
-        communityQueryPort.findComments(
+    /**
+     * 글의 댓글 목록.
+     *
+     * **부모 글의 생존을 먼저 본다.** 댓글은 자기 `deleted_at`만 보므로, 이 검사가 없으면
+     * 지워진 글의 댓글이 `comments(postId:)`로 그대로 읽힌다 — `post(id:)`는 null을 주는데
+     * 댓글은 나오는 상태가 되고, 글 id는 순번이라 추측도 쉽다.
+     *
+     * 이전에는 글을 물리 삭제해 FK CASCADE가 댓글까지 지웠기 때문에 이 구멍이 드러나지
+     * 않았다. 소프트 삭제로 바꾸면서 검사가 필요해졌다(`spotAnswers`가 부모 질문을 먼저
+     * 읽는 것과 같은 규율이다).
+     *
+     * 못 보는 글이면 오류가 아니라 빈 페이지다 — 차단·숨김으로 걸린 경우와 구분되지 않아야
+     * 존재 여부가 새지 않는다.
+     */
+    override fun comments(query: PostCommentsQuery, memberId: Long): CursorPage<CommentView> {
+        val viewer = viewerContext(memberId)
+        communityQueryPort.findPost(query.postId, viewer) ?: return emptyCommentPage()
+        return communityQueryPort.findComments(
             PostCommentsSearch(
                 postId = query.postId,
                 first = clampPageSize(query.first),
                 after = query.after,
-                viewer = viewerContext(memberId),
+                viewer = viewer,
             ),
         )
+    }
+
+    /** 못 보는 글의 댓글. 첫 페이지이므로 양쪽 다 false다. */
+    private fun emptyCommentPage(): CursorPage<CommentView> =
+        cursorPageOf(edges = emptyList(), hasNextPage = false, hasPreviousPage = false)
 
     override fun commentPreviews(postIds: List<Long>, memberId: Long): Map<Long, List<CommentView>> =
         communityQueryPort.findCommentPreviews(
