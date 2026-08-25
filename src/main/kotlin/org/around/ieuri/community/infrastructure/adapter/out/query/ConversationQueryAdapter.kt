@@ -95,6 +95,7 @@ class ConversationQueryAdapter(
             .selectFrom(message)
             .where(
                 message.conversationId.eq(search.conversationId),
+                message.deletedAt.isNull,
                 cursor?.let { keysetCondition(message.createdAt, message.id, it) },
             )
             .orderBy(message.createdAt.desc(), message.id.desc())
@@ -136,7 +137,13 @@ class ConversationQueryAdapter(
         queryFactory
             .selectFrom(message)
             // **대화로도 좁힌다** — 채널 이름이 인가의 근거가 되지 않게 한다.
-            .where(message.id.eq(messageId), message.conversationId.eq(conversationId))
+            // 지워진 메시지는 건너뛴다 — 구독이 id만 받아 여기서 다시 읽으므로, 발행과 읽기
+            // 사이에 탈퇴가 끼면 이 조건이 그것을 막는다(호출부가 null을 건너뛴다).
+            .where(
+                message.id.eq(messageId),
+                message.conversationId.eq(conversationId),
+                message.deletedAt.isNull,
+            )
             .fetchOne()
             ?.let { it.toMessageView(memberId, findQuotesOf(listOf(messageId))[messageId]) }
 
@@ -165,6 +172,9 @@ class ConversationQueryAdapter(
                 message.conversationId.`in`(conversationIds),
                 // 내가 보낸 것은 세지 않는다.
                 message.senderId.ne(memberId),
+                // **지워진 메시지는 세지 않는다.** 목록은 이미 거르므로, 여기서 세면 뱃지에는
+                // 3이 뜨는데 열어 보면 아무것도 없어 뱃지가 영영 사라지지 않는다.
+                message.deletedAt.isNull,
                 // 읽음 지점이 없으면 전부가 안 읽은 것이다.
                 myLastRead.isNull.or(message.id.gt(myLastRead)),
             )
@@ -181,7 +191,8 @@ class ConversationQueryAdapter(
         queryFactory
             .select(message.id.max())
             .from(message)
-            .where(message.conversationId.eq(conversationId))
+            // 읽음 지점을 지워진 메시지로 밀지 않는다 — 세는 쪽과 같은 집합을 봐야 한다.
+            .where(message.conversationId.eq(conversationId), message.deletedAt.isNull)
             .fetchOne()
 
     /**
@@ -205,11 +216,18 @@ class ConversationQueryAdapter(
             .selectFrom(message)
             .where(
                 message.conversationId.`in`(conversationIds),
+                message.deletedAt.isNull,
                 message.createdAt.eq(
                     JPAExpressions
                         .select(latest.createdAt.max())
                         .from(latest)
-                        .where(latest.conversationId.eq(message.conversationId)),
+                        // **서브쿼리에도 같은 조건이 있어야 한다.** 없으면 지워진 메시지가
+                        // 최대 시각을 차지해, 바깥 조건과 맞는 살아 있는 행이 없어지고
+                        // 대화 미리보기가 이전 메시지로 물러나는 대신 **빈 칸**이 된다.
+                        .where(
+                            latest.conversationId.eq(message.conversationId),
+                            latest.deletedAt.isNull,
+                        ),
                 ),
             )
             .fetch()

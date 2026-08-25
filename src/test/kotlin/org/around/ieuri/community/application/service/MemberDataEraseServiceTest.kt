@@ -17,9 +17,9 @@ import kotlin.test.assertFailsWith
  * 탈퇴 회원의 커뮤니티 데이터 정리(SPEC-0011 R17).
  *
  * 고정하는 계약은 둘이다.
- * - **콘텐츠는 소프트 삭제한다** — 글·댓글·질문·답변·답글은 남에게도 보이므로 지우면 남의
- *   스레드에 구멍이 난다. 행은 남기고 표시에서만 지운다.
- * - **본인만의 데이터는 물리 삭제한다** — 좋아요·숨김·차단·DM은 남길 이유가 없다.
+ * - **남에게도 보이는 것은 소프트 삭제한다** — 글·댓글·질문·답변·답글·DM. 지우면 남의
+ *   스레드에 구멍이 나고 대화 상대는 독백을 보게 된다. 행은 남기고 표시에서만 지운다.
+ * - **본인만의 데이터는 물리 삭제한다** — 좋아요·숨김·차단은 남길 이유가 없다.
  */
 class MemberDataEraseServiceTest {
 
@@ -74,6 +74,7 @@ class MemberDataEraseServiceTest {
     fun `모든 콘텐츠가 같은 삭제 시각을 받는다`() {
         service.eraseMemberData(memberId)
 
+        verify { softDeletePort.softDeleteMessagesBySender(memberId, now) }
         verify { softDeletePort.softDeletePostsByAuthor(memberId, now) }
         verify { softDeletePort.softDeleteCommentsByAuthor(memberId, now) }
         verify { softDeletePort.softDeleteSpotQuestionsByAuthor(memberId, now) }
@@ -93,27 +94,27 @@ class MemberDataEraseServiceTest {
     }
 
     /**
-     * SPEC-0017 AC17-1 — 탈퇴하면 그가 보낸 DM 메시지도 지워진다.
+     * SPEC-0017 AC17-1·AC17-2 — 탈퇴하면 그가 보낸 DM이 상대 화면에서 사라진다.
      *
-     * **대화 자체는 지우지 않는다**(AC17-2) — 상대방 화면에서 남은 자기 메시지가 보여야 하고
-     * 조회가 실패하면 안 된다.
+     * **행을 지우지 않는다.** 지우면 상대는 자기 말만 남은 독백을 보게 된다 — 대화를 남기는
+     * 것(AC17-2)의 취지가 메시지를 지우면 반만 지켜진다.
      */
     @Test
-    fun `탈퇴하면 보낸 메시지도 지운다`() {
+    fun `탈퇴하면 보낸 메시지를 소프트 삭제한다`() {
         service.eraseMemberData(memberId)
 
-        verify { erasePort.deleteMessagesBySender(memberId) }
+        verify { softDeletePort.softDeleteMessagesBySender(memberId, now) }
     }
 
     /**
-     * AC17-3 — 메시지 삭제는 **탈퇴 경로에서만** 일어난다. 정지는 해제될 수 있어 되돌릴 수
-     * 없는 삭제를 하지 않으며, 이 유스케이스는 `MemberWithdrawn`에만 연결되어 있다.
+     * AC17-3 — 메시지 처리는 **탈퇴 경로에서만** 일어난다. 정지는 해제될 수 있으므로 이
+     * 유스케이스는 `MemberWithdrawn`에만 연결되어 있다.
      */
     @Test
-    fun `메시지 삭제는 한 번만 일어난다`() {
+    fun `메시지 소프트 삭제는 한 번만 일어난다`() {
         service.eraseMemberData(memberId)
 
-        verify(exactly = 1) { erasePort.deleteMessagesBySender(memberId) }
+        verify(exactly = 1) { softDeletePort.softDeleteMessagesBySender(memberId, now) }
     }
 
     // ── answerCount ──

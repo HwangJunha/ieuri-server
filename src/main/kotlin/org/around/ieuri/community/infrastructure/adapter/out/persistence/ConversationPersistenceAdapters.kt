@@ -119,7 +119,7 @@ class MessagePersistenceAdapter(
                     .orEmpty(),
             )
         }
-        return repository.findByIdIn(messageIds).map { entity ->
+        return repository.findByIdInAndDeletedAtIsNull(messageIds).map { entity ->
             entity.toDomain(
                 decryptedBody = cipher.decrypt(entity.bodyEncrypted),
                 spotQaOrigin = quotes[entity.id],
