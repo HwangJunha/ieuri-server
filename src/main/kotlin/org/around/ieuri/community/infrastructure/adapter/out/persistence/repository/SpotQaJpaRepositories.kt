@@ -9,6 +9,10 @@ import org.springframework.data.jpa.repository.JpaRepository
 
 /**
  * 장소 질문/답변 저장소(SPEC-0026). 파생 쿼리만 쓴다 — 복잡한 조회는 QueryDSL 어댑터가 맡는다.
+ *
+ * **탈퇴 회원 콘텐츠의 소프트 삭제는 여기 없다** — 벌크 UPDATE라 파생 쿼리로 표현할 수 없고,
+ * `@Query` 문자열은 이 저장소가 쓰지 않는다. QueryDSL 어댑터가 맡는다
+ * ([org.around.ieuri.community.infrastructure.adapter.out.persistence.MemberContentSoftDeleteAdapter]).
  */
 
 interface SpotQuestionJpaRepository : JpaRepository<SpotQuestionEntity, Long> {
@@ -19,9 +23,6 @@ interface SpotQuestionJpaRepository : JpaRepository<SpotQuestionEntity, Long> {
 
     /** 탈퇴 회원의 질문. 사진 행을 지우려면 id가 필요해 삭제 전에 모은다(R17). */
     fun findByAuthorId(authorId: Long): List<SpotQuestionEntity>
-
-    /** 탈퇴 회원의 질문 전량 삭제(R17). 타인의 답변도 CASCADE로 함께 사라진다(AC-17.2). */
-    fun deleteByAuthorId(authorId: Long): Long
 }
 
 interface SpotAnswerJpaRepository : JpaRepository<SpotAnswerEntity, Long> {
@@ -33,13 +34,8 @@ interface SpotAnswerJpaRepository : JpaRepository<SpotAnswerEntity, Long> {
      */
     fun findByQuestionId(questionId: Long): List<SpotAnswerEntity>
 
-    fun findByQuestionIdIn(questionIds: Collection<Long>): List<SpotAnswerEntity>
-
-    /** 탈퇴 회원의 답변. 질문과 같은 이유로 삭제 전에 id를 모은다. */
+    /** 탈퇴 회원의 답변. `answerCount`를 내릴 질문 id를 소프트 삭제 **전에** 모은다(R17). */
     fun findByAuthorId(authorId: Long): List<SpotAnswerEntity>
-
-    /** 탈퇴 회원이 남의 질문에 단 답변 전량 삭제(R17). */
-    fun deleteByAuthorId(authorId: Long): Long
 }
 
 interface SpotAnswerReplyJpaRepository : JpaRepository<SpotAnswerReplyEntity, Long> {
@@ -49,12 +45,6 @@ interface SpotAnswerReplyJpaRepository : JpaRepository<SpotAnswerReplyEntity, Lo
     fun findByAnswerId(answerId: Long): List<SpotAnswerReplyEntity>
 
     fun findByAnswerIdIn(answerIds: Collection<Long>): List<SpotAnswerReplyEntity>
-
-    /** 탈퇴 회원의 답글. 삭제 전에 사진 정리용 id를 모은다. */
-    fun findByAuthorId(authorId: Long): List<SpotAnswerReplyEntity>
-
-    /** 탈퇴 회원이 남의 답변에 단 답글 전량 삭제(R17). */
-    fun deleteByAuthorId(authorId: Long): Long
 }
 
 /** 질문·답변·답글의 사진. position 순서가 표시 순서다. */
