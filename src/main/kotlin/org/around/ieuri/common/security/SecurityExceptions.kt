@@ -19,6 +19,17 @@ class UnauthorizedException(message: String) : RuntimeException(message)
 class StaleTokenException(message: String) :
     TokenAuthenticationException("UNAUTHENTICATED_TOKEN_REJECTED", message)
 
+/**
+ * 소켓 신원이 더 이상 유효하지 않아 새 구독을 열 수 없을 때(SPEC-0032 R7).
+ * 최상위 오류 `SUBSCRIPTION_UNAUTHENTICATED`로 나간다.
+ *
+ * **`UNAUTHENTICATED`와 코드를 나누는 이유는 클라이언트의 행동이 다르기 때문이다** —
+ * 소켓 신원은 `connection_init`에 고정되어 있어 **같은 토큰으로 다시 붙으면 결과가 같다.**
+ * 재연결이 아니라 **갱신 후 재구독**이어야 하며, 이 구분이 없어서 무한 재연결이 발생했다.
+ */
+class SubscriptionUnauthenticatedException(message: String) :
+    TokenAuthenticationException("SUBSCRIPTION_UNAUTHENTICATED", message)
+
 /** 인증은 됐으나 요구되는 권한(permission)이 없을 때. */
 class ForbiddenException(message: String) : RuntimeException(message)
 

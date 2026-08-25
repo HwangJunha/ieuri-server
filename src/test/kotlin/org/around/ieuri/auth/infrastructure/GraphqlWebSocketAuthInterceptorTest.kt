@@ -2,6 +2,9 @@ package org.around.ieuri.auth.infrastructure
 
 import io.mockk.every
 import io.mockk.mockk
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
 import org.around.ieuri.auth.application.exception.InvalidTokenException
 import org.around.ieuri.auth.application.port.out.token.AccessTokenClaims
 import org.around.ieuri.auth.application.port.out.token.TokenProviderPort
@@ -28,7 +31,10 @@ class GraphqlWebSocketAuthInterceptorTest {
 
     private val memberId = 7L
     private val tokenProvider = mockk<TokenProviderPort>()
-    private val interceptor = GraphqlWebSocketAuthInterceptor(tokenProvider)
+    private val interceptor = GraphqlWebSocketAuthInterceptor(
+        tokenProvider,
+        Clock.fixed(Instant.parse("2026-08-25T00:00:00Z"), ZoneOffset.UTC),
+    )
 
     @AfterTest
     fun clearContext() {

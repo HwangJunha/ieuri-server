@@ -13,6 +13,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Component
+import java.time.Clock
+import java.time.Instant
 import reactor.core.publisher.Mono
 
 /**
@@ -35,6 +37,7 @@ import reactor.core.publisher.Mono
 @Component
 class GraphqlWebSocketAuthInterceptor(
     private val tokenProvider: TokenProviderPort,
+    private val clock: Clock,
 ) : WebSocketGraphQlInterceptor {
 
     /**
@@ -77,6 +80,8 @@ class GraphqlWebSocketAuthInterceptor(
             val claims = tokenProvider.parseAccessToken(raw)
             sessionInfo.attributes[MEMBER_ID] = claims.memberId
             sessionInfo.attributes[PERMISSIONS] = claims.permissions.toList()
+            // 구독 인가가 이 시각으로부터 액세스 TTL 초과를 판정한다(SPEC-0032 R7).
+            sessionInfo.attributes[CONNECTED_AT] = clock.instant()
             log.debug("WS connection_init 성공: memberId={}", claims.memberId)
             Mono.empty()
         } catch (e: InvalidTokenException) {
@@ -122,6 +127,14 @@ class GraphqlWebSocketAuthInterceptor(
     ): Mono<WebGraphQlResponse> {
         if (request !is WebSocketGraphQlRequest) return chain.next(request)
 
+        // **연결 수립 시각을 실행 컨텍스트에 싣는다**(SPEC-0032 R7). 구독 인가가 이 값으로
+        // 액세스 TTL 초과를 판정하는데, 세션 속성은 리졸버가 닿을 수 없는 자리다.
+        (request.sessionInfo.attributes[CONNECTED_AT] as? Instant)?.let {
+            request.configureExecutionInput { _, builder ->
+                builder.graphQLContext(mapOf(CONNECTED_AT to it)).build()
+            }
+        }
+
         return Mono.defer {
             applyToSecurityContext(request.sessionInfo.attributes)
             chain.next(request)
@@ -148,12 +161,15 @@ class GraphqlWebSocketAuthInterceptor(
             )
     }
 
-    private companion object {
+    companion object {
         private val log = org.slf4j.LoggerFactory.getLogger(GraphqlWebSocketAuthInterceptor::class.java)
 
-        const val AUTHORIZATION = "Authorization"
-        const val BEARER_PREFIX = "Bearer "
-        const val MEMBER_ID = "ieuri.memberId"
-        const val PERMISSIONS = "ieuri.permissions"
+        private const val AUTHORIZATION = "Authorization"
+        private const val BEARER_PREFIX = "Bearer "
+        private const val MEMBER_ID = "ieuri.memberId"
+        private const val PERMISSIONS = "ieuri.permissions"
+
+        /** 연결 수립 시각. 세션 속성이자 GraphQL 컨텍스트 키다(SPEC-0032 R7). */
+        const val CONNECTED_AT = "ieuri.connectedAt"
     }
 }

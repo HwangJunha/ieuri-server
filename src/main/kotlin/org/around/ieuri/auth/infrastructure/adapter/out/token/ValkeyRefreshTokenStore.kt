@@ -59,6 +59,18 @@ class ValkeyRefreshTokenStore(
         }
     }
 
+    /**
+     * 회원 인덱스에 살아 있는 jti가 있는지(SPEC-0032 R7).
+     *
+     * **인덱스의 존재만으로 판정하지 않는다** — Set 멤버에는 개별 TTL이 없어 만료된 jti가
+     * stale로 남을 수 있다. 실제 jti 키를 확인해야 폐기·만료를 정확히 읽는다.
+     */
+    override fun hasActiveToken(memberId: Long): Boolean = translatingFailure {
+        val jtis = redis.opsForSet().members(memberKey(memberId))
+        if (jtis.isNullOrEmpty()) return@translatingFailure false
+        jtis.any { redis.hasKey(jtiKey(it)) == true }
+    }
+
     override fun revokeAllByMember(memberId: Long) {
         val memberKey = memberKey(memberId)
         translatingFailure {
