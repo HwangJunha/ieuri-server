@@ -147,6 +147,21 @@ interface AuditLogPort {
     fun record(memberId: Long, eventType: String, payload: Map<String, Any?>)
 }
 
+/**
+ * 위치 조회 감사 기록 포트(SPEC-0032 R19·R20, POL-057).
+ *
+ * **[payload]에 좌표를 담지 않는다** — 위도·경도는 물론 시군구·행정구역 어느 단위로도
+ * 남기지 않는다(POL-045). 담는 것은 연산의 맥락(연산명 등)뿐이다.
+ */
+interface LocationAccessLogPort {
+    fun record(memberId: Long, payload: Map<String, Any?>)
+}
+
+/** 회원 감사 로그의 보관 정리 포트(SPEC-0032 R22, POL-014). 규약은 위와 같다. */
+interface AuditLogRetentionPort {
+    fun deleteCreatedBefore(cutoff: Instant, limit: Int): Int
+}
+
 /** 비밀번호 재설정 챌린지 포트. */
 interface PasswordResetRepositoryPort {
     fun save(reset: PasswordReset)

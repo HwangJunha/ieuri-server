@@ -22,6 +22,8 @@ class SchemaPlacementTest {
         listOf(
             "member", "member_profile", "member_terms_agreement", "terms", "email_verification",
             "password_reset", "member_audit_log", "role", "permission", "role_permission", "member_role",
+            // 위치 조회 감사(SPEC-0032 R19). 보관 기간과 쓰기 빈도가 달라 member_audit_log와 나눴다.
+            "member_location_access_log",
         ).forEach { put(it, "auth") }
 
         listOf(
@@ -75,8 +77,9 @@ class SchemaPlacementTest {
     @Test
     fun `배치표는 애플리케이션 테이블을 빠짐없이 배정한다`() {
         // 스펙 §4의 46개 + 장소 질문/답변 4개 + 메시지 인용 1개(SPEC-0026) + 알림 3개(SPEC-0028)
-        // + 전국 지도 7개(SPEC-0030: 방문 기록·공유 링크·칸 이미지·시도·칸·칸매핑·관계).
-        assertEquals(62, placement.size, "배치표에 등록된 애플리케이션 테이블 수")
+        // + 전국 지도 7개(SPEC-0030: 방문 기록·공유 링크·칸 이미지·시도·칸·칸매핑·관계)
+        // + 위치 조회 감사 1개(SPEC-0032).
+        assertEquals(63, placement.size, "배치표에 등록된 애플리케이션 테이블 수")
         assertEquals(
             setOf("auth", "community", "tour", "category", "alarm"),
             placement.values.toSet(),

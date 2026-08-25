@@ -10,6 +10,10 @@ import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.tourism.application.command.RecordVisitsCommand
 import org.around.ieuri.tourism.application.command.RemoveVisitCommand
 import org.around.ieuri.common.graphql.generated.types.MapRelation as GqlMapRelation
+import org.around.ieuri.common.graphql.generated.types.CellImage as GqlCellImage
+import org.around.ieuri.common.graphql.generated.types.CellImageKind as GqlCellImageKind
+import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
+import org.around.ieuri.tourism.application.query.CellImageView
 import org.around.ieuri.tourism.application.query.CellSpotView
 import org.around.ieuri.tourism.application.query.MapRelationView
 import org.around.ieuri.tourism.domain.vo.Coordinates
@@ -47,6 +51,8 @@ fun CellSpotView.toGql(): GqlCellSpot = GqlCellSpot(
     category = GqlSpotCategory(code = categoryCode, label = categoryCode, iconUrl = null),
     lat = coordinates.latitude,
     lng = coordinates.longitude,
+    // GraphQL likeCount는 Int!. 한 칸의 좋아요 수가 Int 범위를 넘을 일은 없다.
+    likeCount = likeCount.toInt(),
 )
 
 fun CursorPage<*>.toGqlPageInfo(): GqlPageInfo = GqlPageInfo(
@@ -73,4 +79,19 @@ fun MapRelationView.toGql(): GqlMapRelation = GqlMapRelation(
     overlappingCellIds = overlappingCellIds,
     theirVisitedCount = theirVisitedCount,
     createdAt = createdAt.toString(),
+)
+
+/**
+ * 칸 대표 이미지 → 응답 타입.
+ *
+ * 같은 타입의 문자열이 두 쌍 있어(`imageUrl`/`thumbnailUrl`, `caption`/`attributionText`)
+ * 뒤바뀌어도 컴파일이 통과한다 — 그래서 필드별 테스트가 이 변환의 안전장치다.
+ */
+fun CellImageView.toGql(): GqlCellImage = GqlCellImage(
+    imageUrl = imageUrl,
+    thumbnailUrl = thumbnailUrl,
+    caption = caption,
+    kind = GqlCellImageKind.valueOf(kind.name),
+    copyright = GqlCopyrightType.valueOf(copyright.name),
+    attributionText = attributionText,
 )

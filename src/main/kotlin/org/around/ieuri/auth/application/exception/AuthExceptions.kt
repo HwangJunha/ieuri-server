@@ -68,9 +68,24 @@ class InvalidTokenException(message: String) :
 class TokenReuseDetectedException(message: String) :
     TokenAuthenticationException("TOKEN_REUSE_DETECTED", message)
 
-/** 다른 회원이 이미 쓰는 닉네임일 때(SPEC-0011 R5). 상대의 정보는 담지 않는다(POL-013). */
-class NicknameAlreadyTakenException(message: String) :
-    UserFacingException("NICKNAME_ALREADY_TAKEN", message)
+/**
+ * 토큰 저장소(Valkey)에 닿지 못해 판정을 내릴 수 없을 때. 최상위 오류
+ * `AUTH_STORE_UNAVAILABLE`로 나간다(SPEC-0032 R6).
+ *
+ * **요청은 여전히 실패한다** — 저장소를 못 읽었다고 통과시키면 재사용 감지가 무력화되므로
+ * fail-closed를 유지한다. 코드만 정확해진다.
+ *
+ * `INVALID_TOKEN`·`TOKEN_REUSE_DETECTED`와 나누는 이유는 **클라이언트의 행동이 다르기
+ * 때문이다.** 저 둘은 토큰 문제라 재발급이나 재로그인으로 넘어가지만, 이쪽은 토큰이
+ * 멀쩡한데 서버가 답을 못 하는 상태다 — 재로그인시키면 멀쩡한 세션을 버리게 된다.
+ * 클라이언트는 잠시 후 같은 요청을 다시 보내야 한다.
+ */
+class AuthStoreUnavailableException(message: String, cause: Throwable? = null) :
+    TokenAuthenticationException("AUTH_STORE_UNAVAILABLE", message) {
+    init {
+        cause?.let { initCause(it) }
+    }
+}
 
 /** 닉네임 길이·형식이 규칙을 벗어날 때(R5). */
 class InvalidNicknameException(message: String) :

@@ -1,10 +1,11 @@
 package org.around.ieuri.community.infrastructure.adapter.`in`.graphql
 
 import com.netflix.graphql.dgs.DgsDataLoader
-import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.community.application.port.`in`.query.CommunityQueryUseCase
 import org.around.ieuri.community.domain.vo.TargetCategory
+import org.dataloader.BatchLoaderEnvironment
 import org.dataloader.MappedBatchLoader
+import org.dataloader.MappedBatchLoaderWithContext
 import org.springframework.stereotype.Component
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
@@ -89,16 +90,23 @@ class PostCatalogIdDataLoader(
     }
 }
 
-/** 배치 안의 모든 글이 같은 호출자의 요청이므로 회원을 한 번만 읽는다. */
+/**
+ * 배치 안의 모든 글이 같은 호출자의 요청이므로 회원을 한 번만 읽는다.
+ *
+ * **뷰어를 keyContext로 받는다**(SPEC-0032 R27) — 배치 디스패치가 다른 스레드에서 돌면
+ * ThreadLocal 기반 신원이 사라져, 좋아요 표시가 통째로 뒤집히거나 인증 오류가 난다.
+ */
 @DgsDataLoader(name = PostLikedDataLoader.NAME)
 @Component
 class PostLikedDataLoader(
     private val communityQueryUseCase: CommunityQueryUseCase,
-    private val currentMemberProvider: CurrentMemberProvider,
-) : MappedBatchLoader<Long, Boolean> {
+) : MappedBatchLoaderWithContext<Long, Boolean> {
 
-    override fun load(postIds: Set<Long>): CompletionStage<Map<Long, Boolean>> {
-        val memberId = currentMemberProvider.requireMemberId()
+    override fun load(
+        postIds: Set<Long>,
+        environment: BatchLoaderEnvironment,
+    ): CompletionStage<Map<Long, Boolean>> {
+        val memberId = environment.requireViewer("PostLikedDataLoader")
         val liked = communityQueryUseCase.likedPostIds(postIds.toList(), memberId)
         return CompletableFuture.completedFuture(postIds.associateWith { it in liked })
     }

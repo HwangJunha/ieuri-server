@@ -7,7 +7,6 @@ import org.around.ieuri.auth.application.command.RemoveProfileImageCommand
 import org.around.ieuri.auth.application.exception.ImageTooLargeException
 import org.around.ieuri.auth.application.exception.InvalidNicknameException
 import org.around.ieuri.auth.application.exception.MemberNotFoundException
-import org.around.ieuri.auth.application.exception.NicknameAlreadyTakenException
 import org.around.ieuri.auth.application.exception.ObjectKeyNotFoundException
 import org.around.ieuri.auth.application.exception.PhotoNotUploadedException
 import org.around.ieuri.auth.application.exception.UnsupportedImageTypeException
@@ -15,7 +14,6 @@ import org.around.ieuri.auth.application.policy.ProfileImagePolicy
 import org.around.ieuri.auth.application.port.`in`.command.MemberProfileUseCase
 import org.around.ieuri.auth.application.port.out.client.ProfileImageStoragePort
 import org.around.ieuri.auth.application.port.out.persistence.MemberProfileRepositoryPort
-import org.around.ieuri.auth.application.port.out.persistence.NicknameConflictException
 import org.around.ieuri.auth.application.query.ProfileImageUploadUrlView
 import org.around.ieuri.auth.domain.vo.ImageFormat
 import org.around.ieuri.auth.domain.vo.Nickname
@@ -41,28 +39,17 @@ class MemberProfileService(
 ) : MemberProfileUseCase {
 
     /**
-     * 닉네임 변경. 형식 → 중복 → 저장 순이다.
+     * 닉네임 변경. 형식 검사 후 저장한다.
      *
-     * **확인-후-저장은 경합에서 두 요청을 함께 통과시킨다.** 그래서 유니크 제약 위반도 같은
-     * 실패로 옮긴다 — 사전 확인은 흔한 경우의 메시지를 위한 것이고, 정확성은 제약이 맡는다.
-     *
-     * 자기 현재 닉네임과 같은 값은 성공이다(중복 판정에서 본인을 제외한다).
+     * **중복을 보지 않는다**(SPEC-0032 R31) — 닉네임은 어디서도 조회 키가 아니라 전부
+     * 표시용 투영이므로, 고유성을 강제할 이유가 없다. 형식 규칙은 그대로 남는다.
      */
     @Transactional
     override fun changeNickname(command: ChangeNicknameCommand): String {
         val nickname = runCatching { Nickname(command.nickname) }
             .getOrElse { throw InvalidNicknameException(it.message ?: "닉네임 형식이 올바르지 않습니다.") }
 
-        if (profileRepository.existsByNicknameExcludingMember(nickname.value, command.memberId)) {
-            // 상대가 누구인지는 담지 않는다(POL-013).
-            throw NicknameAlreadyTakenException("이미 사용 중인 닉네임입니다.")
-        }
-
-        try {
-            profileRepository.updateNickname(command.memberId, nickname.value)
-        } catch (e: NicknameConflictException) {
-            throw NicknameAlreadyTakenException("이미 사용 중인 닉네임입니다.")
-        }
+        profileRepository.updateNickname(command.memberId, nickname.value)
         return nickname.value
     }
 

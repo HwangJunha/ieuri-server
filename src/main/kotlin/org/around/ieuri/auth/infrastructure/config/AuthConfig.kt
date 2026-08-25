@@ -26,6 +26,7 @@ import java.time.Duration
     SnsProperties::class,
     ProfileImageProperties::class,
     SnsRevokeProperties::class,
+    AuditRetentionProperties::class,
 )
 class AuthConfig {
 

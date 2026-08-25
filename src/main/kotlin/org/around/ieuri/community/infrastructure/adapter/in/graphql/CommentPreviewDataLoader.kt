@@ -1,10 +1,10 @@
 package org.around.ieuri.community.infrastructure.adapter.`in`.graphql
 
 import com.netflix.graphql.dgs.DgsDataLoader
-import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.community.application.port.`in`.query.CommunityQueryUseCase
 import org.around.ieuri.community.application.query.CommentView
-import org.dataloader.MappedBatchLoader
+import org.dataloader.BatchLoaderEnvironment
+import org.dataloader.MappedBatchLoaderWithContext
 import org.springframework.stereotype.Component
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
@@ -18,17 +18,20 @@ import java.util.concurrent.CompletionStage
  * 페이지네이션은 여기서 하지 않는다 — 목록 안의 목록에 커서를 두면 화면마다 커서 관리가
  * 갈린다. 전체 목록과 더 보기는 루트의 `comments(postId:)`가 담당한다.
  *
- * 배치 안의 모든 글이 같은 호출자의 요청이므로 회원을 한 번만 읽는다.
+ * **뷰어를 keyContext로 받는다**(SPEC-0032 R27) — 배치 디스패치는 리졸버와 다른 스레드에서
+ * 돌 수 있고, 그때 ThreadLocal 기반 신원은 사라진다. 리졸버가 자기 스레드에서 확정해 싣는다.
  */
 @DgsDataLoader(name = CommentPreviewDataLoader.NAME)
 @Component
 class CommentPreviewDataLoader(
     private val communityQueryUseCase: CommunityQueryUseCase,
-    private val currentMemberProvider: CurrentMemberProvider,
-) : MappedBatchLoader<Long, List<CommentView>> {
+) : MappedBatchLoaderWithContext<Long, List<CommentView>> {
 
-    override fun load(postIds: Set<Long>): CompletionStage<Map<Long, List<CommentView>>> {
-        val memberId = currentMemberProvider.requireMemberId()
+    override fun load(
+        postIds: Set<Long>,
+        environment: BatchLoaderEnvironment,
+    ): CompletionStage<Map<Long, List<CommentView>>> {
+        val memberId = environment.requireViewer("CommentPreviewDataLoader")
         val previews = communityQueryUseCase.commentPreviews(postIds.toList(), memberId)
         // 댓글이 없는 글은 조회 결과에 키가 없다 — 빈 목록으로 채워야 리졸버가 null을 만나지 않는다.
         val complete = postIds.associateWith { previews[it].orEmpty() }
@@ -52,11 +55,13 @@ class CommentPreviewDataLoader(
 @Component
 class CommentReplyDataLoader(
     private val communityQueryUseCase: CommunityQueryUseCase,
-    private val currentMemberProvider: CurrentMemberProvider,
-) : MappedBatchLoader<Long, List<CommentView>> {
+) : MappedBatchLoaderWithContext<Long, List<CommentView>> {
 
-    override fun load(parentCommentIds: Set<Long>): CompletionStage<Map<Long, List<CommentView>>> {
-        val memberId = currentMemberProvider.requireMemberId()
+    override fun load(
+        parentCommentIds: Set<Long>,
+        environment: BatchLoaderEnvironment,
+    ): CompletionStage<Map<Long, List<CommentView>>> {
+        val memberId = environment.requireViewer("CommentReplyDataLoader")
         val replies = communityQueryUseCase.commentReplies(parentCommentIds.toList(), memberId)
         // 답글이 없는 댓글은 결과에 키가 없다 — 빈 목록으로 채워야 리졸버가 null을 만나지 않는다.
         val complete = parentCommentIds.associateWith { replies[it].orEmpty() }

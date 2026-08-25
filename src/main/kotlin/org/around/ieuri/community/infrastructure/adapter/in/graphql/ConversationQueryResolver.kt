@@ -15,7 +15,8 @@ import org.around.ieuri.common.graphql.generated.types.ConversationSpotQaOrigin 
 import org.around.ieuri.community.application.query.MessageView
 import org.around.ieuri.community.application.query.PostAuthorView
 import org.around.ieuri.community.application.query.TypingEventView
-import org.dataloader.DataLoader
+import graphql.language.OperationDefinition
+import org.around.ieuri.common.graphql.loader
 import org.springframework.stereotype.Component
 import java.util.concurrent.CompletableFuture
 import org.around.ieuri.common.graphql.generated.types.PostAuthor as GqlPostAuthor
@@ -93,35 +94,50 @@ class ConversationQueryResolver(
     ): GqlConversationSpotQaOrigin? = dfe.messageSource().spotQaOrigin?.toGql()
 
     /**
-     * 메시지 발신자. **DataLoader를 쓰지 않고 직접 읽는다.**
+     * 메시지 발신자. **실행 컨텍스트로 갈린다**(SPEC-0032 R26).
      *
      * DataLoader는 **한 번의 GraphQL 실행에 묶인다.** 구독은 이벤트마다 실행이 새로 도는데
      * 레지스트리는 구독이 열릴 때 만들어진 것을 계속 쓰므로, 첫 실행에서 배치가 소진된 뒤에는
      * 두 번째 이벤트의 `load()`가 영영 완료되지 않는다 — 이벤트는 도착하고 메시지 조회까지
      * 되는데 응답만 나가지 않는 형태로 멈춘다(실측: 2번째부터 member 조회가 없었다).
+     * 구독에는 배치가 필요하지도 않다 — 이벤트 하나에 발신자는 한 명뿐이라 모을 것이 없다.
      *
-     * 배치가 필요하지도 않다 — 이벤트 하나에 발신자는 한 명뿐이라 모을 것이 없다.
+     * **그러나 그 판단이 쿼리 경로까지 덮고 있었다.** `conversationMessages`는 기본 30건을
+     * 돌려주므로 같은 직접 읽기가 30회가 된다. 대화 참여자는 보통 2명이라 배치하면 **1회**다.
+     *
      * 회원이 없어도(탈퇴 등) 메시지는 남으므로 대체 표기로 채운다.
      */
     @DgsData(parentType = "Message", field = "sender")
-    fun messageSender(dfe: DgsDataFetchingEnvironment): GqlPostAuthor {
-        val senderId = dfe.messageSource().senderId
-        return memberLookupPort.findAuthor(senderId).toGqlOrPlaceholder(senderId)
-    }
+    fun messageSender(dfe: DgsDataFetchingEnvironment): CompletableFuture<GqlPostAuthor> =
+        dfe.loadSender(dfe.messageSource().senderId)
 
-    /** 타이핑 중인 상대방. DataLoader를 쓰지 않는 이유는 [messageSender]와 같다. */
+    /** 타이핑 중인 상대방. 갈리는 이유는 [messageSender]와 같다. */
     @DgsData(parentType = "TypingEvent", field = "sender")
-    fun typingEventSender(dfe: DgsDataFetchingEnvironment): GqlPostAuthor {
+    fun typingEventSender(dfe: DgsDataFetchingEnvironment): CompletableFuture<GqlPostAuthor> {
         val source = dfe.getSource<TypingEventView>()
             ?: error("TypingEvent 필드 리졸버는 부모가 반환한 TypingEventView를 소스로 받아야 한다.")
-        return memberLookupPort.findAuthor(source.senderId).toGqlOrPlaceholder(source.senderId)
+        return dfe.loadSender(source.senderId)
     }
 
-    // ── 공통 헬퍼 ────────────────────────────────────────────────────
+    /**
+     * 발신자를 읽는다. **구독이면 직접, 쿼리면 배치로** — 이유는 [messageSender]에 있다.
+     *
+     * 구독 판정은 실행 중인 오퍼레이션 타입으로 한다. 소켓 여부가 아니라 **DataLoader
+     * 레지스트리의 수명**이 갈림의 근거이고, 그것을 결정하는 것이 오퍼레이션 타입이다.
+     */
+    private fun DgsDataFetchingEnvironment.loadSender(senderId: Long): CompletableFuture<GqlPostAuthor> {
+        if (isSubscription()) {
+            return CompletableFuture.completedFuture(
+                memberLookupPort.findAuthor(senderId).toGqlOrPlaceholder(senderId),
+            )
+        }
+        return loadAuthor(senderId)
+    }
 
-    /** 이름이 어긋난 로더를 조용히 넘기면 필드가 빈 채로 뜬다 — 명시적으로 실패시킨다. */
-    private fun <V : Any> DgsDataFetchingEnvironment.loader(name: String): DataLoader<Long, V> =
-        getDataLoader<Long, V>(name) ?: error("DataLoader '$name'가 등록되지 않았다.")
+    private fun DgsDataFetchingEnvironment.isSubscription(): Boolean =
+        operationDefinition?.operation == OperationDefinition.Operation.SUBSCRIPTION
+
+    // ── 공통 헬퍼 ────────────────────────────────────────────────────
 
     private fun DgsDataFetchingEnvironment.loadAuthor(
         memberId: Long,

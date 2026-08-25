@@ -19,6 +19,14 @@ data class RegisterMemberCommand(
     val agreements: List<AgreementInput>,
     /** 탈퇴 시 연결 해제용 토큰을 확보하기 위한 provider authorization code. 확보 실패해도 가입은 성공한다. */
     val authorizationCode: String? = null,
+    /**
+     * 클라이언트가 provider에서 받아 넘긴 닉네임(SPEC-0032 R29).
+     *
+     * **형식을 여기서 검사하지 않는다** — provider가 주는 값이라 클라이언트가 고칠 수 없고,
+     * 규칙을 벗어나면 서버가 조용히 자동 생성으로 대체한다. `require`로 막으면 가입이
+     * 실패하는데, 그것은 사용자가 손쓸 수 없는 이유로 막는 것이다.
+     */
+    val nickname: String? = null,
 ) {
     init {
         require(idToken.isNotBlank()) { "idToken은 필수입니다." }

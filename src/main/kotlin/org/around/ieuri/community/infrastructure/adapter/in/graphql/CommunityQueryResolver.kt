@@ -1,11 +1,13 @@
 package org.around.ieuri.community.infrastructure.adapter.`in`.graphql
 
+import org.around.ieuri.common.event.LocationAccessed
+import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
 import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsData
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
-import org.dataloader.DataLoader
+import org.around.ieuri.common.graphql.loader
 import java.util.concurrent.CompletableFuture
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.community.application.port.`in`.query.CommunityQueryUseCase
@@ -52,6 +54,7 @@ class CommunityQueryResolver(
     private val communityQueryUseCase: CommunityQueryUseCase,
     private val memberLookupPort: MemberLookupPort,
     private val currentMemberProvider: CurrentMemberProvider,
+    private val eventPublisher: CommunityEventPublisherPort,
 ) {
 
     /**
@@ -72,6 +75,11 @@ class CommunityQueryResolver(
         dfe: DgsDataFetchingEnvironment,
     ): PostConnection {
         val memberId = currentMemberProvider.requireMemberId()
+        // **좌표를 실제로 보낸 호출만** 남긴다(SPEC-0032 R19) — 이 연산은 좌표가 선택이라
+        // 전체 피드 조회는 위치 조회가 아니다. 좌표 자체는 넘기지 않는다.
+        if (latitude != null && longitude != null) {
+            eventPublisher.publish(LocationAccessed(memberId, "posts"))
+        }
         val page = communityQueryUseCase.posts(
             PostsQuery(
                 catalogId = catalogId,
@@ -196,11 +204,16 @@ class CommunityQueryResolver(
             }
     }
 
-    /** 호출자가 좋아요했는지. */
+    /**
+     * 호출자가 좋아요했는지.
+     *
+     * **뷰어를 여기서 확정해 실어 보낸다**(SPEC-0032 R27) — 로더가 자기 스레드에서 읽으면
+     * 가상 스레드 전환에 신원을 잃는다.
+     */
     @DgsData(parentType = "Post", field = "likedByViewer")
     fun postLikedByViewer(dfe: DgsDataFetchingEnvironment): CompletableFuture<Boolean> =
         dfe.loader<Boolean>(PostLikedDataLoader.NAME)
-            .load(dfe.postSource().id)
+            .load(dfe.postSource().id, ViewerId(currentMemberProvider.requireMemberId()))
             .thenApply { it ?: false }
 
     /**
@@ -230,12 +243,6 @@ class CommunityQueryResolver(
     fun postAuthor(dfe: DgsDataFetchingEnvironment): CompletableFuture<GqlPostAuthor> =
         dfe.loadAuthor(dfe.postSource().authorId)
 
-    /** 이름이 어긋난 로더를 조용히 넘기면 필드가 빈 채로 뜬다 — 명시적으로 실패시킨다. */
-    private fun <V : Any> DgsDataFetchingEnvironment.loader(
-        name: String,
-    ): DataLoader<Long, V> =
-        getDataLoader<Long, V>(name) ?: error("DataLoader '$name'가 등록되지 않았다.")
-
     /**
      * 답글. **요청된 경우에만** 배치로 읽는다 — 목록만 그리는 화면은 조회가 붙지 않는다.
      * 답글의 replies는 항상 빈 목록이다(깊이 2단계).
@@ -244,7 +251,8 @@ class CommunityQueryResolver(
     fun commentReplies(dfe: DgsDataFetchingEnvironment): CompletableFuture<List<CommentView>> {
         val source = dfe.getSource<CommentView>()
             ?: error("Comment 필드 리졸버는 부모가 반환한 CommentView를 소스로 받아야 한다.")
-        return dfe.loader<List<CommentView>>(CommentReplyDataLoader.NAME).load(source.id)
+        return dfe.loader<List<CommentView>>(CommentReplyDataLoader.NAME)
+            .load(source.id, ViewerId(currentMemberProvider.requireMemberId()))
     }
 
     @DgsData(parentType = "Comment", field = "author")
@@ -258,11 +266,10 @@ class CommunityQueryResolver(
      * 작성자를 배치로 읽는다. 글과 댓글이 같은 로더를 쓰므로 같은 사람이면 조회가 합쳐진다.
      * 회원 정보가 없어도 글은 남으므로(탈퇴해도 글은 보존한다) 대체 표기로 채운다.
      */
-    private fun DgsDataFetchingEnvironment.loadAuthor(memberId: Long): CompletableFuture<GqlPostAuthor> {
-        val loader = getDataLoader<Long, PostAuthorView>(PostAuthorDataLoader.NAME)
-            ?: error("DataLoader '${PostAuthorDataLoader.NAME}'가 등록되지 않았다.")
-        return loader.load(memberId).thenApply { it.toGqlOrPlaceholder(memberId) }
-    }
+    private fun DgsDataFetchingEnvironment.loadAuthor(memberId: Long): CompletableFuture<GqlPostAuthor> =
+        loader<PostAuthorView>(PostAuthorDataLoader.NAME)
+            .load(memberId)
+            .thenApply { it.toGqlOrPlaceholder(memberId) }
 
     /**
      * 댓글 미리보기. **DataLoader가 글 id를 모아 한 번에 읽는다** — 카드마다 물으면
@@ -271,12 +278,9 @@ class CommunityQueryResolver(
      * 여기에 페이지네이션은 없다. 전체 목록과 더 보기는 루트의 `comments(postId:)`다.
      */
     @DgsData(parentType = "Post", field = "commentPreview")
-    fun commentPreview(dfe: DgsDataFetchingEnvironment): CompletableFuture<List<CommentView>> {
-        // 등록된 로더가 없으면 이름이 어긋난 것이다 — 조용히 null을 돌려주면 카드가 빈 채로 뜬다.
-        val loader = dfe.getDataLoader<Long, List<CommentView>>(CommentPreviewDataLoader.NAME)
-            ?: error("DataLoader '${CommentPreviewDataLoader.NAME}'가 등록되지 않았다.")
-        return loader.load(dfe.postSource().id)
-    }
+    fun commentPreview(dfe: DgsDataFetchingEnvironment): CompletableFuture<List<CommentView>> =
+        dfe.loader<List<CommentView>>(CommentPreviewDataLoader.NAME)
+            .load(dfe.postSource().id, ViewerId(currentMemberProvider.requireMemberId()))
 
     /**
      * 부모 리졸버가 돌려준 read DTO. `!!` 대신 명시적으로 실패시킨다 — 실제로 null이 될 수

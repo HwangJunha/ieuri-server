@@ -35,7 +35,6 @@ class SeoulOpenDataClient(
     private val log = LoggerFactory.getLogger(javaClass)
 
     override fun fetch(areaCode: String, areaName: String): SeoulOpenDataSnapshot? {
-        log.warn("서울 실시간 도시데이터 호출 ({}): {}", areaCode, areaName)
         // 키가 비어 있으면 기동은 되고 이 레이어만 degraded다(R11) — 로컬에서 키 없이
         // 지도를 띄울 수 있어야 한다.
         if (properties.apiKey.isBlank()) return null

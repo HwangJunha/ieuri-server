@@ -1,5 +1,9 @@
 package org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql
 
+import org.around.ieuri.common.graphql.tokenPresentation
+import org.around.ieuri.common.security.CurrentMemberProvider
+import org.around.ieuri.common.event.LocationAccessed
+import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
 import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
@@ -34,6 +38,8 @@ import org.around.ieuri.common.graphql.generated.types.RegionScoreFactor as GqlR
 class RegionRecommendationResolver(
     private val regionRecommendationUseCase: RegionRecommendationUseCase,
     private val policy: RegionRecommendationPolicy,
+    private val currentMemberProvider: CurrentMemberProvider,
+    private val eventPublisher: TourismEventPublisherPort,
 ) {
 
     /**
@@ -45,14 +51,22 @@ class RegionRecommendationResolver(
         dfe: DgsDataFetchingEnvironment,
         @InputArgument origin: GqlCoordinatesInput,
         @InputArgument limit: Int?,
-    ): GqlRecommendedRegionResult =
-        regionRecommendationUseCase.recommendedRegions(
+    ): GqlRecommendedRegionResult {
+        // 좌표를 받는 연산이므로 조회 사실을 남긴다(SPEC-0032 R19). **origin은 넘기지 않는다.**
+        //
+        // **거절된 토큰을 비로그인으로 흘리지 않는다** — 만료를 비로그인으로 다루면 로그인한
+        // 회원의 위치 조회가 기록 없이 지나가고, 그 구멍이 액세스 TTL마다 열린다.
+        // 비로그인은 남길 "누구"가 없어 발행하지 않는다.
+        currentMemberProvider.optionalMemberId(dfe.tokenPresentation())
+            ?.let { eventPublisher.publish(LocationAccessed(it, "recommendedRegions")) }
+        return regionRecommendationUseCase.recommendedRegions(
             RecommendedRegionQuery(
                 origin = origin.toDomain(),
                 limit = resolveLimit(limit),
             ),
             locale = dfe.domainLocale(),
         ).toGql()
+    }
 
     /**
      * 개수 검증(R29 · POL-018). **0 이하는 거절, 상한 초과는 클램프**다 — 두 방향의 처리가

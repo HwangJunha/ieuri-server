@@ -1,6 +1,9 @@
 package org.around.ieuri.auth
 
 import io.mockk.mockk
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
 import org.around.ieuri.auth.infrastructure.security.GraphqlWebSocketAuthInterceptor
 import org.around.ieuri.auth.application.port.out.token.TokenProviderPort
 import org.junit.jupiter.api.AfterEach
@@ -33,7 +36,10 @@ import kotlin.test.assertNull
  */
 class GraphqlWebSocketAuthInterceptorTest {
 
-    private val interceptor = GraphqlWebSocketAuthInterceptor(mockk<TokenProviderPort>(relaxed = true))
+    private val interceptor = GraphqlWebSocketAuthInterceptor(
+        mockk<TokenProviderPort>(relaxed = true),
+        Clock.fixed(Instant.parse("2026-08-25T00:00:00Z"), ZoneOffset.UTC),
+    )
 
     @AfterEach
     fun tearDown() = SecurityContextHolder.clearContext()

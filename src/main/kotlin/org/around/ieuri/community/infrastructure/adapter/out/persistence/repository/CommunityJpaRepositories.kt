@@ -21,11 +21,9 @@ import org.springframework.data.jpa.repository.JpaRepository
 interface PostJpaRepository : JpaRepository<PostEntity, Long> {
     fun findByIdAndDeletedAtIsNull(id: Long): PostEntity?
 
-    /**
-     * 탈퇴 회원의 글 전량 삭제(SPEC-0011 R17). **소프트 삭제가 아니라 행 삭제다** —
-     * 자식 행(사진·태그·댓글·좋아요)은 DB의 ON DELETE CASCADE가 따라 지운다.
-     */
-    fun deleteByAuthorId(authorId: Long): Long
+    // 탈퇴 회원의 글은 **소프트 삭제한다**(SPEC-0011 R17) — 행 삭제하면 거기 달린 남의
+    // 댓글·좋아요가 CASCADE로 함께 사라져 남의 화면이 깨진다. 벌크 UPDATE라 파생 쿼리로
+    // 표현할 수 없어 QueryDSL 어댑터가 맡는다(MemberContentSoftDeleteAdapter).
 }
 
 /** 글의 사진. position 순서가 표시 순서다. */
@@ -70,8 +68,7 @@ interface PostHideJpaRepository : JpaRepository<PostHideEntity, Long> {
 interface CommentJpaRepository : JpaRepository<CommentEntity, Long> {
     fun findByIdAndDeletedAtIsNull(id: Long): CommentEntity?
 
-    /** 탈퇴 회원이 남긴 댓글 전량 삭제(R17). 자기 글의 댓글은 글과 함께 이미 사라진 뒤다. */
-    fun deleteByAuthorId(authorId: Long): Long
+    // 탈퇴 회원의 댓글도 소프트 삭제다(R17) — 위와 같은 이유이며 같은 어댑터가 맡는다.
 }
 
 interface PostLikeJpaRepository : JpaRepository<PostLikeEntity, Long> {
