@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql
 
+import org.around.ieuri.common.graphql.rejectStaleToken
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.tourism.application.port.out.client.LocationAuditPort
 import com.netflix.graphql.dgs.DgsComponent
@@ -47,10 +48,20 @@ class SpotDiscoveryResolver(
     private val locationAuditPort: LocationAuditPort,
 ) {
 
-    /** 좌표를 받는 연산의 조회 사실을 남긴다(SPEC-0032 R19). **좌표는 넘기지 않는다.** */
-    private fun auditLocationAccess(operation: String) {
+    /**
+     * 좌표를 받는 연산의 조회 사실을 남긴다(SPEC-0032 R19). **좌표는 넘기지 않는다.**
+     *
+     * **거절된 토큰을 비로그인으로 흘리지 않는다.** 이 네 연산은 결과에 뷰어 신원을 쓰지 않아
+     * R1의 대상이 아니지만, 감사에서는 사정이 다르다 — 만료를 비로그인으로 다루면 로그인한
+     * 회원의 위치 조회가 **기록 없이 지나간다.** 액세스 TTL이 5분이라 그 구멍은 5분마다
+     * 열린다. "누가 위치 정보를 조회했는가"가 R19·POL-057의 전부이므로, 조용히 기록을
+     * 빠뜨리는 것보다 갱신을 요구하는 편이 옳다.
+     */
+    private fun auditLocationAccess(dfe: DgsDataFetchingEnvironment, operation: String) {
+        dfe.rejectStaleToken()
         locationAuditPort.recordAccess(currentMemberProvider.currentMemberId(), operation)
     }
+
     @DgsQuery
     fun searchSpots(
         dfe: DgsDataFetchingEnvironment,
@@ -62,7 +73,7 @@ class SpotDiscoveryResolver(
         @InputArgument page: Int?,
         @InputArgument size: Int?,
     ): GqlSpotSearchPayload {
-        auditLocationAccess("searchSpots")
+        auditLocationAccess(dfe, "searchSpots")
         val result = spotDiscoveryUseCase.searchSpots(
             SearchSpotsQuery(
                 query = query,
@@ -100,7 +111,7 @@ class SpotDiscoveryResolver(
         @InputArgument radiusMeters: Int?,
         @InputArgument limit: Int?,
     ): List<GqlSpotSuggestion> {
-        auditLocationAccess("spotSearchSuggestions")
+        auditLocationAccess(dfe, "spotSearchSuggestions")
         return spotDiscoveryUseCase.spotSearchSuggestions(
             query = query,
             latitude = latitude,
@@ -126,7 +137,7 @@ class SpotDiscoveryResolver(
         @InputArgument first: Int?,
         @InputArgument after: String?,
     ): GqlFestivalConnection {
-        auditLocationAccess("ongoingFestivals")
+        auditLocationAccess(dfe, "ongoingFestivals")
         val page = spotDiscoveryUseCase.ongoingFestivals(
             OngoingFestivalsQuery(
                 latitude = latitude,
@@ -153,7 +164,7 @@ class SpotDiscoveryResolver(
         @InputArgument first: Int?,
         @InputArgument after: String?,
     ): GqlPopularSpotConnection {
-        auditLocationAccess("popularSpots")
+        auditLocationAccess(dfe, "popularSpots")
         val page = spotDiscoveryUseCase.popularSpots(
             PopularSpotsQuery(
                 latitude = latitude,

@@ -155,12 +155,6 @@ interface AuditLogPort {
  */
 interface LocationAccessLogPort {
     fun record(memberId: Long, payload: Map<String, Any?>)
-
-    /**
-     * [cutoff]보다 이전에 만들어진 기록을 최대 [limit]건 지우고 지운 수를 돌려준다(R22).
-     * 경계는 배타적이다 — 정확히 경계 시각의 행은 남는다.
-     */
-    fun deleteCreatedBefore(cutoff: Instant, limit: Int): Int
 }
 
 /** 회원 감사 로그의 보관 정리 포트(SPEC-0032 R22, POL-014). 규약은 위와 같다. */

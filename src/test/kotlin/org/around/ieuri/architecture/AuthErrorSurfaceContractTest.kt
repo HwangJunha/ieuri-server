@@ -52,9 +52,17 @@ class AuthErrorSurfaceContractTest {
     private fun instantiate(className: String): TokenAuthenticationException {
         val type = Class.forName(className)
         val ctor = type.declaredConstructors
-            .firstOrNull { it.parameterTypes.firstOrNull() == String::class.java }
+            // **합성 생성자를 거른다.** Kotlin의 기본 인자는 (…, int, DefaultConstructorMarker)
+            // 형태의 합성 생성자를 함께 만드는데, 거기에 null을 넣으면 primitive int에서
+            // IllegalArgumentException이 난다. 생성자 순서는 JVM 명세가 정하지 않으므로
+            // 거르지 않으면 **테스트가 무작위로 깨진다** — 보안 불변식을 지키는 테스트가
+            // 엉뚱한 이유로 빨개지면 다음 사람은 테스트를 느슨하게 만든다.
+            .filterNot { it.isSynthetic }
+            .filter { it.parameterTypes.firstOrNull() == String::class.java }
+            // 인자가 가장 적은 것 — 메시지만 받는 생성자가 있으면 그쪽이다.
+            .minByOrNull { it.parameterCount }
             ?: error("$className 은 메시지를 받는 생성자가 있어야 한다.")
-        // 첫 인자는 메시지, 나머지(cause 등)는 기본값 자리라 null로 채운다.
+        // 첫 인자는 메시지, 나머지(cause 등)는 참조 타입이라 null로 채운다.
         val args = arrayOfNulls<Any?>(ctor.parameterCount).also { it[0] = "m" }
         return ctor.newInstance(*args) as TokenAuthenticationException
     }

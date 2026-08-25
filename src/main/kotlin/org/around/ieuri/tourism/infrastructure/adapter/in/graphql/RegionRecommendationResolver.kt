@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql
 
+import org.around.ieuri.common.graphql.rejectStaleToken
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.tourism.application.port.out.client.LocationAuditPort
 import com.netflix.graphql.dgs.DgsComponent
@@ -51,6 +52,10 @@ class RegionRecommendationResolver(
         @InputArgument limit: Int?,
     ): GqlRecommendedRegionResult {
         // 좌표를 받는 연산이므로 조회 사실을 남긴다(SPEC-0032 R19). **origin은 넘기지 않는다.**
+        //
+        // **거절된 토큰을 비로그인으로 흘리지 않는다** — 만료를 비로그인으로 다루면 로그인한
+        // 회원의 위치 조회가 기록 없이 지나가고, 그 구멍이 액세스 TTL마다 열린다.
+        dfe.rejectStaleToken()
         locationAuditPort.recordAccess(
             currentMemberProvider.currentMemberId(),
             "recommendedRegions",

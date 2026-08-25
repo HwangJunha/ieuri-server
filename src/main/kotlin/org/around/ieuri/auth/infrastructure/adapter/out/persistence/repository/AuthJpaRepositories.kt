@@ -91,10 +91,11 @@ interface MemberAuditLogJpaRepository : JpaRepository<MemberAuditLogEntity, Long
     fun deleteByIdIn(ids: Collection<Long>): Long
 }
 
-interface MemberLocationAccessLogJpaRepository : JpaRepository<MemberLocationAccessLogEntity, Long> {
-
-    /** 규약은 [MemberAuditLogJpaRepository.findByCreatedAtBefore]와 같다. */
-    fun findByCreatedAtBefore(cutoff: Instant, limit: Limit): List<MemberLocationAccessLogEntity>
-
-    fun deleteByIdIn(ids: Collection<Long>): Long
-}
+/**
+ * 위치 조회 감사 기록(SPEC-0032 R19).
+ *
+ * **보관 정리 메서드가 없는 것이 의도다** — 위치 기록의 보관 기간은 위치정보법 신고 전이라
+ * 아직 정할 근거가 없고, R21의 스위치가 꺼져 있어 정리할 행 자체가 없다. 기간이 정해질 때
+ * `MemberAuditLogJpaRepository`와 같은 형태를 더한다.
+ */
+interface MemberLocationAccessLogJpaRepository : JpaRepository<MemberLocationAccessLogEntity, Long>

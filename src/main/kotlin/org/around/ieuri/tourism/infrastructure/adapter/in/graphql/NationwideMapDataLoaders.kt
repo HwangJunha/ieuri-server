@@ -44,26 +44,30 @@ import java.util.concurrent.CompletionStage
 @Component
 class CellSpotsDataLoader(
     private val nationwideMapUseCase: NationwideMapUseCase,
-) : MappedBatchLoaderWithContext<Long, CursorPage<CellSpotView>> {
+) : MappedBatchLoaderWithContext<CellSpotsKey, CursorPage<CellSpotView>> {
 
     override fun load(
-        cellIds: Set<Long>,
+        keys: Set<CellSpotsKey>,
         environment: BatchLoaderEnvironment,
-    ): CompletionStage<Map<Long, CursorPage<CellSpotView>>> {
-        val context = environment.keyContexts.values
-            .filterIsInstance<CellSpotsLoaderContext>()
+    ): CompletionStage<Map<CellSpotsKey, CursorPage<CellSpotView>>> {
+        val locale = environment.keyContexts.values
+            .filterIsInstance<DomainLocale>()
             .firstOrNull()
-            ?: error("CellSpotsDataLoader는 keyContext로 언어와 페이지 크기를 받아야 한다 — 리졸버가 load(key, context)로 부른다.")
+            ?: error("CellSpotsDataLoader는 keyContext로 언어를 받아야 한다 — 리졸버가 load(key, locale)로 부른다.")
 
-        val pages = nationwideMapUseCase.firstCellSpotsOf(
-            cellIds = cellIds,
-            first = context.first,
-            locale = context.locale,
-        )
+        // **페이지 크기별로 나눠 조회한다.** 한 문서가 같은 칸을 다른 first로 두 번 고를 수
+        // 있어(별칭), 크기를 하나로 뭉치면 한쪽이 남의 페이지를 받는다.
+        val pages = keys.groupBy { it.first }.mapValues { (first, group) ->
+            nationwideMapUseCase.firstCellSpotsOf(
+                cellIds = group.map { it.cellId },
+                first = first,
+                locale = locale,
+            )
+        }
 
         // 장소가 없는 칸은 조회 결과에 키가 없다 — 빈 페이지로 채워 리졸버가 null을 만나지 않게 한다.
         return CompletableFuture.completedFuture(
-            cellIds.associateWith { pages[it] ?: emptyPage() },
+            keys.associateWith { pages[it.first]?.get(it.cellId) ?: emptyPage() },
         )
     }
 
@@ -77,12 +81,17 @@ class CellSpotsDataLoader(
 }
 
 /**
- * [CellSpotsDataLoader]가 키마다 함께 받는 요청 범위 값.
+ * [CellSpotsDataLoader]의 키.
  *
- * 한 배치의 키는 전부 같은 요청에서 오므로 값도 하나다 — 아무 keyContext나 집어 써도 된다.
+ * **페이지 크기가 키의 일부여야 한다.** DataLoader는 키로 캐시하는데(`caching` 기본값 true),
+ * `first`는 필드 인자라 한 문서가 같은 칸을 다른 크기로 두 번 고를 수 있다 —
+ * `mapCells { a: spots(first: 5) b: spots(first: 50) }`. 칸 id만 키로 쓰면 두 번째 호출이
+ * 첫 번째의 페이지를 그대로 받고, **오류가 아니라 잘못된 데이터라 조용하다.**
+ *
+ * 언어는 요청당 하나뿐이라 키가 아니라 keyContext로 간다.
  */
-data class CellSpotsLoaderContext(
-    val locale: DomainLocale,
+data class CellSpotsKey(
+    val cellId: Long,
     val first: Int,
 )
 

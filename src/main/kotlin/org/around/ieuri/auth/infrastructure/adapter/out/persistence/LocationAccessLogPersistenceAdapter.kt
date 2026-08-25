@@ -31,17 +31,6 @@ class LocationAccessLogPersistenceAdapter(
             ),
         )
     }
-
-    /**
-     * 회차 단위로 끊어 지운다 — 벌크 삭제에 LIMIT을 걸 수 없어 대상을 먼저 고른다.
-     * `MessagePurgeAdapter`의 선례와 같은 형태다.
-     */
-    @Transactional
-    override fun deleteCreatedBefore(cutoff: Instant, limit: Int): Int {
-        val targets = repository.findByCreatedAtBefore(cutoff, Limit.of(limit))
-        if (targets.isEmpty()) return 0
-        return repository.deleteByIdIn(targets.mapNotNull { it.id }).toInt()
-    }
 }
 
 /** 회원 감사 로그의 보관 정리(SPEC-0032 R22, POL-014). 규약은 위와 같다. */

@@ -6,11 +6,9 @@ import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.common.graphql.generated.types.CellImage as GqlCellImage
-import org.around.ieuri.common.graphql.generated.types.CellImageKind as GqlCellImageKind
 import org.around.ieuri.common.graphql.generated.types.CellSpotConnection as GqlCellSpotConnection
 import org.around.ieuri.common.graphql.generated.types.CellSpotEdge as GqlCellSpotEdge
 import org.around.ieuri.common.graphql.generated.types.Coordinates as GqlCoordinates
-import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
 import org.around.ieuri.common.graphql.rejectStaleToken
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.tourism.application.policy.NationwideMapPolicy
@@ -25,6 +23,7 @@ import org.around.ieuri.tourism.application.query.CellImageView
 import org.around.ieuri.tourism.application.query.CellSpotView
 import org.around.ieuri.tourism.infrastructure.locale.domainLocale
 import org.around.ieuri.common.graphql.loader
+import org.around.ieuri.common.graphql.loaderOf
 import java.util.concurrent.CompletableFuture
 
 /**
@@ -120,7 +119,7 @@ class NationwideMapResolver(
         dfe.loader<CellImageView>(CellImageDataLoader.NAME)
             .load(dfe.mapCell().id)
             // 이미지가 없는 칸은 로더가 키를 채우지 않는다 — 필드가 null이 된다(SPEC-0030 R10).
-            .thenApply { it?.toGqlCellImage() }
+            .thenApply { it?.toGql() }
 
     /**
      * 칸에 속한 장소(R11). **선택했을 때만 조회한다.**
@@ -146,19 +145,11 @@ class NationwideMapResolver(
             return CompletableFuture.completedFuture(page.toGqlConnection())
         }
 
-        return dfe.loader<CursorPage<CellSpotView>>(CellSpotsDataLoader.NAME)
-            .load(cellId, CellSpotsLoaderContext(locale = dfe.domainLocale(), first = size))
+        // 페이지 크기가 키의 일부다 — 같은 칸을 다른 크기로 두 번 고르면 서로 다른 페이지여야 한다.
+        return dfe.loaderOf<CellSpotsKey, CursorPage<CellSpotView>>(CellSpotsDataLoader.NAME)
+            .load(CellSpotsKey(cellId = cellId, first = size), dfe.domainLocale())
             .thenApply { it.toGqlConnection() }
     }
-
-    private fun CellImageView.toGqlCellImage(): GqlCellImage = GqlCellImage(
-        imageUrl = imageUrl,
-        thumbnailUrl = thumbnailUrl,
-        caption = caption,
-        kind = GqlCellImageKind.valueOf(kind.name),
-        copyright = GqlCopyrightType.valueOf(copyright.name),
-        attributionText = attributionText,
-    )
 
     private fun CursorPage<CellSpotView>.toGqlConnection(): GqlCellSpotConnection =
         GqlCellSpotConnection(
