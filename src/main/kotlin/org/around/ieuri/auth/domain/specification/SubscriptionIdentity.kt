@@ -1,4 +1,4 @@
-package org.around.ieuri.auth.domain.vo
+package org.around.ieuri.auth.domain.specification
 
 import java.time.Duration
 import java.time.Instant

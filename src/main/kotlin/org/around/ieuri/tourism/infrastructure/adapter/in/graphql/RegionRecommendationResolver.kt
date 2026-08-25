@@ -1,8 +1,9 @@
 package org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql
 
-import org.around.ieuri.common.graphql.rejectStaleToken
+import org.around.ieuri.common.graphql.tokenPresentation
 import org.around.ieuri.common.security.CurrentMemberProvider
-import org.around.ieuri.tourism.application.port.out.client.LocationAuditPort
+import org.around.ieuri.common.event.LocationAccessed
+import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
 import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
@@ -38,7 +39,7 @@ class RegionRecommendationResolver(
     private val regionRecommendationUseCase: RegionRecommendationUseCase,
     private val policy: RegionRecommendationPolicy,
     private val currentMemberProvider: CurrentMemberProvider,
-    private val locationAuditPort: LocationAuditPort,
+    private val eventPublisher: TourismEventPublisherPort,
 ) {
 
     /**
@@ -55,11 +56,9 @@ class RegionRecommendationResolver(
         //
         // **거절된 토큰을 비로그인으로 흘리지 않는다** — 만료를 비로그인으로 다루면 로그인한
         // 회원의 위치 조회가 기록 없이 지나가고, 그 구멍이 액세스 TTL마다 열린다.
-        dfe.rejectStaleToken()
-        locationAuditPort.recordAccess(
-            currentMemberProvider.currentMemberId(),
-            "recommendedRegions",
-        )
+        // 비로그인은 남길 "누구"가 없어 발행하지 않는다.
+        currentMemberProvider.optionalMemberId(dfe.tokenPresentation())
+            ?.let { eventPublisher.publish(LocationAccessed(it, "recommendedRegions")) }
         return regionRecommendationUseCase.recommendedRegions(
             RecommendedRegionQuery(
                 origin = origin.toDomain(),

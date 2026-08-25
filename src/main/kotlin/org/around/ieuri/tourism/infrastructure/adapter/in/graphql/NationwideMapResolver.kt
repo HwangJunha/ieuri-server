@@ -9,7 +9,7 @@ import org.around.ieuri.common.graphql.generated.types.CellImage as GqlCellImage
 import org.around.ieuri.common.graphql.generated.types.CellSpotConnection as GqlCellSpotConnection
 import org.around.ieuri.common.graphql.generated.types.CellSpotEdge as GqlCellSpotEdge
 import org.around.ieuri.common.graphql.generated.types.Coordinates as GqlCoordinates
-import org.around.ieuri.common.graphql.rejectStaleToken
+import org.around.ieuri.common.graphql.tokenPresentation
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.tourism.application.policy.NationwideMapPolicy
 import org.around.ieuri.tourism.application.port.`in`.query.NationwideMapUseCase
@@ -23,7 +23,6 @@ import org.around.ieuri.tourism.application.query.CellImageView
 import org.around.ieuri.tourism.application.query.CellSpotView
 import org.around.ieuri.tourism.infrastructure.locale.domainLocale
 import org.around.ieuri.common.graphql.loader
-import org.around.ieuri.common.graphql.loaderOf
 import java.util.concurrent.CompletableFuture
 
 /**
@@ -45,39 +44,33 @@ class NationwideMapResolver(
 ) {
 
     @DgsQuery
-    fun mapCells(dfe: DgsDataFetchingEnvironment): List<MapCellView> {
-        // 만료 토큰을 비로그인으로 강등하지 않는다(R1) — 그러면 방문 칸이 조용히 사라진다.
-        dfe.rejectStaleToken()
-        return nationwideMapUseCase.mapCells(
+    fun mapCells(dfe: DgsDataFetchingEnvironment): List<MapCellView> =
+        nationwideMapUseCase.mapCells(
             locale = dfe.domainLocale(),
-            // 비로그인 허용 — 모든 칸이 미방문으로 나온다(requireMemberId 아님).
-            memberId = currentMemberProvider.currentMemberId(),
+            // 비로그인 허용 — 모든 칸이 미방문으로 나온다(requireMemberId 아님). 다만 만료
+            // 토큰은 비로그인으로 강등하지 않는다(R1) — 그러면 방문 칸이 조용히 사라진다.
+            memberId = dfe.viewerMemberId(),
         )
-    }
 
     @DgsQuery
-    fun mapCell(dfe: DgsDataFetchingEnvironment, @InputArgument id: Long): MapCellView {
-        dfe.rejectStaleToken()
-        return nationwideMapUseCase.mapCell(
+    fun mapCell(dfe: DgsDataFetchingEnvironment, @InputArgument id: Long): MapCellView =
+        nationwideMapUseCase.mapCell(
             cellId = id,
             locale = dfe.domainLocale(),
-            memberId = currentMemberProvider.currentMemberId(),
+            memberId = dfe.viewerMemberId(),
         )
-    }
 
     /**
      * 생성 타입이 아니라 읽기 DTO를 돌려준다 — `overlappingCells`가 지연 필드이기 때문이다.
      * 생성 타입은 그 필드까지 생성자에서 요구해서 비워 둘 수 없다.
      */
     @DgsQuery
-    fun sharedMap(dfe: DgsDataFetchingEnvironment, @InputArgument token: String): SharedMapView {
-        // 겹친 칸은 뷰어 신원으로 계산된다 — 만료를 비로그인으로 다루면 조용히 사라진다(R1).
-        dfe.rejectStaleToken()
-        return nationwideMapUseCase.sharedMap(
+    fun sharedMap(dfe: DgsDataFetchingEnvironment, @InputArgument token: String): SharedMapView =
+        nationwideMapUseCase.sharedMap(
             token = token,
-            viewerMemberId = currentMemberProvider.currentMemberId(),
+            // 겹친 칸은 뷰어 신원으로 계산된다 — 만료를 비로그인으로 다루면 조용히 사라진다(R1).
+            viewerMemberId = dfe.viewerMemberId(),
         )
-    }
 
     /**
      * 겹치는 칸의 이름까지 필요한 화면을 위한 필드. **선택했을 때만 조회한다.**
@@ -87,12 +80,12 @@ class NationwideMapResolver(
      */
     @DgsData(parentType = "SharedMap", field = "overlappingCells")
     fun overlappingCells(dfe: DgsDataFetchingEnvironment): List<MapCellView>? {
-        dfe.rejectStaleToken()
+        val viewerMemberId = dfe.viewerMemberId()
         val ids = dfe.getSource<SharedMapView>()?.overlappingCellIds ?: return null
         return nationwideMapUseCase.mapCellsByIds(
             cellIds = ids,
             locale = dfe.domainLocale(),
-            memberId = currentMemberProvider.currentMemberId(),
+            memberId = viewerMemberId,
         )
     }
 
@@ -121,35 +114,21 @@ class NationwideMapResolver(
             // 이미지가 없는 칸은 로더가 키를 채우지 않는다 — 필드가 null이 된다(SPEC-0030 R10).
             .thenApply { it?.toGql() }
 
-    /**
-     * 칸에 속한 장소(R11). **선택했을 때만 조회한다.**
-     *
-     * **첫 페이지는 배치로 읽는다**(SPEC-0032 R24) — `mapCells`가 161칸을 돌려주므로 칸마다
-     * 질의가 따로 나가면 161회가 된다. 커서를 넘긴 호출은 칸이 하나로 좁혀져 있어 모을 것이
-     * 없으므로 단건 경로로 간다.
-     */
+    /** 칸에 속한 장소(R11). **선택했을 때만 조회한다.** */
     @DgsData(parentType = "MapCell", field = "spots")
     fun spots(
         dfe: DgsDataFetchingEnvironment,
         @InputArgument first: Int?,
         @InputArgument after: String?,
-    ): CompletableFuture<GqlCellSpotConnection> {
-        val size = first ?: DEFAULT_CELL_SPOT_PAGE_SIZE
-        val cellId = dfe.mapCell().id
-
-        if (after != null) {
-            val page = nationwideMapUseCase.cellSpots(
-                CellSpotsQuery(cellId = cellId, first = size, after = after),
-                locale = dfe.domainLocale(),
-            )
-            return CompletableFuture.completedFuture(page.toGqlConnection())
-        }
-
-        // 페이지 크기가 키의 일부다 — 같은 칸을 다른 크기로 두 번 고르면 서로 다른 페이지여야 한다.
-        return dfe.loaderOf<CellSpotsKey, CursorPage<CellSpotView>>(CellSpotsDataLoader.NAME)
-            .load(CellSpotsKey(cellId = cellId, first = size), dfe.domainLocale())
-            .thenApply { it.toGqlConnection() }
-    }
+    ): GqlCellSpotConnection =
+        nationwideMapUseCase.cellSpots(
+            CellSpotsQuery(
+                cellId = dfe.mapCell().id,
+                first = first ?: DEFAULT_CELL_SPOT_PAGE_SIZE,
+                after = after,
+            ),
+            locale = dfe.domainLocale(),
+        ).toGqlConnection()
 
     private fun CursorPage<CellSpotView>.toGqlConnection(): GqlCellSpotConnection =
         GqlCellSpotConnection(
@@ -163,6 +142,13 @@ class NationwideMapResolver(
             pageInfo = toGqlPageInfo(),
         )
 
+
+    /**
+     * 뷰어 신원. **비로그인은 null이지만 만료 토큰은 오류다**(SPEC-0032 R1) — 지도 자체는
+     * 로그인 없이 보이되, 만료를 비로그인으로 다루면 방문 칸이 조용히 사라진다.
+     */
+    private fun DgsDataFetchingEnvironment.viewerMemberId(): Long? =
+        currentMemberProvider.optionalMemberId(tokenPresentation())
 
     /**
      * 부모가 돌려준 읽기 DTO를 꺼낸다.

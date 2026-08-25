@@ -1,6 +1,6 @@
 package org.around.ieuri.auth.domain
 
-import org.around.ieuri.auth.domain.vo.AuditRetention
+import org.around.ieuri.auth.domain.specification.AuditRetention
 import java.time.Duration
 import java.time.Instant
 import kotlin.test.Test

@@ -1,6 +1,5 @@
 package org.around.ieuri.auth.infrastructure.config
 
-import org.around.ieuri.auth.application.policy.LocationAuditPolicy
 import org.around.ieuri.auth.application.policy.ProfileImagePolicy
 import org.around.ieuri.auth.application.policy.VerificationPolicy
 import org.around.ieuri.auth.domain.strategy.NicknameGenerator
@@ -27,15 +26,9 @@ import java.time.Duration
     SnsProperties::class,
     ProfileImageProperties::class,
     SnsRevokeProperties::class,
-    LocationAuditProperties::class,
     AuditRetentionProperties::class,
 )
 class AuthConfig {
-
-    /** 위치 조회 감사 스위치(SPEC-0032 R21). 신고 완료 전까지 꺼져 있다. */
-    @Bean
-    fun locationAuditPolicy(properties: LocationAuditProperties): LocationAuditPolicy =
-        LocationAuditPolicy(enabled = properties.enabled)
 
     /**
      * provider 토큰 교환·연결 해제 호출용 RestClient. 타임아웃이 곧 R11의 대기 상한이다 —

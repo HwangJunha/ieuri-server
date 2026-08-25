@@ -10,12 +10,8 @@ import org.dataloader.DataLoader
  * 그것을 그대로 흘리면 필드가 빈 채로 떠서 "데이터가 없음"과 구별되지 않는다 — 오타 하나가
  * 조용한 오답이 된다. 명시적으로 실패시켜 배포 전에 드러나게 한다.
  *
- * 키가 `Long`인 로더가 대부분이라 [loader]가 그 경우를 짧게 쓰게 해 주고, 복합 키를 쓰는
- * 로더는 [loaderOf]로 키 타입을 명시한다.
+ * 키를 `Long`으로 고정한 것은 이 저장소의 모든 로더가 그렇기 때문이다. 다른 키 타입이
+ * 필요해지면 그때 일반화한다.
  */
-fun <K : Any, V : Any> DataFetchingEnvironment.loaderOf(name: String): DataLoader<K, V> =
-    getDataLoader<K, V>(name) ?: error("DataLoader '$name'가 등록되지 않았다.")
-
-/** 키가 `Long`인 로더. 이 저장소의 대부분이 여기 해당한다. */
 fun <V : Any> DataFetchingEnvironment.loader(name: String): DataLoader<Long, V> =
-    loaderOf(name)
+    getDataLoader<Long, V>(name) ?: error("DataLoader '$name'가 등록되지 않았다.")

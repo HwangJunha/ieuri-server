@@ -1,8 +1,9 @@
 package org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql
 
-import org.around.ieuri.common.graphql.rejectStaleToken
+import org.around.ieuri.common.graphql.tokenPresentation
 import org.around.ieuri.common.security.CurrentMemberProvider
-import org.around.ieuri.tourism.application.port.out.client.LocationAuditPort
+import org.around.ieuri.common.event.LocationAccessed
+import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
 import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
@@ -45,7 +46,7 @@ import org.around.ieuri.common.graphql.generated.types.UserError as GqlUserError
 class SpotDiscoveryResolver(
     private val spotDiscoveryUseCase: SpotDiscoveryUseCase,
     private val currentMemberProvider: CurrentMemberProvider,
-    private val locationAuditPort: LocationAuditPort,
+    private val eventPublisher: TourismEventPublisherPort,
 ) {
 
     /**
@@ -58,8 +59,9 @@ class SpotDiscoveryResolver(
      * 빠뜨리는 것보다 갱신을 요구하는 편이 옳다.
      */
     private fun auditLocationAccess(dfe: DgsDataFetchingEnvironment, operation: String) {
-        dfe.rejectStaleToken()
-        locationAuditPort.recordAccess(currentMemberProvider.currentMemberId(), operation)
+        // 비로그인은 남길 "누구"가 없어 발행하지 않는다.
+        val memberId = currentMemberProvider.optionalMemberId(dfe.tokenPresentation()) ?: return
+        eventPublisher.publish(LocationAccessed(memberId, operation))
     }
 
     @DgsQuery

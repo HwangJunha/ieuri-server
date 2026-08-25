@@ -223,11 +223,6 @@ ieuri:
       - image/png
       - image/webp
   auth:
-    # 위치 조회 감사 기록(SPEC-0032 R19~R21, POL-057).
-    location-audit:
-      # **기본값이 꺼짐인 것이 요구다.** 위치정보사업 신고가 끝나기 전에는 기록을 만들지
-      # 않는다 — 코드는 배포되지만 동작하지 않는다. 켤 때 이 값 하나만 바꾼다.
-      enabled: ${IEURI_LOCATION_AUDIT_ENABLED:false}
     # 회원 감사 로그(1년, POL-014) 만료 삭제 배치(SPEC-0032 R22).
     # 보관 기간 자체는 정책이라 도메인(AuditRetention.MEMBER_AUDIT)이 소유하며 설정에 없다.
     # **실측 전까지 확정값이 아니다**(POL-044) — 회차 크기는 락·WAL 관측 후 조정한다.

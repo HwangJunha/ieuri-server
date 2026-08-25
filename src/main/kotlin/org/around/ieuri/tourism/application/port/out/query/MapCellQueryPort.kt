@@ -45,23 +45,6 @@ interface MapCellQueryPort {
         after: LikeCountCursor?,
     ): List<CellSpotView>
 
-    /**
-     * 여러 칸의 **첫 페이지**를 한 번에 읽는다(SPEC-0032 R24).
-     *
-     * `mapCells`가 161칸을 돌려주므로 칸마다 [findCellSpots]를 부르면 161회가 된다.
-     *
-     * **커서를 받지 않는 것이 의도다.** 칸마다 다른 페이지를 요구할 수 있으면 커서 조건이
-     * 칸 수에 비례해 늘어나 SQL이 입력 크기를 따라 커진다 — 첫 페이지만 묶고 그 뒤 페이지는
-     * 단건 경로로 보낸다. 실제 N+1이 나는 곳은 지도를 그리는 첫 페이지뿐이다.
-     *
-     * 칸마다 [limit]건씩 돌려주며, 장소가 없는 칸은 **결과에 키가 없다** — 채우는 것은
-     * 호출자의 몫이다.
-     */
-    fun findFirstCellSpotsIn(
-        cellIds: Collection<Long>,
-        language: DomainLocale,
-        limit: Int,
-    ): Map<Long, List<CellSpotView>>
 }
 
 /**

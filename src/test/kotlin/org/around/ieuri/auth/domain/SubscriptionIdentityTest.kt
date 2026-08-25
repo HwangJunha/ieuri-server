@@ -1,6 +1,6 @@
 package org.around.ieuri.auth.domain
 
-import org.around.ieuri.auth.domain.vo.SubscriptionIdentity
+import org.around.ieuri.auth.domain.specification.SubscriptionIdentity
 import java.time.Duration
 import java.time.Instant
 import kotlin.test.Test

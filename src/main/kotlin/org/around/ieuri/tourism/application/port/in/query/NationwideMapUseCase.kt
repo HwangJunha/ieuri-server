@@ -47,22 +47,6 @@ interface NationwideMapUseCase {
     fun cellSpots(query: CellSpotsQuery, locale: DomainLocale): CursorPage<CellSpotView>
 
     /**
-     * 여러 칸의 **첫 페이지**를 한 번에 읽는다(SPEC-0032 R24). `mapCells`가 161칸을 돌려주므로
-     * 칸마다 [cellSpots]를 부르면 161회가 된다.
-     *
-     * 커서를 받지 않는다 — 두 번째 페이지부터는 칸이 하나로 좁혀져 있어 [cellSpots]가 맡는다.
-     * [first]는 [cellSpots]와 같은 규칙으로 상한에 맞춰 잘린다.
-     *
-     * **장소가 없는 칸은 결과에 키가 없다** — 채우는 것은 호출자의 몫이다.
-     */
-    fun firstCellSpotsOf(
-        cellIds: Collection<Long>,
-        first: Int,
-        locale: DomainLocale,
-    ): Map<Long, CursorPage<CellSpotView>>
-
-
-    /**
      * 공유 토큰으로 다른 회원의 지도를 본다(R13·R15·R16).
      *
      * [viewerMemberId]가 있으면 겹치는 칸이 함께 온다. 차단 관계면 SHARE_LINK_BLOCKED다.

@@ -2,7 +2,7 @@ package org.around.ieuri.auth.application.service
 
 import org.around.ieuri.auth.application.port.`in`.command.AuditRetentionUseCase
 import org.around.ieuri.auth.application.port.out.persistence.AuditLogRetentionPort
-import org.around.ieuri.auth.domain.vo.AuditRetention
+import org.around.ieuri.auth.domain.specification.AuditRetention
 import org.springframework.stereotype.Service
 import java.time.Clock
 
