@@ -498,3 +498,65 @@ community 4종이 뷰어를 `CurrentMemberProvider`(ThreadLocal)에서 읽는다
 
 spec이 다루지 않는 경우를 만나면 구현을 멈추고 `[AMEND] SPEC-0032: <무엇을·왜>`로 이슈 #111에
 코멘트한다.
+
+---
+
+## 10. 구현 결과 (2026-08-25)
+
+이 슬라이스에서 실제로 내린 판단과 §9의 해소를 기록한다.
+
+### 10.1 §9 미확정의 해소
+
+| # | 결정 |
+|---|---|
+| 4 | **진짜 loader로 전환했다.** R24로 칸 id 키 로더가 생기므로 두 적재가 같은 형태가 되어 tourism 안의 규칙이 하나가 된다. `CellImageBatchLoader`(object) 삭제 → `CellImageDataLoader`. "전부 적재"의 단순함은 그대로다 — 키를 모아도 161칸 전량을 읽는다 |
+| 5 | **R8을 구현하지 않았다.** 아래 10.3 참조 |
+| 3 | **R2를 이 슬라이스에서 하지 않았다.** 아래 10.3 참조 |
+
+### 10.2 설계 판단이 문서와 달라진 지점
+
+- **R24는 첫 페이지만 배치한다.** `cellSpots`가 칸마다 커서를 받으므로 전 페이지를 배치하려면
+  커서 조건이 칸 수에 비례해 커진다(CLAUDE.md의 "SQL이 입력 수를 따라 커진다" 신호). 실제
+  N+1이 나는 곳은 지도를 그리는 첫 페이지뿐이라, `after`가 있는 호출은 기존 단건 경로로 보낸다.
+  구현은 `ROW_NUMBER() OVER (PARTITION BY cell_id ...)` 한 질의다.
+
+- **로더 키가 `(cellId, first)` 복합이다.** 리뷰에서 잡힌 결함 — `first`가 필드 인자라 한 문서가
+  같은 칸을 다른 크기로 두 번 고를 수 있는데, DataLoader 캐싱이 기본 켜져 있어 칸 id만 키로
+  쓰면 두 번째가 첫 번째의 페이지를 조용히 받는다.
+
+- **R1의 판정 결과는 `TokenPresentation` 요청 속성이다.** 필터가 남기고 `DgsWebMvcRequestData.webRequest`를
+  통해 읽는다(`appKey`·`acceptLanguage`와 같은 경로). 거절된 토큰은 `UNAUTHENTICATED_TOKEN_REJECTED`로
+  나가며 `UNAUTHENTICATED`와 코드를 나눴다 — 저쪽은 로그인 화면, 이쪽은 갱신이 정답이라 클라이언트의
+  행동이 다르다.
+
+- **R19의 대상에 `rejectStaleToken`을 함께 걸었다.** 좌표를 받는 연산은 결과에 뷰어 신원을 쓰지
+  않아 R1의 대상이 아니지만, 감사에서는 사정이 다르다 — 만료를 비로그인으로 다루면 로그인한
+  회원의 위치 조회가 **기록 없이** 지나가고 그 구멍이 액세스 TTL(5분)마다 열린다.
+
+- **위치 기록의 보관 정리 코드를 넣지 않았다.** 기간이 미정이고 스위치가 꺼져 있어 정리할 행이
+  없다. 판정 함수(`AuditRetention`)는 문서대로 기간을 인자로 받으므로 대상이 늘 때 로직을 다시
+  쓰지 않는다.
+
+- **도메인 경계**: 리졸버가 auth의 `port/in`을 직접 부르는 것을 `LayeredArchitectureTest`가
+  잡아냈다. tourism·community가 각자 `LocationAuditPort`를 두고 `out/client` 어댑터가 번역한다.
+
+### 10.3 이 슬라이스에서 하지 않은 것
+
+- **R2 (분류의 강제)** — 79종 연산 전체에 `@auth` 디렉티브를 선언하고 대조 테스트를 붙이는
+  작업이라 범위가 독립적으로 크다. R3(인증 실패가 `userErrors`로 새지 않는지)는 구현했으며,
+  클래스패스를 훑어 `TokenAuthenticationException` 하위 전부를 검사한다.
+
+- **R8 (즉시 종료)** — `subscribe` 시점 검사(R7)는 구현했으나, 열린 연결을 **즉시** 끊는 것은
+  하지 않았다. 새 pub/sub 채널과 파드별 연결 추적이 필요해 범위가 따로다. Valkey pub/sub 브로커가
+  이미 있어(`ValkeyConversationEventAdapter`) 경로 자체는 존재하므로, 후속 슬라이스에서
+  단일 인스턴스 한정이 되지 않게 그 경로를 쓸 수 있다.
+
+  **보안 구멍 자체는 R7이 막았다** — 로그아웃·정지·탈퇴 이후 **새 구독**은 거부된다. R8이 더하는
+  것은 이미 열린 스트림의 즉시 중단이다.
+
+### 10.4 매니페스트 전파 (POL-056)
+
+`auditRetentionJob` 빈이 생겼으나 **k8s CronJob 등록은 이 저장소 밖이다.** 등록하지 않으면
+배치가 조용히 실행되지 않고 POL-014는 여전히 미집행으로 남는다.
+
+    IEURI_TOUR_SYNC_JOB=auditRetentionJob
