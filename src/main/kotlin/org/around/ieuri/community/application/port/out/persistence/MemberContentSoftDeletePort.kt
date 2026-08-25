@@ -39,6 +39,17 @@ interface MemberContentSoftDeletePort {
     fun softDeleteSpotAnswerRepliesByAuthor(memberId: Long, now: Instant): Long
 
     /**
+     * 회원이 보낸 DM 메시지(SPEC-0017 R17).
+     *
+     * **지우면 상대가 대화 맥락을 잃는다** — 자기 말만 남고 상대 말이 통째로 사라져 대화가
+     * 독백이 된다. 대화 자체는 원래도 지우지 않았다(AC17-2).
+     *
+     * **보관 기간을 늘리지 않는다** — 정리 배치는 `created_at`으로만 고르므로 지워진 표시가
+     * 있어도 180일 뒤 행이 물리 삭제되고, 그때 첨부 사진의 오브젝트도 함께 정리된다.
+     */
+    fun softDeleteMessagesBySender(memberId: Long, now: Instant): Long
+
+    /**
      * `answerCount`를 내려야 할 질문 id를 모은다(SPEC-0026 R17).
      *
      * **소프트 삭제 전에 불러야 한다** — 칠하고 나면 대상을 알 수 없다. 수를 내리지 않으면

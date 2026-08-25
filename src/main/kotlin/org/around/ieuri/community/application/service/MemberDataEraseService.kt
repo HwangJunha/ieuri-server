@@ -14,10 +14,13 @@ import org.springframework.transaction.annotation.Transactional
  * 탈퇴 회원의 커뮤니티 데이터 정리(SPEC-0011 R17).
  *
  * **두 가지를 나눠 다룬다.**
- * - **콘텐츠는 소프트 삭제한다** — 글·댓글·질문·답변·답글은 남에게도 보이는 것이라 지우면
- *   남의 스레드에 구멍이 나고, 답변이 달린 질문이 통째로 사라진다. 행은 남기고 표시에서만
- *   지운다(읽기 계층이 이미 `deletedAt IS NULL`로 거른다).
- * - **본인만의 데이터는 물리 삭제한다** — 좋아요·숨김·차단·DM은 남길 이유가 없다.
+ * - **남에게도 보이는 것은 소프트 삭제한다** — 글·댓글·질문·답변·답글·DM. 지우면 남의
+ *   스레드에 구멍이 나고, 답변이 달린 질문이 통째로 사라지며, 대화 상대는 자기 말만 남은
+ *   독백을 보게 된다. 행은 남기고 표시에서만 지운다(읽기 계층이 `deletedAt IS NULL`로 거른다).
+ * - **본인만의 데이터는 물리 삭제한다** — 좋아요·숨김·차단은 남길 이유가 없다.
+ *
+ * **소프트 삭제가 영구 보관을 뜻하지 않는다** — DM은 보관 기간(180일)이 지나면 정리 배치가
+ * 행째로 지우고, 그때 첨부 사진의 오브젝트도 함께 정리된다.
  *
  * 이 도메인의 저장소만 만진다 — 다른 도메인의 정리는 각자의 핸들러가 한다.
  */
@@ -52,6 +55,9 @@ class MemberDataEraseService(
         val questions = softDeletePort.softDeleteSpotQuestionsByAuthor(memberId, now)
         val answers = softDeletePort.softDeleteSpotAnswersByAuthor(memberId, now)
         val replies = softDeletePort.softDeleteSpotAnswerRepliesByAuthor(memberId, now)
+        // 대화는 남기고 메시지만 가린다(SPEC-0017 AC17-2) — 지우면 상대가 자기 말만 남은
+        // 독백을 보게 된다. 보관 기간이 지나면 정리 배치가 행째로 지운다.
+        val messages = softDeletePort.softDeleteMessagesBySender(memberId, now)
 
         // **칠한 뒤에 내린다** — 먼저 내리고 삭제가 실패하면 수만 줄어든 상태가 남는다.
         // 같은 질문에 여러 건이면 그 수만큼 내린다(id가 중복으로 담겨 온다).
@@ -61,17 +67,14 @@ class MemberDataEraseService(
         val likes = erasePort.deleteLikesByMember(memberId)
         val hides = erasePort.deleteHidesByMember(memberId)
         val blocks = erasePort.deleteBlocksInvolving(memberId)
-        // 대화는 남기고 메시지만 지운다(SPEC-0017 R17) — 상대의 남은 메시지는 정상
-        // 표시되어야 하고, 조회 자체가 실패하면 안 된다(AC17-2).
-        val messages = erasePort.deleteMessagesBySender(memberId)
 
         // 개인정보를 담지 않는다(POL-013) — 식별자와 건수만 남긴다.
         // DM 본문·수신자는 애초에 기록 대상이 아니다.
         log.info(
             "community data cleared for withdrawn member {}: softDeleted(posts={} comments={} " +
-                "spotQuestions={} spotAnswers={} spotAnswerReplies={}) deleted(likes={} hides={} " +
-                "blocks={} messages={})",
-            memberId, posts, comments, questions, answers, replies, likes, hides, blocks, messages,
+                "spotQuestions={} spotAnswers={} spotAnswerReplies={} messages={}) " +
+                "deleted(likes={} hides={} blocks={})",
+            memberId, posts, comments, questions, answers, replies, messages, likes, hides, blocks,
         )
     }
 

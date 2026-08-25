@@ -3,6 +3,7 @@ package org.around.ieuri.community.infrastructure.adapter.out.persistence
 import com.querydsl.jpa.impl.JPAQueryFactory
 import org.around.ieuri.community.application.port.out.persistence.MemberContentSoftDeletePort
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QCommentEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QMessageEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QSpotAnswerEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QSpotAnswerReplyEntity
@@ -35,6 +36,7 @@ class MemberContentSoftDeleteAdapter(
 
     private val post = QPostEntity.postEntity
     private val comment = QCommentEntity.commentEntity
+    private val message = QMessageEntity.messageEntity
     private val question = QSpotQuestionEntity.spotQuestionEntity
     private val answer = QSpotAnswerEntity.spotAnswerEntity
     private val reply = QSpotAnswerReplyEntity.spotAnswerReplyEntity
@@ -72,6 +74,13 @@ class MemberContentSoftDeleteAdapter(
         queryFactory.update(reply)
             .set(reply.deletedAt, now)
             .where(reply.authorId.eq(memberId), reply.deletedAt.isNull)
+            .execute()
+
+    @Transactional
+    override fun softDeleteMessagesBySender(memberId: Long, now: Instant): Long =
+        queryFactory.update(message)
+            .set(message.deletedAt, now)
+            .where(message.senderId.eq(memberId), message.deletedAt.isNull)
             .execute()
 
     /**
