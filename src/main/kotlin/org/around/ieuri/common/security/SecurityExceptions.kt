@@ -8,6 +8,17 @@ package org.around.ieuri.common.security
 /** 인증이 필요한데 유효한 accessToken이 없을 때. */
 class UnauthorizedException(message: String) : RuntimeException(message)
 
+/**
+ * 토큰이 제시됐으나 거절되어, 신원 없이도 동작하는 연산이 이를 비로그인으로 다루기를
+ * 거부할 때(SPEC-0032 R1). 최상위 오류 `UNAUTHENTICATED_TOKEN_REJECTED`로 나간다.
+ *
+ * **`UNAUTHENTICATED`와 코드를 나누는 이유**: 저쪽은 "로그인이 필요하다"라서 로그인 화면이
+ * 정답이지만, 이쪽은 **이미 로그인했던 세션이 만료된 것**이라 갱신이 정답이다. 뭉뚱그리면
+ * 갱신으로 회복될 사용자를 로그인 화면으로 보내게 된다.
+ */
+class StaleTokenException(message: String) :
+    TokenAuthenticationException("UNAUTHENTICATED_TOKEN_REJECTED", message)
+
 /** 인증은 됐으나 요구되는 권한(permission)이 없을 때. */
 class ForbiddenException(message: String) : RuntimeException(message)
 

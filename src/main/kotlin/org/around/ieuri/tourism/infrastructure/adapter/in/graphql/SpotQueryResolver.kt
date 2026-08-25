@@ -20,6 +20,7 @@ import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toCat
 import org.around.ieuri.tourism.infrastructure.locale.domainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.common.graphql.appKey
+import org.around.ieuri.common.graphql.rejectStaleToken
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
 import org.around.ieuri.common.graphql.generated.types.LikedSpot as GqlLikedSpot
@@ -54,6 +55,8 @@ class SpotQueryResolver(
         @InputArgument page: Int?,
         @InputArgument size: Int?,
     ): GqlSpotPage {
+        // 만료 토큰을 비로그인으로 강등하지 않는다(R1) — 이미 반응한 항목이 조용히 되살아난다.
+        dfe.rejectStaleToken()
         val result = spotQueryUseCase.spots(
             SpotsQuery(
                 latitude = latitude,
@@ -153,6 +156,8 @@ class SpotQueryResolver(
      */
     @DgsData(parentType = "SpotDetail", field = "viewerReaction")
     fun viewerReaction(dfe: DgsDataFetchingEnvironment): String? {
+        // 만료 토큰이면 null(=반응 없음)이 아니라 오류다 — 그래야 클라이언트가 갱신한다(R1).
+        dfe.rejectStaleToken()
         val memberId = currentMemberProvider.currentMemberId() ?: return null
         return spotQueryUseCase.spotViewerReaction(dfe.catalogId(), memberId, dfe.domainLocale())
     }

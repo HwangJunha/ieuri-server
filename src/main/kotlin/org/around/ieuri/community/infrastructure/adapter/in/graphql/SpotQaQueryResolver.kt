@@ -5,6 +5,7 @@ import com.netflix.graphql.dgs.DgsData
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
+import org.around.ieuri.common.graphql.rejectStaleToken
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.community.application.port.`in`.query.SpotQaQueryUseCase
 import org.around.ieuri.community.application.query.PostAuthorView
@@ -68,7 +69,7 @@ class SpotQaQueryResolver(
                 first = first ?: DEFAULT_PAGE_SIZE,
                 after = after,
             ),
-            memberId = if (onlyMine) currentMemberProvider.requireMemberId() else viewerId(),
+            memberId = if (onlyMine) currentMemberProvider.requireMemberId() else viewerId(dfe),
             language = dfe.contentLanguage(),
         )
         return SpotQuestionConnection(
@@ -82,6 +83,7 @@ class SpotQaQueryResolver(
         @InputArgument questionId: Long,
         @InputArgument first: Int?,
         @InputArgument after: String?,
+        dfe: DgsDataFetchingEnvironment,
     ): SpotAnswerConnection {
         val page = spotQaQueryUseCase.spotAnswers(
             SpotAnswersQuery(
@@ -89,7 +91,7 @@ class SpotQaQueryResolver(
                 first = first ?: DEFAULT_PAGE_SIZE,
                 after = after,
             ),
-            memberId = viewerId(),
+            memberId = viewerId(dfe),
         )
         return SpotAnswerConnection(
             edges = page.edges.map { SpotAnswerEdge(cursor = it.cursor, node = it.node) },
@@ -154,8 +156,16 @@ class SpotQaQueryResolver(
 
     // ── 공통 ─────────────────────────────────────────────────────────
 
-    /** 비로그인은 0이다 — 차단 집합도 소유 관계도 없는 호출자를 뜻한다. */
-    private fun viewerId(): Long = currentMemberProvider.currentMemberId() ?: ANONYMOUS
+    /**
+     * 뷰어 신원. 비로그인은 0이다 — 차단 집합도 소유 관계도 없는 호출자를 뜻한다.
+     *
+     * **거절된 토큰은 0으로 흘리지 않는다**(SPEC-0032 R1). 만료를 비로그인으로 다루면 차단
+     * 관계와 소유 관계가 조용히 사라져 **그럴듯한 오답**이 나간다 — 오류보다 나쁘다.
+     */
+    private fun viewerId(dfe: DgsDataFetchingEnvironment): Long {
+        dfe.rejectStaleToken()
+        return currentMemberProvider.currentMemberId() ?: ANONYMOUS
+    }
 
     /**
      * 작성자를 배치로 읽는다. 회원 정보가 없어도 질문·답변은 남으므로(탈퇴해도 보존한다)

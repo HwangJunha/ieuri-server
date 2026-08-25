@@ -11,6 +11,7 @@ import org.around.ieuri.common.graphql.generated.types.CellSpotConnection as Gql
 import org.around.ieuri.common.graphql.generated.types.CellSpotEdge as GqlCellSpotEdge
 import org.around.ieuri.common.graphql.generated.types.Coordinates as GqlCoordinates
 import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
+import org.around.ieuri.common.graphql.rejectStaleToken
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.tourism.application.policy.NationwideMapPolicy
 import org.around.ieuri.tourism.application.port.`in`.query.NationwideMapUseCase
@@ -40,31 +41,39 @@ class NationwideMapResolver(
 ) {
 
     @DgsQuery
-    fun mapCells(dfe: DgsDataFetchingEnvironment): List<MapCellView> =
-        nationwideMapUseCase.mapCells(
+    fun mapCells(dfe: DgsDataFetchingEnvironment): List<MapCellView> {
+        // 만료 토큰을 비로그인으로 강등하지 않는다(R1) — 그러면 방문 칸이 조용히 사라진다.
+        dfe.rejectStaleToken()
+        return nationwideMapUseCase.mapCells(
             locale = dfe.domainLocale(),
             // 비로그인 허용 — 모든 칸이 미방문으로 나온다(requireMemberId 아님).
             memberId = currentMemberProvider.currentMemberId(),
         )
+    }
 
     @DgsQuery
-    fun mapCell(dfe: DgsDataFetchingEnvironment, @InputArgument id: Long): MapCellView =
-        nationwideMapUseCase.mapCell(
+    fun mapCell(dfe: DgsDataFetchingEnvironment, @InputArgument id: Long): MapCellView {
+        dfe.rejectStaleToken()
+        return nationwideMapUseCase.mapCell(
             cellId = id,
             locale = dfe.domainLocale(),
             memberId = currentMemberProvider.currentMemberId(),
         )
+    }
 
     /**
      * 생성 타입이 아니라 읽기 DTO를 돌려준다 — `overlappingCells`가 지연 필드이기 때문이다.
      * 생성 타입은 그 필드까지 생성자에서 요구해서 비워 둘 수 없다.
      */
     @DgsQuery
-    fun sharedMap(@InputArgument token: String): SharedMapView =
-        nationwideMapUseCase.sharedMap(
+    fun sharedMap(dfe: DgsDataFetchingEnvironment, @InputArgument token: String): SharedMapView {
+        // 겹친 칸은 뷰어 신원으로 계산된다 — 만료를 비로그인으로 다루면 조용히 사라진다(R1).
+        dfe.rejectStaleToken()
+        return nationwideMapUseCase.sharedMap(
             token = token,
             viewerMemberId = currentMemberProvider.currentMemberId(),
         )
+    }
 
     /**
      * 겹치는 칸의 이름까지 필요한 화면을 위한 필드. **선택했을 때만 조회한다.**
@@ -74,6 +83,7 @@ class NationwideMapResolver(
      */
     @DgsData(parentType = "SharedMap", field = "overlappingCells")
     fun overlappingCells(dfe: DgsDataFetchingEnvironment): List<MapCellView>? {
+        dfe.rejectStaleToken()
         val ids = dfe.getSource<SharedMapView>()?.overlappingCellIds ?: return null
         return nationwideMapUseCase.mapCellsByIds(
             cellIds = ids,
