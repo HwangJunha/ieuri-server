@@ -5,7 +5,6 @@ import org.around.ieuri.community.infrastructure.adapter.out.persistence.reposit
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.MessageJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.PostHideJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.PostLikeJpaRepository
-import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.SpotAnswerJpaRepository
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
@@ -24,7 +23,6 @@ class MemberDataErasePersistenceAdapter(
     private val hideRepository: PostHideJpaRepository,
     private val blockRepository: BlockJpaRepository,
     private val messageRepository: MessageJpaRepository,
-    private val answerRepository: SpotAnswerJpaRepository,
 ) : MemberDataErasePort {
 
     @Transactional
@@ -46,16 +44,4 @@ class MemberDataErasePersistenceAdapter(
     @Transactional
     override fun deleteMessagesBySender(memberId: Long): Long =
         messageRepository.deleteBySenderId(memberId)
-
-    /**
-     * **소프트 삭제 전에 불러야 한다** — 칠하고 나면 어느 질문의 수를 내려야 하는지 알 수
-     * 없다. 숨겨진 답변은 이미 수에서 빠져 있어 제외한다.
-     */
-    @Transactional(readOnly = true)
-    override fun findQuestionIdsToDecrease(memberId: Long): List<Long> =
-        answerRepository.findByAuthorId(memberId)
-            .filterNot { it.hidden }
-            // 이미 지워진 답변은 수에서 빠진 뒤다 — 두 번 내리면 실제보다 작아진다.
-            .filter { it.deletedAt == null }
-            .map { it.questionId }
 }

@@ -73,4 +73,26 @@ class MemberContentSoftDeleteAdapter(
             .set(reply.deletedAt, now)
             .where(reply.authorId.eq(memberId), reply.deletedAt.isNull)
             .execute()
+
+    /**
+     * `answerCount`를 내려야 할 질문 id(SPEC-0026 R17).
+     *
+     * **엔티티가 아니라 스칼라를 뽑는다.** 애그리거트를 로드하면 같은 트랜잭션의 영속성
+     * 컨텍스트에 managed 사본이 남는데, 바로 뒤의 벌크 UPDATE는 그 컨텍스트를 우회한다 —
+     * 나중에 누가 그 엔티티를 건드리면 `deleted_at = NULL`이 되살아나 소프트 삭제가 풀린다.
+     *
+     * 숨겨진 답변은 이미 수에서 빠져 있고, 이미 지워진 답변도 마찬가지다 — 둘 다 다시 내리면
+     * 수가 실제보다 작아진다. **중복은 접지 않는다**: 같은 질문에 여러 건이면 그만큼 내린다.
+     */
+    @Transactional(readOnly = true)
+    override fun findQuestionIdsToDecrease(memberId: Long): List<Long> =
+        queryFactory
+            .select(answer.questionId)
+            .from(answer)
+            .where(
+                answer.authorId.eq(memberId),
+                answer.hidden.isFalse,
+                answer.deletedAt.isNull,
+            )
+            .fetch()
 }

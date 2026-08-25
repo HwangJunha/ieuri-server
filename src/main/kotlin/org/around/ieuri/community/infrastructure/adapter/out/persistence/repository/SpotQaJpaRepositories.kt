@@ -20,9 +20,6 @@ interface SpotQuestionJpaRepository : JpaRepository<SpotQuestionEntity, Long> {
 
     // 물리 삭제는 상속받은 deleteById를 쓴다. 딸린 답변·답글은 DB의 ON DELETE CASCADE가
     // 따라 지우지만 **사진 행은 따라오지 않는다** — FK가 없어 어댑터가 직접 지운다.
-
-    /** 탈퇴 회원의 질문. 사진 행을 지우려면 id가 필요해 삭제 전에 모은다(R17). */
-    fun findByAuthorId(authorId: Long): List<SpotQuestionEntity>
 }
 
 interface SpotAnswerJpaRepository : JpaRepository<SpotAnswerEntity, Long> {
@@ -34,8 +31,6 @@ interface SpotAnswerJpaRepository : JpaRepository<SpotAnswerEntity, Long> {
      */
     fun findByQuestionId(questionId: Long): List<SpotAnswerEntity>
 
-    /** 탈퇴 회원의 답변. `answerCount`를 내릴 질문 id를 소프트 삭제 **전에** 모은다(R17). */
-    fun findByAuthorId(authorId: Long): List<SpotAnswerEntity>
 }
 
 interface SpotAnswerReplyJpaRepository : JpaRepository<SpotAnswerReplyEntity, Long> {
