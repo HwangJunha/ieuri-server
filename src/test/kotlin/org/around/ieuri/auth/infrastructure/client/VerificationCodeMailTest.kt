@@ -72,13 +72,15 @@ class VerificationCodeMailTest {
         assertTrue(html.contains("style=\""), "인라인 스타일이 없다")
     }
 
-    /** 코드는 숫자로만 오지만, 값의 출처를 신뢰 근거로 삼지 않는다. */
+    /**
+     * 이스케이프 구현은 Spring `HtmlUtils`의 몫이라 검증하지 않는다.
+     * 여기서 고정하는 것은 **템플릿이 값을 이스케이프 없이 끼워 넣지 않는다**는 것뿐이다.
+     */
     @Test
-    fun `본문에 실리는 값은 HTML 이스케이프된다`() {
+    fun `본문에 실리는 값은 마크업으로 새지 않는다`() {
         val html = verificationCodeMail("<script>x</script>").html
 
-        assertFalse(html.contains("<script>x</script>"), "태그가 그대로 실렸다")
-        assertTrue(html.contains("&lt;script&gt;x&lt;/script&gt;"))
+        assertFalse(html.contains("<script>x</script>"), "값이 태그로 실렸다")
     }
 
     /** 평문은 HTML을 막아 둔 클라이언트가 보는 유일한 본문이다. */
