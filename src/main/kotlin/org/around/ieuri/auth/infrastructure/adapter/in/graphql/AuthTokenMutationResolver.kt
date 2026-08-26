@@ -3,6 +3,7 @@ package org.around.ieuri.auth.infrastructure.adapter.`in`.graphql
 import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsMutation
 import com.netflix.graphql.dgs.InputArgument
+import graphql.schema.DataFetchingEnvironment
 import org.around.ieuri.auth.application.command.LoginCommand
 import org.around.ieuri.auth.application.command.LoginEmailCommand
 import org.around.ieuri.auth.application.command.LogoutCommand
@@ -10,6 +11,7 @@ import org.around.ieuri.auth.application.command.RefreshTokenCommand
 import org.around.ieuri.auth.application.port.`in`.command.AuthTokenUseCase
 import org.around.ieuri.auth.application.port.`in`.command.TokenPairResult
 import org.around.ieuri.auth.domain.vo.Provider
+import org.around.ieuri.common.graphql.clientIp
 import org.around.ieuri.common.graphql.generated.types.AuthTokenPayload
 import org.around.ieuri.common.graphql.generated.types.LoginEmailInput
 import org.around.ieuri.common.graphql.generated.types.LoginSnsInput
@@ -27,7 +29,10 @@ class AuthTokenMutationResolver(
     private val authTokenUseCase: AuthTokenUseCase,
 ) {
     @DgsMutation
-    fun loginSns(@InputArgument input: LoginSnsInput): AuthTokenPayload = withUserErrors(
+    fun loginSns(
+        @InputArgument input: LoginSnsInput,
+        dfe: DataFetchingEnvironment,
+    ): AuthTokenPayload = withUserErrors(
         onError = { authTokenErrorPayload(it) },
     ) {
         authTokenUseCase.loginBySns(
@@ -35,15 +40,25 @@ class AuthTokenMutationResolver(
                 provider = Provider.valueOf(input.provider.name),
                 idToken = input.idToken,
                 authorizationCode = input.authorizationCode,
+                ipAddress = dfe.clientIp(),
             ),
         ).toPayload()
     }
 
     @DgsMutation
-    fun loginEmail(@InputArgument input: LoginEmailInput): AuthTokenPayload = withUserErrors(
+    fun loginEmail(
+        @InputArgument input: LoginEmailInput,
+        dfe: DataFetchingEnvironment,
+    ): AuthTokenPayload = withUserErrors(
         onError = { authTokenErrorPayload(it) },
     ) {
-        authTokenUseCase.loginByEmail(LoginEmailCommand(email = input.email, password = input.password)).toPayload()
+        authTokenUseCase.loginByEmail(
+            LoginEmailCommand(
+                email = input.email,
+                password = input.password,
+                ipAddress = dfe.clientIp(),
+            ),
+        ).toPayload()
     }
 
     @DgsMutation
@@ -54,10 +69,15 @@ class AuthTokenMutationResolver(
     }
 
     @DgsMutation
-    fun logout(@InputArgument input: LogoutInput): LogoutPayload = withUserErrors(
+    fun logout(
+        @InputArgument input: LogoutInput,
+        dfe: DataFetchingEnvironment,
+    ): LogoutPayload = withUserErrors(
         onError = { LogoutPayload(success = false, userErrors = it) },
     ) {
-        val result = authTokenUseCase.logout(LogoutCommand(input.refreshToken))
+        val result = authTokenUseCase.logout(
+            LogoutCommand(refreshToken = input.refreshToken, ipAddress = dfe.clientIp()),
+        )
         LogoutPayload(success = result.success, userErrors = emptyList())
     }
 

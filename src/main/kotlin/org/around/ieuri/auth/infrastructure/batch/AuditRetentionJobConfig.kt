@@ -34,26 +34,48 @@ class AuditRetentionJobConfig(
     private val properties: AuditRetentionProperties,
 ) {
 
+    /**
+     * **스텝을 둘로 나눈다.** 한 tasklet에서 두 테이블을 돌면 앞의 것이 실패할 때 뒤의 것이
+     * 아예 시도되지 않는다. 위치 기록은 법정 기간(6개월)이라 회원 감사 로그의 실패에 묶여
+     * 밀리면 안 된다.
+     */
     @Bean
     fun auditRetentionJob(): Job {
-        val step = StepBuilder("${JOB_NAME}Step", jobRepository)
-            .tasklet(purgeTasklet(), transactionManager)
+        val memberAuditStep = StepBuilder("${JOB_NAME}Step", jobRepository)
+            .tasklet(purgeTasklet("member audit logs", retentionUseCase::purgeExpiredBatch), transactionManager)
             .build()
-        return JobBuilder(JOB_NAME, jobRepository).start(step).build()
+        val locationAccessStep = StepBuilder("${JOB_NAME}LocationAccessStep", jobRepository)
+            .tasklet(
+                purgeTasklet("location access logs", retentionUseCase::purgeExpiredLocationAccessBatch),
+                transactionManager,
+            )
+            .build()
+        val accessLogStep = StepBuilder("${JOB_NAME}AccessLogStep", jobRepository)
+            .tasklet(
+                purgeTasklet("access logs", retentionUseCase::purgeExpiredAccessLogBatch),
+                transactionManager,
+            )
+            .build()
+        return JobBuilder(JOB_NAME, jobRepository)
+            .start(memberAuditStep)
+            .next(locationAccessStep)
+            .next(accessLogStep)
+            .build()
     }
 
-    private fun purgeTasklet() = Tasklet { _, _ ->
+    /** 회차 반복은 대상과 무관하게 같다 — 다른 것은 어느 포트를 부르느냐뿐이다. */
+    private fun purgeTasklet(label: String, purgeBatch: (Int) -> Int) = Tasklet { _, _ ->
         var totalDeleted = 0
         var batches = 0
         while (batches < properties.maxBatchesPerRun) {
-            val deleted = retentionUseCase.purgeExpiredBatch(properties.batchSize)
+            val deleted = purgeBatch(properties.batchSize)
             totalDeleted += deleted
             batches += 1
             // 상한보다 적게 지웠으면 더 지울 것이 없다.
             if (deleted < properties.batchSize) break
         }
         // 개인정보를 담지 않는다(POL-013) — 건수만 남긴다.
-        log.info("expired audit logs purged: total={} batches={}", totalDeleted, batches)
+        log.info("expired {} purged: total={} batches={}", label, totalDeleted, batches)
         RepeatStatus.FINISHED
     }
 

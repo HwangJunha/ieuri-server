@@ -3,6 +3,7 @@ package org.around.ieuri.auth.infrastructure.adapter.`in`.graphql
 import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsMutation
 import com.netflix.graphql.dgs.InputArgument
+import graphql.schema.DataFetchingEnvironment
 import org.around.ieuri.auth.application.command.ReactivateMemberCommand
 import org.around.ieuri.auth.application.command.SuspendMemberCommand
 import org.around.ieuri.auth.application.command.WithdrawMemberCommand
@@ -12,6 +13,10 @@ import org.around.ieuri.common.graphql.generated.types.ReactivateMemberInput
 import org.around.ieuri.common.graphql.generated.types.SuspendMemberInput
 import org.around.ieuri.auth.domain.vo.Permission
 import org.around.ieuri.common.graphql.generated.types.WithdrawMemberPayload
+import org.around.ieuri.auth.application.port.out.event.DomainEventPublisherPort
+import org.around.ieuri.common.event.AccessType
+import org.around.ieuri.common.event.MemberAccessed
+import org.around.ieuri.common.graphql.clientIp
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.auth.infrastructure.security.RequiresPermission
 import java.time.Instant
@@ -24,13 +29,16 @@ import java.time.Instant
 class MemberLifecycleMutationResolver(
     private val memberLifecycleUseCase: MemberLifecycleUseCase,
     private val currentMemberProvider: CurrentMemberProvider,
+    private val eventPublisher: DomainEventPublisherPort,
 ) {
     @DgsMutation
-    fun withdrawMember(): WithdrawMemberPayload = withUserErrors(
+    fun withdrawMember(dfe: DataFetchingEnvironment): WithdrawMemberPayload = withUserErrors(
         onError = { WithdrawMemberPayload(success = false, userErrors = it) },
     ) {
         val memberId = currentMemberProvider.requireMemberId()
         val result = memberLifecycleUseCase.withdraw(WithdrawMemberCommand(memberId))
+        // 접속기록(기준 제8조). 계정·개인정보 삭제라 남겨야 하는 수행업무다.
+        eventPublisher.publish(MemberAccessed(memberId, AccessType.WITHDRAW, dfe.clientIp()))
         WithdrawMemberPayload(success = result.success, userErrors = emptyList())
     }
 

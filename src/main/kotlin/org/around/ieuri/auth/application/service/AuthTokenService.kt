@@ -22,6 +22,9 @@ import org.around.ieuri.auth.domain.vo.Email
 import org.around.ieuri.auth.domain.vo.MemberStatus
 import org.around.ieuri.auth.domain.vo.ProviderUserId
 import org.springframework.stereotype.Service
+import org.around.ieuri.auth.application.port.out.event.DomainEventPublisherPort
+import org.around.ieuri.common.event.AccessType
+import org.around.ieuri.common.event.MemberAccessed
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.time.Instant
@@ -40,6 +43,7 @@ class AuthTokenService(
     private val passwordEncoder: PasswordEncoderPort,
     private val identifierProtector: LoginIdentifierProtectorPort,
     private val providerTokenCollector: ProviderTokenCollector,
+    private val eventPublisher: DomainEventPublisherPort,
     private val clock: Clock,
 ) : AuthTokenUseCase {
 
@@ -64,6 +68,7 @@ class AuthTokenService(
         // 탈퇴 시 연결 해제용 토큰 보충. 실패해도 로그인은 성공한다(R7).
         providerTokenCollector.collect(authentication.memberId, command.provider, command.authorizationCode)
 
+        publishAccess(authentication.memberId, AccessType.LOGIN, command.ipAddress)
         return tokenIssuer.issueFor(authentication.memberId)
     }
 
@@ -88,6 +93,8 @@ class AuthTokenService(
         // 차단은 오퍼레이션 단계의 게이트가 맡는다(R9) — 그래야 인증 화면에 머무는 동안
         // 세션이 유지된다. SNS 로그인에는 원래 이 검사가 없었으므로 두 경로가 같아진다.
         ensureLoginable(auth.memberId, auth.status, auth.suspendedUntil, auth.suspensionReason, now)
+
+        publishAccess(auth.memberId, AccessType.LOGIN, command.ipAddress)
         return tokenIssuer.issueFor(auth.memberId)
     }
 
@@ -159,6 +166,21 @@ class AuthTokenService(
             return LogoutResult(success = true)
         }
         refreshTokenStore.revoke(claims.jti)
+
+        publishAccess(claims.memberId, AccessType.LOGOUT, command.ipAddress)
         return LogoutResult(success = true)
+    }
+
+    /**
+     * 접속기록 발행(「개인정보의 안전성 확보조치 기준」 제8조).
+     *
+     * **성공한 접속만 남긴다** — 실패한 로그인 시도는 이 기록의 대상이 아니다(계정 존재 여부를
+     * 드러내지 않으려 실패 경로가 회원을 특정하지 않기도 한다).
+     *
+     * 저장은 리스너가 별도 스레드에서 한다(`MemberAccessAuditListener`) — 사용자가 기다리는
+     * 응답 경로에 INSERT를 두지 않는다.
+     */
+    private fun publishAccess(memberId: Long, accessType: AccessType, ipAddress: String?) {
+        eventPublisher.publish(MemberAccessed(memberId, accessType, ipAddress))
     }
 }

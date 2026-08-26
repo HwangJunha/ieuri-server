@@ -16,6 +16,7 @@ import org.around.ieuri.auth.application.exception.TokenReuseDetectedException
 import org.around.ieuri.auth.application.port.`in`.command.TokenPairResult
 import org.around.ieuri.auth.application.port.out.client.SnsIdentity
 import org.around.ieuri.auth.application.port.out.client.SnsIdentityVerifierPort
+import org.around.ieuri.auth.application.port.out.event.DomainEventPublisherPort
 import org.around.ieuri.auth.application.port.out.client.SnsTokenExchangerPort
 import org.around.ieuri.auth.application.port.out.persistence.EmailAuthentication
 import org.around.ieuri.auth.application.port.out.persistence.MemberAuthentication
@@ -63,9 +64,12 @@ class AuthTokenServiceTest {
     private val now = Instant.parse("2026-07-17T00:00:00Z")
     private val clock = Clock.fixed(now, ZoneOffset.UTC)
 
+    /** 접속기록 발행은 이 슬라이스의 관심사가 아니다 — 발행을 삼키고 로그인 판정만 본다. */
+    private val eventPublisher = mockk<DomainEventPublisherPort>(relaxed = true)
+
     private val service = AuthTokenService(
         snsVerifier, memberRepository, tokenProvider, refreshTokenStore, tokenIssuer, passwordEncoder,
-        identifierProtector, providerTokenCollector, clock,
+        identifierProtector, providerTokenCollector, eventPublisher, clock,
     )
 
     private val tokens = TokenPairResult("acc", "ref", "Bearer", 300, 2_592_000)
