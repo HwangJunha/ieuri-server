@@ -3,6 +3,7 @@ package org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository
 import org.around.ieuri.auth.domain.vo.Provider
 import org.around.ieuri.auth.domain.vo.VerificationPurpose
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.EmailVerificationEntity
+import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberAccessLogEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberAuditLogEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberLocationAccessLogEntity
@@ -92,10 +93,27 @@ interface MemberAuditLogJpaRepository : JpaRepository<MemberAuditLogEntity, Long
 }
 
 /**
+ * 접속기록(「개인정보의 안전성 확보조치 기준」 제8조).
+ *
+ * 보관 정리는 `MemberAuditLogJpaRepository`와 같은 형태다 — 기간만 다르다(기준 제8조
+ * 제2항의 1년, [org.around.ieuri.auth.domain.specification.AuditRetention]).
+ */
+interface MemberAccessLogJpaRepository : JpaRepository<MemberAccessLogEntity, Long> {
+
+    fun findByCreatedAtBefore(cutoff: Instant, limit: Limit): List<MemberAccessLogEntity>
+
+    fun deleteByIdIn(ids: Collection<Long>): Long
+}
+
+/**
  * 위치 조회 감사 기록(SPEC-0032 R19).
  *
- * **보관 정리 메서드가 없는 것이 의도다** — 위치 기록의 보관 기간은 위치정보법 신고 전이라
- * 아직 정할 근거가 없고, R21의 스위치가 꺼져 있어 정리할 행 자체가 없다. 기간이 정해질 때
- * `MemberAuditLogJpaRepository`와 같은 형태를 더한다.
+ * 보관 정리는 `MemberAuditLogJpaRepository`와 같은 형태다 — 기간만 다르다(위치정보법
+ * 제16조 제2항의 6개월, [org.around.ieuri.auth.domain.specification.AuditRetention]).
  */
-interface MemberLocationAccessLogJpaRepository : JpaRepository<MemberLocationAccessLogEntity, Long>
+interface MemberLocationAccessLogJpaRepository : JpaRepository<MemberLocationAccessLogEntity, Long> {
+
+    fun findByCreatedAtBefore(cutoff: Instant, limit: Limit): List<MemberLocationAccessLogEntity>
+
+    fun deleteByIdIn(ids: Collection<Long>): Long
+}
