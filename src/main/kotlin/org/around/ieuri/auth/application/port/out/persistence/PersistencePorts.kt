@@ -162,6 +162,34 @@ interface AuditLogRetentionPort {
     fun deleteCreatedBefore(cutoff: Instant, limit: Int): Int
 }
 
+/**
+ * 접속기록 기록 포트(「개인정보의 안전성 확보조치 기준」 제8조).
+ *
+ * 남기는 것은 기준이 요구하는 넷뿐이다 — 계정·접속일시·접속지 정보([ipAddress])·수행업무
+ * ([operation]). **요청 본문이나 응답을 남기지 않는다**(POL-013).
+ *
+ * [ipAddress]는 프록시가 주지 않으면 null이다. 모르는 것을 채워 넣으면 기록이 거짓이 된다.
+ */
+interface AccessLogPort {
+    fun record(memberId: Long, operation: String, ipAddress: String?)
+}
+
+/** 접속기록의 보관 정리 포트(기준 제8조 제2항의 1년). 규약은 [AuditLogRetentionPort]와 같다. */
+interface AccessLogRetentionPort {
+    fun deleteCreatedBefore(cutoff: Instant, limit: Int): Int
+}
+
+/**
+ * 위치 조회 감사 기록의 보관 정리 포트(위치정보법 제16조 제2항의 6개월).
+ *
+ * **[AuditLogRetentionPort]와 규약이 같은데도 나눈 이유는 지우는 테이블이 다르기 때문이다** —
+ * 한 인터페이스에 두 구현을 두면 주입 지점에서 어느 테이블을 어느 기간으로 지우는지가 타입으로
+ * 드러나지 않는다. 둘이 뒤바뀌면 법정 기간(6개월)을 1년으로 지키게 되고, 그것은 고지 위반이다.
+ */
+interface LocationAccessLogRetentionPort {
+    fun deleteCreatedBefore(cutoff: Instant, limit: Int): Int
+}
+
 /** 비밀번호 재설정 챌린지 포트. */
 interface PasswordResetRepositoryPort {
     fun save(reset: PasswordReset)

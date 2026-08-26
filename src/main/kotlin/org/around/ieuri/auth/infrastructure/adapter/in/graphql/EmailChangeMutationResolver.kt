@@ -3,6 +3,7 @@ package org.around.ieuri.auth.infrastructure.adapter.`in`.graphql
 import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsMutation
 import com.netflix.graphql.dgs.InputArgument
+import graphql.schema.DataFetchingEnvironment
 import org.around.ieuri.auth.application.command.ChangeEmailCommand
 import org.around.ieuri.auth.application.command.ConfirmEmailChangeCommand
 import org.around.ieuri.auth.application.command.ResendEmailChangeCommand
@@ -13,6 +14,10 @@ import org.around.ieuri.common.graphql.generated.types.ConfirmEmailChangeInput
 import org.around.ieuri.common.graphql.generated.types.ConfirmEmailChangePayload
 import org.around.ieuri.common.graphql.generated.types.ResendEmailChangeInput
 import org.around.ieuri.common.graphql.generated.types.ResendEmailChangePayload
+import org.around.ieuri.auth.application.port.out.event.DomainEventPublisherPort
+import org.around.ieuri.common.event.AccessType
+import org.around.ieuri.common.event.MemberAccessed
+import org.around.ieuri.common.graphql.clientIp
 import org.around.ieuri.common.security.CurrentMemberProvider
 import java.util.UUID
 
@@ -26,13 +31,19 @@ import java.util.UUID
 class EmailChangeMutationResolver(
     private val emailChangeUseCase: EmailChangeUseCase,
     private val currentMemberProvider: CurrentMemberProvider,
+    private val eventPublisher: DomainEventPublisherPort,
 ) {
     @DgsMutation
-    fun changeEmail(@InputArgument input: ChangeEmailInput): ChangeEmailPayload = withUserErrors(
+    fun changeEmail(
+        @InputArgument input: ChangeEmailInput,
+        dfe: DataFetchingEnvironment,
+    ): ChangeEmailPayload = withUserErrors(
         onError = { ChangeEmailPayload(success = false, userErrors = it, verificationId = null, expiresAt = null) },
     ) {
         val memberId = currentMemberProvider.requireMemberId()
         val result = emailChangeUseCase.changeEmail(ChangeEmailCommand(memberId, input.newEmail))
+        // 접속기록(기준 제8조). 개인정보(이메일) 변경이라 남겨야 하는 수행업무다.
+        eventPublisher.publish(MemberAccessed(memberId, AccessType.EMAIL_CHANGE, dfe.clientIp()))
         ChangeEmailPayload(
             success = true,
             userErrors = emptyList(),
