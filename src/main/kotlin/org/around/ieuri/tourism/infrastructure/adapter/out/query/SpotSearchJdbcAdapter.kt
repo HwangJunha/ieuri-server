@@ -28,8 +28,14 @@ import org.springframework.transaction.annotation.Transactional
  *
  * **검색은 `spot_catalog_translation` 단독으로 돈다**(SPEC-0019). BM25 인덱스가 그 테이블에
  * 걸리고, pg_search는 `@@@`·`pdb.score()`·`ORDER BY`·`LIMIT`이 전부 같은 질의 레벨에 있어야
- * 인덱스로 밀어넣기 때문에 **어떤 조인도 붙일 수 없다.** 거리 필터·정렬에 필요한 좌표는 그래서
- * 번역 행에 복사돼 있다(V52).
+ * **관련도 상위 N개에서 조기 종료**(`TopKScanExecState`)하기 때문이다. 거리 필터·정렬에 필요한
+ * 좌표는 그래서 번역 행에 복사돼 있다(V52).
+ *
+ * **조인이 불가능한 것은 아니다**(SPEC-0033에서 실측 정정). pg_search 0.25.1에서 조인은 정상
+ * 동작하고 BM25 인덱스도 탄다. 다만 실행 모드가 `NormalScanExecState`로 내려가 `LIMIT` 조기
+ * 종료를 잃고 **매칭 집합 전체를 읽는다**. 관련도 순위가 이 어댑터의 계약이라 그 손실이 곧
+ * 성능 붕괴이므로 여기서는 여전히 조인을 붙이지 않는다 — 반면 정렬이 고정이라 조기 종료가
+ * 애초에 무의미한 경로에서는 조인이 올바른 선택이다([LikedSpotSearchJdbcAdapter] 참조).
  *
  * 카드에 필요한 나머지 값(썸네일·분류·저작권)은 번역 테이블에 없어 **[loadCards]가 2단계로
  * 읽는다.** 거리 필터가 1단계에서 이미 걸렸으므로 2단계는 이미 좁혀진 한 페이지에 대한 단순
@@ -199,7 +205,7 @@ class SpotSearchJdbcAdapter(
         radiusMeters: Int,
         limit: Int,
     ): List<SpotSuggestionHit> {
-        // **어떤 조인도 붙이지 않는다** — 조인하면 pg_search가 인덱스를 못 타고 `@@@`가 깨진다.
+        // **어떤 조인도 붙이지 않는다** — 조인하면 `LIMIT` 조기 종료를 잃는다(클래스 주석 참조).
         // 그래서 분류는 여기서 못 읽고 [loadCards]가 2단계로 채운다.
         val rows = jdbcTemplate.query(
             """

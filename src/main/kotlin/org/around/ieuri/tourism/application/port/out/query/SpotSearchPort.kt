@@ -1,5 +1,7 @@
 package org.around.ieuri.tourism.application.port.out.query
 
+import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.tourism.application.query.LikedSpotView
 import org.around.ieuri.tourism.domain.vo.CategorySelection
 import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.domain.vo.DomainLocale
@@ -32,6 +34,23 @@ interface SpotSearchPort {
      * 관련도가 아니라 접두 일치라 BM25 점수를 돌려주지 않는다.
      */
     fun suggest(prefix: String, language: DomainLocale, center: Coordinates, radiusMeters: Int, limit: Int): List<SpotSuggestionHit>
+}
+
+/**
+ * 좋아요 목록 안에서의 텍스트 검색(SPEC-0033). [SpotSearchPort]와 같은 검색 노드를 보지만
+ * **계약이 다르다** — 이쪽은 관련도가 아니라 `likedAt DESC` 커서 페이지다.
+ *
+ * 별도 포트인 이유는 반환 타입과 페이지네이션 방식이 다르기 때문이다. `searchSpots`는 관련도
+ * 오프셋 페이지를, 이쪽은 좋아요 시각 커서 페이지를 돌려준다.
+ *
+ * **질의 검증은 이 포트를 호출하기 전에 끝나 있어야 한다** — 빈 질의로 여기까지 오면 안 된다.
+ */
+interface LikedSpotSearchPort {
+    /**
+     * 회원의 좋아요 중 [LikedSpotsSearch.query]에 일치하는 한 페이지.
+     * 정렬은 `likedAt DESC, catalogId DESC`이며 검색어가 순서에 영향을 주지 않는다(SPEC-0033 R3).
+     */
+    fun searchLikedSpots(query: LikedSpotsSearch, text: String): CursorPage<LikedSpotView>
 }
 
 /**

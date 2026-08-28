@@ -124,4 +124,16 @@ interface SpotQueryUseCase {
      * 이미 인증된 회원을 전제한다.
      */
     fun likedSpots(query: LikedSpotsQuery, locale: DomainLocale, memberId: Long): CursorPage<LikedSpotView>
+
+    /**
+     * 좋아요한 spot 중 검색어에 일치하는 한 페이지(SPEC-0033). 정렬·커서 규약은 [likedSpots]와
+     * 같고 **검색어가 순서에 영향을 주지 않는다**(R3).
+     *
+     * **조회처가 [likedSpots]와 다르다** — 검색 노드(논리 복제본)를 보므로 방금 누른 좋아요가
+     * 아직 없을 수 있다. 유스케이스를 나눈 이유가 이 차이이며, 두 메서드를 합치면 인자 하나로
+     * 신선도가 달라지는 것이 호출자에게 보이지 않는다.
+     *
+     * 검증 실패는 EMPTY_QUERY·QUERY_TOO_LONG.
+     */
+    fun searchLikedSpots(query: LikedSpotsQuery, text: String, locale: DomainLocale, memberId: Long): CursorPage<LikedSpotView>
 }
