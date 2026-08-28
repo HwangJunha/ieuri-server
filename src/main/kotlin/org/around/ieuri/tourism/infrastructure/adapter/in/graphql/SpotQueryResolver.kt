@@ -22,6 +22,7 @@ import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toCat
 import org.around.ieuri.tourism.infrastructure.locale.domainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.common.graphql.appKey
+import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.graphql.tokenPresentation
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
@@ -186,41 +187,67 @@ class SpotQueryResolver(
     fun likedSpots(
         dfe: DgsDataFetchingEnvironment,
         @InputArgument categories: List<String>?,
-        @InputArgument query: String?,
         @InputArgument first: Int?,
         @InputArgument after: String?,
     ): GqlLikedSpotConnection {
         val memberId = currentMemberProvider.requireMemberId()
-        val page = spotQueryUseCase.likedSpots(
+        return spotQueryUseCase.likedSpots(
             LikedSpotsQuery(
                 categories = toCategorySelection(categories),
                 first = first ?: DEFAULT_LIKED_PAGE_SIZE,
                 after = after,
-                // 트림·검증은 서비스가 한다 — 인자를 보내지 않은 것과 빈 문자열을 보낸 것의
-                // 구분이 그 안에서 살아 있어야 한다(SPEC-0033 R6).
-                query = query,
             ),
             locale = dfe.domainLocale(),
             memberId = memberId,
-        )
-        return GqlLikedSpotConnection(
-            edges = page.edges.map {
-                GqlLikedSpotEdge(
-                    cursor = it.cursor,
-                    node = it.node.toGql(),
-                    // likedAt은 노드가 아니라 엣지의 값이다 — 회원과 spot의 *관계* 속성이라
-                    // 같은 spot이라도 회원마다 다르다.
-                    likedAt = it.node.likedAt.toString(),
-                )
-            },
-            pageInfo = GqlPageInfo(
-                hasNextPage = page.pageInfo.hasNextPage,
-                hasPreviousPage = page.pageInfo.hasPreviousPage,
-                startCursor = page.pageInfo.startCursor,
-                endCursor = page.pageInfo.endCursor,
-            ),
-        )
+        ).toGql()
     }
+
+    /**
+     * 좋아요 목록 내 검색(SPEC-0033). **[likedSpots]와 조회처가 다르다** — 검색 노드를 보므로
+     * 방금 누른 좋아요가 잠시 잡히지 않을 수 있다. 응답 타입·정렬·커서 규약은 같다.
+     *
+     * 검색어가 비어 있으면 이 필드가 아니라 [likedSpots]를 쓴다 — 빈 검색어는 오류다.
+     */
+    @DgsQuery
+    fun searchLikedSpots(
+        dfe: DgsDataFetchingEnvironment,
+        @InputArgument query: String,
+        @InputArgument categories: List<String>?,
+        @InputArgument first: Int?,
+        @InputArgument after: String?,
+    ): GqlLikedSpotConnection {
+        val memberId = currentMemberProvider.requireMemberId()
+        return spotQueryUseCase.searchLikedSpots(
+            LikedSpotsQuery(
+                categories = toCategorySelection(categories),
+                first = first ?: DEFAULT_LIKED_PAGE_SIZE,
+                after = after,
+            ),
+            // 트림·길이 검증은 서비스가 한다(SPEC-0033 R6).
+            text = query,
+            locale = dfe.domainLocale(),
+            memberId = memberId,
+        ).toGql()
+    }
+
+    /** 좋아요 커넥션 변환. 두 필드가 같은 응답 규약을 쓰므로 한 곳에서 만든다. */
+    private fun CursorPage<LikedSpotView>.toGql() = GqlLikedSpotConnection(
+        edges = edges.map {
+            GqlLikedSpotEdge(
+                cursor = it.cursor,
+                node = it.node.toGql(),
+                // likedAt은 노드가 아니라 엣지의 값이다 — 회원과 spot의 *관계* 속성이라
+                // 같은 spot이라도 회원마다 다르다.
+                likedAt = it.node.likedAt.toString(),
+            )
+        },
+        pageInfo = GqlPageInfo(
+            hasNextPage = pageInfo.hasNextPage,
+            hasPreviousPage = pageInfo.hasPreviousPage,
+            startCursor = pageInfo.startCursor,
+            endCursor = pageInfo.endCursor,
+        ),
+    )
 
     private fun LikedSpotView.toGql(): GqlLikedSpot = GqlLikedSpot(
         id = id,

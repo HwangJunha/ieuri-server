@@ -48,26 +48,33 @@ class LikedSpotSearchJdbcAdapter(
      * 좋아요 중 [text]에 일치하는 한 페이지. 정렬은 `likedAt DESC, catalogId DESC` 고정이며
      * **BM25 점수를 계산하지도 정렬에 쓰지도 않는다**(SPEC-0033 R3) — 순수 필터로만 쓴다.
      *
-     * 정확 일치로 먼저 찾고 0건일 때만 오타 검색으로 폴백한다([matchClause] 참조).
+     * 정확 일치가 하나도 없을 때만 오타 검색으로 폴백한다([matchClause] 참조).
      *
-     * **페이지마다 같은 규칙을 적용한다.** `searchSpots`는 첫 페이지가 아니면 폴백하지 않지만
-     * 그쪽은 `count()`가 같은 폴백을 다시 적용해 총계를 맞춰 주기 때문이고, 이 경로에는 그런
-     * 두 번째 질의가 없다. 여기서 `after != null`을 근거로 폴백을 막으면 **오타 질의가 항상
-     * 1페이지에서 끊긴다** — 2페이지의 정확 일치가 0건이라 빈 페이지가 나가고 `hasNextPage`가
-     * false가 된다(AC4.2·AC4.3 위반).
-     *
-     * 정렬이 `likedAt DESC` 고정이고 BM25 점수를 쓰지 않으므로, 두 모드는 **순서가 아니라
-     * 포함 여부만** 다르다 — 페이지마다 판정해도 순서가 흔들리지 않는다.
+     * **모드 판정은 커서와 무관하게 질의 단위로 한 번 한다.** 커서가 걸린 집합으로 판정하면
+     * 페이지마다 답이 달라진다 — 정확 일치 25건짜리 질의가 마지막 페이지에서 "정확 0건"이 되어
+     * 조용히 오타 결과로 넘어가고, 클라이언트는 다 본 목록 뒤에 관계없는 항목을 받는다.
+     * 반대로 `after != null`을 근거로 폴백을 막으면 오타 질의가 1페이지에서 끊긴다(AC4.2·AC4.3).
+     * 둘 다 피하려면 **커서를 뺀 존재 확인**으로 모드를 정하고 그 결정을 모든 페이지가 따라야 한다.
      */
     @Transactional(readOnly = true)
     override fun searchLikedSpots(query: LikedSpotsSearch, text: String): CursorPage<LikedSpotView> {
-        val strict = runSearch(query, text, fuzzyOnly = false)
-        if (strict.isNotEmpty()) return page(query, strict)
-        return page(query, runSearch(query, text, fuzzyOnly = true))
+        // 커서를 빼고 판정한다 — 이 질의에 정확 일치가 **하나라도** 있는가.
+        val fuzzyOnly = !hasStrictMatch(query, text)
+        return page(query, runSearch(query, text, fuzzyOnly, applyCursor = true))
     }
 
-    private fun runSearch(query: LikedSpotsSearch, text: String, fuzzyOnly: Boolean): List<LikedSpotView> {
-        val cursor = query.after?.let {
+    /** 커서를 뺀 정확 일치 존재 확인. 한 건만 있으면 되므로 `LIMIT 1`이다. */
+    private fun hasStrictMatch(query: LikedSpotsSearch, text: String): Boolean =
+        runSearch(query, text, fuzzyOnly = false, applyCursor = false, limit = 1).isNotEmpty()
+
+    private fun runSearch(
+        query: LikedSpotsSearch,
+        text: String,
+        fuzzyOnly: Boolean,
+        applyCursor: Boolean,
+        limit: Int = query.first + 1,
+    ): List<LikedSpotView> {
+        val cursor = query.after?.takeIf { applyCursor }?.let {
             try {
                 LikedSpotCursor.decode(it)
             } catch (e: IllegalArgumentException) {
@@ -87,9 +94,9 @@ class LikedSpotSearchJdbcAdapter(
             query.language.name,
             query.language.name,
         )
-        params += toPhrase(text)
+        params += SpotSearchJdbcAdapter.toPhrase(text)
         // 정확 모드는 제목·주소 두 자리, 폴백 모드는 제목 fuzzy 한 자리다([matchClause] 참조).
-        if (!fuzzyOnly) params += toPhrase(text)
+        if (!fuzzyOnly) params += SpotSearchJdbcAdapter.toPhrase(text)
 
         if (!query.categories.isUnfiltered) {
             // **번역 행의 복사본(`t.category`)으로 거른다** — `searchSpots`가 거르는 것과 같은
@@ -108,7 +115,7 @@ class LikedSpotSearchJdbcAdapter(
             params += it.catalogId
         }
 
-        params += query.first + 1
+        params += limit
 
         // **카드 값을 조인 한 번으로 함께 읽는다.** `searchSpots`가 2단계로 읽는 것은 그쪽이
         // 조인을 못 붙이기 때문이고, 이 경로는 조인이 되므로 그 이유가 없다. 나눠 읽으면
@@ -180,7 +187,7 @@ class LikedSpotSearchJdbcAdapter(
         if (fuzzyOnly) {
             "${titleField(language)} @@@ ?::pdb.fuzzy(1)"
         } else {
-            "(${titleField(language)} @@@ ? OR $ADDRESS_FIELD @@@ ?)"
+            "(${titleField(language)} @@@ ? OR ${SpotSearchJdbcAdapter.ADDRESS_FIELD} @@@ ?)"
         }
 
     /**
@@ -195,23 +202,4 @@ class LikedSpotSearchJdbcAdapter(
         DomainLocale.EN -> "t.title::pdb.alias('title_en')"
     }
 
-    companion object {
-        /**
-         * 주소 매칭 필드. 원본이 null일 수 있어 빈 문자열로 대체해 색인돼 있다(search-node V4).
-         *
-         * **색인 표현식을 그대로 적는다.** `SpotSearchJdbcAdapter`의 같은 이름 상수는 캐스트를
-         * 생략하고 pg_search의 추론에 맡기는데, 둘 다 동작하지만 **같은 이름의 다른 문자열**이라
-         * 서로 같다고 넘겨짚지 않도록 여기 적어 둔다.
-         */
-        const val ADDRESS_FIELD = "(COALESCE(t.address, ''))::pdb.ngram('2','3')"
-
-        /**
-         * 사용자 입력을 pg_search 질의 문자열로 안전하게 감싼다. `@@@`의 오른쪽은 값이 아니라
-         * **질의 언어**라, 바인딩해도 `(`·`:`·`~` 같은 문자가 구문으로 해석돼 질의가 깨진다.
-         * 큰따옴표로 감싸면 그 안에서 전부 리터럴이 된다.
-         *
-         * 입력에 든 큰따옴표는 제거한다 — 감싸는 따옴표와 충돌해 파서를 깨뜨린다.
-         */
-        internal fun toPhrase(text: String): String = "\"" + text.replace("\"", " ") + "\""
-    }
 }

@@ -347,34 +347,39 @@ class SpotQueryService(
      * **애그리거트를 우회한다** — 읽기 전용이고 `spot` 행의 값만 필요하므로 QueryDSL 프로젝션이
      * read DTO를 직접 만든다. 상세(`spot_detail`)를 조인하지 않아 상세가 부재한 spot도 목록에 나온다.
      *
-     * 검색어 검증은 포트 호출보다 먼저다(SPEC-0033 R6) — 이 위치라야 어댑터 없이 단위 테스트로
-     * 고정된다. 상한은 `searchSpots`와 같은 [SpotQueryPolicy.maxSearchQueryLength]를 쓴다.
-     *
-     * **검색어 유무로 조회처가 갈린다.** 없으면 메인 DB(QueryDSL), 있으면 검색 노드(BM25)다 —
-     * 오타·형태소 매칭이 pg_search에만 있기 때문이다. 정렬·커서 형식은 두 경로가 같다
-     * (SPEC-0033 R3·R4) — 같은 `LikedSpotCursor`, 같은 `(likedAt, catalogId)` 키셋이다.
-     *
-     * **다만 신선도는 다르다.** 검색 노드는 논리 복제본이라 방금 누른 좋아요가 아직 없을 수
-     * 있다. 감수한 위험이며 이유는 [LikedSpotSearchJdbcAdapter]에 적어 두었다.
      */
     override fun likedSpots(
         query: LikedSpotsQuery,
         locale: DomainLocale,
         memberId: Long,
-    ): CursorPage<LikedSpotView> {
+    ): CursorPage<LikedSpotView> =
         // 카테고리 가용성 판정은 spots와 같다 — 같은 축을 쓰므로 달라질 이유가 없다.
-        val search = LikedSpotsSearch(
-            memberId = memberId,
-            language = locale,
-            categories = query.categories,
-            first = query.first.coerceIn(1, policy.maxLikedPageSize),
-            after = query.after,
-        )
-        val text = query.query?.let { validatedSearchText(it) }
-            ?: return spotQueryPort.findLikedSpots(search)
+        spotQueryPort.findLikedSpots(searchOf(query, locale, memberId))
 
-        return likedSpotSearchPort.searchLikedSpots(search, text)
-    }
+    /**
+     * 좋아요 목록 내 검색(SPEC-0033). **[likedSpots]와 조회처가 다르다** — 오타·형태소 매칭이
+     * pg_search에만 있어 검색 노드를 본다. 정렬·커서 규약은 같고 신선도만 다르며, 그 차이가
+     * 유스케이스를 나눈 이유다.
+     *
+     * 검증은 포트 호출보다 먼저다(R6) — 이 위치라야 어댑터 없이 단위 테스트로 고정된다.
+     * 상한은 `searchSpots`와 같은 [SpotQueryPolicy.maxSearchQueryLength]를 쓴다.
+     */
+    override fun searchLikedSpots(
+        query: LikedSpotsQuery,
+        text: String,
+        locale: DomainLocale,
+        memberId: Long,
+    ): CursorPage<LikedSpotView> =
+        likedSpotSearchPort.searchLikedSpots(searchOf(query, locale, memberId), validatedSearchText(text))
+
+    /** 두 조회가 같은 조건을 쓰도록 한 곳에서 만든다 — 갈리면 페이지 상한·언어 한정이 어긋난다. */
+    private fun searchOf(query: LikedSpotsQuery, locale: DomainLocale, memberId: Long) = LikedSpotsSearch(
+        memberId = memberId,
+        language = locale,
+        categories = query.categories,
+        first = query.first.coerceIn(1, policy.maxLikedPageSize),
+        after = query.after,
+    )
 
     /**
      * 제출된 검색어를 트림해 돌려준다. 트림 후 비었으면 EMPTY_QUERY, 상한 초과면 QUERY_TOO_LONG.

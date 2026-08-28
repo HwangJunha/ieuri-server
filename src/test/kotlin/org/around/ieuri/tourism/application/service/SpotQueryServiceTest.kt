@@ -1172,9 +1172,12 @@ class SpotQueryServiceTest {
     }
 
     // ── SPEC-0033 좋아요 목록 내 검색 ────────────────────────────────────────────
+    //
+    // 두 유스케이스가 갈려 있다: likedSpots(메인 DB)와 searchLikedSpots(검색 노드).
+    // 조회처가 다르면 신선도가 다르므로, 인자 하나로 가르지 않고 진입점을 나눴다.
 
     @Test
-    fun `AC1_1 - query를 생략하면 메인 DB 조회로 가고 검색 노드를 타지 않는다`() {
+    fun `AC1_1·AC1_2 - 검색 없는 목록은 메인 DB만 본다`() {
         every { spotQueryPort.findLikedSpots(any()) } returns likedPage()
 
         service.likedSpots(LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null), DomainLocale.KO, memberId = 7L)
@@ -1184,28 +1187,15 @@ class SpotQueryServiceTest {
     }
 
     @Test
-    fun `AC1_2 - query가 명시적 null이어도 필터 없음과 같다`() {
-        every { spotQueryPort.findLikedSpots(any()) } returns likedPage()
-
-        service.likedSpots(
-            LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null, query = null),
-            DomainLocale.KO,
-            memberId = 7L,
-        )
-
-        verify(exactly = 1) { spotQueryPort.findLikedSpots(any()) }
-        verify(exactly = 0) { likedSpotSearchPort.searchLikedSpots(any(), any()) }
-    }
-
-    @Test
-    fun `AC1_3 - 검색어가 있으면 검색 노드로 가고 메인 DB 조회를 타지 않는다`() {
-        // 오타·형태소 매칭이 pg_search에만 있어 조회처가 갈린다(SPEC-0033).
+    fun `AC1_3 - 검색은 검색 노드만 본다`() {
+        // 오타·형태소 매칭이 pg_search에만 있어 조회처가 다르다.
         val captured = slot<String>()
         every { likedSpotSearchPort.searchLikedSpots(any(), capture(captured)) } returns likedPage(likedSpot(1L))
 
-        service.likedSpots(
-            LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null, query = "sushi"),
-            DomainLocale.KO,
+        service.searchLikedSpots(
+            LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null),
+            text = "sushi",
+            locale = DomainLocale.KO,
             memberId = 7L,
         )
 
@@ -1220,9 +1210,10 @@ class SpotQueryServiceTest {
         every { likedSpotSearchPort.searchLikedSpots(any(), any()) } returns
             likedPage(likedSpot(3L), likedSpot(1L), likedSpot(2L))
 
-        val page = service.likedSpots(
-            LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null, query = "gyeongbok"),
-            DomainLocale.KO,
+        val page = service.searchLikedSpots(
+            LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null),
+            text = "gyeongbok",
+            locale = DomainLocale.KO,
             memberId = 7L,
         )
 
@@ -1230,13 +1221,14 @@ class SpotQueryServiceTest {
     }
 
     @Test
-    fun `AC4_1·AC4_2 - 검색어가 있어도 커서 규약이 그대로 유지된다`() {
+    fun `AC4_1~AC4_3 - 커서가 그대로 전달된다`() {
         val captured = slot<LikedSpotsSearch>()
         every { likedSpotSearchPort.searchLikedSpots(capture(captured), any()) } returns likedPage(likedSpot(1L))
 
-        service.likedSpots(
-            LikedSpotsQuery(CategorySelection.UNFILTERED, 20, after = "cursor-abc", query = "sushi"),
-            DomainLocale.KO,
+        service.searchLikedSpots(
+            LikedSpotsQuery(CategorySelection.UNFILTERED, 20, after = "cursor-abc"),
+            text = "sushi",
+            locale = DomainLocale.KO,
             memberId = 7L,
         )
 
@@ -1250,14 +1242,14 @@ class SpotQueryServiceTest {
         val text = slot<String>()
         every { likedSpotSearchPort.searchLikedSpots(capture(captured), capture(text)) } returns likedPage()
 
-        service.likedSpots(
+        service.searchLikedSpots(
             LikedSpotsQuery(
                 categories = CategorySelection.ofValues(setOf(SpotCategory("RESTAURANT"))),
                 first = 20,
                 after = null,
-                query = "sushi",
             ),
-            DomainLocale.KO,
+            text = "sushi",
+            locale = DomainLocale.KO,
             memberId = 7L,
         )
 
@@ -1266,13 +1258,15 @@ class SpotQueryServiceTest {
     }
 
     @Test
-    fun `검색어 조회에도 인증 회원·언어·페이지 상한이 그대로 걸린다`() {
+    fun `검색에도 인증 회원·언어·페이지 상한이 목록과 같게 걸린다`() {
+        // 두 조회가 같은 조건을 쓰는지 고정한다 — 갈리면 한쪽만 상한이 풀린다.
         val captured = slot<LikedSpotsSearch>()
         every { likedSpotSearchPort.searchLikedSpots(capture(captured), any()) } returns likedPage()
 
-        service.likedSpots(
-            LikedSpotsQuery(CategorySelection.UNFILTERED, first = 500, after = null, query = "sushi"),
-            DomainLocale.EN,
+        service.searchLikedSpots(
+            LikedSpotsQuery(CategorySelection.UNFILTERED, first = 500, after = null),
+            text = "sushi",
+            locale = DomainLocale.EN,
             memberId = 7L,
         )
 
@@ -1282,14 +1276,15 @@ class SpotQueryServiceTest {
     }
 
     @Test
-    fun `AC4_3 - 검색어 조회의 후속 페이지도 같은 포트로 간다`() {
-        // 폴백 판정은 어댑터가 페이지마다 하므로, 서비스는 after 유무로 경로를 바꾸지 않는다 —
-        // 바꾸면 오타 질의가 1페이지에서 끊긴다.
+    fun `후속 페이지도 커서만 실어 같은 포트로 간다`() {
+        // 정확·오타 모드 판정은 어댑터가 커서와 무관하게 하므로, 서비스는 after 유무로
+        // 경로를 바꾸지 않는다.
         every { likedSpotSearchPort.searchLikedSpots(any(), any()) } returns likedPage(likedSpot(1L))
 
-        service.likedSpots(
-            LikedSpotsQuery(CategorySelection.UNFILTERED, 20, after = "cursor-abc", query = "gyeongbok"),
-            DomainLocale.KO,
+        service.searchLikedSpots(
+            LikedSpotsQuery(CategorySelection.UNFILTERED, 20, after = "cursor-abc"),
+            text = "gyeongbok",
+            locale = DomainLocale.KO,
             memberId = 7L,
         )
 
@@ -1299,11 +1294,13 @@ class SpotQueryServiceTest {
 
     @Test
     fun `AC6_1 - 트림 후 빈 검색어는 EMPTY_QUERY다`() {
-        // 인자 생략과 다르다 — 생략은 필터 없음이고 빈 문자열 제출은 클라이언트가 막았어야 할 결함이다.
+        // 스키마가 query를 non-null로 두어 "생략"은 애초에 이 필드에 오지 않는다.
+        // 빈 문자열 제출은 클라이언트가 막았어야 할 결함이다.
         val e = assertFailsWith<EmptyQueryException> {
-            service.likedSpots(
-                LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null, query = "   "),
-                DomainLocale.KO,
+            service.searchLikedSpots(
+                LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null),
+                text = "   ",
+                locale = DomainLocale.KO,
                 memberId = 7L,
             )
         }
@@ -1315,9 +1312,10 @@ class SpotQueryServiceTest {
     @Test
     fun `AC6_2 - 트림 후 101자면 QUERY_TOO_LONG이다`() {
         val e = assertFailsWith<QueryTooLongException> {
-            service.likedSpots(
-                LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null, query = "a".repeat(101)),
-                DomainLocale.KO,
+            service.searchLikedSpots(
+                LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null),
+                text = "a".repeat(101),
+                locale = DomainLocale.KO,
                 memberId = 7L,
             )
         }
@@ -1332,9 +1330,10 @@ class SpotQueryServiceTest {
         every { likedSpotSearchPort.searchLikedSpots(any(), capture(captured)) } returns likedPage()
         val text = "a".repeat(100)
 
-        service.likedSpots(
-            LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null, query = text),
-            DomainLocale.KO,
+        service.searchLikedSpots(
+            LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null),
+            text = text,
+            locale = DomainLocale.KO,
             memberId = 7L,
         )
 
@@ -1347,9 +1346,10 @@ class SpotQueryServiceTest {
         val captured = slot<String>()
         every { likedSpotSearchPort.searchLikedSpots(any(), capture(captured)) } returns likedPage()
 
-        service.likedSpots(
-            LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null, query = "  ${"a".repeat(100)}  "),
-            DomainLocale.KO,
+        service.searchLikedSpots(
+            LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null),
+            text = "  ${"a".repeat(100)}  ",
+            locale = DomainLocale.KO,
             memberId = 7L,
         )
 
@@ -1360,9 +1360,10 @@ class SpotQueryServiceTest {
     fun `AC7_3 - 오류 메시지에 검색어 원문이 남지 않는다`() {
         val secret = "내가 저장한 그 초밥집"
         val e = assertFailsWith<QueryTooLongException> {
-            service.likedSpots(
-                LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null, query = secret.repeat(20)),
-                DomainLocale.KO,
+            service.searchLikedSpots(
+                LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null),
+                text = secret.repeat(20),
+                locale = DomainLocale.KO,
                 memberId = 7L,
             )
         }
