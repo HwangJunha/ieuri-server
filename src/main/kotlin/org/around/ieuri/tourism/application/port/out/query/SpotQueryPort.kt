@@ -111,6 +111,11 @@ data class LikedSpotsSearch(
     val categories: CategorySelection,
     val first: Int,
     val after: String?,
+    /**
+     * 텍스트 필터(SPEC-0033). **서비스가 트림·검증을 마친 값이거나 null이다** — 어댑터는
+     * 다시 검증하지 않는다. 제목·주소에 대한 대소문자 무시 부분 일치이며, 카테고리와는 AND다.
+     */
+    val query: String? = null,
 )
 
 /**

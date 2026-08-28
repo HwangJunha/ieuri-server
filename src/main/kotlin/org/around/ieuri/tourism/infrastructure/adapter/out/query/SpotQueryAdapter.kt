@@ -252,6 +252,15 @@ class SpotQueryAdapter(
                 // 좋아요가 이 언어의 목록에 섞인다.
                 reaction.language.eq(query.language),
                 query.categories.takeIf { !it.isUnfiltered }?.let { catalog.category.`in`(it.codes()) },
+                // 텍스트 필터(SPEC-0033). 좋아요 집합은 회원당 유계라 인덱스로 좁혀진 뒤 평가되는
+                // 잔여 술어로 충분하다 — BM25도 관련도 점수도 이 경로에 없다.
+                //
+                // **주소는 null일 수 있다.** `or`가 null 피연산자에서 UNKNOWN이 되므로 주소가
+                // 없는 행도 제목 기준으로 정상 판정된다(AC2.3).
+                query.query?.let {
+                    translation.title.containsIgnoreCase(it)
+                        .or(translation.address.containsIgnoreCase(it))
+                },
                 // 정렬이 (updated_at DESC, catalog_id DESC)이므로 다음 페이지는 그 튜플보다 "작은" 행이다.
                 // 총계에는 붙이지 않는다 — 커서는 페이지 경계일 뿐 집합의 조건이 아니다.
                 cursor?.let {

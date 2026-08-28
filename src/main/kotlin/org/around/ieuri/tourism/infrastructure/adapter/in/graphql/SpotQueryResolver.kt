@@ -186,6 +186,7 @@ class SpotQueryResolver(
     fun likedSpots(
         dfe: DgsDataFetchingEnvironment,
         @InputArgument categories: List<String>?,
+        @InputArgument query: String?,
         @InputArgument first: Int?,
         @InputArgument after: String?,
     ): GqlLikedSpotConnection {
@@ -195,6 +196,9 @@ class SpotQueryResolver(
                 categories = toCategorySelection(categories),
                 first = first ?: DEFAULT_LIKED_PAGE_SIZE,
                 after = after,
+                // 트림·검증은 서비스가 한다 — 인자를 보내지 않은 것과 빈 문자열을 보낸 것의
+                // 구분이 그 안에서 살아 있어야 한다(SPEC-0033 R6).
+                query = query,
             ),
             locale = dfe.domainLocale(),
             memberId = memberId,

@@ -132,6 +132,11 @@ data class LikedSpotsQuery(
     val categories: CategorySelection,
     val first: Int,
     val after: String?,
+    /**
+     * 텍스트 필터(SPEC-0033). **null은 필터 없음이고, 트림 후 빈 문자열은 EMPTY_QUERY 오류다** —
+     * 둘을 합치면 클라이언트의 빈 입력 제출이 조용히 전체 목록으로 바뀐다. 검증은 서비스가 한다.
+     */
+    val query: String? = null,
 )
 
 /**

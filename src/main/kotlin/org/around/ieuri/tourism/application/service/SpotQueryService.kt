@@ -1,5 +1,7 @@
 package org.around.ieuri.tourism.application.service
 
+import org.around.ieuri.tourism.application.exception.EmptyQueryException
+import org.around.ieuri.tourism.application.exception.QueryTooLongException
 import org.around.ieuri.tourism.application.exception.SpotDetailNotFoundException
 import org.around.ieuri.tourism.application.exception.SpotNotFoundInLocaleQueryException
 import org.around.ieuri.tourism.application.exception.SpotQueryException
@@ -341,6 +343,9 @@ class SpotQueryService(
      *
      * **애그리거트를 우회한다** — 읽기 전용이고 `spot` 행의 값만 필요하므로 QueryDSL 프로젝션이
      * read DTO를 직접 만든다. 상세(`spot_detail`)를 조인하지 않아 상세가 부재한 spot도 목록에 나온다.
+     *
+     * 검색어 검증은 포트 호출보다 먼저다(SPEC-0033 R6) — 이 위치라야 어댑터 없이 단위 테스트로
+     * 고정된다. 상한은 `searchSpots`와 같은 [SpotQueryPolicy.maxSearchQueryLength]를 쓴다.
      */
     override fun likedSpots(
         query: LikedSpotsQuery,
@@ -355,8 +360,24 @@ class SpotQueryService(
                 categories = query.categories,
                 first = query.first.coerceIn(1, policy.maxLikedPageSize),
                 after = query.after,
+                query = query.query?.let { validatedSearchText(it) },
             ),
         )
+    }
+
+    /**
+     * 제출된 검색어를 트림해 돌려준다. 트림 후 비었으면 EMPTY_QUERY, 상한 초과면 QUERY_TOO_LONG.
+     *
+     * **길이는 트림 후를 센다** — 앞뒤 공백으로 상한을 넘기는 것은 사용자의 의도가 아니다.
+     * 예외 메시지에 원문을 담지 않는다(POL-013).
+     */
+    private fun validatedSearchText(raw: String): String {
+        val trimmed = raw.trim()
+        return when {
+            trimmed.isEmpty() -> throw EmptyQueryException()
+            trimmed.length > policy.maxSearchQueryLength -> throw QueryTooLongException(policy.maxSearchQueryLength)
+            else -> trimmed
+        }
     }
 
     /**

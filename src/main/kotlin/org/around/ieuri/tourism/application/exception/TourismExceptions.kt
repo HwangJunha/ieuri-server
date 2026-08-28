@@ -141,6 +141,26 @@ class InvalidCursorException(message: String = "유효하지 않은 커서입니
     SpotQueryException("INVALID_CURSOR", Classification.BAD_REQUEST, message, cause)
 
 /**
+ * 검색어가 제출됐으나 트림 후 비었다(SPEC-0033 R6).
+ *
+ * **인자 생략·null과 구분한다** — 생략은 "필터 없음"이라 오류가 아니고, 빈 문자열 제출은
+ * 클라이언트가 막았어야 할 결함이다.
+ *
+ * `searchSpots`가 같은 코드를 userErrors[]로 내보내는 것과 이름은 같지만 통로가 다르다 —
+ * `LikedSpotConnection`에는 payload 래퍼가 없어 최상위 errors[]로 나간다.
+ */
+class EmptyQueryException(message: String = "검색어를 입력해 주세요.") :
+    SpotQueryException("EMPTY_QUERY", Classification.BAD_REQUEST, message)
+
+/**
+ * 검색어가 트림 후 길이 상한을 넘었다(SPEC-0033 R6, POL-035).
+ *
+ * **메시지에 검색어 원문을 담지 않는다**(POL-013) — 오류 메시지는 클라이언트 로그에 그대로 남는다.
+ */
+class QueryTooLongException(maxLength: Int) :
+    SpotQueryException("QUERY_TOO_LONG", Classification.BAD_REQUEST, "검색어는 최대 ${maxLength}자까지 입력할 수 있습니다.")
+
+/**
  * 지역 추천 조회의 개수가 0 이하(SPEC-0015 R29).
  *
  * **상한 초과는 이 예외가 아니다** — 상한을 넘는 값은 클램프한다(POL-018). 0 이하만 거절하는

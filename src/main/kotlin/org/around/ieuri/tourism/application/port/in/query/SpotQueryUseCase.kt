@@ -122,6 +122,8 @@ interface SpotQueryUseCase {
      *
      * 요청 언어로 한정하며, [memberId] 본인 것만 조회한다 — 미인증 거부는 리졸버가 판정하고 이 포트는
      * 이미 인증된 회원을 전제한다.
+     *
+     * 텍스트 필터가 있어도 정렬은 바뀌지 않는다(SPEC-0033 R3). 검증 실패는 EMPTY_QUERY·QUERY_TOO_LONG.
      */
     fun likedSpots(query: LikedSpotsQuery, locale: DomainLocale, memberId: Long): CursorPage<LikedSpotView>
 }
