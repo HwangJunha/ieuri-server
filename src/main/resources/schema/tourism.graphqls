@@ -46,6 +46,28 @@ extend type Query {
     likedSpots(
         "카테고리 코드 다중 필터. **유효한 코드는 availableSpotCategories로 조회한다**(스키마에 값 목록이 없다). OR 결합이며, 생략·null이면 전체다. 빈 배열은 EMPTY_CATEGORY_SET으로 거절되고, 없는 코드는 오류가 아니라 결과 0건이다."
         categories: [String!]
+        "페이지 크기. 기본 20, 상한 100 — 초과 시 클램프된다."
+        first: Int = 20
+        after: String
+    ): LikedSpotConnection!
+
+    """
+    내가 좋아요한 장소를 검색어로 좁힌다. 인증 필수(UNAUTHENTICATED).
+
+    **`likedSpots`와 조회처가 다르다.** 이쪽은 검색 노드(논리 복제본)를 보므로 **방금 누른
+    좋아요가 잠시 잡히지 않을 수 있다** — 좋아요 직후 검색이 0건이면 복제 도달 전일 수 있고,
+    같은 항목이 `likedSpots`에는 이미 보인다. 검색어가 비면 이 필드가 아니라 `likedSpots`를
+    쓴다(빈 검색어는 EMPTY_QUERY로 거절된다).
+
+    응답 타입·정렬·커서 규약은 `likedSpots`와 같다 — `likedAt DESC` 고정이며 관련도 순이
+    아니다. 일치 위치나 강도는 순서에 영향을 주지 않는다.
+    """
+    searchLikedSpots(
+        "검색어. 요청 언어의 제목과 주소를 대상으로 하며, 제목은 형태소와 부분 일치를 함께 본다(\"관광\"으로 \"트리아 관광호텔\"이 나온다). 대소문자를 구분하지 않고, **오타는 허용하지 않는다.** 트림 후 빈 문자열은 EMPTY_QUERY, 100자 초과는 QUERY_TOO_LONG."
+        query: String!
+        "카테고리 코드 다중 필터. 검색어와는 AND, 카테고리끼리는 OR다. 규약은 likedSpots와 같다."
+        categories: [String!]
+        "페이지 크기. 기본 20, 상한 100 — 초과 시 클램프된다."
         first: Int = 20
         after: String
     ): LikedSpotConnection!

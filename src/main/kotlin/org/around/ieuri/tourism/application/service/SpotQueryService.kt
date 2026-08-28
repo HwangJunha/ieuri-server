@@ -1,5 +1,7 @@
 package org.around.ieuri.tourism.application.service
 
+import org.around.ieuri.tourism.application.exception.EmptyQueryException
+import org.around.ieuri.tourism.application.exception.QueryTooLongException
 import org.around.ieuri.tourism.application.exception.SpotDetailNotFoundException
 import org.around.ieuri.tourism.application.exception.SpotNotFoundInLocaleQueryException
 import org.around.ieuri.tourism.application.exception.SpotQueryException
@@ -22,6 +24,7 @@ import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisher
 import org.around.ieuri.tourism.application.port.out.query.LikedSpotsSearch
 import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch
 import org.around.ieuri.tourism.application.port.out.query.SpotIdentity
+import org.around.ieuri.tourism.application.port.out.query.LikedSpotSearchPort
 import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
 import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
 import org.around.ieuri.tourism.application.port.out.query.SpotSpatialQueryPort
@@ -64,6 +67,8 @@ class SpotQueryService(
     private val spotQueryPort: SpotQueryPort,
     // 반경 조회만 PostGIS 생 SQL이라 포트가 갈린다 — 어느 읽기가 그쪽인지 여기서 보인다.
     private val spotSpatialQueryPort: SpotSpatialQueryPort,
+    // 좋아요 목록 내 검색만 검색 노드(BM25)를 본다 — 어느 읽기가 그쪽인지 여기서 보인다.
+    private val likedSpotSearchPort: LikedSpotSearchPort,
     private val spotCachePort: SpotCachePort,
     private val spotDetailStorePort: SpotDetailStorePort,
     private val eventPublisher: TourismEventPublisherPort,
@@ -341,22 +346,54 @@ class SpotQueryService(
      *
      * **애그리거트를 우회한다** — 읽기 전용이고 `spot` 행의 값만 필요하므로 QueryDSL 프로젝션이
      * read DTO를 직접 만든다. 상세(`spot_detail`)를 조인하지 않아 상세가 부재한 spot도 목록에 나온다.
+     *
      */
     override fun likedSpots(
         query: LikedSpotsQuery,
         locale: DomainLocale,
         memberId: Long,
-    ): CursorPage<LikedSpotView> {
+    ): CursorPage<LikedSpotView> =
         // 카테고리 가용성 판정은 spots와 같다 — 같은 축을 쓰므로 달라질 이유가 없다.
-        return spotQueryPort.findLikedSpots(
-            LikedSpotsSearch(
-                memberId = memberId,
-                language = locale,
-                categories = query.categories,
-                first = query.first.coerceIn(1, policy.maxLikedPageSize),
-                after = query.after,
-            ),
-        )
+        spotQueryPort.findLikedSpots(searchOf(query, locale, memberId))
+
+    /**
+     * 좋아요 목록 내 검색(SPEC-0033). **[likedSpots]와 조회처가 다르다** — 오타·형태소 매칭이
+     * pg_search에만 있어 검색 노드를 본다. 정렬·커서 규약은 같고 신선도만 다르며, 그 차이가
+     * 유스케이스를 나눈 이유다.
+     *
+     * 검증은 포트 호출보다 먼저다(R6) — 이 위치라야 어댑터 없이 단위 테스트로 고정된다.
+     * 상한은 `searchSpots`와 같은 [SpotQueryPolicy.maxSearchQueryLength]를 쓴다.
+     */
+    override fun searchLikedSpots(
+        query: LikedSpotsQuery,
+        text: String,
+        locale: DomainLocale,
+        memberId: Long,
+    ): CursorPage<LikedSpotView> =
+        likedSpotSearchPort.searchLikedSpots(searchOf(query, locale, memberId), validatedSearchText(text))
+
+    /** 두 조회가 같은 조건을 쓰도록 한 곳에서 만든다 — 갈리면 페이지 상한·언어 한정이 어긋난다. */
+    private fun searchOf(query: LikedSpotsQuery, locale: DomainLocale, memberId: Long) = LikedSpotsSearch(
+        memberId = memberId,
+        language = locale,
+        categories = query.categories,
+        first = query.first.coerceIn(1, policy.maxLikedPageSize),
+        after = query.after,
+    )
+
+    /**
+     * 제출된 검색어를 트림해 돌려준다. 트림 후 비었으면 EMPTY_QUERY, 상한 초과면 QUERY_TOO_LONG.
+     *
+     * **길이는 트림 후를 센다** — 앞뒤 공백으로 상한을 넘기는 것은 사용자의 의도가 아니다.
+     * 예외 메시지에 원문을 담지 않는다(POL-013).
+     */
+    private fun validatedSearchText(raw: String): String {
+        val trimmed = raw.trim()
+        return when {
+            trimmed.isEmpty() -> throw EmptyQueryException()
+            trimmed.length > policy.maxSearchQueryLength -> throw QueryTooLongException(policy.maxSearchQueryLength)
+            else -> trimmed
+        }
     }
 
     /**
