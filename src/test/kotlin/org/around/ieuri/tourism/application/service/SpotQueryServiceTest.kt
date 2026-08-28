@@ -4,7 +4,9 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
+import org.around.ieuri.tourism.application.exception.EmptyQueryException
 import org.around.ieuri.tourism.application.exception.InvalidCoordinatesException
+import org.around.ieuri.tourism.application.exception.QueryTooLongException
 import org.around.ieuri.tourism.application.exception.RadiusTooLargeException
 import org.around.ieuri.tourism.application.exception.SpotDetailNotFoundException
 import org.around.ieuri.tourism.application.exception.SpotNotFoundInLocaleQueryException
@@ -1166,6 +1168,172 @@ class SpotQueryServiceTest {
         verify(exactly = 0) { tourInfoPort.findDetail(any()) }
         verify(exactly = 0) { spotCachePort.getDetail(any()) }
     }
+
+    // ── SPEC-0033 좋아요 목록 내 검색 ────────────────────────────────────────────
+
+    @Test
+    fun `AC1_1 - query를 생략하면 텍스트 필터 없이 조회한다`() {
+        val captured = slot<LikedSpotsSearch>()
+        every { spotQueryPort.findLikedSpots(capture(captured)) } returns likedPage()
+
+        service.likedSpots(LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null), DomainLocale.KO, memberId = 7L)
+
+        assertNull(captured.captured.query)
+    }
+
+    @Test
+    fun `AC1_2 - query가 명시적 null이어도 필터 없음과 같다`() {
+        val captured = slot<LikedSpotsSearch>()
+        every { spotQueryPort.findLikedSpots(capture(captured)) } returns likedPage()
+
+        service.likedSpots(
+            LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null, query = null),
+            DomainLocale.KO,
+            memberId = 7L,
+        )
+
+        assertNull(captured.captured.query)
+    }
+
+    @Test
+    fun `AC1_3 - 검색어가 조회 조건으로 전달된다`() {
+        val captured = slot<LikedSpotsSearch>()
+        every { spotQueryPort.findLikedSpots(capture(captured)) } returns likedPage(likedSpot(1L))
+
+        service.likedSpots(
+            LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null, query = "sushi"),
+            DomainLocale.KO,
+            memberId = 7L,
+        )
+
+        assertEquals("sushi", captured.captured.query)
+    }
+
+    @Test
+    fun `AC3_1·AC3_2 - 정렬은 포트가 돌려준 순서 그대로다`() {
+        // 검색어가 있어도 서비스가 재정렬하지 않는다 — 일치 위치·강도는 순서에 영향을 주지 않으며
+        // 정렬은 likedAt DESC 고정이다(POL-019·POL-055).
+        every { spotQueryPort.findLikedSpots(any()) } returns
+            likedPage(likedSpot(3L), likedSpot(1L), likedSpot(2L))
+
+        val page = service.likedSpots(
+            LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null, query = "gyeongbok"),
+            DomainLocale.KO,
+            memberId = 7L,
+        )
+
+        assertEquals(listOf(3L, 1L, 2L), page.edges.map { it.node.id })
+    }
+
+    @Test
+    fun `AC4_1·AC4_2 - 검색어가 있어도 커서 규약이 그대로 유지된다`() {
+        val captured = slot<LikedSpotsSearch>()
+        every { spotQueryPort.findLikedSpots(capture(captured)) } returns likedPage(likedSpot(1L))
+
+        service.likedSpots(
+            LikedSpotsQuery(CategorySelection.UNFILTERED, 20, after = "cursor-abc", query = "sushi"),
+            DomainLocale.KO,
+            memberId = 7L,
+        )
+
+        assertEquals("cursor-abc", captured.captured.after)
+        assertEquals("sushi", captured.captured.query)
+    }
+
+    @Test
+    fun `AC5_1·AC5_2 - 검색어와 카테고리가 함께 전달된다`() {
+        // 두 조건의 AND 결합은 쿼리 단계에서 걸린다 — 서비스는 둘 다 넘기기만 한다.
+        val captured = slot<LikedSpotsSearch>()
+        every { spotQueryPort.findLikedSpots(capture(captured)) } returns likedPage()
+
+        service.likedSpots(
+            LikedSpotsQuery(
+                categories = CategorySelection.ofValues(setOf(SpotCategory("RESTAURANT"))),
+                first = 20,
+                after = null,
+                query = "sushi",
+            ),
+            DomainLocale.KO,
+            memberId = 7L,
+        )
+
+        assertEquals(CategorySelection.ofValues(setOf(SpotCategory("RESTAURANT"))), captured.captured.categories)
+        assertEquals("sushi", captured.captured.query)
+    }
+
+    @Test
+    fun `AC6_1 - 트림 후 빈 검색어는 EMPTY_QUERY다`() {
+        // 인자 생략과 다르다 — 생략은 필터 없음이고 빈 문자열 제출은 클라이언트가 막았어야 할 결함이다.
+        val e = assertFailsWith<EmptyQueryException> {
+            service.likedSpots(
+                LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null, query = "   "),
+                DomainLocale.KO,
+                memberId = 7L,
+            )
+        }
+
+        assertEquals("EMPTY_QUERY", e.logicalCode)
+        verify(exactly = 0) { spotQueryPort.findLikedSpots(any()) }
+    }
+
+    @Test
+    fun `AC6_2 - 트림 후 101자면 QUERY_TOO_LONG이다`() {
+        val e = assertFailsWith<QueryTooLongException> {
+            service.likedSpots(
+                LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null, query = "a".repeat(101)),
+                DomainLocale.KO,
+                memberId = 7L,
+            )
+        }
+
+        assertEquals("QUERY_TOO_LONG", e.logicalCode)
+        verify(exactly = 0) { spotQueryPort.findLikedSpots(any()) }
+    }
+
+    @Test
+    fun `AC6_3 - 트림 후 정확히 100자면 통과한다`() {
+        val captured = slot<LikedSpotsSearch>()
+        every { spotQueryPort.findLikedSpots(capture(captured)) } returns likedPage()
+        val text = "a".repeat(100)
+
+        service.likedSpots(
+            LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null, query = text),
+            DomainLocale.KO,
+            memberId = 7L,
+        )
+
+        assertEquals(text, captured.captured.query)
+    }
+
+    @Test
+    fun `AC6_4 - 앞뒤 공백은 제거된 뒤 전달된다`() {
+        // 길이도 트림 후를 센다 — 공백으로 상한을 넘기는 것은 사용자의 의도가 아니다.
+        val captured = slot<LikedSpotsSearch>()
+        every { spotQueryPort.findLikedSpots(capture(captured)) } returns likedPage()
+
+        service.likedSpots(
+            LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null, query = "  ${"a".repeat(100)}  "),
+            DomainLocale.KO,
+            memberId = 7L,
+        )
+
+        assertEquals("a".repeat(100), captured.captured.query)
+    }
+
+    @Test
+    fun `AC7_3 - 오류 메시지에 검색어 원문이 남지 않는다`() {
+        val secret = "내가 저장한 그 초밥집"
+        val e = assertFailsWith<QueryTooLongException> {
+            service.likedSpots(
+                LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null, query = secret.repeat(20)),
+                DomainLocale.KO,
+                memberId = 7L,
+            )
+        }
+
+        assertFalse(e.message.orEmpty().contains(secret))
+    }
+
     @Test
     fun `상세 캐시·저장은 카탈로그 id가 아니라 원본 spot_id로 키를 만든다`() {
         // **두 id 공간이 섞이면 조용히 틀린다.** spot_detail 계열의 FK가 spot(id)를 가리키므로
