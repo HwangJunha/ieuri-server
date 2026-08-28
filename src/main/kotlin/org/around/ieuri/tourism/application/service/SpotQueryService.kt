@@ -24,6 +24,7 @@ import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisher
 import org.around.ieuri.tourism.application.port.out.query.LikedSpotsSearch
 import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch
 import org.around.ieuri.tourism.application.port.out.query.SpotIdentity
+import org.around.ieuri.tourism.application.port.out.query.LikedSpotSearchPort
 import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
 import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
 import org.around.ieuri.tourism.application.port.out.query.SpotSpatialQueryPort
@@ -66,6 +67,8 @@ class SpotQueryService(
     private val spotQueryPort: SpotQueryPort,
     // 반경 조회만 PostGIS 생 SQL이라 포트가 갈린다 — 어느 읽기가 그쪽인지 여기서 보인다.
     private val spotSpatialQueryPort: SpotSpatialQueryPort,
+    // 좋아요 목록 내 검색만 검색 노드(BM25)를 본다 — 어느 읽기가 그쪽인지 여기서 보인다.
+    private val likedSpotSearchPort: LikedSpotSearchPort,
     private val spotCachePort: SpotCachePort,
     private val spotDetailStorePort: SpotDetailStorePort,
     private val eventPublisher: TourismEventPublisherPort,
@@ -346,6 +349,13 @@ class SpotQueryService(
      *
      * 검색어 검증은 포트 호출보다 먼저다(SPEC-0033 R6) — 이 위치라야 어댑터 없이 단위 테스트로
      * 고정된다. 상한은 `searchSpots`와 같은 [SpotQueryPolicy.maxSearchQueryLength]를 쓴다.
+     *
+     * **검색어 유무로 조회처가 갈린다.** 없으면 메인 DB(QueryDSL), 있으면 검색 노드(BM25)다 —
+     * 오타·형태소 매칭이 pg_search에만 있기 때문이다. 정렬·커서 형식은 두 경로가 같다
+     * (SPEC-0033 R3·R4) — 같은 `LikedSpotCursor`, 같은 `(likedAt, catalogId)` 키셋이다.
+     *
+     * **다만 신선도는 다르다.** 검색 노드는 논리 복제본이라 방금 누른 좋아요가 아직 없을 수
+     * 있다. 감수한 위험이며 이유는 [LikedSpotSearchJdbcAdapter]에 적어 두었다.
      */
     override fun likedSpots(
         query: LikedSpotsQuery,
@@ -353,16 +363,17 @@ class SpotQueryService(
         memberId: Long,
     ): CursorPage<LikedSpotView> {
         // 카테고리 가용성 판정은 spots와 같다 — 같은 축을 쓰므로 달라질 이유가 없다.
-        return spotQueryPort.findLikedSpots(
-            LikedSpotsSearch(
-                memberId = memberId,
-                language = locale,
-                categories = query.categories,
-                first = query.first.coerceIn(1, policy.maxLikedPageSize),
-                after = query.after,
-                query = query.query?.let { validatedSearchText(it) },
-            ),
+        val search = LikedSpotsSearch(
+            memberId = memberId,
+            language = locale,
+            categories = query.categories,
+            first = query.first.coerceIn(1, policy.maxLikedPageSize),
+            after = query.after,
         )
+        val text = query.query?.let { validatedSearchText(it) }
+            ?: return spotQueryPort.findLikedSpots(search)
+
+        return likedSpotSearchPort.searchLikedSpots(search, text)
     }
 
     /**

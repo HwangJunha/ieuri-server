@@ -29,6 +29,7 @@ import org.around.ieuri.tourism.application.event.SpotDetailFetched
 import org.around.ieuri.tourism.application.event.SpotGalleryFetched
 import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
 import org.around.ieuri.tourism.application.port.out.query.AppCategoryQueryPort
+import org.around.ieuri.tourism.application.port.out.query.LikedSpotSearchPort
 import org.around.ieuri.tourism.application.port.out.query.LikedSpotsSearch
 import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch
 import org.around.ieuri.tourism.application.port.out.query.SpotBasics
@@ -66,6 +67,7 @@ class SpotQueryServiceTest {
     private val tourInfoPort = mockk<TourInfoPort>()
     private val spotQueryPort = mockk<SpotQueryPort>()
     private val spotSpatialQueryPort = mockk<SpotSpatialQueryPort>()
+    private val likedSpotSearchPort = mockk<LikedSpotSearchPort>()
     private val spotCachePort = mockk<SpotCachePort>()
     private val spotDetailStorePort = mockk<SpotDetailStorePort>()
     private val eventPublisher = mockk<TourismEventPublisherPort>(relaxed = true)
@@ -82,8 +84,8 @@ class SpotQueryServiceTest {
     )
     private val appCategoryQueryPort = mockk<AppCategoryQueryPort>()
     private val service = SpotQueryService(
-        tourInfoPort, spotQueryPort, spotSpatialQueryPort, spotCachePort, spotDetailStorePort,
-        eventPublisher, appCategoryQueryPort, policy,
+        tourInfoPort, spotQueryPort, spotSpatialQueryPort, likedSpotSearchPort, spotCachePort,
+        spotDetailStorePort, eventPublisher, appCategoryQueryPort, policy,
     )
 
     // 기본: 아무것도 반응하지 않음(빈 집합). 개별 테스트에서 override.
@@ -1172,19 +1174,18 @@ class SpotQueryServiceTest {
     // ── SPEC-0033 좋아요 목록 내 검색 ────────────────────────────────────────────
 
     @Test
-    fun `AC1_1 - query를 생략하면 텍스트 필터 없이 조회한다`() {
-        val captured = slot<LikedSpotsSearch>()
-        every { spotQueryPort.findLikedSpots(capture(captured)) } returns likedPage()
+    fun `AC1_1 - query를 생략하면 메인 DB 조회로 가고 검색 노드를 타지 않는다`() {
+        every { spotQueryPort.findLikedSpots(any()) } returns likedPage()
 
         service.likedSpots(LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null), DomainLocale.KO, memberId = 7L)
 
-        assertNull(captured.captured.query)
+        verify(exactly = 1) { spotQueryPort.findLikedSpots(any()) }
+        verify(exactly = 0) { likedSpotSearchPort.searchLikedSpots(any(), any()) }
     }
 
     @Test
     fun `AC1_2 - query가 명시적 null이어도 필터 없음과 같다`() {
-        val captured = slot<LikedSpotsSearch>()
-        every { spotQueryPort.findLikedSpots(capture(captured)) } returns likedPage()
+        every { spotQueryPort.findLikedSpots(any()) } returns likedPage()
 
         service.likedSpots(
             LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null, query = null),
@@ -1192,13 +1193,15 @@ class SpotQueryServiceTest {
             memberId = 7L,
         )
 
-        assertNull(captured.captured.query)
+        verify(exactly = 1) { spotQueryPort.findLikedSpots(any()) }
+        verify(exactly = 0) { likedSpotSearchPort.searchLikedSpots(any(), any()) }
     }
 
     @Test
-    fun `AC1_3 - 검색어가 조회 조건으로 전달된다`() {
-        val captured = slot<LikedSpotsSearch>()
-        every { spotQueryPort.findLikedSpots(capture(captured)) } returns likedPage(likedSpot(1L))
+    fun `AC1_3 - 검색어가 있으면 검색 노드로 가고 메인 DB 조회를 타지 않는다`() {
+        // 오타·형태소 매칭이 pg_search에만 있어 조회처가 갈린다(SPEC-0033).
+        val captured = slot<String>()
+        every { likedSpotSearchPort.searchLikedSpots(any(), capture(captured)) } returns likedPage(likedSpot(1L))
 
         service.likedSpots(
             LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null, query = "sushi"),
@@ -1206,14 +1209,15 @@ class SpotQueryServiceTest {
             memberId = 7L,
         )
 
-        assertEquals("sushi", captured.captured.query)
+        assertEquals("sushi", captured.captured)
+        verify(exactly = 0) { spotQueryPort.findLikedSpots(any()) }
     }
 
     @Test
     fun `AC3_1·AC3_2 - 정렬은 포트가 돌려준 순서 그대로다`() {
         // 검색어가 있어도 서비스가 재정렬하지 않는다 — 일치 위치·강도는 순서에 영향을 주지 않으며
         // 정렬은 likedAt DESC 고정이다(POL-019·POL-055).
-        every { spotQueryPort.findLikedSpots(any()) } returns
+        every { likedSpotSearchPort.searchLikedSpots(any(), any()) } returns
             likedPage(likedSpot(3L), likedSpot(1L), likedSpot(2L))
 
         val page = service.likedSpots(
@@ -1228,7 +1232,7 @@ class SpotQueryServiceTest {
     @Test
     fun `AC4_1·AC4_2 - 검색어가 있어도 커서 규약이 그대로 유지된다`() {
         val captured = slot<LikedSpotsSearch>()
-        every { spotQueryPort.findLikedSpots(capture(captured)) } returns likedPage(likedSpot(1L))
+        every { likedSpotSearchPort.searchLikedSpots(capture(captured), any()) } returns likedPage(likedSpot(1L))
 
         service.likedSpots(
             LikedSpotsQuery(CategorySelection.UNFILTERED, 20, after = "cursor-abc", query = "sushi"),
@@ -1237,14 +1241,14 @@ class SpotQueryServiceTest {
         )
 
         assertEquals("cursor-abc", captured.captured.after)
-        assertEquals("sushi", captured.captured.query)
     }
 
     @Test
     fun `AC5_1·AC5_2 - 검색어와 카테고리가 함께 전달된다`() {
         // 두 조건의 AND 결합은 쿼리 단계에서 걸린다 — 서비스는 둘 다 넘기기만 한다.
         val captured = slot<LikedSpotsSearch>()
-        every { spotQueryPort.findLikedSpots(capture(captured)) } returns likedPage()
+        val text = slot<String>()
+        every { likedSpotSearchPort.searchLikedSpots(capture(captured), capture(text)) } returns likedPage()
 
         service.likedSpots(
             LikedSpotsQuery(
@@ -1258,7 +1262,39 @@ class SpotQueryServiceTest {
         )
 
         assertEquals(CategorySelection.ofValues(setOf(SpotCategory("RESTAURANT"))), captured.captured.categories)
-        assertEquals("sushi", captured.captured.query)
+        assertEquals("sushi", text.captured)
+    }
+
+    @Test
+    fun `검색어 조회에도 인증 회원·언어·페이지 상한이 그대로 걸린다`() {
+        val captured = slot<LikedSpotsSearch>()
+        every { likedSpotSearchPort.searchLikedSpots(capture(captured), any()) } returns likedPage()
+
+        service.likedSpots(
+            LikedSpotsQuery(CategorySelection.UNFILTERED, first = 500, after = null, query = "sushi"),
+            DomainLocale.EN,
+            memberId = 7L,
+        )
+
+        assertEquals(7L, captured.captured.memberId)
+        assertEquals(DomainLocale.EN, captured.captured.language)
+        assertEquals(100, captured.captured.first)
+    }
+
+    @Test
+    fun `AC4_3 - 검색어 조회의 후속 페이지도 같은 포트로 간다`() {
+        // 폴백 판정은 어댑터가 페이지마다 하므로, 서비스는 after 유무로 경로를 바꾸지 않는다 —
+        // 바꾸면 오타 질의가 1페이지에서 끊긴다.
+        every { likedSpotSearchPort.searchLikedSpots(any(), any()) } returns likedPage(likedSpot(1L))
+
+        service.likedSpots(
+            LikedSpotsQuery(CategorySelection.UNFILTERED, 20, after = "cursor-abc", query = "gyeongbok"),
+            DomainLocale.KO,
+            memberId = 7L,
+        )
+
+        verify(exactly = 1) { likedSpotSearchPort.searchLikedSpots(any(), any()) }
+        verify(exactly = 0) { spotQueryPort.findLikedSpots(any()) }
     }
 
     @Test
@@ -1273,7 +1309,7 @@ class SpotQueryServiceTest {
         }
 
         assertEquals("EMPTY_QUERY", e.logicalCode)
-        verify(exactly = 0) { spotQueryPort.findLikedSpots(any()) }
+        verify(exactly = 0) { likedSpotSearchPort.searchLikedSpots(any(), any()) }
     }
 
     @Test
@@ -1287,13 +1323,13 @@ class SpotQueryServiceTest {
         }
 
         assertEquals("QUERY_TOO_LONG", e.logicalCode)
-        verify(exactly = 0) { spotQueryPort.findLikedSpots(any()) }
+        verify(exactly = 0) { likedSpotSearchPort.searchLikedSpots(any(), any()) }
     }
 
     @Test
     fun `AC6_3 - 트림 후 정확히 100자면 통과한다`() {
-        val captured = slot<LikedSpotsSearch>()
-        every { spotQueryPort.findLikedSpots(capture(captured)) } returns likedPage()
+        val captured = slot<String>()
+        every { likedSpotSearchPort.searchLikedSpots(any(), capture(captured)) } returns likedPage()
         val text = "a".repeat(100)
 
         service.likedSpots(
@@ -1302,14 +1338,14 @@ class SpotQueryServiceTest {
             memberId = 7L,
         )
 
-        assertEquals(text, captured.captured.query)
+        assertEquals(text, captured.captured)
     }
 
     @Test
     fun `AC6_4 - 앞뒤 공백은 제거된 뒤 전달된다`() {
         // 길이도 트림 후를 센다 — 공백으로 상한을 넘기는 것은 사용자의 의도가 아니다.
-        val captured = slot<LikedSpotsSearch>()
-        every { spotQueryPort.findLikedSpots(capture(captured)) } returns likedPage()
+        val captured = slot<String>()
+        every { likedSpotSearchPort.searchLikedSpots(any(), capture(captured)) } returns likedPage()
 
         service.likedSpots(
             LikedSpotsQuery(CategorySelection.UNFILTERED, 20, null, query = "  ${"a".repeat(100)}  "),
@@ -1317,7 +1353,7 @@ class SpotQueryServiceTest {
             memberId = 7L,
         )
 
-        assertEquals("a".repeat(100), captured.captured.query)
+        assertEquals("a".repeat(100), captured.captured)
     }
 
     @Test
