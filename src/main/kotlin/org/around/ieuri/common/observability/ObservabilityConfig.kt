@@ -1,9 +1,11 @@
 package org.around.ieuri.common.observability
 
 import io.micrometer.observation.ObservationPredicate
+import io.micrometer.observation.ObservationRegistry
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.graphql.observation.GraphQlObservationInstrumentation
 import org.springframework.http.server.observation.ServerRequestObservationContext
 
 /**
@@ -41,4 +43,23 @@ class ObservabilityConfig {
             }
         }
     }
+
+    /**
+     * GraphQL 관측을 켠다.
+     *
+     * **자동구성이 아니다.** Spring GraphQL 은 이 인스트루먼테이션을 애플리케이션이 직접
+     * 등록하도록 하고 있어, 없으면 `graphql.request`·`graphql.datafetcher` 관측이 아예
+     * 만들어지지 않는다.
+     *
+     * 없을 때 무엇이 보이지 않는가: 모든 GraphQL 요청은 `POST /graphql` 한 주소로 오므로
+     * HTTP 계층 span 만으로는 **어떤 쿼리인지 구분되지 않는다.** 느린 요청을 찾아도 그것이
+     * 어느 쿼리였는지 알 수 없어, 정작 고쳐야 할 곳을 짚지 못한다.
+     *
+     * datafetcher 관측은 "non-trivial" 한 데이터 페칭에만 붙는다 — 자바 객체의 필드를 그냥
+     * 읽는 수준은 제외되므로 span 이 무한정 늘어나지 않는다.
+     */
+    @Bean
+    fun graphQlObservationInstrumentation(
+        observationRegistry: ObservationRegistry,
+    ): GraphQlObservationInstrumentation = GraphQlObservationInstrumentation(observationRegistry)
 }
