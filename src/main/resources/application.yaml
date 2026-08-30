@@ -167,12 +167,10 @@ management:
       export:
         otlp:
           # **빈 값을 두면 부팅이 실패한다**(`Invalid endpoint, must start with http://`).
-          # 이 자동구성은 값이 비었을 때 exporter를 건너뛰지 않고 그대로 만들려 든다.
-          # local과 배치 CronJob은 이 변수를 주입받지 않으므로 기본값이 반드시 필요하다.
-          #
-          # 기본값은 로컬 수집기 주소다. 없으면 전송만 조용히 실패하고 앱은 정상 동작한다 —
-          # 관측이 없다고 서비스가 멈추면 안 된다.
-          endpoint: ${IEURI_TRACING_ENDPOINT:http://localhost:4318/v1/traces}
+          # 이 자동구성은 값이 비어도 exporter를 건너뛰지 않고 그대로 만들려 든다.
+          # 그래서 수집기가 없는 환경(local)은 아래 export.enabled로 끈다 — 주소를
+          # 비우는 방식으로는 끌 수 없다.
+          endpoint: ${IEURI_TRACING_ENDPOINT}
 
   endpoint:
     health:
