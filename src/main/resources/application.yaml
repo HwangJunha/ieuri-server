@@ -129,9 +129,19 @@ management:
   endpoints:
     web:
       exposure:
-        # health만 연다. 나머지 actuator 엔드포인트(env·beans·heapdump 등)는 노출하지 않는다 —
-        # Spring Security가 전 경로 permitAll이라(SecurityConfig) 여기서 닫지 않으면 그대로 공개된다.
-        include: health
+        # health와 prometheus만 연다. 나머지 actuator 엔드포인트(env·beans·heapdump 등)는
+        # 노출하지 않는다 — Spring Security가 전 경로 permitAll이라(SecurityConfig) 여기서
+        # 닫지 않으면 그대로 공개된다.
+        #
+        # **prometheus는 인증 없이 열리지만 인터넷에서는 닿지 않는다.** 관리 포트를 앱
+        # 포트(8080)와 분리하지 않았으므로 여기서 여는 것은 앱 포트에 여는 것과 같은데,
+        # 외부 차단은 다른 층이 맡는다 — Ingress가 /actuator를 막는다
+        # (ieuri-manifest의 ieuri-server values.yaml, ingress.blockActuator). 수집기는
+        # 클러스터 안에서 파드 IP로 직접 긁으므로 그 차단에 걸리지 않는다.
+        #
+        # 그러니 이 값을 늘리기 전에 Ingress 쪽 차단이 여전히 유효한지 함께 봐야 한다.
+        # 한쪽만 보고 판단하면 그 순간 공개된다.
+        include: health,prometheus
   endpoint:
     health:
       # k8s 프로브용 /actuator/health/{readiness,liveness} 하위 경로를 만든다.

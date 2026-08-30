@@ -28,9 +28,13 @@ extra["netflixDgsVersion"] = "11.1.0"
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
-    // k8s readiness·liveness 프로브용 health 엔드포인트. 프로브 경로만 열고 나머지
-    // actuator 엔드포인트는 노출하지 않는다(application.yaml의 management 블록).
+    // k8s readiness·liveness 프로브용 health 엔드포인트와 메트릭 노출.
+    // 무엇을 열고 무엇을 닫는지는 application.yaml의 management 블록이 정한다.
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+    // **이 의존이 있어야 /actuator/prometheus가 생긴다.** actuator는 레지스트리 구현이
+    // 클래스패스에 있을 때만 그 엔드포인트를 자동구성하므로, 빼면 management 설정에
+    // prometheus를 적어 두어도 404가 되고 원인이 설정 쪽으로 보여 찾기 어렵다.
+    implementation("io.micrometer:micrometer-registry-prometheus")
     // refresh 토큰 저장소를 Valkey(Redis 프로토콜 호환)로 이관. Lettuce 클라이언트 기본.
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.boot:spring-boot-starter-security")
