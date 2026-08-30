@@ -28,9 +28,35 @@ extra["netflixDgsVersion"] = "11.1.0"
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
-    // k8s readiness·liveness 프로브용 health 엔드포인트. 프로브 경로만 열고 나머지
-    // actuator 엔드포인트는 노출하지 않는다(application.yaml의 management 블록).
+    // k8s readiness·liveness 프로브용 health 엔드포인트와 메트릭 노출.
+    // 무엇을 열고 무엇을 닫는지는 application.yaml의 management 블록이 정한다.
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+    // **이 의존이 있어야 /actuator/prometheus가 생긴다.** actuator는 레지스트리 구현이
+    // 클래스패스에 있을 때만 그 엔드포인트를 자동구성하므로, 빼면 management 설정에
+    // prometheus를 적어 두어도 404가 되고 원인이 설정 쪽으로 보여 찾기 어렵다.
+    implementation("io.micrometer:micrometer-registry-prometheus")
+    // 트레이싱. 메트릭이 집계된 숫자라면 트레이스는 **요청 하나를 끝까지 따라가는 것**이다.
+    // 느린 요청이 어디서 느렸는지(리졸버냐 JPA 쿼리냐)는 집계로는 알 수 없다 — 히스토그램의
+    // 마지막 버킷에 1이 더해질 뿐이다.
+    //
+    // **라이브러리가 아니라 이 스타터를 넣어야 한다.** Boot 4는 자동구성을 모듈로 분리했고
+    // (spring-boot-restclient와 같은 패턴) 트레이싱 자동구성이 이 스타터에 있다.
+    // micrometer-tracing-bridge-otel과 opentelemetry-exporter-otlp만 넣으면 클래스는
+    // 있으나 자동구성이 없어 `management.opentelemetry.tracing.export.otlp.*` 속성이
+    // 바인딩되지 않는다 — 앱은 정상으로 뜨고 요청도 처리되는데 span만 나가지 않는다.
+    // 두 라이브러리는 이 스타터가 전이로 가져오므로 따로 적지 않는다.
+    implementation("org.springframework.boot:spring-boot-starter-opentelemetry")
+    // **JDBC 계측은 자동으로 붙지 않는다.** Lettuce(Valkey)는 자체 Micrometer 관측을 가져
+    // Redis 호출이 span 에 잡히지만, JDBC 에는 그런 것이 없어 SQL 이 트레이스에서 빠진다 —
+    // "GraphQL 요청이 느렸다"까지만 알고 어느 쿼리가 느렸는지는 알 수 없다. 2026-08-30 의
+    // 125초 요청이 정확히 그 질문이었다.
+    //
+    // 쿼리마다 span 이 생기므로 N+1 이 있는 요청은 span 이 수십 개가 된다. 개발은 표본이
+    // 전량이지만 호출이 잦지 않고, 운영은 10% 라 감당 가능하다고 보았다. 용량이 문제되면
+    // 표본 비율을 먼저 조정한다.
+    //
+    // 2.x 가 Spring Boot 4 계열이다(POM 이 spring-boot-autoconfigure 4.0.5 를 참조).
+    implementation("net.ttddyy.observation:datasource-micrometer-spring-boot:2.2.1")
     // refresh 토큰 저장소를 Valkey(Redis 프로토콜 호환)로 이관. Lettuce 클라이언트 기본.
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.boot:spring-boot-starter-security")

@@ -47,3 +47,15 @@ logging:
     # 동작이라 INFO로 올릴 수 없다. 그런데 "알림이 안 온다"를 진단하려면 그중 어디서
     # 멈췄는지가 바로 그 정보다. 로컬에서만 켠다.
     org.around.ieuri.alarm: DEBUG
+
+management:
+  tracing:
+    export:
+      # **로컬에는 수집기가 없다.** 보낼 곳이 없으니 전송을 끈다. span 생성 자체는
+      # 살아 있어 로그의 trace ID는 그대로 찍히고, 내보내기만 멈춘다.
+      #
+      # 주소(management.opentelemetry.tracing.export.otlp.endpoint)는 이 파일에 두지
+      # 않는다 — application-{dev,prod}.yaml 만 갖는다. 여기 두면 값이 없어
+      # PlaceholderResolutionException 으로 부팅이 실패하며, 이 속성으로도 막지 못한다
+      # (조건 평가보다 placeholder 해석이 먼저다).
+      enabled: false

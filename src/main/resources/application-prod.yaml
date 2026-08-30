@@ -26,3 +26,30 @@ logging:
     # local 프로파일이 켜 둔 DEBUG(웹소켓·graphql·alarm)가 운영에 새어 들어오지 않도록
     # 우리 패키지를 INFO로 고정한다.
     org.around.ieuri: INFO
+
+management:
+  tracing:
+    sampling:
+      # 10%만 수집한다. 전량으로 두면 요청마다 span 트리를 만들어 CPU와 네트워크를 쓰는데,
+      # 2 OCPU 단일 노드에는 그만한 여유가 없다. 이 파일의 다른 값들과 마찬가지로 공통
+      # 기본값과 같은 값이지만, 개발 편의로 기본값이 올라갔을 때 운영이 조용히 따라가지
+      # 않도록 여기서 못 박는다.
+      #
+      # 표본이라 **개별 요청을 지목해 찾는 용도로는 쓸 수 없다.** 특정 장애 요청을 봐야
+      # 하면 그때 값을 올리고 재현한다.
+      probability: 0.1
+
+  # 클러스터 안의 Alloy 를 가리킨다. Grafana Cloud 를 직접 가리키지 않으므로 자격증명이
+  # 앱까지 내려오지 않고, 바깥이 느려져도 그 지연이 앱으로 번지지 않는다.
+  #
+  # **경로에 /v1/traces 까지 붙는다.** 이 속성은 OpenTelemetry SDK 와 달리 신호별 경로를
+  # 자동으로 붙이지 않아, 4318 만 주면 루트로 POST 하고 404 가 된다.
+  #
+  # **OTEL_EXPORTER_OTLP_ENDPOINT 로는 주입되지 않는다.** 그것은 SDK 의 표준 변수이고
+  # Micrometer 브리지는 이 속성만 본다 — 그 이름으로 주면 앱은 정상으로 뜨는데 span 만
+  # 나가지 않아 대시보드가 빈 이유가 드러나지 않는다.
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${IEURI_TRACING_ENDPOINT}
