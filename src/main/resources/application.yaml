@@ -142,6 +142,19 @@ management:
         # 그러니 이 값을 늘리기 전에 Ingress 쪽 차단이 여전히 유효한지 함께 봐야 한다.
         # 한쪽만 보고 판단하면 그 순간 공개된다.
         include: health,prometheus
+
+  # ── 트레이싱 ────────────────────────────────────────────────────────────────
+  # **기본값이 10%(0.1)다.** 여기서 명시하지 않으면 환경마다 같은 값이 되는데, 개발은
+  # 트래픽이 없어 10%로는 표본이 거의 잡히지 않고 운영은 트래픽이 붙으면 10%도 부담이
+  # 될 수 있다. 그래서 값을 프로파일별 파일(application-{dev,prod}.yaml)에서 정한다.
+  #
+  # 내보내는 주소는 환경변수 OTEL_EXPORTER_OTLP_ENDPOINT로 주입한다(ieuri-manifest의
+  # _helpers.tpl). **클러스터 안의 Alloy를 가리키며 Grafana Cloud를 직접 가리키지 않는다** —
+  # 토큰이 앱까지 내려오지 않고, 바깥이 느려질 때 그 지연이 앱으로 번지지 않는다.
+  tracing:
+    sampling:
+      probability: ${IEURI_TRACING_SAMPLE_RATE:0.1}
+
   endpoint:
     health:
       # k8s 프로브용 /actuator/health/{readiness,liveness} 하위 경로를 만든다.

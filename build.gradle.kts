@@ -35,6 +35,14 @@ dependencies {
     // 클래스패스에 있을 때만 그 엔드포인트를 자동구성하므로, 빼면 management 설정에
     // prometheus를 적어 두어도 404가 되고 원인이 설정 쪽으로 보여 찾기 어렵다.
     implementation("io.micrometer:micrometer-registry-prometheus")
+    // 트레이싱. 메트릭이 집계된 숫자라면 트레이스는 **요청 하나를 끝까지 따라가는 것**이다.
+    // 느린 요청이 어디서 느렸는지(리졸버냐 JPA 쿼리냐)는 집계로는 알 수 없다 — 히스토그램의
+    // 마지막 버킷에 1이 더해질 뿐이다.
+    //
+    // 둘이 짝이다. bridge가 Micrometer의 관측 지점을 OTel span으로 바꾸고, exporter가
+    // 그것을 내보낸다. 하나만 넣으면 span이 만들어지되 나가지 않거나 그 반대가 된다.
+    implementation("io.micrometer:micrometer-tracing-bridge-otel")
+    implementation("io.opentelemetry:opentelemetry-exporter-otlp")
     // refresh 토큰 저장소를 Valkey(Redis 프로토콜 호환)로 이관. Lettuce 클라이언트 기본.
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.boot:spring-boot-starter-security")
