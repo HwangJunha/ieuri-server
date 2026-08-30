@@ -39,10 +39,13 @@ dependencies {
     // 느린 요청이 어디서 느렸는지(리졸버냐 JPA 쿼리냐)는 집계로는 알 수 없다 — 히스토그램의
     // 마지막 버킷에 1이 더해질 뿐이다.
     //
-    // 둘이 짝이다. bridge가 Micrometer의 관측 지점을 OTel span으로 바꾸고, exporter가
-    // 그것을 내보낸다. 하나만 넣으면 span이 만들어지되 나가지 않거나 그 반대가 된다.
-    implementation("io.micrometer:micrometer-tracing-bridge-otel")
-    implementation("io.opentelemetry:opentelemetry-exporter-otlp")
+    // **라이브러리가 아니라 이 스타터를 넣어야 한다.** Boot 4는 자동구성을 모듈로 분리했고
+    // (spring-boot-restclient와 같은 패턴) 트레이싱 자동구성이 이 스타터에 있다.
+    // micrometer-tracing-bridge-otel과 opentelemetry-exporter-otlp만 넣으면 클래스는
+    // 있으나 자동구성이 없어 `management.opentelemetry.tracing.export.otlp.*` 속성이
+    // 바인딩되지 않는다 — 앱은 정상으로 뜨고 요청도 처리되는데 span만 나가지 않는다.
+    // 두 라이브러리는 이 스타터가 전이로 가져오므로 따로 적지 않는다.
+    implementation("org.springframework.boot:spring-boot-starter-opentelemetry")
     // refresh 토큰 저장소를 Valkey(Redis 프로토콜 호환)로 이관. Lettuce 클라이언트 기본.
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.boot:spring-boot-starter-security")
