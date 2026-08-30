@@ -46,6 +46,17 @@ dependencies {
     // 바인딩되지 않는다 — 앱은 정상으로 뜨고 요청도 처리되는데 span만 나가지 않는다.
     // 두 라이브러리는 이 스타터가 전이로 가져오므로 따로 적지 않는다.
     implementation("org.springframework.boot:spring-boot-starter-opentelemetry")
+    // **JDBC 계측은 자동으로 붙지 않는다.** Lettuce(Valkey)는 자체 Micrometer 관측을 가져
+    // Redis 호출이 span 에 잡히지만, JDBC 에는 그런 것이 없어 SQL 이 트레이스에서 빠진다 —
+    // "GraphQL 요청이 느렸다"까지만 알고 어느 쿼리가 느렸는지는 알 수 없다. 2026-08-30 의
+    // 125초 요청이 정확히 그 질문이었다.
+    //
+    // 쿼리마다 span 이 생기므로 N+1 이 있는 요청은 span 이 수십 개가 된다. 개발은 표본이
+    // 전량이지만 호출이 잦지 않고, 운영은 10% 라 감당 가능하다고 보았다. 용량이 문제되면
+    // 표본 비율을 먼저 조정한다.
+    //
+    // 2.x 가 Spring Boot 4 계열이다(POM 이 spring-boot-autoconfigure 4.0.5 를 참조).
+    implementation("net.ttddyy.observation:datasource-micrometer-spring-boot:2.2.1")
     // refresh 토큰 저장소를 Valkey(Redis 프로토콜 호환)로 이관. Lettuce 클라이언트 기본.
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.boot:spring-boot-starter-security")
