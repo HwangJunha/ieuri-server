@@ -143,6 +143,26 @@ management:
         # 한쪽만 보고 판단하면 그 순간 공개된다.
         include: health,prometheus
 
+  # ── 메트릭 ─────────────────────────────────────────────────────────────────
+  # **메트릭의 OTLP 푸시는 끈다. 우리는 긁어가는 쪽이다.**
+  #
+  # spring-boot-starter-opentelemetry가 micrometer-registry-otlp를 전이로 가져오는데,
+  # 그것이 클래스패스에 있으면 actuator가 OtlpMeterRegistry를 자동구성하고 기본 주소인
+  # `localhost:4318`로 1분마다 푸시한다. 파드 안에는 수집기가 없으므로 계속 실패한다:
+  #
+  #   Failed to publish metrics to OTLP receiver (url=http://localhost:4318/v1/metrics)
+  #   java.net.ConnectException: Connection refused
+  #
+  # 주소를 Alloy로 고쳐 주는 방법도 있으나 그러면 **같은 메트릭이 두 경로로 들어간다** —
+  # Alloy가 이미 /actuator/prometheus를 60초마다 긁고 있어 중복이고, 시계열도 두 배가
+  # 된다(무료 플랜 한도에 직접 걸린다). 푸시를 끄고 긁는 쪽만 남긴다.
+  #
+  # 트레이스는 반대로 푸시만 가능하므로 아래 opentelemetry 블록에서 따로 켠다.
+  otlp:
+    metrics:
+      export:
+        enabled: false
+
   # ── 트레이싱 ────────────────────────────────────────────────────────────────
   # **기본값이 10%(0.1)다.** 여기서 명시하지 않으면 환경마다 같은 값이 되는데, 개발은
   # 트래픽이 없어 10%로는 표본이 거의 잡히지 않고 운영은 트래픽이 붙으면 10%도 부담이
