@@ -82,25 +82,20 @@ class SpotQueryAdapter(
     override fun countReactionsIn(catalogIds: Collection<Long>, language: DomainLocale): Map<Long, ReactionCounts> {
         if (catalogIds.isEmpty()) return emptyMap()
 
-        val counted = HashMap<Long, LongArray>()
-        queryFactory
+        val counted: Map<Pair<Long, ReactionType?>, Long> = queryFactory
             .select(reaction.catalogId, reaction.reaction, reaction.count())
             .from(reaction)
             .where(reaction.catalogId.`in`(catalogIds), reaction.language.eq(language))
             .groupBy(reaction.catalogId, reaction.reaction)
             .fetch()
-            .forEach { row ->
-                val slots = counted.getOrPut(requireNotNull(row.get(reaction.catalogId))) { LongArray(2) }
-                val count = row.get(reaction.count()) ?: 0L
-                when (row.get(reaction.reaction)) {
-                    ReactionType.LIKE -> slots[0] = count
-                    ReactionType.DISLIKE -> slots[1] = count
-                    null -> Unit
-                }
+            .associate { row ->
+                (requireNotNull(row.get(reaction.catalogId)) to row.get(reaction.reaction)) to (row.get(reaction.count()) ?: 0L)
             }
         return catalogIds.associateWith { id ->
-            val slots = counted[id]
-            ReactionCounts(likes = slots?.get(0) ?: 0L, dislikes = slots?.get(1) ?: 0L)
+            ReactionCounts(
+                likes = counted[id to ReactionType.LIKE] ?: 0L,
+                dislikes = counted[id to ReactionType.DISLIKE] ?: 0L,
+            )
         }
     }
 

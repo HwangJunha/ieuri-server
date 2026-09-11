@@ -4,7 +4,10 @@ import org.around.ieuri.tourism.application.port.out.query.NearbyKeysetSearch
 import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch
 import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
 import org.around.ieuri.tourism.application.port.out.query.SpotSpatialQueryPort
+import org.around.ieuri.tourism.domain.vo.CategorySelection
+import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.domain.vo.CopyrightType
+import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Component
@@ -34,7 +37,7 @@ class SpotSpatialQueryAdapter(
      */
     @Transactional(readOnly = true)
     override fun searchNearby(query: NearbySpotSearch): List<SpotSearchResult> {
-        val (where, params) = whereClause(query)
+        val (where, params) = whereClause(query.language, query.center, query.radiusMeters, query.categories, query.excludedSpotIds)
         // 중심 좌표를 CTE로 한 번만 바인딩한다. SELECT·WHERE·ORDER BY 세 곳에서 쓰이는데
         // 그때마다 ST_MakePoint(?, ?)를 반복하면 위치 파라미터가 6개로 늘어 순서를 맞추기 어렵다.
         val sql = """
@@ -74,21 +77,14 @@ class SpotSpatialQueryAdapter(
 
     /**
      * [searchNearby]와 같은 후보·같은 정렬을 (거리, id) 키셋으로(SPEC-0035 R3). 거리가 계산식이라
-     * WHERE에서 별칭을 못 써 서브쿼리로 한 겹 감싼다. `limit + 1`건을 읽어 호출자가 다음 페이지를
-     * 판정한다. 반경 필터(`ST_DWithin`)는 안쪽에 남아 GiST 인덱스를 탄다.
+     * WHERE에서 별칭을 못 써 서브쿼리로 한 겹 감싼다(`FestivalQueryJdbcAdapter`와 같은 모양). `limit + 1`건을
+     * 읽어 호출자가 다음 페이지를 판정한다. 반경 필터(`ST_DWithin`)는 안쪽에 남아 GiST 인덱스를 타고,
+     * 바깥의 seek 조건은 플래너가 서브쿼리 안으로 밀어 넣는다 — 거리는 계산값이라 어느 위치든 인덱스가 없다.
      */
     @Transactional(readOnly = true)
     override fun searchNearbyAfter(query: NearbyKeysetSearch): List<SpotSearchResult> {
         val (where, whereParams) = whereClause(
-            NearbySpotSearch(
-                language = query.language,
-                center = query.center,
-                radiusMeters = query.radiusMeters,
-                categories = query.categories,
-                excludedSpotIds = query.excludedSpotIds,
-                limit = query.limit,
-                offset = 0,
-            ),
+            query.language, query.center, query.radiusMeters, query.categories, query.excludedSpotIds,
         )
         val params = whereParams.toMutableList()
         val seek = if (query.after != null) {
@@ -119,7 +115,7 @@ class SpotSpatialQueryAdapter(
     /** [searchNearby]와 같은 조건에 걸리는 전체 건수. */
     @Transactional(readOnly = true)
     override fun countNearby(query: NearbySpotSearch): Int {
-        val (where, params) = whereClause(query)
+        val (where, params) = whereClause(query.language, query.center, query.radiusMeters, query.categories, query.excludedSpotIds)
         return jdbcTemplate.queryForObject(
             "WITH c AS (SELECT $CENTER AS center) SELECT COUNT(*) FROM $CARD_SOURCE, c WHERE $where",
             Int::class.java,
@@ -134,7 +130,13 @@ class SpotSpatialQueryAdapter(
      * 반경 필터는 반드시 `ST_DWithin`이다 — `ST_Distance(...) <= radius`로 쓰면 전 행을 계산해
      * GiST 인덱스를 타지 못한다.
      */
-    private fun whereClause(query: NearbySpotSearch): Pair<String, List<Any>> {
+    private fun whereClause(
+        language: DomainLocale,
+        center: Coordinates,
+        radiusMeters: Int,
+        categories: CategorySelection,
+        excludedSpotIds: Set<Long>,
+    ): Pair<String, List<Any>> {
         // 파라미터 순서: CTE의 center(경도, 위도)가 먼저 오고, 그다음 조인·WHERE 조건 순서다.
         // **번역 기준으로 거른다**(SPEC-0019 R-9) — `t.language`는 spot 행의 언어가 아니라
         // 번역의 언어다. 번역이 채워진 카탈로그는 그 언어의 spot 행이 없어도 목록에 나온다.
@@ -150,23 +152,23 @@ class SpotSpatialQueryAdapter(
             "ST_DWithin(cat.location, c.center, ?)",
         )
         val params = mutableListOf<Any>(
-            query.center.longitude, query.center.latitude,
-            query.language.name,
-            query.radiusMeters.toDouble(),
+            center.longitude, center.latitude,
+            language.name,
+            radiusMeters.toDouble(),
         )
 
         // 다중 선택은 OR이며 IN으로 표현한다(SPEC-0020). 비어 있으면 조건 자체를 걸지 않는다.
-        if (!query.categories.isUnfiltered) {
-            val codes = query.categories.codes()
+        if (!categories.isUnfiltered) {
+            val codes = categories.codes()
             conditions += "cat.category IN (${codes.joinToString(",") { "?" }})"
             params.addAll(codes)
         }
-        if (query.excludedSpotIds.isNotEmpty()) {
+        if (excludedSpotIds.isNotEmpty()) {
             // 이미 반응한 항목은 DB 단계에서 제외한다 — 조회 후 걸러내면 페이지가 size보다 작아진다.
             // **제외 대상은 카탈로그 id다** — 목록이 카탈로그 id를 내보내므로 호출자가 되돌려
             // 주는 것도 같은 축이다.
-            conditions += "cat.id NOT IN (${query.excludedSpotIds.joinToString(",") { "?" }})"
-            params.addAll(query.excludedSpotIds)
+            conditions += "cat.id NOT IN (${excludedSpotIds.joinToString(",") { "?" }})"
+            params.addAll(excludedSpotIds)
         }
         return conditions.joinToString(" AND ") to params
     }

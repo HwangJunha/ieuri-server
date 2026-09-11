@@ -21,8 +21,6 @@ data class RecommendationProperties(
         val distanceHalfLifeMeters: Double = 5_000.0,
         val popularityCap: Long = 100,
         val activityCap: Long = 50,
-        /** 취향 요인이 성립하는 최소 LIKE 수. S2에서 쓴다. */
-        val affinityMinLikes: Int = 5,
         val taxRefundMultiplier: Double = 0.8,
         /** 면세 태그 판정 패턴. 언어별 표기가 다르다(T6 실측: EN·JA·ZH·KO 네 가지). */
         val taxRefundTitlePatterns: List<String> = listOf("[Tax Refund Shop]"),

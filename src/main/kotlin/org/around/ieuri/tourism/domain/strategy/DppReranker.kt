@@ -29,7 +29,7 @@ class DppReranker(
         require(window >= 1) { "창 크기는 1 이상이어야 합니다." }
     }
 
-    /** 커널의 비대각 원소. 학습 배치도 같은 식을 써야 하므로 공개한다. */
+    /** 커널의 비대각 원소. 나이브 행렬식 그리디와의 대조 테스트가 같은 식을 쓰므로 공개한다. */
     fun kernelOffDiagonal(qi: Double, qj: Double, distance: Double): Double =
         alpha * qi * qj * exp(-distance / (2.0 * sigma * sigma))
 

@@ -130,7 +130,7 @@ class RecommendedFeedQueryService(
         /** [batchNo]번째 묶음. 후보가 바닥나 만들 수 없으면 null. */
         private fun batch(batchNo: Int): List<SpotSearchResult>? {
             batches[batchNo]?.let { return it }
-            feedBatchCachePort.get(conditions.hash, batchNo)?.let {
+            cached(batchNo)?.let {
                 batches[batchNo] = it
                 return it
             }
@@ -146,9 +146,17 @@ class RecommendedFeedQueryService(
 
             val built = rerank(remaining).take(policy.batchSize)
             batches[batchNo] = built
-            feedBatchCachePort.put(conditions.hash, batchNo, built)
+            remember(batchNo, built)
             return built
         }
+
+        /** 캐시 조회 실패는 미스다(AC-17.3) — 캐시는 있으면 빠르고 없으면 정확한 것이다. */
+        private fun cached(batchNo: Int): List<SpotSearchResult>? =
+            tolerating("묶음 캐시 조회", null) { feedBatchCachePort.get(conditions.hash, batchNo) }
+
+        /** 캐시 저장 실패는 no-op이다(AC-17.3). */
+        private fun remember(batchNo: Int, cards: List<SpotSearchResult>) =
+            tolerating("묶음 캐시 저장", Unit) { feedBatchCachePort.put(conditions.hash, batchNo, cards) }
 
         /**
          * 점수가 있는 후보는 DPP 그리디로, 없는 후보는 맨 뒤에 id 순으로(AC-6.2).
@@ -203,11 +211,15 @@ class RecommendedFeedQueryService(
 
         /** 요인 출처의 실패는 오류가 아니라 요인 없음이다(§ 검증과 오류). */
         private fun <T> factorSource(name: String, read: () -> Map<Long, T>): Map<Long, T> =
+            tolerating(name, emptyMap(), read)
+
+        /** 캐시·집계·유행 포트의 실패는 오류가 아니다 — [fallback]으로 진행하고 기록만 남긴다. */
+        private fun <T> tolerating(name: String, fallback: T, action: () -> T): T =
             try {
-                read()
+                action()
             } catch (e: RuntimeException) {
-                log.warn("추천 피드 {} 조회 실패, 요인 없음으로 진행: {}", name, e.javaClass.simpleName)
-                emptyMap()
+                log.warn("추천 피드 {} 실패, 없는 것으로 진행: {}", name, e.javaClass.simpleName)
+                fallback
             }
     }
 }

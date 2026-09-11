@@ -518,7 +518,6 @@ ieuri:
         distance-half-life-meters: 5000
         popularity-cap: 100
         activity-cap: 50
-        affinity-min-likes: 5
         tax-refund-multiplier: 0.8
         # 면세 태그 표기(T6 실측 2026-09-11): EN 10,489 · JA 10,490 · ZH 10,349 · KO 28행.
         # 제목 문자열만 보며, 태그가 없는 행은 감점 없이 계산된다.
