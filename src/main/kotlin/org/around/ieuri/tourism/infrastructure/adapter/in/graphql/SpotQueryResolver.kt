@@ -16,9 +16,9 @@ import org.around.ieuri.tourism.application.query.SpotDetailView
 import org.around.ieuri.tourism.application.query.SpotIntroView
 import org.around.ieuri.tourism.application.query.SpotImageView
 import org.around.ieuri.tourism.application.query.SpotPageView
-import org.around.ieuri.tourism.application.query.SpotView
 import org.around.ieuri.tourism.application.query.SpotsQuery
 import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toCategorySelection
+import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toGql
 import org.around.ieuri.tourism.infrastructure.locale.domainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.common.graphql.appKey
@@ -30,7 +30,6 @@ import org.around.ieuri.common.graphql.generated.types.LikedSpot as GqlLikedSpot
 import org.around.ieuri.common.graphql.generated.types.LikedSpotConnection as GqlLikedSpotConnection
 import org.around.ieuri.common.graphql.generated.types.LikedSpotEdge as GqlLikedSpotEdge
 import org.around.ieuri.common.graphql.generated.types.PageInfo as GqlPageInfo
-import org.around.ieuri.common.graphql.generated.types.Spot as GqlSpot
 import org.around.ieuri.common.graphql.generated.types.SpotCategory as GqlSpotCategory
 import org.around.ieuri.common.graphql.generated.types.SpotDetail as GqlSpotDetail
 import org.around.ieuri.common.graphql.generated.types.SpotImage as GqlSpotImage
@@ -264,19 +263,6 @@ class SpotQueryResolver(
         page = page,
         hasNext = hasNext,
         totalCount = totalCount,
-    )
-
-    private fun SpotView.toGql(): GqlSpot = GqlSpot(
-        id = id,
-        title = title,
-        address = address,
-        thumbnailImageUrl = thumbnailImageUrl,
-        distanceMeters = distanceMeters,
-        category = GqlSpotCategory(code = category.code, label = category.code, iconUrl = null),
-        copyright = GqlCopyrightType.valueOf(copyright.name),
-        attributionText = attributionText,
-        mapX = mapX,
-        mapY = mapY,
     )
 
     private fun SpotIntroView.toGql(): GqlSpotIntro = GqlSpotIntro(

@@ -402,6 +402,27 @@ class CommunityQueryAdapter(
             .fetch()
             .toSet()
 
+    /** 장소별 글 수. GROUP BY에 없는 id는 0으로 채운다 — 글이 없는 것이지 모르는 장소가 아니다. */
+    @Transactional(readOnly = true)
+    override fun countPostsByCatalogIds(catalogIds: Collection<Long>): Map<Long, Long> {
+        if (catalogIds.isEmpty()) return emptyMap()
+
+        val counted = queryFactory
+            .select(postSpot.catalogId, post.id.count())
+            .from(postSpot)
+            .join(post).on(post.id.eq(postSpot.postId))
+            .where(
+                postSpot.catalogId.`in`(catalogIds),
+                post.deletedAt.isNull,
+                post.hidden.isFalse,
+            )
+            .groupBy(postSpot.catalogId)
+            .fetch()
+            .associate { requireNotNull(it.get(postSpot.catalogId)) to (it.get(post.id.count()) ?: 0L) }
+
+        return catalogIds.associateWith { counted[it] ?: 0L }
+    }
+
     /**
      * 피드 공통 조회. spotPosts·nearbyPosts가 조건만 달리해 이 하나를 쓴다 —
      * 정렬·페이징·모더레이션 필터가 두 경로에서 갈리지 않게 하려는 것이다.

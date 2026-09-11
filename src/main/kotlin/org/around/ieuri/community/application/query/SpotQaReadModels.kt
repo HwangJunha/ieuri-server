@@ -68,3 +68,9 @@ data class SpotAnswersQuery(
     val first: Int,
     val after: String?,
 )
+
+/** 장소 하나의 질문·답변 수(SPEC-0035 R9). 삭제·숨김을 뺀 값이며 답글은 세지 않는다. */
+data class SpotQaCounts(
+    val questions: Long,
+    val answers: Long,
+)

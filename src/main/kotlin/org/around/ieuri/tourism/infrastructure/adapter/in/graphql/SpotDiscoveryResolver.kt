@@ -8,23 +8,21 @@ import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
-import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.tourism.application.port.`in`.query.SpotDiscoveryUseCase
 import org.around.ieuri.tourism.application.query.FestivalView
 import org.around.ieuri.tourism.application.query.OngoingFestivalsQuery
 import org.around.ieuri.tourism.application.query.PopularSpotsQuery
 import org.around.ieuri.tourism.application.query.SearchSpotsQuery
-import org.around.ieuri.tourism.application.query.SpotView
 import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toCategorySelection
+import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toGql
+import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toGqlPageInfo
 import org.around.ieuri.tourism.infrastructure.locale.domainLocale
 import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
 import org.around.ieuri.common.graphql.generated.types.Festival as GqlFestival
 import org.around.ieuri.common.graphql.generated.types.FestivalConnection as GqlFestivalConnection
 import org.around.ieuri.common.graphql.generated.types.FestivalEdge as GqlFestivalEdge
-import org.around.ieuri.common.graphql.generated.types.PageInfo as GqlPageInfo
 import org.around.ieuri.common.graphql.generated.types.PopularSpotConnection as GqlPopularSpotConnection
 import org.around.ieuri.common.graphql.generated.types.PopularSpotEdge as GqlPopularSpotEdge
-import org.around.ieuri.common.graphql.generated.types.Spot as GqlSpot
 import org.around.ieuri.common.graphql.generated.types.SpotCategory as GqlSpotCategory
 import org.around.ieuri.common.graphql.generated.types.SpotSearchConnection as GqlSpotSearchConnection
 import org.around.ieuri.common.graphql.generated.types.SpotSearchPayload as GqlSpotSearchPayload
@@ -191,26 +189,6 @@ class SpotDiscoveryResolver(
             pageInfo = page.toGqlPageInfo(),
         )
     }
-
-    private fun CursorPage<*>.toGqlPageInfo(): GqlPageInfo = GqlPageInfo(
-        hasNextPage = pageInfo.hasNextPage,
-        hasPreviousPage = pageInfo.hasPreviousPage,
-        startCursor = pageInfo.startCursor,
-        endCursor = pageInfo.endCursor,
-    )
-
-    private fun SpotView.toGql(): GqlSpot = GqlSpot(
-        id = id,
-        title = title,
-        address = address,
-        thumbnailImageUrl = thumbnailImageUrl,
-        distanceMeters = distanceMeters,
-        category = GqlSpotCategory(code = category.code, label = category.code, iconUrl = null),
-        copyright = GqlCopyrightType.valueOf(copyright.name),
-        attributionText = attributionText,
-        mapX = mapX,
-        mapY = mapY,
-    )
 
     /** 날짜는 원본이 DATE 컬럼이라 시각 성분이 없다 — LocalDate.toString()이 곧 YYYY-MM-DD다. */
     private fun FestivalView.toGql(): GqlFestival = GqlFestival(

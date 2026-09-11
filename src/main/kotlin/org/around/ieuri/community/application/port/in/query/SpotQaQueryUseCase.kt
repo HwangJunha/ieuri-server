@@ -4,6 +4,7 @@ import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.community.application.query.SpotAnswerReplyView
 import org.around.ieuri.community.application.query.SpotAnswerView
 import org.around.ieuri.community.application.query.SpotAnswersQuery
+import org.around.ieuri.community.application.query.SpotQaCounts
 import org.around.ieuri.community.application.query.SpotQuestionView
 import org.around.ieuri.community.application.query.SpotQuestionsQuery
 import org.around.ieuri.community.domain.vo.ContentLanguage
@@ -48,4 +49,10 @@ interface SpotQaQueryUseCase {
     fun answerPhotoKeys(answerIds: List<Long>): Map<Long, List<String>>
 
     fun replyPhotoKeys(replyIds: List<Long>): Map<Long, List<String>>
+
+    /**
+     * 장소별 질문·답변 수(SPEC-0035 R9). 삭제·숨김은 빼며 요청한 id 전부에 값이 있다(없으면 0).
+     * 다른 도메인(tourism의 추천 점수)이 쓰는 진입점이다.
+     */
+    fun qaCountsByCatalogIds(catalogIds: Collection<Long>): Map<Long, SpotQaCounts>
 }

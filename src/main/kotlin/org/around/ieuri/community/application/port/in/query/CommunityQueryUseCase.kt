@@ -87,4 +87,10 @@ interface CommunityQueryUseCase {
      * 구성이 없는 앱이면 빈 목록이며 오류가 아니다 — 앱은 칩 영역이 비는 경우를 허용해야 한다.
      */
     fun communityChips(appKey: AppKey, language: ContentLanguage): List<CommunityChipView>
+
+    /**
+     * 장소별 글 수(SPEC-0035 R9). 삭제·숨김 글은 빼며 요청한 id 전부에 값이 있다(없으면 0).
+     * 다른 도메인(tourism의 추천 점수)이 쓰는 진입점이라 문자열·숫자 축만 쓴다.
+     */
+    fun postCountsByCatalogIds(catalogIds: Collection<Long>): Map<Long, Long>
 }

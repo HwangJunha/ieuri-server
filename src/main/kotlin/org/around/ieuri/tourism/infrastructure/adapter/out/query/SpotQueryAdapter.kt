@@ -5,6 +5,7 @@ import org.around.ieuri.common.pagination.CursorEdge
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.CursorPageInfo
 import org.around.ieuri.tourism.application.port.out.query.LikedSpotsSearch
+import org.around.ieuri.tourism.application.port.out.query.ReactionCounts
 import org.around.ieuri.tourism.application.port.out.query.SpotBasics
 import org.around.ieuri.tourism.application.port.out.query.SpotIdentity
 import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
@@ -73,6 +74,35 @@ class SpotQueryAdapter(
                 reaction.reaction.eq(ReactionType.LIKE),
             )
             .fetchOne() ?: 0L
+
+    /**
+     * 여러 카탈로그의 LIKE·DISLIKE 수를 한 번에. **활성 언어 안에서만 센다**([countLikes]와 같다).
+     * GROUP BY에 없는 id는 0으로 채운다 — 반응이 없는 것이지 모르는 장소가 아니다.
+     */
+    override fun countReactionsIn(catalogIds: Collection<Long>, language: DomainLocale): Map<Long, ReactionCounts> {
+        if (catalogIds.isEmpty()) return emptyMap()
+
+        val counted = HashMap<Long, LongArray>()
+        queryFactory
+            .select(reaction.catalogId, reaction.reaction, reaction.count())
+            .from(reaction)
+            .where(reaction.catalogId.`in`(catalogIds), reaction.language.eq(language))
+            .groupBy(reaction.catalogId, reaction.reaction)
+            .fetch()
+            .forEach { row ->
+                val slots = counted.getOrPut(requireNotNull(row.get(reaction.catalogId))) { LongArray(2) }
+                val count = row.get(reaction.count()) ?: 0L
+                when (row.get(reaction.reaction)) {
+                    ReactionType.LIKE -> slots[0] = count
+                    ReactionType.DISLIKE -> slots[1] = count
+                    null -> Unit
+                }
+            }
+        return catalogIds.associateWith { id ->
+            val slots = counted[id]
+            ReactionCounts(likes = slots?.get(0) ?: 0L, dislikes = slots?.get(1) ?: 0L)
+        }
+    }
 
     /**
      * 이 회원이 이 언어에서 남긴 최신 반응. 반응한 적 없으면 null이며 그것이 정상적인 부재다.

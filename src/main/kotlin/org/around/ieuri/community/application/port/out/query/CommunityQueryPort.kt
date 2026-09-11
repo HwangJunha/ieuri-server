@@ -101,6 +101,12 @@ interface CommunityQueryPort {
 
     /** [memberId]가 개별로 숨긴 글의 id. 피드 필터가 이 집합을 제외한다. */
     fun findHiddenPostIds(memberId: Long): Set<Long>
+
+    /**
+     * 장소별 글 수(SPEC-0035 R9). 삭제·숨김 글은 빼며, **요청한 id 전부에 값이 있다** —
+     * 글이 없는 장소는 0이다. 언어를 가리지 않는다.
+     */
+    fun countPostsByCatalogIds(catalogIds: Collection<Long>): Map<Long, Long>
 }
 
 /**

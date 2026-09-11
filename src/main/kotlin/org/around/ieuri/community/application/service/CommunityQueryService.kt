@@ -174,6 +174,9 @@ class CommunityQueryService(
     override fun postCatalogIds(postIds: List<Long>): Map<Long, Long> =
         communityQueryPort.findCatalogIdsOf(postIds)
 
+    override fun postCountsByCatalogIds(catalogIds: Collection<Long>): Map<Long, Long> =
+        communityQueryPort.countPostsByCatalogIds(catalogIds)
+
     override fun likedPostIds(postIds: List<Long>, memberId: Long): Set<Long> =
         communityQueryPort.findLikedPostIds(memberId, postIds)
 

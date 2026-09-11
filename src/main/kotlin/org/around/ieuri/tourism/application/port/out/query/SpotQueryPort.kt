@@ -30,6 +30,12 @@ interface SpotQueryPort {
     fun countLikes(catalogId: Long, language: DomainLocale): Long
 
     /**
+     * 여러 카탈로그의 **[language]** LIKE·DISLIKE 수를 한 번에(SPEC-0035 R8). 요청한 id 전부에
+     * 값이 있다 — 반응이 없는 장소는 0이지 모르는 장소가 아니다. 다른 언어의 반응은 세지 않는다.
+     */
+    fun countReactionsIn(catalogIds: Collection<Long>, language: DomainLocale): Map<Long, ReactionCounts>
+
+    /**
      * 이 회원이 **[language]에서** 이 카탈로그에 남긴 최신 반응. 반응한 적 없으면 null.
      *
      * `reactToSpot`은 덮어쓰기만 가능하고 취소 수단이 없어 (회원, 카탈로그, 언어)당 행이
@@ -83,6 +89,12 @@ interface SpotQueryPort {
      */
     fun findLikedSpots(query: LikedSpotsSearch): CursorPage<LikedSpotView>
 }
+
+/** 한 카탈로그의 언어별 반응 집계. */
+data class ReactionCounts(
+    val likes: Long,
+    val dislikes: Long,
+)
 
 /**
  * `spot` 행이 보유한 상세 표시 값(read DTO). 본문 부재 시 응답·적재의 재료가 된다.

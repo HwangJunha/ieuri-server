@@ -12,6 +12,7 @@ import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.cursorPageOf
 import org.around.ieuri.community.application.port.out.query.SpotAnswersSearch
 import org.around.ieuri.community.application.port.out.query.SpotQaOriginSource
+import org.around.ieuri.community.application.query.SpotQaCounts
 import org.around.ieuri.community.application.port.out.query.SpotQaQueryPort
 import org.around.ieuri.community.application.port.out.query.SpotQuestionsSearch
 import org.around.ieuri.community.application.port.out.query.ViewerContext
@@ -180,6 +181,31 @@ class SpotQaQueryAdapter(
     @Transactional(readOnly = true)
     override fun findReplyPhotoKeys(replyIds: List<Long>): Map<Long, List<String>> =
         findPhotoKeys(SpotQaPhotoOwnerType.REPLY, replyIds)
+
+    /** 장소별 질문·답변 수. GROUP BY에 없는 id는 0으로 채운다 — 없는 것이지 모르는 장소가 아니다. */
+    @Transactional(readOnly = true)
+    override fun countByCatalogIds(catalogIds: Collection<Long>): Map<Long, SpotQaCounts> {
+        if (catalogIds.isEmpty()) return emptyMap()
+
+        val questions = queryFactory
+            .select(question.catalogId, question.id.count())
+            .from(question)
+            .where(question.catalogId.`in`(catalogIds), question.deletedAt.isNull, question.hidden.isFalse)
+            .groupBy(question.catalogId)
+            .fetch()
+            .associate { requireNotNull(it.get(question.catalogId)) to (it.get(question.id.count()) ?: 0L) }
+        val answers = queryFactory
+            .select(answer.catalogId, answer.id.count())
+            .from(answer)
+            .where(answer.catalogId.`in`(catalogIds), answer.deletedAt.isNull, answer.hidden.isFalse)
+            .groupBy(answer.catalogId)
+            .fetch()
+            .associate { requireNotNull(it.get(answer.catalogId)) to (it.get(answer.id.count()) ?: 0L) }
+
+        return catalogIds.associateWith {
+            SpotQaCounts(questions = questions[it] ?: 0L, answers = answers[it] ?: 0L)
+        }
+    }
 
     /**
      * 출처 스냅샷의 재료. 답변과 질문을 **한 번의 조인으로** 읽는다.

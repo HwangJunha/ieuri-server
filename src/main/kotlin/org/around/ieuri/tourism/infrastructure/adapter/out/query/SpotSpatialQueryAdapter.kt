@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.query
 
+import org.around.ieuri.tourism.application.port.out.query.NearbyKeysetSearch
 import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch
 import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
 import org.around.ieuri.tourism.application.port.out.query.SpotSpatialQueryPort
@@ -8,6 +9,7 @@ import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import java.sql.ResultSet
 
 /**
  * 반경 조회 전용 어댑터. PostGIS 함수(`ST_DWithin`·`ST_Distance`·`ST_MakePoint`)를 QueryDSL로
@@ -47,26 +49,71 @@ class SpotSpatialQueryAdapter(
 
         return jdbcTemplate.query(
             sql,
-            { rs, _ ->
-                SpotSearchResult(
-                    // **클라이언트에 나가는 id는 카탈로그 id다**(SPEC-0019) — 목록의 단위가
-                    // 언어별 spot 행이 아니라 장소이기 때문이다.
-                    spotId = rs.getLong("id"),
-                    title = rs.getString("title"),
-                    address = rs.getString("address"),
-                    // 카탈로그의 썸네일은 nullable이다. 카드 자리를 비워 두는 편이 조회를 통째로
-                    // 실패시키는 것보다 낫다.
-                    thumbnailImageUrl = rs.getString("thumbnail_image_url"),
-                    mapX = rs.getDouble("map_x"),
-                    mapY = rs.getDouble("map_y"),
-                    category = SpotCategory(rs.getString("category")),
-                    // 컬럼에 enum 이름이 그대로 들어 있으므로 코드 변환(fromCode)이 아니라 valueOf다.
-                    copyright = CopyrightType.valueOf(rs.getString("copyright")),
-                    distanceMeters = rs.getDouble("distance_meters"),
-                )
-            },
+            { rs, _ -> rs.toSearchResult() },
             *(params + query.limit + query.offset).toTypedArray(),
         )
+    }
+
+    /** 카드 한 장. 두 조회가 같은 컬럼([CARD_COLUMNS])을 읽으므로 한 곳에서 옮긴다. */
+    private fun ResultSet.toSearchResult(): SpotSearchResult = SpotSearchResult(
+        // **클라이언트에 나가는 id는 카탈로그 id다**(SPEC-0019) — 목록의 단위가
+        // 언어별 spot 행이 아니라 장소이기 때문이다.
+        spotId = getLong("id"),
+        title = getString("title"),
+        address = getString("address"),
+        // 카탈로그의 썸네일은 nullable이다. 카드 자리를 비워 두는 편이 조회를 통째로
+        // 실패시키는 것보다 낫다.
+        thumbnailImageUrl = getString("thumbnail_image_url"),
+        mapX = getDouble("map_x"),
+        mapY = getDouble("map_y"),
+        category = SpotCategory(getString("category")),
+        // 컬럼에 enum 이름이 그대로 들어 있으므로 코드 변환(fromCode)이 아니라 valueOf다.
+        copyright = CopyrightType.valueOf(getString("copyright")),
+        distanceMeters = getDouble("distance_meters"),
+    )
+
+    /**
+     * [searchNearby]와 같은 후보·같은 정렬을 (거리, id) 키셋으로(SPEC-0035 R3). 거리가 계산식이라
+     * WHERE에서 별칭을 못 써 서브쿼리로 한 겹 감싼다. `limit + 1`건을 읽어 호출자가 다음 페이지를
+     * 판정한다. 반경 필터(`ST_DWithin`)는 안쪽에 남아 GiST 인덱스를 탄다.
+     */
+    @Transactional(readOnly = true)
+    override fun searchNearbyAfter(query: NearbyKeysetSearch): List<SpotSearchResult> {
+        val (where, whereParams) = whereClause(
+            NearbySpotSearch(
+                language = query.language,
+                center = query.center,
+                radiusMeters = query.radiusMeters,
+                categories = query.categories,
+                excludedSpotIds = query.excludedSpotIds,
+                limit = query.limit,
+                offset = 0,
+            ),
+        )
+        val params = whereParams.toMutableList()
+        val seek = if (query.after != null) {
+            params += query.after.distanceMeters
+            params += query.after.spotId
+            "WHERE (distance_meters, id) > (?, ?)"
+        } else {
+            ""
+        }
+        params += query.limit + 1
+
+        val sql = """
+            WITH c AS (SELECT $CENTER AS center)
+            SELECT * FROM (
+                SELECT $CARD_COLUMNS,
+                       ST_Distance(cat.location, c.center) AS distance_meters
+                FROM $CARD_SOURCE, c
+                WHERE $where
+            ) ranked
+            $seek
+            ORDER BY distance_meters ASC, id ASC
+            LIMIT ?
+        """.trimIndent()
+
+        return jdbcTemplate.query(sql, { rs, _ -> rs.toSearchResult() }, *params.toTypedArray())
     }
 
     /** [searchNearby]와 같은 조건에 걸리는 전체 건수. */

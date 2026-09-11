@@ -3,6 +3,7 @@ package org.around.ieuri.community.application.port.out.query
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.community.application.query.SpotAnswerReplyView
 import org.around.ieuri.community.application.query.SpotAnswerView
+import org.around.ieuri.community.application.query.SpotQaCounts
 import org.around.ieuri.community.application.query.SpotQuestionView
 import org.around.ieuri.community.domain.vo.ContentLanguage
 
@@ -56,6 +57,12 @@ interface SpotQaQueryPort {
     fun findAnswerPhotoKeys(answerIds: List<Long>): Map<Long, List<String>>
 
     fun findReplyPhotoKeys(replyIds: List<Long>): Map<Long, List<String>>
+
+    /**
+     * 장소별 질문·답변 수(SPEC-0035 R9). 삭제·숨김은 빼며, **요청한 id 전부에 값이 있다** —
+     * 질문이 없는 장소는 0이다. 답글은 세지 않는다.
+     */
+    fun countByCatalogIds(catalogIds: Collection<Long>): Map<Long, SpotQaCounts>
 
     /**
      * DM 출처 스냅샷의 재료(SPEC-0026 R14). 답변 하나에서 질문·장소까지 **한 번에** 읽는다.

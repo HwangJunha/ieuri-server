@@ -8,6 +8,7 @@ import org.around.ieuri.community.application.policy.CommunityPolicy
 import org.around.ieuri.community.application.port.`in`.query.SpotQaQueryUseCase
 import org.around.ieuri.community.application.port.out.client.SpotLookupPort
 import org.around.ieuri.community.application.port.out.query.CommunityQueryPort
+import org.around.ieuri.community.application.query.SpotQaCounts
 import org.around.ieuri.community.application.port.out.query.SpotAnswersSearch
 import org.around.ieuri.community.application.port.out.query.SpotQaQueryPort
 import org.around.ieuri.community.application.port.out.query.SpotQuestionsSearch
@@ -116,6 +117,9 @@ class SpotQaQueryService(
 
     override fun replyPhotoKeys(replyIds: List<Long>): Map<Long, List<String>> =
         spotQaQueryPort.findReplyPhotoKeys(replyIds)
+
+    override fun qaCountsByCatalogIds(catalogIds: Collection<Long>): Map<Long, SpotQaCounts> =
+        spotQaQueryPort.countByCatalogIds(catalogIds)
 
     /**
      * 호출자의 차단 관계를 **양방향으로** 읽어 담는다. 커뮤니티 글과 같은 집합을 쓴다 —

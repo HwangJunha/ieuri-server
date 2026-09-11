@@ -14,7 +14,6 @@ import org.around.ieuri.tourism.application.port.out.query.PopularSpotQueryPort
 import org.around.ieuri.tourism.application.port.out.query.PopularSpotSearch
 import org.around.ieuri.tourism.application.port.out.query.SpotSearchPort
 import org.around.ieuri.tourism.application.port.out.query.SpotSearchQuery
-import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
 import org.around.ieuri.tourism.application.query.FestivalView
 import org.around.ieuri.tourism.application.query.OngoingFestivalsQuery
 import org.around.ieuri.tourism.application.query.PopularSpotView
@@ -23,7 +22,6 @@ import org.around.ieuri.tourism.application.query.SearchSpotsQuery
 import org.around.ieuri.tourism.application.query.SearchUserError
 import org.around.ieuri.tourism.application.query.SpotSearchResultView
 import org.around.ieuri.tourism.application.query.SpotSuggestionView
-import org.around.ieuri.tourism.application.query.SpotView
 import org.around.ieuri.tourism.domain.vo.CategorySelection
 import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.domain.vo.DistanceCursor
@@ -237,20 +235,6 @@ class SpotDiscoveryService(
             throw RadiusTooLargeException("반경은 최대 ${policy.maxRadiusMeters}m까지 허용됩니다.")
         }
     }
-
-    /** attributionText는 copyright에서 파생된다 — 적재하지 않는 이유이기도 하다(둘이 어긋날 수 있다). */
-    private fun SpotSearchResult.toView(): SpotView = SpotView(
-        id = spotId,
-        title = title,
-        address = address,
-        thumbnailImageUrl = thumbnailImageUrl,
-        distanceMeters = distanceMeters,
-        category = category,
-        copyright = copyright,
-        attributionText = copyright.attributionText,
-        mapX = mapX,
-        mapY = mapY,
-    )
 
     private companion object {
         const val FIELD_QUERY = "query"

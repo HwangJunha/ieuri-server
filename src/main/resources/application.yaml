@@ -502,6 +502,50 @@ ieuri:
         - 의원점
         - 약국점
         - Clinic Branch
+
+    # 내 주변 추천 피드(SPEC-0035 §9). **출발값이다**(POL-044) — 가산·동부산 아울렛 좌표에서
+    # 첫 묶음의 카테고리 분포와 연속 유사 카드 수를 실측한 뒤 확정한다(T1·T7).
+    recommendation:
+      score:
+        # 요인 가중치. 없는 요인은 분모에서도 빠진다(POL-043). 유행은 출처 미정이라 0(T4).
+        weights:
+          distance: 0.4
+          popularity: 0.25
+          activity: 0.15
+          affinity: 0.2
+          trend: 0.0
+        # 거리 요인이 0.5가 되는 거리. SPEC-0013 실측(1km→5km).
+        distance-half-life-meters: 5000
+        popularity-cap: 100
+        activity-cap: 50
+        affinity-min-likes: 5
+        tax-refund-multiplier: 0.8
+        # 면세 태그 표기(T6 실측 2026-09-11): EN 10,489 · JA 10,490 · ZH 10,349 · KO 28행.
+        # 제목 문자열만 보며, 태그가 없는 행은 감점 없이 계산된다.
+        tax-refund-title-patterns:
+          - "[Tax Refund Shop]"
+          - "[事後免税店]"
+          - "[事後免稅店]"
+          - "[면세점(TAX REFUND SHOP)]"
+      dpp:
+        # 커널 L_ij = α·q_i·q_j·exp(−D_ij / 2σ²). 학습 전 출발값.
+        alpha: 1.0
+        sigma: 0.5
+        # 창 k(YouTube 논문 "십여 개") · 후보 상한 N · 묶음 B(요청 2회분).
+        window: 12
+        candidate-cap: 300
+        batch-size: 200
+        # 벡터가 없는 쌍의 대체 거리(R14).
+        same-category-distance: 0.3
+        different-category-distance: 1.0
+      cursor:
+        # 스와이프 세션이 하루를 넘지 않는다는 가정. 세션 시작 시각 기준이며 이어 받아도 갱신되지 않는다.
+        max-age: 24h
+        # 비밀값: 커밋 금지. 커서 서명 키 — 없으면 기동하지 않는다(S1 기동 조건, POL-056).
+        secret: ${IEURI_FEED_CURSOR_SECRET}
+      cache:
+        # 묶음 캐시 TTL. 캐시라 값이 틀려도 결과는 같다(R17).
+        ttl: 30m
   sns:
     google:
       # id_token의 aud는 플랫폼별로 다르다: iOS→iOS 클라이언트 ID, Android/Web→웹 클라이언트 ID.

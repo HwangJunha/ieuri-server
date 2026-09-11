@@ -26,7 +26,6 @@ import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch
 import org.around.ieuri.tourism.application.port.out.query.SpotIdentity
 import org.around.ieuri.tourism.application.port.out.query.LikedSpotSearchPort
 import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
-import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
 import org.around.ieuri.tourism.application.port.out.query.SpotSpatialQueryPort
 import org.around.ieuri.common.context.AppKey
 import org.around.ieuri.tourism.application.port.out.query.AppCategoryQueryPort
@@ -42,7 +41,6 @@ import org.around.ieuri.tourism.application.query.SpotInfoItemView
 import org.around.ieuri.tourism.application.query.SpotIntroView
 import org.around.ieuri.tourism.application.query.SpotPageView
 import org.around.ieuri.tourism.application.query.SpotSummaryView
-import org.around.ieuri.tourism.application.query.SpotView
 import org.around.ieuri.tourism.application.query.SpotsQuery
 import org.around.ieuri.tourism.domain.aggregate.SpotDetail
 import org.around.ieuri.tourism.domain.vo.Coordinates
@@ -492,23 +490,5 @@ class SpotQueryService(
         caption = caption,
         copyright = copyright,
         attributionText = attributionText,
-    )
-
-    /**
-     * 읽기 DTO → 응답 뷰. [attributionText]는 copyright에서 파생되므로 여기서 도출한다 —
-     * 적재하지 않는 이유이기도 하다(컬럼으로 두면 둘이 어긋날 수 있다).
-     * 거리는 DB가 계산한 값을 그대로 쓴다.
-     */
-    private fun SpotSearchResult.toView(): SpotView = SpotView(
-        id = spotId,
-        title = title,
-        address = address,
-        thumbnailImageUrl = thumbnailImageUrl,
-        distanceMeters = distanceMeters,
-        category = category,
-        copyright = copyright,
-        attributionText = copyright.attributionText,
-        mapX = mapX,
-        mapY = mapY,
     )
 }

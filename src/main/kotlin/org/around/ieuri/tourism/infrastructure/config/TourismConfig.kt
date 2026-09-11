@@ -5,13 +5,20 @@ import tools.jackson.databind.json.JsonMapper
 import tools.jackson.module.kotlin.kotlinModule
 import org.around.ieuri.tourism.application.policy.MapViewportPolicy
 import org.around.ieuri.tourism.application.policy.NationwideMapPolicy
+import org.around.ieuri.tourism.application.policy.RecommendationPolicy
 import org.around.ieuri.tourism.application.policy.RegionRecommendationPolicy
 import org.around.ieuri.tourism.application.policy.SeoulOpenDataPolicy
 import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
+import org.around.ieuri.tourism.domain.specification.TaxRefundTitleRule
+import org.around.ieuri.tourism.domain.strategy.DppReranker
+import org.around.ieuri.tourism.domain.strategy.RecommendationScore
+import org.around.ieuri.tourism.domain.strategy.SpotSimilarity
 import org.around.ieuri.tourism.domain.vo.DistanceScoring
+import org.around.ieuri.tourism.domain.vo.FeedCursorSecret
 import org.around.ieuri.tourism.domain.vo.FreshnessDecay
 import org.around.ieuri.tourism.domain.specification.SpotExclusionRule
 import org.around.ieuri.tourism.domain.vo.RegionScoreWeights
+import org.around.ieuri.tourism.domain.vo.ScoreWeights
 import org.around.ieuri.tourism.infrastructure.batch.FestivalSyncProperties
 import org.around.ieuri.tourism.infrastructure.batch.TourStatsSyncProperties
 import org.around.ieuri.tourism.infrastructure.batch.SpotSyncProperties
@@ -40,8 +47,45 @@ import java.time.Duration
     DistrictRepresentativeProperties::class,
     SpotExclusionProperties::class,
     NationwideMapProperties::class,
+    RecommendationProperties::class,
 )
 class TourismConfig {
+
+    /**
+     * 추천 피드 정책(SPEC-0035). 도메인 순수 함수(점수·재배열·유사도)에 설정값을 꽂아 조립한다 —
+     * 도메인은 설정 메커니즘을 알지 않는다. 서명 키가 비어 있으면 여기서 기동이 멈춘다(S1 기동 조건).
+     */
+    @Bean
+    fun recommendationPolicy(properties: RecommendationProperties): RecommendationPolicy =
+        RecommendationPolicy(
+            score = RecommendationScore(
+                weights = ScoreWeights(
+                    distance = properties.score.weights.distance,
+                    popularity = properties.score.weights.popularity,
+                    activity = properties.score.weights.activity,
+                    affinity = properties.score.weights.affinity,
+                    trend = properties.score.weights.trend,
+                ),
+                distanceHalfLifeMeters = properties.score.distanceHalfLifeMeters,
+                popularityCap = properties.score.popularityCap,
+                activityCap = properties.score.activityCap,
+                taxRefundMultiplier = properties.score.taxRefundMultiplier,
+                taxRefundTitleRule = TaxRefundTitleRule(properties.score.taxRefundTitlePatterns),
+            ),
+            reranker = DppReranker(
+                alpha = properties.dpp.alpha,
+                sigma = properties.dpp.sigma,
+                window = properties.dpp.window,
+            ),
+            similarity = SpotSimilarity(
+                sameCategoryDistance = properties.dpp.sameCategoryDistance,
+                differentCategoryDistance = properties.dpp.differentCategoryDistance,
+            ),
+            candidateCap = properties.dpp.candidateCap,
+            batchSize = properties.dpp.batchSize,
+            cursorMaxAge = properties.cursor.maxAge,
+            cursorSecret = FeedCursorSecret(properties.cursor.secret),
+        )
 
     /**
      * 비관광 spot 제외 규칙(SPEC-0018). 키워드는 설정에서 오고 규칙 자체는 도메인의 순수
