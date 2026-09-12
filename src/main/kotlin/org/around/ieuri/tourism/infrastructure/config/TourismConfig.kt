@@ -5,6 +5,7 @@ import tools.jackson.databind.json.JsonMapper
 import tools.jackson.module.kotlin.kotlinModule
 import org.around.ieuri.tourism.application.policy.MapViewportPolicy
 import org.around.ieuri.tourism.application.policy.NationwideMapPolicy
+import org.around.ieuri.tourism.application.policy.EmbeddingSpec
 import org.around.ieuri.tourism.application.policy.RecommendationPolicy
 import org.around.ieuri.tourism.application.policy.RegionRecommendationPolicy
 import org.around.ieuri.tourism.domain.specification.TaxRefundTitleRule
@@ -45,6 +46,7 @@ import java.time.Duration
     SpotExclusionProperties::class,
     NationwideMapProperties::class,
     RecommendationProperties::class,
+    VoyageProperties::class,
 )
 class TourismConfig {
 
@@ -59,10 +61,30 @@ class TourismConfig {
                 distanceHalfLifeMeters = properties.distanceHalfLifeMeters,
                 taxRefundMultiplier = properties.taxRefundMultiplier,
                 taxRefundTitleRule = TaxRefundTitleRule(properties.taxRefundTitlePatterns),
+                tasteWeight = properties.tasteWeight,
             ),
             diversity = CategoryDiversity(properties.categoryRepeatPenalty),
             candidateCap = properties.candidateCap,
+            tasteMinReactions = properties.tasteMinReactions,
+            embedding = EmbeddingSpec(
+                model = properties.embedding.model,
+                dimension = properties.embedding.dimension,
+                retryCount = properties.embedding.retryCount,
+            ),
         )
+
+    /**
+     * Voyage 임베딩 호출용 RestClient(SPEC-0035 S2). 배치 경로라 읽기 타임아웃을 길게 잡는다 —
+     * 요청 하나에 텍스트 128건이 실린다. base-url은 어댑터가 붙인다.
+     */
+    @Bean
+    fun voyageRestClient(builder: RestClient.Builder, properties: VoyageProperties): RestClient {
+        val requestFactory = SimpleClientHttpRequestFactory().apply {
+            setConnectTimeout(Duration.ofMillis(properties.connectTimeoutMillis))
+            setReadTimeout(Duration.ofMillis(properties.readTimeoutMillis))
+        }
+        return builder.requestFactory(requestFactory).build()
+    }
 
     /**
      * 비관광 spot 제외 규칙(SPEC-0018). 키워드는 설정에서 오고 규칙 자체는 도메인의 순수

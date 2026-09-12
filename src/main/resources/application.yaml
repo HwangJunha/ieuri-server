@@ -521,6 +521,26 @@ ieuri:
       category-repeat-penalty: 0.1
       # 후보 상한 N. 거리 가까운 순 N건만 점수·재배열 대상이다.
       candidate-cap: 300
+      # 취향(S2). 취향이 있으면 (1 − w)·거리 + w·취향. 반응(좋아요 + 싫어요)이 최소 수 미만이면 취향 없음.
+      taste-weight: 0.5
+      taste-min-reactions: 5
+      embedding:
+        # 차원은 spot_embedding.embedding vector(1024)와 같아야 한다 — 바꾸면 마이그레이션이 따른다.
+        model: voyage-4
+        dimension: 1024
+        # Voyage 요청당 입력 상한(1,000건·320K 토큰) 안. 행당 약 50토큰이라 여유가 크다.
+        batch-size: 128
+        # 제공자 실패 시 즉시 재시도 횟수. 시간 대기 없음(POL-040). 그래도 실패하면 건너뛰고 다음 실행이 다시 잡는다.
+        retry-count: 3
+
+  # Voyage 임베딩 API(SPEC-0035 S2). 키는 환경변수로만 주입한다 — 빈 값이면 기동은 되고 임베딩 단계만
+  # 실패로 센다(목록은 정상, 취향 요인만 없음).
+  voyage:
+    api-key: ${IEURI_VOYAGE_API_KEY:}
+    base-url: https://api.voyageai.com
+    connect-timeout-millis: 5000
+    # 요청 하나에 텍스트 128건이 실리는 배치 경로라 길게 잡는다.
+    read-timeout-millis: 60000
   sns:
     google:
       # id_token의 aud는 플랫폼별로 다르다: iOS→iOS 클라이언트 ID, Android/Web→웹 클라이언트 ID.

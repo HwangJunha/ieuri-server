@@ -11,6 +11,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties
  * @param taxRefundTitlePatterns 면세 태그 판정 패턴. 언어별 표기가 다르다(실측: EN·JA·ZH·KO 네 가지).
  * @param categoryRepeatPenalty 같은 카테고리 n번째 장소에 깎는 `penalty × (n − 1)`. 0이면 순수 점수순.
  * @param candidateCap 후보 상한 N. 거리 가까운 순 N건만 대상이다.
+ * @param tasteWeight 취향 요인 비중 w. 취향이 있으면 `(1 − w)·거리 + w·취향`.
+ * @param tasteMinReactions 취향이 성립하는 최소 반응 수(좋아요 + 싫어요).
  */
 @ConfigurationProperties(prefix = "ieuri.tourism.recommendation")
 data class RecommendationProperties(
@@ -19,4 +21,19 @@ data class RecommendationProperties(
     val taxRefundTitlePatterns: List<String> = listOf("[Tax Refund Shop]"),
     val categoryRepeatPenalty: Double = 0.1,
     val candidateCap: Int = 300,
-)
+    val tasteWeight: Double = 0.5,
+    val tasteMinReactions: Int = 5,
+    val embedding: Embedding = Embedding(),
+) {
+    /**
+     * 임베딩(S2). [dimension]은 `spot_embedding.embedding vector(1024)`와 같아야 한다 — 바꾸면 마이그레이션이
+     * 따른다. [batchSize]는 Voyage 요청당 입력 상한(1,000건·320K 토큰) 안이어야 한다.
+     */
+    data class Embedding(
+        val model: String = "voyage-4",
+        val dimension: Int = 1024,
+        val batchSize: Int = 128,
+        /** 제공자 실패 시 즉시 재시도 횟수(POL-040). */
+        val retryCount: Int = 3,
+    )
+}
