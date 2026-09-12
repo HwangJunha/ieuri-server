@@ -3,8 +3,6 @@ package org.around.ieuri.tourism.infrastructure.batch
 import tools.jackson.databind.ObjectMapper
 import org.around.ieuri.tourism.application.port.`in`.command.SpotCatalogSplitUseCase
 import org.around.ieuri.tourism.application.port.`in`.command.SpotCatalogUseCase
-import org.around.ieuri.tourism.application.port.`in`.command.SpotEmbeddingSyncUseCase
-import org.around.ieuri.tourism.infrastructure.config.RecommendationProperties
 import org.around.ieuri.tourism.application.port.out.client.FestivalSyncPort
 import org.around.ieuri.tourism.application.port.out.client.SpotSyncPort
 import org.around.ieuri.tourism.application.port.out.persistence.FestivalStorePort
@@ -57,8 +55,6 @@ class SpotSyncJobConfig(
     private val festivalProperties: FestivalSyncProperties,
     private val catalogUseCase: SpotCatalogUseCase,
     private val catalogSplitUseCase: SpotCatalogSplitUseCase,
-    private val embeddingSyncUseCase: SpotEmbeddingSyncUseCase,
-    private val recommendationProperties: RecommendationProperties,
     private val objectMapper: ObjectMapper,
 ) {
 
@@ -69,8 +65,7 @@ class SpotSyncJobConfig(
         // 카탈로그 배정은 그 뒤다(SPEC-0019 R-7).
         val steps = order.map(::syncStep) +
             order.map(::festivalStep) +
-            // 임베딩은 카탈로그·번역이 확정된 뒤다 — 번역 행이 대상 단위다(SPEC-0035 S2).
-            listOf(catalogAssignmentStep(), catalogSplitStep(), spotEmbeddingStep())
+            listOf(catalogAssignmentStep(), catalogSplitStep())
         return steps.drop(1)
             .fold(JobBuilder(JOB_NAME, jobRepository).start(steps.first())) { acc, step -> acc.next(step) }
             .build()
@@ -87,14 +82,6 @@ class SpotSyncJobConfig(
      *
      * **배정 뒤여야 한다** — 전량이 붙고 난 뒤라야 한 카탈로그가 몇 장소인지 물을 수 있다.
      */
-    private fun spotEmbeddingStep(): Step =
-        StepBuilder("spotEmbeddingStep", jobRepository)
-            .tasklet(
-                SpotEmbeddingTasklet(embeddingSyncUseCase, recommendationProperties.embedding.batchSize),
-                transactionManager,
-            )
-            .build()
-
     private fun catalogSplitStep(): Step =
         StepBuilder("catalogSplitStep", jobRepository)
             .tasklet(SpotCatalogSplitTasklet(catalogSplitUseCase, catalogUseCase), transactionManager)

@@ -44,7 +44,7 @@
 | `SpotEmbeddingStorePort` → `SpotEmbeddingUpsertJdbcAdapter` | out/persistence | 대상 판정(벡터 없음·텍스트 변경·모델 불일치)과 upsert. 텍스트 해시는 SQL이 행에서 계산 |
 | `TasteSimilarityQueryPort` → `TasteSimilarityQueryJdbcAdapter` | out/query | 좋아요·싫어요 평균(`avg(vector)`)과 후보의 코사인(`<=>`)을 SQL 한 번으로. 벡터는 DB 밖으로 안 나온다 |
 | `TextEmbeddingPort` → `VoyageEmbeddingClient` | out/client/voyage | `POST /v1/embeddings`. 키는 환경변수 |
-| `SpotEmbeddingTasklet` | infrastructure/batch | `spotSyncJob` 마지막 단계. 번역 행 id 키셋 |
+| `SpotEmbeddingJobConfig` → `SpotEmbeddingTasklet` | infrastructure/batch | **별개 잡 `spotEmbeddingJob`**(`spotSyncJob` 뒤에 시각으로 벌려 실행). 외부 제공자에 기대는 단계라 spot 동기화를 붙들지 않게 분리. 번역 행 id 키셋 |
 | `RecommendedSpotsResolver` | infrastructure/in/graphql | 인자 옮기기·응답 변환만. `requireMemberId` |
 | `SpotGqlMapper` | infrastructure/in/graphql/mapper | `SpotView → Spot` |
 
@@ -118,5 +118,5 @@ HMAC 서명·조건 해시 커서, Valkey 묶음 캐시, DPP 재배열, 커뮤�
 | 날짜 | 변경 | 계기 |
 |---|---|---|
 | 2026-09-11 | 초안(스펙 그대로: Location·커서·캐시·DPP) | ieuri-server #131 |
-| 2026-09-12 | S2 취향 구현. 임베딩은 메인 DB `spot_embedding`(검색 노드는 읽기 전용 구독자). Voyage 적재 단계를 `spotSyncJob` 끝에, 취향 유사도는 pgvector SQL 한 번 | 사용자 결정(2026-09-12) |
+| 2026-09-12 | S2 취향 구현. 임베딩은 메인 DB `spot_embedding`(검색 노드는 읽기 전용 구독자). Voyage 적재는 별개 잡 `spotEmbeddingJob`(처음엔 `spotSyncJob`의 단계로 넣었다가 분리 — 외부 제공자 의존을 동기화에서 떼어 낸다), 취향 유사도는 pgvector SQL 한 번. 임베딩 텍스트에 상세 소개문 포함(500자 문장 끝 절삭) | 사용자 결정(2026-09-12) |
 | 2026-09-12 | 전면 재작성. 추천 = 커서 없는 묶음 루트 쿼리, 인증 필수, 기존 `spots` 불변. 점수는 거리·면세, 다양성은 카테고리 반복 감점. 취향은 S2 | 사용자 결정(2026-09-12) |

@@ -2,8 +2,6 @@ package org.around.ieuri.tourism.infrastructure
 
 import io.mockk.mockk
 import org.around.ieuri.tourism.application.port.`in`.command.SpotCatalogSplitUseCase
-import org.around.ieuri.tourism.application.port.`in`.command.SpotEmbeddingSyncUseCase
-import org.around.ieuri.tourism.infrastructure.config.RecommendationProperties
 import org.around.ieuri.tourism.application.port.`in`.command.SpotCatalogUseCase
 import org.around.ieuri.tourism.application.port.out.client.FestivalSyncPort
 import org.around.ieuri.tourism.application.port.out.client.SpotSyncPort
@@ -46,8 +44,6 @@ class FestivalSyncOrderingTest {
         festivalProperties = FestivalSyncProperties(),
         catalogUseCase = mockk<SpotCatalogUseCase>(),
         catalogSplitUseCase = mockk<SpotCatalogSplitUseCase>(),
-        embeddingSyncUseCase = mockk<SpotEmbeddingSyncUseCase>(),
-        recommendationProperties = RecommendationProperties(),
         objectMapper = mockk<ObjectMapper>(),
     )
 
@@ -77,15 +73,8 @@ class FestivalSyncOrderingTest {
         // 스펙 §선행 조사·§비범위. 별도 잡이면 두 잡의 정리가 서로의 행을 지우고, 관광지 수집이
         // 종료 축제를 되살린다 — R-9가 성립하려면 한 잡 안에서 순서가 보장되어야 한다.
         assertEquals(SpotSyncJobConfig.JOB_NAME, config.spotSyncJob().name)
-        // 관광지 4 + 축제 4 + 카탈로그 배정 1 + 분할 1 + 임베딩 1. 번역 대상 조회 Step은 SPEC-0029 R-6이 제거했다.
-        assertEquals(11, stepNames.size)
-    }
-
-    @Test
-    fun `임베딩 Step이 카탈로그 분할 뒤 마지막에 온다`() {
-        // SPEC-0035 S2. 번역 행이 대상 단위라 카탈로그·번역이 확정된 뒤여야 한다.
-        assertEquals("spotEmbeddingStep", stepNames.last())
-        assertTrue(stepNames.indexOf("spotEmbeddingStep") > stepNames.indexOf("catalogSplitStep"))
+        // 관광지 4 + 축제 4 + 카탈로그 배정 1 + 분할 1. 번역 대상 조회 Step은 SPEC-0029 R-6이 제거했다.
+        assertEquals(10, stepNames.size)
     }
 
     @Test
