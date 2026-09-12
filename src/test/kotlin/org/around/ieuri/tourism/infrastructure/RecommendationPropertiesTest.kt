@@ -25,11 +25,9 @@ class RecommendationPropertiesTest {
         assertEquals(0.5, p.dpp.sigma)
         assertEquals(12, p.dpp.window)
         assertEquals(300, p.dpp.candidateCap)
-        assertEquals(200, p.dpp.batchSize)
         assertEquals(0.3, p.dpp.sameCategoryDistance)
         assertEquals(1.0, p.dpp.differentCategoryDistance)
         assertEquals(Duration.ofHours(24), p.cursor.maxAge)
-        assertEquals(Duration.ofMinutes(30), p.cache.ttl)
     }
 
     @Test

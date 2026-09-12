@@ -12,7 +12,6 @@ data class RecommendationProperties(
     val score: Score = Score(),
     val dpp: Dpp = Dpp(),
     val cursor: Cursor = Cursor(),
-    val cache: Cache = Cache(),
 ) {
     /** 점수 요인(R6~R12). */
     data class Score(
@@ -35,7 +34,7 @@ data class RecommendationProperties(
         val trend: Double = 0.0,
     )
 
-    /** 재배열(R13~R16). */
+    /** 재배열(R13~R15). */
     data class Dpp(
         val alpha: Double = 1.0,
         val sigma: Double = 0.5,
@@ -43,8 +42,6 @@ data class RecommendationProperties(
         val window: Int = 12,
         /** 후보 상한 N. */
         val candidateCap: Int = 300,
-        /** 묶음 크기 B. */
-        val batchSize: Int = 200,
         val sameCategoryDistance: Double = 0.3,
         val differentCategoryDistance: Double = 1.0,
     )
@@ -52,10 +49,5 @@ data class RecommendationProperties(
     /** 커서(R4). */
     data class Cursor(
         val maxAge: Duration = Duration.ofHours(24),
-    )
-
-    /** 묶음 캐시(R17). 캐시라 값이 틀려도 결과는 같다. */
-    data class Cache(
-        val ttl: Duration = Duration.ofMinutes(30),
     )
 }

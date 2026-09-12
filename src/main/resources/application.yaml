@@ -530,19 +530,15 @@ ieuri:
         # 커널 L_ij = α·q_i·q_j·exp(−D_ij / 2σ²). 학습 전 출발값.
         alpha: 1.0
         sigma: 0.5
-        # 창 k(YouTube 논문 "십여 개") · 후보 상한 N · 묶음 B(요청 2회분).
+        # 창 k(YouTube 논문 "십여 개") · 후보 상한 N.
         window: 12
         candidate-cap: 300
-        batch-size: 200
         # 벡터가 없는 쌍의 대체 거리(R14).
         same-category-distance: 0.3
         different-category-distance: 1.0
       cursor:
         # 스와이프 세션이 하루를 넘지 않는다는 가정. 세션 시작 시각 기준이며 이어 받아도 갱신되지 않는다.
         max-age: 24h
-      cache:
-        # 묶음 캐시 TTL. 캐시라 값이 틀려도 결과는 같다(R17).
-        ttl: 30m
   sns:
     google:
       # id_token의 aud는 플랫폼별로 다르다: iOS→iOS 클라이언트 ID, Android/Web→웹 클라이언트 ID.

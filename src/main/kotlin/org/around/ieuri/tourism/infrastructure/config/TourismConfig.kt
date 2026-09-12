@@ -81,7 +81,6 @@ class TourismConfig {
                 differentCategoryDistance = properties.dpp.differentCategoryDistance,
             ),
             candidateCap = properties.dpp.candidateCap,
-            batchSize = properties.dpp.batchSize,
             cursorMaxAge = properties.cursor.maxAge,
         )
 

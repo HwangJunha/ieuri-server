@@ -13,6 +13,8 @@ import org.around.ieuri.tourism.application.port.out.query.SpotSpatialQueryPort
 import org.around.ieuri.tourism.application.query.LocationView
 import org.around.ieuri.tourism.application.query.LocationViewQuery
 import org.around.ieuri.tourism.application.query.SpotView
+import org.around.ieuri.tourism.application.validation.coordinatesOf
+import org.around.ieuri.tourism.application.validation.requireRadiusWithin
 import org.around.ieuri.tourism.domain.vo.DistanceCursor
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.springframework.stereotype.Service

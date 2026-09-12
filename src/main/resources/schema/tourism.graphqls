@@ -275,9 +275,9 @@ type Location {
 
     비로그인 호출자는 반응 제외가 없다. 페이지 정보의 형태는 같다.
 
-    커서는 첫 요청의 조건(반경·카테고리·언어·좌표·호출자)에 묶인다. 조건이 바뀐 채 이어
-    받으면 INVALID_CURSOR, 수명을 넘기면 CURSOR_EXPIRED — 두 경우 모두 after 없이
-    새로 시작한다. 같은 커서·같은 조건이면 같은 항목이 온다.
+    커서는 순서상 위치만 담는다 — 조건(반경·카테고리·언어·좌표)이 바뀌면 커서를 버리고
+    after 없이 새로 시작한다. 손상된 커서는 INVALID_CURSOR, 수명을 넘기면 CURSOR_EXPIRED이며
+    두 경우 모두 after 없이 새로 시작한다. 같은 커서·같은 조건이면 같은 항목이 온다.
 
     후보가 소진되면 pageInfo.hasNextPage가 false다. 총 개수는 제공하지 않는다
     (popularSpots·likedSpots와 같은 규약).

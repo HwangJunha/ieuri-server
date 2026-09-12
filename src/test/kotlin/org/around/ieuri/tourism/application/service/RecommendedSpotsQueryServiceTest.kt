@@ -9,7 +9,6 @@ import org.around.ieuri.tourism.application.exception.InvalidCursorException
 import org.around.ieuri.tourism.application.exception.RadiusTooLargeException
 import org.around.ieuri.tourism.application.policy.RecommendationPolicy
 import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
-import org.around.ieuri.tourism.application.port.out.cache.RecommendedSpotsBatchCachePort
 import org.around.ieuri.tourism.application.port.out.client.ActivityCounts
 import org.around.ieuri.tourism.application.port.out.client.CommunityActivityCountPort
 import org.around.ieuri.tourism.application.port.out.client.ExternalTrendScorePort
@@ -40,9 +39,9 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * SPEC-0035 R4~R17 — 추천 목록의 첫 요청·이어 받기·묶음·캐시·결정성. 포트는 전부 스텁이다.
+ * SPEC-0035 R4~R16 — 추천 목록의 첫 요청·이어 받기·결정성. 포트는 전부 스텁이다.
  *
- * 숫자를 작게 잡는다: 후보 상한 N=6, 묶음 B=4, 창 k=2. 후보는 거리순 id 1..6이다.
+ * 숫자를 작게 잡는다: 후보 상한 N=6, 창 k=2. 후보는 거리순 id 1..6이다.
  */
 class RecommendedSpotsQueryServiceTest {
 
@@ -50,7 +49,6 @@ class RecommendedSpotsQueryServiceTest {
     private val spotSpatialQueryPort = mockk<SpotSpatialQueryPort>()
     private val activityCountPort = mockk<CommunityActivityCountPort>()
     private val trendScorePort = mockk<ExternalTrendScorePort>()
-    private val batchCachePort = mockk<RecommendedSpotsBatchCachePort>()
     private val now = Instant.parse("2026-09-11T09:00:00Z")
 
     private val spotQueryPolicy = SpotQueryPolicy(
@@ -65,7 +63,7 @@ class RecommendedSpotsQueryServiceTest {
         minPopularLikeCount = 5,
     )
 
-    private fun policy(alpha: Double = 1.0, trendWeight: Double = 0.0, candidateCap: Int = 6, batchSize: Int = 4) =
+    private fun policy(alpha: Double = 1.0, trendWeight: Double = 0.0, candidateCap: Int = 6) =
         RecommendationPolicy(
             score = RecommendationScore(
                 weights = ScoreWeights(distance = 0.4, popularity = 0.25, activity = 0.15, affinity = 0.2, trend = trendWeight),
@@ -78,14 +76,12 @@ class RecommendedSpotsQueryServiceTest {
             reranker = DppReranker(alpha = alpha, sigma = 0.5, window = 2),
             similarity = SpotSimilarity(sameCategoryDistance = 0.3, differentCategoryDistance = 1.0),
             candidateCap = candidateCap,
-            batchSize = batchSize,
             cursorMaxAge = Duration.ofHours(24),
         )
 
     private fun service(policy: RecommendationPolicy = policy(), clock: Clock = Clock.fixed(now, ZoneOffset.UTC)) =
         RecommendedSpotsQueryService(
-            spotQueryPort, spotSpatialQueryPort, activityCountPort, trendScorePort, batchCachePort,
-            spotQueryPolicy, policy, clock,
+            spotQueryPort, spotSpatialQueryPort, activityCountPort, trendScorePort, spotQueryPolicy, policy, clock,
         )
 
     private val candidates = (1L..6L).map { card(it) }
@@ -95,8 +91,6 @@ class RecommendedSpotsQueryServiceTest {
         every { spotQueryPort.countReactionsIn(any(), any()) } returns emptyMap()
         every { activityCountPort.countByCatalogIds(any()) } returns emptyMap()
         every { trendScorePort.findByCatalogIds(any()) } returns emptyMap()
-        every { batchCachePort.get(any(), any()) } returns null
-        every { batchCachePort.put(any(), any(), any()) } returns Unit
     }
 
     // ── 검증 ────────────────────────────────────────────────────────────────
@@ -190,7 +184,7 @@ class RecommendedSpotsQueryServiceTest {
         assertEquals(6, page.edges.size)
     }
 
-    // ── 묶음·이어 받기 ───────────────────────────────────────────────────────
+    // ── 페이지·이어 받기 ─────────────────────────────────────────────────────
 
     @Test
     fun `첫 요청은 앞 first건을 주고 커서 위치는 first다 - AC-15_2`() {
@@ -205,80 +199,37 @@ class RecommendedSpotsQueryServiceTest {
     }
 
     @Test
-    fun `후보가 묶음보다 적으면 마지막 페이지의 hasNextPage는 false다 - AC-15_3`() {
+    fun `후보가 페이지보다 적으면 있는 만큼 주고 hasNextPage는 false다 - AC-15_3`() {
         stubDefaults(candidates.take(3))
-        val page = service().recommendedSpots(query(first = 3), DomainLocale.EN, null)
+        val page = service().recommendedSpots(query(first = 5), DomainLocale.EN, null)
         assertEquals(3, page.edges.size)
         assertFalse(page.pageInfo.hasNextPage)
     }
 
     @Test
-    fun `이어 받기는 확정된 순서의 다음 구간이며 중복·누락이 없다 - AC-16_1`() {
-        stubDefaults()
-        val first = service().recommendedSpots(query(first = 2), DomainLocale.EN, null)
-        val second = service().recommendedSpots(query(first = 2, after = first.pageInfo.endCursor), DomainLocale.EN, null)
-
-        assertTrue(second.pageInfo.hasPreviousPage)
-        val ids = (first.edges + second.edges).map { it.node.id }
-        assertEquals(4, ids.toSet().size)
-        assertEquals(4, RecommendedSpotsCursor.decode(second.pageInfo.endCursor!!).position)
-    }
-
-    @Test
-    fun `묶음이 바닥나면 앞 묶음을 제외한 후보로 새 묶음을 만든다 - AC-16_2 AC-16_3`() {
+    fun `이어 받기는 같은 순열의 다음 구간이며 끝까지 중복·누락이 없다 - AC-16_1 AC-16_3`() {
         stubDefaults()
         val p1 = service().recommendedSpots(query(first = 4), DomainLocale.EN, null)
         val p2 = service().recommendedSpots(query(first = 4, after = p1.pageInfo.endCursor), DomainLocale.EN, null)
 
         assertEquals(4, p1.edges.size)
         assertTrue(p1.pageInfo.hasNextPage)
+        assertTrue(p2.pageInfo.hasPreviousPage)
         assertEquals(2, p2.edges.size)
         assertFalse(p2.pageInfo.hasNextPage)
         assertEquals((1L..6L).toSet(), (p1.edges + p2.edges).map { it.node.id }.toSet())
-        // 두 번째 묶음도 캐시에 저장된다(첫 요청이 다음 페이지 판정을 위해 한 번, 이어 받기가 미스라 한 번).
-        verify(atLeast = 1) { batchCachePort.put(any(), 1, any()) }
+        assertEquals(6, RecommendedSpotsCursor.decode(p2.pageInfo.endCursor!!).position)
     }
 
     @Test
-    fun `페이지가 묶음 경계를 걸치면 두 묶음에서 이어 붙인다`() {
+    fun `같은 입력은 요청마다 같은 순열이다 - AC-4_1 AC-13_3`() {
         stubDefaults()
-        val p1 = service().recommendedSpots(query(first = 3), DomainLocale.EN, null)
-        val p2 = service().recommendedSpots(query(first = 3, after = p1.pageInfo.endCursor), DomainLocale.EN, null)
-
-        assertEquals(3, p2.edges.size)
-        assertFalse(p2.pageInfo.hasNextPage)
-        assertEquals((1L..6L).toSet(), (p1.edges + p2.edges).map { it.node.id }.toSet())
+        val a = service().recommendedSpots(query(first = 6), DomainLocale.EN, null)
+        val b = service().recommendedSpots(query(first = 6), DomainLocale.EN, null)
+        assertEquals(a.edges.map { it.node.id }, b.edges.map { it.node.id })
     }
 
     // ── 커서 ────────────────────────────────────────────────────────────────
-
-    @Test
-    fun `같은 조건이면 캐시가 비어 있어도 채워져 있어도 같은 항목이다 - AC-4_1 AC-17_2`() {
-        stubDefaults()
-        val first = service().recommendedSpots(query(first = 2), DomainLocale.EN, null)
-        val recomputed = service().recommendedSpots(query(first = 2, after = first.pageInfo.endCursor), DomainLocale.EN, null)
-
-        // 이번엔 캐시가 첫 묶음을 돌려준다.
-        val put = slot<List<SpotSearchResult>>()
-        every { batchCachePort.put(any(), 0, capture(put)) } returns Unit
-        service().recommendedSpots(query(first = 2), DomainLocale.EN, null)
-        every { batchCachePort.get(any(), 0) } returns put.captured
-        val fromCache = service().recommendedSpots(query(first = 2, after = first.pageInfo.endCursor), DomainLocale.EN, null)
-
-        assertEquals(recomputed.edges.map { it.node.id }, fromCache.edges.map { it.node.id })
-    }
-
-    @Test
-    fun `조건이 다른 커서로 이어 받으면 INVALID_CURSOR다 - AC-4_2`() {
-        stubDefaults()
-        val first = service().recommendedSpots(query(first = 2), DomainLocale.EN, null)
-        assertFailsWith<InvalidCursorException> {
-            service().recommendedSpots(query(first = 2, after = first.pageInfo.endCursor).copy(radiusMeters = 5_000), DomainLocale.EN, null)
-        }
-        assertFailsWith<InvalidCursorException> {
-            service().recommendedSpots(query(first = 2, after = first.pageInfo.endCursor), DomainLocale.JA, null)
-        }
-    }
 
     @Test
     fun `형식이 깨진 커서는 INVALID_CURSOR다 - AC-4_3`() {
@@ -305,34 +256,6 @@ class RecommendedSpotsQueryServiceTest {
         val later = Clock.fixed(now.plus(Duration.ofHours(1)), ZoneOffset.UTC)
         val second = service(clock = later).recommendedSpots(query(first = 2, after = first.pageInfo.endCursor), DomainLocale.EN, null)
         assertEquals(now, RecommendedSpotsCursor.decode(second.pageInfo.endCursor!!).issuedAt)
-    }
-
-    // ── 캐시 ────────────────────────────────────────────────────────────────
-
-    @Test
-    fun `캐시 히트면 재배열 없이 캐시의 순서로 응답한다 - AC-17_1`() {
-        stubDefaults()
-        val cached = listOf(card(4), card(2), card(6), card(1))
-        every { batchCachePort.get(any(), 0) } returns cached
-
-        val page = service().recommendedSpots(query(first = 3), DomainLocale.EN, null)
-
-        assertEquals(listOf(4L, 2L, 6L), page.edges.map { it.node.id })
-        verify(exactly = 0) { spotSpatialQueryPort.searchNearby(any()) }
-    }
-
-    @Test
-    fun `캐시 포트가 예외를 던져도 재계산 결과를 돌려준다 - AC-17_3`() {
-        stubDefaults()
-        every { batchCachePort.get(any(), any()) } throws IllegalStateException("valkey down")
-        every { batchCachePort.put(any(), any(), any()) } throws IllegalStateException("valkey down")
-
-        val first = service().recommendedSpots(query(first = 2), DomainLocale.EN, null)
-        val second = service().recommendedSpots(query(first = 2, after = first.pageInfo.endCursor), DomainLocale.EN, null)
-
-        assertEquals(2, first.edges.size)
-        assertEquals(2, second.edges.size)
-        assertTrue((first.edges + second.edges).map { it.node.id }.toSet().size == 4)
     }
 
     // ── 고정 데이터 ──────────────────────────────────────────────────────────
