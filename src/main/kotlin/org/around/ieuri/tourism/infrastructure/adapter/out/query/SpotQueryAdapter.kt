@@ -57,6 +57,18 @@ class SpotQueryAdapter(
             .fetch()
             .toSet()
 
+    override fun findReactedSpotIdsByReaction(memberId: Long, language: DomainLocale): Map<ReactionType, Set<Long>> =
+        queryFactory
+            .select(reaction.catalogId, reaction.reaction)
+            .from(reaction)
+            .where(reaction.memberId.eq(memberId), reaction.language.eq(language))
+            .fetch()
+            .groupBy(
+                { requireNotNull(it.get(reaction.reaction)) },
+                { requireNotNull(it.get(reaction.catalogId)) },
+            )
+            .mapValues { (_, ids) -> ids.toSet() }
+
     /**
      * LIKE 반응 수. **활성 언어 안에서만 센다**(SPEC-0029 AC-13.5) — 다른 언어의 좋아요는
      * 합산되지 않는다. SPEC-0019가 언어를 합쳤던 것을 이 스펙이 되돌린다.
