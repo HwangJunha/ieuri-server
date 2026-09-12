@@ -4,6 +4,7 @@ import org.around.ieuri.tourism.application.port.out.persistence.EmbeddingTarget
 import org.around.ieuri.tourism.application.port.out.persistence.SpotEmbedding
 import org.around.ieuri.tourism.application.port.out.persistence.SpotEmbeddingStorePort
 import org.around.ieuri.tourism.domain.vo.DomainLocale
+import org.around.ieuri.tourism.infrastructure.config.RecommendationProperties
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.ParameterizedPreparedStatementSetter
 import org.springframework.stereotype.Component
@@ -14,11 +15,13 @@ import org.springframework.transaction.annotation.Transactional
  *
  * 두 SQL은 같은 두 조각을 담고 있다 — 소개문을 붙이는 LATERAL 조인과 텍스트 해시 `md5(...)`. **둘이 글자까지
  * 같아야 한다.** 대상 판정이 계산한 해시와 저장한 해시가 다르면 그 행은 매 실행 다시 대상이 된다.
- * 벡터는 `[0.1,0.2,...]` 문자열로 넘겨 `::vector`로 캐스팅한다.
+ * 해시의 소개문은 임베딩 텍스트와 같은 상한(`embedding.overview-max-chars`)으로 자른다 — 상한 밖만 바뀐
+ * 소개문으로 같은 벡터를 다시 만들지 않기 위해서다. 벡터는 `[0.1,0.2,...]` 문자열로 넘겨 `::vector`로 캐스팅한다.
  */
 @Component
 class SpotEmbeddingUpsertJdbcAdapter(
     private val jdbcTemplate: JdbcTemplate,
+    private val properties: RecommendationProperties,
 ) : SpotEmbeddingStorePort {
 
     /**
@@ -47,7 +50,7 @@ class SpotEmbeddingUpsertJdbcAdapter(
               AND (
                     e.translation_id IS NULL
                  OR e.model <> ?
-                 OR e.text_hash <> md5(t.title || '|' || t.category || '|' || coalesce(t.address, '') || '|' || coalesce(d.overview, ''))
+                 OR e.text_hash <> md5(t.title || '|' || t.category || '|' || coalesce(t.address, '') || '|' || left(coalesce(d.overview, ''), ?))
               )
             ORDER BY t.id
             LIMIT ?
@@ -62,7 +65,7 @@ class SpotEmbeddingUpsertJdbcAdapter(
                     overview = rs.getString("overview"),
                 )
             },
-            afterTranslationId, model, limit,
+            afterTranslationId, model, properties.embedding.overviewMaxChars, limit,
         )
 
     /** 번역 행에서 해시를 다시 계산해 벡터와 함께 upsert한다. */
@@ -71,15 +74,16 @@ class SpotEmbeddingUpsertJdbcAdapter(
         if (embeddings.isEmpty()) return
         val setter = ParameterizedPreparedStatementSetter<SpotEmbedding> { ps, embedding ->
             ps.setString(1, model)
-            ps.setString(2, embedding.vector.toPgVector())
-            ps.setLong(3, embedding.translationId)
+            ps.setInt(2, properties.embedding.overviewMaxChars)
+            ps.setString(3, embedding.vector.toPgVector())
+            ps.setLong(4, embedding.translationId)
         }
         jdbcTemplate.batchUpdate(
             """
             INSERT INTO spot_embedding (translation_id, model, text_hash, embedding, updated_at)
             SELECT t.id,
                    ?,
-                   md5(t.title || '|' || t.category || '|' || coalesce(t.address, '') || '|' || coalesce(d.overview, '')),
+                   md5(t.title || '|' || t.category || '|' || coalesce(t.address, '') || '|' || left(coalesce(d.overview, ''), ?)),
                    ?::vector,
                    now()
             FROM spot_catalog_translation t

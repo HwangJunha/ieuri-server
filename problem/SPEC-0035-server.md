@@ -35,16 +35,16 @@
 |---|---|---|
 | `TaxRefundTitleRule` | domain/specification | 제목 패턴으로 면세 태그 장소 판정. 패턴은 설정 |
 | `RecommendationScore` | domain/strategy | 거리 `1/(1+거리÷반감)`, 취향 `((cos좋아요 − cos싫어요) + 1)/2`, 취향이 있으면 `(1−w)·거리 + w·취향`, × 면세 배율. 순수 함수 |
-| `EmbeddingText` | domain/specification | 임베딩 입력 `"제목 | 카테고리 라벨 | 주소"` |
+| `EmbeddingText` | domain/specification | 임베딩 입력 `"제목 | 카테고리 라벨 | 주소 | 소개문(500자 문장 끝 절삭)"` |
 | `CategoryDiversity` | domain/strategy | 같은 카테고리 n번째에 `penalty×(n−1)` 감점 후 정렬. 행을 숨기지 않는다 |
 | `RecommendationPolicy` | application/policy | 위 셋 + 후보 상한 N·취향 최소 반응 수·임베딩 사양(모델·차원·재시도). 설정값을 담는다 |
 | `coordinatesOf`·`requireRadiusWithin` | application/validation | 도메인 검증 실패 → 오류 코드 번역. `spots`와 같은 코드 |
 | `RecommendedSpotsQueryService` | application/service | 검증 → 감사 이벤트 → 반응(좋아요·싫어요) → 후보(반응 제외) → 취향 유사도(SQL 1회) → 점수 → 감점 정렬 → 앞 first건 |
 | `SpotEmbeddingSyncService` | application/service | 대상 행 → 텍스트 → Voyage(즉시 재시도) → 저장. 실패는 세고 건너뛴다 |
-| `SpotEmbeddingStorePort` → `SpotEmbeddingUpsertJdbcAdapter` | out/persistence | 대상 판정(벡터 없음·텍스트 변경·모델 불일치)과 upsert. 텍스트 해시는 SQL이 행에서 계산 |
+| `SpotEmbeddingStorePort` → `SpotEmbeddingUpsertJdbcAdapter` | out/persistence | 대상 판정(벡터 없음·텍스트 변경·모델 불일치)과 upsert. 텍스트 해시는 SQL이 행에서 계산 — 소개문은 `left(…, 500)`으로 임베딩 텍스트와 같은 상한 |
 | `TasteSimilarityQueryPort` → `TasteSimilarityQueryJdbcAdapter` | out/query | 좋아요·싫어요 평균(`avg(vector)`)과 후보의 코사인(`<=>`)을 SQL 한 번으로. 벡터는 DB 밖으로 안 나온다 |
 | `TextEmbeddingPort` → `VoyageEmbeddingClient` | out/client/voyage | `POST /v1/embeddings`. 키는 환경변수 |
-| `SpotEmbeddingJobConfig` → `SpotEmbeddingTasklet` | infrastructure/batch | **별개 잡 `spotEmbeddingJob`**(`spotSyncJob` 뒤에 시각으로 벌려 실행). 외부 제공자에 기대는 단계라 spot 동기화를 붙들지 않게 분리. 번역 행 id 키셋 |
+| `SpotEmbeddingJobConfig` → `SpotEmbeddingTasklet` | infrastructure/batch | **별개 잡 `spotEmbeddingJob`**(CronJob 06:00, `spotSyncJob` 뒤에 시각으로 벌려 실행). 외부 제공자에 기대는 단계라 spot 동기화를 붙들지 않게 분리. 번역 행 id 키셋 |
 | `RecommendedSpotsResolver` | infrastructure/in/graphql | 인자 옮기기·응답 변환만. `requireMemberId` |
 | `SpotGqlMapper` | infrastructure/in/graphql/mapper | `SpotView → Spot` |
 
@@ -89,7 +89,7 @@
 선언돼 있지 않다** — 운영 반영 전 추가해야 V6가 통과한다(POL-034·056).
 
 - 번역 행(언어별)마다 벡터 하나. PK `translation_id`(FK CASCADE). 대상 판정은 SQL 한 조건 — 벡터 없음·
-  `text_hash`(제목|분류|주소|소개문의 md5) 변경·모델 불일치. 초기 적재·증분·모델 교체·**상세 도착**이 같은 경로다.
+  `text_hash`(제목|분류|주소|소개문 앞 500자의 md5 — 상한 밖만 바뀐 소개문은 대상이 아니다) 변경·모델 불일치. 초기 적재·증분·모델 교체·**상세 도착**이 같은 경로다.
 - 텍스트는 `"제목 | 카테고리 라벨(행의 언어) | 주소 | 소개문"`. 제목은 저장된 그대로(면세 태그 포함). 소개문은
   `spot_detail.overview`(원본 `spot` 행 경유, `(catalog_id, language)`당 여럿이면 최근 적재 하나)이며
   **500자에서 마지막 문장 끝으로 절삭**(`embedding.overview-max-chars`) — 토큰 비용의 천장이다. 상세는 지연
