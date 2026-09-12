@@ -58,7 +58,7 @@ class SpotEmbeddingSyncService(
         }
         return targets.map { target ->
             val label = labels.getValue(target.language)[target.categoryCode]?.label ?: target.categoryCode
-            EmbeddingText.of(target.title, label, target.address)
+            EmbeddingText.of(target.title, label, target.address, target.overview, policy.embedding.overviewMaxChars)
         }
     }
 

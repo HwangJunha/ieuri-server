@@ -35,5 +35,7 @@ data class RecommendationProperties(
         val batchSize: Int = 128,
         /** 제공자 실패 시 즉시 재시도 횟수(POL-040). */
         val retryCount: Int = 3,
+        /** 임베딩 텍스트에 넣는 소개문(spot_detail.overview) 길이 상한(자). 문장 끝에서 자른다. */
+        val overviewMaxChars: Int = 500,
     )
 }

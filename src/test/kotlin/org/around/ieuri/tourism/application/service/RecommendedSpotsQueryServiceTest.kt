@@ -54,7 +54,7 @@ class RecommendedSpotsQueryServiceTest {
         diversity = CategoryDiversity(penalty = 0.1),
         candidateCap = 300,
         tasteMinReactions = 3,
-        embedding = EmbeddingSpec(model = "voyage-4", dimension = 4, retryCount = 1),
+        embedding = EmbeddingSpec(model = "voyage-4", dimension = 4, retryCount = 1, overviewMaxChars = 500),
     )
     private val service = RecommendedSpotsQueryService(
         spotQueryPort, spotSpatialQueryPort, tasteSimilarityQueryPort, eventPublisher, spotQueryPolicy, policy,

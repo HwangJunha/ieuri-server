@@ -76,6 +76,7 @@
 | `taste-min-reactions` | 5 | 출발점 |
 | `embedding.model` / `dimension` | `voyage-4` / 1024 | 확정. 차원은 `spot_embedding.embedding vector(1024)`와 같아야 한다 |
 | `embedding.batch-size` / `retry-count` | 128 / 3 | Voyage 요청당 1,000건·320K 토큰 안. 재시도는 즉시(POL-040) |
+| `embedding.overview-max-chars` | 500 | 실측 p90 KO 324자, 500자 초과 57건 중 2건. 문장 끝 절삭 |
 | `ieuri.voyage.api-key` | `${IEURI_VOYAGE_API_KEY:}` | 없으면 기동은 되고 임베딩 단계만 실패로 센다 |
 
 가산·동부산 아울렛 좌표에서 첫 묶음의 카테고리 분포를 실측한 뒤 확정한다.
@@ -88,8 +89,13 @@
 선언돼 있지 않다** — 운영 반영 전 추가해야 V6가 통과한다(POL-034·056).
 
 - 번역 행(언어별)마다 벡터 하나. PK `translation_id`(FK CASCADE). 대상 판정은 SQL 한 조건 — 벡터 없음·
-  `text_hash`(제목|분류|주소의 md5) 변경·모델 불일치. 초기 적재·증분·모델 교체가 같은 경로다.
-- 텍스트는 `"제목 | 카테고리 라벨(행의 언어) | 주소"`. 제목은 저장된 그대로(면세 태그 포함).
+  `text_hash`(제목|분류|주소|소개문의 md5) 변경·모델 불일치. 초기 적재·증분·모델 교체·**상세 도착**이 같은 경로다.
+- 텍스트는 `"제목 | 카테고리 라벨(행의 언어) | 주소 | 소개문"`. 제목은 저장된 그대로(면세 태그 포함). 소개문은
+  `spot_detail.overview`(원본 `spot` 행 경유, `(catalog_id, language)`당 여럿이면 최근 적재 하나)이며
+  **500자에서 마지막 문장 끝으로 절삭**(`embedding.overview-max-chars`) — 토큰 비용의 천장이다. 상세는 지연
+  조회(SPEC-0003)라 지금은 80,529행 중 57행뿐이고, production API로 상세를 전량 선적재하면 해시가 바뀌어
+  그 행들이 한 번씩 재임베딩된다(약 15M 토큰, 최악 43M). 취향 신호의 실질은 소개문에서 온다 — 제목만으로는
+  "고깃집"이 잡히는 곳이 가산 20km 음식점 1,497곳 중 129곳이다(실측).
 - Voyage `voyage-4` 1024차원, `input_type: document`. 요청당 128건. 실패는 즉시 3회 재시도 후 건너뛰고
   센다 — 그 행은 다음 실행의 대상으로 남는다. 차원이 다른 벡터는 저장하지 않는다.
 - 요청 시 SQL 한 번: `avg(embedding)`으로 좋아요·싫어요 평균, `1 − (embedding <=> 평균)`으로 후보 300개의

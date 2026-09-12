@@ -70,6 +70,7 @@ class TourismConfig {
                 model = properties.embedding.model,
                 dimension = properties.embedding.dimension,
                 retryCount = properties.embedding.retryCount,
+                overviewMaxChars = properties.embedding.overviewMaxChars,
             ),
         )
 

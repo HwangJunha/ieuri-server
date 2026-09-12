@@ -21,6 +21,7 @@ class RecommendationPropertiesTest {
         assertEquals(1024, p.embedding.dimension)
         assertEquals(128, p.embedding.batchSize)
         assertEquals(3, p.embedding.retryCount)
+        assertEquals(500, p.embedding.overviewMaxChars)
     }
 
     @Test

@@ -31,13 +31,13 @@ class SpotEmbeddingSyncServiceTest {
         diversity = CategoryDiversity(0.1),
         candidateCap = 300,
         tasteMinReactions = 5,
-        embedding = EmbeddingSpec(model = "voyage-4", dimension = 3, retryCount = 2),
+        embedding = EmbeddingSpec(model = "voyage-4", dimension = 3, retryCount = 2, overviewMaxChars = 500),
     )
     private val service = SpotEmbeddingSyncService(storePort, embeddingPort, categoryPort, policy)
 
     private val targets = listOf(
-        EmbeddingTarget(11L, DomainLocale.KO, "나이키 가산점", "SHOPPING", "서울 금천구"),
-        EmbeddingTarget(12L, DomainLocale.KO, "가산 칼국수", "RESTAURANT", null),
+        EmbeddingTarget(11L, DomainLocale.KO, "나이키 가산점", "SHOPPING", "서울 금천구", "스포츠 브랜드 매장이다."),
+        EmbeddingTarget(12L, DomainLocale.KO, "가산 칼국수", "RESTAURANT", null, null),
     )
 
     @Test
@@ -61,7 +61,7 @@ class SpotEmbeddingSyncServiceTest {
         val result = service.syncNext(0L, 100)
 
         // 라벨이 없는 카테고리는 코드가 라벨이다. 주소가 없으면 빈 칸.
-        assertEquals(listOf("나이키 가산점 | 쇼핑 | 서울 금천구", "가산 칼국수 | RESTAURANT |"), texts.captured)
+        assertEquals(listOf("나이키 가산점 | 쇼핑 | 서울 금천구 | 스포츠 브랜드 매장이다.", "가산 칼국수 | RESTAURANT |  |"), texts.captured)
         assertEquals(listOf(11L, 12L), saved.captured.map { it.translationId })
         assertEquals(listOf(1f, 0f, 0f), saved.captured[0].vector.toList())
         assertEquals(2, result.processed)
