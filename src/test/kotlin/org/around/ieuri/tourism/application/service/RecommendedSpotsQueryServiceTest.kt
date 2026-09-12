@@ -9,7 +9,7 @@ import org.around.ieuri.tourism.application.exception.InvalidCursorException
 import org.around.ieuri.tourism.application.exception.RadiusTooLargeException
 import org.around.ieuri.tourism.application.policy.RecommendationPolicy
 import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
-import org.around.ieuri.tourism.application.port.out.cache.FeedBatchCachePort
+import org.around.ieuri.tourism.application.port.out.cache.RecommendedSpotsBatchCachePort
 import org.around.ieuri.tourism.application.port.out.client.ActivityCounts
 import org.around.ieuri.tourism.application.port.out.client.CommunityActivityCountPort
 import org.around.ieuri.tourism.application.port.out.client.ExternalTrendScorePort
@@ -26,8 +26,7 @@ import org.around.ieuri.tourism.domain.strategy.SpotSimilarity
 import org.around.ieuri.tourism.domain.vo.CategorySelection
 import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
-import org.around.ieuri.tourism.domain.vo.FeedCursor
-import org.around.ieuri.tourism.domain.vo.FeedCursorSecret
+import org.around.ieuri.tourism.domain.vo.RecommendedSpotsCursor
 import org.around.ieuri.tourism.domain.vo.ScoreWeights
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import java.time.Clock
@@ -41,18 +40,17 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * SPEC-0035 R4~R17 — 추천 피드의 첫 요청·이어 받기·묶음·캐시·결정성. 포트는 전부 스텁이다.
+ * SPEC-0035 R4~R17 — 추천 목록의 첫 요청·이어 받기·묶음·캐시·결정성. 포트는 전부 스텁이다.
  *
  * 숫자를 작게 잡는다: 후보 상한 N=6, 묶음 B=4, 창 k=2. 후보는 거리순 id 1..6이다.
  */
-class RecommendedFeedQueryServiceTest {
+class RecommendedSpotsQueryServiceTest {
 
     private val spotQueryPort = mockk<SpotQueryPort>()
     private val spotSpatialQueryPort = mockk<SpotSpatialQueryPort>()
     private val activityCountPort = mockk<CommunityActivityCountPort>()
     private val trendScorePort = mockk<ExternalTrendScorePort>()
-    private val feedBatchCachePort = mockk<FeedBatchCachePort>()
-    private val secret = FeedCursorSecret("test-secret")
+    private val batchCachePort = mockk<RecommendedSpotsBatchCachePort>()
     private val now = Instant.parse("2026-09-11T09:00:00Z")
 
     private val spotQueryPolicy = SpotQueryPolicy(
@@ -82,12 +80,11 @@ class RecommendedFeedQueryServiceTest {
             candidateCap = candidateCap,
             batchSize = batchSize,
             cursorMaxAge = Duration.ofHours(24),
-            cursorSecret = secret,
         )
 
     private fun service(policy: RecommendationPolicy = policy(), clock: Clock = Clock.fixed(now, ZoneOffset.UTC)) =
-        RecommendedFeedQueryService(
-            spotQueryPort, spotSpatialQueryPort, activityCountPort, trendScorePort, feedBatchCachePort,
+        RecommendedSpotsQueryService(
+            spotQueryPort, spotSpatialQueryPort, activityCountPort, trendScorePort, batchCachePort,
             spotQueryPolicy, policy, clock,
         )
 
@@ -98,8 +95,8 @@ class RecommendedFeedQueryServiceTest {
         every { spotQueryPort.countReactionsIn(any(), any()) } returns emptyMap()
         every { activityCountPort.countByCatalogIds(any()) } returns emptyMap()
         every { trendScorePort.findByCatalogIds(any()) } returns emptyMap()
-        every { feedBatchCachePort.get(any(), any()) } returns null
-        every { feedBatchCachePort.put(any(), any(), any()) } returns Unit
+        every { batchCachePort.get(any(), any()) } returns null
+        every { batchCachePort.put(any(), any(), any()) } returns Unit
     }
 
     // ── 검증 ────────────────────────────────────────────────────────────────
@@ -203,8 +200,8 @@ class RecommendedFeedQueryServiceTest {
         assertEquals(2, page.edges.size)
         assertTrue(page.pageInfo.hasNextPage)
         assertFalse(page.pageInfo.hasPreviousPage)
-        assertEquals(2, FeedCursor.decode(page.pageInfo.endCursor!!, secret).position)
-        assertEquals(1, FeedCursor.decode(page.edges[0].cursor, secret).position)
+        assertEquals(2, RecommendedSpotsCursor.decode(page.pageInfo.endCursor!!).position)
+        assertEquals(1, RecommendedSpotsCursor.decode(page.edges[0].cursor).position)
     }
 
     @Test
@@ -224,7 +221,7 @@ class RecommendedFeedQueryServiceTest {
         assertTrue(second.pageInfo.hasPreviousPage)
         val ids = (first.edges + second.edges).map { it.node.id }
         assertEquals(4, ids.toSet().size)
-        assertEquals(4, FeedCursor.decode(second.pageInfo.endCursor!!, secret).position)
+        assertEquals(4, RecommendedSpotsCursor.decode(second.pageInfo.endCursor!!).position)
     }
 
     @Test
@@ -239,7 +236,7 @@ class RecommendedFeedQueryServiceTest {
         assertFalse(p2.pageInfo.hasNextPage)
         assertEquals((1L..6L).toSet(), (p1.edges + p2.edges).map { it.node.id }.toSet())
         // 두 번째 묶음도 캐시에 저장된다(첫 요청이 다음 페이지 판정을 위해 한 번, 이어 받기가 미스라 한 번).
-        verify(atLeast = 1) { feedBatchCachePort.put(any(), 1, any()) }
+        verify(atLeast = 1) { batchCachePort.put(any(), 1, any()) }
     }
 
     @Test
@@ -263,9 +260,9 @@ class RecommendedFeedQueryServiceTest {
 
         // 이번엔 캐시가 첫 묶음을 돌려준다.
         val put = slot<List<SpotSearchResult>>()
-        every { feedBatchCachePort.put(any(), 0, capture(put)) } returns Unit
+        every { batchCachePort.put(any(), 0, capture(put)) } returns Unit
         service().recommendedSpots(query(first = 2), DomainLocale.EN, null)
-        every { feedBatchCachePort.get(any(), 0) } returns put.captured
+        every { batchCachePort.get(any(), 0) } returns put.captured
         val fromCache = service().recommendedSpots(query(first = 2, after = first.pageInfo.endCursor), DomainLocale.EN, null)
 
         assertEquals(recomputed.edges.map { it.node.id }, fromCache.edges.map { it.node.id })
@@ -284,7 +281,7 @@ class RecommendedFeedQueryServiceTest {
     }
 
     @Test
-    fun `서명·형식이 깨진 커서는 INVALID_CURSOR다 - AC-4_3`() {
+    fun `형식이 깨진 커서는 INVALID_CURSOR다 - AC-4_3`() {
         stubDefaults()
         assertFailsWith<InvalidCursorException> {
             service().recommendedSpots(query(first = 2, after = "garbage"), DomainLocale.EN, null)
@@ -307,7 +304,7 @@ class RecommendedFeedQueryServiceTest {
         val first = service().recommendedSpots(query(first = 2), DomainLocale.EN, null)
         val later = Clock.fixed(now.plus(Duration.ofHours(1)), ZoneOffset.UTC)
         val second = service(clock = later).recommendedSpots(query(first = 2, after = first.pageInfo.endCursor), DomainLocale.EN, null)
-        assertEquals(now, FeedCursor.decode(second.pageInfo.endCursor!!, secret).issuedAt)
+        assertEquals(now, RecommendedSpotsCursor.decode(second.pageInfo.endCursor!!).issuedAt)
     }
 
     // ── 캐시 ────────────────────────────────────────────────────────────────
@@ -316,7 +313,7 @@ class RecommendedFeedQueryServiceTest {
     fun `캐시 히트면 재배열 없이 캐시의 순서로 응답한다 - AC-17_1`() {
         stubDefaults()
         val cached = listOf(card(4), card(2), card(6), card(1))
-        every { feedBatchCachePort.get(any(), 0) } returns cached
+        every { batchCachePort.get(any(), 0) } returns cached
 
         val page = service().recommendedSpots(query(first = 3), DomainLocale.EN, null)
 
@@ -327,8 +324,8 @@ class RecommendedFeedQueryServiceTest {
     @Test
     fun `캐시 포트가 예외를 던져도 재계산 결과를 돌려준다 - AC-17_3`() {
         stubDefaults()
-        every { feedBatchCachePort.get(any(), any()) } throws IllegalStateException("valkey down")
-        every { feedBatchCachePort.put(any(), any(), any()) } throws IllegalStateException("valkey down")
+        every { batchCachePort.get(any(), any()) } throws IllegalStateException("valkey down")
+        every { batchCachePort.put(any(), any(), any()) } throws IllegalStateException("valkey down")
 
         val first = service().recommendedSpots(query(first = 2), DomainLocale.EN, null)
         val second = service().recommendedSpots(query(first = 2, after = first.pageInfo.endCursor), DomainLocale.EN, null)

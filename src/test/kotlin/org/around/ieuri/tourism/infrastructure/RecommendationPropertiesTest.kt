@@ -36,7 +36,7 @@ class RecommendationPropertiesTest {
     fun `설정으로 덮어쓰면 그 값이다 - AC-25_2`() {
         val p = RecommendationProperties(
             dpp = RecommendationProperties.Dpp(alpha = 2.0, window = 8),
-            cursor = RecommendationProperties.Cursor(maxAge = Duration.ofHours(1), secret = "s"),
+            cursor = RecommendationProperties.Cursor(maxAge = Duration.ofHours(1)),
         )
         assertEquals(2.0, p.dpp.alpha)
         assertEquals(8, p.dpp.window)

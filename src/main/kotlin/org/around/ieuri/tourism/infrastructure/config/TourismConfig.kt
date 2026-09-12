@@ -14,7 +14,6 @@ import org.around.ieuri.tourism.domain.strategy.DppReranker
 import org.around.ieuri.tourism.domain.strategy.RecommendationScore
 import org.around.ieuri.tourism.domain.strategy.SpotSimilarity
 import org.around.ieuri.tourism.domain.vo.DistanceScoring
-import org.around.ieuri.tourism.domain.vo.FeedCursorSecret
 import org.around.ieuri.tourism.domain.vo.FreshnessDecay
 import org.around.ieuri.tourism.domain.specification.SpotExclusionRule
 import org.around.ieuri.tourism.domain.vo.RegionScoreWeights
@@ -52,8 +51,8 @@ import java.time.Duration
 class TourismConfig {
 
     /**
-     * 추천 피드 정책(SPEC-0035). 도메인 순수 함수(점수·재배열·유사도)에 설정값을 꽂아 조립한다 —
-     * 도메인은 설정 메커니즘을 알지 않는다. 서명 키가 비어 있으면 여기서 기동이 멈춘다(S1 기동 조건).
+     * 추천 목록 정책(SPEC-0035). 도메인 순수 함수(점수·재배열·유사도)에 설정값을 꽂아 조립한다 —
+     * 도메인은 설정 메커니즘을 알지 않는다.
      */
     @Bean
     fun recommendationPolicy(properties: RecommendationProperties): RecommendationPolicy =
@@ -84,7 +83,6 @@ class TourismConfig {
             candidateCap = properties.dpp.candidateCap,
             batchSize = properties.dpp.batchSize,
             cursorMaxAge = properties.cursor.maxAge,
-            cursorSecret = FeedCursorSecret(properties.cursor.secret),
         )
 
     /**

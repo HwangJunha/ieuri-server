@@ -6,11 +6,11 @@ import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 
 /**
- * 추천 피드 묶음 캐시의 카드 1장(어댑터 내부 직렬화 DTO). read DTO를 Jackson으로 직접 굽지 않는
+ * 추천 목록 묶음 캐시의 카드 1장(어댑터 내부 직렬화 DTO). read DTO를 Jackson으로 직접 굽지 않는
  * 이유는 [CachedSpotDetail]과 같다 — 값 클래스([SpotCategory])는 Jackson 왕복이 보장되지 않는다.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-data class CachedFeedCard(
+data class CachedSpotCard(
     val id: Long = 0,
     val title: String = "",
     val address: String? = null,
@@ -35,7 +35,7 @@ data class CachedFeedCard(
     )
 
     companion object {
-        fun from(card: SpotSearchResult): CachedFeedCard = CachedFeedCard(
+        fun from(card: SpotSearchResult): CachedSpotCard = CachedSpotCard(
             id = card.spotId,
             title = card.title,
             address = card.address,

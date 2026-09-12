@@ -141,7 +141,7 @@ class InvalidCursorException(message: String = "유효하지 않은 커서입니
     SpotQueryException("INVALID_CURSOR", Classification.BAD_REQUEST, message, cause)
 
 /**
- * 추천 피드 커서의 발급 시각이 수명 상한을 넘겼다(SPEC-0035 R4). 서명·조건은 맞으므로
+ * 추천 목록 커서의 발급 시각이 수명 상한을 넘겼다(SPEC-0035 R4). 조건은 맞으므로
  * [InvalidCursorException]과 구분한다 — 클라이언트는 두 경우 모두 커서 없이 새로 시작한다.
  */
 class CursorExpiredException(message: String = "커서가 만료되었습니다.") :

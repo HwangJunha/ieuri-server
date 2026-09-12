@@ -4,7 +4,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 import java.time.Duration
 
 /**
- * 추천 피드 설정(SPEC-0035 §9 · POL-044). 코드 기본값은 스펙 §9의 **출발값**이며 실측 후 확정한다(T1·T7).
+ * 추천 목록 설정(SPEC-0035 §9 · POL-044). 코드 기본값은 스펙 §9의 **출발값**이며 실측 후 확정한다(T1·T7).
  * 값은 `application.yaml`이 덮어쓴다.
  */
 @ConfigurationProperties(prefix = "ieuri.tourism.recommendation")
@@ -49,10 +49,9 @@ data class RecommendationProperties(
         val differentCategoryDistance: Double = 1.0,
     )
 
-    /** 커서(R4). [secret]은 환경변수로만 온다 — 로그·응답에 노출 금지. */
+    /** 커서(R4). */
     data class Cursor(
         val maxAge: Duration = Duration.ofHours(24),
-        val secret: String = "",
     )
 
     /** 묶음 캐시(R17). 캐시라 값이 틀려도 결과는 같다. */

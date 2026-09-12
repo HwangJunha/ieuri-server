@@ -7,8 +7,8 @@ import org.around.ieuri.tourism.application.exception.CursorExpiredException
 import org.around.ieuri.tourism.application.exception.InvalidCursorException
 import org.around.ieuri.tourism.application.policy.RecommendationPolicy
 import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
-import org.around.ieuri.tourism.application.port.`in`.query.RecommendedFeedUseCase
-import org.around.ieuri.tourism.application.port.out.cache.FeedBatchCachePort
+import org.around.ieuri.tourism.application.port.`in`.query.RecommendedSpotsUseCase
+import org.around.ieuri.tourism.application.port.out.cache.RecommendedSpotsBatchCachePort
 import org.around.ieuri.tourism.application.port.out.client.CommunityActivityCountPort
 import org.around.ieuri.tourism.application.port.out.client.ExternalTrendScorePort
 import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch
@@ -20,8 +20,8 @@ import org.around.ieuri.tourism.application.query.SpotView
 import org.around.ieuri.tourism.domain.strategy.DppItem
 import org.around.ieuri.tourism.domain.strategy.SimilarityInput
 import org.around.ieuri.tourism.domain.vo.DomainLocale
-import org.around.ieuri.tourism.domain.vo.FeedConditions
-import org.around.ieuri.tourism.domain.vo.FeedCursor
+import org.around.ieuri.tourism.domain.vo.RecommendedSpotsConditions
+import org.around.ieuri.tourism.domain.vo.RecommendedSpotsCursor
 import org.around.ieuri.tourism.domain.vo.ScoreFactors
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -37,30 +37,30 @@ import java.time.Instant
  * 순열을 낸다(AC-4.1). 캐시·집계·유행 포트의 실패는 오류가 아니라 요인 없음·재계산이다.
  */
 @Service
-class RecommendedFeedQueryService(
+class RecommendedSpotsQueryService(
     private val spotQueryPort: SpotQueryPort,
     // 반경 조회만 PostGIS 생 SQL이라 포트가 갈린다 — 어느 읽기가 그쪽인지 여기서 보인다.
     private val spotSpatialQueryPort: SpotSpatialQueryPort,
     private val activityCountPort: CommunityActivityCountPort,
     private val trendScorePort: ExternalTrendScorePort,
-    private val feedBatchCachePort: FeedBatchCachePort,
+    private val batchCachePort: RecommendedSpotsBatchCachePort,
     private val spotQueryPolicy: SpotQueryPolicy,
     private val policy: RecommendationPolicy,
     private val clock: Clock,
-) : RecommendedFeedUseCase {
+) : RecommendedSpotsUseCase {
 
-    private val log = LoggerFactory.getLogger(RecommendedFeedQueryService::class.java)
+    private val log = LoggerFactory.getLogger(RecommendedSpotsQueryService::class.java)
 
     override fun recommendedSpots(
         query: LocationViewQuery,
         locale: DomainLocale,
         memberId: Long?,
     ): CursorPage<SpotView> {
-        val center = validatedCenter(query.latitude, query.longitude)
-        validateRadius(query.radiusMeters, spotQueryPolicy.maxRadiusMeters)
+        val center = coordinatesOf(query.latitude, query.longitude)
+        requireRadiusWithin(query.radiusMeters, spotQueryPolicy.maxRadiusMeters)
         val first = query.first.coerceIn(1, spotQueryPolicy.maxPageSize)
 
-        val conditions = FeedConditions(
+        val conditions = RecommendedSpotsConditions(
             center = center,
             radiusMeters = query.radiusMeters,
             categories = query.categories,
@@ -73,13 +73,13 @@ class RecommendedFeedQueryService(
         // 세션 시작 시각은 이어 받아도 그대로다 — 수명이 세션 전체에 걸린다(R4).
         val issuedAt = cursor?.issuedAt ?: now
 
-        val session = FeedSession(conditions)
+        val session = RecommendationSession(conditions)
         // first + 1건을 읽어 초과분의 존재로 다음 페이지를 판정한다(keysetPageOf와 같은 규약).
         val cards = session.slice(from = position, count = first + 1)
         return cursorPageOf(
             edges = cards.take(first).mapIndexed { index, card ->
                 CursorEdge(
-                    cursor = FeedCursor(conditions.hash, position + index + 1, issuedAt).encode(policy.cursorSecret),
+                    cursor = RecommendedSpotsCursor(conditions.hash, position + index + 1, issuedAt).encode(),
                     node = card.toView(),
                 )
             },
@@ -88,10 +88,10 @@ class RecommendedFeedQueryService(
         )
     }
 
-    /** 서명·형식 → 조건 해시 → 수명 순으로 판정한다. 앞 단계가 실패하면 뒤를 보지 않는다. */
-    private fun decodeCursor(after: String, conditions: FeedConditions, now: Instant): FeedCursor {
+    /** 형식 → 조건 해시 → 수명 순으로 판정한다. 앞 단계가 실패하면 뒤를 보지 않는다. */
+    private fun decodeCursor(after: String, conditions: RecommendedSpotsConditions, now: Instant): RecommendedSpotsCursor {
         val cursor = try {
-            FeedCursor.decode(after, policy.cursorSecret)
+            RecommendedSpotsCursor.decode(after)
         } catch (e: IllegalArgumentException) {
             throw InvalidCursorException(cause = e)
         }
@@ -106,7 +106,7 @@ class RecommendedFeedQueryService(
      * 한 요청 동안의 순열 계산 상태. 후보·집계는 첫 캐시 미스에서 한 번만 읽고, 만든 묶음은
      * 요청 안에서 다시 쓴다. 요청마다 새로 만들어지므로 공유 가변 상태가 아니다.
      */
-    private inner class FeedSession(private val conditions: FeedConditions) {
+    private inner class RecommendationSession(private val conditions: RecommendedSpotsConditions) {
         private val batches = HashMap<Int, List<SpotSearchResult>>()
         private val candidates: List<SpotSearchResult> by lazy { loadCandidates() }
         private val qualities: Map<Long, Double?> by lazy { scoreCandidates(candidates) }
@@ -152,11 +152,11 @@ class RecommendedFeedQueryService(
 
         /** 캐시 조회 실패는 미스다(AC-17.3) — 캐시는 있으면 빠르고 없으면 정확한 것이다. */
         private fun cached(batchNo: Int): List<SpotSearchResult>? =
-            tolerating("묶음 캐시 조회", null) { feedBatchCachePort.get(conditions.hash, batchNo) }
+            tolerating("묶음 캐시 조회", null) { batchCachePort.get(conditions.hash, batchNo) }
 
         /** 캐시 저장 실패는 no-op이다(AC-17.3). */
         private fun remember(batchNo: Int, cards: List<SpotSearchResult>) =
-            tolerating("묶음 캐시 저장", Unit) { feedBatchCachePort.put(conditions.hash, batchNo, cards) }
+            tolerating("묶음 캐시 저장", Unit) { batchCachePort.put(conditions.hash, batchNo, cards) }
 
         /**
          * 점수가 있는 후보는 DPP 그리디로, 없는 후보는 맨 뒤에 id 순으로(AC-6.2).
@@ -218,7 +218,7 @@ class RecommendedFeedQueryService(
             try {
                 action()
             } catch (e: RuntimeException) {
-                log.warn("추천 피드 {} 실패, 없는 것으로 진행: {}", name, e.javaClass.simpleName)
+                log.warn("추천 목록 {} 실패, 없는 것으로 진행: {}", name, e.javaClass.simpleName)
                 fallback
             }
     }

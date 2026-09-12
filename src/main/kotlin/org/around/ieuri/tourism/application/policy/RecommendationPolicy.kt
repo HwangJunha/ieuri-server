@@ -3,11 +3,10 @@ package org.around.ieuri.tourism.application.policy
 import org.around.ieuri.tourism.domain.strategy.DppReranker
 import org.around.ieuri.tourism.domain.strategy.RecommendationScore
 import org.around.ieuri.tourism.domain.strategy.SpotSimilarity
-import org.around.ieuri.tourism.domain.vo.FeedCursorSecret
 import java.time.Duration
 
 /**
- * 추천 피드 정책(SPEC-0035 §9, POL-044). 계수는 전부 설정에서 오며 여기 숫자를 적지 않는다.
+ * 추천 목록 정책(SPEC-0035 §9, POL-044). 계수는 전부 설정에서 오며 여기 숫자를 적지 않는다.
  *
  * @param candidateCap 후보 상한 N. 거리 가까운 순 N건만 점수·재배열 대상이다(R15).
  * @param batchSize 묶음 크기 B. 순열은 B건씩 확정되고 캐시된다(R15·R16). **묶음 수는 ⌈N ÷ B⌉이고
@@ -21,7 +20,6 @@ data class RecommendationPolicy(
     val candidateCap: Int,
     val batchSize: Int,
     val cursorMaxAge: Duration,
-    val cursorSecret: FeedCursorSecret,
 ) {
     init {
         require(candidateCap >= 1) { "후보 상한은 1 이상이어야 합니다." }

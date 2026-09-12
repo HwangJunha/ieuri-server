@@ -12,6 +12,6 @@ import org.around.ieuri.tourism.domain.vo.DomainLocale
  * 커서는 조건 해시·위치·발급 시각·서명을 담은 자립형 토큰이라 캐시 없이도 같은 결과가 나온다(R17).
  * 조건 불일치·서명 실패는 INVALID_CURSOR, 수명 초과는 CURSOR_EXPIRED.
  */
-interface RecommendedFeedUseCase {
+interface RecommendedSpotsUseCase {
     fun recommendedSpots(query: LocationViewQuery, locale: DomainLocale, memberId: Long?): CursorPage<SpotView>
 }

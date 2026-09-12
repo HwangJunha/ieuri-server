@@ -5,13 +5,11 @@ import com.netflix.graphql.dgs.DgsData
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
-import org.around.ieuri.common.event.LocationAccessed
 import org.around.ieuri.common.graphql.tokenPresentation
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.tourism.application.port.`in`.query.LocationQueryUseCase
-import org.around.ieuri.tourism.application.port.`in`.query.RecommendedFeedUseCase
-import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
+import org.around.ieuri.tourism.application.port.`in`.query.RecommendedSpotsUseCase
 import org.around.ieuri.tourism.application.query.LocationView
 import org.around.ieuri.tourism.application.query.LocationViewQuery
 import org.around.ieuri.tourism.application.query.SpotView
@@ -33,9 +31,8 @@ import org.around.ieuri.common.graphql.generated.types.SpotEdge as GqlSpotEdge
 @DgsComponent
 class LocationQueryResolver(
     private val locationQueryUseCase: LocationQueryUseCase,
-    private val recommendedFeedUseCase: RecommendedFeedUseCase,
+    private val recommendedSpotsUseCase: RecommendedSpotsUseCase,
     private val currentMemberProvider: CurrentMemberProvider,
-    private val eventPublisher: TourismEventPublisherPort,
 ) {
 
     @DgsQuery
@@ -43,11 +40,7 @@ class LocationQueryResolver(
         dfe: DgsDataFetchingEnvironment,
         @InputArgument latitude: Double,
         @InputArgument longitude: Double,
-    ): LocationView {
-        // 좌표를 받는 연산이므로 조회 사실을 남긴다(SPEC-0032 R19). **좌표는 넘기지 않는다.**
-        dfe.viewerMemberId()?.let { eventPublisher.publish(LocationAccessed(it, "location")) }
-        return locationQueryUseCase.location(latitude, longitude)
-    }
+    ): LocationView = locationQueryUseCase.location(latitude, longitude, dfe.viewerMemberId())
 
     @DgsData(parentType = "Location", field = "spots")
     fun spots(
@@ -71,7 +64,7 @@ class LocationQueryResolver(
         @InputArgument first: Int?,
         @InputArgument after: String?,
     ): GqlSpotConnection =
-        recommendedFeedUseCase.recommendedSpots(
+        recommendedSpotsUseCase.recommendedSpots(
             dfe.viewQuery(radiusMeters, categories, first, after),
             locale = dfe.domainLocale(),
             memberId = dfe.viewerMemberId(),

@@ -8,6 +8,8 @@ import org.around.ieuri.tourism.application.exception.InvalidCoordinatesExceptio
 import org.around.ieuri.tourism.application.exception.InvalidCursorException
 import org.around.ieuri.tourism.application.exception.RadiusTooLargeException
 import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
+import org.around.ieuri.common.event.LocationAccessed
+import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
 import org.around.ieuri.tourism.application.port.out.query.NearbyKeysetSearch
 import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
 import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
@@ -29,6 +31,7 @@ class LocationQueryServiceTest {
 
     private val spotQueryPort = mockk<SpotQueryPort>()
     private val spotSpatialQueryPort = mockk<SpotSpatialQueryPort>()
+    private val eventPublisher = mockk<TourismEventPublisherPort>(relaxed = true)
     private val policy = SpotQueryPolicy(
         maxRadiusMeters = 100_000,
         maxPageSize = 100,
@@ -40,11 +43,11 @@ class LocationQueryServiceTest {
         maxSearchPage = 500,
         minPopularLikeCount = 5,
     )
-    private val service = LocationQueryService(spotQueryPort, spotSpatialQueryPort, policy)
+    private val service = LocationQueryService(spotQueryPort, spotSpatialQueryPort, eventPublisher, policy)
 
     @Test
     fun `location은 좌표를 담은 맥락을 돌려주고 어떤 포트도 부르지 않는다 - AC-1_1`() {
-        val view = service.location(37.48, 126.88)
+        val view = service.location(37.48, 126.88, memberId = null)
         assertEquals(37.48, view.latitude)
         assertEquals(126.88, view.longitude)
         verify(exactly = 0) { spotSpatialQueryPort.searchNearbyAfter(any()) }
@@ -52,9 +55,18 @@ class LocationQueryServiceTest {
     }
 
     @Test
+    fun `로그인 회원의 location은 좌표 없는 감사 이벤트를 남기고 비로그인은 남기지 않는다`() {
+        service.location(37.48, 126.88, memberId = 7L)
+        verify(exactly = 1) { eventPublisher.publish(LocationAccessed(7L, "location")) }
+
+        service.location(37.48, 126.88, memberId = null)
+        verify(exactly = 1) { eventPublisher.publish(any<LocationAccessed>()) }
+    }
+
+    @Test
     fun `범위 밖 좌표는 spots와 같은 코드로 거절된다 - AC-1_2`() {
-        assertFailsWith<InvalidCoordinatesException> { service.location(91.0, 126.88) }
-        assertFailsWith<InvalidCoordinatesException> { service.location(37.48, 181.0) }
+        assertFailsWith<InvalidCoordinatesException> { service.location(91.0, 126.88, null) }
+        assertFailsWith<InvalidCoordinatesException> { service.location(37.48, 181.0, null) }
         assertFailsWith<InvalidCoordinatesException> { service.spots(query(first = 3).copy(latitude = 91.0), DomainLocale.EN, null) }
     }
 

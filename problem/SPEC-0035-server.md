@@ -31,13 +31,13 @@
 | `AffinityCentroid` (VO) | domain | LIKE 벡터 평균, 코사인 | R10 |
 | `SpotSimilarity` (도메인 함수) | domain | 벡터 거리, 없으면 카테고리 대체 거리 | R14 |
 | `DppReranker` (도메인 서비스, 순수) | domain | 커널 L 구성, 창 k 그리디, 결정적 동점 규칙 | R13, R15, R16 |
-| `FeedCursor` (VO) | domain | 조건 해시·위치·발급시각·서명. 인코딩·검증·만료 판정 | R4 |
+| `RecommendedSpotsCursor` (VO) | domain | 조건 해시·위치·발급시각. 인코딩·만료 판정. **서명 없음**(2026-09-12 결정 — 아래 "커서 형식") | R4 |
 | `DistanceCursor` (기존 VO 재사용) | domain | `Location.spots`의 (거리, id) 키셋. `SearchCursors.kt`의 `d` 접두 커서를 그대로 쓴다 | R3 |
 | `SpotEmbedding` (VO) | domain | `spotId`, `model`, `dimension`, `textHash`, `vector` | R18~R20 |
 | `EmbeddingTarget` (도메인 함수) | domain | 대상 판정 한 규칙 — 미보유·텍스트 변경·모델 불일치 | R18 |
 | `DppParameterGrid` (도메인 서비스, 순수) | domain | 사례 집합에 대한 로그 가능도, 격자 최대 | R22 |
 | `LocationQueryService` | application | `location` 진입 검증(DB 없음) + `Location.spots`(기존 `SpotQueryService.spots`의 후보 경로 + 키셋 커서). 둘을 한 서비스에 둔다 — 검증 한 줄짜리 서비스를 따로 두지 않는다(S1 결정) | R1, R2, R3, R5 |
-| `RecommendedFeedQueryService` | application | 첫 요청·이어 받기·묶음 생성·캐시·로그 | R4~R17, R21, R24 |
+| `RecommendedSpotsQueryService` | application | 첫 요청·이어 받기·묶음 생성·캐시·로그 | R4~R17, R21, R24 |
 | `SpotEmbeddingSyncService` | application | 임베딩 단계의 명령. 대상 선정 → 제공자 호출 → 저장 | R18~R20 |
 | `DppParameterLearningService` | application | 로그 → 사례 → 격자 → 저장/미적용 | R22~R24 |
 
@@ -45,7 +45,7 @@
 
 ### GraphQL 어댑터
 
-- `LocationQueryResolver` — `@DgsQuery location(latitude, longitude)`는 `GqlLocation(lat, lng)` 경량 객체만 돌려준다. DB를 건드리지 않는다(AC-1.1).
+- `LocationQueryResolver` — `@DgsQuery location(latitude, longitude)`는 유스케이스가 돌려준 `LocationView` 경량 read DTO만 넘긴다. DB를 건드리지 않는다(AC-1.1). **위치 조회 감사 이벤트(`LocationAccessed`)는 리졸버가 아니라 `LocationQueryService.location`이 발행한다** — 제어는 서비스에 둔다(2026-09-12 결정). 기존 리졸버 6곳의 발행은 별도 정리 대상이다.
 - `@DgsData(parentType = "Location", field = "spots")`·`"recommendedSpots"`는 `dfe.getSource<GqlLocation>()`로 좌표를 받는다. `CategoryDisplayResolver`가 하는 방식 그대로이고, `error(...)`로 계약 위반을 잡는다. 가상 스레드에서 두 형제 필드가 동시에 풀릴 수 있으므로 공유 가변 상태를 두지 않는다.
 - `PageInfo`는 `common/pagination/CursorPage.kt`의 `cursorPageOf`/`keysetPageOf`로 만든다. `first + 1` 초과 조회로 `hasNextPage`를 판정하는 기존 규약을 따른다.
 
@@ -70,14 +70,14 @@
 | 7 점수 | `RecommendationScore` | 순수 |
 | 8 재배열 | `DppReranker(alpha, sigma, k)` — 학습값 있으면 그것(`LearnedDppParametersPort.latest()`), 없으면 설정 | R13, R24 |
 | 9 묶음 | 앞 B건의 catalog id 순열 | R15 |
-| 10 캐시 | `FeedBatchCachePort.put(key, batchNo, cards)` — 키는 조건 해시, **값은 카드(`SpotSearchResult`) 목록**. id만 두면 캐시 히트에서도 거리·제목을 다시 조회해야 해 히트가 DB 왕복을 없애지 못한다(S1 결정). 예외는 **서비스**가 삼키고 기록 | R17 |
+| 10 캐시 | `RecommendedSpotsBatchCachePort.put(key, batchNo, cards)` — 키는 조건 해시, **값은 카드(`SpotSearchResult`) 목록**. id만 두면 캐시 히트에서도 거리·제목을 다시 조회해야 해 히트가 DB 왕복을 없애지 못한다(S1 결정). 예외는 **서비스**가 삼키고 기록 | R17 |
 | 11 로그 | `FeedBatchLogPort.append(memberId, batchId, windows)` — 로그인만. 예외는 삼킴 | R21 |
-| 12 응답 | 순열의 `[position, position + first)` 카드 → `SpotEdge` + `FeedCursor(hash, position + i + 1, issuedAt)`. 카드가 값을 전부 들고 있어 hydrate가 없다. `first + 1`건을 잘라 `hasNextPage`를 판정한다 | |
+| 12 응답 | 순열의 `[position, position + first)` 카드 → `SpotEdge` + `RecommendedSpotsCursor(hash, position + i + 1, issuedAt)`. 카드가 값을 전부 들고 있어 hydrate가 없다. `first + 1`건을 잘라 `hasNextPage`를 판정한다 | |
 
 ### 이어 받기
 
-1. `FeedCursor.decode(after, secret)` — 서명·형식 실패 → `InvalidCursorException`, 조건 해시 불일치 → `InvalidCursorException`, 수명 초과 → `CursorExpiredException("CURSOR_EXPIRED", BAD_REQUEST)` **신설**.
-2. 위치 p, 묶음 번호 b = p ÷ B. `FeedBatchCachePort.get(key, b)` 히트면 슬라이스, 미스·예외면 **첫 요청의 1~9를 다시 수행**해 같은 순열을 만든다(AC-17.2, AC-17.3). 재계산이 같은 결과를 내려면 아래 "결정성"을 지켜야 한다.
+1. `RecommendedSpotsCursor.decode(after)` — 형식 실패 → `InvalidCursorException`, 조건 해시 불일치 → `InvalidCursorException`, 수명 초과 → `CursorExpiredException("CURSOR_EXPIRED", BAD_REQUEST)` **신설**.
+2. 위치 p, 묶음 번호 b = p ÷ B. `RecommendedSpotsBatchCachePort.get(key, b)` 히트면 슬라이스, 미스·예외면 **첫 요청의 1~9를 다시 수행**해 같은 순열을 만든다(AC-17.2, AC-17.3). 재계산이 같은 결과를 내려면 아래 "결정성"을 지켜야 한다.
 3. b번째 묶음이 필요한데 b ≥ 1이면 앞 묶음들의 id를 제외한 후보로 순열을 만든다(AC-16.2). 앞 묶음 id는 캐시 히트면 캐시에서, 아니면 재계산으로 얻는다.
 
 ### 결정성 (AC-13.3, AC-4.1)
@@ -88,11 +88,11 @@
 
 ### 커서 형식 (R4)
 
-`f1|{conditionsHash}|{position}|{issuedAtEpochSec}|{hmacSha256}` → Base64 URL-safe 무패딩. 기존 커서(`SearchCursors.kt`)는 서명이 없지만 이 커서는 조건 해시로 불일치를 잡는 것이 목적이라 서명이 없으면 해시를 위조해 검사를 무력화할 수 있다. 키는 환경변수 `IEURI_FEED_CURSOR_SECRET`(매니페스트 secret, POL-056). 조건 해시 입력은 좌표(소수 5자리로 반올림)·반경·정렬된 카테고리 코드·언어·**호출자(memberId, 비로그인은 없음)**다 — 로그인 회원은 반응 제외로 후보 집합이 달라, 호출자를 빼면 같은 조건의 다른 회원이 캐시에서 남의 묶음을 받는다(S1 결정). 좌표는 해시로만 실리고 로그에는 남기지 않는다(POL-045). 발급 시각은 이어 받아도 갱신하지 않는다 — 수명은 세션 전체에 걸린다.
+`r1|{conditionsHash}|{position}|{issuedAtEpochSec}` → Base64 URL-safe 무패딩. 기존 커서(`SearchCursors.kt`)와 같은 모양이며 **서명을 두지 않는다**(2026-09-12 사용자 결정). 초안은 "서명이 없으면 해시를 위조해 검사를 무력화한다"고 했으나, 서버는 커서 값을 신뢰하지 않는다 — 조건은 요청 인자·토큰에서 다시 계산해 비교만 하고, 위치는 페이지를 넘기면 누구나 도달하는 오프셋이며, 발급 시각 위조로 얻는 것은 UX 규칙(24h)의 우회뿐이라 위조 커서가 주는 응답은 정상 커서와 같다. 서명은 지키는 자산 없이 환경마다 secret 하나를 요구했다. 조건 해시 입력은 좌표(소수 5자리로 반올림)·반경·정렬된 카테고리 코드·언어·**호출자(memberId, 비로그인은 없음)**다 — 로그인 회원은 반응 제외로 후보 집합이 달라, 호출자를 빼면 같은 조건의 다른 회원이 캐시에서 남의 묶음을 받는다(S1 결정). 좌표는 해시로만 실리고 로그에는 남기지 않는다(POL-045). 발급 시각은 이어 받아도 갱신하지 않는다 — 수명은 세션 전체에 걸린다.
 
 ### 캐시 어댑터
 
-`ValkeyFeedBatchCache` — `ValkeySpotCache`와 같은 자리(`infrastructure/adapter/out/cache/`), 같은 인스턴스, 키 `ieuri:tourism:feed:{hash}:{batchNo}`, 값은 카드 목록(`CachedFeedCard` JSON), TTL은 설정(T7). **어댑터는 예외를 올리고 서비스가 `null`/no-op으로 흡수한다** — `ValkeySpotCache`와 반대 배치인 이유는 AC-17.3("포트가 예외를 던져도 재계산")을 포트 스텁만으로 고정하기 위해서다. 캐시는 있으면 빠르고 없으면 정확한 것이다.
+`ValkeyRecommendedSpotsBatchCache` — `ValkeySpotCache`와 같은 자리(`infrastructure/adapter/out/cache/`), 같은 인스턴스, 키 `ieuri:tourism:recommended:{hash}:{batchNo}`, 값은 카드 목록(`CachedSpotCard` JSON), TTL은 설정(T7). **어댑터는 예외를 올리고 서비스가 `null`/no-op으로 흡수한다** — `ValkeySpotCache`와 반대 배치인 이유는 AC-17.3("포트가 예외를 던져도 재계산")을 포트 스텁만으로 고정하기 위해서다. 캐시는 있으면 빠르고 없으면 정확한 것이다.
 
 **카디널리티**: 키에 호출자·5자리 좌표가 들어가 (회원 × 약 1m 격자 × 반경 × 카테고리 × 언어)마다 묶음(약 60KB)이 하나씩 생긴다. 앱은 위치 새로고침 게이트 뒤에서만 조회하므로 팬(pan)마다 생기지는 않는다. T7 실측 항목이다.
 
@@ -147,7 +147,7 @@
 | 좌표 범위 | 기존 `spots`와 같은 예외 | 기존 | 최상위 `errors[]` |
 | 반경 상한 | `RadiusTooLargeException` | `RADIUS_TOO_LARGE` | 〃 |
 | 빈 카테고리 | `EmptyCategorySetException` | `EMPTY_CATEGORY_SET` | 〃 (`SecurityGraphqlExceptionHandler`) |
-| 커서 손상·서명·조건 불일치 | `InvalidCursorException` | `INVALID_CURSOR` | 〃 |
+| 커서 손상·조건 불일치 | `InvalidCursorException` | `INVALID_CURSOR` | 〃 |
 | 커서 수명 초과 | `CursorExpiredException` **신설** | `CURSOR_EXPIRED` | 〃 (`TourismQueryExceptionHandler`에 추가) |
 
 `first`는 `coerceIn(1, 100)`으로 절삭한다(POL-018). 캐시·로그·유행·집계 포트의 실패는 오류가 아니다 — 요인 없음 또는 no-op이다.
@@ -162,8 +162,8 @@
 | `TaxRefundTitleRuleTest` | AC-11.1, 11.2 |
 | `SpotSimilarityTest` | AC-14.x, 20.x |
 | `DppRerankerTest` | AC-13.x, 15.x, 16.1. 구현자가 증분 Cholesky 등 빠른 그리디를 택하면 나이브 행렬식 그리디와 같은 순열을 내는지 이 테스트에 고정한다 |
-| `FeedCursorTest` | AC-4.2~4.4 인코딩·서명·만료 |
-| `RecommendedFeedQueryServiceTest` | AC-4.1, 5.x, 10.2~10.4, 12.1, 12.3, 16.2, 16.3, 17.x, 21.x, 24.x — 포트 전부 스텁 |
+| `RecommendedSpotsCursorTest` | AC-4.2~4.4 인코딩·만료·조건 해시 |
+| `RecommendedSpotsQueryServiceTest` | AC-4.1, 5.x, 10.2~10.4, 12.1, 12.3, 16.2, 16.3, 17.x, 21.x, 24.x — 포트 전부 스텁 |
 | `LocationQueryServiceTest` | AC-1.1, 1.2, 2.x, 3.x |
 | `EmbeddingTargetTest` · `SpotEmbeddingSyncServiceTest` | AC-18.x, 19.1, 19.2 |
 | `DppParameterGridTest` · `DppParameterLearningServiceTest` | AC-22.x, 23.x |
@@ -183,7 +183,6 @@
 
 | 데이터·설정 | 만드는 주체 | 없으면 |
 |---|---|---|
-| `IEURI_FEED_CURSOR_SECRET` | 매니페스트 secret(POL-056) | 커서 발급 불가 — S1 기동 조건 |
 | `IEURI_VOYAGE_API_KEY` | 사용자 발급 → 매니페스트 secret | S2 임베딩 단계가 전부 실패로 카운트. 목록은 정상 |
 | `vector` 확장 (선택한 DB) | 검색 노드면 이미 있음. 메인이면 매니페스트 | S2 마이그레이션 실패 |
 | 학습 배치 CronJob | 매니페스트 | S3 미실행. 서빙은 기본값 |
@@ -200,4 +199,5 @@
 | 날짜 | 변경 | 계기 |
 |---|---|---|
 | 2026-09-11 | 초안 | ieuri-server #131 |
+| 2026-09-12 | 사용자 결정 3건 반영. (1) **커서 서명 제거** — 서버가 커서 값을 신뢰하지 않아 서명이 지키는 자산이 없고, `IEURI_FEED_CURSOR_SECRET` 기동 조건만 늘렸다. 스펙 R4·AC-4.3·§2·§7·POL-045 행을 함께 고쳤다. 플래너가 같은 모양을 다시 내지 않도록 이슈에 남긴다. (2) **감사 이벤트 발행을 리졸버에서 서비스로** — 리졸버는 유스케이스 호출과 응답 변환만 한다. 기존 6곳(SPEC-0032 선례)은 후속 정리 PR. (3) **`Feed` 명명 제거** — 스키마 필드가 `recommendedSpots`이므로 코드도 `RecommendedSpots*`로 맞춘다 | 사용자 리뷰(2026-09-12) |
 | 2026-09-11 | S1 구현 반영. (1) 캐시 값은 id 목록이 아니라 카드 목록 — 히트에서 hydrate 왕복을 없애기 위해. (2) 조건 해시·캐시 키에 호출자 포함 — 반응 제외로 후보가 회원마다 달라서. (3) `SpotReactionCountPort`·`SpotQaCountPort` 신설 대신 `SpotQueryPort.countReactionsIn`·`CommunityActivityCountPort` 하나. (4) `Location` VO 없음(`Coordinates` + `LocationView`), `NearbySpotsQueryService`는 `LocationQueryService`에 합침. (5) 캐시 예외는 어댑터가 아니라 서비스가 삼킨다(AC-17.3 단위 테스트). (6) T6 실측: 면세 태그는 EN `[Tax Refund Shop]` 10,489 · JA `[事後免税店]` 10,490 · ZH `[事後免稅店]` 10,349 · KO `[면세점(TAX REFUND SHOP)]` 28행 — 패턴 4개를 설정에 둔다. (7) `score.affinity-min-likes`는 S1에서 읽는 곳이 없어 S2가 도입한다 | ieuri-server 구현(feature/SPEC-0035-recommended-feed), 리뷰어·simplify-review 반영 |

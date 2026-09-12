@@ -1,10 +1,12 @@
 package org.around.ieuri.tourism.application.service
 
+import org.around.ieuri.common.event.LocationAccessed
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.keysetPageOf
 import org.around.ieuri.tourism.application.exception.InvalidCursorException
 import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
 import org.around.ieuri.tourism.application.port.`in`.query.LocationQueryUseCase
+import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
 import org.around.ieuri.tourism.application.port.out.query.NearbyKeysetSearch
 import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
 import org.around.ieuri.tourism.application.port.out.query.SpotSpatialQueryPort
@@ -24,17 +26,23 @@ class LocationQueryService(
     private val spotQueryPort: SpotQueryPort,
     // 반경 조회만 PostGIS 생 SQL이라 포트가 갈린다 — 어느 읽기가 그쪽인지 여기서 보인다.
     private val spotSpatialQueryPort: SpotSpatialQueryPort,
+    private val eventPublisher: TourismEventPublisherPort,
     private val policy: SpotQueryPolicy,
 ) : LocationQueryUseCase {
 
-    override fun location(latitude: Double, longitude: Double): LocationView {
-        val center = validatedCenter(latitude, longitude)
+    /**
+     * 좌표 검증과 위치 조회 감사(SPEC-0032 R19)만 한다. **좌표는 이벤트에 넘기지 않는다**(POL-045).
+     * 비로그인은 남길 "누구"가 없어 발행하지 않는다.
+     */
+    override fun location(latitude: Double, longitude: Double, memberId: Long?): LocationView {
+        val center = coordinatesOf(latitude, longitude)
+        memberId?.let { eventPublisher.publish(LocationAccessed(it, "location")) }
         return LocationView(latitude = center.latitude, longitude = center.longitude)
     }
 
     override fun spots(query: LocationViewQuery, locale: DomainLocale, memberId: Long?): CursorPage<SpotView> {
-        val center = validatedCenter(query.latitude, query.longitude)
-        validateRadius(query.radiusMeters, policy.maxRadiusMeters)
+        val center = coordinatesOf(query.latitude, query.longitude)
+        requireRadiusWithin(query.radiusMeters, policy.maxRadiusMeters)
         val first = query.first.coerceIn(1, policy.maxPageSize)
 
         // 반응 제외는 DB 단계에서, 활성 언어 단위로 — `Query.spots`와 같다(AC-3.2).
