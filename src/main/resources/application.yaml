@@ -502,6 +502,25 @@ ieuri:
         - 의원점
         - 약국점
         - Clinic Branch
+
+    # 내 주변 추천(SPEC-0035 §9). **출발값이다**(POL-044) — 가산·동부산 아울렛 좌표에서 첫 묶음의
+    # 카테고리 분포를 실측한 뒤 확정한다.
+    recommendation:
+      # 거리 요인이 0.5가 되는 거리. SPEC-0013 실측(1km→5km).
+      distance-half-life-meters: 5000
+      tax-refund-multiplier: 0.8
+      # 면세 태그 표기(실측 2026-09-11): EN 10,489 · JA 10,490 · ZH 10,349 · KO 28행.
+      # 제목 문자열만 보며, 태그가 없는 행은 감점 없이 계산된다.
+      tax-refund-title-patterns:
+        - "[Tax Refund Shop]"
+        - "[事後免税店]"
+        - "[事後免稅店]"
+        - "[면세점(TAX REFUND SHOP)]"
+      # 같은 카테고리 n번째 장소에 깎는 penalty × (n − 1). 점수가 0~1이라 0.1이면 같은 카테고리
+      # 두 번째가 앞에 오려면 다른 카테고리 첫 번째보다 0.1 이상 높아야 한다. 0이면 순수 점수순.
+      category-repeat-penalty: 0.1
+      # 후보 상한 N. 거리 가까운 순 N건만 점수·재배열 대상이다.
+      candidate-cap: 300
   sns:
     google:
       # id_token의 aud는 플랫폼별로 다르다: iOS→iOS 클라이언트 ID, Android/Web→웹 클라이언트 ID.

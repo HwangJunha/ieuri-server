@@ -254,3 +254,16 @@ data class PopularSpotView(
     val spot: SpotView,
     val likeCount: Long,
 )
+
+/**
+ * recommendedSpots 입력(SPEC-0035). 인자는 `spots`와 같되 페이지가 아니라 묶음 크기 [first]만 받는다.
+ * 언어는 Accept-Language, 회원은 인증 컨텍스트에서 온다.
+ */
+data class RecommendedSpotsQuery(
+    val latitude: Double,
+    val longitude: Double,
+    val radiusMeters: Int,
+    /** 카테고리 선택. 비어 있으면 전체이며, 값이 여럿이면 OR로 결합된다(`spots`와 같은 규약). */
+    val categories: CategorySelection,
+    val first: Int,
+)
