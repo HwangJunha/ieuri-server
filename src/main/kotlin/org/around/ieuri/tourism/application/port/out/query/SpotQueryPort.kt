@@ -24,6 +24,12 @@ interface SpotQueryPort {
     fun findReactedSpotIds(memberId: Long, language: DomainLocale): Set<Long>
 
     /**
+     * [findReactedSpotIds]와 같은 집합을 반응 종류별로. 추천이 제외 집합과 취향 재료를 한 번에 읽는다
+     * (SPEC-0035 S2). 반응이 없는 종류는 키가 없다.
+     */
+    fun findReactedSpotIdsByReaction(memberId: Long, language: DomainLocale): Map<ReactionType, Set<Long>>
+
+    /**
      * 이 카탈로그에 대한 **[language]의** LIKE 반응 수. DISLIKE는 세지 않으며, 반응이 없으면 0.
      * 다른 언어의 좋아요는 합산되지 않는다(SPEC-0029 AC-13.5).
      */

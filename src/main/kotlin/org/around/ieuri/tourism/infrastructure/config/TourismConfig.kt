@@ -5,7 +5,12 @@ import tools.jackson.databind.json.JsonMapper
 import tools.jackson.module.kotlin.kotlinModule
 import org.around.ieuri.tourism.application.policy.MapViewportPolicy
 import org.around.ieuri.tourism.application.policy.NationwideMapPolicy
+import org.around.ieuri.tourism.application.policy.EmbeddingSpec
+import org.around.ieuri.tourism.application.policy.RecommendationPolicy
 import org.around.ieuri.tourism.application.policy.RegionRecommendationPolicy
+import org.around.ieuri.tourism.domain.specification.TaxRefundTitleRule
+import org.around.ieuri.tourism.domain.strategy.CategoryDiversity
+import org.around.ieuri.tourism.domain.strategy.RecommendationScore
 import org.around.ieuri.tourism.application.policy.SeoulOpenDataPolicy
 import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
 import org.around.ieuri.tourism.domain.vo.DistanceScoring
@@ -40,8 +45,47 @@ import java.time.Duration
     DistrictRepresentativeProperties::class,
     SpotExclusionProperties::class,
     NationwideMapProperties::class,
+    RecommendationProperties::class,
+    VoyageProperties::class,
 )
 class TourismConfig {
+
+    /**
+     * 추천 정책(SPEC-0035). 도메인 순수 함수(점수·카테고리 감점)에 설정값을 꽂아 조립한다 —
+     * 도메인은 설정 메커니즘을 알지 않는다.
+     */
+    @Bean
+    fun recommendationPolicy(properties: RecommendationProperties): RecommendationPolicy =
+        RecommendationPolicy(
+            score = RecommendationScore(
+                distanceHalfLifeMeters = properties.distanceHalfLifeMeters,
+                taxRefundMultiplier = properties.taxRefundMultiplier,
+                taxRefundTitleRule = TaxRefundTitleRule(properties.taxRefundTitlePatterns),
+                tasteWeight = properties.tasteWeight,
+            ),
+            diversity = CategoryDiversity(properties.categoryRepeatPenalty),
+            candidateCap = properties.candidateCap,
+            tasteMinReactions = properties.tasteMinReactions,
+            embedding = EmbeddingSpec(
+                model = properties.embedding.model,
+                dimension = properties.embedding.dimension,
+                retryCount = properties.embedding.retryCount,
+                overviewMaxChars = properties.embedding.overviewMaxChars,
+            ),
+        )
+
+    /**
+     * Voyage 임베딩 호출용 RestClient(SPEC-0035 S2). 배치 경로라 읽기 타임아웃을 길게 잡는다 —
+     * 요청 하나에 텍스트 128건이 실린다. base-url은 어댑터가 붙인다.
+     */
+    @Bean
+    fun voyageRestClient(builder: RestClient.Builder, properties: VoyageProperties): RestClient {
+        val requestFactory = SimpleClientHttpRequestFactory().apply {
+            setConnectTimeout(Duration.ofMillis(properties.connectTimeoutMillis))
+            setReadTimeout(Duration.ofMillis(properties.readTimeoutMillis))
+        }
+        return builder.requestFactory(requestFactory).build()
+    }
 
     /**
      * 비관광 spot 제외 규칙(SPEC-0018). 키워드는 설정에서 오고 규칙 자체는 도메인의 순수

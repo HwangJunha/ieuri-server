@@ -502,6 +502,49 @@ ieuri:
         - 의원점
         - 약국점
         - Clinic Branch
+
+    # 내 주변 추천(SPEC-0035 §9). **출발값이다**(POL-044) — 가산·동부산 아울렛 좌표에서 첫 묶음의
+    # 카테고리 분포를 실측한 뒤 확정한다.
+    recommendation:
+      # 거리 요인이 0.5가 되는 거리. SPEC-0013 실측(1km→5km).
+      distance-half-life-meters: 5000
+      tax-refund-multiplier: 0.8
+      # 면세 태그 표기(실측 2026-09-11): EN 10,489 · JA 10,490 · ZH 10,349 · KO 28행.
+      # 제목 문자열만 보며, 태그가 없는 행은 감점 없이 계산된다.
+      tax-refund-title-patterns:
+        - "[Tax Refund Shop]"
+        - "[事後免税店]"
+        - "[事後免稅店]"
+        - "[면세점(TAX REFUND SHOP)]"
+      # 같은 카테고리 n번째 장소에 깎는 penalty × (n − 1). 점수가 0~1이라 0.1이면 같은 카테고리
+      # 두 번째가 앞에 오려면 다른 카테고리 첫 번째보다 0.1 이상 높아야 한다. 0이면 순수 점수순.
+      category-repeat-penalty: 0.1
+      # 후보 상한 N. 거리 가까운 순 N건만 점수·재배열 대상이다.
+      candidate-cap: 300
+      # 취향(S2). 취향이 있으면 (1 − w)·거리 + w·취향. 반응(좋아요 + 싫어요)이 최소 수 미만이면 취향 없음.
+      taste-weight: 0.5
+      taste-min-reactions: 5
+      embedding:
+        # 차원은 spot_embedding.embedding vector(1024)와 같아야 한다 — 바꾸면 마이그레이션이 따른다.
+        model: voyage-4
+        dimension: 1024
+        # Voyage 요청당 입력 상한(1,000건·320K 토큰) 안. 행당 약 50토큰이라 여유가 크다.
+        batch-size: 128
+        # 제공자 실패 시 즉시 재시도 횟수. 시간 대기 없음(POL-040). 그래도 실패하면 건너뛰고 다음 실행이 다시 잡는다.
+        retry-count: 3
+        # 임베딩 텍스트에 넣는 소개문(spot_detail.overview) 길이 상한. 토큰 비용의 천장이다 —
+        # 실측(2026-09-12) 소개문 p90은 KO 324자, 500자 초과는 57건 중 2건. 상한 안 마지막 문장 끝에서 자른다.
+        # 전량 재임베딩 1회 비용: 평균 약 15M 토큰, 최악(전부 500자) 약 43M 토큰.
+        overview-max-chars: 500
+
+  # Voyage 임베딩 API(SPEC-0035 S2). 키는 환경변수로만 주입한다 — 빈 값이면 기동은 되고 임베딩 단계만
+  # 실패로 센다(목록은 정상, 취향 요인만 없음).
+  voyage:
+    api-key: ${IEURI_VOYAGE_API_KEY:}
+    base-url: https://api.voyageai.com
+    connect-timeout-millis: 5000
+    # 요청 하나에 텍스트 128건이 실리는 배치 경로라 길게 잡는다.
+    read-timeout-millis: 60000
   sns:
     google:
       # id_token의 aud는 플랫폼별로 다르다: iOS→iOS 클라이언트 ID, Android/Web→웹 클라이언트 ID.

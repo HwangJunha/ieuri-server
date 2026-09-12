@@ -44,6 +44,7 @@ class SchemaPlacementTest {
         listOf(
             "spot", "spot_catalog", "spot_catalog_translation", "spot_catalog_festival", "spot_detail",
             "spot_detail_image", "spot_detail_intro", "spot_detail_info", "spot_festival", "spot_reaction",
+            "spot_embedding",
             "congestion_area", "district", "kto_visitor_count", "kto_concentration_rate",
             "kto_stay_intensity", "kto_spending_intensity",
             // 전국 지도(SPEC-0030). map_cell은 JPA 엔티티가 없다 — geography를 읽는 질의와 함께
@@ -67,6 +68,8 @@ class SchemaPlacementTest {
      */
     private val tablesWithoutEntity = setOf(
         "congestion_area",
+        // vector 타입은 JPA가 표현하지 못한다(SPEC-0035 S2) — 전용 JDBC 어댑터만 건드린다.
+        "spot_embedding",
         "kto_visitor_count", "kto_concentration_rate", "kto_stay_intensity", "kto_spending_intensity",
     )
 
@@ -81,7 +84,7 @@ class SchemaPlacementTest {
         // 스펙 §4의 46개 + 장소 질문/답변 4개 + 메시지 인용 1개(SPEC-0026) + 알림 3개(SPEC-0028)
         // + 전국 지도 7개(SPEC-0030: 방문 기록·공유 링크·칸 이미지·시도·칸·칸매핑·관계)
         // + 위치 조회 감사 1개(SPEC-0032) + 접속기록 1개(안전성 확보조치 기준 제8조).
-        assertEquals(64, placement.size, "배치표에 등록된 애플리케이션 테이블 수")
+        assertEquals(65, placement.size, "배치표에 등록된 애플리케이션 테이블 수")
         assertEquals(
             setOf("auth", "community", "tour", "category", "alarm"),
             placement.values.toSet(),
