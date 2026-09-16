@@ -45,7 +45,7 @@ Uses the Gradle wrapper (`./gradlew`); Gradle 9.5.1, Java toolchain 25.
 
 ## Architecture & conventions
 
-- **Simple is Best — do not force-fit a pattern the data or upstream doesn't support.** The hexagonal/CQRS structure itself is deliberate and stays; this rule is about everything built *inside* it. Prefer the simplest implementation that satisfies the acceptance criteria, and let real capabilities — not the shape of a contract or a convention — drive the design. Signs you are over-building: emulating a capability an upstream/library doesn't natively provide (e.g. synthesizing an opaque cursor over an API that only offers `pageNo` offset paging, then re-fetching/merging pages every request to fake stability); adding config knobs, retry/backfill loops, or defensive branches for cases you have not actually observed; hand-rolling parsing/serialization a library already does. When the schema you are about to write implies such machinery, change the shape instead — the repo owns the schema (see [Contract](#contract)) — and record it on the issue. Deleting code that doesn't earn its keep is a feature, not a regression. (Precedent: SPEC-0002 dropped a faked Relay cursor because TourAPI is offset-only.) Run `simplify-review` before the PR to catch these.
+- **Simple is Best — do not force-fit a pattern the data or upstream doesn't support.** The hexagonal/CQRS structure itself is deliberate and stays; this rule is about everything built *inside* it. Prefer the simplest implementation that satisfies the acceptance criteria, and let real capabilities — not the shape of a contract or a convention — drive the design. Signs you are over-building: emulating a capability an upstream/library doesn't natively provide (e.g. synthesizing an opaque cursor over an API that only offers `pageNo` offset paging, then re-fetching/merging pages every request to fake stability); adding config knobs, retry/backfill loops, or defensive branches for cases you have not actually observed; hand-rolling parsing/serialization a library already does. When the schema you are about to write implies such machinery, change the shape instead — you are writing it, so change it before it ships — and record it on the issue. Deleting code that doesn't earn its keep is a feature, not a regression. (Precedent: SPEC-0002 dropped a faked Relay cursor because TourAPI is offset-only.) Run `simplify-review` before the PR to catch these.
 
   **When the complexity comes from a constraint, suspect the constraint first.** These three are signs you are keeping some constraint fixed and faking the result around it — if any appears, stop and ask *why that constraint is there* before writing more code. Changing it usually deletes the awkward code rather than tidying it.
     - Generated SQL or config **grows with the input count** (an N-branch `CASE WHEN`, an `IN` clause of thousands).
@@ -204,6 +204,18 @@ skill re-checks them:
 `ConsistencyConventionTest` and `ImportStyleTest` fix **what is already consistent**, chosen because
 a full survey found zero violations — not because the convention has been settled. They are
 revisited in the refactoring; `problem/HARNESS-server-sensors.md` lists what is up for review.
+
+**A sensor's failure message says what to do and where to go back to**, not just what is wrong:
+
+```
+[konsist] SpotQueryAdapter.toDomain is a private member.
+  → POL-033: mappers are extension functions on the source type.
+  → If this conflicts with a decision, revisit it in problem/SPEC-XXXX-server.md.
+```
+
+The second arrow is the point — it opens a path from a failing build back to the decision record,
+so a rule that is wrong for this slice gets reconsidered instead of worked around. A sensor that
+only says "this is wrong" invites a silent workaround.
 
 - `architecture-review` — CQRS rails, mapper placement and purity, framework leaking below
   infrastructure, domain independence, `common/` bloat, required values weakened to nullable.
@@ -404,21 +416,17 @@ Merge & review rules:
 Requirements do not originate in this repository. They come from the planner harness
 (`ieuri-planner`) and live in the Obsidian vault under `Specs/SPEC-XXXX/`.
 
-Two documents, two jobs:
+**`Specs/SPEC-XXXX/spec.md`** (vault) is the authority on *what must be true* — requirements and
+acceptance criteria. It is the one document in this workflow that this repo does not author.
 
-- **`Specs/SPEC-XXXX/spec.md`** (vault) — requirements and acceptance criteria.
-  The authority on *what must be true*.
-- **`problem/SPEC-XXXX-server.md`** (this repo) — the server-side design: domain, aggregate
-  boundary, command/query split, persistence implications. The entry point for implementation,
-  versioned alongside the code.
+**`problem/SPEC-XXXX-server.md`** is the server-side design — domain, aggregate boundary,
+command/query split, persistence implications — and it is **written here, not handed down**. The
+planner supplies requirements; how they are realised is decided and recorded in this repo. Record
+the history and the reason alongside each decision. Other files under `problem/` are yours to write
+freely.
 
-**Read both before implementing.** The design document is where you start; the acceptance
-criteria in the linked spec are what the tests must satisfy. A slice that satisfies the design
-but not the acceptance criteria is not done.
-
-`problem/SPEC-*.md` files are written here, not handed down. The planner supplies requirements; how
-they are realised is decided and recorded in this repo. Record the history and the reason alongside
-each decision. Other files under `problem/` are yours to write freely.
+**A slice that satisfies the design but not the acceptance criteria is not done.** The design is
+yours and can be wrong; the acceptance criteria are what the tests must satisfy.
 
 Write the document from `problem/_TEMPLATE-server.md`. For a SPEC that carries a hard-to-reverse
 decision — a domain boundary, a contract, a data model, a new infrastructure dependency, a
@@ -455,19 +463,24 @@ as a decision.
 **Do not run slices back to back on your own.** The point of slicing is to leave a place for a
 person to step in; running straight through removes it.
 
+**Once a slice's schema is settled, hand it to the `mock-announce` subagent before implementing.**
+It starts the mock for this worktree and writes the notice — the url plus what changed, field by
+field. The client then builds in parallel instead of waiting out the implementation. See
+[the schema section](#the-schema-and-delivering-it-to-the-client).
+
 ### When the spec is wrong — fix the spec, not just the code
 
 Requirements change while the work happens. Reflecting a changed requirement only in the code and
 leaving the spec alone makes the spec meaningless within three features. So **the implementer edits
-the spec and the design document directly.**
+`spec.md` in the vault directly** — it is the one document here that this repo does not author.
 
-When the spec does not cover a case, demands something technically impossible, or the contract needs
-to change:
+When the spec does not cover a case or demands something technically impossible:
 
-1. Edit `Specs/SPEC-XXXX/spec.md` (the vault) and `problem/SPEC-XXXX-server.md`.
+1. Edit `Specs/SPEC-XXXX/spec.md` (the vault), and record the decision in
+   `problem/SPEC-XXXX-server.md`.
 2. **Record the date, what changed, and why in the change history.** An edit without history is
    indistinguishable from drift.
-3. Leave a line on the issue too — the planner sees this decision when writing the next spec.
+3. Leave a line on the issue too — that is where the other repo working from this spec sees it.
 
 Always list what you edited under **확인할 것** (To confirm) at the end of the turn. Quietly changing
 a spec is the same failure as quietly implementing something different from it.
@@ -488,13 +501,44 @@ State what must change and why, plus **what the implementation actually settled 
 spec's candidate wording and the implementation result differ, spell out the difference — the
 recorder promotes from this document, not from the spec.
 
-### Contract
+### The schema, and delivering it to the client
 
-There is no contract proposal from the planner. The schema is derived here, from the requirements
-and the decisions in `problem/SPEC-XXXX-server.md`.
+The schema is written here, from the requirements and the decisions in
+`problem/SPEC-XXXX-server.md`. Grow it to what the current slice needs and no further — a field no
+acceptance criterion requires does not belong in `.graphqls` yet.
 
-Grow the schema to what the current slice needs and no further. A field that no acceptance
-criterion requires does not belong in `.graphqls` yet.
+**The client builds against this schema, and this repo is what publishes it.** The planner used to
+hand down a draft `contract.graphql`; it no longer does, because a draft written before
+implementation drifted from what the server actually served, and the planner could not change code
+to close the gap — so the answer was always "ignore the draft, look at the live one." Whoever holds
+the schema has to be the one who publishes it.
+
+**Implementation takes far longer than settling the schema.** If the client waits for it, they idle
+through the whole slice. So the moment the schema is settled — **before implementing it** — hand
+them a mock server generated from that schema and let them build in parallel.
+
+```bash
+cd <this worktree> && /Users/junha/git/ieuri/ieuri-mock-api/mock.sh
+```
+
+It reads **this checkout's** `.graphqls`, picks a free port (avoiding 8080 and 8888), and reloads
+itself when a schema file changes. Its three startup lines — url, branch, schema path — are what
+gets handed to the client.
+
+- **Run it from the worktree you are working in.** It never guesses which schema to serve: worktrees
+  run in parallel, so "the most recently edited schema" would quietly serve another slice's shape,
+  and a mock that lies is worse than no mock.
+- **Responses are generated from the schema's types.** Never hand-write fixtures — they are a second
+  copy of the schema that goes stale the moment a field changes, which is the `contract.graphql`
+  failure over again.
+- **Announcing is the job, not starting the process.** The `mock-announce` subagent starts it and
+  writes the notice: what changed in the schema, with the url. "Check the live schema" makes the
+  client re-read everything; naming the changed fields does not.
+- **A schema change after the client has started is the expensive case.** Settle the shape before
+  announcing, and if it must change, say so on the issue rather than letting them find out from a
+  broken build.
+- Introspection is on in `local` only; `dev` and `prod` keep it off on purpose. The mock does not
+  change that — it is a separate process serving generated data, with no database behind it.
 
 ### Status
 

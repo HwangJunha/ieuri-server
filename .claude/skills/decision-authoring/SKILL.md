@@ -64,24 +64,15 @@ settled that way lives in the report.
 So: read the report before you fill a scale assumption. A number you invent that the report already
 records a conflict over is the one that gets reverted after implementation.
 
-## Precedent, and what is not precedent
+## Precedent, and the slice list
 
-`CLAUDE.md` says to grep for existing precedent first. That rule has a hole right now: SPEC
-documents written before SPEC-0035 carry no decision record, and the code currently being
-refactored is not precedent either. If a grep turns up only refactoring targets, treat it as **no
-precedent** and make a fresh decision — then record it, so the next SPEC has one.
+Both rules live in `CLAUDE.md` — the "no precedent" carve-out in the infrastructure ordering, and
+"a slice is one acceptance criterion" under Issues and branches. Follow them there rather than
+here; a second copy drifts from the first.
 
-Following code that is on its way out is worse than having no example at all: it launders a
-decision nobody made into one that looks settled.
-
-## The slice list
-
-One slice is one acceptance criterion. A commit is too small — refactoring and config commits mix
-in — and a whole SPEC is too large. Matching the unit of implementation to the unit of verification
-means "why is this here" always has exactly one answer.
-
-The list is not final. After S1 is built, the shape of S2 and S3 may change, and that is normal.
-Do not try to partition perfectly up front — the next one being clear is enough.
+The one thing to add when *writing* the list: it is not final. After S1 is built the shape of S2
+and S3 may change, and that is normal. Do not partition perfectly up front — the next one being
+clear is enough.
 
 ## 이번 범위 아님 is a mechanism, not a courtesy
 

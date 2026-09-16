@@ -62,7 +62,15 @@ Does removing it lose a real capability or invariant? If not, recommend removal.
 | SpotLikeCountResolver | FR-003 |
 
 Ids only, never prose. A sentence of justification is something you can invent; an id is something
-that exists or does not.
+that exists or does not. Take them from the issue and `problem/SPEC-XXXX-server.md`.
+
+**One row per thing a requirement could plausibly be traced to** — a new root field, resolver,
+aggregate, port, entity, migration, batch job, config knob. Not every class: a private helper
+extracted from something already mapped inherits its parent's id. A row per symbol makes the table
+too long to read, which is the same as not having one.
+
+**`(none)` means ask, not block.** It marks either dead weight or a requirement nobody wrote down,
+and you cannot tell which from the diff — that is the user's call.
 
 Cross-check every row against 이번 범위 아님 in `problem/SPEC-XXXX-server.md`. A match there is a
 confirmed overreach, not a judgment call.

@@ -111,23 +111,15 @@ state one, it is a preference; drop it.
 
 ## Output
 
-**The reverse mapping table comes first — before any finding.**
+**The reverse mapping table and scale check come first — before any finding.** Both are defined in
+`simplify-review`; build them as it specifies. Two things are yours rather than the skill's:
 
-| Added | Requirement id |
-|---|---|
-| RecommendationCursor | (none) |
-| SpotLikeCountResolver | FR-003 |
-
-One row per thing the diff adds. **Ids only, never prose** — a sentence of justification is
-something you can invent; an id is something that exists or does not. Take the ids from the issue
-and `problem/SPEC-XXXX-server.md`, and cross-check every row against that document's 이번 범위 아님
-section: a match there is a confirmed overreach, not a judgment call.
-
-**You write this table, not the implementer.** Whoever built the thing can justify every line of
-it; someone reading only the diff writes `(none)` honestly. That asymmetry is the entire point.
-
-Then the scale check — compare the implementation against 규모 가정 ("capped at 20" + cursor
-pagination → mismatch). State the pair and the mismatch; this is comparison, not judgment.
+- **You write the table, not the implementer.** Whoever built the thing can justify every line of
+  it; someone reading only the diff writes `(none)` honestly. That asymmetry is the entire point.
+- **Row scope: one row per thing a requirement could plausibly be traced to** — a new root field,
+  resolver, aggregate, port, entity, migration, batch job, config knob. Not every class: a private
+  helper extracted from a mapped thing inherits its parent's id. And `(none)` is not automatically
+  a finding — it means *ask*, not *block*.
 
 Then findings grouped by severity, most severe first:
 
