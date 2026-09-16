@@ -419,6 +419,11 @@ Requirements do not originate in this repository. They come from the planner har
 **`Specs/SPEC-XXXX/spec.md`** (vault) is the authority on *what must be true* — requirements and
 acceptance criteria. It is the one document in this workflow that this repo does not author.
 
+**`Specs/policies.md`** (vault) holds the 59 numbered platform policies. It no longer appears as an
+"적용 정책" section inside `spec.md`, so **checking it is this repo's job** — see
+[Policies are recorder-owned](#policies-are-recorder-owned--never-edited-here). A policy violation
+compiles and passes the suite; nothing else catches it.
+
 **`problem/SPEC-XXXX-server.md`** is the server-side design — domain, aggregate boundary,
 command/query split, persistence implications — and it is **written here, not handed down**. The
 planner supplies requirements; how they are realised is decided and recorded in this repo. Record
@@ -489,6 +494,13 @@ a spec is the same failure as quietly implementing something different from it.
 
 `Specs/policies.md` is **a document several specs depend on at once.** If one implementer edits it,
 the premises of other specs collapse silently, so do not edit it directly.
+
+**Read it before deciding, every slice.** The planner's `spec.md` used to carry an "적용 정책"
+section naming the ones that applied; it no longer does, and nothing replaced it — so a policy now
+binds this repo only if someone here opens the catalogue. Read the sections your slice touches (it
+is organised as 인증·계정 / 개인정보 / API 계약 / 다국어 / 법규·플랫폼 / 운영), cite the ids in the
+근거 column of `problem/SPEC-XXXX-server.md`, and treat a requirement that contradicts a policy as a
+gap rather than a decision you may make. `decision-authoring` carries the working rule.
 
 To promote a new policy or revise an existing one, leave a request document **at the point the user
 says the work is done**:

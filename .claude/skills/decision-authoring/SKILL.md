@@ -64,6 +64,34 @@ settled that way lives in the report.
 So: read the report before you fill a scale assumption. A number you invent that the report already
 records a conflict over is the one that gets reverted after implementation.
 
+## Check the policy catalogue — every time
+
+`$IEURI_VAULT/Specs/policies.md` holds 59 numbered platform policies (POL-001…) in six sections:
+인증·계정 / 개인정보 / API 계약 / 다국어 / 법규·플랫폼 / 운영. **They bind this repo whether or not
+anything reminds you of them.**
+
+The planner's `spec.md` used to carry an "적용 정책" section listing which ones applied. It no longer
+does, so **checking them is this document's job now.** Nothing else does it.
+
+Read the sections your slice touches — not all 59. A query with paging touches API 계약 (POL-017
+cursor, POL-018 page sizes and caps, POL-019 sort guarantees); anything storing member data touches
+개인정보 (POL-013 no PII in logs, POL-014 retention); anything with coordinates touches POL-045.
+When in doubt about a section, read its policy titles; they are one line each.
+
+For each policy that bears on a decision:
+
+- **It constrains the decision** → cite the id in the 근거 column. "POL-018: 콘텐츠형 상한 50" is a
+  rationale you cannot invent, which is exactly what makes it worth citing.
+- **The requirement conflicts with it** → that is a gap, not a decision you may make. Policies are
+  shared by several specs at once, so overriding one here silently breaks the premises of others.
+  Put it under 부족한 정보 and stop.
+- **It needs to change, or a new one is needed** → still not yours to write.
+  `Specs/policies.md` is recorder-owned (see `CLAUDE.md`, "Policies are recorder-owned"). Record what
+  the implementation settled on and leave the promotion request where that section says.
+
+A policy violation compiles, passes the suite, and is caught by nobody — POL-045 forbids putting a
+timestamp on a location record, and no test in this repo will ever tell you that.
+
 ## Precedent, and the slice list
 
 Both rules live in `CLAUDE.md` — the "no precedent" carve-out in the infrastructure ordering, and

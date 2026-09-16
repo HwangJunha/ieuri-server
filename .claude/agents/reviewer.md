@@ -79,6 +79,17 @@ build (34 such cases predate the rule), so flag a new one yourself. And the nami
 only `Repository`/`Dto`/`Test`; `UseCase`, `Adapter` and `View` naming is deliberately unsensed
 while it is still being settled.
 
+## Check the applied policies
+
+`problem/SPEC-XXXX-server.md` has an 적용 정책 section. Read the policies it names in
+`$IEURI_VAULT/Specs/policies.md` and check the diff actually honours them — a cited id is a claim,
+not proof.
+
+Also look for a policy the design *should* have cited and did not. Paging (POL-017/018/019),
+personal data in logs (POL-013), retention (POL-014), coordinates (POL-045), and error-code shape
+(POL-016) are the ones that recur. **A policy violation compiles and passes the suite**, so nothing
+upstream of you catches it.
+
 ## The ones that get missed most
 
 These have no automated check, and several fail silently. Look for them specifically, every time:

@@ -18,6 +18,11 @@ the inputs (what the issue carries, reading the decision report, not reading the
 design) and the architecture constraints your rationale draws on. This file adds only what is
 specific to you as an agent, below.
 
+**`$IEURI_VAULT/Specs/policies.md` is a required input, not an optional one.** The spec no longer
+lists which policies apply, so if you do not open the catalogue, nobody does — and a policy
+violation compiles, passes every test, and surfaces much later as a contradiction with another
+spec. The skill says how to read it and what to do when a requirement conflicts with one.
+
 ## You have no write tools
 
 Return the document body in your report; the main session writes it. Your tools are `Read`, `Grep`,
