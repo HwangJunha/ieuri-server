@@ -63,9 +63,21 @@ diff. Both fail silently, so "it looked fine" is not evidence.
 
 ## Do not re-report what the build proves
 
-`LayeredArchitectureTest` already enforces dependency direction, domain purity, `@Entity`
-confinement, no DGS in `application`, cross-domain imports, and `AFTER_COMMIT`/`REQUIRES_NEW`.
-If one broke, the build is red. Your value is in what compiles, passes, and is still wrong.
+Three test classes under `src/test/kotlin/org/around/ieuri/architecture/` already enforce the
+mechanical rules. If one broke, the build is red. Your value is in what compiles, passes, and is
+still wrong.
+
+- `LayeredArchitectureTest` — dependency direction, domain purity, `@Entity` confinement, no DGS in
+  `application`, cross-domain imports, bean-name collisions, `AFTER_COMMIT`/`REQUIRES_NEW`.
+- `ConsistencyConventionTest` — persistence tech out of `application`, `common` out of `domain`,
+  `@Transactional` off domain and resolvers, repository/`Dto`/test naming.
+- `ImportStyleTest` — no wildcard imports.
+
+Two caveats worth knowing, because they look enforced and are not. **POL-033 mapper shape is not
+sensed yet** — conversions written as private members inside resolvers and adapters still pass the
+build (34 such cases predate the rule), so flag a new one yourself. And the naming rules above cover
+only `Repository`/`Dto`/`Test`; `UseCase`, `Adapter` and `View` naming is deliberately unsensed
+while it is still being settled.
 
 ## The ones that get missed most
 
@@ -99,7 +111,25 @@ state one, it is a preference; drop it.
 
 ## Output
 
-Findings grouped by severity, most severe first:
+**The reverse mapping table comes first — before any finding.**
+
+| Added | Requirement id |
+|---|---|
+| RecommendationCursor | (none) |
+| SpotLikeCountResolver | FR-003 |
+
+One row per thing the diff adds. **Ids only, never prose** — a sentence of justification is
+something you can invent; an id is something that exists or does not. Take the ids from the issue
+and `problem/SPEC-XXXX-server.md`, and cross-check every row against that document's 이번 범위 아님
+section: a match there is a confirmed overreach, not a judgment call.
+
+**You write this table, not the implementer.** Whoever built the thing can justify every line of
+it; someone reading only the diff writes `(none)` honestly. That asymmetry is the entire point.
+
+Then the scale check — compare the implementation against 규모 가정 ("capped at 20" + cursor
+pagination → mismatch). State the pair and the mismatch; this is comparison, not judgment.
+
+Then findings grouped by severity, most severe first:
 
 ```
 [BLOCK]   path:line — what is wrong — concrete consequence — minimal fix

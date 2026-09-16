@@ -25,16 +25,16 @@ reads straight is better than an abstraction that couples two callers together.
 
 ## Flag these
 
-1. **Forced-fit implementation** — the highest-value flag. Machinery emulating a capability the
+1. **Forced-fit implementation** — the flag that finds the deepest problems. Machinery emulating a capability the
    upstream/library/data does not actually provide. Ask: *does the source support this natively?*
    If not, the honest simpler model is right, and the client is told.
    *Tell-tales:* a cursor synthesized over an offset-only API, with re-fetch/merge to fake stability;
    repeated calls to "fill in" values the contract demands but the source won't give; retry/backfill
    loops layered onto a source with no such guarantee.
 
-2. **Contract-driven overreach** — building machinery to satisfy the *shape* of a planner's
-   `contract.graphql` rather than the acceptance criteria. The repo owns the final schema: change
-   the contract, don't implement the fiction.
+2. **Unmapped code** — the check to run first, because it is mechanical rather than a judgment call.
+   Build the reverse mapping table below. Anything with no requirement id behind it is either dead
+   weight or a requirement nobody wrote down. Both need the user.
 
 3. **Dead code** — unused functions, params, branches, and orphaned config knobs. Grep callers
    before rewriting: a "migrate this" task sometimes turns out to be "delete it".
@@ -54,7 +54,31 @@ reads straight is better than an abstraction that couples two callers together.
 
 Does removing it lose a real capability or invariant? If not, recommend removal.
 
+## Reverse mapping — write this first
+
+| Added | Requirement id |
+|---|---|
+| RecommendationCursor | (none) |
+| SpotLikeCountResolver | FR-003 |
+
+Ids only, never prose. A sentence of justification is something you can invent; an id is something
+that exists or does not.
+
+Cross-check every row against 이번 범위 아님 in `problem/SPEC-XXXX-server.md`. A match there is a
+confirmed overreach, not a judgment call.
+
+## Scale check
+
+Compare the implementation against 규모 가정:
+
+- "results capped at 20" + cursor pagination → mismatch
+- "100 concurrent users" + distributed lock → mismatch
+- "daily batch" + cache layer → mismatch
+
+This is comparison, not judgment. State the pair and the mismatch.
+
 ## Output
 
+The mapping table first, then the scale check, then findings:
 `path:line — what's over-built — simpler form — what is lost`. Group "safe to remove" vs "consider".
 End with one line on whether the change is proportionate to the problem.
