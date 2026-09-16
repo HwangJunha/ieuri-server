@@ -52,11 +52,22 @@ Sort into:
 If the diff touches no schema file, say so and do not invent changes. Starting a mock for an
 unchanged schema is fine — the client may simply need it running.
 
-## 3. Write the notice
+## 3. Post it to the client's issue
 
-Korean, and short enough to paste into an issue:
+The notice goes on the **client repo's issue for this SPEC** — `HwangJunha/ieuri-k-trip-spot`, one
+issue per SPEC (`apps.md` is the registry; the id is `k-trip-spot`). A notice that lives only in
+this session reaches nobody, which is the manual step this replaces.
 
+Find the issue by the SPEC id in its title:
+
+```bash
+gh issue list --repo HwangJunha/ieuri-k-trip-spot --search "SPEC-XXXX" --state all --limit 5
 ```
+
+Then comment on it:
+
+```bash
+gh issue comment <number> --repo HwangJunha/ieuri-k-trip-spot --body "$(cat <<'EOF'
 목 서버: http://localhost:<port>/graphql  (브랜치: <branch>)
 
 스키마 변경
@@ -65,17 +76,24 @@ Korean, and short enough to paste into an issue:
 - 삭제: 없음
 
 구현 전이라 응답은 전부 생성된 값이다. 스키마를 고치면 목이 자동으로 다시 읽는다.
+EOF
+)"
 ```
 
 **Never write "확인해봐" or "라이브 스키마를 보라" alone.** That asks the client to re-read
 everything, which is what this replaced. If you cannot say what changed, say that plainly instead.
 
+**If no issue matches the SPEC id, do not open one and do not guess a number.** Report the notice
+and say which SPEC had no client issue — the client may not be a target of this spec at all, and an
+issue opened on the wrong repo is worse than none.
+
 ## Output
 
 Report in Korean:
 
-1. The notice above, ready to paste.
-2. The mock's url, branch, and schema path — as printed, not as assumed.
-3. Anything breaking, called out separately so it is not missed in the list.
+1. **Where it was posted** — repo and issue number, or that no issue matched.
+2. The notice text as posted.
+3. The mock's url, branch, and schema path — as printed, not as assumed.
+4. Anything breaking, called out separately so it is not missed in the list.
 
 Do not edit schema files, and do not implement anything. You publish what is already settled.

@@ -531,9 +531,11 @@ gets handed to the client.
 - **Responses are generated from the schema's types.** Never hand-write fixtures — they are a second
   copy of the schema that goes stale the moment a field changes, which is the `contract.graphql`
   failure over again.
-- **Announcing is the job, not starting the process.** The `mock-announce` subagent starts it and
-  writes the notice: what changed in the schema, with the url. "Check the live schema" makes the
-  client re-read everything; naming the changed fields does not.
+- **Announcing is the job, not starting the process.** The `mock-announce` subagent starts the mock
+  and posts the notice — the url plus what changed, field by field — as a comment on the client
+  repo's issue for that SPEC (`HwangJunha/ieuri-k-trip-spot`, one issue per SPEC). "Check the live
+  schema" makes the client re-read everything; naming the changed fields does not, and a notice that
+  never leaves this session reaches nobody.
 - **A schema change after the client has started is the expensive case.** Settle the shape before
   announcing, and if it must change, say so on the issue rather than letting them find out from a
   broken build.

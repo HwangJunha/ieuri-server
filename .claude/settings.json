@@ -8,9 +8,11 @@
     "allow": [
       "Bash(git commit:*)"
     ],
+    "// ask-gh-issue": "mock-announce가 client 저장소(ieuri-k-trip-spot) 이슈에 목 안내를 단다. 바깥으로 나가는 행위이고 이슈 번호를 잘못 고르면 엉뚱한 곳에 남으므로 gh pr과 같이 확인을 받는다.",
     "ask": [
       "Bash(git push:*)",
-      "Bash(gh pr:*)"
+      "Bash(gh pr:*)",
+      "Bash(gh issue comment:*)"
     ]
   },
 
