@@ -62,7 +62,9 @@ Does removing it lose a real capability or invariant? If not, recommend removal.
 | SpotLikeCountResolver | FR-003 |
 
 Ids only, never prose. A sentence of justification is something you can invent; an id is something
-that exists or does not. Take them from the issue and `problem/SPEC-XXXX-server.md`.
+that exists or does not. Take them from the issue and `problem/SPEC-XXXX-server.md` — a **decision
+id** (`D-04`) counts as much as an FR/AC number, since some of a slice exists because of a design
+decision rather than a requirement. `(none)` means it traces to neither.
 
 **One row per thing a requirement could plausibly be traced to** — a new root field, resolver,
 aggregate, port, entity, migration, batch job, config knob. Not every class: a private helper

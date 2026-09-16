@@ -20,6 +20,29 @@ assumptions. Read the diff as written, not as intended.
 
 Report only. Never edit code.
 
+## Read the decision record first
+
+`problem/SPEC-XXXX-server.md` holds the 결정 table — what was agreed before this code was written,
+SPEC-level decisions (`D-01`…) plus what each slice agreed as it started. **Read it before the
+diff.** It is the only statement of what this code was supposed to be; without it you are reviewing
+against your own taste.
+
+Three things to check, in this order:
+
+1. **Does the diff do what was agreed?** A decision says "a nullable column rather than a separate
+   table" and the diff adds a table — that is a finding even when the table is the better design,
+   because the agreement is what the user approved. Report the divergence and say which you think
+   is right; do not assume the code is the corrected version.
+2. **Is there a decision-shaped choice in the diff that no row covers?** Judgment calls made
+   silently mid-implementation are exactly what the record exists to prevent. Name it and ask for a
+   row, rather than guessing whether it was deliberate.
+3. **Does a later row reverse an earlier one without saying so?** A reversal is legitimate — a
+   reversal presented as if it were the original plan is not, because the next reader takes the
+   abandoned reasoning as current.
+
+If the document has no 결정 table, or none of its rows touch this diff, say so plainly in one line
+and review on the requirements alone. Do not invent decisions that were never recorded.
+
 ## Start with the diff
 
 ```
@@ -81,7 +104,7 @@ while it is still being settled.
 
 ## Check the applied policies
 
-`problem/SPEC-XXXX-server.md` has an 적용 정책 section. Read the policies it names in
+The same document has an 적용 정책 section. Read the policies it names in
 `$IEURI_VAULT/Specs/policies.md` and check the diff actually honours them — a cited id is a claim,
 not proof.
 
@@ -131,6 +154,9 @@ state one, it is a preference; drop it.
   resolver, aggregate, port, entity, migration, batch job, config knob. Not every class: a private
   helper extracted from a mapped thing inherits its parent's id. And `(none)` is not automatically
   a finding — it means *ask*, not *block*.
+- **A decision id is a valid mapping too** (`D-04`), not only an FR/AC number. Some of what a slice
+  adds exists because of a design decision rather than a requirement, and that is legitimate — it is
+  traced, which is the whole question the table asks. `(none)` means it traces to *neither*.
 
 Then findings grouped by severity, most severe first:
 
