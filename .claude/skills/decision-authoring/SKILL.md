@@ -28,11 +28,22 @@ split. Stop before the field list.
 
 ## When to stop and ask
 
-Write the decision when you can fill the rationale column from the constraints and the existing
-decisions alone. That is the whole test.
+**A gap is a fact about the service that only the user can supply.** Not a technical choice you find
+hard — those are yours to make, and making them is the job. How long a hold lasts, what a user sees
+when a thing is missing, whether two people may hold the same seat: nobody in this repo can derive
+those, and guessing produces code that is wrong in a way no test will show.
 
-If the rationale would read "probably", "likely", or "seems", you do not have a decision — you
-have a gap. Put it under 부족한 정보 and stop.
+So the test is not how confident the sentence sounds. Ask instead: **if I pick one, what tells me
+later that I picked wrong?**
+
+- **The constraints do** — a policy, an existing decision, the upstream's actual capability, a
+  measurement. Then it is a decision. Write it, cite what decided it, and move on.
+- **Only the user does** — the answer lives in how the service is supposed to behave, and no
+  artifact in this repo contains it. Then it is a gap. Put it under 부족한 정보 and stop.
+
+Hedging language is a symptom worth noticing — if the rationale wants to say "probably" or "seems",
+you are usually in the second case. But **deleting the hedge does not make it a decision.** The
+question is what would catch the mistake, not how the sentence reads.
 
 A gap is not a failure of the document. An unfilled gap that gets implemented anyway is.
 
