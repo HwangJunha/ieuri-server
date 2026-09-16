@@ -345,7 +345,7 @@ what you did and why.
 
 **Work in a git worktree by default.** Several slices run concurrently, so each unit of work gets its own worktree instead of sharing the checkout — otherwise parallel sessions collide on the working tree and the Gradle build directory. `worktree.bgIsolation` is set to `worktree` in `.claude/settings.local.json`; when a task starts in an existing session, call `EnterWorktree` rather than branching in place. One worktree per branch, named after it.
 
-> `worktree.baseRef` is `origin/dev`, so a fresh worktree branches from `dev` — matching the rule that features cut from `dev`. It does **not** branch from your current HEAD, so uncommitted work in the shared checkout does not carry over.
+> `worktree.baseRef` is `fresh` — it takes only `fresh` or `head`, never a git ref. `fresh` branches a new worktree from the latest remote default branch (`dev` here), matching the rule that features cut from `dev`. It does **not** branch from your current HEAD, so uncommitted work in the shared checkout does not carry over. (`head` would branch from the current HEAD instead.)
 
 Branches: `master`, `dev`, `feature/*`, `hotfix/*`.
 
