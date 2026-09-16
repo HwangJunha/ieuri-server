@@ -3,6 +3,8 @@
   "env": { "IEURI_VAULT": "/Users/junha/Documents/Obsidian Vault" },
 
   "permissions": {
+    "// additionalDirectories": "요구사항 원본(spec.md)이 vault에 있다. 읽기만이 아니라 쓰기도 필요하다 — 요구사항이 틀렸을 때 고치고 규모 가정을 되쓰는 것이 server의 일이다(CLAUDE.md 'When the spec is wrong'). 쓰기 범위를 권한으로 쪼개지 않는다: policies.md를 고치지 않는 것은 규칙으로 이미 서 있다.",
+    "additionalDirectories": ["/Users/junha/Documents/Obsidian Vault"],
     "allow": [
       "Bash(git commit:*)"
     ],
