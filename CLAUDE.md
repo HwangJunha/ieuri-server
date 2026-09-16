@@ -45,14 +45,20 @@ Uses the Gradle wrapper (`./gradlew`); Gradle 9.5.1, Java toolchain 25.
 
 ## Architecture & conventions
 
-- **Simple is Best — do not force-fit a pattern the data or upstream doesn't support.** The hexagonal/CQRS structure itself is deliberate and stays; this rule is about everything built *inside* it. Prefer the simplest implementation that satisfies the acceptance criteria, and let real capabilities — not the shape of a contract or a convention — drive the design. Signs you are over-building: emulating a capability an upstream/library doesn't natively provide (e.g. synthesizing an opaque cursor over an API that only offers `pageNo` offset paging, then re-fetching/merging pages every request to fake stability); adding config knobs, retry/backfill loops, or defensive branches for cases you have not actually observed; hand-rolling parsing/serialization a library already does. When a proposed contract (e.g. a planner's `contract.graphql`) implies such machinery, change the contract here instead — the repo owns the final schema (see [Contract](#contract)) — and record it on the issue. Deleting code that doesn't earn its keep is a feature, not a regression. (Precedent: SPEC-0002 dropped a faked Relay cursor because TourAPI is offset-only.) Run `simplify-review` before the PR to catch these.
+- **Simple is Best — do not force-fit a pattern the data or upstream doesn't support.** The hexagonal/CQRS structure itself is deliberate and stays; this rule is about everything built *inside* it. Prefer the simplest implementation that satisfies the acceptance criteria, and let real capabilities — not the shape of a contract or a convention — drive the design. Signs you are over-building: emulating a capability an upstream/library doesn't natively provide (e.g. synthesizing an opaque cursor over an API that only offers `pageNo` offset paging, then re-fetching/merging pages every request to fake stability); adding config knobs, retry/backfill loops, or defensive branches for cases you have not actually observed; hand-rolling parsing/serialization a library already does. When the schema you are about to write implies such machinery, change the shape instead — the repo owns the schema (see [Contract](#contract)) — and record it on the issue. Deleting code that doesn't earn its keep is a feature, not a regression. (Precedent: SPEC-0002 dropped a faked Relay cursor because TourAPI is offset-only.) Run `simplify-review` before the PR to catch these.
 
   **When the complexity comes from a constraint, suspect the constraint first.** These three are signs you are keeping some constraint fixed and faking the result around it — if any appears, stop and ask *why that constraint is there* before writing more code. Changing it usually deletes the awkward code rather than tidying it.
     - Generated SQL or config **grows with the input count** (an N-branch `CASE WHEN`, an `IN` clause of thousands).
     - Something the framework cannot express is **mapped as a different type** to sneak it through.
     - You need a **fudge factor with no basis** — "read 3× and filter afterwards", "retry a few times".
+    - You need to **call the same source more than once to satisfy one field.** That means the requirement is asking for something the source does not have.
+
+  **When a forced-fit signal appears mid-implementation, do not fix the code.** Identify which decision or requirement forced it — by id — record the counter-evidence and an alternative in the 결정 section of `problem/SPEC-XXXX-server.md`, and stop. "This implementation feels forced" is useless; "D-03 (cursor pagination) is impossible because TourAPI is offset-only" is actionable.
 
 - **Infrastructure: follow convention, never hand-roll.** When a slice needs an infrastructure capability (async execution, queueing, scheduling, caching, retries, transactions, events), resolve it in this order and **stop at the first hit**:
+
+  Before step 1: SPEC documents written before SPEC-0035 carry no decision record, and the code currently being refactored is not precedent. If a grep turns up only refactoring targets, treat it as "no precedent" and make a fresh decision — then record it. Following code that is on its way out is worse than having no example at all.
+
     1. **This project's existing precedent.** Grep for it first. If another domain already solves it, copy that shape — even if you would design it differently. Consistency beats local optimality.
     2. **The Spring Framework / Boot idiom**, or a purpose-built library already on the classpath. Spring almost always has one (`ApplicationEventPublisher`, `@Async`, `@Scheduled`, `@Transactional`, `TaskExecutor`, Spring Batch, Spring Cache).
     3. **Neither exists → stop and ask the user.** Do not invent infrastructure and do not proceed on a guess.
@@ -69,12 +75,17 @@ Uses the Gradle wrapper (`./gradlew`); Gradle 9.5.1, Java toolchain 25.
 
   A conversion written inline inside a resolver method cannot be called on its own, so it cannot be tested without standing up the resolver. When a slice adds one with enough fields to swap, **extract it as an extension function on the source type** and test that. Conversions predating this rule are untested; that is the accepted current state, and the rule binds what a slice adds or changes.
 
-- **Tests are written once, right before the PR — not during the work, and not run during it.**
-  Requirements keep moving while a slice is built. Not following the planner's document exactly is
+- **Behavioural tests are written once, right before the PR — not during the work, and not run during it.**
+  Requirements keep moving while a slice is built. Not following the requirement document exactly is
   normal, which is why policy judgment and code decisions belong to this server harness. Tests
   written early get rewritten every time a requirement moves, and that cost exceeds the feedback
-  gained. While working, **keep it compiling** (`./gradlew compileKotlin compileTestKotlin`) and
-  nothing more.
+  gained.
+
+  **Structure sensors are the exception — run them continuously.** While working, run
+  `./gradlew compileKotlin compileTestKotlin test --tests "org.around.ieuri.architecture.*"`.
+  A check that only runs right before the PR never enters the self-correction loop, which is the
+  whole point of having one. This does not conflict with the rule above: what that rule prevents is
+  **tests that move with the requirements**, and structure rules do not move.
 
   **Immediately before opening the PR**, write the tests for the domain and application logic this
   slice added, and make `./gradlew test` pass. The `test-strategy` skill has the required shape.
@@ -179,9 +190,20 @@ not have to be repeated, and so tooling and other sessions follow the same shape
 
 ## Review — skills and the reviewer
 
-This document is the authority on the rules. The skills cover **only what ArchUnit cannot catch** —
-code that compiles, passes the suite, and is still designed wrong. The eight boundary violations are
-enforced by `LayeredArchitectureTest`, so no skill re-checks them.
+This document is the authority on the rules. The skills cover **only what the structure sensors
+cannot catch** — code that compiles, passes the suite, and is still designed wrong. Three test
+classes under `src/test/kotlin/org/around/ieuri/architecture/` hold the mechanical checks, so no
+skill re-checks them:
+
+- `LayeredArchitectureTest` — dependency direction, domain purity, `@Entity` confinement, DGS
+  isolation, cross-domain slices, bean-name collisions, `AFTER_COMMIT`/`REQUIRES_NEW`.
+- `ConsistencyConventionTest` — persistence tech out of `application`, `common` out of `domain`,
+  `@Transactional` off domain and resolvers, repository/`Dto`/test naming.
+- `ImportStyleTest` — no wildcard imports (source-level, so Konsist rather than ArchUnit).
+
+`ConsistencyConventionTest` and `ImportStyleTest` fix **what is already consistent**, chosen because
+a full survey found zero violations — not because the convention has been settled. They are
+revisited in the refactoring; `problem/HARNESS-server-sensors.md` lists what is up for review.
 
 - `architecture-review` — CQRS rails, mapper placement and purity, framework leaking below
   infrastructure, domain independence, `common/` bloat, required values weakened to nullable.
@@ -235,7 +257,7 @@ Package root: `org.around.ieuri`. Organized **by domain first, then hexagonal la
 
 ```
 org/around/ieuri/
-  <domain>/                          # community, commerce, tourism, auth, auction
+  <domain>/                          # auth, tourism, community, alarm
     domain/                          # pure Kotlin — no framework/JPA/DGS imports
       aggregate/                     # aggregate roots (entry point to invariants)
       entity/                        # entities owned by an aggregate
@@ -248,28 +270,44 @@ org/around/ieuri/
         in/
           command/                   # write use-case interfaces (XxxCommandUseCase)
           query/                     # read use-case interfaces (XxxQueryUseCase)
-        out/
-          persistence/               # write ports: load/save aggregate
-          query/                     # read ports: return read-model DTOs
-          client/                    # external system ports
+        out/                         # one subpackage per outbound concern; add one when a new
+          persistence/               #   concern appears rather than widening an existing name.
+          query/                     #   Today: persistence, query, client, event, cache, token,
+          client/                    #   push, security.
       command/                       # Command input objects (write inputs only)
       query/                         # read-model DTOs + query inputs (read models only)
       service/                       # use-case implementations (XxxService, impl of port/in command & query)
+      policy/                        # configurable policy values a use case reads
+      validation/                    # domain validation failure → error-code translation
+      event/                         # application-level event types
+      exception/                     # use-case exceptions
     infrastructure/
       adapter/
         in/
           graphql/                   # DGS resolvers + schema-mapped response types
+            mapper/                  # GraphQL input -> Command, read DTO -> response (POL-033)
+          event/                     # listeners for other domains' published events
           messaging/                 # Kafka consumers
         out/
           persistence/               # port impl + JPA @Entity + repositories
             entity/                  # @Entity only — confined here
+            repository/              # Spring Data interfaces (XxxRepository)
             mapper/                  # domain<->entity extension functions (POL-033)
           query/                     # QueryDSL projections → read-model DTOs
           client/                    # HTTP/gRPC clients
             mapper/                  # external response -> domain, kept apart from entity mappers
+          event/                     # this domain's event publishing
+          storage/                   # object storage (R2/S3)
+      batch/                         # Spring Batch jobs, tasklets
+      config/                        # per-domain @Configuration
+      security/                      # per-domain security wiring
   common/                            # thin shared kernel: base VO, error types, authzService.can()
   IeuriApplication.kt
 ```
+
+The tree is the shape a domain grows into, not a checklist — a domain has only the packages it
+needs. When a new outbound concern appears, add a subpackage for it rather than widening an
+existing name; `port/out/` currently has eight for that reason.
 
 There is no per-domain `utils` package. Domain-specific helpers become domain services, value objects, or specifications; genuinely generic helpers go in `common/`.
 
@@ -368,7 +406,7 @@ Requirements do not originate in this repository. They come from the planner har
 
 Two documents, two jobs:
 
-- **`Specs/SPEC-XXXX/spec.md`** (vault) — requirements, acceptance criteria, applied policies.
+- **`Specs/SPEC-XXXX/spec.md`** (vault) — requirements and acceptance criteria.
   The authority on *what must be true*.
 - **`problem/SPEC-XXXX-server.md`** (this repo) — the server-side design: domain, aggregate
   boundary, command/query split, persistence implications. The entry point for implementation,
@@ -378,19 +416,44 @@ Two documents, two jobs:
 criteria in the linked spec are what the tests must satisfy. A slice that satisfies the design
 but not the acceptance criteria is not done.
 
-`problem/SPEC-*.md` files are produced by the planner, but **when a requirement changes, the
-implementer edits them directly** (see "When the spec is wrong" below). Record the history and the
-reason alongside the edit. Other files under `problem/` are yours to write freely.
+`problem/SPEC-*.md` files are written here, not handed down. The planner supplies requirements; how
+they are realised is decided and recorded in this repo. Record the history and the reason alongside
+each decision. Other files under `problem/` are yours to write freely.
+
+Write the document from `problem/_TEMPLATE-server.md`. For a SPEC that carries a hard-to-reverse
+decision — a domain boundary, a contract, a data model, a new infrastructure dependency, a
+concurrency strategy, or the reversal of an earlier decision — the `requirement-analyst` subagent
+drafts it once, before any code; the `decision-authoring` skill is the rule for what a decision is
+and when a gap must stop you. If none of those six apply, go straight to implementing.
 
 ### Issues and branches
 
-Each spec opens one issue per target repo, created by the planner. The issue carries the
-background, a link to the spec, the acceptance conditions for this repo, and the branch name.
+Each spec opens one issue per target repo, created by the planner. The issue carries a link to the
+spec, the **FR/AC numbers** this repo owns, and a link to the decision report.
 
-Branches are `feature/SPEC-XXXX-<short-kebab-name>`, cut from `dev` as before. The spec id is a
+**The issue has the numbers, not the sentences — opening `spec.md` is not optional.** And read the
+decision report before filling any scale assumption: it records which items are still undecided,
+what they block, and where the user's answer conflicted with a legal or industry source. None of
+that survives into `spec.md`, which keeps only settled values.
+
+When a spec targets two repos there are two issues, and each repo decides its own realisation from
+the same `spec.md`. Do not read the other repo's design document.
+
+Branches are `feature/SPEC-XXXX-<short-kebab-name>`, cut from `dev`, **one per slice** — the
+reviewer reads the `dev...HEAD` diff, so a smaller diff is a better review. The spec id is a
 permanent identifier shared by the spec, the issue, the log, and the published post, so carrying
 it in the branch makes the whole chain greppable. A step or plan number still does not belong
 there — it stops meaning anything the moment the plan changes.
+
+A slice is **one acceptance criterion**. A commit is too small (refactoring and config commits mix
+in) and a whole SPEC is too large; matching the unit of implementation to the unit of verification
+means "why is this here" always has exactly one answer. Read the whole requirement, implement only
+this slice — looking ahead may shape the data model, but not the code. If looking ahead leaves
+something behind now (a column for an expiry you will not process yet), record that and its reason
+as a decision.
+
+**Do not run slices back to back on your own.** The point of slicing is to leave a place for a
+person to step in; running straight through removes it.
 
 ### When the spec is wrong — fix the spec, not just the code
 
@@ -427,12 +490,11 @@ recorder promotes from this document, not from the spec.
 
 ### Contract
 
-`Specs/SPEC-XXXX/contract.graphql` is a **proposal** from the planner, not a decision. This
-repository owns the final schema.
+There is no contract proposal from the planner. The schema is derived here, from the requirements
+and the decisions in `problem/SPEC-XXXX-server.md`.
 
-Where the proposal is wrong, change it here and say so in the issue — that is a normal outcome,
-not an amendment. Where you accept it, the `.graphqls` under `src/main/resources/schema/` must
-end up matching it — check it against the contract before the PR.
+Grow the schema to what the current slice needs and no further. A field that no acceptance
+criterion requires does not belong in `.graphqls` yet.
 
 ### Status
 
