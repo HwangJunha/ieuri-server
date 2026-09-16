@@ -40,8 +40,9 @@ Three things to check, in this order:
    reversal presented as if it were the original plan is not, because the next reader takes the
    abandoned reasoning as current.
 
-If the document has no decision table, or none of its rows touch this diff, say so plainly in one line
-and review on the requirements alone. Do not invent decisions that were never recorded.
+**Every SPEC has this document** — it holds the slice table, so a missing one means the workflow was
+skipped, and that is itself the first finding. If it exists but no row touches this diff, say so in
+one line and review on the requirements alone. Do not invent decisions that were never recorded.
 
 ## Start with the diff
 

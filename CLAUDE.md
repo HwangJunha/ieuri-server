@@ -424,6 +424,31 @@ Merge & review rules:
 
 ## Spec-driven workflow
 
+### A slice
+
+**A slice is one acceptance criterion, on its own branch, ending in one PR.** Those three are the
+same thing — if an AC needs two branches, or one branch covers two ACs, the slicing is wrong rather
+than the rule.
+
+A commit is too small a unit (refactoring and config commits mix in) and a whole SPEC is too large.
+Matching the unit of implementation to the unit of verification means "why is this here" always has
+exactly one answer, and it keeps the `dev...HEAD` diff small enough to review properly.
+
+What that fixes in practice:
+
+- **Branch**: `feature/SPEC-XXXX-<short-kebab-name>`, cut from `dev`, one per slice.
+- **Scope**: read the whole requirement, implement only this AC. Looking ahead may shape the data
+  model but not the code — if it leaves something behind now (a column for an expiry you will not
+  process yet), that is a decision and gets recorded as one.
+- **Naming**: `S1`, `S2`, … number the slices of one SPEC, in the slice table of
+  `problem/SPEC-XXXX-server.md`. "S2 해줘" means that row.
+- **The list is not final.** After S1 lands, the shape of S2 and S3 may change; only the next one
+  has to be clear.
+
+Every slice — no exceptions, no size threshold — starts by agreeing its design (below) and ends at
+the reviewer. **Do not run slices back to back on your own**: the point of slicing is to leave a
+place for a person to step in, and running straight through removes it.
+
 Requirements do not originate in this repository. They come from the planner harness
 (`ieuri-planner`) and live in the Obsidian vault under `Specs/SPEC-XXXX/`.
 
@@ -444,11 +469,17 @@ freely.
 **A slice that satisfies the design but not the acceptance criteria is not done.** The design is
 yours and can be wrong; the acceptance criteria are what the tests must satisfy.
 
-Write the document from `problem/_TEMPLATE-server.md`. For a SPEC that carries a hard-to-reverse
-decision — a domain boundary, a contract, a data model, a new infrastructure dependency, a
-concurrency strategy, or the reversal of an earlier decision — the `requirement-analyst` subagent
-drafts it once, before any code; the `decision-authoring` skill is the rule for what a decision is
-and when a gap must stop you. If none of those six apply, go straight to implementing.
+**Every SPEC gets this document, written from `problem/_TEMPLATE-server.md` before any code.** It is
+not optional and there is no size threshold — the slice table lives in it, so without it "S2" names
+nothing, and the applied-policies section is the only place policies get checked. A trivial SPEC
+produces a short document, not no document.
+
+What *is* a judgment call is whether to delegate the drafting. Hand it to the `requirement-analyst`
+subagent when the SPEC carries a hard-to-reverse decision — a domain boundary, a contract, a data
+model, a new infrastructure dependency, a concurrency strategy, or the reversal of an earlier
+decision. Otherwise write it yourself. Either way the `decision-authoring` skill is the rule for
+what a decision is and when a gap must stop you, and either way the document exists before the
+first slice starts.
 
 ### Issues and branches
 
@@ -469,15 +500,7 @@ permanent identifier shared by the spec, the issue, the log, and the published p
 it in the branch makes the whole chain greppable. A step or plan number still does not belong
 there — it stops meaning anything the moment the plan changes.
 
-A slice is **one acceptance criterion**. A commit is too small (refactoring and config commits mix
-in) and a whole SPEC is too large; matching the unit of implementation to the unit of verification
-means "why is this here" always has exactly one answer. Read the whole requirement, implement only
-this slice — looking ahead may shape the data model, but not the code. If looking ahead leaves
-something behind now (a column for an expiry you will not process yet), record that and its reason
-as a decision.
-
-**Do not run slices back to back on your own.** The point of slicing is to leave a place for a
-person to step in; running straight through removes it.
+See [A slice](#a-slice) for what one is and how it is scoped.
 
 ### Agree the slice's design before writing it
 
@@ -516,8 +539,9 @@ Keep it to what someone could disagree with — usually under ten lines:
 - **The judgment calls you are making, with the alternative you rejected.** This is the part worth
   reading. "A nullable column rather than a separate table, because only festivals have this" is a
   decision; "add a column" is not.
-- **Which policies bind it** — cite the ids from `Specs/policies.md`. A slice small enough to skip
-  `requirement-analyst` still has to honour them, and this is the only place it gets checked.
+- **Which policies bind it** — cite the ids from `Specs/policies.md`, and add any the design
+  document missed to its applied-policies section. The document was written before this slice's
+  shape was known, so it cannot have caught all of them.
 - **What you are not doing in this slice.**
 
 Then **stop and wait for a reply.** This is the same rule as "never write code without approval" —

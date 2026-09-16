@@ -141,7 +141,7 @@ timestamp on a location record, and no test in this repo will ever tell you that
 ## Precedent, and the slice list
 
 Both rules live in `CLAUDE.md` — the "no precedent" carve-out in the infrastructure ordering, and
-"a slice is one acceptance criterion" under Issues and branches. Follow them there rather than
+the definition of a slice under "A slice". Follow them there rather than
 here; a second copy drifts from the first.
 
 The one thing to add when *writing* the list: it is not final. After S1 is built the shape of S2
