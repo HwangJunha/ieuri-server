@@ -1,10 +1,85 @@
-# 하네스 개편 — 계산적 센서 조사 결과
+# 하네스 개편 — 계산적 센서
 
-> `server-개편.md` §5의 센서 5개를 실제로 만들 수 있는지 조사한 기록.
-> **아직 결정이 아니다** — 무엇을 어떻게 만들지는 사용자와 상의해서 정한다.
+> `server-개편.md` §5의 센서를 무엇으로 어디까지 만들지에 대한 조사와 결정.
 >
-> 2026-09-16에 센서 2개를 시험 삼아 만들어 실제 코드에 돌려봤고, 확인이 끝난 뒤
-> 코드는 되돌렸다. 아래는 그 과정에서 나온 사실들이다.
+> **1차 센서를 켰다**(2026-09-16). 아래 "1차 센서" 절이 실제로 들어간 것이고, 그 아래는
+> 그렇게 고른 근거가 된 전수 조사 결과다.
+
+## 1차 센서 — 무엇을 켰는가
+
+센서의 목적은 **컨벤션을 기계적으로 고정해 LLM이 판단 없이 자연스럽게 맞는 코드를 쓰게 하는
+것**이다. ArchUnit이 하는 일과 같다 — 규칙이 빌드에 박혀 있으니 어기면 즉시 빨갛고, 그래서
+매번 "이게 맞나"를 판단할 필요가 사라진다.
+
+그래서 **이미 100% 지켜지는 컨벤션**을 골랐다. 역설적이지만 그게 가장 값싼 센서다 — 지금 전부
+지켜지고 있으니 전체 코드를 검사해도 녹색이고, 앞으로 깨지는 것만 막는다. 리팩토링을 기다릴
+필요가 없다.
+
+| 파일 | 규칙 | 도구 |
+|---|---|---|
+| `ConsistencyConventionTest` | application이 JPA·Hibernate·QueryDSL에 의존하지 않는다 | ArchUnit |
+| | domain이 common에 의존하지 않는다 | ArchUnit |
+| | domain·리졸버에 `@Transactional`을 붙이지 않는다 (클래스·메서드 양쪽) | ArchUnit |
+| | Spring Data 리포지토리는 `Repository`로 끝나고 `persistence/repository/`에 있다 | ArchUnit |
+| | `Dto` 접미사를 쓰지 않는다 | ArchUnit |
+| | 테스트 클래스는 `Test`로 끝난다 | ArchUnit |
+| `ImportStyleTest` | 와일드카드 import를 쓰지 않는다 | Konsist |
+
+**검사 범위는 전체 코드다.** 위반이 0건이라 그래도 된다.
+
+### 도구를 왜 이렇게 나눴나
+
+ArchUnit을 우선한다 — 이미 쓰고 있고(`LayeredArchitectureTest`), 바이트코드를 읽어 빠르며,
+선례가 있어 읽는 사람이 한 체계만 알면 된다.
+
+**와일드카드 import 하나만 Konsist다.** ArchUnit으로는 불가능하다 — 바이트코드에 import가 남지
+않아 `import a.b.*`와 개별 import가 컴파일 후 구별되지 않는다. 소스를 읽는 도구가 필요하고,
+그 자리가 Konsist가 의존성 값을 하는 유일한 자리다.
+
+### 검증
+
+각 규칙이 실제로 일하는지 양쪽으로 확인했다:
+
+- **기준선 녹색** — 전체 테스트 통과. `@Ignore`도 예외 목록도 없다.
+- **범위가 비어 있지 않다** — 규칙이 아무 클래스도 못 잡으면 통과해도 무의미하다.
+  main 2208 / test 217 클래스, application 574 / domain 189 / 리졸버 95 / 리포지토리 46 /
+  JUnit 테스트 176으로 전부 실제 대상이 있다.
+- **새 위반을 잡는다** — 와일드카드 import를 쓴 임시 파일을 넣자 실패했고, 지우자 녹색이 됐다.
+
+### 이 규칙들은 임시다 — 리팩토링에서 재검토
+
+"옳은 컨벤션이라서"가 아니라 **"지금 위반이 0건이라서"** 골랐다. 둘은 다르다.
+
+실제로 현재 일관성과 올바른 이름이 어긋나는 자리가 이미 보인다:
+
+| 항목 | 지금 | 재검토할 것 |
+|---|---|---|
+| 엔티티 변환 동사 | `toNewEntity` 21건, plain `toEntity` 0건 | `New`가 붙은 근거가 없다 |
+| `port/in` 이름 | `command/` 21개 중 15개가 방향 없는 `*UseCase` | CLAUDE.md는 `*CommandUseCase`/`*QueryUseCase`를 말한다. **이름 충돌까지 있다** — `MapRelationUseCase`(query) vs `MapRelationCommandUseCase`(command) |
+| persistence 어댑터 | `*PersistenceAdapter` 16 / `*JdbcAdapter` 12 / `*StoreAdapter` 6 | 하나로 정해야 한다 |
+| 읽기 모델 | `View` 50 / `Row` 2 | `View`로 통일할지 |
+
+그래서 **네이밍 규칙은 리팩토링에서 바뀔 이유가 없는 셋만** 넣었다(`Repository`·`Dto` 금지·
+`Test`). `UseCase`·`Adapter`·`View`는 2차로 미뤘다.
+
+각 테스트 파일 KDoc에도 같은 경고를 적어 두었다 — **센서가 근거 없는 권위가 되는 것**,
+즉 나중에 "센서가 이러니 이게 맞는 컨벤션이겠지" 하고 잘못된 것을 굳히는 일을 막기 위해서다.
+
+## 순서
+
+```
+1차 (완료)   — 이미 일관된 것을 고정. 새 코드의 이탈만 막는다
+    ↓
+리팩토링     — 올바른 컨벤션을 정하고 코드를 거기에 맞춘다
+    ↓
+2차          — 정해진 컨벤션을 센서로 고정. 1차 규칙 일부는 이때 수정된다
+```
+
+---
+
+# 조사 결과 (근거)
+
+> 2026-09-16, main 623파일 / test 169파일 전수. 위 결정의 근거다.
 
 ## 왜 조사부터 했는가
 
@@ -91,32 +166,72 @@ MockK `verify(exactly = 1)` 자체는 이미 쓰고 있다. SPEC-0003의 지연 
 같은 일을 `simplify-review`의 **역매핑 표**가 한다(§4) — 추가된 것마다 요구사항 id를 적게 하고
 `(none)`이면 초과다.
 
-## 검사 범위 — 전체인가 변경분인가
+## 전수 조사 — 이미 일관된 것 vs 깨져 있는 것
 
-시험 삼아 만든 센서를 전체 코드에 돌리니 **기존 위반 35건**이 나왔다(매퍼 1 + 변환 33 +
-인터페이스 1). POL-033이 이 코드보다 나중에 생겼기 때문이고, `CLAUDE.md`도 이미 인정한다 —
-*"Conversions predating this rule are untested; that is the accepted current state, and the rule
-binds what a slice adds or changes."*
+1차 센서를 고른 근거다. main 623 / test 169파일 전수(2026-09-16).
 
-전체를 검사하면 센서가 켜지는 순간 빨갛고, 그러면 `@Ignore`나 예외 목록으로 꺼지고, 꺼진
-센서는 아무것도 막지 못한다. **변경분만 검사하면**(`git diff dev...HEAD` + 미커밋 + 새 파일)
-기존 35건은 안 걸리고 새 위반은 즉시 걸린다. 기존 파일을 고치는 순간 그 파일이 검사 대상이
-되므로 정리는 점진적으로 일어난다.
+### 위반 0건 — 1차로 켤 수 있는 것
 
-시험 구현으로 양쪽을 확인했다: 기존 코드에서 `@Ignore` 없이 녹색, 일부러 넣은 새 위반 3건은
-전부 빨강.
+| 컨벤션 | 현재 |
+|---|---|
+| 와일드카드 import 없음 | 792파일 중 0 |
+| `application`이 JPA·Hibernate·QueryDSL을 import 안 함 | 0. Spring도 `@Service`·`@Transactional` 등 4개 심볼뿐 |
+| `domain`이 `common/`을 import 안 함 | 94파일 중 0 |
+| 리포지토리가 `Repository`로 끝남 | 46/46 |
+| `port/in`에 `handle()`·`execute()` 없음 | 139개 함수 전부 의미 있는 이름 |
+| `lateinit var` 없음 | 0 |
+| `domain`·리졸버에 `@Transactional` 없음 | 0 |
+| `Dto` 접미사 없음 | 0 (읽기 모델의 실제 단어는 `View` 50개) |
+| out 어댑터가 다른 어댑터를 주입 안 함 | 0 |
+| 테스트가 `*Test` | 167/169 (나머지 2개는 Stub) |
 
-## 상의가 필요한 것
+**이 중 센서가 된 것은 7개다.** 나머지 셋은 검사할 수단이 마땅치 않아 뺐다:
 
-1. **센서를 몇 개, 무엇으로 할 것인가.** Konsist 2개(매퍼·단일구현)는 실물로 동작을 확인했다.
-   detekt 1개(루프 안 호출)는 알파 의존성 + 서브프로젝트를 치르고 실제 대상이 3건인데,
-   그래도 할 것인지.
-2. **검사 범위** — 변경분만인지 전체인지.
-3. **매퍼 변환 이름 목록**을 무엇으로 할지. 지금 7개로 좁혔지만 이 목록이 곧 규칙의 경계다.
-4. **기존 위반 35건**을 언제 어떻게 정리할지(별도 슬라이스로 뺄지, 그냥 둘지).
+- **`lateinit var` 없음** — 바이트코드에서 non-final 필드일 뿐이라 ArchUnit이 구별하지 못한다.
+- **필드 주입 없음** — 같은 이유로 잡을 수 없다. 이 저장소는
+  `-Xannotation-default-target=param-property`를 쓰므로 **생성자 파라미터의 애노테이션이 백킹
+  필드에도 붙는다.** 그래서 ArchUnit의 "필드에 `@Autowired`"는 생성자 주입과 구별되지 않는다 —
+  실제로 규칙을 켜자 `FcmPushSender`의 정상적인 생성자 주입(`@Autowired(required = false)`,
+  선택적 빈)이 걸렸다.
+- **`port/in`에 `handle()` 없음** — 금지 목록을 이름으로 박아야 하는데, 그 목록이 규칙의
+  경계가 된다. 지금 0건이라 급하지 않고 2차에서 네이밍과 함께 정하는 편이 낫다.
+
+### 깨져 있는 것 — 리팩토링 대상
+
+| 컨벤션 | 현재 | 비고 |
+|---|---|---|
+| `port/in` 이름에 방향 없음 | `command/` 21개 중 15개가 `*UseCase` | 이름 충돌 2쌍 |
+| `toGql`이 mapper 밖 | 28/37이 리졸버 인라인(76%) | POL-033 위반 |
+| persistence 어댑터 3갈래 | `*PersistenceAdapter` 16 / `*JdbcAdapter` 12 / `*StoreAdapter` 6 | |
+| `JdbcTemplate` 격리 | 27개 중 2개가 이름에 raw SQL 표시 없음 | `RegionMetricQueryAdapter`, `CongestionAreaQueryAdapter` |
+| `application/service/` 접미사 | 45/50 | `TokenIssuer`, `PushDispatchStore` 등 5개 |
+| `inline fun <reified T>` | 1건 | `TourApiDetailResponse.kt:180`. "Personal style"이 금지한 것 |
+| `!!` | main 17곳 | `SpotQaQueryAdapter.kt`에 7곳(41%) |
+
+### 문서와 실제가 다른 것
+
+- **CLAUDE.md Layout에 `alarm` 도메인이 없다.** 실제로는 있고, 문서엔 아직 없는
+  `commerce`·`auction`이 적혀 있다.
+- `port/out` 하위가 문서엔 3개(`persistence`/`query`/`client`), 실제론 8개
+  (`event`·`cache`·`token`·`push`·`security` 추가).
+- Layout에 없는 패키지: `application/{policy,exception,event,validation}`,
+  `infrastructure/{batch,config,locale,security}`, `adapter/out/storage`,
+  `adapter/in/graphql/mapper`, `adapter/out/query/mapper`, `adapter/out/event/mapper`.
+
+## 2차로 미룬 것
+
+- **POL-033 매퍼 형태 검사.** 시험 구현으로 동작을 확인했고(변환 이름 7개로 좁히면 거짓 양성이
+  15→1로 준다), 기존 위반이 34건이라 리팩토링과 같이 켠다. 이때 **§5의 패키지 패턴
+  `..adapter.out..mapper..`는 못 쓴다** — GraphQL 입력 매퍼가 `adapter/in/graphql/mapper`에
+  있어 `..adapter..mapper..`여야 한다.
+- **단일 구현 인터페이스 검사.** 센서로 부적합하다고 본다 — 구현이 하나인 게 잘못인지는
+  맥락에 달렸고(포트 정상, 공유 커널 정상), 면제 규칙을 두 번 고쳐 1건으로 줄인 것 자체가
+  규칙이 아니라 휴리스틱이라는 증거다. 남은 1건(`Authorizer`)은 리뷰어의 판단으로 충분하다.
+- **네이밍 재정의** — `UseCase`·`Adapter`·`View`·`toNewEntity`.
 
 ## 변경 이력
 
 | 날짜 | 무엇을 | 왜 |
 |---|---|---|
-| 2026-09-16 | 조사 기록 작성. 센서 2개를 시험 구현해 확인 후 코드는 되돌림 | 무엇을 만들지 정하기 전에 무엇이 가능한지부터 확인해야 했다. 결정은 상의 후에 한다 |
+| 2026-09-16 | 조사 기록 작성. 센서 2개를 시험 구현해 확인 후 코드는 되돌림 | 무엇을 만들지 정하기 전에 무엇이 가능한지부터 확인해야 했다 |
+| 2026-09-16 | 1차 센서 7개를 켬(ArchUnit 6 + Konsist 1). 전체 코드 검사 | 이미 위반 0건인 컨벤션만 골라 리팩토링을 기다리지 않고 고정했다. 매퍼·단일구현은 2차로 미뤘다 |
