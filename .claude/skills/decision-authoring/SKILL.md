@@ -36,6 +36,18 @@ have a gap. Put it under 부족한 정보 and stop.
 
 A gap is not a failure of the document. An unfilled gap that gets implemented anyway is.
 
+**This test governs what goes in *this* document, not whether the user is consulted at all.** Two
+things are deliberately not settled here:
+
+- **A decision you can justify may still be one the user wants to make.** Filling the rationale
+  column proves the decision is defensible, not that it is theirs to skip. When a choice changes
+  what the service does — what a user sees, what is stored about them, what a client must handle —
+  put it in the 결정 table *and* raise it, rather than treating the table as the approval.
+- **Each slice agrees its own design before it is written** (`CLAUDE.md`, "Agree the slice's design
+  before writing it"). This document is written once, before any code, so it cannot answer questions
+  that only appear once the shape is known. Those are not failures of this document; they are the
+  next conversation, and they land in the same 결정 table as `D-04`, `D-05`, …
+
 ## How to phrase a gap
 
 The user answers service questions, not technical ones. Never ask which mechanism to use; ask for

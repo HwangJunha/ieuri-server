@@ -26,6 +26,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
   Two things this is *not*. Running the build, the tests, or read-only queries to check a hypothesis is investigation and needs no approval — it changes nothing. And once the user approves a piece of work, carrying it out completely is expected; do not stop mid-edit to re-ask about steps that plainly belong to what was agreed.
 
+  **What you put in front of the user is the slice's design**, not a request to start typing — see [Agree the slice's design before writing it](#agree-the-slices-design-before-writing-it). Asking "shall I proceed?" with nothing to disagree with is not approval; it is a formality that produces the same unreviewed code.
+
 ## Overview
 
 `ieuri` is a Spring Boot 4 application written in Kotlin, exposing a GraphQL API via Netflix DGS backed by PostgreSQL through Spring Data JPA (with QueryDSL for reads), and Spring Security on the request path. Two bounded contexts are implemented today — `auth` (members, tokens, RBAC) and `tourism` (spots, details, reactions, festival sync) — plus a Spring Batch job that syncs TourAPI data.
@@ -467,6 +469,38 @@ as a decision.
 
 **Do not run slices back to back on your own.** The point of slicing is to leave a place for a
 person to step in; running straight through removes it.
+
+### Agree the slice's design before writing it
+
+**Every slice starts with a short design agreement, not with code.** The SPEC-level decisions were
+made before any of it existed, so they cannot answer the questions that only appear once you know
+what you are about to build. Say what you intend to build, then wait.
+
+Keep it to what someone could disagree with — usually under ten lines:
+
+- **Shape** — root vs field, command vs query, which aggregate owns it, what the schema looks like.
+- **Where the work goes** — new types and which package, or which existing ones change.
+- **Persistence** — new table or column, a migration, an index.
+- **The judgment calls you are making, with the alternative you rejected.** This is the part worth
+  reading. "A nullable column rather than a separate table, because only festivals have this" is a
+  decision; "add a column" is not.
+- **Which policies bind it** — cite the ids from `Specs/policies.md`. A slice small enough to skip
+  `requirement-analyst` still has to honour them, and this is the only place it gets checked.
+- **What you are not doing in this slice.**
+
+Then **stop and wait for a reply.** This is the same rule as "never write code without approval" —
+the design agreement is what makes that approval possible, because approving a plan is a different
+act from reviewing a finished diff.
+
+Once it is agreed, carry it out completely. Do not re-ask about steps that plainly belong to what
+was agreed. If the work leaves the agreed shape mid-slice — a constraint you did not know about, a
+forced-fit signal, a policy you had missed — that is a new question, so raise it then rather than
+deciding alone.
+
+**Record what was agreed in the 결정 table of `problem/SPEC-XXXX-server.md`**, continuing the same
+numbering (`D-04`, `D-05`, …). One SPEC keeps one decision record; there is no separate ADR
+directory. A decision made in S2 that reverses one from S1 says so in its 근거 column — that
+reversal is the most useful thing the document will ever hold.
 
 **Once a slice's schema is settled, hand it to the `mock-announce` subagent before implementing.**
 It starts the mock for this worktree and writes the notice — the url plus what changed, field by
