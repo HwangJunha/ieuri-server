@@ -20,6 +20,34 @@ assumptions. Read the diff as written, not as intended.
 
 Report only. Never edit code.
 
+## Read the decision record first
+
+`problem/SPEC-XXXX-server.md` holds the decision table (`결정`) — what was agreed before this code was written,
+SPEC-level decisions (`D-01`…) plus what each slice agreed as it started. **Read it before the
+diff.** It is the only statement of what this code was supposed to be; without it you are reviewing
+against your own taste.
+
+Three things to check, in this order:
+
+1. **Does the diff do what was agreed?** A decision says "a nullable column rather than a separate
+   table" and the diff adds a table — that is a finding even when the table is the better design,
+   because the agreement is what the user approved. Report it as `[WARN]` when the code looks
+   right and the record is merely stale (the fix is to amend the decision row, not the code), and
+   `[BLOCK]` when the divergence undoes the reason the decision was made. Say which you think is
+   right; do not assume the code is the corrected version. **A divergence is the one finding that
+   needs no concrete consequence** — the consequence is that the record and the code now disagree,
+   and the next reader believes the wrong one.
+2. **Is there a decision-shaped choice in the diff that no row covers?** Judgment calls made
+   silently mid-implementation are exactly what the record exists to prevent. Name it and ask for a
+   row, rather than guessing whether it was deliberate.
+3. **Does a later row reverse an earlier one without saying so?** A reversal is legitimate — a
+   reversal presented as if it were the original plan is not, because the next reader takes the
+   abandoned reasoning as current.
+
+**Every SPEC has this document** — it holds the slice table, so a missing one means the workflow was
+skipped, and that is itself the first finding. If it exists but no row touches this diff, say so in
+one line and review on the requirements alone. Do not invent decisions that were never recorded.
+
 ## Start with the diff
 
 ```
@@ -63,9 +91,33 @@ diff. Both fail silently, so "it looked fine" is not evidence.
 
 ## Do not re-report what the build proves
 
-`LayeredArchitectureTest` already enforces dependency direction, domain purity, `@Entity`
-confinement, no DGS in `application`, cross-domain imports, and `AFTER_COMMIT`/`REQUIRES_NEW`.
-If one broke, the build is red. Your value is in what compiles, passes, and is still wrong.
+Three test classes under `src/test/kotlin/org/around/ieuri/architecture/` already enforce the
+mechanical rules. If one broke, the build is red. Your value is in what compiles, passes, and is
+still wrong.
+
+- `LayeredArchitectureTest` — dependency direction, domain purity, `@Entity` confinement, no DGS in
+  `application`, cross-domain imports, bean-name collisions, `AFTER_COMMIT`/`REQUIRES_NEW`.
+- `ConsistencyConventionTest` — persistence tech out of `application`, `common` out of `domain`,
+  `@Transactional` off domain and resolvers, repository/`Dto`/test naming.
+- `ImportStyleTest` — no wildcard imports.
+
+Two caveats worth knowing, because they look enforced and are not. **POL-033 mapper shape is not
+sensed yet** — conversions written as private members inside resolvers and adapters still pass the
+build (33 such cases predate the rule — 28 of them inline `toGql` in resolvers), so flag a new one
+yourself. And the naming rules above cover
+only `Repository`/`Dto`/`Test`; `UseCase`, `Adapter` and `View` naming is deliberately unsensed
+while it is still being settled.
+
+## Check the applied policies
+
+The same document has an applied-policies section (`적용 정책`). Read the policies it names in
+`$IEURI_VAULT/Specs/policies.md` and check the diff actually honours them — a cited id is a claim,
+not proof.
+
+Also look for a policy the design *should* have cited and did not. Paging (POL-017/018/019),
+personal data in logs (POL-013), retention (POL-014), coordinates (POL-045), and error-code shape
+(POL-016) are the ones that recur. **A policy violation compiles and passes the suite**, so nothing
+upstream of you catches it.
 
 ## The ones that get missed most
 
@@ -99,7 +151,20 @@ state one, it is a preference; drop it.
 
 ## Output
 
-Findings grouped by severity, most severe first:
+**The reverse mapping table and scale check come first — before any finding.** Both are defined in
+`simplify-review`; build them as it specifies. Two things are yours rather than the skill's:
+
+- **You write the table, not the implementer.** Whoever built the thing can justify every line of
+  it; someone reading only the diff writes `(none)` honestly. That asymmetry is the entire point.
+- **Row scope: one row per thing a requirement could plausibly be traced to** — a new root field,
+  resolver, aggregate, port, entity, migration, batch job, config knob. Not every class: a private
+  helper extracted from a mapped thing inherits its parent's id. And `(none)` is not automatically
+  a finding — it means *ask*, not *block*.
+- **A decision id is a valid mapping too** (`D-04`), not only an FR/AC number. Some of what a slice
+  adds exists because of a design decision rather than a requirement, and that is legitimate — it is
+  traced, which is the whole question the table asks. `(none)` means it traces to *neither*.
+
+Then findings grouped by severity, most severe first:
 
 ```
 [BLOCK]   path:line — what is wrong — concrete consequence — minimal fix
