@@ -58,7 +58,7 @@ class ConsistencyConventionTest {
                 "org.hibernate..",
                 "com.querydsl..",
             )
-            .because("영속 기술은 infrastructure의 세부사항이다. application은 포트와 read DTO만 안다. 충돌하면 problem/SPEC-XXXX-server.md의 결정 절을 다시 보라")
+            .because("영속 기술은 infrastructure의 세부사항이다. application은 포트와 read DTO만 안다")
             .check(classes)
     }
 
@@ -71,7 +71,7 @@ class ConsistencyConventionTest {
     fun `domain은 common에 의존하지 않는다`() {
         noClasses().that().resideInAPackage("..domain..")
             .should().dependOnClassesThat().resideInAPackage("org.around.ieuri.common..")
-            .because("common은 얇게 유지한다. 도메인이 기대기 시작하면 추출이 막힌다. 충돌하면 problem/SPEC-XXXX-server.md의 결정 절을 다시 보라")
+            .because("common은 얇게 유지한다. 도메인이 기대기 시작하면 추출이 막힌다")
             .check(classes)
     }
 
@@ -87,17 +87,17 @@ class ConsistencyConventionTest {
     fun `domain과 리졸버에는 Transactional을 붙이지 않는다`() {
         noClasses().that().resideInAPackage("..domain..")
             .should().beAnnotatedWith("org.springframework.transaction.annotation.Transactional")
-            .because("domain은 프레임워크를 모른다. 충돌하면 problem/SPEC-XXXX-server.md의 결정 절을 다시 보라")
+            .because("domain은 프레임워크를 모른다")
             .check(classes)
 
         noClasses().that().resideInAPackage("..adapter.in.graphql..")
             .should().beAnnotatedWith("org.springframework.transaction.annotation.Transactional")
-            .because("트랜잭션 경계는 유스케이스가 정한다. 리졸버에 붙이면 요청 전체로 넓어진다. 충돌하면 problem/SPEC-XXXX-server.md의 결정 절을 다시 보라")
+            .because("트랜잭션 경계는 유스케이스가 정한다. 리졸버에 붙이면 요청 전체로 넓어진다")
             .check(classes)
 
         noMethods().that().areDeclaredInClassesThat().resideInAPackage("..adapter.in.graphql..")
             .should().beAnnotatedWith("org.springframework.transaction.annotation.Transactional")
-            .because("트랜잭션 경계는 유스케이스가 정한다. 리졸버에 붙이면 요청 전체로 넓어진다. 충돌하면 problem/SPEC-XXXX-server.md의 결정 절을 다시 보라")
+            .because("트랜잭션 경계는 유스케이스가 정한다. 리졸버에 붙이면 요청 전체로 넓어진다")
             .check(classes)
     }
 
@@ -114,7 +114,7 @@ class ConsistencyConventionTest {
             .and().areInterfaces()
             .should().haveSimpleNameEndingWith("Repository")
             .andShould().resideInAPackage("..persistence.repository..")
-            .because("리포지토리는 한 곳에 모인다 — 어디를 봐야 하는지가 이름과 위치로 정해진다. 충돌하면 problem/SPEC-XXXX-server.md의 결정 절을 다시 보라")
+            .because("리포지토리는 한 곳에 모인다 — 어디를 봐야 하는지가 이름과 위치로 정해진다")
             .check(classes)
     }
 
@@ -127,7 +127,7 @@ class ConsistencyConventionTest {
     @Test
     fun `Dto 접미사를 쓰지 않는다`() {
         noClasses().should().haveSimpleNameEndingWith("Dto")
-            .because("읽기 모델은 View다. DTO는 모든 층의 타입을 삼키는 말이라 구별에 쓸 수 없다. 충돌하면 problem/SPEC-XXXX-server.md의 결정 절을 다시 보라")
+            .because("읽기 모델은 View다. DTO는 모든 층의 타입을 삼키는 말이라 구별에 쓸 수 없다")
             .check(classes)
     }
 
@@ -142,7 +142,7 @@ class ConsistencyConventionTest {
         )
             .and().areNotNestedClasses()
             .should().haveSimpleNameEndingWith("Test")
-            .because("테스트는 이름으로 식별된다 — Tests·Spec·IT이 섞이면 실행 대상 지정이 흔들린다. 충돌하면 problem/SPEC-XXXX-server.md의 결정 절을 다시 보라")
+            .because("테스트는 이름으로 식별된다 — Tests·Spec·IT이 섞이면 실행 대상 지정이 흔들린다")
             .check(testClasses)
     }
 }

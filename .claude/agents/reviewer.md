@@ -31,8 +31,12 @@ Three things to check, in this order:
 
 1. **Does the diff do what was agreed?** A decision says "a nullable column rather than a separate
    table" and the diff adds a table — that is a finding even when the table is the better design,
-   because the agreement is what the user approved. Report the divergence and say which you think
-   is right; do not assume the code is the corrected version.
+   because the agreement is what the user approved. Report it as `[WARN]` when the code looks
+   right and the record is merely stale (the fix is to amend the decision row, not the code), and
+   `[BLOCK]` when the divergence undoes the reason the decision was made. Say which you think is
+   right; do not assume the code is the corrected version. **A divergence is the one finding that
+   needs no concrete consequence** — the consequence is that the record and the code now disagree,
+   and the next reader believes the wrong one.
 2. **Is there a decision-shaped choice in the diff that no row covers?** Judgment calls made
    silently mid-implementation are exactly what the record exists to prevent. Name it and ask for a
    row, rather than guessing whether it was deliberate.
@@ -99,7 +103,8 @@ still wrong.
 
 Two caveats worth knowing, because they look enforced and are not. **POL-033 mapper shape is not
 sensed yet** — conversions written as private members inside resolvers and adapters still pass the
-build (34 such cases predate the rule), so flag a new one yourself. And the naming rules above cover
+build (33 such cases predate the rule — 28 of them inline `toGql` in resolvers), so flag a new one
+yourself. And the naming rules above cover
 only `Repository`/`Dto`/`Test`; `UseCase`, `Adapter` and `View` naming is deliberately unsensed
 while it is still being settled.
 

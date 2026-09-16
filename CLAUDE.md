@@ -216,17 +216,20 @@ skill re-checks them:
 a full survey found zero violations — not because the convention has been settled. They are
 revisited in the refactoring; `problem/HARNESS-server-sensors.md` lists what is up for review.
 
-**A sensor's failure message says what to do and where to go back to**, not just what is wrong:
+**A sensor's failure message says what to do, not just what is wrong** — name the rule it enforces,
+so the reader can tell a real violation from a rule that is wrong for this slice:
 
 ```
-[konsist] SpotQueryAdapter.toDomain is a private member.
-  → POL-033: mappers are extension functions on the source type.
-  → If this conflicts with a decision, revisit it in problem/SPEC-XXXX-server.md.
+[konsist] A wildcard import hides where a name comes from.
+  → Use individual imports.
 ```
 
-The second arrow is the point — it opens a path from a failing build back to the decision record,
-so a rule that is wrong for this slice gets reconsidered instead of worked around. A sensor that
-only says "this is wrong" invites a silent workaround.
+**A sensor that is wrong for the slice is a finding, not an obstacle.** When one fires on something
+you believe is correct, say so and record why in the decision table rather than reshaping the code
+to get past it — a rule nobody is allowed to question stops being a rule and becomes a ritual. That
+belongs in the design agreement, not in every failure string; ArchUnit's `because` renders as the
+rule's description rather than as failure output, so putting it there only makes the rule read
+oddly.
 
 - `architecture-review` — CQRS rails, mapper placement and purity, framework leaking below
   infrastructure, domain independence, `common/` bloat, required values weakened to nullable.
@@ -240,10 +243,15 @@ only says "this is wrong" invites a silent workaround.
 - `simplify-review` — forced-fit implementations and needless abstraction.
 - `test-strategy` — the shape tests must take when written before the PR.
 
-**When a slice is finished, hand it to the `reviewer` subagent.** It reads the `dev...HEAD` diff and
-applies the six review skills. An implementer treats the decisions they just made as correct, so
-they miss the same things in their own code repeatedly. The reviewer never saw those decisions being
-made — only the diff — so the bias does not carry over. This is why human code review works.
+**When a slice is finished, hand it to the `reviewer` subagent.** It reads the decision record, then
+the `dev...HEAD` diff, then applies the six review skills — and its output leads with the reverse
+mapping table (everything the diff adds, traced to an FR/AC or decision id) before any finding.
+
+An implementer treats the decisions they just made as correct, so they miss the same things in their
+own code repeatedly. The reviewer read those decisions but did not participate in making them — it
+sees what was agreed and what shipped as two separate things, where the implementer remembers only
+one. That is why it catches divergence the implementer cannot, and why the mapping table is its job
+rather than the implementer's: whoever built something can justify every line of it.
 
 The reviewer reads only the domains the diff touches, plus `common/`. Narrowing what must be read is
 the practical payoff of the DDD split; if a change genuinely required reading another domain, that
@@ -553,14 +561,29 @@ was agreed. If the work leaves the agreed shape mid-slice — a constraint you d
 forced-fit signal, a policy you had missed — that is a new question, so raise it then rather than
 deciding alone.
 
-**Record what was agreed in the decision table (`결정`) of `problem/SPEC-XXXX-server.md`**, continuing the same
-numbering (`D-04`, `D-05`, …). One SPEC keeps one decision record; there is no separate ADR
-directory. A decision made in S2 that reverses one from S1 says so in its rationale column — that
-reversal is the most useful thing the document will ever hold.
+**Record what was agreed in `problem/SPEC-XXXX-server.md`**, and the agreement splits across two
+sections rather than one:
 
-**Once a slice's schema is settled, hand it to the `mock-announce` subagent before implementing.**
-It starts the mock for this worktree and writes the notice — the url plus what changed, field by
-field. The client then builds in parallel instead of waiting out the implementation. See
+- **Each judgment call becomes its own row** in the decision table (`결정`), continuing the same
+  numbering (`D-04`, `D-05`, …) with the slice in the second column. One row per call, not one per
+  agreement — a row whose rationale covers three unrelated things cannot be reversed individually.
+- **What you said you are not doing goes into `이번 범위 아님`.** `simplify-review` cross-checks the
+  implementation against that section, so a deferral that stays in the conversation turns a
+  confirmed overreach back into a judgment call.
+
+Shape and placement decisions that carry no alternative need no row; they are visible in the diff.
+One SPEC keeps one decision record; there is no separate ADR directory. A decision made in S2 that
+reverses one from S1 says so in its rationale column — that reversal is the most useful thing the
+document will ever hold.
+
+**After the agreement is approved, write the `.graphqls` first — before any Kotlin — then hand it to
+the `mock-announce` subagent.** The order matters: the agreement settles the schema's shape in
+prose, but `mock-announce` diffs the schema files on disk, so it has nothing to report until they
+are written. Writing them first also means the client starts against the same text the
+implementation will compile against.
+
+The subagent starts the mock for this worktree and posts the notice — the url plus what changed,
+field by field. The client then builds in parallel instead of waiting out the implementation. See
 [the schema section](#the-schema-and-delivering-it-to-the-client).
 
 ### When the spec is wrong — fix the spec, not just the code

@@ -28,7 +28,7 @@ class ImportStyleTest {
                     [konsist] 와일드카드 import가 있습니다.
                       → 이름의 출처가 파일 안에서 사라지고, 상대 패키지에 타입이 추가되는 것만으로
                         이 파일의 이름 해석이 바뀝니다. 개별 import로 바꾸세요.
-                      → 이 결정과 충돌한다면 problem/SPEC-XXXX-server.md의 결정 절을 다시 보세요.
+                      → 개별 import로 바꾼다.
                 """.trimIndent(),
             ) { it.isWildcard }
     }
