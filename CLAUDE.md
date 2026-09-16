@@ -672,3 +672,31 @@ gets handed to the client.
 
 The recorder harness moves the spec to `implemented` when it records completion. Do not edit spec
 status yourself.
+
+### When a SPEC is done, re-check every memory
+
+Persisted memories go stale the moment code moves, and a stale one is worse than no memory at all:
+it sends you to a class that was renamed, cites a PR that already merged, or tells you to copy a
+file that is now committed. You do not notice, because a memory reads as established fact — so the
+wrong path gets taken confidently.
+
+**A finished SPEC is exactly when they rot**, so check them then. Read every file in the memory
+directory and, for each one, pull out its checkable claims — a path, a class name, a config value, a
+count, a PR state — and **actually run the check**. Plausibility is not verification; the ones that
+mislead are the ones that still sound right.
+
+Then act on what you find:
+
+- **Wrong** — delete it, or correct it with the evidence you just gathered.
+- **Stale** — the claim was true and the situation moved (a merged PR, a cleared blocker, work that
+  is now done). Rewrite it to today's state rather than deleting; the history is often the point.
+- **A brittle number** — "780 files", "59 branches". Replace it with the conclusion it supported;
+  counts drift and re-break every time.
+- **Already in `CLAUDE.md`** — delete the memory. Two copies of one rule means one of them is
+  silently wrong later, and this document is the authority.
+- **A behaviour rule** ("always do X", "never do Y") — it does not belong in memory at all. Memory
+  holds facts about this project; rules belong here, where they are read every turn.
+
+Finish by checking the index and `[[links]]` still resolve — a pointer to a file you just deleted is
+the same failure in miniature. Delegate the sweep to a subagent: the same bias that makes you trust
+your own code makes you trust your own notes.
