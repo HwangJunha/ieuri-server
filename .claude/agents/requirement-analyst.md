@@ -40,6 +40,7 @@ Report in Korean:
 
 1. **The document body**, ready to write to `problem/SPEC-XXXX-server.md` from
    `problem/_TEMPLATE-server.md`.
-2. **결정** — each id with a one-line summary.
-3. **부족한 정보** — as service questions. If non-empty, say plainly that implementation may not begin.
-4. **슬라이스** — one acceptance criterion each.
+2. **Decisions** (`결정`) — each id with a one-line summary.
+3. **Gaps** (`부족한 정보`) — as service questions. If non-empty, say plainly that implementation
+   may not begin.
+4. **Slices** (`슬라이스`) — one acceptance criterion each.

@@ -26,6 +26,27 @@ implementer into a transcriber — they stop deciding and start copying, which i
 this reform exists to remove. Name the domain, the aggregate boundary, and the command/query
 split. Stop before the field list.
 
+## Before writing a decision, find what it is competing with
+
+A decision with no rejected alternative is a report, not a decision. The rejected-alternative
+column (`탈락 대안`) is not paperwork — it is the only evidence that a choice was made at all, and
+it is what lets a later slice reverse this one knowingly rather than by accident.
+
+So for each row, before filling it in:
+
+- **Name the other option.** Two is enough. If you cannot name one, that itself is worth a line —
+  "no alternative: the upstream exposes only this" is a real finding, and it stops the next person
+  re-deriving it.
+- **Say what separates them** — a constraint, a policy id, a measurement, a cost the other one
+  carries. If nothing separates them, the choice is arbitrary and either would do; say that too, and
+  pick the simpler one.
+- **Check the requirement is not what is wrong.** When both options feel forced, the constraint
+  producing them is the suspect — `CLAUDE.md` says to suspect the constraint before writing more
+  code, and that applies to decisions before it applies to code.
+
+Write the row only after that. Filling the decision column first and then justifying it backwards
+produces rationale that fits whatever was already decided, which is worse than an empty column.
+
 ## When to stop and ask
 
 **A gap is a fact about the service that only the user can supply.** Not a technical choice you find
@@ -39,7 +60,8 @@ later that I picked wrong?**
 - **The constraints do** — a policy, an existing decision, the upstream's actual capability, a
   measurement. Then it is a decision. Write it, cite what decided it, and move on.
 - **Only the user does** — the answer lives in how the service is supposed to behave, and no
-  artifact in this repo contains it. Then it is a gap. Put it under 부족한 정보 and stop.
+  artifact in this repo contains it. Then it is a gap — put it under the gaps section
+  (`부족한 정보`) and stop.
 
 Hedging language is a symptom worth noticing — if the rationale wants to say "probably" or "seems",
 you are usually in the second case. But **deleting the hedge does not make it a decision.** The
@@ -53,11 +75,11 @@ things are deliberately not settled here:
 - **A decision you can justify may still be one the user wants to make.** Filling the rationale
   column proves the decision is defensible, not that it is theirs to skip. When a choice changes
   what the service does — what a user sees, what is stored about them, what a client must handle —
-  put it in the 결정 table *and* raise it, rather than treating the table as the approval.
+  put it in the decision table *and* raise it, rather than treating the table as the approval.
 - **Each slice agrees its own design before it is written** (`CLAUDE.md`, "Agree the slice's design
   before writing it"). This document is written once, before any code, so it cannot answer questions
   that only appear once the shape is known. Those are not failures of this document; they are the
-  next conversation, and they land in the same 결정 table as `D-04`, `D-05`, …
+  next conversation, and they land in the same decision table as `D-04`, `D-05`, …
 
 ## How to phrase a gap
 
@@ -72,12 +94,12 @@ the fact you are missing.
 If you cannot phrase it without naming an implementation, you are asking the user to design.
 Rephrase.
 
-The mechanism is then **your** decision, derived from their answer, and it goes in the 결정 table
+The mechanism is then **your** decision, derived from their answer, and it goes in the decision table
 with their answer as its rationale. That is what makes the record worth keeping: it shows the
 service fact the mechanism came from, so when the fact changes the mechanism is revisited instead
 of defended.
 
-## Read the decision report before filling 규모 가정
+## Read the decision report before filling the scale assumptions
 
 The issue carries a decision-report URL alongside the spec path. The report holds what `미정` items
 remain, which requirements they block, and **where the user's answer conflicted with a legal or
@@ -89,25 +111,26 @@ records a conflict over is the one that gets reverted after implementation.
 
 ## Check the policy catalogue — every time
 
-`$IEURI_VAULT/Specs/policies.md` holds 59 numbered platform policies (POL-001…) in six sections:
-인증·계정 / 개인정보 / API 계약 / 다국어 / 법규·플랫폼 / 운영. **They bind this repo whether or not
-anything reminds you of them.**
+`$IEURI_VAULT/Specs/policies.md` holds 59 numbered platform policies (POL-001…) in six sections —
+auth, personal data, API contract, i18n, legal/platform, and operations. **They bind this repo
+whether or not anything reminds you of them.**
 
 The planner's `spec.md` used to carry an "적용 정책" section listing which ones applied. It no longer
 does, so **checking them is this document's job now.** Nothing else does it.
 
-Read the sections your slice touches — not all 59. A query with paging touches API 계약 (POL-017
-cursor, POL-018 page sizes and caps, POL-019 sort guarantees); anything storing member data touches
-개인정보 (POL-013 no PII in logs, POL-014 retention); anything with coordinates touches POL-045.
-When in doubt about a section, read its policy titles; they are one line each.
+Read the sections your slice touches — not all 59. A query with paging touches the API contract
+section (POL-017 cursor, POL-018 page sizes and caps, POL-019 sort guarantees); anything storing
+member data touches personal data (POL-013 no PII in logs, POL-014 retention); anything with
+coordinates touches POL-045. When in doubt about a section, read its policy titles; they are one
+line each.
 
 For each policy that bears on a decision:
 
-- **It constrains the decision** → cite the id in the 근거 column. "POL-018: 콘텐츠형 상한 50" is a
-  rationale you cannot invent, which is exactly what makes it worth citing.
+- **It constrains the decision** → cite the id in the rationale column. "POL-018: content lists cap
+  at 50" is a rationale you cannot invent, which is exactly what makes it worth citing.
 - **The requirement conflicts with it** → that is a gap, not a decision you may make. Policies are
   shared by several specs at once, so overriding one here silently breaks the premises of others.
-  Put it under 부족한 정보 and stop.
+  Put it under the gaps section and stop.
 - **It needs to change, or a new one is needed** → still not yours to write.
   `Specs/policies.md` is recorder-owned (see `CLAUDE.md`, "Policies are recorder-owned"). Record what
   the implementation settled on and leave the promotion request where that section says.
@@ -125,7 +148,7 @@ The one thing to add when *writing* the list: it is not final. After S1 is built
 and S3 may change, and that is normal. Do not partition perfectly up front — the next one being
 clear is enough.
 
-## 이번 범위 아님 is a mechanism, not a courtesy
+## The out-of-scope section is a mechanism, not a courtesy
 
 Everything deferred goes in that section by name. `simplify-review` cross-checks the implementation
 against it, and a match there is a **confirmed overreach rather than a judgment call** — which is
@@ -140,5 +163,5 @@ Write `problem/SPEC-XXXX-server.md` from the template. Write nothing else — no
 
 End by stating, in Korean:
 - which decisions you recorded (ids and one line each),
-- what is under 부족한 정보, phrased as service questions, and
-- whether implementation may begin (it may not, if 부족한 정보 is non-empty).
+- what is under the gaps section, phrased as service questions, and
+- whether implementation may begin (it may not, if the gaps section is non-empty).

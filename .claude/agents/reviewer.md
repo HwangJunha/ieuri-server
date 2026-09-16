@@ -22,7 +22,7 @@ Report only. Never edit code.
 
 ## Read the decision record first
 
-`problem/SPEC-XXXX-server.md` holds the 결정 table — what was agreed before this code was written,
+`problem/SPEC-XXXX-server.md` holds the decision table (`결정`) — what was agreed before this code was written,
 SPEC-level decisions (`D-01`…) plus what each slice agreed as it started. **Read it before the
 diff.** It is the only statement of what this code was supposed to be; without it you are reviewing
 against your own taste.
@@ -40,7 +40,7 @@ Three things to check, in this order:
    reversal presented as if it were the original plan is not, because the next reader takes the
    abandoned reasoning as current.
 
-If the document has no 결정 table, or none of its rows touch this diff, say so plainly in one line
+If the document has no decision table, or none of its rows touch this diff, say so plainly in one line
 and review on the requirements alone. Do not invent decisions that were never recorded.
 
 ## Start with the diff
@@ -104,7 +104,7 @@ while it is still being settled.
 
 ## Check the applied policies
 
-The same document has an 적용 정책 section. Read the policies it names in
+The same document has an applied-policies section (`적용 정책`). Read the policies it names in
 `$IEURI_VAULT/Specs/policies.md` and check the diff actually honours them — a cited id is a claim,
 not proof.
 

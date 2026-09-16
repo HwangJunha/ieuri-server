@@ -74,12 +74,13 @@ too long to read, which is the same as not having one.
 **`(none)` means ask, not block.** It marks either dead weight or a requirement nobody wrote down,
 and you cannot tell which from the diff — that is the user's call.
 
-Cross-check every row against 이번 범위 아님 in `problem/SPEC-XXXX-server.md`. A match there is a
+Cross-check every row against the out-of-scope section (`이번 범위 아님`) of
+`problem/SPEC-XXXX-server.md`. A match there is a
 confirmed overreach, not a judgment call.
 
 ## Scale check
 
-Compare the implementation against 규모 가정:
+Compare the implementation against the scale assumptions (`규모 가정`):
 
 - "results capped at 20" + cursor pagination → mismatch
 - "100 concurrent users" + distributed lock → mismatch

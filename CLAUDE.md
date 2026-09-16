@@ -55,7 +55,7 @@ Uses the Gradle wrapper (`./gradlew`); Gradle 9.5.1, Java toolchain 25.
     - You need a **fudge factor with no basis** — "read 3× and filter afterwards", "retry a few times".
     - You need to **call the same source more than once to satisfy one field.** That means the requirement is asking for something the source does not have.
 
-  **When a forced-fit signal appears mid-implementation, do not fix the code.** Identify which decision or requirement forced it — by id — record the counter-evidence and an alternative in the 결정 section of `problem/SPEC-XXXX-server.md`, and stop. "This implementation feels forced" is useless; "D-03 (cursor pagination) is impossible because TourAPI is offset-only" is actionable.
+  **When a forced-fit signal appears mid-implementation, do not fix the code.** Identify which decision or requirement forced it — by id — record the counter-evidence and an alternative in the decision table (`결정`) of `problem/SPEC-XXXX-server.md`, and stop. "This implementation feels forced" is useless; "D-03 (cursor pagination) is impossible because TourAPI is offset-only" is actionable.
 
 - **Infrastructure: follow convention, never hand-roll.** When a slice needs an infrastructure capability (async execution, queueing, scheduling, caching, retries, transactions, events), resolve it in this order and **stop at the first hit**:
 
@@ -485,6 +485,29 @@ person to step in; running straight through removes it.
 made before any of it existed, so they cannot answer the questions that only appear once you know
 what you are about to build. Say what you intend to build, then wait.
 
+**Before writing that agreement, find the second option.** The first shape that comes to mind is
+usually the one the last slice used, or the one the schema's wording suggests — neither is an
+argument. Until you have something to compare against, you are not choosing, you are reporting.
+
+Three questions, and they are worth answering in writing even when the answer is short:
+
+1. **What else could carry this?** A field on an existing type instead of a new root; an argument
+   instead of a field; a column instead of a table; nothing at all, with the client deriving it.
+2. **What makes this slice different from the obvious precedent?** Copying a shape is right far more
+   often than not — but say what you checked, so "we already do it this way" is a finding rather
+   than a reflex.
+3. **What would make this wrong in three slices?** A shape that cannot hold the next acceptance
+   criterion is worth knowing about now, while changing it is free.
+
+Then write the agreement, and put the rejected option in it — **that is the part the user reads.**
+"A nullable column, not a separate table" says what you decided; "a nullable column rather than a
+separate table, because only festivals have this field" says what you decided *against*, which is
+the only part anyone can disagree with.
+
+If the three questions produce nothing — sometimes there genuinely is one shape — say that in a
+line. An agreement with no alternative considered and no note saying why is the failure this
+prevents.
+
 Keep it to what someone could disagree with — usually under ten lines:
 
 - **Shape** — root vs field, command vs query, which aggregate owns it, what the schema looks like.
@@ -506,9 +529,9 @@ was agreed. If the work leaves the agreed shape mid-slice — a constraint you d
 forced-fit signal, a policy you had missed — that is a new question, so raise it then rather than
 deciding alone.
 
-**Record what was agreed in the 결정 table of `problem/SPEC-XXXX-server.md`**, continuing the same
+**Record what was agreed in the decision table (`결정`) of `problem/SPEC-XXXX-server.md`**, continuing the same
 numbering (`D-04`, `D-05`, …). One SPEC keeps one decision record; there is no separate ADR
-directory. A decision made in S2 that reverses one from S1 says so in its 근거 column — that
+directory. A decision made in S2 that reverses one from S1 says so in its rationale column — that
 reversal is the most useful thing the document will ever hold.
 
 **Once a slice's schema is settled, hand it to the `mock-announce` subagent before implementing.**
@@ -541,9 +564,10 @@ the premises of other specs collapse silently, so do not edit it directly.
 **Read it before deciding, every slice.** The planner's `spec.md` used to carry an "적용 정책"
 section naming the ones that applied; it no longer does, and nothing replaced it — so a policy now
 binds this repo only if someone here opens the catalogue. Read the sections your slice touches (it
-is organised as 인증·계정 / 개인정보 / API 계약 / 다국어 / 법규·플랫폼 / 운영), cite the ids in the
-근거 column of `problem/SPEC-XXXX-server.md`, and treat a requirement that contradicts a policy as a
-gap rather than a decision you may make. `decision-authoring` carries the working rule.
+is organised into six sections — auth, personal data, API contract, i18n, legal/platform, and
+operations), cite the ids in the rationale column of `problem/SPEC-XXXX-server.md`, and treat a
+requirement that contradicts a policy as a gap rather than a decision you may make.
+`decision-authoring` carries the working rule.
 
 To promote a new policy or revise an existing one, leave a request document **at the point the user
 says the work is done**:
