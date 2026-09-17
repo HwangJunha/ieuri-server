@@ -66,6 +66,8 @@ class MapQueryServiceTest {
         maxAreaInSquareDegrees = 4.0,
         maxSpotMarkers = 3,
         maxEventMarkers = 2,
+        recommendationCandidateCap = 2_000,
+        maxRecommendationSize = 100,
     )
     private val openDataPolicy = SeoulOpenDataPolicy(
         minRefetchInterval = Duration.ofMinutes(5),
