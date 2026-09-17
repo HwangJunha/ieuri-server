@@ -14,6 +14,11 @@ package org.around.ieuri.tourism.application.policy
  *   기본값 4.0은 대략 2°×2°로, 서울(약 0.3°×0.25°)을 한참 넘고 남한 전체를 담는 크기다.
  * @param maxSpotMarkers 개별 마커 상한(R3). 초과분은 잘리고 truncated가 선다.
  * @param maxEventMarkers 문화행사 마커 상한. 행사는 밀집도가 낮아 spot보다 작게 잡는다.
+ * @param recommendationCandidateCap 영역 추천의 후보 상한(SPEC-0036 T5 = 2,000). 중심점에서 가까운
+ *   순 이 수만큼만 점수 계산 대상이다. **SPEC-0035의 `candidate-cap`과 다른 노브다** — 그쪽은
+ *   내 위치 반경 기준이고 이쪽은 영역 기준이라, 묶으면 한쪽을 조정할 때 다른 쪽이 조용히 바뀐다.
+ *   값이 작으면 남은 후보를 못 본 채 소진 판정이 나므로(FR-009) 실측으로 정했다.
+ * @param maxRecommendationSize 추천 묶음 크기 상한. 초과 요청은 거절이 아니라 절삭이다(POL-018).
  */
 data class MapViewportPolicy(
     val minZoom: Int,
@@ -21,7 +26,14 @@ data class MapViewportPolicy(
     val maxAreaInSquareDegrees: Double,
     val maxSpotMarkers: Int,
     val maxEventMarkers: Int,
+    val recommendationCandidateCap: Int,
+    val maxRecommendationSize: Int,
 ) {
+    init {
+        require(recommendationCandidateCap >= 1) { "추천 후보 상한은 1 이상이어야 합니다." }
+        require(maxRecommendationSize >= 1) { "추천 묶음 크기 상한은 1 이상이어야 합니다." }
+    }
+
     /** 줌이 카카오맵 유효 범위 안인지. */
     fun isValidZoom(zoom: Int): Boolean = zoom in minZoom..maxZoom
 }

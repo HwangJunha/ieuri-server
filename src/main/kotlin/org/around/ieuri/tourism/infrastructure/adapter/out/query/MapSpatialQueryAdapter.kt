@@ -1,5 +1,7 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.query
 
+import org.around.ieuri.tourism.application.port.out.query.MapCandidateSearch
+import org.around.ieuri.tourism.application.port.out.query.MapCandidateView
 import org.around.ieuri.tourism.application.port.out.query.MapQueryPort
 import org.around.ieuri.tourism.application.port.out.query.MapViewportSearch
 import org.around.ieuri.tourism.application.query.MapSpotView
@@ -72,6 +74,76 @@ class MapSpatialQueryAdapter(
         )
     }
 
+    /**
+     * bbox 안의 추천 후보(SPEC-0036). 중심점에서 가까운 순 상한 N건이며, 최종 순서는 점수가
+     * 정한다(호출자가 재배열한다).
+     *
+     * **정렬은 `<->`(KNN)이고 표시용 거리는 `ST_Distance`로 따로 계산한다.** 같은 bbox에서
+     * `ORDER BY ST_Distance(...)`는 전 후보를 계산한 뒤 정렬해 530ms였고 `<->`는 45ms였다
+     * (dev 실측, 서울 중심 4,714건). 표시용 거리는 상한에 걸려 남은 행에만 필요하다.
+     *
+     * **제외 id는 배열 한 개로 바인딩한다.** 제외 목록은 세션 내내 커져 상한이 없으므로,
+     * `NOT IN (?, ?, …)`처럼 플레이스홀더를 개수만큼 펼치면 SQL이 입력 크기에 비례해 자란다.
+     * 배열은 InitPlan에서 한 번만 평가된다(제외 500건 + 후보 2,000건 실측 114ms).
+     */
+    @Transactional(readOnly = true)
+    override fun findRecommendationCandidatesWithin(query: MapCandidateSearch): List<MapCandidateView> {
+        val categoryCodes = query.categories.codes()
+        val categoryCondition =
+            if (query.categories.isUnfiltered) ""
+            else "AND cat.category IN (${categoryCodes.joinToString(",") { "?" }})"
+        // 빈 배열에도 조건을 그대로 걸 수 있지만(전부 참) 불필요한 스캔 조건이라 비면 뺀다.
+        val exclusionCondition =
+            if (query.excludedSpotIds.isEmpty()) ""
+            else "AND NOT (cat.id = ANY (?))"
+
+        val center = query.bounds.center
+        // **파라미터 순서는 SQL 문자열의 ? 등장 순서다.** 중심점이 SELECT·ORDER BY 두 곳에
+        // 나오므로 CTE로 한 번만 바인딩한다 — 반복하면 위치 파라미터가 4개로 늘어난다.
+        val params = buildList<Any> {
+            add(center.longitude)
+            add(center.latitude)
+            add(query.language.name)
+            addAll(envelopeParams(query.bounds))
+            addAll(categoryCodes)
+            if (query.excludedSpotIds.isNotEmpty()) {
+                add(query.excludedSpotIds.toLongArray())
+            }
+            add(query.limit)
+        }
+
+        return jdbcTemplate.query(
+            """
+            WITH c AS (SELECT $CENTER AS center)
+            SELECT cat.id AS id,
+                   t.title, cat.thumbnail_image_url, cat.category, cat.map_x, cat.map_y,
+                   ST_Distance(cat.location, c.center) AS distance_meters
+            FROM spot_catalog cat
+            JOIN spot_catalog_translation t ON t.catalog_id = cat.id AND t.language = ? AND t.visible
+            -- **CROSS JOIN이 JOIN 뒤에 와야 한다.** `FROM cat, c JOIN t ON …`으로 쓰면 ON 절이
+            -- cat을 볼 수 없어 "invalid reference to FROM-clause entry"로 거절된다.
+            CROSS JOIN c
+            WHERE $BBOX_PREDICATE
+              $categoryCondition
+              $exclusionCondition
+            ORDER BY cat.location <-> c.center, cat.id
+            LIMIT ?
+            """.trimIndent(),
+            { rs, _ ->
+                MapCandidateView(
+                    id = rs.getLong("id"),
+                    title = rs.getString("title"),
+                    thumbnailImageUrl = rs.getString("thumbnail_image_url"),
+                    category = SpotCategory(rs.getString("category")),
+                    lng = rs.getDouble("map_x"),
+                    lat = rs.getDouble("map_y"),
+                    distanceMeters = rs.getDouble("distance_meters"),
+                )
+            },
+            *params.toTypedArray(),
+        )
+    }
+
     /** envelope 파라미터는 (minLng, minLat, maxLng, maxLat) 순서다 — 경도가 먼저다. */
     private fun envelopeParams(bounds: MapBounds): List<Any> =
         listOf(bounds.minLng, bounds.minLat, bounds.maxLng, bounds.maxLat)
@@ -93,5 +165,11 @@ class MapSpatialQueryAdapter(
          */
         const val BBOX_PREDICATE =
             "cat.location && ST_MakeEnvelope(?, ?, ?, ?, 4326)::geography"
+
+        /**
+         * 뷰포트 중심점을 geography 점으로(SPEC-0036). ST_MakePoint는 **(경도, 위도)** 순서다 —
+         * 뒤집으면 조용히 틀린다.
+         */
+        const val CENTER = "ST_MakePoint(?, ?)::geography"
     }
 }

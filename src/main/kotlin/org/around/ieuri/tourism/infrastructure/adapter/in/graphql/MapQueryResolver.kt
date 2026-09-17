@@ -9,7 +9,6 @@ import org.around.ieuri.tourism.application.port.`in`.query.MapQueryUseCase
 import org.around.ieuri.tourism.application.query.CongestionAreaBoundaryView
 import org.around.ieuri.tourism.application.query.CongestionAreaView
 import org.around.ieuri.tourism.application.query.CulturalEventView
-import org.around.ieuri.tourism.application.query.MapSpotView
 import org.around.ieuri.tourism.application.query.MapViewportQuery
 import org.around.ieuri.tourism.application.query.MapViewportView
 import org.around.ieuri.tourism.application.query.SeoulCongestionView
@@ -18,6 +17,8 @@ import org.around.ieuri.tourism.domain.vo.CongestionForecast
 import org.around.ieuri.tourism.domain.vo.CongestionSnapshot
 import org.around.ieuri.tourism.domain.vo.MapBounds
 import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toCategorySelection
+import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toDomain
+import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toGql
 import org.around.ieuri.tourism.infrastructure.locale.domainLocale
 import org.around.ieuri.common.graphql.generated.types.CommercialActivityLevel as GqlCommercialActivityLevel
 import org.around.ieuri.common.graphql.generated.types.CommercialStatus as GqlCommercialStatus
@@ -28,10 +29,8 @@ import org.around.ieuri.common.graphql.generated.types.CongestionLevel as GqlCon
 import org.around.ieuri.common.graphql.generated.types.CongestionSnapshot as GqlCongestionSnapshot
 import org.around.ieuri.common.graphql.generated.types.CulturalEvent as GqlCulturalEvent
 import org.around.ieuri.common.graphql.generated.types.MapBoundsInput as GqlMapBoundsInput
-import org.around.ieuri.common.graphql.generated.types.MapSpot as GqlMapSpot
 import org.around.ieuri.common.graphql.generated.types.MapViewportResult as GqlMapViewportResult
 import org.around.ieuri.common.graphql.generated.types.SeoulCongestionResult as GqlSeoulCongestionResult
-import org.around.ieuri.common.graphql.generated.types.SpotCategory as GqlSpotCategory
 
 /**
  * 지도 조회 GraphQL 리졸버(인바운드 어댑터, CQRS 읽기, SPEC-0014). 언어는 요청 스코프
@@ -61,7 +60,7 @@ class MapQueryResolver(
     ): GqlMapViewportResult =
         mapQueryUseCase.mapViewport(
             MapViewportQuery(
-                bounds = bbox.toDomain(),
+                bounds = bbox.toBounds(),
                 zoom = zoom,
                 categories = toCategorySelection(categories),
             ),
@@ -76,7 +75,7 @@ class MapQueryResolver(
     ): GqlSeoulCongestionResult =
         mapQueryUseCase.seoulCongestion(
             areaIds = areaIds,
-            bounds = bbox?.toDomain(),
+            bounds = bbox?.toBounds(),
             locale = dfe.domainLocale(),
         ).toGql()
 
@@ -84,36 +83,15 @@ class MapQueryResolver(
     fun seoulCongestionAreas(dfe: DgsDataFetchingEnvironment): List<GqlCongestionAreaBoundary> =
         mapQueryUseCase.seoulCongestionAreas(dfe.domainLocale()).map { it.toGql() }
 
-    /**
-     * 입력 bbox → 도메인 VO. 좌표 범위·뒤집힘 검증이 여기서 일어나며, 실패는
-     * `INVALID_BBOX`다(R4).
-     *
-     * 형식 검증을 인바운드 어댑터에서 하는 것이 프로젝트 규약이다 — 도메인은 GraphQL
-     * 오류 코드를 모르므로 VO는 null을 돌려주고 코드 선택은 여기서 한다.
-     */
-    private fun GqlMapBoundsInput.toDomain(): MapBounds =
-        MapBounds.ofOrNull(
-            minLat = minLat,
-            minLng = minLng,
-            maxLat = maxLat,
-            maxLng = maxLng,
-        ) ?: throw InvalidBboxException("지도 영역이 올바르지 않습니다.")
+    /** 형식 검증은 mapper의 `toDomain`이 하고, 오류 코드 선택만 여기 남는다(R4). */
+    private fun GqlMapBoundsInput.toBounds(): MapBounds =
+        toDomain() ?: throw InvalidBboxException("지도 영역이 올바르지 않습니다.")
 
     private fun MapViewportView.toGql() = GqlMapViewportResult(
         spots = spots.map { it.toGql() },
         events = events.map { it.toGql() },
         truncated = truncated,
     )
-
-    private fun MapSpotView.toGql() = GqlMapSpot(
-        id = id,
-        title = title,
-        thumbnailImageUrl = thumbnailImageUrl,
-        category = GqlSpotCategory(code = category.code, label = category.code, iconUrl = null),
-        lng = lng,
-        lat = lat,
-    )
-
 
     private fun CulturalEventView.toGql() = GqlCulturalEvent(
         id = id,

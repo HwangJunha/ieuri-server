@@ -143,6 +143,8 @@ class TourismConfig {
             maxAreaInSquareDegrees = properties.maxAreaSquareDegrees,
             maxSpotMarkers = properties.maxSpotMarkers,
             maxEventMarkers = properties.maxEventMarkers,
+            recommendationCandidateCap = properties.recommendationCandidateCap,
+            maxRecommendationSize = properties.maxRecommendationSize,
         )
 
     @Bean

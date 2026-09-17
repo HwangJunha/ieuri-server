@@ -25,6 +25,22 @@ data class MapViewportQuery(
     val categories: CategorySelection,
 )
 
+/**
+ * mapRecommendedSpots 쿼리 입력(SPEC-0036). 언어는 인자가 아니라 Accept-Language에서 온다.
+ *
+ * **커서가 없다**(POL-037) — 「더 보기」는 페이지 넘기기가 아니라 [excludedSpotIds]를 키운
+ * 새 묶음 요청이다. 그래서 같은 영역을 다시 물어도 조건이 그대로다(FR-010).
+ *
+ * [excludedSpotIds]는 **클라이언트가 소유한다** — 「봤다」의 판정이 마커로 실제 그려졌는지이고,
+ * 격자로 솎아 그리는 쪽만 그것을 안다. 개수 상한이 없어 세션 내내 커진다.
+ */
+data class MapRecommendedSpotsQuery(
+    val bounds: MapBounds,
+    val excludedSpotIds: Set<Long>,
+    val categories: CategorySelection,
+    val first: Int,
+)
+
 /** mapViewport 응답(R1·R3, R12). */
 data class MapViewportView(
     val spots: List<MapSpotView>,
