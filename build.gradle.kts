@@ -111,6 +111,13 @@ dependencies {
     testImplementation("io.mockk:mockk:1.13.13")
     // 패키지 의존성 방향(infrastructure → application → domain) 검증
     testImplementation("com.tngtech.archunit:archunit-junit5:1.4.1")
+    // 소스를 읽어야만 보이는 컨벤션(와일드카드 import)을 검사한다. ArchUnit은 바이트코드를 읽는데
+    // import 형태는 거기 남지 않는다 — `import a.b.*`와 개별 import가 컴파일 후 구별되지 않는다.
+    //
+    // **Konsist는 자체 임베디드 컴파일러(2.0.20)로 파싱한다** — 이 프로젝트의 2.3.0이 아니다.
+    // 그보다 나중 문법은 파싱에 실패할 수 있다. 2026-09-16 전체 소스(793파일)로 확인했으며,
+    // Kotlin 버전을 올릴 때 이쪽이 먼저 깨질 수 있다는 뜻이다.
+    testImplementation("com.lemonappdev:konsist:0.17.3")
     testImplementation("org.springframework.boot:spring-boot-starter-security-test")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("com.netflix.graphql.dgs:graphql-dgs-spring-graphql-starter-test")

@@ -89,7 +89,11 @@
       "Bash(gh issue *)",
       "Bash(./gradlew compileKotlin --console=plain)",
       "Bash(python3 -c \"import yaml; yaml.safe_load\\(open\\('.github/workflows/build.yml'\\)\\); print\\('YAML 파싱: OK'\\)\")",
-      "Bash(gh run *)"
+      "Bash(gh run *)",
+      "Bash(sed *)",
+      "Bash(gh pr *)",
+      "Bash(git *)",
+      "Bash(kubectl get *)"
     ],
     "deny": [
       "Bash(rm -rf:*)",
@@ -120,8 +124,11 @@
     "defaultMode": "acceptEdits"
   },
   "worktree": {
-    "bgIsolation": "worktree",
-    "baseRef": "origin/dev"
+    "baseRef": "fresh",
+    "bgIsolation": "worktree"
   },
-  "// note": "Personal, gitignored overrides for THIS repo (.claude/settings.local.json). Team-shared rules go in .claude/settings.json. Precedence: deny > ask > allow, first match wins. A deny can't carry allow exceptions — narrow the deny instead."
+  "// note": "Personal, gitignored overrides for THIS repo (.claude/settings.local.json). Team-shared rules go in .claude/settings.json. Precedence: deny > ask > allow, first match wins. A deny can't carry allow exceptions — narrow the deny instead.",
+  "enabledMcpjsonServers": [
+    "obsidian"
+  ]
 }

@@ -26,6 +26,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
   Two things this is *not*. Running the build, the tests, or read-only queries to check a hypothesis is investigation and needs no approval — it changes nothing. And once the user approves a piece of work, carrying it out completely is expected; do not stop mid-edit to re-ask about steps that plainly belong to what was agreed.
 
+  **What you put in front of the user is the slice's design**, not a request to start typing — see [Agree the slice's design before writing it](#agree-the-slices-design-before-writing-it). Asking "shall I proceed?" with nothing to disagree with is not approval; it is a formality that produces the same unreviewed code.
+
 ## Overview
 
 `ieuri` is a Spring Boot 4 application written in Kotlin, exposing a GraphQL API via Netflix DGS backed by PostgreSQL through Spring Data JPA (with QueryDSL for reads), and Spring Security on the request path. Two bounded contexts are implemented today — `auth` (members, tokens, RBAC) and `tourism` (spots, details, reactions, festival sync) — plus a Spring Batch job that syncs TourAPI data.
@@ -45,14 +47,20 @@ Uses the Gradle wrapper (`./gradlew`); Gradle 9.5.1, Java toolchain 25.
 
 ## Architecture & conventions
 
-- **Simple is Best — do not force-fit a pattern the data or upstream doesn't support.** The hexagonal/CQRS structure itself is deliberate and stays; this rule is about everything built *inside* it. Prefer the simplest implementation that satisfies the acceptance criteria, and let real capabilities — not the shape of a contract or a convention — drive the design. Signs you are over-building: emulating a capability an upstream/library doesn't natively provide (e.g. synthesizing an opaque cursor over an API that only offers `pageNo` offset paging, then re-fetching/merging pages every request to fake stability); adding config knobs, retry/backfill loops, or defensive branches for cases you have not actually observed; hand-rolling parsing/serialization a library already does. When a proposed contract (e.g. a planner's `contract.graphql`) implies such machinery, change the contract here instead — the repo owns the final schema (see [Contract](#contract)) — and record it on the issue. Deleting code that doesn't earn its keep is a feature, not a regression. (Precedent: SPEC-0002 dropped a faked Relay cursor because TourAPI is offset-only.) Run `simplify-review` before the PR to catch these.
+- **Simple is Best — do not force-fit a pattern the data or upstream doesn't support.** The hexagonal/CQRS structure itself is deliberate and stays; this rule is about everything built *inside* it. Prefer the simplest implementation that satisfies the acceptance criteria, and let real capabilities — not the shape of a contract or a convention — drive the design. Signs you are over-building: emulating a capability an upstream/library doesn't natively provide (e.g. synthesizing an opaque cursor over an API that only offers `pageNo` offset paging, then re-fetching/merging pages every request to fake stability); adding config knobs, retry/backfill loops, or defensive branches for cases you have not actually observed; hand-rolling parsing/serialization a library already does. When the schema you are about to write implies such machinery, change the shape instead — you are writing it, so change it before it ships — and record it on the issue. Deleting code that doesn't earn its keep is a feature, not a regression. (Precedent: SPEC-0002 dropped a faked Relay cursor because TourAPI is offset-only.) Run `simplify-review` before the PR to catch these.
 
   **When the complexity comes from a constraint, suspect the constraint first.** These three are signs you are keeping some constraint fixed and faking the result around it — if any appears, stop and ask *why that constraint is there* before writing more code. Changing it usually deletes the awkward code rather than tidying it.
     - Generated SQL or config **grows with the input count** (an N-branch `CASE WHEN`, an `IN` clause of thousands).
     - Something the framework cannot express is **mapped as a different type** to sneak it through.
     - You need a **fudge factor with no basis** — "read 3× and filter afterwards", "retry a few times".
+    - You need to **call the same source more than once to satisfy one field.** That means the requirement is asking for something the source does not have.
+
+  **When a forced-fit signal appears mid-implementation, do not fix the code.** Identify which decision or requirement forced it — by id — record the counter-evidence and an alternative in the decision table (`결정`) of `problem/SPEC-XXXX-server.md`, and stop. "This implementation feels forced" is useless; "D-03 (cursor pagination) is impossible because TourAPI is offset-only" is actionable.
 
 - **Infrastructure: follow convention, never hand-roll.** When a slice needs an infrastructure capability (async execution, queueing, scheduling, caching, retries, transactions, events), resolve it in this order and **stop at the first hit**:
+
+  Before step 1: SPEC documents written before SPEC-0035 carry no decision record, and the code currently being refactored is not precedent. If a grep turns up only refactoring targets, treat it as "no precedent" and make a fresh decision — then record it. Following code that is on its way out is worse than having no example at all.
+
     1. **This project's existing precedent.** Grep for it first. If another domain already solves it, copy that shape — even if you would design it differently. Consistency beats local optimality.
     2. **The Spring Framework / Boot idiom**, or a purpose-built library already on the classpath. Spring almost always has one (`ApplicationEventPublisher`, `@Async`, `@Scheduled`, `@Transactional`, `TaskExecutor`, Spring Batch, Spring Cache).
     3. **Neither exists → stop and ask the user.** Do not invent infrastructure and do not proceed on a guess.
@@ -69,12 +77,26 @@ Uses the Gradle wrapper (`./gradlew`); Gradle 9.5.1, Java toolchain 25.
 
   A conversion written inline inside a resolver method cannot be called on its own, so it cannot be tested without standing up the resolver. When a slice adds one with enough fields to swap, **extract it as an extension function on the source type** and test that. Conversions predating this rule are untested; that is the accepted current state, and the rule binds what a slice adds or changes.
 
-- **Tests are written once, right before the PR — not during the work, and not run during it.**
-  Requirements keep moving while a slice is built. Not following the planner's document exactly is
+- **Behavioural tests are written once, right before the PR — not during the work, and not run during it.**
+  Requirements keep moving while a slice is built. Not following the requirement document exactly is
   normal, which is why policy judgment and code decisions belong to this server harness. Tests
   written early get rewritten every time a requirement moves, and that cost exceeds the feedback
-  gained. While working, **keep it compiling** (`./gradlew compileKotlin compileTestKotlin`) and
-  nothing more.
+  gained.
+
+  **Structure sensors are the exception — run them as you finish each piece, not once at the end.**
+
+  ```
+  ./gradlew compileKotlin compileTestKotlin test --tests "org.around.ieuri.architecture.*"
+  ```
+
+  Run it when a piece of the slice stands on its own — a resolver wired up, a mapper written, a
+  migration added — not after every edit. The point is that a violation surfaces while you still
+  remember why you wrote it that way; a check saved for just before the PR arrives when the fix is
+  a rewrite. It takes well under a minute, so the cost of running it a few times per slice is
+  nothing against finding out late.
+
+  This does not conflict with the rule above: what that rule prevents is **tests that move with the
+  requirements**, and structure rules do not move.
 
   **Immediately before opening the PR**, write the tests for the domain and application logic this
   slice added, and make `./gradlew test` pass. The `test-strategy` skill has the required shape.
@@ -179,9 +201,35 @@ not have to be repeated, and so tooling and other sessions follow the same shape
 
 ## Review — skills and the reviewer
 
-This document is the authority on the rules. The skills cover **only what ArchUnit cannot catch** —
-code that compiles, passes the suite, and is still designed wrong. The eight boundary violations are
-enforced by `LayeredArchitectureTest`, so no skill re-checks them.
+This document is the authority on the rules. The skills cover **only what the structure sensors
+cannot catch** — code that compiles, passes the suite, and is still designed wrong. Three test
+classes under `src/test/kotlin/org/around/ieuri/architecture/` hold the mechanical checks, so no
+skill re-checks them:
+
+- `LayeredArchitectureTest` — dependency direction, domain purity, `@Entity` confinement, DGS
+  isolation, cross-domain slices, bean-name collisions, `AFTER_COMMIT`/`REQUIRES_NEW`.
+- `ConsistencyConventionTest` — persistence tech out of `application`, `common` out of `domain`,
+  `@Transactional` off domain and resolvers, repository/`Dto`/test naming.
+- `ImportStyleTest` — no wildcard imports (source-level, so Konsist rather than ArchUnit).
+
+`ConsistencyConventionTest` and `ImportStyleTest` fix **what is already consistent**, chosen because
+a full survey found zero violations — not because the convention has been settled. They are
+revisited in the refactoring; `problem/HARNESS-server-sensors.md` lists what is up for review.
+
+**A sensor's failure message says what to do, not just what is wrong** — name the rule it enforces,
+so the reader can tell a real violation from a rule that is wrong for this slice:
+
+```
+[konsist] A wildcard import hides where a name comes from.
+  → Use individual imports.
+```
+
+**A sensor that is wrong for the slice is a finding, not an obstacle.** When one fires on something
+you believe is correct, say so and record why in the decision table rather than reshaping the code
+to get past it — a rule nobody is allowed to question stops being a rule and becomes a ritual. That
+belongs in the design agreement, not in every failure string; ArchUnit's `because` renders as the
+rule's description rather than as failure output, so putting it there only makes the rule read
+oddly.
 
 - `architecture-review` — CQRS rails, mapper placement and purity, framework leaking below
   infrastructure, domain independence, `common/` bloat, required values weakened to nullable.
@@ -195,10 +243,15 @@ enforced by `LayeredArchitectureTest`, so no skill re-checks them.
 - `simplify-review` — forced-fit implementations and needless abstraction.
 - `test-strategy` — the shape tests must take when written before the PR.
 
-**When a slice is finished, hand it to the `reviewer` subagent.** It reads the `dev...HEAD` diff and
-applies the six review skills. An implementer treats the decisions they just made as correct, so
-they miss the same things in their own code repeatedly. The reviewer never saw those decisions being
-made — only the diff — so the bias does not carry over. This is why human code review works.
+**When a slice is finished, hand it to the `reviewer` subagent.** It reads the decision record, then
+the `dev...HEAD` diff, then applies the six review skills — and its output leads with the reverse
+mapping table (everything the diff adds, traced to an FR/AC or decision id) before any finding.
+
+An implementer treats the decisions they just made as correct, so they miss the same things in their
+own code repeatedly. The reviewer read those decisions but did not participate in making them — it
+sees what was agreed and what shipped as two separate things, where the implementer remembers only
+one. That is why it catches divergence the implementer cannot, and why the mapping table is its job
+rather than the implementer's: whoever built something can justify every line of it.
 
 The reviewer reads only the domains the diff touches, plus `common/`. Narrowing what must be read is
 the practical payoff of the DDD split; if a change genuinely required reading another domain, that
@@ -235,7 +288,7 @@ Package root: `org.around.ieuri`. Organized **by domain first, then hexagonal la
 
 ```
 org/around/ieuri/
-  <domain>/                          # community, commerce, tourism, auth, auction
+  <domain>/                          # auth, tourism, community, alarm
     domain/                          # pure Kotlin — no framework/JPA/DGS imports
       aggregate/                     # aggregate roots (entry point to invariants)
       entity/                        # entities owned by an aggregate
@@ -248,28 +301,44 @@ org/around/ieuri/
         in/
           command/                   # write use-case interfaces (XxxCommandUseCase)
           query/                     # read use-case interfaces (XxxQueryUseCase)
-        out/
-          persistence/               # write ports: load/save aggregate
-          query/                     # read ports: return read-model DTOs
-          client/                    # external system ports
+        out/                         # one subpackage per outbound concern; add one when a new
+          persistence/               #   concern appears rather than widening an existing name.
+          query/                     #   Today: persistence, query, client, event, cache, token,
+          client/                    #   push, security.
       command/                       # Command input objects (write inputs only)
       query/                         # read-model DTOs + query inputs (read models only)
       service/                       # use-case implementations (XxxService, impl of port/in command & query)
+      policy/                        # configurable policy values a use case reads
+      validation/                    # domain validation failure → error-code translation
+      event/                         # application-level event types
+      exception/                     # use-case exceptions
     infrastructure/
       adapter/
         in/
           graphql/                   # DGS resolvers + schema-mapped response types
+            mapper/                  # GraphQL input -> Command, read DTO -> response (POL-033)
+          event/                     # listeners for other domains' published events
           messaging/                 # Kafka consumers
         out/
           persistence/               # port impl + JPA @Entity + repositories
             entity/                  # @Entity only — confined here
+            repository/              # Spring Data interfaces (XxxRepository)
             mapper/                  # domain<->entity extension functions (POL-033)
           query/                     # QueryDSL projections → read-model DTOs
           client/                    # HTTP/gRPC clients
             mapper/                  # external response -> domain, kept apart from entity mappers
+          event/                     # this domain's event publishing
+          storage/                   # object storage (R2/S3)
+      batch/                         # Spring Batch jobs, tasklets
+      config/                        # per-domain @Configuration
+      security/                      # per-domain security wiring
   common/                            # thin shared kernel: base VO, error types, authzService.can()
   IeuriApplication.kt
 ```
+
+The tree is the shape a domain grows into, not a checklist — a domain has only the packages it
+needs. When a new outbound concern appears, add a subpackage for it rather than widening an
+existing name; `port/out/` currently has eight for that reason.
 
 There is no per-domain `utils` package. Domain-specific helpers become domain services, value objects, or specifications; genuinely generic helpers go in `common/`.
 
@@ -345,7 +414,7 @@ what you did and why.
 
 **Work in a git worktree by default.** Several slices run concurrently, so each unit of work gets its own worktree instead of sharing the checkout — otherwise parallel sessions collide on the working tree and the Gradle build directory. `worktree.bgIsolation` is set to `worktree` in `.claude/settings.local.json`; when a task starts in an existing session, call `EnterWorktree` rather than branching in place. One worktree per branch, named after it.
 
-> `worktree.baseRef` is `origin/dev`, so a fresh worktree branches from `dev` — matching the rule that features cut from `dev`. It does **not** branch from your current HEAD, so uncommitted work in the shared checkout does not carry over.
+> `worktree.baseRef` is `fresh` — it takes only `fresh` or `head`, never a git ref. `fresh` branches a new worktree from the latest remote default branch (`dev` here), matching the rule that features cut from `dev`. It does **not** branch from your current HEAD, so uncommitted work in the shared checkout does not carry over. (`head` would branch from the current HEAD instead.)
 
 Branches: `master`, `dev`, `feature/*`, `hotfix/*`.
 
@@ -363,48 +432,173 @@ Merge & review rules:
 
 ## Spec-driven workflow
 
+### A slice
+
+**A slice is one acceptance criterion, on its own branch, ending in one PR.** Those three are the
+same thing — if an AC needs two branches, or one branch covers two ACs, the slicing is wrong rather
+than the rule.
+
+A commit is too small a unit (refactoring and config commits mix in) and a whole SPEC is too large.
+Matching the unit of implementation to the unit of verification means "why is this here" always has
+exactly one answer, and it keeps the `dev...HEAD` diff small enough to review properly.
+
+What that fixes in practice:
+
+- **Branch**: `feature/SPEC-XXXX-<short-kebab-name>`, cut from `dev`, one per slice.
+- **Scope**: read the whole requirement, implement only this AC. Looking ahead may shape the data
+  model but not the code — if it leaves something behind now (a column for an expiry you will not
+  process yet), that is a decision and gets recorded as one.
+- **Naming**: `S1`, `S2`, … number the slices of one SPEC, in the slice table of
+  `problem/SPEC-XXXX-server.md`. "S2 해줘" means that row.
+- **The list is not final.** After S1 lands, the shape of S2 and S3 may change; only the next one
+  has to be clear.
+
+Every slice — no exceptions, no size threshold — starts by agreeing its design (below) and ends at
+the reviewer. **Do not run slices back to back on your own**: the point of slicing is to leave a
+place for a person to step in, and running straight through removes it.
+
 Requirements do not originate in this repository. They come from the planner harness
 (`ieuri-planner`) and live in the Obsidian vault under `Specs/SPEC-XXXX/`.
 
-Two documents, two jobs:
+**`Specs/SPEC-XXXX/spec.md`** (vault) is the authority on *what must be true* — requirements and
+acceptance criteria. It is the one document in this workflow that this repo does not author.
 
-- **`Specs/SPEC-XXXX/spec.md`** (vault) — requirements, acceptance criteria, applied policies.
-  The authority on *what must be true*.
-- **`problem/SPEC-XXXX-server.md`** (this repo) — the server-side design: domain, aggregate
-  boundary, command/query split, persistence implications. The entry point for implementation,
-  versioned alongside the code.
+**`Specs/policies.md`** (vault) holds the 59 numbered platform policies. It no longer appears as an
+"적용 정책" section inside `spec.md`, so **checking it is this repo's job** — see
+[Policies are recorder-owned](#policies-are-recorder-owned--never-edited-here). A policy violation
+compiles and passes the suite; nothing else catches it.
 
-**Read both before implementing.** The design document is where you start; the acceptance
-criteria in the linked spec are what the tests must satisfy. A slice that satisfies the design
-but not the acceptance criteria is not done.
+**`problem/SPEC-XXXX-server.md`** is the server-side design — domain, aggregate boundary,
+command/query split, persistence implications — and it is **written here, not handed down**. The
+planner supplies requirements; how they are realised is decided and recorded in this repo. Record
+the history and the reason alongside each decision. Other files under `problem/` are yours to write
+freely.
 
-`problem/SPEC-*.md` files are produced by the planner, but **when a requirement changes, the
-implementer edits them directly** (see "When the spec is wrong" below). Record the history and the
-reason alongside the edit. Other files under `problem/` are yours to write freely.
+**A slice that satisfies the design but not the acceptance criteria is not done.** The design is
+yours and can be wrong; the acceptance criteria are what the tests must satisfy.
+
+**Every SPEC gets this document, written from `problem/_TEMPLATE-server.md` before any code.** It is
+not optional and there is no size threshold — the slice table lives in it, so without it "S2" names
+nothing, and the applied-policies section is the only place policies get checked. A trivial SPEC
+produces a short document, not no document.
+
+What *is* a judgment call is whether to delegate the drafting. Hand it to the `requirement-analyst`
+subagent when the SPEC carries a hard-to-reverse decision — a domain boundary, a contract, a data
+model, a new infrastructure dependency, a concurrency strategy, or the reversal of an earlier
+decision. Otherwise write it yourself. Either way the `decision-authoring` skill is the rule for
+what a decision is and when a gap must stop you, and either way the document exists before the
+first slice starts.
 
 ### Issues and branches
 
-Each spec opens one issue per target repo, created by the planner. The issue carries the
-background, a link to the spec, the acceptance conditions for this repo, and the branch name.
+Each spec opens one issue per target repo, created by the planner. The issue carries a link to the
+spec, the **FR/AC numbers** this repo owns, and a link to the decision report.
 
-Branches are `feature/SPEC-XXXX-<short-kebab-name>`, cut from `dev` as before. The spec id is a
+**The issue has the numbers, not the sentences — opening `spec.md` is not optional.** And read the
+decision report before filling any scale assumption: it records which items are still undecided,
+what they block, and where the user's answer conflicted with a legal or industry source. None of
+that survives into `spec.md`, which keeps only settled values.
+
+When a spec targets two repos there are two issues, and each repo decides its own realisation from
+the same `spec.md`. Do not read the other repo's design document.
+
+Branches are `feature/SPEC-XXXX-<short-kebab-name>`, cut from `dev`, **one per slice** — the
+reviewer reads the `dev...HEAD` diff, so a smaller diff is a better review. The spec id is a
 permanent identifier shared by the spec, the issue, the log, and the published post, so carrying
 it in the branch makes the whole chain greppable. A step or plan number still does not belong
 there — it stops meaning anything the moment the plan changes.
+
+See [A slice](#a-slice) for what one is and how it is scoped.
+
+### Agree the slice's design before writing it
+
+**Every slice starts with a short design agreement, not with code.** The SPEC-level decisions were
+made before any of it existed, so they cannot answer the questions that only appear once you know
+what you are about to build. Say what you intend to build, then wait.
+
+**Before writing that agreement, find the second option.** The first shape that comes to mind is
+usually the one the last slice used, or the one the schema's wording suggests — neither is an
+argument. Until you have something to compare against, you are not choosing, you are reporting.
+
+Three questions, and they are worth answering in writing even when the answer is short:
+
+1. **What else could carry this?** A field on an existing type instead of a new root; an argument
+   instead of a field; a column instead of a table; nothing at all, with the client deriving it.
+2. **What makes this slice different from the obvious precedent?** Copying a shape is right far more
+   often than not — but say what you checked, so "we already do it this way" is a finding rather
+   than a reflex.
+3. **What would make this wrong in three slices?** A shape that cannot hold the next acceptance
+   criterion is worth knowing about now, while changing it is free.
+
+Then write the agreement, and put the rejected option in it — **that is the part the user reads.**
+"A nullable column, not a separate table" says what you decided; "a nullable column rather than a
+separate table, because only festivals have this field" says what you decided *against*, which is
+the only part anyone can disagree with.
+
+If the three questions produce nothing — sometimes there genuinely is one shape — say that in a
+line. An agreement with no alternative considered and no note saying why is the failure this
+prevents.
+
+Keep it to what someone could disagree with — usually under ten lines:
+
+- **Shape** — root vs field, command vs query, which aggregate owns it, what the schema looks like.
+- **Where the work goes** — new types and which package, or which existing ones change.
+- **Persistence** — new table or column, a migration, an index.
+- **The judgment calls you are making, with the alternative you rejected.** This is the part worth
+  reading. "A nullable column rather than a separate table, because only festivals have this" is a
+  decision; "add a column" is not.
+- **Which policies bind it** — cite the ids from `Specs/policies.md`, and add any the design
+  document missed to its applied-policies section. The document was written before this slice's
+  shape was known, so it cannot have caught all of them.
+- **What you are not doing in this slice.**
+
+Then **stop and wait for a reply.** This is the same rule as "never write code without approval" —
+the design agreement is what makes that approval possible, because approving a plan is a different
+act from reviewing a finished diff.
+
+Once it is agreed, carry it out completely. Do not re-ask about steps that plainly belong to what
+was agreed. If the work leaves the agreed shape mid-slice — a constraint you did not know about, a
+forced-fit signal, a policy you had missed — that is a new question, so raise it then rather than
+deciding alone.
+
+**Record what was agreed in `problem/SPEC-XXXX-server.md`**, and the agreement splits across two
+sections rather than one:
+
+- **Each judgment call becomes its own row** in the decision table (`결정`), continuing the same
+  numbering (`D-04`, `D-05`, …) with the slice in the second column. One row per call, not one per
+  agreement — a row whose rationale covers three unrelated things cannot be reversed individually.
+- **What you said you are not doing goes into `이번 범위 아님`.** `simplify-review` cross-checks the
+  implementation against that section, so a deferral that stays in the conversation turns a
+  confirmed overreach back into a judgment call.
+
+Shape and placement decisions that carry no alternative need no row; they are visible in the diff.
+One SPEC keeps one decision record; there is no separate ADR directory. A decision made in S2 that
+reverses one from S1 says so in its rationale column — that reversal is the most useful thing the
+document will ever hold.
+
+**After the agreement is approved, write the `.graphqls` first — before any Kotlin — then hand it to
+the `mock-announce` subagent.** The order matters: the agreement settles the schema's shape in
+prose, but `mock-announce` diffs the schema files on disk, so it has nothing to report until they
+are written. Writing them first also means the client starts against the same text the
+implementation will compile against.
+
+The subagent starts the mock for this worktree and posts the notice — the url plus what changed,
+field by field. The client then builds in parallel instead of waiting out the implementation. See
+[the schema section](#the-schema-and-delivering-it-to-the-client).
 
 ### When the spec is wrong — fix the spec, not just the code
 
 Requirements change while the work happens. Reflecting a changed requirement only in the code and
 leaving the spec alone makes the spec meaningless within three features. So **the implementer edits
-the spec and the design document directly.**
+`spec.md` in the vault directly** — it is the one document here that this repo does not author.
 
-When the spec does not cover a case, demands something technically impossible, or the contract needs
-to change:
+When the spec does not cover a case or demands something technically impossible:
 
-1. Edit `Specs/SPEC-XXXX/spec.md` (the vault) and `problem/SPEC-XXXX-server.md`.
+1. Edit `Specs/SPEC-XXXX/spec.md` (the vault), and record the decision in
+   `problem/SPEC-XXXX-server.md`.
 2. **Record the date, what changed, and why in the change history.** An edit without history is
    indistinguishable from drift.
-3. Leave a line on the issue too — the planner sees this decision when writing the next spec.
+3. Leave a line on the issue too — that is where the other repo working from this spec sees it.
 
 Always list what you edited under **확인할 것** (To confirm) at the end of the turn. Quietly changing
 a spec is the same failure as quietly implementing something different from it.
@@ -413,6 +607,14 @@ a spec is the same failure as quietly implementing something different from it.
 
 `Specs/policies.md` is **a document several specs depend on at once.** If one implementer edits it,
 the premises of other specs collapse silently, so do not edit it directly.
+
+**Read it before deciding, every slice.** The planner's `spec.md` used to carry an "적용 정책"
+section naming the ones that applied; it no longer does, and nothing replaced it — so a policy now
+binds this repo only if someone here opens the catalogue. Read the sections your slice touches (it
+is organised into six sections — auth, personal data, API contract, i18n, legal/platform, and
+operations), cite the ids in the rationale column of `problem/SPEC-XXXX-server.md`, and treat a
+requirement that contradicts a policy as a gap rather than a decision you may make.
+`decision-authoring` carries the working rule.
 
 To promote a new policy or revise an existing one, leave a request document **at the point the user
 says the work is done**:
@@ -425,16 +627,76 @@ State what must change and why, plus **what the implementation actually settled 
 spec's candidate wording and the implementation result differ, spell out the difference — the
 recorder promotes from this document, not from the spec.
 
-### Contract
+### The schema, and delivering it to the client
 
-`Specs/SPEC-XXXX/contract.graphql` is a **proposal** from the planner, not a decision. This
-repository owns the final schema.
+The schema is written here, from the requirements and the decisions in
+`problem/SPEC-XXXX-server.md`. Grow it to what the current slice needs and no further — a field no
+acceptance criterion requires does not belong in `.graphqls` yet.
 
-Where the proposal is wrong, change it here and say so in the issue — that is a normal outcome,
-not an amendment. Where you accept it, the `.graphqls` under `src/main/resources/schema/` must
-end up matching it — check it against the contract before the PR.
+**The client builds against this schema, and this repo is what publishes it.** The planner used to
+hand down a draft `contract.graphql`; it no longer does, because a draft written before
+implementation drifted from what the server actually served, and the planner could not change code
+to close the gap — so the answer was always "ignore the draft, look at the live one." Whoever holds
+the schema has to be the one who publishes it.
+
+**Implementation takes far longer than settling the schema.** If the client waits for it, they idle
+through the whole slice. So the moment the schema is settled — **before implementing it** — hand
+them a mock server generated from that schema and let them build in parallel.
+
+```bash
+cd <this worktree> && /Users/junha/git/ieuri/ieuri-mock-api/mock.sh
+```
+
+It reads **this checkout's** `.graphqls`, picks a free port (avoiding 8080 and 8888), and reloads
+itself when a schema file changes. Its three startup lines — url, branch, schema path — are what
+gets handed to the client.
+
+- **Run it from the worktree you are working in.** It never guesses which schema to serve: worktrees
+  run in parallel, so "the most recently edited schema" would quietly serve another slice's shape,
+  and a mock that lies is worse than no mock.
+- **Responses are generated from the schema's types.** Never hand-write fixtures — they are a second
+  copy of the schema that goes stale the moment a field changes, which is the `contract.graphql`
+  failure over again.
+- **Announcing is the job, not starting the process.** The `mock-announce` subagent starts the mock
+  and posts the notice — the url plus what changed, field by field — as a comment on the client
+  repo's issue for that SPEC (`HwangJunha/ieuri-k-trip-spot`, one issue per SPEC). "Check the live
+  schema" makes the client re-read everything; naming the changed fields does not, and a notice that
+  never leaves this session reaches nobody.
+- **A schema change after the client has started is the expensive case.** Settle the shape before
+  announcing, and if it must change, say so on the issue rather than letting them find out from a
+  broken build.
+- Introspection is on in `local` only; `dev` and `prod` keep it off on purpose. The mock does not
+  change that — it is a separate process serving generated data, with no database behind it.
 
 ### Status
 
 The recorder harness moves the spec to `implemented` when it records completion. Do not edit spec
 status yourself.
+
+### When a SPEC is done, re-check every memory
+
+Persisted memories go stale the moment code moves, and a stale one is worse than no memory at all:
+it sends you to a class that was renamed, cites a PR that already merged, or tells you to copy a
+file that is now committed. You do not notice, because a memory reads as established fact — so the
+wrong path gets taken confidently.
+
+**A finished SPEC is exactly when they rot**, so check them then. Read every file in the memory
+directory and, for each one, pull out its checkable claims — a path, a class name, a config value, a
+count, a PR state — and **actually run the check**. Plausibility is not verification; the ones that
+mislead are the ones that still sound right.
+
+Then act on what you find:
+
+- **Wrong** — delete it, or correct it with the evidence you just gathered.
+- **Stale** — the claim was true and the situation moved (a merged PR, a cleared blocker, work that
+  is now done). Rewrite it to today's state rather than deleting; the history is often the point.
+- **A brittle number** — "780 files", "59 branches". Replace it with the conclusion it supported;
+  counts drift and re-break every time.
+- **Already in `CLAUDE.md`** — delete the memory. Two copies of one rule means one of them is
+  silently wrong later, and this document is the authority.
+- **A behaviour rule** ("always do X", "never do Y") — it does not belong in memory at all. Memory
+  holds facts about this project; rules belong here, where they are read every turn.
+
+Finish by checking the index and `[[links]]` still resolve — a pointer to a file you just deleted is
+the same failure in miniature. Delegate the sweep to a subagent: the same bias that makes you trust
+your own code makes you trust your own notes.

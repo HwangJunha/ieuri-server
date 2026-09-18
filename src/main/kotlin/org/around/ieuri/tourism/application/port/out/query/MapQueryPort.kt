@@ -20,6 +20,15 @@ interface MapQueryPort {
      */
     fun findSpotsWithin(query: MapViewportSearch): List<MapSpotView>
 
+    /**
+     * bbox 안의 **추천 후보**(SPEC-0036). 점수 계산 대상이라 [findSpotsWithin]보다 많이 가져오며,
+     * 반응·이미 표시한 장소를 DB 단계에서 제외하고 중심점 거리를 함께 돌려준다.
+     *
+     * 정렬은 중심점에서 가까운 순이다 — 상한에 걸려 잘릴 때 가까운 후보가 남게 하기 위한 것이며,
+     * 최종 순서는 점수가 정한다(호출자가 재배열한다).
+     */
+    fun findRecommendationCandidatesWithin(query: MapCandidateSearch): List<MapCandidateView>
+
 }
 
 /**
@@ -55,5 +64,37 @@ data class MapViewportSearch(
     /** 카테고리 선택. 비어 있으면 전체. 값이 여럿이면 IN으로 거른다(OR). 상한보다 먼저 적용된다. */
     val categories: CategorySelection,
     val limit: Int,
+)
+
+/**
+ * bbox 추천 후보 조회 조건(SPEC-0036). [MapViewportSearch]와 갈라 두는 이유는 성격이 달라서다 —
+ * 이쪽은 점수 계산 대상이라 제외 집합과 중심점 거리가 필요하고 상한이 훨씬 크다.
+ *
+ * [limit]은 후보 상한 그대로다 — 잘림을 알릴 필요가 없어 `+1`을 받지 않는다(마커 상한과 달리
+ * 소진 판정은 점수 계산 후 결과 수로 한다).
+ */
+data class MapCandidateSearch(
+    val language: DomainLocale,
+    val bounds: MapBounds,
+    val categories: CategorySelection,
+    /** 제외할 카탈로그 id. 반응한 장소와 클라이언트가 이미 표시한 장소가 합쳐져 들어온다. 개수 상한 없음. */
+    val excludedSpotIds: Set<Long>,
+    val limit: Int,
+)
+
+/**
+ * 추천 후보 1건. 점수 계산에 필요한 것만 담는다 — 제목은 면세 태그 판정에, 카테고리는 반복 감점에,
+ * 거리는 거리 요인에 쓰인다.
+ *
+ * [distanceMeters]는 **bbox 중심점까지**의 구면 거리다(사용자 위치 아님).
+ */
+data class MapCandidateView(
+    val id: Long,
+    val title: String,
+    val thumbnailImageUrl: String,
+    val category: SpotCategory,
+    val lng: Double,
+    val lat: Double,
+    val distanceMeters: Double,
 )
 
