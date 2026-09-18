@@ -4,13 +4,11 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
-import org.around.ieuri.common.event.LocationAccessed
 import org.around.ieuri.tourism.application.exception.BboxTooLargeException
 import org.around.ieuri.tourism.application.exception.InvalidBboxException
 import org.around.ieuri.tourism.application.policy.EmbeddingSpec
 import org.around.ieuri.tourism.application.policy.MapViewportPolicy
 import org.around.ieuri.tourism.application.policy.RecommendationPolicy
-import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
 import org.around.ieuri.tourism.application.port.out.query.MapCandidateSearch
 import org.around.ieuri.tourism.application.port.out.query.MapCandidateView
 import org.around.ieuri.tourism.application.port.out.query.MapQueryPort
@@ -37,7 +35,6 @@ class MapRecommendationServiceTest {
     private val mapQueryPort = mockk<MapQueryPort>()
     private val spotQueryPort = mockk<SpotQueryPort>()
     private val tasteSimilarityQueryPort = mockk<TasteSimilarityQueryPort>()
-    private val eventPublisher = mockk<TourismEventPublisherPort>(relaxed = true)
 
     private val viewportPolicy = MapViewportPolicy(
         minZoom = 1,
@@ -54,6 +51,8 @@ class MapRecommendationServiceTest {
             taxRefundMultiplier = 0.8,
             taxRefundTitleRule = TaxRefundTitleRule(listOf("[Tax Refund Shop]")),
             tasteWeight = 0.5,
+            likedMultiplier = 1.1,
+            dislikedMultiplier = 0.4,
         ),
         diversity = CategoryDiversity(penalty = 0.1),
         candidateCap = 300,
@@ -64,7 +63,6 @@ class MapRecommendationServiceTest {
         mapQueryPort,
         spotQueryPort,
         tasteSimilarityQueryPort,
-        eventPublisher,
         viewportPolicy,
         recommendationPolicy,
     )
@@ -94,18 +92,24 @@ class MapRecommendationServiceTest {
         first = first,
     )
 
+    /**
+     * 후보 1건. **좌표는 id마다 다르게 준다** — 같은 좌표는 대표 1건으로 접히므로(D-14),
+     * 접기를 검증하지 않는 케이스에서 후보가 조용히 줄어드는 것을 막는다.
+     */
     private fun candidate(
         id: Long,
         distanceMeters: Double,
         category: SpotCategory = shopping,
         title: String = "장소 $id",
+        lng: Double = 126.99 + id * 0.0001,
+        lat: Double = 37.55 + id * 0.0001,
     ) = MapCandidateView(
         id = id,
         title = title,
         thumbnailImageUrl = "https://img.example/$id.jpg",
         category = category,
-        lng = 126.99,
-        lat = 37.55,
+        lng = lng,
+        lat = lat,
         distanceMeters = distanceMeters,
     )
 
@@ -163,7 +167,7 @@ class MapRecommendationServiceTest {
     }
 
     @Test
-    fun `AC-004 요청이 준 제외 id는 반응과 합쳐져 조회 조건으로 넘어간다`() {
+    fun `AC-004 제외 집합은 요청이 준 id뿐이며 반응은 들어가지 않는다`() {
         every { spotQueryPort.findReactedSpotIdsByReaction(7L, DomainLocale.EN) } returns
             mapOf(ReactionType.LIKE to setOf(2L), ReactionType.DISLIKE to setOf(5L))
         val search = slot<MapCandidateSearch>()
@@ -171,7 +175,8 @@ class MapRecommendationServiceTest {
 
         service.mapRecommendedSpots(query(excluded = setOf(11L, 12L)), DomainLocale.EN, 7L)
 
-        assertEquals(setOf(2L, 5L, 11L, 12L), search.captured.excludedSpotIds)
+        // 반응한 2·5는 제외되지 않는다(D-13) — 지도는 화면 안의 것을 그리고 반응은 순서만 바꾼다.
+        assertEquals(setOf(11L, 12L), search.captured.excludedSpotIds)
         assertEquals(DomainLocale.EN, search.captured.language)
         assertEquals(2_000, search.captured.limit)
     }
@@ -198,15 +203,57 @@ class MapRecommendationServiceTest {
     }
 
     @Test
-    fun `AC-011 싫어요한 장소는 조회 조건의 제외 집합에 들어간다`() {
+    fun `AC-011 싫어요한 장소도 결과에 있고 같은 거리의 미반응 장소보다 뒤에 온다`() {
         every { spotQueryPort.findReactedSpotIdsByReaction(7L, DomainLocale.EN) } returns
             mapOf(ReactionType.DISLIKE to setOf(42L))
-        val search = slot<MapCandidateSearch>()
-        every { mapQueryPort.findRecommendationCandidatesWithin(capture(search)) } returns emptyList()
+        // 거리·카테고리를 같게 두어 반응 배율만 순서를 가르게 한다.
+        candidatesAre(candidate(42L, 100.0, restaurant), candidate(43L, 100.0, shopping))
 
-        service.mapRecommendedSpots(query(), DomainLocale.EN, 7L)
+        val result = service.mapRecommendedSpots(query(), DomainLocale.EN, 7L)
 
-        assertTrue(42L in search.captured.excludedSpotIds)
+        assertContentEquals(listOf(43L, 42L), result.map { it.id })
+    }
+
+    @Test
+    fun `좋아요한 장소는 같은 거리의 미반응 장소보다 앞에 온다`() {
+        every { spotQueryPort.findReactedSpotIdsByReaction(7L, DomainLocale.EN) } returns
+            mapOf(ReactionType.LIKE to setOf(42L))
+        candidatesAre(candidate(42L, 100.0, restaurant), candidate(43L, 100.0, shopping))
+
+        val result = service.mapRecommendedSpots(query(), DomainLocale.EN, 7L)
+
+        assertContentEquals(listOf(42L, 43L), result.map { it.id })
+    }
+
+    @Test
+    fun `AC-016 같은 좌표의 후보는 점수가 가장 높은 1건만 남는다`() {
+        noReactions()
+        // 한 지점에 3건, 다른 지점에 1건. 지도는 좌표 하나에 마커 하나를 그린다(D-14).
+        candidatesAre(
+            candidate(1L, 500.0, shopping, lng = 126.99, lat = 37.55),
+            candidate(2L, 300.0, shopping, lng = 126.99, lat = 37.55),
+            candidate(3L, 900.0, shopping, lng = 126.99, lat = 37.55),
+            candidate(4L, 800.0, restaurant, lng = 127.01, lat = 37.57),
+        )
+
+        val result = service.mapRecommendedSpots(query(), DomainLocale.EN, 7L)
+
+        // 겹친 3건 중 가장 가까운 2번만 남는다.
+        assertContentEquals(listOf(2L, 4L), result.map { it.id })
+        assertEquals(2, result.map { it.lng to it.lat }.distinct().size)
+    }
+
+    @Test
+    fun `같은 좌표에서 점수가 같으면 id가 작은 쪽이 대표가 된다`() {
+        noReactions()
+        candidatesAre(
+            candidate(8L, 400.0, shopping, lng = 126.99, lat = 37.55),
+            candidate(5L, 400.0, shopping, lng = 126.99, lat = 37.55),
+        )
+
+        val result = service.mapRecommendedSpots(query(), DomainLocale.EN, 7L)
+
+        assertContentEquals(listOf(5L), result.map { it.id })
     }
 
     @Test
@@ -215,19 +262,6 @@ class MapRecommendationServiceTest {
         candidatesAre()
 
         assertEquals(emptyList(), service.mapRecommendedSpots(query(), DomainLocale.EN, 7L))
-    }
-
-    @Test
-    fun `AC-013 감사 기록에는 회원과 연산명만 담기고 좌표는 담기지 않는다`() {
-        noReactions()
-        candidatesAre()
-        val event = slot<LocationAccessed>()
-        every { eventPublisher.publish(capture(event)) } returns Unit
-
-        service.mapRecommendedSpots(query(), DomainLocale.EN, 7L)
-
-        assertEquals(7L, event.captured.memberId)
-        assertEquals("mapRecommendedSpots", event.captured.operation)
     }
 
     @Test
@@ -240,7 +274,6 @@ class MapRecommendationServiceTest {
         assertFailsWith<InvalidBboxException> { service.mapRecommendedSpots(flipped, DomainLocale.EN, 7L) }
         assertFailsWith<InvalidBboxException> { service.mapRecommendedSpots(outOfRange, DomainLocale.EN, 7L) }
         verify(exactly = 0) { mapQueryPort.findRecommendationCandidatesWithin(any()) }
-        verify(exactly = 0) { eventPublisher.publish(any()) }
     }
 
     @Test
@@ -251,7 +284,6 @@ class MapRecommendationServiceTest {
             service.mapRecommendedSpots(query(bounds = huge), DomainLocale.EN, 7L)
         }
         verify(exactly = 0) { mapQueryPort.findRecommendationCandidatesWithin(any()) }
-        verify(exactly = 0) { eventPublisher.publish(any()) }
     }
 
     @Test
