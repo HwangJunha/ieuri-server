@@ -83,7 +83,13 @@ class MapRecommendationService(
         return recommendationPolicy.diversity.order(ranked).take(first).map { byId.getValue(it).toView() }
     }
 
-    /** 후보별 취향 요인. 반응이 최소량 미만이면 비어 있다. 좋아요 평균이 없으면(벡터 없음) 그 후보도 없음. */
+    /**
+     * 후보별 취향 요인. 반응이 최소량 미만이면 비어 있다. 좋아요 평균이 없으면(벡터 없음) 그 후보도 없음.
+     *
+     * `RecommendedSpotsQueryService`에 거의 같은 함수가 있다. 지금은 둘로 두는 편이 곧게 읽히지만,
+     * **세 번째 호출자가 생기면 후보 id만 받는 공통 함수로 추출한다** — 그때는 실패 정책이 하나라는
+     * 것이 우연이 아니라 규칙이 된다.
+     */
     private fun tasteOf(
         liked: Set<Long>,
         disliked: Set<Long>,
