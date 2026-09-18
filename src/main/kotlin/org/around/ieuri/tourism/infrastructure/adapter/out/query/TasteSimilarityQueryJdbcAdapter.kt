@@ -13,6 +13,10 @@ import org.springframework.transaction.annotation.Transactional
  * 코사인 유사도(`1 − 거리`)만 돌려준다 — 벡터는 DB 밖으로 나오지 않는다.
  *
  * 비어 있는 id 집합은 `WHERE false`로 바꾼다 — 평균은 행 하나(NULL)를 돌려주고 유사도가 NULL이 된다.
+ *
+ * **id 목록은 배열 한 개로 바인딩한다.** 플레이스홀더를 개수만큼 펼치면 SQL 본문이 입력 크기에
+ * 비례해 자라고, 개수가 다를 때마다 다른 구문이 되어 계획 캐시가 재사용되지 않는다. 후보는
+ * 지도 영역 추천에서 2,000건까지 올라온다(SPEC-0036).
  */
 @Component
 class TasteSimilarityQueryJdbcAdapter(
@@ -33,7 +37,7 @@ class TasteSimilarityQueryJdbcAdapter(
         val disliked = centroidClause(dislikedCatalogIds, language, model, params)
         params += model
         params += language.name
-        params.addAll(candidateCatalogIds)
+        params += candidateCatalogIds.toLongArray()
 
         val sql = """
             WITH liked AS ($liked), disliked AS ($disliked)
@@ -44,7 +48,7 @@ class TasteSimilarityQueryJdbcAdapter(
             JOIN spot_catalog_translation t ON t.id = e.translation_id
             CROSS JOIN liked
             CROSS JOIN disliked
-            WHERE e.model = ? AND t.language = ? AND t.catalog_id IN (${placeholders(candidateCatalogIds.size)})
+            WHERE e.model = ? AND t.language = ? AND t.catalog_id = ANY (?)
         """.trimIndent()
 
         return jdbcTemplate.query(
@@ -66,8 +70,8 @@ class TasteSimilarityQueryJdbcAdapter(
         val filter = if (ids.isEmpty()) {
             "false"
         } else {
-            params.addAll(ids)
-            "t.catalog_id IN (${placeholders(ids.size)})"
+            params += ids.toLongArray()
+            "t.catalog_id = ANY (?)"
         }
         return """
             SELECT avg(e.embedding) AS v
@@ -76,5 +80,4 @@ class TasteSimilarityQueryJdbcAdapter(
         """.trimIndent()
     }
 
-    private fun placeholders(count: Int) = List(count) { "?" }.joinToString(",")
 }

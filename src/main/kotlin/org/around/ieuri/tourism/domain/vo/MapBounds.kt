@@ -20,6 +20,15 @@ data class MapBounds(
     val areaInSquareDegrees: Double
         get() = (maxLat - minLat) * (maxLng - minLng)
 
+    /**
+     * 사각형의 중심점(SPEC-0036). 추천 점수의 **거리 기준점**이며 사용자의 실제 위치가 아니다.
+     *
+     * 위경도 평균이다 — 구면 중점과 미세하게 다르지만 거리 요인은 반감 5,000m의 완만한
+     * 감쇠라 그 차이가 순서를 바꾸지 않는다.
+     */
+    val center: Coordinates
+        get() = Coordinates(latitude = (minLat + maxLat) / 2.0, longitude = (minLng + maxLng) / 2.0)
+
     companion object {
         const val MIN_LATITUDE = -90.0
         const val MAX_LATITUDE = 90.0

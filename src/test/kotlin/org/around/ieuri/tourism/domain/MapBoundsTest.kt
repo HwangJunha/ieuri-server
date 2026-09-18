@@ -89,4 +89,24 @@ class MapBoundsTest {
         assertNotNull(bounds)
         assertEquals(0.5, bounds.areaInSquareDegrees, 1e-9)
     }
+
+    @Test
+    fun `중심점은 위경도 평균이다`() {
+        // SPEC-0036의 거리 기준점. 네 변을 전부 다른 값으로 둬 위경도가 뒤바뀌면 깨지게 한다.
+        val bounds = MapBounds.ofOrNull(minLat = 37.0, minLng = 126.0, maxLat = 37.5, maxLng = 127.0)
+
+        assertNotNull(bounds)
+        assertEquals(37.25, bounds.center.latitude, 1e-9)
+        assertEquals(126.5, bounds.center.longitude, 1e-9)
+    }
+
+    @Test
+    fun `적도와 본초자오선을 걸치는 영역의 중심점도 평균이다`() {
+        // 음수 좌표에서 부호를 잃지 않는지 — 서비스 지역은 아니지만 계산 자체는 일반적이어야 한다.
+        val bounds = MapBounds.ofOrNull(minLat = -1.0, minLng = -2.0, maxLat = 3.0, maxLng = 6.0)
+
+        assertNotNull(bounds)
+        assertEquals(1.0, bounds.center.latitude, 1e-9)
+        assertEquals(2.0, bounds.center.longitude, 1e-9)
+    }
 }

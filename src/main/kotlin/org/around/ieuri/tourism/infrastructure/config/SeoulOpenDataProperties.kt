@@ -44,4 +44,6 @@ data class MapViewportProperties(
     val maxAreaSquareDegrees: Double = 4.0,
     val maxSpotMarkers: Int = 500,
     val maxEventMarkers: Int = 200,
+    val recommendationCandidateCap: Int = 2000,
+    val maxRecommendationSize: Int = 100,
 )
