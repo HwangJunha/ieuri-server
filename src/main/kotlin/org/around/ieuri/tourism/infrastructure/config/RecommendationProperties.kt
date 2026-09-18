@@ -13,6 +13,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties
  * @param candidateCap 후보 상한 N. 거리 가까운 순 N건만 대상이다.
  * @param tasteWeight 취향 요인 비중 w. 취향이 있으면 `(1 − w)·거리 + w·취향`.
  * @param tasteMinReactions 취향이 성립하는 최소 반응 수(좋아요 + 싫어요).
+ * @param likedMultiplier 좋아요한 장소의 점수 배율(SPEC-0036 D-13). 1보다 크면 앞으로 당긴다.
+ * @param dislikedMultiplier 싫어요한 장소의 점수 배율. 1보다 작으면 뒤로 민다 — **0이어도 결과에서
+ *   빠지지는 않는다**. 지도는 화면 안의 것을 다 그린다.
  */
 @ConfigurationProperties(prefix = "ieuri.tourism.recommendation")
 data class RecommendationProperties(
@@ -23,6 +26,8 @@ data class RecommendationProperties(
     val candidateCap: Int = 300,
     val tasteWeight: Double = 0.5,
     val tasteMinReactions: Int = 5,
+    val likedMultiplier: Double = 1.1,
+    val dislikedMultiplier: Double = 0.4,
     val embedding: Embedding = Embedding(),
 ) {
     /**

@@ -62,6 +62,8 @@ class TourismConfig {
                 taxRefundMultiplier = properties.taxRefundMultiplier,
                 taxRefundTitleRule = TaxRefundTitleRule(properties.taxRefundTitlePatterns),
                 tasteWeight = properties.tasteWeight,
+                likedMultiplier = properties.likedMultiplier,
+                dislikedMultiplier = properties.dislikedMultiplier,
             ),
             diversity = CategoryDiversity(properties.categoryRepeatPenalty),
             candidateCap = properties.candidateCap,
