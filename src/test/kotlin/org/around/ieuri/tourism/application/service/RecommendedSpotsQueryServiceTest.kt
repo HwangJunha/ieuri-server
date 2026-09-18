@@ -162,6 +162,25 @@ class RecommendedSpotsQueryServiceTest {
     }
 
     @Test
+    fun `취향 요인이 압축돼 있어도 후보 안에서 펼쳐져 순서를 가른다`() {
+        every { spotQueryPort.findReactedSpotIdsByReaction(7L, DomainLocale.EN) } returns
+            mapOf(ReactionType.LIKE to setOf(8L, 9L), ReactionType.DISLIKE to setOf(6L))
+        // 1번이 더 멀지만(2,000m vs 1,000m) 취향이 높다. 실측에서 관찰된 압축 구간을 그대로 쓴다 —
+        // 원값 그대로면 두 취향 요인의 차가 0.0035라 거리 격차(0.03)에 묻혀 2번이 앞선다.
+        // 정규화하면 0과 1로 펼쳐져 1번이 앞선다.
+        every { spotSpatialQueryPort.searchNearby(any()) } returns
+            listOf(card(1, 2_000.0, shopping), card(2, 1_000.0, restaurant))
+        every { tasteSimilarityQueryPort.findSimilarities(any(), any(), any(), any(), any()) } returns mapOf(
+            1L to TasteSimilarity(like = 0.5084, dislike = 0.5000),
+            2L to TasteSimilarity(like = 0.5014, dislike = 0.5000),
+        )
+
+        val result = service.recommendedSpots(query(), DomainLocale.EN, 7L)
+
+        assertEquals(listOf(1L, 2L), result.map { it.id })
+    }
+
+    @Test
     fun `벡터가 없는 후보와 좋아요 평균이 없는 경우는 거리만으로 점수를 받는다`() {
         every { spotQueryPort.findReactedSpotIdsByReaction(any(), any()) } returns mapOf(ReactionType.LIKE to setOf(8L, 9L, 10L))
         every { spotSpatialQueryPort.searchNearby(any()) } returns listOf(card(1, 2_000.0, shopping), card(2, 1_000.0, restaurant))
