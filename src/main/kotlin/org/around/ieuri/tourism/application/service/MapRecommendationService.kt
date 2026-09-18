@@ -13,6 +13,7 @@ import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
 import org.around.ieuri.tourism.application.port.out.query.TasteSimilarityQueryPort
 import org.around.ieuri.tourism.application.query.MapRecommendedSpotsQuery
 import org.around.ieuri.tourism.application.query.MapSpotView
+import org.around.ieuri.tourism.application.validation.boundsOf
 import org.around.ieuri.tourism.domain.strategy.RankedSpot
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.ReactionType
@@ -48,7 +49,9 @@ class MapRecommendationService(
         locale: DomainLocale,
         memberId: Long,
     ): List<MapSpotView> {
-        if (query.bounds.areaInSquareDegrees > viewportPolicy.maxAreaInSquareDegrees) {
+        // 원시 좌표 → 도메인 VO. 범위·뒤집힘 실패는 INVALID_BBOX로 번역된다.
+        val bounds = boundsOf(query.minLat, query.minLng, query.maxLat, query.maxLng)
+        if (bounds.areaInSquareDegrees > viewportPolicy.maxAreaInSquareDegrees) {
             throw BboxTooLargeException("지도를 확대해 주세요.")
         }
         val first = query.first.coerceIn(1, viewportPolicy.maxRecommendationSize)
@@ -65,7 +68,7 @@ class MapRecommendationService(
         val candidates = mapQueryPort.findRecommendationCandidatesWithin(
             MapCandidateSearch(
                 language = locale,
-                bounds = query.bounds,
+                bounds = bounds,
                 categories = query.categories,
                 excludedSpotIds = liked + disliked + query.excludedSpotIds,
                 limit = viewportPolicy.recommendationCandidateCap,

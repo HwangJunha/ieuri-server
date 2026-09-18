@@ -5,11 +5,9 @@ import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.common.security.CurrentMemberProvider
-import org.around.ieuri.tourism.application.exception.InvalidBboxException
 import org.around.ieuri.tourism.application.port.`in`.query.MapRecommendationUseCase
 import org.around.ieuri.tourism.application.query.MapRecommendedSpotsQuery
 import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toCategorySelection
-import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toDomain
 import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toGql
 import org.around.ieuri.tourism.infrastructure.locale.domainLocale
 import org.around.ieuri.common.graphql.generated.types.MapBoundsInput as GqlMapBoundsInput
@@ -38,7 +36,12 @@ class MapRecommendationResolver(
     ): List<GqlMapSpot> =
         mapRecommendationUseCase.mapRecommendedSpots(
             MapRecommendedSpotsQuery(
-                bounds = bbox.toDomain() ?: throw InvalidBboxException("지도 영역이 올바르지 않습니다."),
+                // **좌표를 그대로 넘긴다.** 도메인 VO 조립과 범위 검증은 응용 계층의 일이다 —
+                // 여기서 만들면 다른 인바운드가 같은 유스케이스를 부를 때 그것을 각자 반복한다.
+                minLat = bbox.minLat,
+                minLng = bbox.minLng,
+                maxLat = bbox.maxLat,
+                maxLng = bbox.maxLng,
                 // 숫자로 읽히지 않는 id는 어떤 행과도 일치할 수 없으므로 조용히 뺀다 — 거절과
                 // 결과가 같으면서, 클라이언트 목록이 한 건 상해도 추천이 통째로 실패하지 않는다.
                 excludedSpotIds = excludedIds.orEmpty().mapNotNull(String::toLongOrNull).toSet(),

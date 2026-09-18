@@ -33,9 +33,17 @@ data class MapViewportQuery(
  *
  * [excludedSpotIds]는 **클라이언트가 소유한다** — 「봤다」의 판정이 마커로 실제 그려졌는지이고,
  * 격자로 솎아 그리는 쪽만 그것을 안다. 개수 상한이 없어 세션 내내 커진다.
+ *
+ * **영역은 도메인 VO가 아니라 원시 좌표로 받는다.** 외부 입력을 도메인 언어로 옮기는 것은
+ * 응용 계층의 일이라, 인바운드 어댑터가 [MapBounds]를 조립해 넘기면 그 책임이 전송 계층으로
+ * 올라간다 — GraphQL 말고 다른 인바운드가 같은 유스케이스를 부를 때 조립을 각자 반복하게 된다.
+ * `recommendedSpots`가 위경도를 그대로 받는 것과 같은 규약이다.
  */
 data class MapRecommendedSpotsQuery(
-    val bounds: MapBounds,
+    val minLat: Double,
+    val minLng: Double,
+    val maxLat: Double,
+    val maxLng: Double,
     val excludedSpotIds: Set<Long>,
     val categories: CategorySelection,
     val first: Int,

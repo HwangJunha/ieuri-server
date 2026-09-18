@@ -6,6 +6,7 @@ import io.mockk.slot
 import io.mockk.verify
 import org.around.ieuri.common.event.LocationAccessed
 import org.around.ieuri.tourism.application.exception.BboxTooLargeException
+import org.around.ieuri.tourism.application.exception.InvalidBboxException
 import org.around.ieuri.tourism.application.policy.EmbeddingSpec
 import org.around.ieuri.tourism.application.policy.MapViewportPolicy
 import org.around.ieuri.tourism.application.policy.RecommendationPolicy
@@ -82,7 +83,12 @@ class MapRecommendationServiceTest {
         excluded: Set<Long> = emptySet(),
         first: Int = 10,
     ) = MapRecommendedSpotsQuery(
-        bounds = bounds,
+        // 쿼리 입력은 원시 좌표다 — 도메인 VO 조립은 서비스가 한다. 테스트에서는 읽기 쉽도록
+        // MapBounds로 케이스를 쓰고 여기서 풀어 넘긴다.
+        minLat = bounds.minLat,
+        minLng = bounds.minLng,
+        maxLat = bounds.maxLat,
+        maxLng = bounds.maxLng,
         excludedSpotIds = excluded,
         categories = CategorySelection.ofValues(emptySet()),
         first = first,
@@ -222,6 +228,19 @@ class MapRecommendationServiceTest {
 
         assertEquals(7L, event.captured.memberId)
         assertEquals("mapRecommendedSpots", event.captured.operation)
+    }
+
+    @Test
+    fun `뒤집히거나 범위 밖인 좌표는 응용 계층에서 거절된다`() {
+        // 검증은 어댑터가 아니라 여기서 한다 — 다른 인바운드가 같은 유스케이스를 불러도
+        // 같은 규칙이 걸린다. 도메인 불변식 실패를 INVALID_BBOX로 번역하는 것이 boundsOf다.
+        val flipped = query().copy(minLat = 37.56, maxLat = 37.54)
+        val outOfRange = query().copy(minLat = -91.0)
+
+        assertFailsWith<InvalidBboxException> { service.mapRecommendedSpots(flipped, DomainLocale.EN, 7L) }
+        assertFailsWith<InvalidBboxException> { service.mapRecommendedSpots(outOfRange, DomainLocale.EN, 7L) }
+        verify(exactly = 0) { mapQueryPort.findRecommendationCandidatesWithin(any()) }
+        verify(exactly = 0) { eventPublisher.publish(any()) }
     }
 
     @Test

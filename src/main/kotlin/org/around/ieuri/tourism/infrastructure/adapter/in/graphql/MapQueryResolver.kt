@@ -17,7 +17,6 @@ import org.around.ieuri.tourism.domain.vo.CongestionForecast
 import org.around.ieuri.tourism.domain.vo.CongestionSnapshot
 import org.around.ieuri.tourism.domain.vo.MapBounds
 import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toCategorySelection
-import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toDomain
 import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toGql
 import org.around.ieuri.tourism.infrastructure.locale.domainLocale
 import org.around.ieuri.common.graphql.generated.types.CommercialActivityLevel as GqlCommercialActivityLevel
@@ -83,9 +82,18 @@ class MapQueryResolver(
     fun seoulCongestionAreas(dfe: DgsDataFetchingEnvironment): List<GqlCongestionAreaBoundary> =
         mapQueryUseCase.seoulCongestionAreas(dfe.domainLocale()).map { it.toGql() }
 
-    /** 형식 검증은 mapper의 `toDomain`이 하고, 오류 코드 선택만 여기 남는다(R4). */
+    /**
+     * 입력 bbox → 도메인 VO. 좌표 범위·뒤집힘 검증이 여기서 일어나며, 실패는 `INVALID_BBOX`다(R4).
+     *
+     * **새 코드는 이 형태를 따르지 않는다.** 어댑터가 도메인 VO를 조립하면 외부 입력을 도메인
+     * 언어로 옮기는 책임이 전송 계층에 남아, 다른 인바운드가 같은 유스케이스를 부를 때 조립을
+     * 반복하게 된다 — `mapRecommendedSpots`는 좌표를 그대로 넘기고 응용 계층의 `boundsOf`가
+     * 만든다. 여기를 그대로 두는 것은 SPEC-0014의 기존 동작을 건드리지 않기 위해서이며,
+     * 일괄 정리는 별도 리팩토링에서 한다.
+     */
     private fun GqlMapBoundsInput.toBounds(): MapBounds =
-        toDomain() ?: throw InvalidBboxException("지도 영역이 올바르지 않습니다.")
+        MapBounds.ofOrNull(minLat = minLat, minLng = minLng, maxLat = maxLat, maxLng = maxLng)
+            ?: throw InvalidBboxException("지도 영역이 올바르지 않습니다.")
 
     private fun MapViewportView.toGql() = GqlMapViewportResult(
         spots = spots.map { it.toGql() },
