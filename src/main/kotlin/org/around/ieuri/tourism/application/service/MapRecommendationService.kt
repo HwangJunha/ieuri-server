@@ -15,6 +15,7 @@ import org.around.ieuri.tourism.application.query.MapRecommendedSpotsQuery
 import org.around.ieuri.tourism.application.query.MapSpotView
 import org.around.ieuri.tourism.application.validation.boundsOf
 import org.around.ieuri.tourism.domain.strategy.RankedSpot
+import org.around.ieuri.tourism.domain.strategy.TasteNormalization
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.ReactionType
 import org.slf4j.LoggerFactory
@@ -116,9 +117,12 @@ class MapRecommendationService(
             log.warn("취향 유사도 조회 실패, 취향 없이 진행: {}", e.javaClass.simpleName)
             return emptyMap()
         }
-        return similarities.mapNotNull { (id, s) ->
-            s.like?.let { like -> id to recommendationPolicy.score.tasteFactor(like, s.dislike) }
-        }.toMap()
+        // 후보 집단 안에서 0~1로 펼친다 — 원값은 0.5 근처로 압축돼 거리에 묻힌다.
+        return TasteNormalization.normalize(
+            similarities.mapNotNull { (id, s) ->
+                s.like?.let { like -> id to recommendationPolicy.score.tasteFactor(like, s.dislike) }
+            }.toMap(),
+        )
     }
 
     private fun MapCandidateView.toView(): MapSpotView = MapSpotView(
