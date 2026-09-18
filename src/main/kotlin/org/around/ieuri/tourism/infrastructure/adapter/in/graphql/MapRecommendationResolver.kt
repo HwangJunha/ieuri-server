@@ -39,8 +39,8 @@ class MapRecommendationResolver(
         mapRecommendationUseCase.mapRecommendedSpots(
             MapRecommendedSpotsQuery(
                 bounds = bbox.toDomain() ?: throw InvalidBboxException("지도 영역이 올바르지 않습니다."),
-                // 숫자로 읽히지 않는 id는 존재할 수 없는 장소이므로 제외 목록에서 조용히 뺀다 —
-                // 거절하면 클라이언트가 들고 있는 목록 하나 때문에 지도 전체가 실패한다.
+                // 숫자로 읽히지 않는 id는 어떤 행과도 일치할 수 없으므로 조용히 뺀다 — 거절과
+                // 결과가 같으면서, 클라이언트 목록이 한 건 상해도 추천이 통째로 실패하지 않는다.
                 excludedSpotIds = excludedIds.orEmpty().mapNotNull(String::toLongOrNull).toSet(),
                 categories = toCategorySelection(categories),
                 first = first ?: DEFAULT_FIRST,

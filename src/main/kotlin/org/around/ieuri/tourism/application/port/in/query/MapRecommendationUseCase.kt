@@ -7,9 +7,11 @@ import org.around.ieuri.tourism.domain.vo.DomainLocale
 /**
  * 지도 영역 추천 유스케이스(SPEC-0036).
  *
- * [MapQueryUseCase]와 갈라 두는 이유는 **인증 경계가 다르기** 때문이다 — 이쪽은 회원의 반응과
- * 취향을 쓰므로 로그인 필수이고, 뷰포트 마커·문화행사·혼잡도는 비로그인에서도 동작해야 한다.
- * 한 포트에 묶으면 회원 id가 필요 없는 메서드까지 회원 단위 포트에 들어간다.
+ * [MapQueryUseCase]와 갈라 두는 이유는 **인증 경계가 다르기** 때문이다. 한 포트에 묶으면
+ * `MapQueryResolver`가 `CurrentMemberProvider`를 갖게 되고, 그 뒤로는 거기 필드를 더하는 사람이
+ * 어느 메서드가 회원을 요구하는지 기억해야 한다 — 뷰포트 마커·문화행사·혼잡도는 비로그인에서도
+ * 동작해야 하므로 그 경계를 구조로 남긴다. `RecommendedSpotsUseCase`가 `SpotQueryUseCase`와
+ * 갈라진 것과 같은 선례다.
  */
 interface MapRecommendationUseCase {
     /**
