@@ -11,11 +11,12 @@ import java.time.Duration
  * (`FestivalSyncProperties`·`TourStatsSyncProperties`).
  *
  * **전부 근거가 확정되지 않은 값이라 설정으로 뺐다**(POL-044). 재확보 30일은 사용자가 정했고,
- * 동시 호출 수는 초당 한도 응답을 보고 조정한다.
+ * 초당 호출 수는 실측 경계(50)에 마진을 둔 값이다 — 공식 고지값이 아니다.
  *
  * @param batchSize 한 번에 뽑는 대상 수. 이 단위가 곧 트랜잭션·커서 전진의 경계다.
  * @param refreshAfter 마지막 확보로부터 이 기간이 지나면 다시 확보한다(FR-007).
- * @param concurrency 동시에 던지는 upstream 호출 수. 초당 한도에 걸리면 낮춘다.
+ * @param callsPerSecond **한 갈래가 초당 던지는 upstream 호출 수.** 한도는 (언어 × 오퍼레이션)
+ *   조합마다 초당 50으로 실측됐고, 통신 순단 뒤 재시도가 몰릴 여지를 두어 그보다 낮게 잡는다.
  * @param dailyLimit **한 갈래가 하루에 처리할 장소 수의 상한.** 장소 하나가 호출 하나이므로
  *   곧 호출 수다. 오퍼레이션당 쿼터가 100,000이라 기본값 90,000은 10,000건을 사용자 조회 시점
  *   확보(FR-010) 몫으로 남긴다 — 배치가 쿼터를 다 쓰면 그날 조회가 upstream에 닿지 못한다.
@@ -24,6 +25,6 @@ import java.time.Duration
 data class SpotDetailPrefetchProperties(
     val batchSize: Int = 200,
     val refreshAfter: Duration = Duration.ofDays(30),
-    val concurrency: Int = 20,
+    val callsPerSecond: Int = 40,
     val dailyLimit: Int = 90_000,
 )

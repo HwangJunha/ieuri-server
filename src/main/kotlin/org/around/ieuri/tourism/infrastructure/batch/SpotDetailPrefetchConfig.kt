@@ -24,7 +24,7 @@ class SpotDetailPrefetchConfig {
     fun spotDetailPrefetchPolicy(properties: SpotDetailPrefetchProperties): SpotDetailPrefetchPolicy =
         SpotDetailPrefetchPolicy(
             refreshAfter = properties.refreshAfter,
-            concurrency = properties.concurrency,
+            callsPerSecond = properties.callsPerSecond,
         )
 
     @Bean

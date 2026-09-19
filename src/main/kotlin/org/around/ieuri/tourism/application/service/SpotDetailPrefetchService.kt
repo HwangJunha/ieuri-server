@@ -1,12 +1,11 @@
 package org.around.ieuri.tourism.application.service
 
+import io.github.resilience4j.ratelimiter.RateLimiter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
 import org.around.ieuri.tourism.application.exception.UpstreamRateLimitedException
 import org.around.ieuri.tourism.application.policy.SpotDetailPrefetchPolicy
 import org.around.ieuri.tourism.application.port.`in`.command.PrefetchResult
@@ -21,7 +20,9 @@ import org.around.ieuri.tourism.domain.aggregate.SpotDetail
 import org.around.ieuri.tourism.domain.vo.SpotImage
 import org.around.ieuri.tourism.domain.vo.SpotInfoItem
 import org.around.ieuri.tourism.domain.vo.SpotIntro
+import io.github.resilience4j.ratelimiter.RateLimiterConfig
 import org.slf4j.LoggerFactory
+import java.time.Duration
 import java.time.Instant
 
 /**
@@ -47,6 +48,24 @@ class SpotDetailPrefetchService(
 
     private val log = LoggerFactory.getLogger(SpotDetailPrefetchService::class.java)
 
+    /**
+     * **갈래마다 따로 둔다** — upstream 한도가 (언어 × 오퍼레이션) 조합마다 초당 50이라
+     * 하나를 공유하면 네 갈래가 한 갈래 몫을 나눠 쓰게 된다. 갈래가 곧 오퍼레이션이다.
+     */
+    private val limiters: Map<SpotDetailPart, RateLimiter> =
+        SpotDetailPart.entries.associateWith { part ->
+            RateLimiter.of(
+                "spot-detail-prefetch-$part",
+                RateLimiterConfig.custom()
+                    .limitForPeriod(policy.callsPerSecond)
+                    .limitRefreshPeriod(Duration.ofSeconds(1))
+                    // 한도를 기다리는 것은 정상 동작이다 — 묶음 전체가 창을 나눠 쓰므로
+                    // 마지막 호출은 (묶음 크기 / 초당 한도)초까지 기다릴 수 있다.
+                    .timeoutDuration(Duration.ofMinutes(1))
+                    .build(),
+            )
+        }
+
     override fun prefetchNext(part: SpotDetailPart, afterSpotId: Long, limit: Int): PrefetchResult {
         val staleBefore = Instant.now().minus(policy.refreshAfter)
         val targets = targetQueryPort.findTargets(part, afterSpotId, limit, staleBefore)
@@ -64,17 +83,26 @@ class SpotDetailPrefetchService(
 
     /**
      * 묶음 전체를 동시에 받아 온다. **순차로는 FR-002(1일 이내)를 지킬 수 없다** — 건당 0.2초로
-     * 잡아도 18시간이다. 동시 호출 수는 [Semaphore]가 제한한다: 초당 한도가 고지되지 않은
-     * 상대라 순간 부하를 상한 이하로 묶어 둔다.
+     * 잡아도 18시간이다.
+     *
+     * 속도는 [RateLimiter]가 잡는다. **동시 실행 수를 묶는 것으로는 부족하다** — 응답이 빠르면
+     * 같은 동시성으로도 초당 호출이 얼마든 늘어나고, 실제로 동시 20으로 1000건이 2초에 나가
+     * 대부분이 한도에 걸렸다. 제한해야 하는 것은 초당 호출 수다.
      *
      * 한 장소가 [UpstreamRateLimitedException]을 던지면 스코프가 나머지를 취소하고 그 예외를
      * 그대로 올린다 — 그날 쿼터가 끝났으므로 남은 호출은 낭비다(AC-018).
      */
     private suspend fun fetchAll(part: SpotDetailPart, targets: List<PrefetchTarget>): List<Detail?> =
         coroutineScope {
-            val gate = Semaphore(policy.concurrency)
+            val limiter = limiters.getValue(part)
             targets
-                .map { target -> async(Dispatchers.IO) { gate.withPermit { fetch(part, target) } } }
+                .map { target ->
+                    async(Dispatchers.IO) {
+                        // 창이 열릴 때까지 대기한다. 대기는 스레드를 잡지만 Dispatchers.IO의 몫이다.
+                        limiter.acquirePermission()
+                        fetch(part, target)
+                    }
+                }
                 .awaitAll()
         }
 

@@ -27,8 +27,8 @@ import kotlin.test.assertFailsWith
  * 상세 사전 수집의 판단을 고정한다(SPEC-0037). 검증 대상은 **부재와 실패의 구분**, **실패해도
  * 다시 묻지 않는 것**, **일일 한도가 어떻게 나가는지** 셋이다.
  *
- * 동시 실행 자체는 검증하지 않는다 — 코루틴의 몫이고, 여기서 확인할 것은 어떤 I/O가 일어나고
- * 무엇이 적재되는가다.
+ * 동시 실행과 유량 제어 자체는 검증하지 않는다 — 코루틴과 RateLimiter의 몫이고, 여기서 확인할
+ * 것은 어떤 I/O가 일어나고 무엇이 적재되는가다. `callsPerSecond`를 크게 두어 대기를 없앤다.
  */
 class SpotDetailPrefetchServiceTest {
 
@@ -37,7 +37,7 @@ class SpotDetailPrefetchServiceTest {
     private lateinit var upsertPort: SpotDetailUpsertPort
     private lateinit var service: SpotDetailPrefetchService
 
-    private val policy = SpotDetailPrefetchPolicy(refreshAfter = Duration.ofDays(30), concurrency = 4)
+    private val policy = SpotDetailPrefetchPolicy(refreshAfter = Duration.ofDays(30), callsPerSecond = 1000)
 
     @BeforeEach
     fun setUp() {
