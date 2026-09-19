@@ -23,6 +23,12 @@ import org.around.ieuri.tourism.infrastructure.batch.SpotSyncProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.apache.hc.client5.http.config.ConnectionConfig
+import org.apache.hc.client5.http.impl.classic.HttpClients
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder
+import org.apache.hc.core5.util.TimeValue
+import org.apache.hc.core5.util.Timeout
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory
 import org.springframework.http.client.SimpleClientHttpRequestFactory
 import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter
 import org.springframework.web.client.RestClient
@@ -115,17 +121,41 @@ class TourismConfig {
         )
 
     /**
-     * TourAPI 호출용 RestClient. Boot가 자동구성한 [RestClient.Builder](메시지 컨버터 등 포함)에 타임아웃만 입혀
-     * build한다. 타임아웃은 필수: upstream 스톨이 요청 스레드를 무한정 매달지 않고 UPSTREAM_UNAVAILABLE로 전환되도록.
+     * TourAPI 호출용 RestClient. **커넥션을 재사용한다** — `SimpleClientHttpRequestFactory`는
+     * 풀이 없어 매 호출마다 TCP·TLS 핸드셰이크를 새로 하고, 닫은 소켓이 `TIME_WAIT`로 수 분간
+     * 남는다. 상세 사전 수집처럼 수만 회를 연속으로 던지면 로컬 포트가 잠식되고 신규 연결
+     * 폭주가 upstream의 유량 제어에 걸린다(2026-09-19 실측: 12분 뒤 429 22,065건).
+     *
+     * 타임아웃은 필수다 — upstream 스톨이 요청 스레드를 무한정 매달지 않게 한다.
      * base-url은 언어별로 달라 여기서 고정하지 않고 어댑터가 매 호출 절대 URI로 넘긴다.
      */
     @Bean
     fun tourApiRestClient(builder: RestClient.Builder, properties: TourApiProperties): RestClient {
-        val requestFactory = SimpleClientHttpRequestFactory().apply {
-            setConnectTimeout(Duration.ofMillis(properties.connectTimeoutMillis))
-            setReadTimeout(Duration.ofMillis(properties.readTimeoutMillis))
-        }
-        return builder.requestFactory(requestFactory).build()
+        val connectionManager = PoolingHttpClientConnectionManagerBuilder.create()
+            // **언어별 호스트가 넷이라 라우트도 넷이다.** 기본값(라우트당 5)이면 한 언어의 동시
+            // 호출이 5로 묶여 나머지가 줄을 선다. 배치가 갈래당 초당 40 × 4갈래를 던지므로
+            // 응답 200ms 기준 동시 32 남짓이 필요하고, 느려질 때를 위해 배로 잡는다.
+            .setMaxConnPerRoute(64)
+            .setMaxConnTotal(256)
+            .setDefaultConnectionConfig(
+                ConnectionConfig.custom()
+                    .setConnectTimeout(Timeout.ofMilliseconds(properties.connectTimeoutMillis))
+                    .setSocketTimeout(Timeout.ofMilliseconds(properties.readTimeoutMillis))
+                    // 오래 놀던 연결은 서버가 이미 닫았을 수 있다 — 쓰기 전에 확인해
+                    // `NoHttpResponseException`을 피한다.
+                    .setValidateAfterInactivity(Timeout.ofSeconds(5))
+                    .build(),
+            )
+            .build()
+
+        val httpClient = HttpClients.custom()
+            .setConnectionManager(connectionManager)
+            // 유휴 연결을 정리해 포트를 붙잡고 있지 않게 한다.
+            .evictIdleConnections(TimeValue.ofSeconds(30))
+            .build()
+
+        // 타임아웃은 위 ConnectionConfig가 이미 갖고 있다 — 여기서 다시 주면 두 곳이 갈린다.
+        return builder.requestFactory(HttpComponentsClientHttpRequestFactory(httpClient)).build()
     }
 
     @Bean
