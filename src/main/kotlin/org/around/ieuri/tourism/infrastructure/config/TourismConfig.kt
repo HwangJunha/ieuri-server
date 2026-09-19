@@ -107,7 +107,6 @@ class TourismConfig {
             maxRadiusMeters = properties.maxRadiusMeters,
             maxPageSize = properties.maxPageSize,
             maxLikedPageSize = properties.maxLikedPageSize,
-            detailAbsenceTtl = properties.detailAbsenceTtl,
             maxSearchPageSize = properties.maxSearchPageSize,
             maxSuggestionCount = properties.maxSuggestionCount,
             maxSearchQueryLength = properties.maxSearchQueryLength,

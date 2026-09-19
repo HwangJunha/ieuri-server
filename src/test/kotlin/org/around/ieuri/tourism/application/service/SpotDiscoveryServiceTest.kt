@@ -59,7 +59,6 @@ class SpotDiscoveryServiceTest {
         maxRadiusMeters = 100_000,
         maxPageSize = 100,
         maxLikedPageSize = 100,
-        detailAbsenceTtl = Duration.ofDays(7),
         maxSearchPageSize = 50,
         maxSuggestionCount = 10,
         maxSearchQueryLength = 100,

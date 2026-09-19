@@ -75,7 +75,6 @@ class SpotQueryServiceTest {
         maxRadiusMeters = 100_000,
         maxPageSize = 100,
         maxLikedPageSize = 100,
-        detailAbsenceTtl = Duration.ofDays(7),
         maxSearchPageSize = 50,
         maxSuggestionCount = 10,
         maxSearchQueryLength = 100,
@@ -959,8 +958,10 @@ class SpotQueryServiceTest {
     }
 
     @Test
-    fun `AC-12 - 신선도 기준 이전이면 여전히 부재로 응답한다`() {
-        every { spotDetailStorePort.findDetail(spotIdOf(100L)) } returns storedAbsence(age = Duration.ofDays(3))
+    fun `SPEC-0037 AC-017 - 부재 행은 아무리 오래돼도 조회를 계기로 다시 묻지 않는다`() {
+        // SPEC-0008 R-4의 7일 재조회를 SPEC-0037 FR-011이 걷어냈다. 재확보는 30일 주기 배치의
+        // 몫이며, 조회 경로가 그것을 앞당기지 않는다 — 그래야 재확보 주체가 하나로 모인다.
+        every { spotDetailStorePort.findDetail(spotIdOf(100L)) } returns storedAbsence(age = Duration.ofDays(400))
 
         val view = service.spotDetail(100L, DomainLocale.KO)
 
@@ -969,48 +970,12 @@ class SpotQueryServiceTest {
     }
 
     @Test
-    fun `AC-13 - 부재의 신선도가 지나면 upstream에 다시 묻는다`() {
-        every { spotDetailStorePort.findDetail(spotIdOf(100L)) } returns storedAbsence(age = Duration.ofDays(8))
-        every { tourInfoPort.findDetail(any()) } returns null
+    fun `SPEC-0037 - 부재 행을 읽어도 적재 이벤트를 다시 발행하지 않는다`() {
+        // 조회가 fetched_at을 갱신하면 30일 창이 조회 때마다 밀려 배치가 영영 대상으로 집지
+        // 못한다 — 재확보가 조용히 멈추는 경로다.
+        every { spotDetailStorePort.findDetail(spotIdOf(100L)) } returns storedAbsence(age = Duration.ofDays(40))
 
         service.spotDetail(100L, DomainLocale.KO)
-
-        verify(exactly = 1) { tourInfoPort.findDetail(any()) }
-    }
-
-    @Test
-    fun `AC-14 - 재조회 결과 본문이 생기면 본문 있는 상태로 전환된다`() {
-        every { spotDetailStorePort.findDetail(spotIdOf(100L)) } returns storedAbsence(age = Duration.ofDays(8))
-        every { tourInfoPort.findDetail(any()) } returns detail()
-
-        val view = service.spotDetail(100L, DomainLocale.KO)
-
-        assertEquals("조선의 법궁", view.overview)
-        // 부재가 아니라 본문 적재 이벤트가 나가야 body_absent가 false로 되돌아간다.
-        verify(exactly = 1) { eventPublisher.publish(ofType(SpotDetailFetched::class)) }
-        verify(exactly = 0) { eventPublisher.publish(ofType(SpotDetailAbsent::class)) }
-    }
-
-    @Test
-    fun `AC-15 - 재조회가 여전히 부재면 적재 시각이 갱신된다`() {
-        // 갱신하지 않으면 신선도 경과가 누적된 채로 남아 매 조회마다 upstream을 치는 상태로
-        // 퇴화한다 — 부재 적재가 무의미해지는 지점이다.
-        every { spotDetailStorePort.findDetail(spotIdOf(100L)) } returns storedAbsence(age = Duration.ofDays(8))
-        every { tourInfoPort.findDetail(any()) } returns null
-
-        service.spotDetail(100L, DomainLocale.KO)
-
-        // 부재 이벤트 재발행 = 어댑터의 upsert가 fetched_at을 now()로 갱신 → 창이 새로 시작된다.
-        verify(exactly = 1) { eventPublisher.publish(ofType(SpotDetailAbsent::class)) }
-    }
-
-    @Test
-    fun `AC-16 - 재조회가 실패로 끝나면 적재 시각을 갱신하지 않는다`() {
-        // 실패는 부재의 재확인이 아니므로 신선도 창을 연장해서는 안 된다.
-        every { spotDetailStorePort.findDetail(spotIdOf(100L)) } returns storedAbsence(age = Duration.ofDays(8))
-        every { tourInfoPort.findDetail(any()) } throws UpstreamUnavailableException("boom")
-
-        assertFailsWith<UpstreamUnavailableException> { service.spotDetail(100L, DomainLocale.KO) }
 
         verify(exactly = 0) { eventPublisher.publish(any()) }
     }
