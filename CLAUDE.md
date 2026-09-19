@@ -26,7 +26,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
   Two things this is *not*. Running the build, the tests, or read-only queries to check a hypothesis is investigation and needs no approval — it changes nothing. And once the user approves a piece of work, carrying it out completely is expected; do not stop mid-edit to re-ask about steps that plainly belong to what was agreed.
 
-  **What you put in front of the user is the slice's design**, not a request to start typing — see [Agree the slice's design before writing it](#agree-the-slices-design-before-writing-it). Asking "shall I proceed?" with nothing to disagree with is not approval; it is a formality that produces the same unreviewed code.
+  **What you put in front of the user is the design**, not a request to start typing — see [Agree the design before writing it](#agree-the-design-before-writing-it). Asking "shall I proceed?" with nothing to disagree with is not approval; it is a formality that produces the same unreviewed code.
 
 ## Overview
 
@@ -434,28 +434,39 @@ Merge & review rules:
 
 ### A slice
 
-**A slice is one acceptance criterion, on its own branch, ending in one PR.** Those three are the
-same thing — if an AC needs two branches, or one branch covers two ACs, the slicing is wrong rather
-than the rule.
+**A slice is a commit, not a branch.** Number the slices of one SPEC `S1`, `S2`, … in the slice
+table of `problem/SPEC-XXXX-server.md` and read that list as a **commit plan**: one branch, one PR,
+several commits that each read well in history. "S2 해줘" still means that row.
 
-A commit is too small a unit (refactoring and config commits mix in) and a whole SPEC is too large.
-Matching the unit of implementation to the unit of verification means "why is this here" always has
-exactly one answer, and it keeps the `dev...HEAD` diff small enough to review properly.
+**Cut a new branch when the work is a different feature, not when it is the next slice.** A SPEC
+gets one `feature/SPEC-XXXX-<short-kebab-name>` branch from `dev`; if something of a genuinely
+different nature turns up mid-way, that is when a second branch is right.
+
+Lowering the unit of work is correct — the unit just isn't the branch. Splitting one SPEC across
+branches costs a review round each time and usually cuts in the wrong place: a batch job split into
+"the job" and "its retry/limit handling" leaves a job nobody can run until the second PR lands,
+while the remaining slices turn out to be one `WHERE` clause and three file deletions. Merging them
+also dissolves ordering constraints that only existed because of the split (SPEC-0037: removing a
+TTL first would have left a window with no refresh path — irrelevant once the refresh cycle ships
+in the same PR).
 
 What that fixes in practice:
 
-- **Branch**: `feature/SPEC-XXXX-<short-kebab-name>`, cut from `dev`, one per slice.
-- **Scope**: read the whole requirement, implement only this AC. Looking ahead may shape the data
-  model but not the code — if it leaves something behind now (a column for an expiry you will not
-  process yet), that is a decision and gets recorded as one.
-- **Naming**: `S1`, `S2`, … number the slices of one SPEC, in the slice table of
-  `problem/SPEC-XXXX-server.md`. "S2 해줘" means that row.
+- **Branch**: one per SPEC, cut from `dev`. Not one per slice.
+- **Commits**: one logical change each, in the slice order, so `dev...HEAD` reads as the story of
+  the SPEC rather than one dump.
+- **Scope**: read the whole requirement. Looking ahead may shape the data model but not the code —
+  if it leaves something behind now (a column for an expiry you will not process yet), that is a
+  decision and gets recorded as one.
 - **The list is not final.** After S1 lands, the shape of S2 and S3 may change; only the next one
   has to be clear.
+- **Judge the split by what it costs.** If the slices are a `WHERE` clause and a deletion, they are
+  commits. If one of them is a feature someone would describe without mentioning the others, it is
+  a branch.
 
-Every slice — no exceptions, no size threshold — starts by agreeing its design (below) and ends at
-the reviewer. **Do not run slices back to back on your own**: the point of slicing is to leave a
-place for a person to step in, and running straight through removes it.
+**A SPEC — no exceptions, no size threshold — starts by agreeing its design (below) and ends at the
+reviewer.** That gate is per SPEC, not per slice; the point is to leave a place for a person to step
+in before the work is built, and once between design and PR is enough for work this size.
 
 Requirements do not originate in this repository. They come from the planner harness
 (`ieuri-planner`) and live in the Obsidian vault under `Specs/SPEC-XXXX/`.
@@ -502,19 +513,24 @@ that survives into `spec.md`, which keeps only settled values.
 When a spec targets two repos there are two issues, and each repo decides its own realisation from
 the same `spec.md`. Do not read the other repo's design document.
 
-Branches are `feature/SPEC-XXXX-<short-kebab-name>`, cut from `dev`, **one per slice** — the
-reviewer reads the `dev...HEAD` diff, so a smaller diff is a better review. The spec id is a
+Branches are `feature/SPEC-XXXX-<short-kebab-name>`, cut from `dev`, **one per SPEC** (see
+[A slice](#a-slice)) — the reviewer reads the `dev...HEAD` diff, so keep that diff to one SPEC's
+worth of work and let the commits inside carry the slice structure. The spec id is a
 permanent identifier shared by the spec, the issue, the log, and the published post, so carrying
 it in the branch makes the whole chain greppable. A step or plan number still does not belong
 there — it stops meaning anything the moment the plan changes.
 
 See [A slice](#a-slice) for what one is and how it is scoped.
 
-### Agree the slice's design before writing it
+### Agree the design before writing it
 
-**Every slice starts with a short design agreement, not with code.** The SPEC-level decisions were
-made before any of it existed, so they cannot answer the questions that only appear once you know
-what you are about to build. Say what you intend to build, then wait.
+**Work starts with a short design agreement, not with code.** The decisions recorded when the SPEC
+document was written came before any of it existed, so they cannot answer the questions that only
+appear once you know what you are about to build. Say what you intend to build, then wait.
+
+One agreement covers the SPEC when it ships as one branch. Come back for another only when the
+shape changes mid-way — a constraint you did not know about, a forced-fit signal, a policy you had
+missed — or when a genuinely different feature turns up and earns its own branch.
 
 **Before writing that agreement, find the second option.** The first shape that comes to mind is
 usually the one the last slice used, or the one the schema's wording suggests — neither is an
