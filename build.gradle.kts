@@ -72,6 +72,10 @@ dependencies {
     implementation("com.netflix.graphql.dgs:graphql-dgs-spring-graphql-starter")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("tools.jackson.module:jackson-module-kotlin")
+    // 배치의 동시 upstream 호출(SPEC-0037). Future 대신 쓰는 이유는 **예외가 감싸지지 않는
+    // 것**이다 — Future.get()은 ExecutionException으로 덮어 일일 한도와 장애의 구분을 호출자가
+    // 놓치게 만들고, 그것을 벗기는 코드가 매번 따라붙는다. 동시성 상한은 Semaphore가 잡는다.
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core")
     // 읽기(CQRS) 프로젝션: QueryDSL. Spring Boot 4(Hibernate 7)와 호환되는 OpenFeign 포크(jakarta) 사용.
     implementation("io.github.openfeign.querydsl:querydsl-jpa:6.11")
     kapt("io.github.openfeign.querydsl:querydsl-apt:6.11:jakarta")

@@ -47,17 +47,13 @@ ieuri:
       # 마지막 확보로부터 이 기간이 지나면 다시 확보한다(FR-007). 사용자가 정한 값이며
       # TourAPI 실측이 아니다 — 근거는 spec.md의 각주에 있다.
       refresh-after: ${IEURI_TOUR_DETAIL_PREFETCH_REFRESH_AFTER:30d}
-      # 네트워크 오류·초당 한도의 재시도 횟수와 첫 대기(FR-008). 시도마다 두 배가 된다.
-      # 일일 한도는 재시도하지 않는다 — 기다려도 그날은 풀리지 않는다.
-      retry-count: ${IEURI_TOUR_DETAIL_PREFETCH_RETRY_COUNT:5}
-      retry-base-delay: ${IEURI_TOUR_DETAIL_PREFETCH_RETRY_BASE_DELAY:3s}
       # 동시에 던지는 upstream 호출 수. **순차로는 FR-002(1일 이내)를 못 지킨다** —
       # 건당 0.2초로 잡아도 18시간이다. 초당 한도(코드 23)를 만나면 이 값을 낮춘다.
       concurrency: ${IEURI_TOUR_DETAIL_PREFETCH_CONCURRENCY:20}
-      # 한 갈래가 하루에 쓸 호출 수의 상한. 오퍼레이션당 한도가 10만이므로 1만 건을
-      # 사용자 조회 시점 확보(FR-010) 몫으로 남긴다 — 배치가 한도를 다 쓰면 그날
-      # 조회가 upstream에 닿지 못한다.
-      daily-call-budget: ${IEURI_TOUR_DETAIL_PREFETCH_DAILY_CALL_BUDGET:90000}
+      # 한 갈래가 하루에 처리할 장소 수. 장소 하나가 호출 하나이므로 곧 호출 수다.
+      # 오퍼레이션당 쿼터가 10만이라 1만 건을 사용자 조회 시점 확보(FR-010) 몫으로
+      # 남긴다 — 배치가 쿼터를 다 쓰면 그날 조회가 upstream에 닿지 못한다.
+      daily-limit: ${IEURI_TOUR_DETAIL_PREFETCH_DAILY_LIMIT:90000}
 
   # 한국관광공사 관광통계 4종(SPEC-0015). 갱신 주기가 갈려 잡을 나눴다 — 묶으면 월 단위가 매일 헛돈다.
   #   tourStatsVisitorCountSyncJob · tourStatsConcentrationRateSyncJob        매일

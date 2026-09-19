@@ -46,7 +46,7 @@ class SpotDetailPrefetchJobConfig(
     private fun prefetchStep(part: SpotDetailPart): Step =
         StepBuilder("${JOB_NAME}Step-$part", jobRepository)
             .tasklet(
-                SpotDetailPrefetchTasklet(useCase, part, properties.batchSize, properties.dailyCallBudget),
+                SpotDetailPrefetchTasklet(useCase, part, properties.batchSize, properties.dailyLimit),
                 transactionManager,
             )
             .build()
