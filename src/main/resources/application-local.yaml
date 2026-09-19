@@ -6,6 +6,12 @@ server:
   port: 8888
 
 ieuri:
+  tourapi:
+    detail-prefetch:
+      # **로컬에서는 상세 수집을 돌리지 않는다**(SPEC-0037). 한 번 돌면 오퍼레이션당 수만 회를
+      # 쓰는데 그 쿼터는 dev·prod와 같은 계정에서 나간다 — 로컬 실수 한 번이 운영 몫을 태운다.
+      # 0이면 Tasklet이 첫 판정에서 바로 끝내므로 호출이 아예 나가지 않는다.
+      daily-limit: 0
   # 검색 노드도 로컬에서는 같은 port-forward 터널 위에 있어, 메인과 같은 이유로 SSL을 끈다
   # (아래 spring.datasource 주석 참조).
   search-datasource:

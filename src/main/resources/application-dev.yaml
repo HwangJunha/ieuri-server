@@ -47,3 +47,11 @@ management:
       export:
         otlp:
           endpoint: ${IEURI_TRACING_ENDPOINT}
+
+ieuri:
+  tourapi:
+    detail-prefetch:
+      # **dev는 전량을 받지 않는다**(SPEC-0037). 갈래당 상한을 낮게 잡아 동작만 확인하고,
+      # 문제가 없으면 이 값을 올려 가며 넓힌다 — 전량(9만)을 처음부터 주면 설정이 잘못됐을 때
+      # 그날 쿼터를 통째로 태우고, 그 쿼터는 prod와 같은 계정에서 나간다.
+      daily-limit: ${IEURI_TOUR_DETAIL_PREFETCH_DAILY_LIMIT:10000}
