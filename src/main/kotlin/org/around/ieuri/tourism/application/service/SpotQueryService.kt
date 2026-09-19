@@ -143,12 +143,16 @@ class SpotQueryService(
      * **부재와 실패를 절대 섞지 않는다**(SPEC-0008 R-1·AC-4). 업스트림에 본문이 *없는* 것은 다시
      * 물어도 결과가 같은 사실이므로 적재해 두고 성공으로 응답한다. 업스트림 호출이 *깨진* 것은
      * 다음엔 될 수 있으므로 적재하지 않고 예외를 그대로 올린다. 섞으면 일시적 장애가 부재로 적재되어
-     * 신선도 기준이 지날 때까지 데이터가 복구되지 않는다.
+     * 다음 재확보 주기까지 데이터가 복구되지 않는다.
      *
      * 세 가지 상태를 구분한다(R-3):
      *   - 미조회      : 캐시·DB 모두 미스        → upstream 호출 (AC-10)
-     *   - 조회함·부재 : bodyAbsent = true       → upstream 호출 안 함, 단 신선도가 지나면 재조회 (AC-9·AC-13)
+     *   - 조회함·부재 : bodyAbsent = true       → upstream 호출 **안 함**(SPEC-0037 FR-011)
      *   - 조회함·존재 : bodyAbsent = false      → upstream 호출 안 함
+     *
+     * **부재 행을 조회 시점에 재확인하지 않는다.** SPEC-0008 R-4의 7일 재조회를 SPEC-0037이
+     * 걷어냈고, 재확보는 30일 주기 배치가 맡는다 — 그래야 재확보 주체가 하나로 모여 호출량이
+     * 예측 가능해진다.
      */
     override fun spotDetail(catalogId: Long, locale: DomainLocale): SpotDetailView {
         val identity = resolve(catalogId, locale)
@@ -161,20 +165,18 @@ class SpotQueryService(
         spotCachePort.getDetail(spotId)?.let { return it.detail.toView(catalogId, identity) }
 
         // DB 히트: Valkey를 충전하고 upstream은 건드리지 않는다(AC-35).
-        // 단 **부재 행은 신선도를 본다**(R-4) — 나중에 업스트림에 데이터가 생길 수 있다.
+        // **부재 행도 그대로 응답한다**(SPEC-0037 FR-011) — 조회를 계기로 원본에 다시 묻지 않는다.
+        // 재확보는 30일 주기 배치(`spotDetailPrefetchJob`)가 맡는다.
         spotDetailStorePort.findDetail(spotId)?.let { stored ->
-            if (!stored.isStaleAbsence()) {
-                if (stored.bodyAbsent) {
-                    spotCachePort.putDetailAbsence(spotId, stored.detail)
-                } else {
-                    spotCachePort.putDetail(spotId, stored.detail)
-                }
-                return stored.detail.toView(catalogId, identity)
+            if (stored.bodyAbsent) {
+                spotCachePort.putDetailAbsence(spotId, stored.detail)
+            } else {
+                spotCachePort.putDetail(spotId, stored.detail)
             }
-            // 부재이면서 신선도가 지났다 — 아래로 떨어져 upstream에 다시 물어본다(AC-13).
+            return stored.detail.toView(catalogId, identity)
         }
 
-        // 양쪽 미스(또는 부재 재조회 시점): upstream 조회 후 캐시 충전 + 적재 이벤트 발행(AC-36·AC-39).
+        // 양쪽 미스: upstream 조회 후 캐시 충전 + 적재 이벤트 발행(AC-36·AC-39).
         // 여기서 던져지는 예외는 **실패**이며 부재로 적재되지 않는다 — 이벤트 발행 전에 전파된다(AC-4·AC-16).
         val fetched = tourInfoPort.findDetail(identity.toQuery(locale))
 
@@ -193,14 +195,6 @@ class SpotQueryService(
         eventPublisher.publish(SpotDetailFetched(spotId, fetched))
         return fetched.toView(catalogId, identity)
     }
-
-    /**
-     * 부재 행의 신선도 판정(R-4). **부재 행에만 적용된다** — 정상 행에는 만료가 없다(1차 신선도는
-     * Valkey TTL 24h이고 배치가 목록을 매일 최신화한다). 부재를 더 짧게 잡는 이유는 업스트림에
-     * 나중에 데이터가 생길 수 있기 때문이다.
-     */
-    private fun StoredDetail.isStaleAbsence(): Boolean =
-        bodyAbsent && fetchedAt.isBefore(Instant.now().minus(policy.detailAbsenceTtl))
 
     /**
      * 본문 부재 시 응답·적재의 재료(R-2). `spot` 행이 title·category·thumbnailImageUrl·copyright를

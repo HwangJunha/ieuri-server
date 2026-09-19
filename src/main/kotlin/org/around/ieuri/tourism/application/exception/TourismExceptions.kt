@@ -95,6 +95,16 @@ class UpstreamRateLimitedException(message: String = "잠시 후 다시 시도�
     SpotQueryException("UPSTREAM_RATE_LIMITED", Classification.RESOURCE_EXHAUSTED, message, cause)
 
 /**
+ * TourAPI **초당** 호출 한도 초과(SPEC-0037). 일일 한도([UpstreamRateLimitedException])와 반드시
+ * 구분한다 — 이쪽은 잠시 뒤 재시도하면 풀리는 일시 상태이고, 배치가 둘을 섞으면 초당 한도 한 번에
+ * 그날 수집이 통째로 끝난다.
+ *
+ * 클라이언트에게는 같은 안내(잠시 후 재시도)라 오류 코드를 공유한다.
+ */
+class UpstreamTooManyRequestsException(message: String = "잠시 후 다시 시도해 주세요.", cause: Throwable? = null) :
+    SpotQueryException("UPSTREAM_RATE_LIMITED", Classification.RESOURCE_EXHAUSTED, message, cause)
+
+/**
  * 지도 뷰포트·혼잡도 조회의 실패(SPEC-0014 §10). 기존 쿼리 오류와 같은 경로로 최상위
  * errors[]에 실린다.
  *

@@ -53,3 +53,12 @@ management:
       export:
         otlp:
           endpoint: ${IEURI_TRACING_ENDPOINT}
+
+ieuri:
+  tourapi:
+    detail-prefetch:
+      # 전량 수집(SPEC-0037). 오퍼레이션당 쿼터 10만에서 1만을 사용자 조회 시점 확보(FR-010)
+      # 몫으로 남긴다 — 배치가 다 쓰면 그날 조회가 upstream에 닿지 못한다.
+      # **application.yaml 기본값과 같지만 명시한다** — 기본값이 개발 편의로 바뀌어도
+      # 운영이 조용히 따라가지 않게 한다(이 파일의 다른 값과 같은 이유).
+      daily-limit: ${IEURI_TOUR_DETAIL_PREFETCH_DAILY_LIMIT:90000}

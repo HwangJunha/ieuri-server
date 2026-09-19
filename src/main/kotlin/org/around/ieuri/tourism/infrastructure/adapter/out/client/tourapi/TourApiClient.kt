@@ -1,5 +1,8 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi
 
+import org.around.ieuri.tourism.application.exception.UpstreamRateLimitedException
+import org.around.ieuri.tourism.application.exception.UpstreamTooManyRequestsException
+import org.around.ieuri.tourism.application.exception.UpstreamUnavailableException
 import org.around.ieuri.tourism.application.port.out.client.NearbySpotQuery
 import org.around.ieuri.tourism.application.port.out.client.NearbySpotResult
 import org.around.ieuri.tourism.application.port.out.client.SpotDetailQuery
@@ -17,8 +20,11 @@ import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi.mapper
 import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi.mapper.toSpotDetail
 import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi.mapper.toSpotIntroOrNull
 import org.around.ieuri.tourism.infrastructure.config.TourApiProperties
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
+import org.springframework.web.client.RestClientException
+import org.springframework.web.client.RestClientResponseException
 import org.springframework.web.client.requiredBody
 import org.springframework.web.util.UriComponentsBuilder
 import java.net.URI
@@ -65,33 +71,87 @@ class TourApiClient(
      * HTTP·역직렬화 실패는 여전히 예외로 나간다(그쪽은 진짜 실패다).
      */
     override fun findDetail(query: SpotDetailQuery): SpotDetail? {
-        val response: TourApiDetailCommonResponse =
-            tourApiRestClient.get().uri(detailUri(query, "detailCommon2")).retrieve().requiredBody()
+        val response: TourApiDetailCommonResponse = call(detailUri(query, "detailCommon2"), TourApiDetailCommonResponse::class.java)
+        verify(response.response.header)
         val item = response.response.body.items.firstOrNull() ?: return null
         return mapDetail(item, query.locale)
     }
 
     /** 갤러리(detailImage2 1콜). */
     override fun findGallery(query: SpotDetailQuery): List<SpotImage> {
-        val response: TourApiDetailImageResponse =
-            tourApiRestClient.get().uri(detailUri(query, "detailImage2")).retrieve().requiredBody()
+        val response: TourApiDetailImageResponse = call(detailUri(query, "detailImage2"), TourApiDetailImageResponse::class.java)
+        verify(response.response.header)
         return mapGallery(response.response.body.items)
     }
 
     /** 운영 정보(detailIntro2 1콜). 언어별 카테고리 코드가 없으면 호출 자체를 생략한다. */
     override fun findIntro(query: SpotDetailQuery, category: SpotCategory): SpotIntro? {
         val contentTypeId = categoryCode(category, query.locale) ?: return null
-        val response: TourApiDetailIntroResponse =
-            tourApiRestClient.get().uri(detailUri(query, "detailIntro2", contentTypeId)).retrieve().requiredBody()
+        val response: TourApiDetailIntroResponse = call(detailUri(query, "detailIntro2", contentTypeId), TourApiDetailIntroResponse::class.java)
+        verify(response.response.header)
         return mapIntro(response.response.body.items.firstOrNull())
     }
 
     /** 이용안내 항목(detailInfo2 1콜). 언어별 카테고리 코드가 없으면 호출 자체를 생략한다. */
     override fun findInfoItems(query: SpotDetailQuery, category: SpotCategory): List<SpotInfoItem> {
         val contentTypeId = categoryCode(category, query.locale) ?: return emptyList()
-        val response: TourApiDetailInfoResponse =
-            tourApiRestClient.get().uri(detailUri(query, "detailInfo2", contentTypeId)).retrieve().requiredBody()
+        val response: TourApiDetailInfoResponse = call(detailUri(query, "detailInfo2", contentTypeId), TourApiDetailInfoResponse::class.java)
+        verify(response.response.header)
         return mapInfoItems(response.response.body.items)
+    }
+
+    /**
+     * 상세 오퍼레이션 호출 + **전송 계층 예외의 도메인 변환**(SPEC-0037). 연결 실패·타임아웃·
+     * 5xx·역직렬화 실패가 그대로 새면 재시도 대상인지 판단할 수 없어, FR-008이 지정한
+     * "네트워크 오류는 재시도한다"가 성립하지 않는다.
+     *
+     * HTTP 429만 초당 한도로 가르고 나머지는 전부 장애다 — 4xx도 포함되는 것은 배치 관점에서
+     * 결론(넘어간다)이 같기 때문이다. **URI는 로그에 싣지 않는다**(serviceKey 누출).
+     */
+    private fun <T : Any> call(uri: URI, type: Class<T>): T =
+        try {
+            tourApiRestClient.get().uri(uri).retrieve().body(type)
+                ?: throw UpstreamUnavailableException("TourAPI 응답이 비어 있습니다.")
+        } catch (e: RestClientException) {
+            throw translate(e)
+        }
+
+    fun translate(e: RestClientException): RuntimeException {
+        val status = (e as? RestClientResponseException)?.statusCode?.value()
+        if (status == HTTP_TOO_MANY_REQUESTS) {
+            return UpstreamTooManyRequestsException("TourAPI 초당 호출 한도를 초과했습니다.", e)
+        }
+        log.warn(
+            "TourAPI 호출 실패: {} status={} cause={}",
+            e.javaClass.simpleName, status, e.cause?.javaClass?.simpleName ?: "-",
+        )
+        return UpstreamUnavailableException("TourAPI 호출에 실패했습니다(${e.javaClass.simpleName}).", e)
+    }
+
+    /**
+     * 공공데이터포털 응답 코드 판정(SPEC-0037). **호출자가 구분해야 하는 세 결론만** 가른다 —
+     * 오늘은 그만둔다(일일 한도 `22`) · 잠시 뒤 다시 한다(초당 한도 `23`) · 넘어간다(그 밖의 전부).
+     * 나머지 코드는 배치에서 결론이 같으므로 타입을 나누지 않는다.
+     *
+     * **빈 코드는 성공으로 본다** — DTO 기본값이 빈 문자열이라, 헤더 없는 응답을 실패로 만들면
+     * 정상 조회가 장애로 둔갑한다(`TourStatsClient`와 같은 규율). 결과 없음은 items가 비어 오는
+     * 것으로 이미 표현되며 여기서 예외가 되지 않는다(SPEC-0008 R-1).
+     *
+     * **resultMsg는 로그에 싣지 않는다** — 오류 메시지에 요청 URI가 섞여 오면 serviceKey가 샌다.
+     *
+     * HTTP·역직렬화와 분리돼 있어 단위 테스트가 가능하다([translate]도 같다).
+     */
+    fun verify(header: TourApiResponse.Header) {
+        val code = header.resultCode
+        when {
+            code.isBlank() || code == RESULT_OK -> return
+            code == RESULT_DAILY_LIMIT -> throw UpstreamRateLimitedException("TourAPI 일일 호출 한도를 초과했습니다.")
+            code == RESULT_PER_SECOND_LIMIT -> throw UpstreamTooManyRequestsException("TourAPI 초당 호출 한도를 초과했습니다.")
+            else -> {
+                log.warn("TourAPI 오류 응답: code={}", code)
+                throw UpstreamUnavailableException("TourAPI 오류 응답: $code")
+            }
+        }
     }
 
     /** TourAPI 응답 DTO → 중립 결과. HTTP·역직렬화와 분리해 단위 테스트 가능. */
@@ -154,4 +214,17 @@ class TourApiClient(
             categoryMapping.categoryOf(it, CategoryExternalMappingPort.PROVIDER_TOUR_API, codeset(locale))
         } ?: SpotCategory.TOURIST_SPOT
 
+    companion object {
+        private val log = LoggerFactory.getLogger(TourApiClient::class.java)
+
+        private const val RESULT_OK = "0000"
+
+        /** `LIMITED_NUMBER_OF_SERVICE_REQUESTS_EXCEEDS_ERROR` — 그날이 끝났다. */
+        private const val RESULT_DAILY_LIMIT = "22"
+
+        /** `LIMITED_NUMBER_OF_SERVICE_REQUESTS_PER_SECOND_EXCEEDS_ERROR` — 잠시 뒤 풀린다. */
+        private const val RESULT_PER_SECOND_LIMIT = "23"
+
+        private const val HTTP_TOO_MANY_REQUESTS = 429
+    }
 }
