@@ -39,6 +39,26 @@ ieuri:
       # 상한이 실측되지 않았다 — 업스트림이 거부하면 이 값만 낮춘다.
       page-size: ${IEURI_TOUR_FESTIVAL_PAGE_SIZE:1000}
 
+    # 관광지 상세 사전 전량 수집(SPEC-0037). `spotDetailPrefetchJob`이 읽는다.
+    # 값에 확정된 근거가 없어 전부 설정으로 뺐다(POL-044).
+    detail-prefetch:
+      # 한 번에 뽑는 대상 수. 이 단위가 트랜잭션·커서 전진의 경계다.
+      batch-size: ${IEURI_TOUR_DETAIL_PREFETCH_BATCH_SIZE:200}
+      # 마지막 확보로부터 이 기간이 지나면 다시 확보한다(FR-007). 사용자가 정한 값이며
+      # TourAPI 실측이 아니다 — 근거는 spec.md의 각주에 있다.
+      refresh-after: ${IEURI_TOUR_DETAIL_PREFETCH_REFRESH_AFTER:30d}
+      # 네트워크 오류·초당 한도의 재시도 횟수와 첫 대기(FR-008). 시도마다 두 배가 된다.
+      # 일일 한도는 재시도하지 않는다 — 기다려도 그날은 풀리지 않는다.
+      retry-count: ${IEURI_TOUR_DETAIL_PREFETCH_RETRY_COUNT:5}
+      retry-base-delay: ${IEURI_TOUR_DETAIL_PREFETCH_RETRY_BASE_DELAY:3s}
+      # 동시에 던지는 upstream 호출 수. **순차로는 FR-002(1일 이내)를 못 지킨다** —
+      # 건당 0.2초로 잡아도 18시간이다. 초당 한도(코드 23)를 만나면 이 값을 낮춘다.
+      concurrency: ${IEURI_TOUR_DETAIL_PREFETCH_CONCURRENCY:20}
+      # 한 갈래가 하루에 쓸 호출 수의 상한. 오퍼레이션당 한도가 10만이므로 1만 건을
+      # 사용자 조회 시점 확보(FR-010) 몫으로 남긴다 — 배치가 한도를 다 쓰면 그날
+      # 조회가 upstream에 닿지 못한다.
+      daily-call-budget: ${IEURI_TOUR_DETAIL_PREFETCH_DAILY_CALL_BUDGET:90000}
+
   # 한국관광공사 관광통계 4종(SPEC-0015). 갱신 주기가 갈려 잡을 나눴다 — 묶으면 월 단위가 매일 헛돈다.
   #   tourStatsVisitorCountSyncJob · tourStatsConcentrationRateSyncJob        매일
   #   tourStatsStayIntensitySyncJob · tourStatsSpendingIntensitySyncJob       매월 17일 이후
