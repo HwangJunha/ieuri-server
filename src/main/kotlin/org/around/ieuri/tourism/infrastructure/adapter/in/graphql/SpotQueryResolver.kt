@@ -25,6 +25,7 @@ import org.around.ieuri.common.graphql.appKey
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.graphql.tokenPresentation
 import org.around.ieuri.common.security.CurrentMemberProvider
+import org.dataloader.DataLoader
 import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
 import org.around.ieuri.common.graphql.generated.types.LikedSpot as GqlLikedSpot
 import org.around.ieuri.common.graphql.generated.types.LikedSpotConnection as GqlLikedSpotConnection
@@ -93,7 +94,8 @@ class SpotQueryResolver(
     @DgsQuery
     fun availableSpotCategories(dfe: DgsDataFetchingEnvironment): List<GqlSpotCategory> {
         val configured = spotQueryUseCase.availableCategories(dfe.appKey(), dfe.domainLocale())
-        val loader = dfe.categoryDisplayLoader()
+        val loader: DataLoader<String, CategoryDisplay> =
+            dfe.getDataLoader(CategoryDisplayDataLoader::class.java)
         configured.forEach {
             loader.prime(it.category.code, CategoryDisplay(it.category, it.label, it.iconUrl))
         }

@@ -1,12 +1,10 @@
 package org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql
 
 import com.netflix.graphql.dgs.DgsDataLoader
-import graphql.schema.DataFetchingEnvironment
 import org.around.ieuri.tourism.application.port.`in`.query.SpotQueryUseCase
 import org.around.ieuri.tourism.application.query.CategoryDisplay
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.dataloader.BatchLoaderEnvironment
-import org.dataloader.DataLoader
 import org.dataloader.MappedBatchLoaderWithContext
 import org.springframework.stereotype.Component
 import java.util.concurrent.CompletableFuture
@@ -35,7 +33,7 @@ import java.util.concurrent.CompletionStage
  * 루트가 이미 읽어 둔 값이 있으면 `prime()`으로 심어 조회를 아예 건너뛴다
  * (`SpotQueryResolver.availableSpotCategories`).
  */
-@DgsDataLoader(name = CategoryDisplayDataLoader.NAME)
+@DgsDataLoader
 @Component
 class CategoryDisplayDataLoader(
     private val spotQueryUseCase: SpotQueryUseCase,
@@ -52,18 +50,4 @@ class CategoryDisplayDataLoader(
 
         return CompletableFuture.completedFuture(spotQueryUseCase.categoryDisplays(codes, locale))
     }
-
-    companion object {
-        const val NAME = "tourism.categoryDisplay"
-    }
 }
-
-/**
- * 등록된 카테고리 로더를 꺼낸다.
- *
- * **이름이 어긋난 로더를 조용히 넘기지 않는다.** `getDataLoader`는 미등록 시 null을 주는데,
- * 그것을 흘리면 필드가 빈 채로 떠서 "데이터가 없음"과 구별되지 않는다.
- */
-internal fun DataFetchingEnvironment.categoryDisplayLoader(): DataLoader<String, CategoryDisplay> =
-    getDataLoader<String, CategoryDisplay>(CategoryDisplayDataLoader.NAME)
-        ?: error("DataLoader '${CategoryDisplayDataLoader.NAME}'가 등록되지 않았다.")

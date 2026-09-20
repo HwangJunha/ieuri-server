@@ -5,6 +5,7 @@ import com.netflix.graphql.dgs.DgsData
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import org.around.ieuri.tourism.application.query.CategoryDisplay
 import org.around.ieuri.tourism.infrastructure.locale.domainLocale
+import org.dataloader.DataLoader
 import java.util.concurrent.CompletableFuture
 import org.around.ieuri.common.graphql.generated.types.SpotCategory as GqlSpotCategory
 
@@ -33,8 +34,11 @@ class CategoryDisplayResolver {
      * 부모가 돌려준 코드를 요청 언어와 함께 로더에 싣는다. 언어는 키가 아니라 keyContext다 —
      * 이유는 [CategoryDisplayDataLoader] 참조.
      */
-    private fun DgsDataFetchingEnvironment.display(): CompletableFuture<CategoryDisplay> =
-        categoryDisplayLoader().load(categorySource().code, domainLocale())
+    private fun DgsDataFetchingEnvironment.display(): CompletableFuture<CategoryDisplay> {
+        val loader: DataLoader<String, CategoryDisplay> =
+            getDataLoader(CategoryDisplayDataLoader::class.java)
+        return loader.load(categorySource().code, domainLocale())
+    }
 
     /**
      * 부모가 돌려준 값. `!!` 대신 명시적으로 실패시킨다 — 나머지 전 리졸버의 규약이고,
