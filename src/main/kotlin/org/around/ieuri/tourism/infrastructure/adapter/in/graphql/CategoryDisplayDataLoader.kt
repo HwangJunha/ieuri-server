@@ -63,9 +63,6 @@ class CategoryDisplayDataLoader(
  *
  * **이름이 어긋난 로더를 조용히 넘기지 않는다.** `getDataLoader`는 미등록 시 null을 주는데,
  * 그것을 흘리면 필드가 빈 채로 떠서 "데이터가 없음"과 구별되지 않는다.
- *
- * 공유 커널의 `loader()`를 쓰지 않는다 — 그것은 키가 `Long`으로 고정돼 있고, 에러 한 줄을
- * 재사용하려고 호출부 13곳의 시그니처를 넓히는 것은 비용이 뒤집힌 거래다.
  */
 internal fun DataFetchingEnvironment.categoryDisplayLoader(): DataLoader<String, CategoryDisplay> =
     getDataLoader<String, CategoryDisplay>(CategoryDisplayDataLoader.NAME)
