@@ -17,5 +17,20 @@ USER 10001
 EXPOSE 8080
 
 # 힙은 컨테이너 메모리 limit 기준으로 잡는다 — limit이 없으면 노드 전체(12GiB)를 기준으로 삼는다.
-# 2 OCPU 환경이라 병렬 GC의 스레드 경합보다 SerialGC가 유리하다.
-ENTRYPOINT ["java", "-XX:MaxRAMPercentage=70", "-XX:+UseSerialGC", "-jar", "/app/app.jar"]
+#
+# **SerialGC에서 G1GC로 바꾼다**(2026-09-21 부하 측정). 원래 판단은 "2 OCPU 환경이라 병렬 GC의
+# 스레드 경합보다 SerialGC가 유리하다"였고 그 자체로는 틀리지 않았다. 뒤집은 것은 측정이다:
+#
+#   개발 100 RPS, 힙 718Mi(1Gi × 70%)
+#     med 205ms / p90 23.7s / p95 30.1s / max 54.6s
+#     jcmd GC.heap_info: Tenured 170416K 중 165278K 사용(96%)
+#     부하가 끝나고 CPU가 3m로 유휴인데도 메모리가 내려오지 않고 OOMKilled
+#
+# 중앙값과 p90의 간극이 두 자릿수 배인 것은 **Full GC의 stop-the-world**다. SerialGC의 Full GC는
+# 단일 스레드라 힙이 찰수록 정지가 길어지고, 그 구간에 걸린 요청이 꼬리를 만든다. 스레드 경합을
+# 피하려다 정지 시간을 얻은 셈이다.
+#
+# **CPU limit 상향과 한 쌍이다**(ieuri-manifest). 컨테이너가 보는 CPU는 노드의 2 OCPU가 아니라
+# limit에서 온다 — 800m이면 `nproc`이 1이고, G1이 GC 스레드를 병렬로 쓰지 못한다. 매니페스트에서
+# limit을 1000m으로 올려 2로 인식시키는 변경이 함께 가야 이 플래그가 제값을 한다.
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=70", "-XX:+UseG1GC", "-jar", "/app/app.jar"]
