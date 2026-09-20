@@ -23,28 +23,18 @@ import org.around.ieuri.common.graphql.generated.types.SpotCategory as GqlSpotCa
 class CategoryDisplayResolver {
 
     @DgsData(parentType = "SpotCategory", field = "label")
-    fun label(dfe: DgsDataFetchingEnvironment): CompletableFuture<String> =
-        dfe.display().thenApply { it.label }
-
-    @DgsData(parentType = "SpotCategory", field = "iconUrl")
-    fun iconUrl(dfe: DgsDataFetchingEnvironment): CompletableFuture<String?> =
-        dfe.display().thenApply { it.iconUrl }
-
-    /**
-     * 부모가 돌려준 코드를 요청 언어와 함께 로더에 싣는다. 언어는 키가 아니라 keyContext다 —
-     * 이유는 [CategoryDisplayDataLoader] 참조.
-     */
-    private fun DgsDataFetchingEnvironment.display(): CompletableFuture<CategoryDisplay> {
+    fun label(dfe: DgsDataFetchingEnvironment): CompletableFuture<String> {
         val loader: DataLoader<String, CategoryDisplay> =
-            getDataLoader(CategoryDisplayDataLoader::class.java)
-        return loader.load(categorySource().code, domainLocale())
+            dfe.getDataLoader(CategoryDisplayDataLoader::class.java)
+        val category = requireNotNull(dfe.getSource<GqlSpotCategory>())
+        return loader.load(category.code, dfe.domainLocale()).thenApply { it.label }
     }
 
-    /**
-     * 부모가 돌려준 값. `!!` 대신 명시적으로 실패시킨다 — 나머지 전 리졸버의 규약이고,
-     * 실패했을 때 어느 리졸버의 문제인지가 메시지에 남는다.
-     */
-    private fun DgsDataFetchingEnvironment.categorySource(): GqlSpotCategory =
-        getSource<GqlSpotCategory>()
-            ?: error("SpotCategory 필드 리졸버는 부모가 반환한 SpotCategory를 소스로 받아야 한다.")
+    @DgsData(parentType = "SpotCategory", field = "iconUrl")
+    fun iconUrl(dfe: DgsDataFetchingEnvironment): CompletableFuture<String?> {
+        val loader: DataLoader<String, CategoryDisplay> =
+            dfe.getDataLoader(CategoryDisplayDataLoader::class.java)
+        val category = requireNotNull(dfe.getSource<GqlSpotCategory>())
+        return loader.load(category.code, dfe.domainLocale()).thenApply { it.iconUrl }
+    }
 }
