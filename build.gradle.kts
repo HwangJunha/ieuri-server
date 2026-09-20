@@ -76,6 +76,9 @@ dependencies {
     // 것**이다 — Future.get()은 ExecutionException으로 덮어 일일 한도와 장애의 구분을 호출자가
     // 놓치게 만들고, 그것을 벗기는 코드가 매번 따라붙는다. 호출 속도는 RateLimiter가 잡는다.
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core")
+    // TourAPI 호출의 커넥션 풀(SPEC-0037 후속). **전이 의존성에 기대지 않는다** — DGS가 떨구면
+    // 조용히 `SimpleClientHttpRequestFactory` 동작으로 돌아가고, 그 결함은 12분쯤 뒤에야 드러난다.
+    implementation("org.apache.httpcomponents.client5:httpclient5")
     // TourAPI 초당 호출 제한(SPEC-0037). **세마포어로는 표현할 수 없다** — 동시 실행 수를 묶어도
     // 응답이 빠르면 초당 호출이 얼마든 늘어난다(실측: 동시 20으로 1000건이 2초에 나갔다).
     // 한도는 (언어 × 오퍼레이션) 조합마다 초당 50이며, 여기서 제한하는 것은 초당 호출 수다.
