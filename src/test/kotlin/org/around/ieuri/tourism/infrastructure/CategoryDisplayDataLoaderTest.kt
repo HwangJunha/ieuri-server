@@ -9,6 +9,7 @@ import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.CategoryDisplayDataLoader
 import org.dataloader.BatchLoaderEnvironment
+import org.dataloader.DataLoaderFactory
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
@@ -73,6 +74,38 @@ class CategoryDisplayDataLoaderTest {
         assertEquals("숙박", result.getValue("LODGING").label)
         assertEquals(null, result.getValue("LODGING").iconUrl)
         assertEquals("LODGING", result.getValue("LODGING").category.code)
+    }
+
+    @Test
+    fun `미리 채운 코드는 조회하지 않는다`() {
+        // availableSpotCategories가 구성 조회로 이미 읽어 온 값을 prime으로 심는다. 등록된 필드
+        // 리졸버는 소스에 값이 있어도 언제나 실행되므로, 심지 않으면 칩 목록이 한 번 더 조회된다.
+        every { spotQueryUseCase.categoryDisplays(any(), any()) } returns emptyMap()
+        val dataLoader = DataLoaderFactory.newMappedDataLoader(loader)
+        val primed = display("RESTAURANT", "음식점", "https://cdn/restaurant.png")
+        dataLoader.prime("RESTAURANT", primed)
+
+        val value = dataLoader.load("RESTAURANT", DomainLocale.KO)
+        dataLoader.dispatch()
+
+        assertEquals(primed, value.join())
+        verify(exactly = 0) { spotQueryUseCase.categoryDisplays(any(), any()) }
+    }
+
+    @Test
+    fun `채우지 않은 코드는 같은 배치에서 함께 조회된다`() {
+        // prime이 나머지 키의 배치를 깨지 않는지 — 심은 것만 빠지고 한 번에 나가야 한다.
+        every { spotQueryUseCase.categoryDisplays(any(), any()) } returns
+            mapOf("LODGING" to display("LODGING", "숙박", null))
+        val dataLoader = DataLoaderFactory.newMappedDataLoader(loader)
+        dataLoader.prime("RESTAURANT", display("RESTAURANT", "음식점", null))
+
+        dataLoader.load("RESTAURANT", DomainLocale.KO)
+        val lodging = dataLoader.load("LODGING", DomainLocale.KO)
+        dataLoader.dispatch()
+
+        assertEquals("숙박", lodging.join().label)
+        verify(exactly = 1) { spotQueryUseCase.categoryDisplays(setOf("LODGING"), DomainLocale.KO) }
     }
 
     @Test

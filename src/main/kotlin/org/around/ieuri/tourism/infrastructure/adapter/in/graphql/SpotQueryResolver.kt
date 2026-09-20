@@ -9,6 +9,7 @@ import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.tourism.application.port.`in`.query.SpotQueryUseCase
 import org.around.ieuri.tourism.application.exception.SpotDetailNotFoundException
+import org.around.ieuri.tourism.application.query.CategoryDisplay
 import org.around.ieuri.tourism.application.query.LikedSpotView
 import org.around.ieuri.tourism.application.query.LikedSpotsQuery
 import org.around.ieuri.tourism.application.query.SpotDetailView
@@ -81,12 +82,25 @@ class SpotQueryResolver(
 
     /**
      * **순서를 정하지 않는다**(V59) — 서버는 무엇을 보일지만 정하고 배열 순서는 클라이언트가 정한다.
+     *
+     * **구성 조회가 담아 온 라벨·아이콘을 로더에 미리 채운다.** 등록된 필드 리졸버는 소스 객체에
+     * 값이 이미 있어도 언제나 실행되므로(graphql-java는 명시적 페처가 있으면 프로퍼티로
+     * 폴백하지 않는다), 채우지 않으면 여기서 읽은 값을 버리고 칩 목록을 한 번 더 조회한다.
+     *
+     * `app_category`로 걸러 읽은 **이 앱의** 값이 권위를 갖게 하는 것도 겸한다 —
+     * 로더의 조회는 앱 범위가 아니다.
      */
     @DgsQuery
-    fun availableSpotCategories(dfe: DgsDataFetchingEnvironment): List<GqlSpotCategory> =
-        spotQueryUseCase.availableCategories(dfe.appKey(), dfe.domainLocale()).map {
+    fun availableSpotCategories(dfe: DgsDataFetchingEnvironment): List<GqlSpotCategory> {
+        val configured = spotQueryUseCase.availableCategories(dfe.appKey(), dfe.domainLocale())
+        val loader = dfe.categoryDisplayLoader()
+        configured.forEach {
+            loader.prime(it.category.code, CategoryDisplay(it.category, it.label, it.iconUrl))
+        }
+        return configured.map {
             GqlSpotCategory(code = it.category.code, label = it.label, iconUrl = it.iconUrl)
         }
+    }
 
     /**
      * 상세 본문(detailCommon2 1콜). gallery·intro·infoItems·likeCount는 **요청된 경우에만** 아래 @DgsData

@@ -5,7 +5,6 @@ import com.netflix.graphql.dgs.DgsData
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import org.around.ieuri.tourism.application.query.CategoryDisplay
 import org.around.ieuri.tourism.infrastructure.locale.domainLocale
-import org.dataloader.DataLoader
 import java.util.concurrent.CompletableFuture
 import org.around.ieuri.common.graphql.generated.types.SpotCategory as GqlSpotCategory
 
@@ -35,15 +34,7 @@ class CategoryDisplayResolver {
      * 이유는 [CategoryDisplayDataLoader] 참조.
      */
     private fun DgsDataFetchingEnvironment.display(): CompletableFuture<CategoryDisplay> =
-        categoryLoader().load(categorySource().code, domainLocale())
-
-    /**
-     * **이름이 어긋난 로더를 조용히 넘기지 않는다.** `getDataLoader`는 미등록 시 null을 주는데,
-     * 그것을 흘리면 필드가 빈 채로 떠서 "데이터가 없음"과 구별되지 않는다.
-     */
-    private fun DgsDataFetchingEnvironment.categoryLoader(): DataLoader<String, CategoryDisplay> =
-        getDataLoader<String, CategoryDisplay>(CategoryDisplayDataLoader.NAME)
-            ?: error("DataLoader '${CategoryDisplayDataLoader.NAME}'가 등록되지 않았다.")
+        categoryDisplayLoader().load(categorySource().code, domainLocale())
 
     /**
      * 부모가 돌려준 값. `!!` 대신 명시적으로 실패시킨다 — 나머지 전 리졸버의 규약이고,
