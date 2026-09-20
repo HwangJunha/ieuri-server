@@ -47,7 +47,8 @@ spring:
       # 그것이 의도한 값인지 설정 누락인지 코드만 봐서는 구별되지 않았다 — 부하 중 Grafana의
       # `active 10 / pending 65`가 상한에 붙은 것을 보고서야 드러났다.
       #
-      # 파드당 20. CNPG `max_connections`가 100이고(dev 실측 2026-09-21):
+      # 파드당 20. CNPG `max_connections`는 100이다 — dev·prod가 같은 클러스터에 네임스페이스로만
+      # 갈리고 CNPG 설정이 같아 실측(dev, 2026-09-21)이 그대로 운영 값이다:
       #   앱 메인 2파드 × 20        40
       #   search  2파드 × 10        20   (search-datasource는 값이 없어 기본 10)
       #   배치 CronJob 1파드 × 8     8   (application-batch.yaml이 따로 낮춘 값)
