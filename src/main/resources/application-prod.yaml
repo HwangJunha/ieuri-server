@@ -6,6 +6,12 @@
 # 때문이다. 운영에서 절대 켜지면 안 되는 것만 여기서 못 박는다.
 
 spring:
+  datasource:
+    hikari:
+      # 파드당 20(PERF-20260921). **application.yaml 기본값과 같지만 명시한다** — 커넥션
+      # 상한은 DB의 `max_connections`와 파드 수를 함께 봐야 정해지는 값이라, 공통 기본값이
+      # 개발 편의로 올라갔을 때 운영이 조용히 따라가면 DB가 커넥션을 거절한다.
+      maximum-pool-size: 20
   jpa:
     # 질의 로그를 남기지 않는다. 파라미터에 개인정보가 실릴 수 있고 양도 많다.
     show-sql: false
