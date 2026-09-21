@@ -19,6 +19,7 @@ import org.around.ieuri.community.application.query.SpotQuestionView
 import org.around.ieuri.community.application.query.SpotQuestionsQuery
 import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 
 /**
  * 장소 질문/답변 조회(SPEC-0026 R1, R2, R11, R12, R16).
@@ -30,6 +31,7 @@ import org.springframework.stereotype.Service
  * 넣으면 쓰이지 않는 쿼리가 조회마다 한 번씩 더 붙는다.
  */
 @Service
+@Transactional(readOnly = true)
 class SpotQaQueryService(
     private val spotQaQueryPort: SpotQaQueryPort,
     private val communityQueryPort: CommunityQueryPort,

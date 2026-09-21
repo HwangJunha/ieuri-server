@@ -1,9 +1,11 @@
 package org.around.ieuri.auth.infrastructure.adapter.`in`.event
 
 import org.around.ieuri.auth.application.port.out.persistence.LocationAccessLogPort
+import org.around.ieuri.auth.infrastructure.config.AuthAsyncConfig
 import org.around.ieuri.common.event.LocationAccessed
 import org.slf4j.LoggerFactory
 import org.springframework.context.event.EventListener
+import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Component
 
 /**
@@ -25,6 +27,7 @@ class LocationAccessAuditListener(
     private val locationAccessLogPort: LocationAccessLogPort,
 ) {
 
+    @Async(AuthAsyncConfig.ACCESS_LOG_EXECUTOR)
     @EventListener
     fun on(event: LocationAccessed) {
         try {

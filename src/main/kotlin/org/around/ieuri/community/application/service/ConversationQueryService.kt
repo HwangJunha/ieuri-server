@@ -12,6 +12,7 @@ import org.around.ieuri.community.application.query.ConversationView
 import org.around.ieuri.community.application.query.MessageView
 import org.around.ieuri.community.application.query.TypingEventView
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import reactor.core.publisher.Flux
 
 /**
@@ -27,6 +28,7 @@ import reactor.core.publisher.Flux
  * "볼 수 없는 대화"를 나눠 처리해야 해서 구분한다(AC9-5).
  */
 @Service
+@Transactional(readOnly = true)
 class ConversationQueryService(
     private val conversationQueryPort: ConversationQueryPort,
     private val conversationEventPort: ConversationEventPort,
