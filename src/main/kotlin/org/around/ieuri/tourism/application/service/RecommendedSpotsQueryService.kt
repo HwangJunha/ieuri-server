@@ -20,6 +20,7 @@ import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.ReactionType
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 
 /**
  * 내 주변 추천(SPEC-0035). 반경 안 가까운 순 N건에서 이 회원이 반응한 장소를 빼고, 점수(거리·취향·면세)를
@@ -29,6 +30,7 @@ import org.springframework.stereotype.Service
  * 없으면 그 후보는 거리만으로 점수를 받는다. 유사도 조회 실패는 오류가 아니라 취향 없음이다.
  */
 @Service
+@Transactional(readOnly = true)
 class RecommendedSpotsQueryService(
     private val spotQueryPort: SpotQueryPort,
     // 반경 조회만 PostGIS 생 SQL이라 포트가 갈린다 — 어느 읽기가 그쪽인지 여기서 보인다.

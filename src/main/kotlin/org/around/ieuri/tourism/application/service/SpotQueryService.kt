@@ -51,6 +51,7 @@ import org.around.ieuri.tourism.domain.vo.SpotIntro
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 
 /**
@@ -62,6 +63,7 @@ import java.time.Instant
  * 페이지네이션은 오프셋(page/size)이다.
  */
 @Service
+@Transactional(readOnly = true)
 class SpotQueryService(
     private val tourInfoPort: TourInfoPort,
     private val spotQueryPort: SpotQueryPort,

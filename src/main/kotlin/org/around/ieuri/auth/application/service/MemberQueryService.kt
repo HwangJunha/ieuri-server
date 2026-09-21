@@ -10,12 +10,14 @@ import org.around.ieuri.auth.application.query.MembersQuery
 import org.around.ieuri.auth.application.query.MeView
 import org.around.ieuri.common.pagination.CursorPage
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 
 /**
  * 회원 조회(본인/단건 상세/목록). 애그리거트를 우회해 읽기 포트가 프로젝션한 read DTO를 그대로 반환한다.
  * 인가는 인바운드 리졸버에서 판정하고, 여기선 조회에 집중한다. 목록은 이메일 미포함(최소수집).
  */
 @Service
+@Transactional(readOnly = true)
 class MemberQueryService(
     private val memberQueryPort: MemberQueryPort,
 ) : MemberQueryUseCase {
