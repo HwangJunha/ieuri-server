@@ -244,6 +244,20 @@ server:
   shutdown: graceful
 
 ieuri:
+  # 읽기 복제본(PERF-20260921). **같은 CNPG 클러스터의 `-ro` 서비스**이고, 검색 노드와 달리
+  # 별도 인스턴스가 아니다 — 계정도 같아 `spring.datasource.username/password`를 그대로 쓴다.
+  #
+  # CNPG가 만들어 둔 `-ro`는 replica 2대로 분산된다(실측 2026-09-22: 엔드포인트 2개).
+  # primary는 CPU가 포화인데 replica는 7~10m로 놀고 있었다.
+  #
+  # **비어 있으면 라우팅을 만들지 않는다** — 전부 primary로 간다. 로컬에는 복제본이 없고,
+  # 배치는 쓰기 작업이라 나눌 이유가 없어 둘 다 기본값(빈 문자열)을 쓴다.
+  #
+  # **`@Transactional(readOnly = true)`가 유일한 판정 근거다.** 애노테이션이 없는 조회는
+  # primary로 간다(느리지만 정확). 쓰기 트랜잭션에 참여한 조회도 primary로 간다 — 전파가
+  # 바깥 속성을 따르므로, 쓰기 직후 읽기가 복제 지연을 만나는 일이 없다.
+  read-replica:
+    url: ${IEURI_DB_RO_URL:}
   # 검색 전용 노드(SPEC-0013). 메인과 **다른 DB 인스턴스**이고 **읽기 전용이다** — spot이
   # 논리 복제로 들어오므로 앱이 쓰면 복제와 충돌한다. DDL만 Flyway가 만든다.
   #

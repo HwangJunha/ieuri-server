@@ -4,8 +4,11 @@ import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.migration.JavaMigration
 import org.springframework.beans.factory.BeanFactoryUtils
 import org.springframework.beans.factory.ObjectProvider
+import org.springframework.beans.factory.ListableBeanFactory
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor
 import org.springframework.orm.jpa.AbstractEntityManagerFactoryBean
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.jdbc.autoconfigure.DataSourceProperties
@@ -13,6 +16,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Primary
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.jdbc.datasource.LazyConnectionDataSourceProxy
 import javax.sql.DataSource
 
 /**
@@ -23,13 +27,16 @@ import javax.sql.DataSource
  * 만들면 통째로 물러난다. SPEC-0013이 검색 노드용 DataSource를 추가하면서 그 일이 실제로
  * 벌어졌고, JPA가 검색 노드를 붙잡아 `Unable to determine Dialect`로 기동이 깨졌다.
  *
- * **`@Primary`가 반드시 필요하다.** JPA·배치 자동구성은 `DataSource`를 **타입으로** 받는데
- * 후보가 둘(메인·검색 노드)이라 기본값이 없으면 고르지 못한다. 실제로 떼어 보면
- * `entityManagerFactory`가 아예 만들어지지 않아 기동이 깨진다(실측):
+ * **[dataSource]에 `@Primary`가 반드시 필요하다.** JPA·배치 자동구성은 `DataSource`를
+ * **타입으로** 받는데 후보가 여럿(primary·replica·검색 노드)이라 기본값이 없으면 고르지
+ * 못한다. 실제로 떼어 보면 `entityManagerFactory`가 아예 만들어지지 않아 기동이 깨진다(실측):
  *   `Parameter 0 of constructor in MemberPersistenceAdapter required a bean named
  *    'entityManagerFactory' that could not be found`
- * 우리 코드는 이름으로 지목할 수 있지만 프레임워크 코드는 그럴 수 없다 — 그래서 여기만
+ * 우리 코드는 이름으로 지목할 수 있지만 프레임워크 코드는 그럴 수 없다 — 그래서 거기만
  * `@Primary`를 남긴다([jdbcTemplate]은 전부 우리 코드가 받으므로 붙이지 않는다).
+ *
+ * **읽기 복제본 라우팅이 [dataSource]에 있다**(PERF-20260921). `ieuri.read-replica.url`이
+ * 있으면 읽기 전용 트랜잭션이 replica로 가고, 없으면 primary 하나만 쓴다.
  *
  * 검색 노드로 가야 하는 것은 검색 어댑터 3종뿐이며, 그것들은 `searchJdbcTemplate`을
  * 이름으로 지목한다(tourism의 `SearchDataSourceConfig`).
@@ -38,14 +45,56 @@ import javax.sql.DataSource
  * tourism 설정에 두면 tourism이 다른 도메인의 영속성을 쥐는 모양이 된다.
  */
 @Configuration
-@EnableConfigurationProperties(FlywayProperties::class)
+@EnableConfigurationProperties(FlywayProperties::class, ReadReplicaProperties::class)
 class DataSourceConfig {
 
+    /**
+     * 쓰기(primary)용 풀. 이 빈만 `spring.datasource.hikari.*`를 직접 받는다.
+     *
+     * **`@Primary`가 아니다** — 주입 대상은 [dataSource]가 돌려주는 라우팅 쪽이어야 한다.
+     */
+    @Bean
+    @ConfigurationProperties(prefix = "spring.datasource.hikari")
+    fun primaryDataSource(properties: DataSourceProperties): DataSource =
+        properties.initializeDataSourceBuilder().build()
+
+    /**
+     * 조회(replica)용 풀(PERF-20260921). `ieuri.read-replica.url`이 비면 만들지 않는다 —
+     * 그러면 [dataSource]가 라우팅 없이 primary 하나를 그대로 쓴다(로컬·배치의 기본값).
+     *
+     * **접속 정보만 replica로 바꾸고 나머지 Hikari 설정은 primary와 같아야 한다.**
+     * 특히 `connection-init-sql`의 `search_path`를 물려받지 못하면 생 SQL 어댑터가 테이블을
+     * 찾지 못한다(SPEC-0023). 그래서 같은 `@ConfigurationProperties`를 다시 적용한다.
+     */
+    @Bean
+    @ConfigurationProperties(prefix = "spring.datasource.hikari")
+    @ConditionalOnProperty(prefix = "ieuri.read-replica", name = ["url"], matchIfMissing = false)
+    fun replicaDataSource(
+        properties: DataSourceProperties,
+        replica: ReadReplicaProperties,
+    ): DataSource =
+        properties.initializeDataSourceBuilder()
+            .url(replica.url)
+            .build()
+
+    /**
+     * JPA·배치가 타입으로 주입받는 기본 DataSource.
+     *
+     * replica 풀이 있으면 [ReadWriteRoutingDataSource]를 **[LazyConnectionDataSourceProxy]로
+     * 감싸** 돌려준다. 감싸지 않으면 트랜잭션 시작 시점에 커넥션을 먼저 잡아 라우팅 판단
+     * 전에 primary가 정해진다 — 오류 없이 조용히 전부 primary로 간다.
+     */
     @Bean
     @Primary
-    @ConfigurationProperties(prefix = "spring.datasource.hikari")
-    fun dataSource(properties: DataSourceProperties): DataSource =
-        properties.initializeDataSourceBuilder().build()
+    fun dataSource(
+        @Qualifier("primaryDataSource") primary: DataSource,
+        beanFactory: ListableBeanFactory,
+    ): DataSource {
+        // 이름으로 찾는다 — 타입으로 받으면 primary 자신과 검색 노드까지 후보가 된다.
+        if (!beanFactory.containsBean("replicaDataSource")) return primary
+        val replica = beanFactory.getBean("replicaDataSource", DataSource::class.java)
+        return LazyConnectionDataSourceProxy(ReadWriteRoutingDataSource(primary, replica))
+    }
 
     /**
      * 메인 JdbcTemplate. **[dataSource]·[flyway]와 똑같은 이유로 여기서 명시한다.**
@@ -172,4 +221,15 @@ data class FlywayProperties(
     val baselineOnMigrate: Boolean = true,
     val baselineVersion: String = "0",
     val ignoreMigrationPatterns: List<String> = listOf("repeatable:missing"),
+)
+
+/**
+ * 읽기 복제본 접속(PERF-20260921).
+ *
+ * @param url 비어 있으면 라우팅을 만들지 않는다 — 전부 primary로 간다(로컬·배치의 기본값).
+ *            계정은 primary와 같으므로 `spring.datasource.username/password`를 그대로 쓴다.
+ */
+@ConfigurationProperties(prefix = "ieuri.read-replica")
+data class ReadReplicaProperties(
+    val url: String = "",
 )
