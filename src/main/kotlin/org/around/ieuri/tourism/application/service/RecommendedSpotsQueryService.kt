@@ -6,9 +6,8 @@ import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
 import org.around.ieuri.tourism.application.port.`in`.query.RecommendedSpotsUseCase
 import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
 import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch
-import org.around.ieuri.tourism.application.port.out.query.SpotCandidate
-import org.around.ieuri.tourism.application.port.out.query.SpotCard
 import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
+import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
 import org.around.ieuri.tourism.application.port.out.query.SpotSpatialQueryPort
 import org.around.ieuri.tourism.application.port.out.query.TasteSimilarityQueryPort
 import org.around.ieuri.tourism.application.query.RecommendedSpotsQuery
@@ -56,10 +55,7 @@ class RecommendedSpotsQueryService(
         val reactions = spotQueryPort.findReactedSpotIdsByReaction(memberId, locale)
         val liked = reactions[ReactionType.LIKE].orEmpty()
         val disliked = reactions[ReactionType.DISLIKE].orEmpty()
-        // **후보는 썸네일·저작권 없이 받는다**(SPEC-0038). 그 둘만 카탈로그에 있어, 후보
-        // 전부에 조인하면 아래 재배열에서 버려질 행까지 읽는다 — cap 500·first 100이면
-        // 400건분이 낭비다. 살아남은 것만 아래에서 채운다.
-        val candidates = spotSpatialQueryPort.searchNearbyCandidates(
+        val candidates = spotSpatialQueryPort.searchNearby(
             NearbySpotSearch(
                 language = locale,
                 center = center,
@@ -75,20 +71,14 @@ class RecommendedSpotsQueryService(
         val ranked = candidates.map {
             RankedSpot(it.spotId, it.category, policy.score.score(it.distanceMeters, it.title, taste[it.spotId]))
         }
-        val survivors = policy.diversity.order(ranked).take(first)
-        // 카드 필드는 여기서 채운다. **없는 id는 건너뛴다** — 조회 사이에 삭제된 장소를
-        // 빈 카드로 내보내면 클라이언트가 non-null 필드에서 깨진다.
-        val cards = spotSpatialQueryPort.findCards(survivors)
-        return survivors.mapNotNull { id ->
-            cards[id]?.let { byId.getValue(id).toView(it) }
-        }
+        return policy.diversity.order(ranked).take(first).map { byId.getValue(it).toView() }
     }
 
     /** 후보별 취향 요인. 반응이 최소량 미만이면 비어 있다. 좋아요 평균이 없으면(벡터 없음) 그 후보도 없음. */
     private fun tasteOf(
         liked: Set<Long>,
         disliked: Set<Long>,
-        candidates: List<SpotCandidate>,
+        candidates: List<SpotSearchResult>,
         locale: DomainLocale,
     ): Map<Long, Double> {
         if (candidates.isEmpty() || liked.size + disliked.size < policy.tasteMinReactions) return emptyMap()
@@ -113,15 +103,15 @@ class RecommendedSpotsQueryService(
     }
 
     /** attributionText는 copyright에서 파생된다 — 적재하지 않는 이유이기도 하다(둘이 어긋날 수 있다). */
-    private fun SpotCandidate.toView(card: SpotCard): SpotView = SpotView(
+    private fun SpotSearchResult.toView(): SpotView = SpotView(
         id = spotId,
         title = title,
         address = address,
-        thumbnailImageUrl = card.thumbnailImageUrl,
+        thumbnailImageUrl = thumbnailImageUrl,
         distanceMeters = distanceMeters,
         category = category,
-        copyright = card.copyright,
-        attributionText = card.copyright.attributionText,
+        copyright = copyright,
+        attributionText = copyright.attributionText,
         mapX = mapX,
         mapY = mapY,
     )
