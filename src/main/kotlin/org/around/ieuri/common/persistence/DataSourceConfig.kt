@@ -4,7 +4,6 @@ import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.migration.JavaMigration
 import org.springframework.beans.factory.BeanFactoryUtils
 import org.springframework.beans.factory.ObjectProvider
-import org.springframework.beans.factory.ListableBeanFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor
 import org.springframework.orm.jpa.AbstractEntityManagerFactoryBean
@@ -93,17 +92,12 @@ class DataSourceConfig {
     @Primary
     fun dataSource(
         @Qualifier("primaryDataSource") primary: DataSource,
-        beanFactory: ListableBeanFactory,
+        @Qualifier("replicaDataSource") replica: DataSource?,
     ): DataSource {
-        // 이름으로 찾는다 — 타입으로 받으면 primary 자신과 검색 노드까지 후보가 된다.
-        //
-        // **`replicaDataSource`는 URL이 비면 null을 돌려준다.** 그때 Spring은 그 이름을
-        // `NullBean`으로 등록하므로 `containsBean`은 참이고 `getBean`은 실패한다 —
-        // 있는지 없는지는 타입으로 조회되는지로 가른다.
-        val replica = beanFactory.getBeanNamesForType(DataSource::class.java)
-            .firstOrNull { it == REPLICA_BEAN }
-            ?.let { beanFactory.getBean(it, DataSource::class.java) }
-            ?: return primary
+        // **복제본은 없을 수 있다** — `ieuri.read-replica.url`이 비면 [replicaDataSource]가
+        // null을 돌려주고(로컬·배치의 기본값), 그 자리에는 null이 주입된다. 그러면 라우팅
+        // 없이 primary 하나만 쓴다.
+        replica ?: return primary
         return LazyConnectionDataSourceProxy(ReadWriteRoutingDataSource(primary, replica))
     }
 
@@ -203,9 +197,6 @@ class DataSourceConfig {
      * 그때 새 테이블이 없다며 기동이 깨진다(V43 같은 신규 마이그레이션에서 드러난다).
      */
     companion object {
-        /** 읽기 복제본 풀의 빈 이름. [dataSource]가 이름으로 지목한다. */
-        private const val REPLICA_BEAN = "replicaDataSource"
-
         /**
          * **`@JvmStatic`이어야 한다.** BeanFactoryPostProcessor는 컨테이너 생명주기의 아주
          * 이른 시점에 만들어지는데, 인스턴스 메서드로 두면 그것을 담은 @Configuration이

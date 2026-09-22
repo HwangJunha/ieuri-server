@@ -11,8 +11,8 @@ import javax.sql.DataSource
  * 읽기 복제본 풀을 **언제 만드는가**. 프레임워크 배선이 아니라 이 설정 클래스의 판단을 고정한다.
  *
  * `ieuri.read-replica.url`의 기본값이 `${IEURI_DB_RO_URL:}`이라 변수가 없어도 속성은 빈
- * 문자열로 **존재한다**. `@ConditionalOnProperty(matchIfMissing = false)`는 "속성이 있는가"만
- * 보므로 그 조건으로는 빈 값을 거를 수 없었고, 빈 URL로 풀을 만들어 기동이 깨졌다.
+ * 문자열로 **존재한다**. 그래서 "속성이 있는가"로는 로컬(복제본 없음)과 배포(있음)를 가를 수
+ * 없고, 빈 URL로 풀을 만들면 `jdbcUrl is required`로 기동이 깨진다.
  */
 class ReplicaDataSourceWiringTest {
 
@@ -50,27 +50,17 @@ class ReplicaDataSourceWiringTest {
     @DisplayName("복제본이 없으면 라우팅 없이 primary를 그대로 쓴다")
     fun `no replica means primary is used directly`() {
         val primary = StubDataSource()
-        val resolved = config.dataSource(primary, StubBeanFactory(replica = null))
 
-        assertThat(resolved).isSameAs(primary)
+        assertThat(config.dataSource(primary, replica = null)).isSameAs(primary)
     }
 
     @Test
     @DisplayName("복제본이 있으면 LazyConnectionDataSourceProxy로 감싼 라우팅을 쓴다")
     fun `replica present means lazy routing proxy`() {
-        val resolved = config.dataSource(StubDataSource(), StubBeanFactory(replica = StubDataSource()))
+        val resolved = config.dataSource(StubDataSource(), replica = StubDataSource())
 
         // 감싸지 않으면 트랜잭션 시작 시점에 커넥션을 먼저 잡아 라우팅 판단 전에 primary가 정해진다.
         assertThat(resolved).isInstanceOf(LazyConnectionDataSourceProxy::class.java)
-    }
-}
-
-/** 이름이 실제 등록 상태를 말하게 하는 최소 스텁. 타입 조회에 잡히는 이름만 돌려준다. */
-private class StubBeanFactory(private val replica: DataSource?) :
-    org.springframework.beans.factory.support.DefaultListableBeanFactory() {
-
-    init {
-        replica?.let { registerSingleton("replicaDataSource", it) }
     }
 }
 
