@@ -1,6 +1,8 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.query
 
 import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch
+import org.around.ieuri.tourism.application.port.out.query.SpotCandidate
+import org.around.ieuri.tourism.application.port.out.query.SpotCard
 import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
 import org.around.ieuri.tourism.application.port.out.query.SpotSpatialQueryPort
 import org.around.ieuri.tourism.domain.vo.CopyrightType
@@ -78,6 +80,65 @@ class SpotSpatialQueryAdapter(
             },
             *(params + query.limit + query.offset).toTypedArray(),
         )
+    }
+
+    /**
+     * 랭킹용 후보. **카탈로그를 조인하지 않는다** — 썸네일·저작권만 그쪽에 있는데,
+     * 후보 전부에 조인하면 재배열 후 버려질 행까지 읽는다(SPEC-0038).
+     *
+     * cap 500·first 100 기준으로 조인 400회가 빠진다(건당 약 3버퍼 = 1,200버퍼).
+     */
+    @Transactional(readOnly = true)
+    override fun searchNearbyCandidates(query: NearbySpotSearch): List<SpotCandidate> {
+        val (where, params) = whereClause(query)
+        val sql = """
+            WITH c AS (SELECT $CENTER AS center)
+            SELECT $RANKED_COLUMNS,
+                   ST_Distance(t.location, c.center) AS distance_meters
+            FROM spot_catalog_translation t, c
+            WHERE $where
+            ORDER BY ST_Distance(t.location, c.center), t.catalog_id
+            LIMIT ? OFFSET ?
+        """.trimIndent()
+
+        return jdbcTemplate.query(
+            sql,
+            { rs, _ ->
+                SpotCandidate(
+                    spotId = rs.getLong("catalog_id"),
+                    title = rs.getString("title"),
+                    address = rs.getString("address"),
+                    mapX = rs.getDouble("map_x"),
+                    mapY = rs.getDouble("map_y"),
+                    category = SpotCategory(rs.getString("category")),
+                    distanceMeters = rs.getDouble("distance_meters"),
+                )
+            },
+            *(params + query.limit + query.offset).toTypedArray(),
+        )
+    }
+
+    /**
+     * 살아남은 후보의 카드 필드. PK 조회라 id 개수만큼만 읽는다.
+     *
+     * **id 목록은 배열 한 개로 바인딩한다** — 플레이스홀더를 개수만큼 펼치면 SQL 본문이
+     * 입력 크기에 비례해 자라고, 개수가 다를 때마다 다른 구문이 되어 계획 캐시가
+     * 재사용되지 않는다.
+     */
+    @Transactional(readOnly = true)
+    override fun findCards(spotIds: Collection<Long>): Map<Long, SpotCard> {
+        if (spotIds.isEmpty()) return emptyMap()
+        return jdbcTemplate.query(
+            "SELECT id, thumbnail_image_url, copyright FROM spot_catalog WHERE id = ANY (?)",
+            { rs, _ ->
+                rs.getLong("id") to SpotCard(
+                    thumbnailImageUrl = rs.getString("thumbnail_image_url"),
+                    // 컬럼에 enum 이름이 그대로 들어 있으므로 코드 변환이 아니라 valueOf다.
+                    copyright = CopyrightType.valueOf(rs.getString("copyright")),
+                )
+            },
+            spotIds.toLongArray(),
+        ).toMap()
     }
 
     /** [searchNearby]와 같은 조건에 걸리는 전체 건수. */
