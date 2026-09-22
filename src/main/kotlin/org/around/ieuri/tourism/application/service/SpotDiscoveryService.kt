@@ -31,6 +31,7 @@ import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.LikeCountCursor
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.time.LocalDate
 import java.time.ZoneId
@@ -50,6 +51,7 @@ import java.time.ZoneId
  *    페이지 간 항목이 중복·누락된다(R7).
  */
 @Service
+@Transactional(readOnly = true)
 class SpotDiscoveryService(
     private val spotSearchPort: SpotSearchPort,
     private val festivalQueryPort: FestivalQueryPort,

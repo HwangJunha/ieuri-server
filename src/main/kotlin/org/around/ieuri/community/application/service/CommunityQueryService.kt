@@ -29,6 +29,7 @@ import org.around.ieuri.community.domain.vo.PostSortOrder
 import org.around.ieuri.community.domain.vo.PostTag
 import org.around.ieuri.community.domain.vo.TargetCategory
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 
 /**
  * 커뮤니티 조회. **애그리게이트를 우회한다** — 읽기 전용이므로 QueryDSL 프로젝션이 read DTO를
@@ -41,6 +42,7 @@ import org.springframework.stereotype.Service
  * 필터를 각 쿼리에 흩어 두지 않고 여기 모아 네 경로가 같은 구현을 공유하게 한다.
  */
 @Service
+@Transactional(readOnly = true)
 class CommunityQueryService(
     private val communityQueryPort: CommunityQueryPort,
     private val postSpatialQueryPort: PostSpatialQueryPort,

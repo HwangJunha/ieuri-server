@@ -19,6 +19,7 @@ import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.ReactionType
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 
 /**
  * 지도 영역 추천(SPEC-0036). 보고 있는 영역 안 후보에서 이미 표시한 장소만 빼고,
@@ -41,6 +42,7 @@ import org.springframework.stereotype.Service
  * 「봤다」의 판정이 마커로 실제 그려졌는지이고, 격자로 솎아 그리는 쪽만 그것을 안다.
  */
 @Service
+@Transactional(readOnly = true)
 class MapRecommendationService(
     private val mapQueryPort: MapQueryPort,
     private val spotQueryPort: SpotQueryPort,

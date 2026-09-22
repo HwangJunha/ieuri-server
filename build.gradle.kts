@@ -56,7 +56,14 @@ dependencies {
     // 표본 비율을 먼저 조정한다.
     //
     // 2.x 가 Spring Boot 4 계열이다(POM 이 spring-boot-autoconfigure 4.0.5 를 참조).
-    implementation("net.ttddyy.observation:datasource-micrometer-spring-boot:2.2.1")
+    //
+    // **2.3.0 미만은 읽기 복제본 라우팅을 조용히 무력화한다**(PERF-20260921, 업스트림 #114).
+    // 계측이 span 에 url/host/port 를 채우려고 커넥션을 받자마자 `getMetaData()` 를 부르는데,
+    // 그 시점은 Spring 이 `Connection#setReadOnly(true)` 를 걸기 **전**이다. 그래서
+    // `LazyConnectionDataSourceProxy` 가 지연해 두려던 실제 커넥션이 거기서 확정되고,
+    // readOnly 가 아직 false 라 **전부 primary 로 간다** — 오류도 로그도 없다.
+    // 2.3.0 이 `JdbcConnectionInfo` 를 DataSource 단위로 캐시해(업스트림 #119) 이 조기 호출을 없앴다.
+    implementation("net.ttddyy.observation:datasource-micrometer-spring-boot:2.3.0")
     // refresh 토큰 저장소를 Valkey(Redis 프로토콜 호환)로 이관. Lettuce 클라이언트 기본.
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.boot:spring-boot-starter-security")

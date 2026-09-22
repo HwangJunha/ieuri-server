@@ -18,8 +18,13 @@ import org.springframework.transaction.annotation.Transactional
  *
  * **`spot`을 읽지 않는다**(SPEC-0019). 카탈로그와 번역만 본다 — `spot.language`로 거르면 그
  * 언어의 spot 행이 없는 장소가 목록에서 통째로 빠지는데, 이 스펙이 번역으로 채우는 대상이
- * 정확히 그 장소들이다. 제목·주소는 번역에서, 좌표·썸네일·분류·저작권은 카탈로그가 확정해 둔
- * 표준값에서 온다.
+ * 정확히 그 장소들이다.
+ *
+ * **거리 정렬은 번역 행 단독으로 한다**(SPEC-0038). 번역이 좌표·분류 사본을 갖고 있어
+ * 카탈로그를 조인하지 않고도 걸러 낼 수 있다. 조인을 `LIMIT` 앞에 두면 정렬 대상을 확정하려고
+ * 반경 안 전 행(가산 20km에서 8,925행)을 조인해야 한다 — `LIMIT`은 정렬 뒤에 적용되므로
+ * 후보 상한을 낮춰도 이 횟수는 줄지 않는다. 썸네일·저작권만 카탈로그에 사본이 없어,
+ * 살아남은 `LIMIT`건에만 PK로 조인한다.
  */
 @Component
 class SpotSpatialQueryAdapter(
@@ -35,14 +40,22 @@ class SpotSpatialQueryAdapter(
         val (where, params) = whereClause(query)
         // 중심 좌표를 CTE로 한 번만 바인딩한다. SELECT·WHERE·ORDER BY 세 곳에서 쓰이는데
         // 그때마다 ST_MakePoint(?, ?)를 반복하면 위치 파라미터가 6개로 늘어 순서를 맞추기 어렵다.
+        //
+        // **정렬·LIMIT을 끝낸 뒤에 카탈로그를 조인한다.** ranked의 ORDER BY와 바깥의 ORDER BY는
+        // 같은 키여야 한다 — 조인이 순서를 보존한다는 보장이 없다(POL-019·055).
         val sql = """
-            WITH c AS (SELECT $CENTER AS center)
-            SELECT $CARD_COLUMNS,
-                   ST_Distance(cat.location, c.center) AS distance_meters
-            FROM $CARD_SOURCE, c
-            WHERE $where
-            ORDER BY ST_Distance(cat.location, c.center), cat.id
-            LIMIT ? OFFSET ?
+            WITH c AS (SELECT $CENTER AS center),
+                 ranked AS (
+                     SELECT $RANKED_COLUMNS,
+                            ST_Distance(t.location, c.center) AS distance_meters
+                     FROM spot_catalog_translation t, c
+                     WHERE $where
+                     ORDER BY ST_Distance(t.location, c.center), t.catalog_id
+                     LIMIT ? OFFSET ?
+                 )
+            SELECT $CARD_COLUMNS
+            FROM ranked r JOIN spot_catalog cat ON cat.id = r.catalog_id
+            ORDER BY r.distance_meters, r.catalog_id
         """.trimIndent()
 
         return jdbcTemplate.query(
@@ -54,8 +67,6 @@ class SpotSpatialQueryAdapter(
                     spotId = rs.getLong("id"),
                     title = rs.getString("title"),
                     address = rs.getString("address"),
-                    // 카탈로그의 썸네일은 nullable이다. 카드 자리를 비워 두는 편이 조회를 통째로
-                    // 실패시키는 것보다 낫다.
                     thumbnailImageUrl = rs.getString("thumbnail_image_url"),
                     mapX = rs.getDouble("map_x"),
                     mapY = rs.getDouble("map_y"),
@@ -73,8 +84,12 @@ class SpotSpatialQueryAdapter(
     @Transactional(readOnly = true)
     override fun countNearby(query: NearbySpotSearch): Int {
         val (where, params) = whereClause(query)
+        // 카탈로그를 조인하지 않아도 수가 같다. 두 방향이 모두 필요하다 —
+        // 늘지 않는 것은 `UNIQUE(catalog_id, language)`(카탈로그당 최대 1행)가 막고,
+        // **줄지 않는 것은 `catalog_id`의 NOT NULL FK가 보장한다**(부모 없는 번역 행이 없다).
+        // FK를 지우면 고아 행이 이 카운트에만 더해진다.
         return jdbcTemplate.queryForObject(
-            "WITH c AS (SELECT $CENTER AS center) SELECT COUNT(*) FROM $CARD_SOURCE, c WHERE $where",
+            "WITH c AS (SELECT $CENTER AS center) SELECT COUNT(*) FROM spot_catalog_translation t, c WHERE $where",
             Int::class.java,
             *params.toTypedArray(),
         ) ?: 0
@@ -93,14 +108,16 @@ class SpotSpatialQueryAdapter(
         // 번역의 언어다. 번역이 채워진 카탈로그는 그 언어의 spot 행이 없어도 목록에 나온다.
         // 그것이 이 스펙 목적의 절반이다.
         //
-        // **좌표가 없는 카탈로그는 빠진다.** `ST_DWithin`이 null location에 참을 돌려주지 않아
-        // 자연히 걸러지지만, 상류 결손 317건이 여기서 사라진다는 사실 자체는 기록해 둔다.
-        //
-        // **카테고리가 없는 카탈로그도 빠진다.** 카드가 카테고리를 필수로 요구하는데(도메인 enum에
+        // **카테고리가 없는 카탈로그는 빠진다.** 카드가 카테고리를 필수로 요구하는데(도메인 enum에
         // 미분류 값이 없다) 임의의 기본값을 만들면 잘못된 분류로 노출된다.
+        //
+        // **좌표·분류는 번역 행의 사본을 본다**(SPEC-0038). 카탈로그가 확정한 값이 그대로
+        // 복사돼 있고(실측 82,051행 불일치 0건) 기존 트리거가 `location`을 맞춘다. 번역의
+        // `location`은 NOT NULL이라 좌표 결손으로 빠지는 행은 애초에 번역이 없는 행이다.
         val conditions = mutableListOf(
+            "t.visible",
             "t.language = ?",
-            "ST_DWithin(cat.location, c.center, ?)",
+            "ST_DWithin(t.location, c.center, ?)",
         )
         val params = mutableListOf<Any>(
             query.center.longitude, query.center.latitude,
@@ -111,15 +128,20 @@ class SpotSpatialQueryAdapter(
         // 다중 선택은 OR이며 IN으로 표현한다(SPEC-0020). 비어 있으면 조건 자체를 걸지 않는다.
         if (!query.categories.isUnfiltered) {
             val codes = query.categories.codes()
-            conditions += "cat.category IN (${codes.joinToString(",") { "?" }})"
+            conditions += "t.category IN (${codes.joinToString(",") { "?" }})"
             params.addAll(codes)
         }
         if (query.excludedSpotIds.isNotEmpty()) {
             // 이미 반응한 항목은 DB 단계에서 제외한다 — 조회 후 걸러내면 페이지가 size보다 작아진다.
             // **제외 대상은 카탈로그 id다** — 목록이 카탈로그 id를 내보내므로 호출자가 되돌려
             // 주는 것도 같은 축이다.
-            conditions += "cat.id NOT IN (${query.excludedSpotIds.joinToString(",") { "?" }})"
-            params.addAll(query.excludedSpotIds)
+            //
+            // **id 목록은 배열 한 개로 바인딩한다.** 플레이스홀더를 개수만큼 펼치면 SQL 본문이
+            // 입력 크기에 비례해 자라고, 개수가 다를 때마다 다른 구문이 되어 계획 캐시가
+            // 재사용되지 않는다 — 제외 집합은 회원의 반응 수만큼 커진다(실측 최대 179건).
+            // `TasteSimilarityQueryJdbcAdapter`가 같은 이유로 같은 형태를 쓴다.
+            conditions += "t.catalog_id <> ALL (?)"
+            params += query.excludedSpotIds.toLongArray()
         }
         return conditions.joinToString(" AND ") to params
     }
@@ -129,17 +151,20 @@ class SpotSpatialQueryAdapter(
         const val CENTER = "ST_MakePoint(?, ?)::geography"
 
         /**
-         * 카드 한 장의 출처. 제목·주소만 번역에서 오고 나머지는 카탈로그가 확정한 표준값이다.
+         * 정렬 단계가 번역 행에서 읽는 컬럼. 좌표·분류는 카탈로그 값의 사본이다.
          *
-         * 조인 조건의 `t.language = ?`는 [whereClause]가 담당한다 — 조회와 카운트가 같은 조건을
-         * 쓰도록 조건을 한 곳에 모으기 위해서다. `UNIQUE(catalog_id, language)`가 있어 이 조인은
-         * 카탈로그당 최대 1행이며, 번역이 없는 언어는 결과에서 빠진다.
+         * 여기에 카탈로그 컬럼을 더하면 조인이 `LIMIT` 앞으로 돌아가 이 최적화가 사라진다.
          */
-        const val CARD_SOURCE = "spot_catalog cat JOIN spot_catalog_translation t ON t.catalog_id = cat.id AND t.visible"
+        const val RANKED_COLUMNS = "t.catalog_id, t.title, t.address, t.map_x, t.map_y, t.category"
 
-        /** 카드가 읽는 컬럼. [CARD_SOURCE]의 별칭과 짝이며 조회·카운트가 같은 이름을 본다. */
+        /**
+         * 카드가 읽는 컬럼. 썸네일·저작권만 카탈로그에서 오고 나머지는 정렬 단계가 이미 갖고 있다.
+         *
+         * **클라이언트에 나가는 id는 카탈로그 id다**(SPEC-0019) — 목록의 단위가 언어별 spot 행이
+         * 아니라 장소이기 때문이다.
+         */
         const val CARD_COLUMNS =
-            "cat.id AS id, t.title, t.address, cat.thumbnail_image_url, " +
-                "cat.map_x, cat.map_y, cat.category, cat.copyright"
+            "r.catalog_id AS id, r.title, r.address, cat.thumbnail_image_url, " +
+                "r.map_x, r.map_y, r.category, cat.copyright, r.distance_meters"
     }
 }

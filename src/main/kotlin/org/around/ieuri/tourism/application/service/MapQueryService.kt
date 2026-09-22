@@ -25,6 +25,7 @@ import org.around.ieuri.tourism.domain.vo.AreaName
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.MapBounds
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.time.Duration
 import java.time.LocalDateTime
@@ -41,6 +42,7 @@ import java.time.LocalDateTime
  * 데이터로 표현한다. 반대로 입력 검증 실패는 그대로 예외다(§10의 오류 코드).
  */
 @Service
+@Transactional(readOnly = true)
 class MapQueryService(
     private val mapQueryPort: MapQueryPort,
     private val congestionAreaQueryPort: CongestionAreaQueryPort,

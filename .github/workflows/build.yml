@@ -46,6 +46,9 @@ jobs:
       - id: rev
         run: |
           echo "sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          # 커밋 시각(Unix). build-push-action의 SOURCE_DATE_EPOCH로 넘겨 이미지 config의
+          # `created`를 못 박는다 — 캐시된 레이어의 값을 물려받지 않게 하기 위함이다.
+          echo "epoch=$(git log -1 --format=%ct)" >> "$GITHUB_OUTPUT"
           branch="${{ inputs.branch || github.ref_name }}"
           case "$branch" in
             master) echo "env=prod" >> "$GITHUB_OUTPUT" ;;
@@ -105,6 +108,22 @@ jobs:
             type=raw,value=${{ inputs.branch || github.ref_name }}
 
       - uses: docker/build-push-action@v7
+        # **SOURCE_DATE_EPOCH를 커밋 시각으로 못 박는다**(2026-09-21).
+        #
+        # 없으면 이미지 config의 `created`가 **캐시된 레이어의 값을 그대로 물려받는다.**
+        # 실제로 그렇게 됐다: Dockerfile의 ENTRYPOINT 한 줄만 바꾼 빌드(13b85d4)가
+        # 레이어를 전부 캐시에서 꺼내는 바람에, 38분 전 빌드(ffdbd51)와 `created`가
+        # 나노초까지 같아졌다(둘 다 2026-09-20T19:16:15.612685281Z).
+        #
+        # 그러면 **Image Updater가 멈춘다.** `updateStrategy: newest-build`는 이 필드로
+        # 최신을 가리는데 값이 동률이면 "더 새로운 것이 없다"로 판정한다 — errors=0,
+        # images_updated=1이라는 성공 로그를 남기면서 제자리를 돈다. 세 사이클과 파드
+        # 재시작에도 같았고, 사람이 values-dev.yaml을 직접 고쳐도 다음 사이클에 되돌렸다.
+        #
+        # GHCR의 Published 시각은 정상적으로 달랐다. 레지스트리도 이미지도 멀쩡하고,
+        # Updater가 보는 필드 하나만 같았던 것이다 — 조용히 멈추는 종류의 고장이다.
+        env:
+          SOURCE_DATE_EPOCH: ${{ steps.rev.outputs.epoch }}
         with:
           context: .
           platforms: linux/arm64

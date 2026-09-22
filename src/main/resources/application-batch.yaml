@@ -10,6 +10,15 @@
 # 공통 설정은 application.yaml에서 상속받고, 여기에는 배치일 때만 달라지는 값만 둔다.
 
 spring:
+  datasource:
+    hikari:
+      # **공통값 20을 상속하지 않는다**(PERF-20260921). 배치 파드는 API 파드가 떠 있는 채로
+      # CronJob이 따로 띄우므로, 커넥션 예산에서 API와 **더해지는** 몫이다. 20을 물려받으면
+      # 앱 메인 40 + search 20 + 나머지 ~14에 20이 더해져 `max_connections` 100에 6만 남는다.
+      #
+      # 8이면 충분하다 — 가장 넓게 쓰는 상세 수집 잡이 `SpotDetailPart` 4갈래를 병렬로 돌고
+      # (`SpotDetailPrefetchJobConfig`), 거기에 잡 리포지터리 몫을 더한 것이 상한이다.
+      maximum-pool-size: 8
   batch:
     job:
       # 부팅 시 자동 실행 금지. 실행할 잡은 아래 ieuri.tourapi.sync.job이 고른다.

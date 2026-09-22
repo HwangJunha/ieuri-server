@@ -18,6 +18,7 @@ import org.around.ieuri.tourism.domain.vo.RegionScoreFactor
 import org.around.ieuri.tourism.domain.vo.RegionTotalScore
 import org.around.ieuri.tourism.domain.vo.ScoreNormalization
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 
 /**
  * 지역 추천 조회 유스케이스 구현(SPEC-0015, CQRS 읽기).
@@ -30,6 +31,7 @@ import org.springframework.stereotype.Service
  * 상한을 먼저 적용하면 둘 다 달라지므로 **자르기는 마지막이다.**
  */
 @Service
+@Transactional(readOnly = true)
 class RegionRecommendationService(
     private val regionMetricQueryPort: RegionMetricQueryPort,
     private val policy: RegionRecommendationPolicy,

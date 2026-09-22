@@ -14,9 +14,8 @@ import org.springframework.stereotype.Component
  * **이벤트로 받는 이유는 기록이 요청의 결과를 바꾸지 않기 때문이다** —
  * `LocationAccessAuditListener`와 같은 판단이다. 발행자는 자기 일만 알고 auth가 그것을 구독한다.
  *
- * **[Async]인 것이 저 리스너와 다른 점이다.** 로그인은 사용자가 응답을 기다리는 연산이라
- * 기록 INSERT를 응답 경로에 두면 그만큼 느려진다. 위치 감사와 달리 발행량이 적어(로그인·탈퇴
- * 등 계정 사건뿐) 별도 스레드로 넘겨도 밀리지 않는다.
+ * **[Async]인 것도 같다.** 기록 INSERT를 응답 경로에 두면 그만큼 느려진다. 큐가 차면
+ * `CallerRunsPolicy`가 호출 스레드에서 저장하므로 밀려도 유실되지 않는다.
  *
  * `@TransactionalEventListener`가 아니라 `@EventListener`인 것도 같다 — 접속 사실은 트랜잭션의
  * 성패와 무관하게 남아야 한다. 로그인 트랜잭션이 뒤에서 실패해도 **접속 시도는 있었다.**
