@@ -67,8 +67,6 @@ class SpotSpatialQueryAdapter(
                     spotId = rs.getLong("id"),
                     title = rs.getString("title"),
                     address = rs.getString("address"),
-                    // 카탈로그의 썸네일은 nullable이다. 카드 자리를 비워 두는 편이 조회를 통째로
-                    // 실패시키는 것보다 낫다.
                     thumbnailImageUrl = rs.getString("thumbnail_image_url"),
                     mapX = rs.getDouble("map_x"),
                     mapY = rs.getDouble("map_y"),
@@ -86,8 +84,10 @@ class SpotSpatialQueryAdapter(
     @Transactional(readOnly = true)
     override fun countNearby(query: NearbySpotSearch): Int {
         val (where, params) = whereClause(query)
-        // 카탈로그를 조인하지 않는다 — 세는 단위가 번역 행이고, `UNIQUE(catalog_id, language)`가
-        // 있어 카탈로그당 최대 1행이므로 조인해도 수가 같다.
+        // 카탈로그를 조인하지 않아도 수가 같다. 두 방향이 모두 필요하다 —
+        // 늘지 않는 것은 `UNIQUE(catalog_id, language)`(카탈로그당 최대 1행)가 막고,
+        // **줄지 않는 것은 `catalog_id`의 NOT NULL FK가 보장한다**(부모 없는 번역 행이 없다).
+        // FK를 지우면 고아 행이 이 카운트에만 더해진다.
         return jdbcTemplate.queryForObject(
             "WITH c AS (SELECT $CENTER AS center) SELECT COUNT(*) FROM spot_catalog_translation t, c WHERE $where",
             Int::class.java,
@@ -135,8 +135,13 @@ class SpotSpatialQueryAdapter(
             // 이미 반응한 항목은 DB 단계에서 제외한다 — 조회 후 걸러내면 페이지가 size보다 작아진다.
             // **제외 대상은 카탈로그 id다** — 목록이 카탈로그 id를 내보내므로 호출자가 되돌려
             // 주는 것도 같은 축이다.
-            conditions += "t.catalog_id NOT IN (${query.excludedSpotIds.joinToString(",") { "?" }})"
-            params.addAll(query.excludedSpotIds)
+            //
+            // **id 목록은 배열 한 개로 바인딩한다.** 플레이스홀더를 개수만큼 펼치면 SQL 본문이
+            // 입력 크기에 비례해 자라고, 개수가 다를 때마다 다른 구문이 되어 계획 캐시가
+            // 재사용되지 않는다 — 제외 집합은 회원의 반응 수만큼 커진다(실측 최대 179건).
+            // `TasteSimilarityQueryJdbcAdapter`가 같은 이유로 같은 형태를 쓴다.
+            conditions += "t.catalog_id <> ALL (?)"
+            params += query.excludedSpotIds.toLongArray()
         }
         return conditions.joinToString(" AND ") to params
     }
