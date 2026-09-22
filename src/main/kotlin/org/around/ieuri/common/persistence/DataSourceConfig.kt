@@ -4,11 +4,9 @@ import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.migration.JavaMigration
 import org.springframework.beans.factory.BeanFactoryUtils
 import org.springframework.beans.factory.ObjectProvider
-import org.springframework.beans.factory.ListableBeanFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor
 import org.springframework.orm.jpa.AbstractEntityManagerFactoryBean
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.jdbc.autoconfigure.DataSourceProperties
@@ -62,20 +60,26 @@ class DataSourceConfig {
      * 조회(replica)용 풀(PERF-20260921). `ieuri.read-replica.url`이 비면 만들지 않는다 —
      * 그러면 [dataSource]가 라우팅 없이 primary 하나를 그대로 쓴다(로컬·배치의 기본값).
      *
+     * **빈 문자열을 `@ConditionalOnProperty`로 거를 수 없어 조건이 아니라 여기서 가른다.**
+     * 기본값이 `${IEURI_DB_RO_URL:}`이라 변수가 없어도 속성은 `""`로 **존재하고**,
+     * 그 조건은 "속성이 있는가"만 보므로 `matchIfMissing = false`가 걸리지 않는다. 그대로
+     * 두면 빈 URL로 풀을 만들어 `jdbcUrl is required with driverClassName`으로 기동이 깨진다.
+     *
      * **접속 정보만 replica로 바꾸고 나머지 Hikari 설정은 primary와 같아야 한다.**
      * 특히 `connection-init-sql`의 `search_path`를 물려받지 못하면 생 SQL 어댑터가 테이블을
      * 찾지 못한다(SPEC-0023). 그래서 같은 `@ConfigurationProperties`를 다시 적용한다.
      */
     @Bean
     @ConfigurationProperties(prefix = "spring.datasource.hikari")
-    @ConditionalOnProperty(prefix = "ieuri.read-replica", name = ["url"], matchIfMissing = false)
     fun replicaDataSource(
         properties: DataSourceProperties,
         replica: ReadReplicaProperties,
-    ): DataSource =
-        properties.initializeDataSourceBuilder()
-            .url(replica.url)
-            .build()
+    ): DataSource? =
+        replica.url.takeIf { it.isNotBlank() }?.let { url ->
+            properties.initializeDataSourceBuilder()
+                .url(url)
+                .build()
+        }
 
     /**
      * JPA·배치가 타입으로 주입받는 기본 DataSource.
@@ -88,11 +92,12 @@ class DataSourceConfig {
     @Primary
     fun dataSource(
         @Qualifier("primaryDataSource") primary: DataSource,
-        beanFactory: ListableBeanFactory,
+        @Qualifier("replicaDataSource") replica: DataSource?,
     ): DataSource {
-        // 이름으로 찾는다 — 타입으로 받으면 primary 자신과 검색 노드까지 후보가 된다.
-        if (!beanFactory.containsBean("replicaDataSource")) return primary
-        val replica = beanFactory.getBean("replicaDataSource", DataSource::class.java)
+        // **복제본은 없을 수 있다** — `ieuri.read-replica.url`이 비면 [replicaDataSource]가
+        // null을 돌려주고(로컬·배치의 기본값), 그 자리에는 null이 주입된다. 그러면 라우팅
+        // 없이 primary 하나만 쓴다.
+        replica ?: return primary
         return LazyConnectionDataSourceProxy(ReadWriteRoutingDataSource(primary, replica))
     }
 
