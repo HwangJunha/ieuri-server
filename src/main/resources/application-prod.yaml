@@ -8,12 +8,18 @@
 spring:
   datasource:
     hikari:
-      # 파드당 30(PERF-20260921). **application.yaml 기본값과 같지만 명시한다** — 커넥션
-      # 상한은 DB의 `max_connections`와 파드 수를 함께 봐야 정해지는 값이라, 공통 기본값이
-      # 개발 편의로 올라갔을 때 운영이 조용히 따라가면 DB가 커넥션을 거절한다.
+      # 파드당 60(2026-09-22, 읽기 분리 이후 상향). **application.yaml 기본값과 같지만
+      # 명시한다** — 커넥션 상한은 DB의 `max_connections`와 파드 수를 함께 봐야 정해지는
+      # 값이라, 공통 기본값이 개발 편의로 올라갔을 때 운영이 조용히 따라가면 DB가 커넥션을
+      # 거절한다.
       #
-      # 운영만 파드가 2개다(dev는 1개). 같은 값이라도 DB에서 빠지는 몫은 두 배다.
-      maximum-pool-size: 30
+      # 이 값은 쓰기·읽기 두 풀 각각에 적용된다. 운영은 파드가 2개이므로 DB에서 빠지는 몫은
+      # 쓰기 2×60=120(primary) + 읽기 2×60=120(replica 분산)이다. max_connections 500
+      # 상한 안에 든다(합계 ≈ 282, 위 application.yaml 산술 참조).
+      #
+      # **DB(max_connections 500) 매니페스트 PR을 먼저 머지할 것.** 순서가 뒤집히면 파드가
+      # 뜨는 순간 커넥션이 거절된다.
+      maximum-pool-size: 60
   jpa:
     # 질의 로그를 남기지 않는다. 파라미터에 개인정보가 실릴 수 있고 양도 많다.
     show-sql: false
