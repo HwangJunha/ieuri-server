@@ -8,7 +8,6 @@ import org.springframework.beans.factory.ListableBeanFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor
 import org.springframework.orm.jpa.AbstractEntityManagerFactoryBean
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.jdbc.autoconfigure.DataSourceProperties
@@ -62,20 +61,26 @@ class DataSourceConfig {
      * 조회(replica)용 풀(PERF-20260921). `ieuri.read-replica.url`이 비면 만들지 않는다 —
      * 그러면 [dataSource]가 라우팅 없이 primary 하나를 그대로 쓴다(로컬·배치의 기본값).
      *
+     * **빈 문자열을 `@ConditionalOnProperty`로 거를 수 없어 조건이 아니라 여기서 가른다.**
+     * 기본값이 `${IEURI_DB_RO_URL:}`이라 변수가 없어도 속성은 `""`로 **존재하고**,
+     * 그 조건은 "속성이 있는가"만 보므로 `matchIfMissing = false`가 걸리지 않는다. 그대로
+     * 두면 빈 URL로 풀을 만들어 `jdbcUrl is required with driverClassName`으로 기동이 깨진다.
+     *
      * **접속 정보만 replica로 바꾸고 나머지 Hikari 설정은 primary와 같아야 한다.**
      * 특히 `connection-init-sql`의 `search_path`를 물려받지 못하면 생 SQL 어댑터가 테이블을
      * 찾지 못한다(SPEC-0023). 그래서 같은 `@ConfigurationProperties`를 다시 적용한다.
      */
     @Bean
     @ConfigurationProperties(prefix = "spring.datasource.hikari")
-    @ConditionalOnProperty(prefix = "ieuri.read-replica", name = ["url"], matchIfMissing = false)
     fun replicaDataSource(
         properties: DataSourceProperties,
         replica: ReadReplicaProperties,
-    ): DataSource =
-        properties.initializeDataSourceBuilder()
-            .url(replica.url)
-            .build()
+    ): DataSource? =
+        replica.url.takeIf { it.isNotBlank() }?.let { url ->
+            properties.initializeDataSourceBuilder()
+                .url(url)
+                .build()
+        }
 
     /**
      * JPA·배치가 타입으로 주입받는 기본 DataSource.
@@ -91,8 +96,14 @@ class DataSourceConfig {
         beanFactory: ListableBeanFactory,
     ): DataSource {
         // 이름으로 찾는다 — 타입으로 받으면 primary 자신과 검색 노드까지 후보가 된다.
-        if (!beanFactory.containsBean("replicaDataSource")) return primary
-        val replica = beanFactory.getBean("replicaDataSource", DataSource::class.java)
+        //
+        // **`replicaDataSource`는 URL이 비면 null을 돌려준다.** 그때 Spring은 그 이름을
+        // `NullBean`으로 등록하므로 `containsBean`은 참이고 `getBean`은 실패한다 —
+        // 있는지 없는지는 타입으로 조회되는지로 가른다.
+        val replica = beanFactory.getBeanNamesForType(DataSource::class.java)
+            .firstOrNull { it == REPLICA_BEAN }
+            ?.let { beanFactory.getBean(it, DataSource::class.java) }
+            ?: return primary
         return LazyConnectionDataSourceProxy(ReadWriteRoutingDataSource(primary, replica))
     }
 
@@ -192,6 +203,9 @@ class DataSourceConfig {
      * 그때 새 테이블이 없다며 기동이 깨진다(V43 같은 신규 마이그레이션에서 드러난다).
      */
     companion object {
+        /** 읽기 복제본 풀의 빈 이름. [dataSource]가 이름으로 지목한다. */
+        private const val REPLICA_BEAN = "replicaDataSource"
+
         /**
          * **`@JvmStatic`이어야 한다.** BeanFactoryPostProcessor는 컨테이너 생명주기의 아주
          * 이른 시점에 만들어지는데, 인스턴스 메서드로 두면 그것을 담은 @Configuration이
