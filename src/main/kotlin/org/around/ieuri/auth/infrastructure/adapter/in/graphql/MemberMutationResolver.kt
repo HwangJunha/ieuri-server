@@ -31,22 +31,13 @@ import org.around.ieuri.common.graphql.generated.types.VerifyEmailPayload
 import org.around.ieuri.common.security.CurrentMemberProvider
 import java.util.UUID
 
-/**
- * 회원 관련 GraphQL 뮤테이션 리졸버(인바운드 어댑터). 얇게 유지하며 유스케이스에 위임한다.
- * 입력/출력 타입은 auth.graphqls로부터 DGS codegen으로 생성된다(schema-first).
- * 리졸버는 생성 타입 → 커맨드, 애플리케이션 결과 → 생성 응답 타입 매핑만 담당한다.
- */
+/** 회원 관련 뮤테이션 리졸버. 생성 타입 → 커맨드, 결과 → 응답 타입 매핑만 하고 유스케이스에 위임한다. */
 @DgsComponent
 class MemberMutationResolver(
     private val memberRegistrationUseCase: MemberRegistrationUseCase,
     private val currentMemberProvider: CurrentMemberProvider,
 ) {
-    /**
-     * 인증 대기 주소 정정(SPEC-0024 R7). **본인 대상이라 인증이 필요하다** — 검증 핸들이 아니라
-     * 인증 주체로 회원을 정하므로, 핸들을 잃은 회원도 주소를 고칠 수 있다.
-     *
-     * 미인증 회원이 호출하는 오퍼레이션이므로 게이트의 허용 목록에 들어 있다(R9).
-     */
+    /** 인증 대기 주소 정정(SPEC-0024 R7). 인증 주체로 회원을 정하며, 미인증 게이트의 허용 목록에 들어 있다(R9). */
     @DgsMutation
     fun retargetEmailVerification(
         @InputArgument input: RetargetEmailVerificationInput,
@@ -88,8 +79,7 @@ class MemberMutationResolver(
             // 생성된 TermsCode enum → String (도메인/커맨드는 데이터주도로 String 유지)
             agreements = input.agreements.map { AgreementInput(it.termsCode.name, it.agreed) },
             authorizationCode = input.authorizationCode,
-            // 형식 검사를 여기서 하지 않는다 — 규칙을 벗어나면 서버가 조용히 자동 생성으로
-            // 대체한다(R30). provider가 주는 값이라 클라이언트가 고칠 수 없다.
+            // 형식 검사를 하지 않는다. 규칙을 벗어나면 서버가 자동 생성으로 대체한다(R30).
             nickname = input.nickname,
         )
         val result = memberRegistrationUseCase.registerBySns(command)
@@ -154,7 +144,6 @@ class MemberMutationResolver(
         onError = { RequestPasswordResetPayload(success = false, userErrors = it) },
     ) {
         memberRegistrationUseCase.requestPasswordReset(RequestPasswordResetCommand(input.email))
-        // 계정 유무를 드러내지 않도록 항상 성공으로 응답한다.
         RequestPasswordResetPayload(success = true, userErrors = emptyList())
     }
 

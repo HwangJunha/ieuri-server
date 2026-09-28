@@ -21,11 +21,7 @@ import kotlin.test.assertNull
 
 /**
  * WebSocket 연결 수립 인증(SPEC-0017 R10, POL-048).
- *
- * **SecurityContext 정리가 이 테스트의 핵심이다.** WebSocket 프레임은 서블릿 필터 체인을 타지
- * 않아 `SecurityContextHolder`를 지워 주는 주체가 없고, 처리 스레드는 요청과 연결을 가로질러
- * 재사용된다. 남겨 두면 인증 없는 다음 요청이 앞 회원의 신원을 물려받아 **그의 대화를 조회하게
- * 된다** — 인증 실패가 아니라 잘못된 성공이라 조용하다.
+ * - SecurityContext 정리가 핵심이다. 남기면 재사용 스레드의 다음 요청이 앞 회원의 신원을 물려받는다.
  */
 class GraphqlWebSocketAuthInterceptorTest {
 
@@ -81,11 +77,7 @@ class GraphqlWebSocketAuthInterceptorTest {
         }
     }
 
-    /**
-     * **핸드셰이크 헤더로 온 토큰도 받는다.** 브라우저는 커스텀 헤더를 못 붙여 페이로드를
-     * 쓰지만, 네이티브 클라이언트와 API 도구는 헤더를 쓰는 쪽이 흔하다 — 한쪽만 받으면
-     * 나머지 절반이 "토큰을 넣었는데 인증이 안 된다"는 상태에 빠진다.
-     */
+    /** 핸드셰이크 헤더로 온 토큰도 받는다(브라우저는 페이로드, 네이티브 클라이언트·API 도구는 헤더). */
     @Test
     fun `헤더로 온 토큰도 인증된다`() {
         givenValidToken()
@@ -161,10 +153,7 @@ class GraphqlWebSocketAuthInterceptorTest {
         }
     }
 
-    /**
-     * 연결 수립은 SecurityContext를 세우지 않는다 — 세우는 것은 요청 처리 시점(`intercept`)이고,
-     * 거기서만 세웠다 지운다. 수립 단계에서 세우면 지울 지점이 없어진다.
-     */
+    /** 연결 수립은 SecurityContext를 세우지 않는다. 세우고 지우는 것은 `intercept`에서만 한다. */
     @Test
     fun `연결 수립은 SecurityContext를 건드리지 않는다`() {
         givenValidToken()

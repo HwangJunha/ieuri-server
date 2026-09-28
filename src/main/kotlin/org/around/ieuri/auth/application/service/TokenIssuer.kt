@@ -8,13 +8,7 @@ import org.springframework.stereotype.Component
 import java.time.Clock
 import java.time.Duration
 
-/**
- * accessToken/refreshToken 쌍을 발급하고 refresh jti를 저장소에 등록하는 공통 로직.
- * 로그인·재발급(회전) 양쪽에서 재사용한다.
- *
- * accessToken에는 발급 시점의 유효 권한(역할들의 권한 합집합)과 역할 코드를 담는다.
- * 재발급(회전) 시에도 현재 유효 권한을 재조회하므로 역할 변경이 자연히 전파된다(최대 access TTL 지연).
- */
+/** access/refresh 쌍을 발급하고 refresh jti를 저장소에 등록한다. 발급마다 유효 권한을 재조회한다. */
 @Component
 class TokenIssuer(
     private val tokenProvider: TokenProviderPort,

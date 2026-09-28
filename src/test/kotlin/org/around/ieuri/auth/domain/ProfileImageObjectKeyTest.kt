@@ -8,12 +8,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * 프로필 이미지 오브젝트 키(SPEC-0011 R6).
- *
- * 핵심은 **커뮤니티 사진과 네임스페이스가 갈린다**는 것과, **소유권을 저장소 없이
- * 문자열만으로 판정한다**는 것이다.
- */
+/** 프로필 이미지 오브젝트 키(SPEC-0011 R6). 커뮤니티와 네임스페이스가 갈리고, 소유권을 문자열만으로 판정한다. */
 class ProfileImageObjectKeyTest {
 
     private val uuid = UUID.fromString("11111111-2222-3333-4444-555555555555")

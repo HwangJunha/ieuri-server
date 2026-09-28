@@ -4,12 +4,9 @@ import org.around.ieuri.auth.domain.vo.MemberStatus
 import org.around.ieuri.auth.domain.vo.Provider
 import java.time.Instant
 
-/*
- * 읽기(CQRS) 전용 read model. 애그리거트를 우회해 QueryDSL이 직접 프로젝션한 결과이며,
- * 도메인/JPA 어느 쪽도 아니다. 리졸버가 이 DTO를 GraphQL 응답 타입으로 매핑한다.
- */
+/* 읽기 전용 read model. QueryDSL이 직접 프로젝션하며 리졸버가 GraphQL 응답 타입으로 매핑한다. */
 
-/** 본인 정보(me). 인증만 필요(권한 불요). 이메일은 본인이므로 평문 노출, 권한/역할로 클라이언트 메뉴 렌더에 사용. */
+/** 본인 정보(me). 이메일은 평문이며 권한/역할은 클라이언트 메뉴 렌더에 쓴다. */
 data class MeView(
     val memberId: Long,
     val email: String,
@@ -22,10 +19,7 @@ data class MeView(
     val permissions: List<String>,
     val createdAt: Instant,
 ) {
-    /**
-     * 이메일 변경 가능 여부(SPEC-0024 R6). **저장하지 않고 provider에서 파생한다** —
-     * 저장하면 provider와 어긋날 수 있는 두 번째 진실이 생긴다.
-     */
+    /** 이메일 변경 가능 여부(SPEC-0024 R6). 저장하지 않고 provider에서 파생한다. */
     val canChangeEmail: Boolean get() = provider == Provider.EMAIL
 }
 
@@ -44,17 +38,14 @@ data class MemberDetailView(
     val createdAt: Instant,
 )
 
-/**
- * 표시용 최소 회원 정보. 권한 불요이며 **이메일을 담지 않는다**(복호화도 하지 않는다).
- * 다른 도메인이 작성자·대상 회원을 표시할 때 쓰는 형태다.
- */
+/** 표시용 최소 회원 정보. 이메일을 담지 않으며 다른 도메인이 작성자 표시에 쓴다. */
 data class MemberPublicProfileView(
     val memberId: Long,
     val nickname: String,
     val profileImageUrl: String?,
 )
 
-/** 관리자 회원 목록 항목. 최소수집: 대량 복호화 회피를 위해 이메일은 포함하지 않는다. */
+/** 관리자 회원 목록 항목. 이메일은 포함하지 않는다(대량 복호화 회피). */
 data class MemberSummaryView(
     val memberId: Long,
     val nickname: String,
@@ -63,10 +54,7 @@ data class MemberSummaryView(
     val createdAt: Instant,
 )
 
-/**
- * 회원 목록 조회 조건(커서 기본). status/roleCode는 선택 필터.
- * first는 가져올 개수, after는 커서(없으면 처음부터). 목록은 커서 페이지네이션으로 통일한다.
- */
+/** 회원 목록 조회 조건. first는 개수, after는 커서(없으면 처음부터), status/roleCode는 선택 필터. */
 data class MembersQuery(
     val status: MemberStatus?,
     val roleCode: String?,

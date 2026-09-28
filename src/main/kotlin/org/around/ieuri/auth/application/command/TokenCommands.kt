@@ -2,19 +2,13 @@ package org.around.ieuri.auth.application.command
 
 import org.around.ieuri.auth.domain.vo.Provider
 
-/**
- * 로그인 커맨드. SNS 인증 결과(id_token)로 기존 회원을 인증한다.
- * (미가입 회원은 로그인 거부 → 회원가입으로 유도)
- */
+/** SNS 로그인 커맨드. id_token으로 기존 회원을 인증한다(미가입은 거부). */
 data class LoginCommand(
     val provider: Provider,
     val idToken: String,
     /** 탈퇴 시 연결 해제용 토큰을 보충하기 위한 provider authorization code. 없으면 보충하지 않는다. */
     val authorizationCode: String? = null,
-    /**
-     * 접속지 정보(접속기록용). **인바운드 어댑터가 헤더에서 읽어 넘긴다** — 애플리케이션 계층이
-     * 서블릿을 알지 않게 하려는 것이며, `acceptLanguage`와 같은 방향이다. 판정 불가 시 null.
-     */
+    /** 접속지 정보(접속기록용). 인바운드 어댑터가 헤더에서 읽어 넘기며, 판정 불가 시 null. */
     val ipAddress: String? = null,
 ) {
     init {

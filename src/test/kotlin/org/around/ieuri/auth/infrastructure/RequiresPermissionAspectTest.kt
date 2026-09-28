@@ -13,13 +13,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
-/**
- * @RequiresPermission 애스펙트가 애노테이션이 붙은 메서드 실행 "전에" Authorizer.require를 호출하고,
- * 거부되면 실제 실행을 막는지 검증한다. Spring AOP 프록시(AspectJProxyFactory)로 대상 빈을 직접 감싸므로
- * ApplicationContext/DB가 필요 없다(순수 단위 테스트).
- *
- * 운영에서는 kotlin-spring all-open이 @DgsComponent(리졸버)를 open으로 만들어 동일하게 프록시된다.
- */
+/** @RequiresPermission 애스펙트가 실행 전에 Authorizer.require를 호출하고 거부 시 실행을 막는지 본다(AspectJProxyFactory, 컨텍스트 없음). */
 class RequiresPermissionAspectTest {
 
     private val authorizer = mockk<Authorizer>(relaxed = true)

@@ -2,19 +2,9 @@ package org.around.ieuri.auth.application.port.out.client
 
 import java.time.Instant
 
-/**
- * 프로필 이미지 오브젝트 스토리지(SPEC-0011 R6). **서버는 이미지 바이트를 중계하지 않는다** —
- * 발급과 확인만 하고 업로드는 클라이언트가 스토리지로 직접 PUT한다.
- *
- * 커뮤니티의 같은 이름 포트와 계약이 겹치지만 **포트를 따로 둔다.** auth가 community의
- * 포트를 import하면 도메인 간 내부 의존이 생겨 나중에 auth를 떼어낼 수 없다.
- * 구현(어댑터)은 같은 R2 클라이언트를 공유해도 무방하다.
- */
+/** 프로필 이미지 오브젝트 스토리지(SPEC-0011 R6). 서버는 바이트를 중계하지 않고 발급·확인만 한다. */
 interface ProfileImageStoragePort {
-    /**
-     * 단일 키에만 유효한 presigned PUT URL. [contentType]·[contentLength]가 **서명에
-     * 포함되므로** 선언과 다르게 올리면 스토리지가 거부한다.
-     */
+    /** 단일 키 presigned PUT URL. [contentType]·[contentLength]가 서명에 포함돼 선언과 다르게 올리면 스토리지가 거부한다. */
     fun presignPut(
         objectKey: String,
         contentType: String,

@@ -14,11 +14,8 @@ import org.springframework.web.client.RestClient
 import java.time.Clock
 
 /**
- * authorization code → refresh token 교환 클라이언트(SPEC-0012 R5).
- *
- * Apple은 client secret을 ES256 JWT로 서명해야 하고, Google은 client secret 문자열을 그대로 쓴다.
- * Kakao는 어드민 키로 해제하므로 교환하지 않고 null을 반환한다.
- * 자격증명이 설정되지 않았거나 응답에 refresh_token이 없으면 null이다(호출자가 곁가지로 처리).
+ * authorization code → refresh token 교환 클라이언트(SPEC-0012 R5). Kakao는 교환하지 않는다.
+ * - 자격증명 미설정이거나 응답에 refresh_token이 없으면 null이다.
  */
 @Component
 class SnsTokenExchangeClient(

@@ -14,10 +14,9 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 /**
- * 역할 부여/회수(관리자). member_role 매핑을 추가/제거하고 감사 이력을 남긴다. 둘 다 멱등이다.
- * 대상 회원의 accessToken에는 다음 재발급(최대 access TTL) 후 새 권한이 반영된다(즉시 무효화는 이월 스텝).
- *
- * 자기 강등 방지: 본인이 자신의 마지막 "관리 역할"(role:assign/role:revoke를 주는 역할)을 회수하는 것은 거부한다.
+ * 역할 부여/회수(관리자). 둘 다 멱등이며 감사 이력을 남긴다.
+ * - 대상의 accessToken에는 다음 재발급(최대 access TTL) 후 반영된다.
+ * - 본인의 마지막 관리 역할(role:assign/role:revoke를 주는 역할) 회수는 거부한다(자기 강등 방지).
  */
 @Service
 class RoleService(
@@ -59,10 +58,7 @@ class RoleService(
             if (!retainsAnotherAdminRole) {
                 throw SelfDemotionException("마지막 관리 역할은 스스로 회수할 수 없습니다.")
             }
-            // 참고: 이 검사(조회)와 실제 회수(삭제) 사이에는 이론적 TOCTOU 경합이 있다.
-            // 본인의 마지막 관리 역할 2개를 두 요청이 동시에 회수하면 둘 다 통과할 수 있다.
-            // RBAC 변경은 관리자 전용·저빈도이고 즉시 무효화 자체가 Valkey 스텝으로 이월된 상태라,
-            // 행 잠금(SELECT ... FOR UPDATE)을 도입하지 않고 이 잔여 위험을 의도적으로 수용한다.
+            // 검사와 회수 사이의 TOCTOU 경합(동시 회수 2건이 모두 통과)은 의도적으로 수용한 잔여 위험이다.
         }
 
         val changed = roleRepository.revokeRoleFromMember(command.targetMemberId, command.roleCode)

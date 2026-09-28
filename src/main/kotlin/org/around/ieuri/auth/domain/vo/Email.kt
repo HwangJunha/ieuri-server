@@ -1,10 +1,6 @@
 package org.around.ieuri.auth.domain.vo
 
-/**
- * 이메일 값 객체. 정규화(trim + lowercase)하여 저장하므로
- * provider 검증 이메일과 사용자 제출 이메일을 대소문자 무관하게 동등 비교할 수 있다.
- * 개인정보이므로 영속 계층에서 암호화되어 저장된다(도메인은 평문만 다룬다).
- */
+/** 이메일 값 객체. trim + lowercase로 정규화한다. 영속 계층에서 암호화된다(도메인은 평문만 다룬다). */
 @JvmInline
 value class Email private constructor(val value: String) {
     companion object {

@@ -6,9 +6,7 @@ import org.around.ieuri.auth.application.command.IssueProfileImageUploadUrlComma
 import org.around.ieuri.auth.application.command.RemoveProfileImageCommand
 import org.around.ieuri.auth.application.query.ProfileImageUploadUrlView
 
-/**
- * 프로필 수정 유스케이스(SPEC-0011 R5·R6). 전부 본인 데이터 대상이라 별도 권한 계층이 없다.
- */
+/** 프로필 수정 유스케이스(SPEC-0011 R5·R6). 전부 본인 데이터 대상이다. */
 interface MemberProfileUseCase {
     /** 닉네임 변경. 반영된 값(공백 제거 후)을 돌려준다. */
     fun changeNickname(command: ChangeNicknameCommand): String

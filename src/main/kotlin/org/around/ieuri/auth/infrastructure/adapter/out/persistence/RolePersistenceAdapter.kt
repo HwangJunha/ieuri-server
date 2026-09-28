@@ -13,10 +13,7 @@ import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.R
 import org.springframework.stereotype.Component
 import java.time.Clock
 
-/**
- * 역할/권한 쓰기 포트 구현. JPA 엔티티↔도메인(Role) 매핑을 담당한다.
- * 유효 권한은 역할의 권한 합집합이므로, 회원의 역할들과 각 역할의 권한 코드를 조합해 도메인 Role로 재구성한다.
- */
+/** 역할/권한 쓰기 포트 구현. 회원의 역할들과 각 역할의 권한 코드를 조합해 도메인 Role로 재구성한다. */
 @Component
 class RolePersistenceAdapter(
     private val roleRepository: RoleJpaRepository,

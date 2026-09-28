@@ -40,10 +40,7 @@ interface MemberProfileJpaRepository : JpaRepository<MemberProfileEntity, Long> 
 interface MemberTermsAgreementJpaRepository : JpaRepository<MemberTermsAgreementEntity, Long> {
     fun deleteByMemberId(memberId: Long)
 
-    /**
-     * 회원의 약관별 **현재 상태**. `(member_id, terms_id)` 유일 제약(V38) 덕분에 약관 하나에
-     * 한 행이며, 여기서 고를 것이 없다 — 이력은 member_audit_log가 갖는다.
-     */
+    /** 회원의 약관별 현재 상태. `(member_id, terms_id)` 유일 제약(V38)으로 약관당 한 행이다. */
     fun findByMemberId(memberId: Long): List<MemberTermsAgreementEntity>
 
     /** 재동의·철회 시 갱신할 관리 엔티티. 없으면 신규 동의다. */
@@ -82,22 +79,14 @@ interface MemberAuditLogJpaRepository : JpaRepository<MemberAuditLogEntity, Long
 
     /**
      * 보관 기간이 지난 기록을 최대 [limit]건 고른다(SPEC-0032 R22).
-     *
-     * **대상을 먼저 골라 지운다** — 벌크 삭제에는 LIMIT을 걸 수 없어, 한 회차에 지울 양을
-     * 제한하려면 대상을 먼저 추려야 한다. 회차 단위로 끊어야 락과 WAL이 커지지 않는다.
-     * (`messageRetentionJob`의 선례와 같은 형태다.)
+     * - 벌크 삭제에는 LIMIT이 없어 대상을 먼저 골라 회차 단위로 지운다.
      */
     fun findByCreatedAtBefore(cutoff: Instant, limit: Limit): List<MemberAuditLogEntity>
 
     fun deleteByIdIn(ids: Collection<Long>): Long
 }
 
-/**
- * 접속기록(「개인정보의 안전성 확보조치 기준」 제8조).
- *
- * 보관 정리는 `MemberAuditLogJpaRepository`와 같은 형태다 — 기간만 다르다(기준 제8조
- * 제2항의 1년, [org.around.ieuri.auth.domain.specification.AuditRetention]).
- */
+/** 접속기록(안전성 확보조치 기준 제8조). 보관 정리는 `MemberAuditLogJpaRepository`와 같은 형태다(1년). */
 interface MemberAccessLogJpaRepository : JpaRepository<MemberAccessLogEntity, Long> {
 
     fun findByCreatedAtBefore(cutoff: Instant, limit: Limit): List<MemberAccessLogEntity>
@@ -105,12 +94,7 @@ interface MemberAccessLogJpaRepository : JpaRepository<MemberAccessLogEntity, Lo
     fun deleteByIdIn(ids: Collection<Long>): Long
 }
 
-/**
- * 위치 조회 감사 기록(SPEC-0032 R19).
- *
- * 보관 정리는 `MemberAuditLogJpaRepository`와 같은 형태다 — 기간만 다르다(위치정보법
- * 제16조 제2항의 6개월, [org.around.ieuri.auth.domain.specification.AuditRetention]).
- */
+/** 위치 조회 감사 기록(SPEC-0032 R19). 보관 정리는 `MemberAuditLogJpaRepository`와 같은 형태다(6개월). */
 interface MemberLocationAccessLogJpaRepository : JpaRepository<MemberLocationAccessLogEntity, Long> {
 
     fun findByCreatedAtBefore(cutoff: Instant, limit: Limit): List<MemberLocationAccessLogEntity>

@@ -23,9 +23,8 @@ import org.around.ieuri.common.pagination.CursorPageInfo
 import org.springframework.stereotype.Component
 
 /**
- * 회원 읽기 포트 구현(CQRS 읽기 측). QueryDSL이 read DTO로 직접 프로젝션하며 애그리거트를 우회한다.
- * 평문 이메일이 필요한 조회(me/단건)는 여기서 EmailEncryptorPort로 복호화해 DTO를 완성한다(도메인/리졸버 아님).
- * 목록은 최소수집 원칙으로 이메일을 프로젝션하지 않는다(대량 복호화 회피).
+ * 회원 읽기 포트 구현. QueryDSL이 read DTO로 직접 프로젝션한다.
+ * - 평문 이메일이 필요한 조회(me/단건)만 여기서 복호화하고, 목록은 이메일을 프로젝션하지 않는다.
  */
 @Component
 class MemberQueryAdapter(
@@ -98,10 +97,7 @@ class MemberQueryAdapter(
         )
     }
 
-    /**
-     * 표시용 최소 정보. `member` 존재를 확인하고 프로필을 얹는다 — 프로필이 없어도 회원은
-     * 존재하므로 leftJoin이며, 닉네임은 기존 조회와 같은 기본값으로 채운다.
-     */
+    /** 표시용 최소 정보. 프로필이 없어도 회원은 존재하므로 leftJoin이며, 닉네임은 기본값으로 채운다. */
     override fun findPublicProfile(memberId: Long): MemberPublicProfileView? = queryFactory
         .select(profile.nickname, profile.profileImageUrl)
         .from(member)
@@ -116,10 +112,7 @@ class MemberQueryAdapter(
             )
         }
 
-    /**
-     * 여러 회원을 한 번에. 목록을 그리는 호출자가 행마다 묻지 않게 한다 —
-     * 피드 카드 20장이면 조회가 20번이 된다.
-     */
+    /** 여러 회원을 한 번에 조회한다(목록 N+1 회피). */
     override fun findPublicProfilesIn(memberIds: List<Long>): Map<Long, MemberPublicProfileView> {
         if (memberIds.isEmpty()) return emptyMap()
 

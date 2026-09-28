@@ -8,13 +8,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * 인증 코드 메일 템플릿 검증.
- *
- * 마크업의 생김새는 고정하지 않는다 — 디자인을 손볼 때마다 깨지는 테스트가 되고,
- * 실제 렌더링은 클라이언트마다 다르므로 여기서 증명할 수 있는 것도 아니다.
- * 고정하는 것은 **틀렸을 때 사용자가 코드를 못 받는 것들**이다:
- * 코드가 두 본문에 모두 실리는가, 두 메일이 서로 다른 제목·문구를 쓰는가,
- * HTML이 이메일 클라이언트에서 살아남을 형태인가(인라인 스타일·외부 리소스 없음).
+ * 인증 코드 메일 템플릿. 마크업 생김새는 고정하지 않는다.
+ * - 코드가 두 본문에 실리는지, 두 메일의 문구가 갈리는지, HTML이 인라인 스타일·외부 리소스 없음인지를 본다.
  */
 class VerificationCodeMailTest {
 
@@ -57,10 +52,7 @@ class VerificationCodeMailTest {
         assertTrue(mail.plainText.contains("요청하지 않으셨다면"))
     }
 
-    /**
-     * Gmail을 비롯한 클라이언트가 `<style>` 블록과 외부 리소스를 제거하므로,
-     * 그런 것에 의존하면 스타일이 통째로 날아간다.
-     */
+    /** `<style>` 블록과 외부 리소스는 다수 클라이언트가 제거한다. */
     @Test
     fun `HTML은 인라인 스타일만 쓰고 외부 리소스를 참조하지 않는다`() {
         val html = verificationCodeMail("341010").html
@@ -72,10 +64,7 @@ class VerificationCodeMailTest {
         assertTrue(html.contains("style=\""), "인라인 스타일이 없다")
     }
 
-    /**
-     * 이스케이프 구현은 Spring `HtmlUtils`의 몫이라 검증하지 않는다.
-     * 여기서 고정하는 것은 **템플릿이 값을 이스케이프 없이 끼워 넣지 않는다**는 것뿐이다.
-     */
+    /** 템플릿이 값을 이스케이프 없이 끼워 넣지 않는지만 본다(이스케이프 구현은 `HtmlUtils`의 몫). */
     @Test
     fun `본문에 실리는 값은 마크업으로 새지 않는다`() {
         val html = verificationCodeMail("<script>x</script>").html

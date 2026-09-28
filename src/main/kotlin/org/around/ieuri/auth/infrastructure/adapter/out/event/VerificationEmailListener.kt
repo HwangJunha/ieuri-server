@@ -7,10 +7,7 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.event.TransactionPhase
 import org.springframework.transaction.event.TransactionalEventListener
 
-/**
- * 코드 메일 발송 트리거. 가입/재발송/비밀번호 재설정 트랜잭션이 커밋된 뒤에만 발송하여
- * 롤백 시 메일이 나가지 않도록 한다(AFTER_COMMIT).
- */
+/** 코드 메일 발송 트리거. 트랜잭션 커밋 후에만 발송해 롤백 시 메일이 나가지 않는다(AFTER_COMMIT). */
 @Component
 class VerificationEmailListener(
     private val emailSender: EmailSenderPort,

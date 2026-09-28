@@ -20,11 +20,8 @@ sealed interface VerificationResult {
 
 /**
  * 이메일 검증 챌린지 애그리거트. 6자리 코드 무차별 대입에 대비한 규칙을 캡슐화한다:
- *   ① 짧은 만료(expiresAt) ② 시도 횟수 제한(attempts/maxAttempts)
- *   ③ 단회용(consumed) — 성공 또는 시도 초과 시 폐기.
- *
- * 코드는 평문이 아닌 해시로 다룬다(codeHash). 시간/랜덤/해시는 application·infrastructure에서
- * 주입하여 도메인은 순수 규칙만 담는다. member_id는 직접 노출하지 않고 publicId(핸들)로 식별한다.
+ * 짧은 만료, 시도 횟수 제한, 단회용(성공 또는 시도 초과 시 폐기).
+ * - 코드는 해시(codeHash)로만 다루고, member_id 대신 publicId(핸들)로 식별한다.
  */
 class EmailVerification private constructor(
     val id: Long?,
@@ -39,22 +36,11 @@ class EmailVerification private constructor(
     val createdAt: Instant,
     /** 무엇을 확인하는 챌린지인가. 코드를 보낼 주소와 통과 후 처리가 갈린다(SPEC-0011 R7). */
     val purpose: VerificationPurpose,
-    /**
-     * 이메일 변경 시 확정할 새 주소의 **암호문**. 검증 통과 전이라도 개인정보라 평문으로
-     * 두지 않는다(POL-012). 가입 검증에는 없다(null).
-     *
-     * 도메인이 복호화하지 않는다 — 암호화는 인프라 관심사이고, 여기서는 옮기기만 한다.
-     */
+    /** 확정할 대상 주소의 암호문(POL-012). 도메인은 복호화하지 않는다. 대상이 없으면 null. */
     val targetEmailEncrypted: String?,
 ) {
     init {
-        // purpose와 대상의 짝이 맞는지는 DB 제약(V63)과 같은 규칙이다. 도메인에서도 막아
-        // 잘못 만든 챌린지가 저장소까지 가지 않게 한다.
-        //
-        // **가입 챌린지도 대상을 가질 수 있다**(SPEC-0024 R7). 인증 주소를 정정하면 새 주소는
-        // 소유를 증명하기 전까지 회원 행이 아니라 이 챌린지가 들고 있다 — 즉시 반영하면
-        // 증명되지 않은 주소가 `(provider, email)` 유니크를 선점한다. 정정하지 않은 최초 가입·
-        // 단순 재발송은 회원이 이미 그 주소를 갖고 있어 null이다.
+        // purpose와 대상의 짝 규칙은 DB 제약(V63)과 같다. 가입 챌린지도 주소 정정(SPEC-0024 R7) 시에는 대상을 가진다.
         require(purpose != VerificationPurpose.EMAIL_CHANGE || targetEmailEncrypted != null) {
             "이메일 변경 챌린지는 대상 주소가 있어야 합니다."
         }
@@ -91,10 +77,7 @@ class EmailVerification private constructor(
     companion object {
         const val DEFAULT_MAX_ATTEMPTS: Int = 5
 
-        /**
-         * 새 챌린지 발급. [purpose]를 주지 않으면 가입 검증이다 — 기존 호출부의 의미가 그것이다.
-         * 이메일 변경은 [targetEmailEncrypted]를 반드시 함께 준다.
-         */
+        /** 새 챌린지 발급. [purpose]를 주지 않으면 가입 검증이며, 이메일 변경은 [targetEmailEncrypted]가 필수다. */
         fun issue(
             publicId: UUID,
             memberId: Long,

@@ -14,12 +14,9 @@ import org.springframework.web.client.RestClient
 import java.time.Clock
 
 /**
- * 탈퇴 시 provider 계정 연결을 해제하는 클라이언트(SPEC-0012 R8·R9·R10).
- *
- * Apple·Google은 저장된 refresh token을 폐기하고, Kakao는 어드민 키 + 회원번호로 연결을 끊는다.
- * **예외를 밖으로 던지지 않는다** — 해제 실패가 탈퇴를 막아서는 안 되고,
- * 호출자가 @Transactional 안에 있어 예외가 나가면 회원 삭제까지 롤백되기 때문이다(R11).
- * 대기 상한은 snsRevokeRestClient의 타임아웃으로 건다.
+ * 탈퇴 시 provider 계정 연결 해제 클라이언트(SPEC-0012 R8~R10). Apple·Google은 토큰 폐기, Kakao는 어드민 키 + 회원번호.
+ * - 예외를 밖으로 던지지 않는다. 호출자가 @Transactional 안이라 예외가 나가면 회원 삭제까지 롤백된다(R11).
+ * - 대기 상한은 snsRevokeRestClient의 타임아웃이다.
  */
 @Component
 class SnsConnectionRevokeClient(

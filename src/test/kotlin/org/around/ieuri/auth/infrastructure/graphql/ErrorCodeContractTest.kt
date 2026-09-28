@@ -11,13 +11,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * `userErrors[].code`로 나갈 수 있는 값이 스키마의 `ErrorCode` enum과 어긋나지 않는지 고정한다.
- *
- * **클라이언트는 스키마만 본다.** 코드가 코틀린 예외에만 있고 스키마에 없으면 클라이언트는
- * 그 분기를 만들 수 없고, 존재조차 알 수 없다. 이 테스트가 없으면 새 `UserFacingException`을
- * 추가할 때 스키마가 조용히 뒤처진다 — 컴파일도 기존 테스트도 통과하므로 드러나지 않는다.
- */
+/** `userErrors[].code`로 나갈 수 있는 값과 스키마 `ErrorCode` enum이 어긋나지 않는지 고정한다(클라이언트는 스키마만 본다). */
 class ErrorCodeContractTest {
 
     /** 프로덕션 클래스패스의 모든 `UserFacingException` 구현이 내는 코드. */

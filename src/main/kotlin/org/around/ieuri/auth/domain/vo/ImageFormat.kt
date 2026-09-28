@@ -1,17 +1,8 @@
 package org.around.ieuri.auth.domain.vo
 
 /**
- * 프로필 이미지로 허용하는 형식과 그 매직바이트.
- *
- * **이미지를 파싱하지 않는다** — 앞부분 몇 바이트가 형식 시그니처와 맞는지만 본다.
- * 파서를 태우면 이미지 파서 취약점(ImageTragick·libwebp CVE 계열)에 노출된다.
- *
- * 커뮤니티에 같은 이름의 값 객체가 있으나 **도메인 간 내부 타입을 공유하지 않는다** —
- * auth가 community를 import하면 나중에 auth를 떼어낼 수 없다. 두 도메인이 허용 형식을
- * 각자 정할 수 있다는 뜻이기도 하다.
- *
- * 이 검사는 위조를 완전히 막지 못한다. 그래서 검증을 여러 층에 나눠 건다: 서명에 포함된
- * Content-Type·Content-Length, 확인 단계의 실제 크기, 그리고 여기의 매직바이트다.
+ * 프로필 이미지 허용 형식과 매직바이트. 이미지를 파싱하지 않고 앞부분 바이트만 본다.
+ * - 위조를 완전히 막지 못한다. 서명의 Content-Type·Length, 확인 단계의 실제 크기와 함께 쓰인다.
  */
 enum class ImageFormat(val contentType: String) {
     JPEG("image/jpeg") {

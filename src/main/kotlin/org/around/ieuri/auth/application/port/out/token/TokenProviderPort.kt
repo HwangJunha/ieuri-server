@@ -2,15 +2,9 @@ package org.around.ieuri.auth.application.port.out.token
 
 import java.time.Instant
 
-/**
- * 토큰 발급/검증 포트. JWT는 인프라 관심사이므로 구현(JwtTokenProvider)에 위임한다.
- * refresh 검증 실패(서명/만료/타입 불일치)는 InvalidTokenException을 던진다.
- */
+/** 토큰 발급/검증 포트. refresh 검증 실패(서명/만료/타입)는 InvalidTokenException을 던진다. */
 interface TokenProviderPort {
-    /**
-     * accessToken 발급. 발급 시점의 유효 권한(permissions)과 역할(roles)을 클레임에 flatten해 담는다.
-     * 인가는 요청당 DB 조회 없이 이 토큰의 permissions로 판정한다(역할 변경은 최대 access TTL 후 반영).
-     */
+    /** accessToken 발급. 유효 권한·역할을 클레임에 담으므로 역할 변경은 최대 access TTL 뒤에 반영된다. */
     fun issueAccessToken(memberId: Long, permissions: Set<String>, roles: Set<String>): IssuedToken
 
     fun issueRefreshToken(memberId: Long): IssuedRefreshToken

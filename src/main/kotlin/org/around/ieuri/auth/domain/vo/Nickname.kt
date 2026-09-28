@@ -1,11 +1,6 @@
 package org.around.ieuri.auth.domain.vo
 
-/**
- * 표시용 닉네임. 평문 저장하며 **회원 간 고유하지 않다**(SPEC-0032 R31) — 동명이인 구별은
- * 회원 식별자가 맡는다.
- *
- * 앞뒤 공백은 제거하고 저장한다 — 눈에 보이지 않는 차이가 표시에 남지 않게 한다.
- */
+/** 표시용 닉네임. 회원 간 고유하지 않다(SPEC-0032 R31). 앞뒤 공백은 제거한다. */
 @JvmInline
 value class Nickname private constructor(val value: String) {
     companion object {

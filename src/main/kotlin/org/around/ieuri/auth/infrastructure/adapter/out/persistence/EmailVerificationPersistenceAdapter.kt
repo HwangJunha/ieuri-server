@@ -12,10 +12,7 @@ import org.springframework.stereotype.Component
 import java.time.Instant
 import java.util.UUID
 
-/**
- * 이메일 검증 챌린지 쓰기 포트 구현.
- * update()는 managed 엔티티를 로드해 attempts/consumed/verifiedAt를 반영하고 dirty-check에 맡긴다.
- */
+/** 이메일 검증 챌린지 쓰기 포트 구현. update()는 managed 엔티티를 고쳐 dirty-check에 맡긴다. */
 @Component
 class EmailVerificationPersistenceAdapter(
     private val repository: EmailVerificationJpaRepository,

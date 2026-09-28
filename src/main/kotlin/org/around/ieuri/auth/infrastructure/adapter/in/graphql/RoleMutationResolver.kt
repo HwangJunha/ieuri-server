@@ -13,10 +13,7 @@ import org.around.ieuri.common.graphql.generated.types.RevokeRoleInput
 import org.around.ieuri.common.graphql.generated.types.RoleChangePayload
 import org.around.ieuri.common.security.CurrentMemberProvider
 
-/**
- * 역할 부여/회수 GraphQL 뮤테이션 리졸버. 각각 role:assign/role:revoke 권한을 요구하고,
- * 요청 주체(actor)를 유스케이스에 전달한다(자기 강등 방지 판정·감사에 사용).
- */
+/** 역할 부여/회수 뮤테이션 리졸버. role:assign/role:revoke 권한을 요구하고 요청 주체(actor)를 넘긴다. */
 @DgsComponent
 class RoleMutationResolver(
     private val roleUseCase: RoleUseCase,

@@ -22,10 +22,8 @@ import org.around.ieuri.common.security.CurrentMemberProvider
 import java.util.UUID
 
 /**
- * 이메일 변경 뮤테이션 리졸버(SPEC-0011 R7·R8). 전부 인증 주체(본인) 대상이라 권한 검사가 없다.
- *
- * **코드 검증 실패는 `userErrors`가 아니라 `failureReason`으로 내려간다** — 요청은 정상
- * 처리됐고 코드가 틀렸을 뿐이라 오류가 아니다. 기존 `verifyEmail`과 같은 규약이다.
+ * 이메일 변경 뮤테이션 리졸버(SPEC-0011 R7·R8). 전부 본인 대상이라 권한 검사가 없다.
+ * - 코드 검증 실패는 `userErrors`가 아니라 `failureReason`으로 내려간다.
  */
 @DgsComponent
 class EmailChangeMutationResolver(

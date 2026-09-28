@@ -5,9 +5,7 @@ import org.around.ieuri.auth.application.command.LoginEmailCommand
 import org.around.ieuri.auth.application.command.LogoutCommand
 import org.around.ieuri.auth.application.command.RefreshTokenCommand
 
-/**
- * 인증 토큰 계열 유스케이스(쓰기). SNS 로그인·refresh 회전·로그아웃을 하나의 응집된 포트로 묶는다.
- */
+/** 인증 토큰 유스케이스: 로그인·refresh 회전·로그아웃. */
 interface AuthTokenUseCase {
     /** SNS 로그인 → 토큰 발급. 기존 회원만 인증한다(미가입은 거부). */
     fun loginBySns(command: LoginCommand): TokenPairResult

@@ -138,10 +138,7 @@ class MemberRegistrationServiceTest {
 
     // --- registerBySns: 닉네임 결정 (SPEC-0032 R29·R30) ---
 
-    /**
-     * 가입 시 저장된 닉네임을 꺼낸다. provider 값 채택 여부는 저장된 회원에만 나타나므로
-     * `save`에 실린 애그리거트를 잡아 읽는다.
-     */
+    /** `save`에 실린 애그리거트에서 저장된 닉네임을 꺼낸다. */
     private fun registerAndCaptureNickname(
         providerNickname: String?,
         clientNickname: String? = null,
@@ -162,10 +159,7 @@ class MemberRegistrationServiceTest {
         assertEquals("여행자", registerAndCaptureNickname("여행자"))
     }
 
-    /**
-     * 클라이언트가 넘긴 값이 클레임보다 앞선다 — 카카오는 `/v2/user/me`에서만 주는 닉네임이
-     * 있어 클라이언트 쪽이 더 정확할 수 있다.
-     */
+    /** 클라이언트가 넘긴 값이 클레임보다 앞선다. */
     @Test
     fun `클라이언트가 넘긴 닉네임이 클레임보다 우선한다`() {
         val nickname = registerAndCaptureNickname(
@@ -181,11 +175,7 @@ class MemberRegistrationServiceTest {
         assertEquals("클레임값", registerAndCaptureNickname("클레임값", clientNickname = null))
     }
 
-    /**
-     * **R30의 요지다.** provider가 주는 값이라 클라이언트가 고칠 수 없으므로, 규칙(2~20자)을
-     * 벗어나도 오류가 아니라 조용히 다음 후보로 넘어간다 — 사용자가 손쓸 수 없는 이유로
-     * 가입을 막지 않는다.
-     */
+    /** R30. provider 닉네임이 규칙(2~20자)을 벗어나도 오류가 아니라 다음 후보로 넘어간다. */
     @Test
     fun `클라이언트 닉네임이 한 글자여도 오류가 아니라 다음 후보로 넘어간다`() {
         val nickname = registerAndCaptureNickname(
@@ -217,10 +207,7 @@ class MemberRegistrationServiceTest {
         assertTrue(nickname != "여행자")
     }
 
-    /**
-     * R30. **잘라내지 않는다** — 잘린 이름은 사용자가 의도하지 않은 값이고, 생성 닉네임은
-     * 언제든 바꿀 수 있다. 범위를 벗어나면 통째로 생성기로 물러난다.
-     */
+    /** R30. 잘라내지 않는다 — 범위를 벗어나면 통째로 생성기로 물러난다. */
     @Test
     fun `provider 닉네임이 길이 규칙을 벗어나면 자르지 않고 생성기로 물러난다`() {
         listOf("가", "가".repeat(21)).forEach { raw ->
@@ -259,11 +246,7 @@ class MemberRegistrationServiceTest {
         verify { auditLog.record(100L, "MEMBER_REGISTERED", any()) }
     }
 
-    /**
-     * R12-1·R12-2. 클라이언트가 R1(읽기 전용 표시)을 어겨 다른 주소를 제출해도 **provider 값이
-     * 저장되고 인증은 면제된다.** 제출값을 아예 쓰지 않는 것이 보안 경계를 서버에 두는 방식이다 —
-     * 예전에는 두 값을 비교해 미검증으로 떨어뜨렸으나, 그 판정은 SPEC-0024가 없앴다.
-     */
+    /** R12-1·R12-2. 제출값이 provider 값과 달라도 provider 값이 저장되고 인증은 면제된다. */
     @Test
     fun `제출 이메일이 provider 값과 달라도 provider 값을 저장하고 검증을 면제한다`() {
         every { snsVerifier.verify(any(), any()) } returns identity(email = "original@example.com")
@@ -473,8 +456,7 @@ class MemberRegistrationServiceTest {
 
     @Test
     fun `비밀번호 정책 위반은 전용 코드로 나간다`() {
-        // 특수문자 없음 → 정책 위반. INVALID_INPUT으로 뭉뚱그리면 클라이언트가 어느 입력이
-        // 문제인지 알 수 없어 자국어 안내를 띄우지 못한다(POL-022).
+        // 특수문자 없음 → INVALID_INPUT이 아니라 전용 코드다(POL-022).
         val ex = assertFailsWith<PasswordPolicyViolationException> { emailCommand(password = "Password1") }
         assertEquals("PASSWORD_POLICY_VIOLATION", ex.code)
     }
@@ -518,11 +500,7 @@ class MemberRegistrationServiceTest {
         verify { passwordResetRepository.save(any<PasswordReset>()) }
     }
 
-    /**
-     * 가입되지 않은 주소는 **코드로 거부한다.** 예전에는 조용히 성공으로 끝냈으나,
-     * 사용자가 오지 않을 메일을 기다리게 만들 뿐이었다 — 2단계 사유가 갈려 계정 열거는
-     * 이미 가능했으므로 침묵이 값을 하지 못했다.
-     */
+    /** 가입되지 않은 주소는 코드로 거부한다. */
     @Test
     fun `재설정 요청은 가입되지 않은 주소면 MEMBER_NOT_FOUND로 거부한다`() {
         every { memberRepository.findEmailAuthentication(any()) } returns null
@@ -725,11 +703,7 @@ class MemberRegistrationServiceTest {
         assertEquals("right@example.com", (sent.captured as VerificationEmailRequested).toEmail)
     }
 
-    /**
-     * R7-2. **전용 코드로 거부한다** — 도메인은 `require`로 판정하지만 그대로 두면
-     * `INVALID_INPUT`이 되어 클라이언트가 형식 오류와 구분하지 못한다. 이 상태는 입력을
-     * 고칠 것이 아니라 인증 화면을 벗어나야 하는 상황이라 분기가 달라야 한다.
-     */
+    /** R7-2. INVALID_INPUT이 아니라 전용 코드로 거부한다 — 클라이언트는 인증 화면을 벗어나야 한다. */
     @Test
     fun `이미 인증을 마친 회원의 주소 정정은 ALREADY_VERIFIED로 거부된다`() {
         every { memberRepository.load(100L) } returns pendingMember(emailVerified = true)
@@ -825,10 +799,7 @@ class MemberRegistrationServiceTest {
         verify { memberRepository.updateEmail(100L, any(), any(), "protected:right@example.com") }
     }
 
-    /**
-     * 주소를 고친 뒤 재발송을 누르면 **정정한 주소로 다시 보낸다.** 회원 행의 이메일을 읽으면
-     * 정정 이전 주소로 되돌아가 정정이 조용히 취소된다.
-     */
+    /** 주소를 고친 뒤 재발송하면 정정한 주소로 다시 보낸다. 회원 행을 읽으면 정정이 조용히 취소된다. */
     @Test
     fun `정정 후 재발송은 정정한 주소를 이어받는다`() {
         every { verificationRepository.findByPublicId(verifyPublicId) } returns retargetChallenge()
@@ -861,13 +832,7 @@ class MemberRegistrationServiceTest {
         targetEmailEncrypted = "enc:victim@example.com",
     )
 
-    /**
-     * **이메일 변경 핸들로 가입 인증을 통과시킬 수 없다.**
-     *
-     * `verifyEmail`은 인증을 요구하지 않아 호출자가 핸들의 주인인지 확인하지 않는다.
-     * 목적을 거르지 않으면 남의 이메일 변경이 이 경로로 확정된다 —
-     * 소유권 검사를 하는 `confirmEmailChange`를 통째로 우회하게 된다.
-     */
+    /** 이메일 변경 핸들로 가입 인증을 통과시킬 수 없다. 거르지 않으면 인증 없는 경로로 남의 이메일 변경이 확정된다. */
     @Test
     fun `이메일 변경 핸들로는 가입 인증을 할 수 없다`() {
         every { verificationRepository.findByPublicId(verifyPublicId) } returns emailChangeChallenge()

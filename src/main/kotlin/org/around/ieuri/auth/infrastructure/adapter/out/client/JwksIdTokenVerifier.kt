@@ -13,18 +13,9 @@ import org.around.ieuri.auth.application.exception.SnsVerificationFailedExceptio
 import java.net.URI
 
 /**
- * provider 공개키(JWKS)로 OIDC id_token의 서명·발급자(iss)·audience(aud)·만료(exp)를 검증하고
- * 검증된 클레임을 돌려주는 재사용 컴포넌트. Nimbus JOSE로 JWKS를 원격 조회·캐시한다.
- *
- * 어떤 사유로 실패했는지 과도하게 노출하지 않도록, 모든 검증 실패는 단일
- * [SnsVerificationFailedException]으로 일반화한다.
- *
- * @param jwksUri   provider의 JWKS 엔드포인트
- * @param issuers   허용 발급자(iss) 집합(구글은 두 형태를 허용하므로 집합)
- * @param audiences 허용 aud 집합. **한 provider도 플랫폼별로 aud가 다르다** — 예를 들어
- *   Google id_token의 aud는 iOS 앱에선 iOS 클라이언트 ID, Android/Web에선 웹 클라이언트 ID다
- *   (SDK 설계상 정상). 그래서 단일 값이 아니라 허용 집합으로 받아 하나라도 맞으면 통과시킨다.
- * @param algorithms 허용 서명 알고리즘(RS256/ES256 등)
+ * provider JWKS로 OIDC id_token의 서명·iss·aud·exp를 검증하고 클레임을 돌려준다(Nimbus, JWKS 원격 조회·캐시).
+ * - 모든 실패는 단일 [SnsVerificationFailedException]으로 일반화한다.
+ * @param audiences 허용 aud 집합. 한 provider도 플랫폼별로 aud가 달라(예: Google iOS/웹) 하나라도 맞으면 통과한다.
  */
 class JwksIdTokenVerifier(
     jwkSource: JWKSource<SecurityContext>,

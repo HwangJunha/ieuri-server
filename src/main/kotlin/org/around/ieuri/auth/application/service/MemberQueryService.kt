@@ -12,10 +12,7 @@ import org.around.ieuri.common.pagination.CursorPage
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
-/**
- * 회원 조회(본인/단건 상세/목록). 애그리거트를 우회해 읽기 포트가 프로젝션한 read DTO를 그대로 반환한다.
- * 인가는 인바운드 리졸버에서 판정하고, 여기선 조회에 집중한다. 목록은 이메일 미포함(최소수집).
- */
+/** 회원 조회. 읽기 포트의 read DTO를 그대로 반환하며 인가는 리졸버가 판정한다. */
 @Service
 @Transactional(readOnly = true)
 class MemberQueryService(

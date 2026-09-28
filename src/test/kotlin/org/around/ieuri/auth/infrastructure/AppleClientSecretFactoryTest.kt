@@ -15,11 +15,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * 애플 client secret JWT 생성 검증(SPEC-0012 R8).
- *
- * 서명의 **유효성**은 애플만 판정할 수 있어 범위 밖이다. 여기서 고정하는 것은
- * 설정된 값(teamId/keyId/clientId)이 실제로 JWT에 실린다는 것과,
- * 환경변수로 주입되는 `\n` 이스케이프 PEM을 읽어 ES256 서명까지 간다는 것이다.
+ * 애플 client secret JWT 생성(SPEC-0012 R8). 서명 유효성은 애플만 판정할 수 있어 범위 밖이다.
+ * - 설정값(teamId/keyId/clientId)이 JWT에 실리고, PEM을 읽어 ES256 서명까지 가는지 고정한다.
  */
 class AppleClientSecretFactoryTest {
 
@@ -45,10 +42,7 @@ class AppleClientSecretFactoryTest {
         ),
     )
 
-    /**
-     * 고정 시각을 쓰지 않는다 — client secret은 5분 만료라, 과거로 고정하면 파서가
-     * 만료로 거부해 시간이 지나면 깨지는 테스트가 된다. 만료 자체는 아래에서 따로 검증한다.
-     */
+    /** 고정 시각을 쓰지 않는다 — client secret은 5분 만료라 과거로 고정하면 파서가 만료로 거부한다. */
     private val now: Instant = Instant.now()
 
     @Test

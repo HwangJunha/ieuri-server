@@ -7,12 +7,8 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 
 /**
- * authorization code를 폐기용 refresh token으로 교환해 저장하는 공통 로직(SPEC-0012 R5·R6·R7).
- * SNS 가입·로그인 양쪽에서 재사용한다.
- *
- * **인증 흐름의 곁가지다** — 교환이 실패해도 예외를 밖으로 내보내지 않는다.
- * provider 장애로 로그인·가입이 막히면 revoke를 위해 가용성을 희생하는 셈이기 때문이다(R7).
- * 실패는 로그로만 남기며 code와 토큰 값은 기록하지 않는다(POL-013).
+ * authorization code를 폐기용 refresh token으로 교환해 저장한다(SPEC-0012 R5~R7). SNS 가입·로그인이 쓴다.
+ * - 교환이 실패해도 예외를 내보내지 않는다(R7). 로그에 code와 토큰 값을 남기지 않는다(POL-013).
  */
 @Component
 class ProviderTokenCollector(

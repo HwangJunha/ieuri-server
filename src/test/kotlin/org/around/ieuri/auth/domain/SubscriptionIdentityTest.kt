@@ -7,15 +7,7 @@ import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/**
- * 구독 인가 판정(SPEC-0032 R7, POL-048).
- *
- * 고정하는 계약은 둘이다 — **연결 수명이 액세스 TTL을 넘기면 새 구독을 거부**하고,
- * **토큰이 전부 폐기됐으면 시간과 무관하게 거부**한다.
- *
- * 전송 계층 결합(프레임 수준 SecurityContext 전파)은 여기서 검증하지 않는다 — 실제 소켓이
- * 있어야 드러나므로 판정 로직만 순수 함수로 떼어 본다.
- */
+/** 구독 인가 판정(SPEC-0032 R7, POL-048). 연결 수명이 액세스 TTL을 넘기거나 토큰이 전부 폐기됐으면 새 구독을 거부한다. */
 class SubscriptionIdentityTest {
 
     private val connectedAt = Instant.parse("2026-08-25T00:00:00Z")
@@ -53,10 +45,7 @@ class SubscriptionIdentityTest {
         )
     }
 
-    /**
-     * 탈퇴·정지·재사용 감지가 모두 revokeAllByMember를 부르므로, 이 한 값이 세 경우를 함께
-     * 막는다. **연결이 살아 있다는 것이 자격의 증명은 아니다.**
-     */
+    /** 탈퇴·정지·재사용 감지가 모두 revokeAllByMember를 부르므로 이 한 값이 세 경우를 막는다. */
     @Test
     fun `토큰이 전부 폐기됐으면 수명 안이어도 거부한다`() {
         assertFalse(

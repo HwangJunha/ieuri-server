@@ -25,12 +25,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * 약관 동의 조회·변경(SPEC-0011 R9~R12).
- *
- * 가장 중요한 계약은 **버전이 올라가면 이전 동의가 이월되지 않는다**는 것과,
- * **이력은 감사 로그가, 현재 상태는 동의 테이블이 갖는다**는 분리다.
- */
+/** 약관 동의 조회·변경(SPEC-0011 R9~R12). 버전 상승 시 이월 없음, 이력(감사 로그)과 상태(동의 테이블)의 분리를 고정한다. */
 class MemberAgreementServiceTest {
 
     private val memberId = 7L
@@ -162,8 +157,7 @@ class MemberAgreementServiceTest {
 
     @Test
     fun `필수 약관도 철회할 수 있다`() {
-        // 동의 철회권은 동의와 대등한 수단으로 보장되어야 한다 — 탈퇴로만 물릴 수 있게 하면
-        // 철회와 계정 삭제가 강제로 묶인다.
+        // 필수 약관도 철회할 수 있다.
         givenTerms()
         givenHistory(TermsKey("SERVICE", "1.0") to AgreementRecord(false, now))
         val appended = slot<List<Agreement>>()
@@ -191,8 +185,7 @@ class MemberAgreementServiceTest {
 
     @Test
     fun `동의와 철회를 감사 로그에 남긴다`() {
-        // member_terms_agreement는 탈퇴 시 회원과 함께 지워진다 — 철회·탈퇴가 증빙이 가장
-        // 필요한 사건인데 그때 사라지므로, FK가 없는 감사 로그가 최종 보관처다.
+        // 동의 테이블은 탈퇴 시 함께 지워지므로 감사 로그가 최종 보관처다.
         givenTerms()
         givenHistory()
 

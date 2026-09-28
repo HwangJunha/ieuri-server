@@ -14,14 +14,8 @@ import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
 
 /**
- * accessToken 인증 필터. `Authorization: Bearer <access>`가 유효하면 인증 주체(memberId)를
- * SecurityContext에 설정한다. 토큰이 없거나 무효면 인증 없이 통과시키고,
- * 인증이 필요한 처리(예: 탈퇴)는 리졸버에서 memberId 유무로 거부한다.
- *
- * **판정 결과를 요청 속성에 남긴다**(SPEC-0032 R1). SecurityContext를 비우고 끝내면 "토큰
- * 없음"과 "토큰 무효"가 같은 상태가 되어, 만료된 세션이 비로그인으로 조용히 강등된다.
- * 신원 없이도 동작하는 연산이 이 속성을 읽어 둘을 구별한다
- * ([org.around.ieuri.common.graphql.tokenPresentation]).
+ * accessToken 인증 필터. 유효하면 memberId를 SecurityContext에 세우고, 없거나 무효면 인증 없이 통과시킨다.
+ * - 판정 결과(없음/무효)를 요청 속성에 남긴다(SPEC-0032 R1, [org.around.ieuri.common.graphql.tokenPresentation]).
  */
 @Component
 class JwtAuthenticationFilter(

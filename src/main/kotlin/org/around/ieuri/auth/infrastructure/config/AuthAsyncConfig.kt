@@ -7,18 +7,8 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
 import java.util.concurrent.Executor
 
 /**
- * 접속기록 저장 전용 executor. alarm의 푸시, community의 조회수와 같은 관례다.
- *
- * **도메인마다 executor를 따로 두는 이유는 격리다** — 푸시가 밀렸을 때 접속기록이 함께 굶으면
- * 안 되고, 그 반대도 마찬가지다.
- *
- * 워커가 적은 이유는 발행량이 적기 때문이다. 기록 대상이 로그인·탈퇴 등 계정 사건뿐이라
- * (`AccessType`) 조회 API처럼 초당 수십 건이 들어오지 않는다.
- *
- * **큐가 차도 폐기하지 않는다.** 푸시(POL-048)와 다른 점이다 — 접속기록은 법정 기록이라
- * 유실이 허용되지 않는다. `CallerRunsPolicy`가 기본값이므로 큐가 차면 **호출 스레드가 직접
- * 저장한다.** 그러면 그 요청만 느려지고 기록은 남는다. 폐기하면 침해사고 조사에서 그 구간이
- * 통째로 비는데, 그것이 느려지는 것보다 나쁘다.
+ * 접속기록 저장 전용 executor(도메인별 격리).
+ * - 큐가 차도 폐기하지 않는다. `CallerRunsPolicy`로 호출 스레드가 직접 저장한다 — 법정 기록이라 유실이 허용되지 않는다.
  */
 @Configuration
 @EnableAsync

@@ -6,12 +6,7 @@ import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.M
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
-/**
- * 프로필 쓰기 포트 구현(SPEC-0011 R5·R6).
- *
- * 변경은 managed 엔티티를 로드해 필드를 바꾸고 **dirty-check로 UPDATE를 흘린다** —
- * detached 엔티티를 새로 만들어 save()하면 dirty-check가 무의미해진다.
- */
+/** 프로필 쓰기 포트 구현(SPEC-0011 R5·R6). managed 엔티티를 고쳐 dirty-check로 UPDATE한다. */
 @Component
 class MemberProfilePersistenceAdapter(
     private val profileRepository: MemberProfileJpaRepository,

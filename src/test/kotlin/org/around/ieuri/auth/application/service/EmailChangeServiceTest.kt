@@ -44,10 +44,8 @@ import kotlin.test.assertTrue
 
 /**
  * 이메일 변경(SPEC-0011 R7·R8).
- *
- * 고정하는 계약: **확인을 통과하기 전까지 이메일은 바뀌지 않는다**, 코드 실패는 오류가 아니라
- * `failureReason`이다, 그리고 **`EMAIL` 회원은 로그인 식별자가 함께 갱신된다**(R8) —
- * 그러지 않으면 이메일을 바꾼 회원이 로그인하지 못한다.
+ * - 확인을 통과하기 전까지 이메일은 바뀌지 않고, 코드 실패는 오류가 아니라 `failureReason`이다.
+ * - EMAIL 회원은 로그인 식별자가 함께 갱신된다(R8).
  */
 class EmailChangeServiceTest {
 
@@ -57,10 +55,7 @@ class EmailChangeServiceTest {
     private val newEmail = "new@example.com"
     private val publicId = UUID.randomUUID()
 
-    /**
-     * **목이 아니라 손으로 쓴 페이크다.** `Email`이 value class라 mockk가 그 반환을 스텁하지
-     * 못한다(언박싱 규약이 어긋나 ClassCastException). 이 포트만 페이크로 두고 나머지는 목이다.
-     */
+    /** 손으로 쓴 페이크다. `Email`이 value class라 mockk가 그 반환을 스텁하지 못한다(ClassCastException). */
     private val memberRepository = FakeMemberRepository()
     private val verificationRepository = mockk<EmailVerificationRepositoryPort>(relaxed = true)
     private val auditLog = mockk<AuditLogPort>(relaxed = true)
@@ -99,10 +94,7 @@ class EmailChangeServiceTest {
         Clock.fixed(now, ZoneOffset.UTC),
     )
 
-    /**
-     * 변경 요청은 회원을 적재해 [Member.canChangeEmail]로 판정하므로(SPEC-0024 R6),
-     * 현재 주소를 세우는 것은 곧 **변경 가능한 `EMAIL` 회원**을 세우는 것이다.
-     */
+    /** 현재 주소를 세운다. 변경 요청이 [Member.canChangeEmail]로 판정하므로 변경 가능한 EMAIL 회원을 세운다. */
     private fun givenCurrentEmail(email: String = currentEmail) {
         memberRepository.currentEmail = Email(email)
         givenMember(Provider.EMAIL, email)
@@ -464,10 +456,7 @@ class EmailChangeServiceTest {
     }
 }
 
-/**
- * `MemberRepositoryPort`의 최소 페이크. **이 슬라이스가 쓰는 메서드만 실동작하고**
- * 나머지는 쓰이지 않으므로 호출되면 실패시킨다 — 조용히 no-op이면 검증이 헐거워진다.
- */
+/** `MemberRepositoryPort`의 최소 페이크. 이 슬라이스가 쓰는 메서드만 동작하고 나머지는 호출되면 실패한다. */
 private class FakeMemberRepository : MemberRepositoryPort {
     var currentEmail: Email? = Email("old@example.com")
     var identifierTaken: Boolean = false

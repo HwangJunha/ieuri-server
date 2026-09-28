@@ -2,12 +2,7 @@ package org.around.ieuri.auth.domain.entity
 
 import org.around.ieuri.auth.domain.vo.Nickname
 
-/**
- * 회원 프로필. Member 애그리거트에 소유되는 엔티티.
- * 가입 시 자동 생성된 닉네임으로 시작하며(SPEC-0011 R20) 표시용이라 평문으로 다룬다.
- *
- * 변경은 애그리거트 루트(Member)를 거친다 — 여기의 setter는 private이다.
- */
+/** 회원 프로필. Member 애그리거트 소유이며, 변경은 루트(Member)를 거친다(setter는 private). */
 class Profile(
     nicknameInitial: Nickname,
     profileImageUrlInitial: String?,

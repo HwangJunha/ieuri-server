@@ -18,21 +18,9 @@ import java.time.Clock
 import java.time.Instant
 
 /**
- * WebSocket 연결 수립(`connection_init`) 시 1회 인증하고, 이후 프레임마다 인증 주체를
- * 실행 스레드에 세운다(SPEC-0017 R10, POL-048).
- *
- * **HTTP JWT 필터가 이 경로를 타지 않는다** — WebSocket 핸드셰이크 이후의 프레임은 서블릿
- * 필터 체인을 거치지 않으므로 인증을 여기서 다뤄야 한다.
- *
- * 인증은 **연결당 1회**이고, 구독별 참여자 검사는 `subscribe` 시점에 따로 한다 — 연결이
- * 살아 있다는 것이 특정 대화를 볼 자격의 증명은 아니다.
- *
- * **토큰 만료로 기존 연결을 끊지 않는다.** accessToken은 5분 만료라(POL-008) 대화 중에 반드시
- * 만료되는데, 끊으면 타이핑 표시가 주기적으로 사라진다. 만료는 새 `subscribe` 시점부터
- * 적용되며, 그 판정은 구독을 여는 유스케이스의 참여자 검사가 맡는다.
- *
- * auth에 두는 이유는 토큰 해석이 이 도메인의 책임이기 때문이다 — community는 이 클래스를
- * 알지 못하고 SecurityContext를 통해 memberId만 읽는다(JwtAuthenticationFilter와 같은 구조).
+ * WebSocket `connection_init`에서 1회 인증하고, 요청마다 인증 주체를 실행 스레드에 세운다(SPEC-0017 R10, POL-048).
+ * - HTTP JWT 필터는 이 경로를 타지 않는다.
+ * - 토큰 만료로 기존 연결을 끊지 않는다. 만료는 새 `subscribe`의 인가에서 판정한다.
  */
 @Component
 class GraphqlWebSocketAuthInterceptor(
@@ -40,27 +28,19 @@ class GraphqlWebSocketAuthInterceptor(
     private val clock: Clock,
 ) : WebSocketGraphQlInterceptor {
 
-    /**
-     * 토큰이 없거나 무효면 **연결 자체를 거부한다.** 구독 시점까지 미루면 클라이언트가 연결에
-     * 성공했다고 믿고 이벤트를 기다린다.
-     */
+    /** 토큰이 없거나 무효면 연결 자체를 거부한다. */
     override fun handleConnectionInitialization(
         sessionInfo: WebSocketSessionInfo,
         connectionInitPayload: Map<String, Any>,
     ): Mono<Any> {
-        // **연결 수립이 실패하면 리졸버까지 가지 않아 아무 로그도 남지 않는다.**
-        // 페이로드 키 이름만 남긴다 — 값에는 토큰이 들어 있어 기록하지 않는다(POL-013).
+        // 연결 거부는 리졸버까지 가지 않아 로그가 없다. 페이로드 키 이름만 남기고 값(토큰)은 기록하지 않는다(POL-013).
         log.debug(
             "WS connection_init: payloadKeys={} headerNames={}",
             connectionInitPayload.keys,
             sessionInfo.headers.headerNames(),
         )
 
-        // **두 경로를 모두 받는다.** 페이로드를 먼저 보고 없으면 핸드셰이크 헤더를 본다.
-        //
-        // 브라우저의 WebSocket API는 커스텀 헤더를 붙일 수 없어 페이로드가 유일한 수단이고,
-        // 네이티브 클라이언트·API 도구(Postman 등)는 헤더를 쓰는 쪽이 흔하다. 한쪽만 받으면
-        // 나머지 절반이 "토큰을 넣었는데 인증이 안 된다"는 상태에 빠진다.
+        // 페이로드를 먼저 보고 없으면 핸드셰이크 헤더를 본다(브라우저는 커스텀 헤더를 붙일 수 없다).
         val raw = payloadToken(connectionInitPayload) ?: headerToken(sessionInfo)
         if (raw == null) {
             log.warn(
@@ -102,21 +82,9 @@ class GraphqlWebSocketAuthInterceptor(
     private fun bearerToken(raw: String): String? = raw.takeIf { it.startsWith(BEARER_PREFIX) }?.removePrefix(BEARER_PREFIX)?.takeIf { it.isNotBlank() }
 
     /**
-     * 구독 요청이 실행되기 직전에 세션의 인증 주체를 **현재 스레드의 SecurityContext로 옮기고,
-     * 끝나면 반드시 지운다.**
-     *
-     * 지우는 것이 이 메서드의 핵심이다. WebSocket 프레임은 서블릿 필터 체인을 타지 않아
-     * `SecurityContextHolder`를 정리해 주는 주체가 **없고**, 처리 스레드는 연결과 요청을 가로질러
-     * 재사용된다. 세우기만 하면 앞 요청의 회원 신원이 다음 요청에 그대로 남아 **다른 사람의
-     * 대화를 그의 권한으로 조회하게 된다.** 인증 실패가 아니라 잘못된 성공이라 조용하다.
-     *
-     * 리졸버가 스트림을 만들 때까지만 필요하다 — 구독이 열린 뒤 흘러오는 이벤트는 참여자
-     * 검사를 이미 통과한 것이라 그 시점의 SecurityContext를 요구하지 않는다.
-     *
-     * **`Mono.defer`로 감싸는 것이 핵심이다.** `chain.next()`는 콜드 Mono를 돌려주므로 그냥
-     * try/finally로 감싸면 finally가 **조립 시점에** 돌아, 정작 리졸버가 실행되는 구독 시점에는
-     * 컨텍스트가 이미 비어 있다. 세우기와 지우기를 둘 다 리액티브 생명주기 안으로 넣어야
-     * 실행 구간을 정확히 감싼다.
+     * 요청 실행 동안 세션의 인증 주체를 SecurityContext에 세우고, 끝나면 반드시 지운다.
+     * - 지우지 않으면 재사용되는 스레드에서 다음 요청이 앞 회원의 신원을 물려받는다(필터 체인이 정리해 주지 않는다).
+     * - `Mono.defer`로 감싸야 한다. try/finally만 쓰면 조립 시점에 지워져 리졸버 실행 시점엔 비어 있다.
      */
     override fun intercept(
         request: WebGraphQlRequest,
@@ -124,8 +92,7 @@ class GraphqlWebSocketAuthInterceptor(
     ): Mono<WebGraphQlResponse> {
         if (request !is WebSocketGraphQlRequest) return chain.next(request)
 
-        // **연결 수립 시각을 실행 컨텍스트에 싣는다**(SPEC-0032 R7). 구독 인가가 이 값으로
-        // 액세스 TTL 초과를 판정하는데, 세션 속성은 리졸버가 닿을 수 없는 자리다.
+        // 연결 수립 시각을 GraphQL 컨텍스트에 싣는다(SPEC-0032 R7). 구독 인가가 액세스 TTL 초과를 판정한다.
         (request.sessionInfo.attributes[CONNECTED_AT] as? Instant)?.let {
             request.configureExecutionInput { _, builder ->
                 builder.graphQLContext(mapOf(CONNECTED_AT to it)).build()

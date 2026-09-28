@@ -3,13 +3,9 @@ package org.around.ieuri.auth.infrastructure.adapter.out.client
 import org.springframework.web.util.HtmlUtils
 
 /**
- * 인증 코드 메일의 제목과 본문. HTML 본문과 평문 대체본을 함께 만든다 —
- * HTML을 막아 둔 클라이언트에는 평문이 그대로 보인다.
- *
- * 스타일은 전부 인라인이다. Gmail을 비롯한 다수 클라이언트가 `<style>` 블록과 외부
- * 리소스를 제거하므로 클래스 선택자와 이미지는 쓰지 않는다.
- *
- * 본문에 끼워 넣는 값은 마크업 주입 지점이므로 값의 출처와 무관하게 이스케이프한다.
+ * 인증 코드 메일의 제목과 본문(HTML + 평문 대체본).
+ * - 스타일은 전부 인라인이다. 다수 클라이언트가 `<style>`과 외부 리소스를 제거한다.
+ * - 끼워 넣는 값은 출처와 무관하게 이스케이프한다.
  */
 data class VerificationCodeMail(
     val subject: String,
