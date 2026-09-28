@@ -16,12 +16,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
-/**
- * 엔티티 ↔ 도메인 변환(POL-033).
- *
- * 필드마다 **서로 다른 값**을 준다 — `deviceId`와 `fcmToken`이 둘 다 String이라 뒤바뀌어도
- * 컴파일이 통과한다.
- */
+/** 엔티티 ↔ 도메인 변환(POL-033). 필드마다 서로 다른 값을 준다. */
 class AlarmMapperTest {
 
     private val createdAt = Instant.parse("2026-08-19T01:02:03Z")
@@ -91,7 +86,6 @@ class AlarmMapperTest {
         assertEquals(false, domain.enabled)
     }
 
-    /** 종류와 언어가 둘 다 enum이라 뒤바뀌면 컴파일이 통과한다 — 값을 다르게 준다. */
     @Test
     fun `알림 문구 엔티티가 도메인으로 옮겨진다`() {
         val entity = NotificationMessageEntity(

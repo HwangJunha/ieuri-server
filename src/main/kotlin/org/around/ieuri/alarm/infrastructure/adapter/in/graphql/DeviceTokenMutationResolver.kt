@@ -12,12 +12,7 @@ import org.around.ieuri.common.graphql.generated.types.RegisterDeviceTokenPayloa
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.springframework.stereotype.Component
 
-/**
- * 기기 토큰 등록·해제(SPEC-0028 R1·R2).
- *
- * 두 연산 모두 **인증을 요구한다** — 보낼 대상이 회원이므로 미인증 호출은 성립하지 않는다.
- * 회원 신원은 인증 컨텍스트에서 오며 입력이 주장하지 않는다.
- */
+/** 기기 토큰 등록·해제(SPEC-0028 R1·R2). 두 연산 모두 인증을 요구한다. */
 @DgsComponent
 @Component
 class DeviceTokenMutationResolver(

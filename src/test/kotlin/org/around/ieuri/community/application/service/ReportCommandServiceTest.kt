@@ -148,7 +148,7 @@ class ReportCommandServiceTest {
             reporterId,
         )
 
-        // 집계 조회조차 하지 않는다 — 자동 조치 대상이 아니기 때문이다.
+        // 자동 조치 대상이 아니라 집계 조회조차 하지 않는다.
         verify(exactly = 0) { reportRepository.countDistinctReporters(any(), any()) }
         verify(exactly = 0) { moderationPort.hide(any()) }
     }

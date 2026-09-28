@@ -6,11 +6,7 @@ import org.around.ieuri.alarm.domain.aggregate.NotificationPreference
 import org.around.ieuri.alarm.domain.vo.NotificationCategory
 import org.around.ieuri.alarm.domain.vo.NotificationType
 
-/**
- * 기기 토큰 저장(SPEC-0028 R1~R4).
- *
- * 조회 키가 `deviceId`인 것이 이 포트의 핵심이다 — FCM 토큰은 로테이션되므로 키가 될 수 없다.
- */
+/** 기기 토큰 저장(SPEC-0028 R1~R4). 키는 로테이션되는 FCM 토큰이 아니라 `deviceId`다. */
 interface DeviceTokenRepositoryPort {
     fun findByDeviceId(deviceId: String): DeviceToken?
 
@@ -19,7 +15,7 @@ interface DeviceTokenRepositoryPort {
 
     fun save(deviceToken: DeviceToken): DeviceToken
 
-    /** 재등록으로 바뀐 토큰·언어·소유 회원을 반영한다. 관리 엔티티에 얹어 dirty-check로 UPDATE한다. */
+    /** 재등록으로 바뀐 토큰·언어·소유 회원을 반영한다. */
     fun update(deviceToken: DeviceToken)
 
     /** 로그아웃 해제(R2). 없어도 예외가 아니다 — 지운 건수를 돌려준다(AC2.2). */
@@ -32,26 +28,13 @@ interface DeviceTokenRepositoryPort {
     fun deleteByDeviceIds(deviceIds: Collection<String>): Long
 }
 
-/**
- * 알림 제목 문구 조회(SPEC-0028 R13).
- *
- * 쓰기가 없다 — 문구는 마이그레이션이 넣고 운영자가 DB에서 고친다. 앱이 바꿀 값이 아니라
- * 앱이 읽는 값이라, 지금 필요 없는 저장 연산을 포트에 두지 않는다.
- */
+/** 알림 문구 조회(SPEC-0028 R13). 읽기 전용이며 값은 마이그레이션·운영자가 넣는다. */
 interface NotificationMessageRepositoryPort {
-    /**
-     * 한 종류의 모든 언어 문구. **발송 1건에 한 번만 읽는다** — 수신자가 기기마다 다른
-     * 언어를 쓸 수 있어 언어별로 나눠 보내는데, 그때마다 조회하면 조회가 여러 번 붙는다.
-     */
+    /** 한 종류의 모든 언어 문구. */
     fun findByType(type: NotificationType): List<NotificationMessage>
 }
 
-/**
- * 수신 설정 저장(SPEC-0028 R19).
- *
- * **저장된 행이 없는 것이 정상 상태다** — 켜짐을 뜻하며(AC10.3) 사용자가 토글을 처음
- * 건드릴 때만 행이 생긴다.
- */
+/** 수신 설정 저장(SPEC-0028 R19). 행이 없으면 켜짐이다(AC10.3). */
 interface NotificationPreferenceRepositoryPort {
     fun findByMemberId(memberId: Long): List<NotificationPreference>
 
@@ -62,7 +45,6 @@ interface NotificationPreferenceRepositoryPort {
 
     fun save(preference: NotificationPreference): NotificationPreference
 
-    /** 관리 엔티티에 얹어 dirty-check로 UPDATE한다. */
     fun update(preference: NotificationPreference)
 
     /** 탈퇴 연쇄 삭제(R3). 지운 건수를 돌려준다. */

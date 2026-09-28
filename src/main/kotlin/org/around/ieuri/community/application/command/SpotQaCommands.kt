@@ -1,11 +1,6 @@
 package org.around.ieuri.community.application.command
 
-/**
- * 장소 질문/답변 쓰기 입력(SPEC-0026).
- *
- * 커뮤니티의 다른 커맨드와 같이 **memberId를 담지 않는다** — 호출자 신원은 인증 컨텍스트에서
- * 오며 커맨드는 입력만 들고 있다.
- */
+// 장소 질문/답변 쓰기 입력(SPEC-0026). memberId는 담지 않는다.
 
 data class CreateSpotQuestionCommand(
     val catalogId: Long,
@@ -23,12 +18,7 @@ data class DeleteSpotQuestionCommand(val questionId: Long) {
     }
 }
 
-/**
- * 해결 상태 변경(R8). **양방향이다** — [resolved]가 false면 미해결로 되돌린다.
- *
- * 불리언을 받는 이유는 뮤테이션을 둘로 나누지 않기 위해서다. 해제 전용 뮤테이션을 두면
- * 소유자 판정·멱등 규약이 두 벌이 되고 갈라진다.
- */
+/** 해결 상태 변경(R8). [resolved]가 false면 미해결로 되돌린다. */
 data class ResolveSpotQuestionCommand(
     val questionId: Long,
     val resolved: Boolean,

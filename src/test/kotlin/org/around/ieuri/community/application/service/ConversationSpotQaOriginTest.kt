@@ -26,14 +26,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /**
- * 메시지의 장소 질문/답변 인용(SPEC-0026 R13·R14).
- *
- * **인용은 메시지에 붙는다** — 한 대화에서 여러 질문을 물을 수 있기 때문이다. 방에 하나만
- * 두면 두 번째 질문이 담길 곳이 없어 클라이언트가 평문으로 우회하게 된다.
- *
- * 핵심 규약 둘: 인용을 만들지 못해도 **메시지는 전송된다**(AC-13.4)는 것과, 스펙에 없던
- * 방어 하나 — 인용 답변의 작성자가 대화 상대가 아니면 무시한다. 없으면 남의 답변을 붙여
- * 상대의 받은함에 맥락을 위조할 수 있다.
+ * 메시지의 장소 질문/답변 인용(SPEC-0026 R13·R14). 인용은 대화가 아니라 메시지에 붙는다.
+ * - 인용을 만들지 못해도 메시지는 전송된다(AC-13.4).
+ * - 인용 답변의 작성자가 대화 상대가 아니면 인용을 무시한다.
  */
 class ConversationSpotQaOriginTest {
 
@@ -164,10 +159,7 @@ class ConversationSpotQaOriginTest {
         assertNull(saved.captured.spotQaOrigin)
     }
 
-    /**
-     * **한 대화에서 여러 질문을 인용할 수 있다** — 이것이 대화가 아니라 메시지에 붙인 이유다.
-     * 방에 하나만 두면 두 번째 인용이 담길 곳이 없다.
-     */
+    /** 한 대화에서 여러 질문을 인용할 수 있다. */
     @Test
     fun `같은 대화에서 다른 질문을 다시 인용할 수 있다`() {
         givenParticipatingConversation()
@@ -193,7 +185,7 @@ class ConversationSpotQaOriginTest {
         assertEquals("둘째 질문", second.questionExcerpt)
     }
 
-    /** AC-13.4 — 거절하지 않는다. 메시지를 보내는 것이 본질이고 인용은 부가 맥락이다. */
+    /** AC-13.4 — 인용을 만들지 못해도 거절하지 않는다. */
     @Test
     fun `인용 답변이 이미 삭제됐으면 인용 없이 전송된다`() {
         givenParticipatingConversation()
@@ -215,10 +207,7 @@ class ConversationSpotQaOriginTest {
         assertNull(saved.captured.spotQaOrigin)
     }
 
-    /**
-     * 스펙에 없던 방어. 이것이 빠지면 A가 C의 답변을 인용해 B에게 보내, B의 받은함에
-     * "B의 답변에 대한 문의"인 것처럼 보이는 맥락을 만들 수 있다.
-     */
+    /** 대화 상대가 쓰지 않은 답변은 인용하지 않는다(맥락 위조 방지). */
     @Test
     fun `인용 답변의 작성자가 대화 상대가 아니면 인용을 무시한다`() {
         givenParticipatingConversation()
@@ -244,7 +233,7 @@ class ConversationSpotQaOriginTest {
         assertEquals(100, origin.answerExcerpt.length)
     }
 
-    /** 인용 자체가 보낼 내용이다 — 본문 없이 인용만 보내는 것도 성립해야 한다. */
+    /** 본문 없이 인용만 보내는 것도 성립한다. */
     @Test
     fun `본문 없이 인용만 보낼 수 있다`() {
         givenParticipatingConversation()

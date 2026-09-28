@@ -12,9 +12,7 @@ import org.springframework.transaction.annotation.Transactional
 
 /**
  * 차단·해제. 중복 차단과 미차단 해제는 오류가 아니라 멱등 no-op이다.
- *
- * 저장은 단방향 한 건이며 양방향 해석은 조회 시점에 일어난다 — 두 건을 쓰면 A가 해제할 때
- * B가 건 차단까지 지워질 위험이 있다.
+ * - 저장은 단방향 한 건이며 양방향 해석은 조회 시점에 한다.
  */
 @Service
 class BlockCommandService(
@@ -24,7 +22,7 @@ class BlockCommandService(
 
     @Transactional
     override fun block(command: BlockUserCommand, memberId: Long) {
-        // 자기 차단을 존재 확인보다 먼저 본다 — 본인 id는 조회할 필요가 없다.
+        // 자기 차단은 존재 확인보다 먼저 거부한다.
         if (command.targetMemberId == memberId) throw CannotBlockSelfException()
         if (memberLookupPort.findAuthor(command.targetMemberId) == null) throw MemberNotFoundException()
 

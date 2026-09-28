@@ -38,15 +38,8 @@ import org.around.ieuri.common.graphql.generated.types.PostSpot as GqlPostSpot
 import org.around.ieuri.common.graphql.generated.types.TargetCategory as GqlTargetCategory
 
 /**
- * 커뮤니티 조회 리졸버.
- *
- * **read DTO를 노드로 반환한다** — 생성 타입은 non-null 필드를 생성자 필수 인자로 요구해서
- * 지연 필드를 비워 둘 수 없다. spot·author·comments는 각각 다른 저장소를 물어야 하므로
- * @DgsData 필드 리졸버가 **요청된 경우에만** 조회한다. `{ id body }`만 물으면 추가 조회는 없다.
- *
- * 글·댓글 커넥션은 생성 타입 대신 이 패키지의 [PostConnection]·[CommentConnection]을 쓴다 —
- * 생성된 edge의 node가 지연 필드를 비워 둘 수 없기 때문이다. 두 타입의 **이름이 `Connection`으로
- * 끝나야** Spring for GraphQL의 커넥션 래핑을 통과한다(CommunityConnections.kt 참조).
+ * 커뮤니티 조회 리졸버. read DTO를 노드로 반환하고 spot·author·comments 등은 @DgsData가 요청 시에만 읽는다.
+ * - 커넥션 타입 이름은 `Connection`으로 끝나야 Spring for GraphQL 커넥션 래핑을 통과한다.
  */
 @DgsComponent
 @Component
@@ -75,8 +68,7 @@ class CommunityQueryResolver(
         dfe: DgsDataFetchingEnvironment,
     ): PostConnection {
         val memberId = currentMemberProvider.requireMemberId()
-        // **좌표를 실제로 보낸 호출만** 남긴다(SPEC-0032 R19) — 이 연산은 좌표가 선택이라
-        // 전체 피드 조회는 위치 조회가 아니다. 좌표 자체는 넘기지 않는다.
+        // 좌표를 보낸 호출만 위치 조회로 남긴다(SPEC-0032 R19). 좌표 값은 싣지 않는다.
         if (latitude != null && longitude != null) {
             eventPublisher.publish(LocationAccessed(memberId, "posts"))
         }
@@ -88,7 +80,6 @@ class CommunityQueryResolver(
                 radiusMeters = radiusMeters ?: DEFAULT_RADIUS_METERS,
                 categories = toTargetCategories(categories),
                 tag = tag,
-                // 스키마 기본값이 LATEST라 null이 오는 경우는 없지만, 계약을 코드에도 남긴다.
                 sort = sort?.let { PostSortOrder.valueOf(it.name) } ?: PostSortOrder.LATEST,
                 hiddenByViewer = hiddenByViewer ?: false,
                 first = first ?: DEFAULT_PAGE_SIZE,
@@ -103,10 +94,7 @@ class CommunityQueryResolver(
         )
     }
 
-    /**
-     * 내가 쓴 글(SPEC-0011 R3). 위치·반경 인자가 없고 숨김·차단 필터도 걸리지 않는다 —
-     * 자기 글은 자기가 숨겼더라도 마이페이지에 보여야 한다.
-     */
+    /** 내가 쓴 글(SPEC-0011 R3). 숨김·차단 필터가 걸리지 않는다. */
     @DgsQuery
     fun myPosts(
         @InputArgument first: Int?,
@@ -158,7 +146,7 @@ class CommunityQueryResolver(
             BlockedUsersQuery(first = first ?: DEFAULT_PAGE_SIZE, after = after),
             memberId = memberId,
         )
-        // 목록 자체가 회원 정보를 보여주기 위한 것이라 지연시키지 않는다. 대신 **한 번에** 읽는다.
+        // 회원 정보가 목록의 본체라 지연시키지 않고 한 번에 읽는다.
         val authors = memberLookupPort.findAuthors(page.edges.map { it.node.member.id })
         return GqlBlockedUserConnection(
             edges = page.edges.map {
@@ -173,10 +161,7 @@ class CommunityQueryResolver(
         )
     }
 
-    /**
-     * 상단 카테고리 칩. 앱 식별은 X-App-Key 헤더에서 오며 GraphQL 인자가 아니다 —
-     * 클라이언트가 고르는 값이 아니라 요청의 속성이기 때문이다(Accept-Language와 같은 이유).
-     */
+    /** 상단 카테고리 칩. 앱 식별은 인자가 아니라 X-App-Key 헤더에서 온다. */
     @DgsQuery
     fun communityChips(dfe: DgsDataFetchingEnvironment): List<GqlTargetCategory> = communityQueryUseCase.communityChips(dfe.appKey(), dfe.contentLanguage())
         .map { GqlTargetCategory.valueOf(it.category.name) }
@@ -202,9 +187,7 @@ class CommunityQueryResolver(
 
     /**
      * 호출자가 좋아요했는지.
-     *
-     * **뷰어를 여기서 확정해 실어 보낸다**(SPEC-0032 R27) — 로더가 자기 스레드에서 읽으면
-     * 가상 스레드 전환에 신원을 잃는다.
+     * - 뷰어는 여기서 확정해 로더에 넘긴다 — 로더 스레드에서 읽으면 신원을 잃는다(SPEC-0032 R27).
      */
     @DgsData(parentType = "Post", field = "likedByViewer")
     fun postLikedByViewer(dfe: DgsDataFetchingEnvironment): CompletableFuture<Boolean> = dfe.loader<Boolean>(PostLikedDataLoader.NAME)
@@ -212,12 +195,8 @@ class CommunityQueryResolver(
         .thenApply { it ?: false }
 
     /**
-     * 장소 칩. **장소는 선택이라 없으면 null이다.** 연결을 먼저 배치로 확인하고, 있을 때만
-     * tourism을 배치로 묻는다 — 두 단계 모두 요청된 경우에만 돈다.
-     *
-     * **활성 언어에서 해소되지 않아도 null이다**(SPEC-0029 R-27). 다른 언어 이름으로 대신
-     * 채우지 않는다 — 클라이언트는 칩이 없는 것으로 렌더한다. 목록 자체가 활성 언어로
-     * 걸러지므로(R-23) 정상 경로에서는 여기가 null이 될 일이 거의 없다.
+     * 장소 칩. 연결을 먼저 확인하고 있을 때만 tourism을 배치로 묻는다.
+     * - 장소가 없거나 활성 언어에서 해소되지 않으면 null이다. 다른 언어 이름으로 채우지 않는다(SPEC-0029 R-27).
      */
     @DgsData(parentType = "Post", field = "spot")
     fun postSpot(dfe: DgsDataFetchingEnvironment): CompletableFuture<GqlPostSpot?> = dfe.loader<Long>(PostCatalogIdDataLoader.NAME)
@@ -236,10 +215,7 @@ class CommunityQueryResolver(
     @DgsData(parentType = "Post", field = "author")
     fun postAuthor(dfe: DgsDataFetchingEnvironment): CompletableFuture<GqlPostAuthor> = dfe.loadAuthor(dfe.postSource().authorId)
 
-    /**
-     * 답글. **요청된 경우에만** 배치로 읽는다 — 목록만 그리는 화면은 조회가 붙지 않는다.
-     * 답글의 replies는 항상 빈 목록이다(깊이 2단계).
-     */
+    /** 답글. 요청된 경우에만 배치로 읽는다. 답글의 replies는 항상 빈 목록이다(깊이 2단계). */
     @DgsData(parentType = "Comment", field = "replies")
     fun commentReplies(dfe: DgsDataFetchingEnvironment): CompletableFuture<List<CommentView>> {
         val source = dfe.getSource<CommentView>()
@@ -255,28 +231,17 @@ class CommunityQueryResolver(
         return dfe.loadAuthor(source.author.id)
     }
 
-    /**
-     * 작성자를 배치로 읽는다. 글과 댓글이 같은 로더를 쓰므로 같은 사람이면 조회가 합쳐진다.
-     * 회원 정보가 없어도 글은 남으므로(탈퇴해도 글은 보존한다) 대체 표기로 채운다.
-     */
+    /** 작성자를 배치로 읽는다. 회원 정보가 없으면(탈퇴) 대체 표기로 채운다. */
     private fun DgsDataFetchingEnvironment.loadAuthor(memberId: Long): CompletableFuture<GqlPostAuthor> = loader<PostAuthorView>(PostAuthorDataLoader.NAME)
         .load(memberId)
         .thenApply { it.toGqlOrPlaceholder(memberId) }
 
-    /**
-     * 댓글 미리보기. **DataLoader가 글 id를 모아 한 번에 읽는다** — 카드마다 물으면
-     * 피드 한 페이지에 쿼리가 20번 붙는다.
-     *
-     * 여기에 페이지네이션은 없다. 전체 목록과 더 보기는 루트의 `comments(postId:)`다.
-     */
+    /** 댓글 미리보기. 글 id를 모아 배치로 읽으며 페이지네이션은 없다(전체는 `comments(postId:)`). */
     @DgsData(parentType = "Post", field = "commentPreview")
     fun commentPreview(dfe: DgsDataFetchingEnvironment): CompletableFuture<List<CommentView>> = dfe.loader<List<CommentView>>(CommentPreviewDataLoader.NAME)
         .load(dfe.postSource().id, ViewerId(currentMemberProvider.requireMemberId()))
 
-    /**
-     * 부모 리졸버가 돌려준 read DTO. `!!` 대신 명시적으로 실패시킨다 — 실제로 null이 될 수
-     * 없지만 그 보장은 DGS의 실행 순서에 달려 있어 타입이 증명하지 못한다.
-     */
+    /** 부모 리졸버가 돌려준 read DTO. 없으면 명시적으로 실패한다. */
     private fun DgsDataFetchingEnvironment.postSource(): PostView = getSource<PostView>()
         ?: error("Post 필드 리졸버는 부모가 반환한 PostView를 소스로 받아야 한다.")
 
@@ -288,9 +253,6 @@ class CommunityQueryResolver(
         thumbnailImageUrl = thumbnailImageUrl,
         category = category?.let { GqlTargetCategory.valueOf(it.name) },
     )
-
-    // 작성자 대체 표기와 pageInfo 변환은 mapper 패키지가 소유한다 — 장소 질문/답변도
-    // 같은 모양을 쓰므로, 리졸버마다 두면 한 곳만 고쳐지는 날이 온다(POL-033).
 
     private companion object {
         const val DEFAULT_PAGE_SIZE = 20

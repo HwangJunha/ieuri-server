@@ -10,9 +10,7 @@ import kotlin.test.assertFailsWith
 
 /**
  * 질문 목록 커서(SPEC-0026 R2, R16).
- *
- * 정렬이 `resolved ASC, createdAt DESC`라 **커서가 정렬 키 셋을 전부 담아야 한다** —
- * 시각만 담으면 미해결 구간과 해결 구간의 시각이 겹쳐 경계에서 항목이 중복되거나 누락된다.
+ * - 정렬이 `resolved ASC, createdAt DESC`라 커서가 정렬 키 셋을 전부 담는다.
  */
 class SpotQuestionCursorTest {
 
@@ -38,7 +36,6 @@ class SpotQuestionCursorTest {
         assertEquals(false, decoded.resolved)
     }
 
-    /** 나노초를 잘라내면 같은 마이크로초의 두 행에서 커서가 어긋나 항목을 건너뛴다. */
     @Test
     fun `나노초까지 보존된다`() {
         val decoded = decodeSpotQuestionCursor(
@@ -48,7 +45,7 @@ class SpotQuestionCursorTest {
         assertEquals(123456789, decoded.createdAt.nano)
     }
 
-    /** 해결 여부가 커서에 실려야 경계에서 구간을 구분할 수 있다. */
+    /** 해결 여부가 커서에 실린다. */
     @Test
     fun `해결 여부가 다르면 커서 값도 다르다`() {
         val resolved = encodeSpotQuestionCursor(resolved = true, createdAt = createdAt, id = 42L)
@@ -59,7 +56,7 @@ class SpotQuestionCursorTest {
 
     @Test
     fun `다른 커넥션의 커서는 거부된다`() {
-        // 접두어가 없는 커뮤니티 커서를 그대로 넘기면 조용히 엉뚱한 위치로 가는 대신 오류다.
+        // 접두어가 없는 커뮤니티 커서는 오류다.
         assertFailsWith<IllegalArgumentException> {
             decodeSpotQuestionCursor(encodeCursor(createdAt, 42L))
         }

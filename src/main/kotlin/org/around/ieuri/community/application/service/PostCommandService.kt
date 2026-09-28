@@ -29,14 +29,8 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 /**
- * 글 생성·삭제.
- *
- * 사진 키에 대한 **두 검사는 계층이 다르다**:
- *  - 키 소유권(이 키가 호출자에게 발급된 것인가) → 도메인. 키 문자열만 보며 포트 호출이 없다.
- *  - 업로드 여부(그 키에 실제 객체가 있는가)     → 여기. ObjectStoragePort에 묻는다.
- *
- * 소유권을 먼저 본다. 둘 다 실패 코드는 PHOTO_NOT_UPLOADED 하나로 통일한다 — 구분해 알려
- * 주면 남의 오브젝트 키가 존재하는지 캐내는 수단이 된다.
+ * 글 생성·수정·삭제.
+ * - 사진 키는 소유권(키 문자열)을 먼저, 업로드 여부(저장소)를 나중에 본다. 실패는 모두 PHOTO_NOT_UPLOADED다.
  */
 @Service
 class PostCommandService(
@@ -52,8 +46,7 @@ class PostCommandService(
         memberId: Long,
         language: ContentLanguage,
     ): Long {
-        // 본문 판정을 도메인보다 먼저 한다 — 도메인의 require는 IllegalArgumentException 하나로
-        // 뭉뚱그려지는데, 계약은 빈 본문과 길이 초과를 서로 다른 코드로 구분한다.
+        // 빈 값과 길이 초과를 다른 코드로 내려고 도메인보다 먼저 판정한다.
         val title = command.title.trim()
         if (title.isEmpty()) throw PostTitleRequiredException()
         if (title.length > Post.TITLE_MAX_LENGTH) throw PostTitleLengthInvalidException()
@@ -63,19 +56,15 @@ class PostCommandService(
         if (body.length > Post.BODY_MAX_LENGTH) throw PostBodyLengthInvalidException()
         if (command.photoKeys.size > Post.MAX_PHOTOS) throw TooManyPhotosException()
 
-        // **장소는 선택이다.** 준 경우에만 존재를 확인한다 — 부재가 곧 유효성 판정이다.
-        // 좌표를 여기서 함께 받아 글에 복사한다 — 지역 피드가 tourism에 spot 목록을
-        // 되묻지 않게 하는 값이며, 그래야 목록 상한이 피드의 한계가 되지 않는다.
-        // 검사 기준은 **활성 언어다**(SPEC-0029 R-16) — 없는 카탈로그와 이 언어에 원본이
-        // 없는 카탈로그를 포트가 똑같이 null로 돌려주므로 한 코드로 응답한다.
+        // 장소는 선택이다. 준 경우 활성 언어로 확인하고 좌표를 글에 복사한다.
+        // 없는 카탈로그와 이 언어에 원본이 없는 카탈로그는 같은 SPOT_NOT_FOUND_IN_LOCALE이다.
         val spotPoint = command.catalogId?.let { catalogId ->
             val summary = spotLookupPort.findSummary(catalogId, language)
                 ?: throw SpotNotFoundInLocaleException()
             SpotPoint(longitude = summary.longitude, latitude = summary.latitude)
         }
 
-        // 형식이 어긋난 태그는 조용히 버리지 않고 거부한다 — 유저가 입력한 것이 사라지면
-        // 왜 안 붙었는지 알 수 없다.
+        // 형식이 어긋난 태그는 버리지 않고 거부한다.
         val tags = command.tags.map { raw ->
             PostTag.parseOrNull(raw) ?: throw InvalidTagException()
         }
@@ -98,10 +87,8 @@ class PostCommandService(
     }
 
     /**
-     * 제목·본문 수정. 길이 판정을 도메인보다 먼저 해서 계약의 코드로 구분한다(생성과 같은 이유).
-     *
-     * 소유자가 아닌 경우와 숨겨진 글인 경우를 **서로 다른 코드로** 응답한다 — 남의 글인지는
-     * 이미 ownedByViewer로 드러나 있어 숨길 것이 없고, 작성자에게는 왜 못 고치는지 알려야 한다.
+     * 글 수정. 길이 판정은 생성과 같이 도메인보다 먼저 한다.
+     * - 소유자 아님(NotPostOwner)과 숨겨진 글(HiddenPostNotEditable)은 다른 코드다.
      */
     @Transactional
     override fun editPost(command: EditPostCommand, memberId: Long, language: ContentLanguage) {
@@ -113,22 +100,19 @@ class PostCommandService(
         if (body.isEmpty()) throw PostBodyRequiredException()
         if (body.length > Post.BODY_MAX_LENGTH) throw PostBodyLengthInvalidException()
 
-        // **사진을 준 경우에만** 검증한다. null은 "건드리지 않는다"는 뜻이라 빈 배열과 다르다.
+        // null은 "건드리지 않는다"이고 빈 배열(전부 제거)과 다르다.
         val photoKeys = command.photoKeys?.let { raw ->
             if (raw.size > Post.MAX_PHOTOS) throw TooManyPhotosException()
             raw.map { verifiedPhotoKey(it, memberId) }
         }
 
-        // 태그는 형식이 어긋나면 조용히 버리지 않고 거부한다 — 유저가 입력한 것이 사라지면
-        // 왜 안 붙었는지 알 수 없다.
+        // 형식이 어긋난 태그는 버리지 않고 거부한다.
         val tags = command.tags?.map { raw ->
             PostTag.parseOrNull(raw) ?: throw InvalidTagException()
         }
         if (tags != null && tags.size > PostTag.MAX_PER_POST) throw TooManyTagsException()
 
-        // 장소를 바꾼다면 좌표를 함께 받아 둔다 — 좌표 없이 장소만 바꾸면 그 글이 지역
-        // 피드의 거리순에서 조용히 사라진다.
-        // 생성과 같이 **활성 언어 기준으로** 확인한다(SPEC-0029 R-16).
+        // 장소를 바꾸면 좌표도 함께 바꾼다 — 빠뜨리면 거리순 피드에서 글이 사라진다. 활성 언어로 확인한다.
         val newSpotPoint = command.catalogId?.let { catalogId ->
             val summary = spotLookupPort.findSummary(catalogId, language)
                 ?: throw SpotNotFoundInLocaleException()
@@ -146,13 +130,9 @@ class PostCommandService(
         postRepositoryPort.save(post)
     }
 
-    /**
-     * 키의 형식·소유권·확인 여부를 판정하고 실제 오브젝트가 있는지까지 본다.
-     * 세 실패를 한 코드로 뭉뚱그리는 이유는 남의 키가 존재하는지 캐낼 수 있어서다.
-     */
+    /** 키의 형식·소유권·확정 여부와 실제 오브젝트 존재를 본다. 실패는 모두 PhotoNotUploadedException이다. */
     private fun verifiedPhotoKey(raw: String, memberId: Long): PhotoObjectKey {
         val key = PhotoObjectKey.parse(raw) ?: throw PhotoNotUploadedException()
-        // 소유권과 확인 여부는 저장소를 묻지 않고 판정한다.
         if (!key.ownedBy(memberId) || !key.confirmed) throw PhotoNotUploadedException()
         if (objectStoragePort.findSize(key.value) == null) throw PhotoNotUploadedException()
         return key

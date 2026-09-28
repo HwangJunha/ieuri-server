@@ -6,24 +6,15 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
-/**
- * 카탈로그-언어 사본 적재 전용 어댑터(SPEC-0029 R-15).
- *
- * **생 SQL을 쓰는 이유는 upsert다** — JPA에 이식 가능한 upsert가 없고, `merge` 의미로 흉내
- * 내면 select-then-insert 경합이 생긴다(`SpotCatalogUpsertJdbcAdapter`와 같은 판단).
- * `JdbcTemplate`은 그 어댑터들에만 머문다.
- *
- * **행마다 문장을 내지 않는다.** 이벤트 하나가 수만 쌍을 실을 수 있어(배정 배치의 노출 갱신)
- * 왕복 수가 그대로 지연이 된다 — `batchUpdate`가 한 번의 왕복으로 보낸다.
- */
+/** 카탈로그-언어 사본 적재 전용 raw SQL 어댑터(SPEC-0029 R-15, upsert). */
 @Component
 class SpotCatalogLanguageJdbcAdapter(
     private val jdbcTemplate: JdbcTemplate,
 ) : SpotCatalogLanguagePort {
 
     /**
-     * 표 전체를 [entries]로 맞춘다. 정본이 비면 표를 비운다 — 원본이 정말 비었다는 뜻일 수
-     * 있고, 그때 사본만 남으면 사라진 장소의 글이 계속 보인다.
+     * 표 전체를 [entries]로 맞춘다(차집합만 움직인다).
+     * - 주의: [entries]가 비면 표를 전부 지운다.
      */
     @Transactional
     override fun replaceAll(entries: List<CatalogLanguageEntry>): Int {
@@ -32,12 +23,8 @@ class SpotCatalogLanguageJdbcAdapter(
             return 0
         }
 
-        // **비우고 다시 넣지 않는다.** 수만 행을 지웠다 넣으면 그것이 전부 복제로 흘러가고,
-        // 중간에 표가 비는 순간 동시에 도는 목록 조회가 spot 붙은 글을 통째로 놓친다.
-        // 정본을 임시 테이블에 싣고 차집합만 움직이면 실제로 달라진 행만 바뀐다.
-        //
-        // `NOT IN` 목록이 아니라 임시 테이블인 이유는 정본 크기가 파라미터 상한(65,535)을
-        // 넘을 수 있어서다 — 크기와 무관하게 한 가지 방식으로 끝난다.
+        // 비우고 다시 넣지 않는다 — 중간에 표가 비면 동시 조회가 글을 놓친다.
+        // 정본을 임시 테이블에 싣고 차집합만 움직인다.
         jdbcTemplate.execute(CREATE_TEMP_SQL)
         jdbcTemplate.batchUpdate(
             INSERT_TEMP_SQL,
@@ -50,10 +37,7 @@ class SpotCatalogLanguageJdbcAdapter(
     }
 
     private companion object {
-        /**
-         * 정본을 담을 임시 테이블. `ON COMMIT DROP`이라 트랜잭션이 끝나면 사라지고, 커넥션
-         * 풀이 재사용하는 커넥션에 남지 않는다.
-         */
+        /** 정본을 담을 임시 테이블. `ON COMMIT DROP` — 트랜잭션 안에서만 쓸 수 있다. */
         const val CREATE_TEMP_SQL = """
             CREATE TEMP TABLE resolved_catalog_language (
                 catalog_id BIGINT NOT NULL,
@@ -74,14 +58,14 @@ class SpotCatalogLanguageJdbcAdapter(
             )
         """
 
-        /** 사본에 없는 정본 행을 넣는다. 이미 있는 것은 건드리지 않아 복제가 조용하다. */
+        /** 사본에 없는 정본 행을 넣는다. */
         const val INSERT_NEW_SQL = """
             INSERT INTO community.community_spot_catalog_language (catalog_id, language)
             SELECT r.catalog_id, r.language FROM resolved_catalog_language r
             ON CONFLICT (catalog_id, language) DO NOTHING
         """
 
-        /** 정본이 비었을 때 표를 통째로 비운다 — 조건 없이 전부 지운다. */
+        /** 정본이 비었을 때 표를 통째로 비운다. */
         const val DELETE_ALL_SQL = "DELETE FROM community.community_spot_catalog_language"
     }
 }

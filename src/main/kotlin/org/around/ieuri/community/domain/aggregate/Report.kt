@@ -6,10 +6,7 @@ import java.time.Instant
 
 /**
  * 신고. 애그리게이트 루트.
- *
- * 같은 대상을 두 번 신고할 수 없다는 규칙은 저장소의 유일 제약 `(reporterId, targetType, targetId)`가
- * 판정한다. 그 제약이 "서로 다른 신고자 5명" 집계의 근거이기도 하다 — 같은 사람이 5번
- * 신고해도 신고자 수는 1이다.
+ * - 중복 신고는 저장소의 유일 제약 `(reporterId, targetType, targetId)`가 막는다.
  */
 class Report private constructor(
     val id: Long?,
@@ -51,10 +48,7 @@ class Report private constructor(
             )
         }
 
-        /**
-         * 신고자 수가 자동 숨김 임계값에 도달했는지. 대상 종류가 자동 숨김 대상이 아니면
-         * 아무리 쌓여도 false다.
-         */
+        /** 신고자 수가 자동 숨김 임계값에 도달했는지. 자동 숨김 대상이 아닌 종류는 항상 false. */
         fun reachesAutoHideThreshold(targetType: ReportTargetType, distinctReporters: Int): Boolean = targetType.autoHideable && distinctReporters >= AUTO_HIDE_THRESHOLD
     }
 }

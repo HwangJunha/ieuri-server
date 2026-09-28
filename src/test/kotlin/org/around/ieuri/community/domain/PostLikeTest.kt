@@ -7,9 +7,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
-/**
- * 좋아요 식별. 멱등성 자체는 저장소의 유일 제약이 판정하고, 여기서는 값의 유효성만 본다.
- */
+/** 좋아요 식별값의 유효성. 멱등성은 저장소의 유일 제약이 판정한다. */
 class PostLikeTest {
 
     @Test

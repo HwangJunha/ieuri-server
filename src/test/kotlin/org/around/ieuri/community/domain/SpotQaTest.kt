@@ -86,7 +86,7 @@ class SpotQuestionTest {
         assertTrue(question.resolved)
     }
 
-    /** R8 — 양방향이다. 되돌릴 수 없으면 잘못 누른 상태에 갇힌다. */
+    /** R8 — 해결 표시는 되돌릴 수 있다. */
     @Test
     fun `작성자는 해결을 미해결로 되돌릴 수 있고 멱등이다`() {
         val question = restored()
@@ -119,7 +119,7 @@ class SpotQuestionTest {
         assertFalse(question.resolved)
     }
 
-    /** 되돌리기도 소유자만 — 타인이 남의 질문을 미해결로 만들 수 없다. */
+    /** 되돌리기도 소유자만 할 수 있다. */
     @Test
     fun `타인은 해결된 질문을 되돌릴 수 없다`() {
         val question = restored()

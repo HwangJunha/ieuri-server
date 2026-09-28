@@ -21,10 +21,7 @@ import kotlin.test.assertFailsWith
 
 /**
  * 좋아요 멱등성(R12).
- *
- * **애그리게이트를 복원하지 않는다** — 좋아요 수 하나에 태그·사진까지 읽을 이유가 없고,
- * 읽고 고쳐 쓰면 동시 요청이 서로의 증가를 덮어쓴다. 계수는 DB가 원자적으로 올리고
- * 갱신값은 읽기 포트로 다시 조회한다(CQRS).
+ * - 애그리게이트를 복원하지 않는다. 계수는 DB가 원자적으로 올리고 갱신값은 읽기 포트로 조회한다.
  */
 class PostLikeCommandServiceTest {
 
@@ -104,7 +101,7 @@ class PostLikeCommandServiceTest {
 
         service.like(LikePostCommand(postId), memberId)
 
-        // exists 한 번이면 충분하다 — 복원하면 태그·사진·카테고리·장소까지 읽는다.
+        // 존재 확인은 exists 한 번이다.
         verify(exactly = 1) { moderationPort.exists(postId) }
     }
 

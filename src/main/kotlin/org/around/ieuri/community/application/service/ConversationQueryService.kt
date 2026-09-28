@@ -16,16 +16,8 @@ import org.springframework.transaction.annotation.Transactional
 import reactor.core.publisher.Flux
 
 /**
- * 대화·메시지 조회와 타이핑 구독(SPEC-0017 R8·R10).
- *
- * **참여자가 아니면 [ForbiddenException]이다** — 뮤테이션의 NOT_CONVERSATION_PARTICIPANT와
- * 갈리는 지점이다(AC8-3·10-3). 조회는 볼 자격 자체가 없어 부분 성공이 성립하지 않으므로
- * 최상위 errors[]로 나가고, 뮤테이션은 요청이 정상 처리된 뒤 도메인 규칙에 걸린 것이라
- * userErrors[]로 나간다(spec.md "권한 실패의 표면화 위치").
- *
- * 없는 대화도 [ForbiddenException]으로 답한다 — 조회 경로에서는 존재 여부를 구분해 줄 이유가
- * 없고, 구분하면 대화 id 존재 확인 수단이 된다. 뮤테이션 쪽은 클라이언트가 "사라진 대화"와
- * "볼 수 없는 대화"를 나눠 처리해야 해서 구분한다(AC9-5).
+ * 대화·메시지 조회와 타이핑·새 메시지 구독(SPEC-0017).
+ * - 없거나 참여자가 아닌 대화는 모두 [ForbiddenException](최상위 errors[])이다 — 뮤테이션의 userErrors[]와 다르다.
  */
 @Service
 @Transactional(readOnly = true)
@@ -64,24 +56,17 @@ class ConversationQueryService(
         )
     }
 
-    /**
-     * **구독 시작 시점에 참여자를 검사한다**(POL-048) — 연결이 살아 있다는 것이 특정 대화를
-     * 볼 자격의 증명은 아니다. 연결 수립 시의 인증과 별개 판정이다.
-     */
+    /** 구독 시작 시점에 참여자를 검사한다(POL-048). 연결 인증과 별개다. */
     override fun typingIndicator(conversationId: Long, memberId: Long): Flux<TypingEventView> {
         requireParticipant(conversationId, memberId)
-        // **자기 타이핑은 걸러낸다.** 채널은 대화 단위라 발신자에게도 되돌아오는데,
-        // 계약상 이 스트림은 "상대가 입력 중"이다 — 자기 화면에 자기 표시가 뜨면 안 된다.
+        // 자기 타이핑은 걸러낸다 — 이 스트림은 "상대가 입력 중"이다.
         return conversationEventPort.subscribeTyping(conversationId)
             .filter { it.senderId != memberId }
     }
 
     /**
-     * 새 메시지 구독. 이벤트에는 **id만 실려 오므로 DB에서 다시 읽어** 내려준다 —
-     * 본문을 브로커에 싣지 않기 때문이고(POL-013), 그래서 값의 원본이 항상 DB다.
-     *
-     * 읽는 사이에 보관 만료·탈퇴로 사라진 메시지는 **조용히 건너뛴다** — 구독자에게 빈
-     * 말풍선을 내려보내는 것보다 낫다.
+     * 새 메시지 구독. 이벤트의 id로 DB에서 다시 읽어 내려준다(POL-013).
+     * - 읽는 사이에 사라진 메시지는 조용히 건너뛴다.
      */
     override fun newMessage(conversationId: Long, memberId: Long): Flux<MessageView> {
         requireParticipant(conversationId, memberId)
@@ -89,12 +74,7 @@ class ConversationQueryService(
             .mapNotNull { conversationQueryPort.findMessage(conversationId, it, memberId) }
     }
 
-    /**
-     * **읽기 포트로 판정한다** — 애그리게이트를 복원하면 참여자 두 명을 알자고 도메인 객체를
-     * 만들게 되고, 읽기 서비스가 쓰기 포트에 물려 CQRS 레일이 무너진다.
-     *
-     * 조회는 참여자 조건을 질의에 담으므로, 결과가 없다는 것이 곧 "없거나 볼 수 없다"이다.
-     */
+    /** 읽기 포트로 판정한다. 결과가 없으면 "없거나 볼 수 없다"이다. */
     private fun requireParticipant(conversationId: Long, memberId: Long) {
         conversationQueryPort.findConversation(conversationId, memberId)
             ?: throw ForbiddenException("대화를 볼 수 있는 권한이 없습니다.")

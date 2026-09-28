@@ -85,7 +85,7 @@ class DeviceTokenCommandServiceTest {
         assertEquals(AlarmLocale.JA, existing.language)
     }
 
-    /** AC1.4 — 다른 회원이 쓰던 기기. 소유가 새 회원에게 옮겨져야 한다. */
+    /** AC1.4 — 다른 회원이 쓰던 기기. 소유가 새 회원에게 옮겨진다. */
     @Test
     fun `다른 회원이 쓰던 기기는 소유가 옮겨진다`() {
         val existing = stored(ownerId = 99L)
@@ -117,7 +117,7 @@ class DeviceTokenCommandServiceTest {
         verify(exactly = 0) { deviceTokenRepository.deleteByDeviceId(any()) }
     }
 
-    /** 남의 기기는 지우지 않는다 — deviceId만 알면 남의 토큰을 끊을 수 있으면 안 된다. */
+    /** 다른 회원의 기기는 지우지 않는다. */
     @Test
     fun `다른 회원의 기기는 지우지 않는다`() {
         every { deviceTokenRepository.findByDeviceId(deviceId) } returns stored(ownerId = 99L)

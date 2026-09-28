@@ -36,11 +36,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
-/**
- * 대화 시작·메시지 전송·타이핑(SPEC-0017 R9·R10·R11).
- *
- * 대화 시작은 SPEC-0021 R2로 입력이 회원 id로 바뀌었다.
- */
+/** 대화 시작·메시지 전송·타이핑(SPEC-0017 R9·R10·R11, SPEC-0021 R2). */
 class ConversationCommandServiceTest {
 
     private val memberId = 7L
@@ -59,7 +55,7 @@ class ConversationCommandServiceTest {
     private val storage = mockk<ObjectStoragePort> { every { findSize(any()) } returns 1_024L }
     private val clock = mockk<ClockPort> { every { now() } returns now }
 
-    // 출처 없는 대화가 기본이다(SPEC-0026 R13) — 주지 않으면 스냅샷 조회 자체가 일어나지 않는다.
+    // 출처 없는 대화가 기본이다(SPEC-0026 R13).
     private val spotQaQueryPort = mockk<SpotQaQueryPort>(relaxed = true)
     private val spotLookupPort = mockk<SpotLookupPort>(relaxed = true)
 
@@ -108,7 +104,7 @@ class ConversationCommandServiceTest {
         assertEquals(conversationId, id)
     }
 
-    /** AC2.2 — 기존 대화가 있으면 새로 만들지 않는다. 판정은 저장소의 유일 제약이 맡는다. */
+    /** AC2.2 — 기존 대화가 있으면 새로 만들지 않는다(저장소 유일 제약이 판정). */
     @Test
     fun `이미 대화가 있으면 기존 대화가 반환된다`() {
         givenExistingCounterpart()
@@ -118,7 +114,7 @@ class ConversationCommandServiceTest {
         val id = service.startConversation(StartConversationCommand(authorId), memberId)
 
         assertEquals(conversationId, id)
-        // saveIfAbsent 한 번만 부른다 — 존재 확인을 따로 하지 않는다(경합에서 중복이 생긴다).
+        // saveIfAbsent 한 번만 부르고 존재 확인을 따로 하지 않는다.
         verify(exactly = 1) { conversationRepository.saveIfAbsent(any()) }
     }
 
@@ -145,10 +141,7 @@ class ConversationCommandServiceTest {
         verify(exactly = 0) { conversationRepository.saveIfAbsent(any()) }
     }
 
-    /**
-     * AC2.6 — **탈퇴 회원도 같은 코드다.** 탈퇴는 회원 행 삭제라 조회가 그대로 null이 되며,
-     * 구분해 알려 주면 상대가 탈퇴했다는 사실이 노출된다.
-     */
+    /** AC2.6 — 탈퇴 회원도 같은 코드(MEMBER_NOT_FOUND)다. */
     @Test
     fun `탈퇴 회원을 지목하면 없는 회원과 같은 MEMBER_NOT_FOUND다`() {
         every { memberLookupPort.findAuthor(authorId) } returns null
@@ -190,10 +183,7 @@ class ConversationCommandServiceTest {
         verify { conversationRepository.touch(conversationId, sentAt) }
     }
 
-    /**
-     * 저장 뒤 새 메시지 이벤트가 발행된다 — 구독자가 이 신호로 화면을 갱신한다(R9).
-     * **id만 싣는다**: 본문을 브로커에 흘리지 않기 위함이다(POL-013).
-     */
+    /** 저장 뒤 새 메시지 이벤트가 id만 실어 발행된다(R9, POL-013). */
     @Test
     fun `메시지를 저장한 뒤 새 메시지 이벤트를 발행한다`() {
         every { conversationRepository.findById(conversationId) } returns conversation()
@@ -205,8 +195,7 @@ class ConversationCommandServiceTest {
 
         service.sendMessage(SendMessageCommand(conversationId, "안녕"), memberId, language)
 
-        // **브로커로 직접 발행하지 않는다** — 커밋 전에 발행하면 구독자가 그 id로 DB를 읽을 때
-        // 아직 행이 없어 이벤트가 조용히 버려진다. 커밋 뒤 발행은 리스너의 몫이다.
+        // 브로커로 직접 발행하지 않는다 — 커밋 뒤 발행은 리스너의 몫이다.
         verify { eventPublisher.publish(NewMessageStored(conversationId, 500L)) }
         verify(exactly = 0) { conversationEventPort.publishNewMessage(any(), any()) }
     }
@@ -224,10 +213,7 @@ class ConversationCommandServiceTest {
         verify(exactly = 0) { eventPublisher.publish(any()) }
     }
 
-    /**
-     * **upToMessageId를 생략하면 마지막 메시지까지**로 본다 — 클라이언트가 "모두 읽음"을
-     * 표현하는 방법이며, 마지막 id를 몰라도 부를 수 있어야 한다.
-     */
+    /** upToMessageId를 생략하면 마지막 메시지까지 읽음 처리한다. */
     @Test
     fun `읽을 지점을 주지 않으면 마지막 메시지까지 읽은 것으로 본다`() {
         every { conversationRepository.findById(conversationId) } returns conversation()
@@ -254,7 +240,7 @@ class ConversationCommandServiceTest {
         verify(exactly = 0) { conversationRepository.updateReadState(any()) }
     }
 
-    /** 처리 후 남은 수를 돌려준다 — 클라이언트가 뱃지를 다시 조회하지 않아도 되도록. */
+    /** 처리 후 남은 수를 돌려준다. */
     @Test
     fun `읽음 처리 후 남은 안 읽은 수를 돌려준다`() {
         every { conversationRepository.findById(conversationId) } returns conversation()
@@ -288,10 +274,7 @@ class ConversationCommandServiceTest {
         }
     }
 
-    /**
-     * AC9-5 — **없는 대화와 권한 없는 대화는 서로 다른 코드다.** 뭉뚱그리면 클라이언트가
-     * "사라진 대화"와 "볼 수 없는 대화"를 구분하지 못한다.
-     */
+    /** AC9-5 — 없는 대화와 권한 없는 대화는 서로 다른 코드다. */
     @Test
     fun `없는 대화는 CONVERSATION_NOT_FOUND로 구분된다`() {
         every { conversationRepository.findById(conversationId) } returns null
@@ -301,10 +284,7 @@ class ConversationCommandServiceTest {
         }
     }
 
-    /**
-     * AC11-4 — **대화 성립 이후의 차단도 막는다.** 생성 시점에만 검사하면 기존 대화가
-     * 차단을 우회하는 통로가 된다.
-     */
+    /** AC11-4 — 대화 성립 이후의 차단도 전송을 막는다. */
     @Test
     fun `대화 성립 이후 차단되면 전송이 거부된다`() {
         every { conversationRepository.findById(conversationId) } returns conversation()
@@ -347,10 +327,7 @@ class ConversationCommandServiceTest {
 
     // ── 타이핑 알림(R10) ─────────────────────────────────────────────
 
-    /**
-     * AC10-2 — **수신자가 구독 중이 아니어도 성공한다.** 받을 사람이 없는 것은 실패가 아니며,
-     * 포트는 발행만 하고 수신자 수를 보지 않는다.
-     */
+    /** AC10-2 — 수신자가 구독 중이 아니어도 성공한다. */
     @Test
     fun `수신자가 없어도 타이핑 알림은 성공한다`() {
         every { conversationRepository.findById(conversationId) } returns conversation()

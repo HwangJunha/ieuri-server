@@ -27,13 +27,8 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 
 /**
- * 대화·메시지 읽기 어댑터(SPEC-0017 R8).
- *
- * **본문 복호화를 여기서 한다**(R16) — 키를 아는 것은 어댑터이고 read DTO에는 평문이 담긴다.
- * 암호화 컬럼이라 본문으로 검색·정렬할 수 없으며, 대화 검색은 비범위다.
- *
- * **참여자 판정을 하지 않는다** — 조회에서 참여자가 아니면 최상위 errors[]의 FORBIDDEN이라
- * 서비스가 판정하고 예외를 고른다. 여기서 조용히 빈 결과를 주면 그 구분이 사라진다.
+ * 대화·메시지 읽기 어댑터(SPEC-0017). 본문을 여기서 복호화해 read DTO에 평문을 담는다(R16).
+ * - 메시지 조회는 참여자 판정을 하지 않는다 — 서비스가 판정해 FORBIDDEN을 고른다.
  */
 @Component
 class ConversationQueryAdapter(
@@ -45,7 +40,7 @@ class ConversationQueryAdapter(
     private val message = QMessageEntity.messageEntity
     private val quote = QMessageQuoteEntity.messageQuoteEntity
 
-    /** 내가 참여한 대화. 두 컬럼 어느 쪽에도 내가 올 수 있어 OR로 묶는다. */
+    /** 내가 참여한 대화. 최근 활동순. */
     @Transactional(readOnly = true)
     override fun findConversations(search: ConversationsSearch): CursorPage<ConversationView> {
         val cursor = search.after?.let { decodeCursor(it) }
@@ -62,11 +57,9 @@ class ConversationQueryAdapter(
 
         val hasNextPage = rows.size > search.first
         val pageRows = if (hasNextPage) rows.take(search.first) else rows
-        // 목록에 실을 마지막 메시지를 **한 번에** 읽는다 — 대화마다 물으면 20건에 조회가
-        // 20번 붙는다(N+1).
+        // 마지막 메시지와 안 읽은 수는 페이지 단위로 한 번에 읽는다(N+1 방지).
         val pageIds = pageRows.mapNotNull { it.id }
         val lastMessages = findLastMessagesOf(pageIds, search.memberId)
-        // 안 읽은 수도 **한 번에** 센다 — 대화마다 물으면 여기서 N+1이 된다.
         val unreadCounts = countUnreadOf(pageIds, search.memberId)
 
         val edges = pageRows.map { entity ->
@@ -84,9 +77,7 @@ class ConversationQueryAdapter(
         return cursorPageOf(edges, hasNextPage = hasNextPage, hasPreviousPage = cursor != null)
     }
 
-    /**
-     * 대화의 메시지. **최신순이다** — 채팅 화면은 위로 올릴수록 과거를 더 불러온다.
-     */
+    /** 대화의 메시지. 최신순이다. */
     @Transactional(readOnly = true)
     override fun findMessages(search: ConversationMessagesSearch): CursorPage<MessageView> {
         val cursor = search.after?.let { decodeCursor(it) }
@@ -104,7 +95,6 @@ class ConversationQueryAdapter(
 
         val hasNextPage = rows.size > search.first
         val pageRows = if (hasNextPage) rows.take(search.first) else rows
-        // 인용을 **한 번에** 읽는다 — 메시지마다 물으면 여기서 N+1이 된다.
         val quotes = findQuotesOf(pageRows.mapNotNull { it.id })
         val edges = pageRows.map { entity ->
             val createdAt = requireNotNull(entity.createdAt)
@@ -135,9 +125,7 @@ class ConversationQueryAdapter(
     @Transactional(readOnly = true)
     override fun findMessage(conversationId: Long, messageId: Long, memberId: Long): MessageView? = queryFactory
         .selectFrom(message)
-        // **대화로도 좁힌다** — 채널 이름이 인가의 근거가 되지 않게 한다.
-        // 지워진 메시지는 건너뛴다 — 구독이 id만 받아 여기서 다시 읽으므로, 발행과 읽기
-        // 사이에 탈퇴가 끼면 이 조건이 그것을 막는다(호출부가 null을 건너뛴다).
+        // 대화로도 좁힌다(채널 이름을 인가 근거로 쓰지 않음). 지워진 메시지면 null이다.
         .where(
             message.id.eq(messageId),
             message.conversationId.eq(conversationId),
@@ -147,13 +135,9 @@ class ConversationQueryAdapter(
         ?.let { it.toMessageView(memberId, findQuotesOf(listOf(messageId))[messageId]) }
 
     /**
-     * 대화별 안 읽은 메시지 수를 **한 번에** 센다 — 대화마다 물으면 20건에 조회가 20번 붙는다.
-     *
-     * "내가 읽은 지점 이후 + 내가 보내지 않은" 메시지를 센다. 읽음 지점이 null이면
-     * (아직 아무것도 안 읽음) 상대가 보낸 전부가 대상이다.
-     *
-     * 읽음 지점이 내 위치(low/high)에 따라 다른 컬럼이라 CASE로 고른다 — 참여자가 둘로
-     * 고정된 구조의 대가이며, 그룹 대화가 생기면 이 질의도 함께 재설계된다.
+     * 대화별 안 읽은 메시지 수를 한 번에 센다.
+     * - 내 읽음 지점 이후, 상대가 보낸, 지워지지 않은 메시지. 읽음 지점이 null이면 전부다.
+     * - 결과가 0인 대화는 키가 없다.
      */
     @Transactional(readOnly = true)
     override fun countUnreadOf(conversationIds: List<Long>, memberId: Long): Map<Long, Int> {
@@ -169,12 +153,9 @@ class ConversationQueryAdapter(
             .join(conversation).on(conversation.id.eq(message.conversationId))
             .where(
                 message.conversationId.`in`(conversationIds),
-                // 내가 보낸 것은 세지 않는다.
                 message.senderId.ne(memberId),
-                // **지워진 메시지는 세지 않는다.** 목록은 이미 거르므로, 여기서 세면 뱃지에는
-                // 3이 뜨는데 열어 보면 아무것도 없어 뱃지가 영영 사라지지 않는다.
+                // 목록과 같은 집합을 세야 한다 — 빼면 뱃지가 사라지지 않는다.
                 message.deletedAt.isNull,
-                // 읽음 지점이 없으면 전부가 안 읽은 것이다.
                 myLastRead.isNull.or(message.id.gt(myLastRead)),
             )
             .groupBy(message.conversationId)
@@ -194,14 +175,8 @@ class ConversationQueryAdapter(
         .fetchOne()
 
     /**
-     * 대화별 마지막 메시지를 한 번에 읽는다.
-     *
-     * **대화별 최대 createdAt과 일치하는 행만 읽는다.** 대상 대화의 메시지를 전부 읽어 첫
-     * 건만 취하면 6개월치가 쌓인 대화에서 읽는 양이 사실상 무한해지고, 버릴 행까지 전부
-     * 복호화하게 된다 — 페이지가 50건으로 제한돼도 대화당 메시지 수는 제한되지 않는다.
-     *
-     * 같은 시각의 행이 둘 이상이면 그만큼만 더 오고, id가 큰 쪽을 취한다.
-     * JPQL에 `ROW_NUMBER() OVER (PARTITION BY ...)`가 없어 상관 서브쿼리로 편다.
+     * 대화별 마지막 메시지를 한 번에 읽는다. 대화별 최대 createdAt 행만 읽고(상관 서브쿼리),
+     * 동시각이면 id가 큰 쪽을 취한다.
      */
     private fun findLastMessagesOf(
         conversationIds: List<Long>,
@@ -219,9 +194,7 @@ class ConversationQueryAdapter(
                     JPAExpressions
                         .select(latest.createdAt.max())
                         .from(latest)
-                        // **서브쿼리에도 같은 조건이 있어야 한다.** 없으면 지워진 메시지가
-                        // 최대 시각을 차지해, 바깥 조건과 맞는 살아 있는 행이 없어지고
-                        // 대화 미리보기가 이전 메시지로 물러나는 대신 **빈 칸**이 된다.
+                        // 서브쿼리에도 deletedAt 조건이 필요하다 — 빼면 미리보기가 빈 칸이 된다.
                         .where(
                             latest.conversationId.eq(message.conversationId),
                             latest.deletedAt.isNull,
@@ -235,12 +208,7 @@ class ConversationQueryAdapter(
             }
     }
 
-    /**
-     * 메시지들의 인용을 **한 번에** 읽는다 — 메시지마다 물으면 30건짜리 페이지에 조회가
-     * 30번 붙는다(N+1). 인용이 없는 메시지는 결과에 키가 없다.
-     *
-     * 발췌 복호화도 여기서 한다 — 키를 아는 것은 어댑터이고 read DTO에는 평문이 담긴다.
-     */
+    /** 메시지들의 인용을 한 번에 읽고 발췌를 복호화한다. 인용이 없는 메시지는 키가 없다. */
     private fun findQuotesOf(messageIds: List<Long>): Map<Long, ConversationSpotQaOriginView> {
         if (messageIds.isEmpty()) return emptyMap()
 
@@ -279,10 +247,7 @@ class ConversationQueryAdapter(
         updatedAt = requireNotNull(lastMessageAt) { "조회된 대화에는 lastMessageAt이 있어야 한다." },
     )
 
-    /**
-     * 본문이 빈 메시지는 복호화를 건너뛴다 — 빈 값을 복호화하려 들면 base64 디코딩에서
-     * 터진다. 사진만 보낸 메시지와, 피드 인용만 있던 과거 메시지가 여기 해당한다.
-     */
+    /** 본문이 빈 메시지(사진만 등)는 복호화를 건너뛴다 — 빈 값은 base64 디코딩에서 터진다. */
     private fun MessageEntity.toMessageView(
         memberId: Long,
         spotQaOrigin: ConversationSpotQaOriginView? = null,

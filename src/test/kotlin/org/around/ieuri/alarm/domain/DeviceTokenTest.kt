@@ -63,7 +63,7 @@ class DeviceTokenTest {
         assertEquals("new-token", existing.fcmToken)
     }
 
-    /** AC1.4 — 기기 소유가 옮겨진다. 이전 회원 귀속이 남으면 엉뚱한 사람에게 발송된다. */
+    /** AC1.4 — 기기 소유가 옮겨진다. */
     @Test
     fun `재등록이 소유 회원을 옮긴다`() {
         val existing = token(memberId = 1L)

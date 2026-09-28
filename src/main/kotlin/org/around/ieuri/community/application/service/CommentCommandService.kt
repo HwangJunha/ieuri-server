@@ -17,10 +17,8 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 /**
- * 댓글 생성·삭제. 글의 commentCount를 같은 트랜잭션에서 함께 갱신한다 — 매 조회마다 세지 않는다.
- *
- * 숨겨진 댓글은 그 수에 포함되지 않으므로, 삭제 시에도 **이미 숨겨져 있었다면 내리지 않는다**.
- * 숨김 시점에 이미 한 번 내렸기 때문이며, 두 번 내리면 숫자가 실제보다 작아진다.
+ * 댓글 생성·삭제. 글의 commentCount를 같은 트랜잭션에서 함께 갱신한다.
+ * - 대댓글도 수에 포함된다. 이미 숨겨진 댓글을 지울 때는 수를 내리지 않는다.
  */
 @Service
 class CommentCommandService(
@@ -32,12 +30,11 @@ class CommentCommandService(
 
     @Transactional
     override fun createComment(command: CreateCommentCommand, memberId: Long): Long {
-        // 계약이 빈 본문과 길이 초과를 서로 다른 코드로 구분하므로 도메인보다 먼저 판정한다.
+        // 빈 본문과 길이 초과를 다른 코드로 내려고 도메인보다 먼저 판정한다.
         val body = command.body.trim()
         if (body.isEmpty()) throw CommentBodyRequiredException()
         if (body.length > Comment.BODY_MAX_LENGTH) throw CommentBodyLengthInvalidException()
 
-        // 존재 확인만 필요하다 — 애그리게이트를 복원하면 태그·사진까지 읽는다.
         if (!postModerationPort.exists(command.postId)) throw PostNotFoundException()
 
         val saved = commentRepositoryPort.save(
@@ -48,18 +45,14 @@ class CommentCommandService(
                 parentCommentId = command.parentCommentId?.let { resolveReplyParentId(it, command.postId) },
             ),
         )
-        // 대댓글도 댓글 수에 포함된다 — "댓글 3개"인데 열어서 5개면 어긋나 보인다.
         postCounterPort.increaseCommentCount(command.postId)
 
         return requireNotNull(saved.id) { "저장된 댓글에는 id가 있어야 한다." }
     }
 
     /**
-     * 답글이 붙을 실제 부모. **대댓글에 답글을 달면 그 부모(최상위)에 눕는다** — 거부하는
-     * 대신 2단계로 유지하며, 사용자에게는 답글이 정상적으로 달린 것으로 보인다.
-     *
-     * 다른 글의 댓글을 부모로 지정하면 거부한다. 허용하면 글 A의 댓글 목록에 글 B의 답글이
-     * 섞이고 댓글 수도 어긋난다.
+     * 답글이 붙을 실제 부모. 대댓글에 답글을 달면 거부하지 않고 그 최상위 부모에 붙인다(2단계 유지).
+     * - 다른 글의 댓글을 부모로 지정하면 CommentNotFoundException이다.
      */
     private fun resolveReplyParentId(parentCommentId: Long, postId: Long): Long {
         val parent = commentRepositoryPort.findById(parentCommentId)

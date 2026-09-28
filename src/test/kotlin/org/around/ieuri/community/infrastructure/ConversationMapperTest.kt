@@ -14,10 +14,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 
-/**
- * DM 엔티티↔도메인 변환(POL-033). **필드마다 다른 값을 준다** — 같은 값을 쓰면 뒤바뀐
- * 매핑이 통과한다.
- */
+/** DM 엔티티↔도메인 변환(POL-033). 필드마다 다른 값을 준다. */
 class ConversationMapperTest {
 
     private val createdAt = Instant.parse("2026-08-10T01:02:03Z")
@@ -114,10 +111,7 @@ class ConversationMapperTest {
         assertEquals(createdAt, message.createdAt)
     }
 
-    /**
-     * SPEC-0021 AC4.2 — **본문도 사진도 없는 메시지가 조회 경로에서 살아남는다.** 피드 인용만
-     * 있던 과거 메시지이며, 여기서 터지면 그 메시지가 든 대화 조회가 통째로 실패한다.
-     */
+    /** SPEC-0021 AC4.2 — 본문도 사진도 없는 과거 메시지가 조회 경로에서 살아남는다. */
     @Test
     fun `본문과 사진이 모두 빈 과거 메시지도 도메인으로 옮겨진다`() {
         val entity = MessageEntity(

@@ -14,17 +14,11 @@ import org.around.ieuri.common.graphql.generated.types.DevicePlatform as GqlDevi
 import org.around.ieuri.common.graphql.generated.types.NotificationCategory as GqlNotificationCategory
 import org.around.ieuri.common.graphql.generated.types.NotificationPreference as GqlNotificationPreference
 
-/**
- * GraphQL 입력 ↔ 도메인 변환(POL-033).
- *
- * 리졸버 안에 인라인으로 두지 않는 이유는 **혼자 호출할 수 없어 테스트가 불가능하기** 때문이다.
- * **memberId를 싣지 않는다** — 호출자 신원은 인증 컨텍스트에서 오며 입력이 정하지 않는다.
- */
+/** GraphQL 입력 → Command(POL-033). memberId는 인증 컨텍스트에서 오므로 싣지 않는다. */
 fun RegisterDeviceTokenInput.toCommand(): RegisterDeviceTokenCommand = RegisterDeviceTokenCommand(
     deviceId = deviceId,
     fcmToken = fcmToken,
-    // 지원하지 않는 언어는 EN으로 떨어진다(AC20.3). 계약이 enum이라 여기 도달하는 값은
-    // 이미 4개 중 하나지만, 폴백 규약을 한곳에 두려고 같은 함수를 지난다.
+    // 지원하지 않는 언어는 EN으로 떨어진다(AC20.3).
     language = AlarmLocale.ofOrFallback(language.name),
     platform = platform.toDomain(),
 )

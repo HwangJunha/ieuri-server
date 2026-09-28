@@ -14,17 +14,9 @@ import org.around.ieuri.common.persistence.DbSchema
 import org.around.ieuri.community.domain.vo.ReportReason
 import java.time.Instant
 
-/*
- * DM JPA 엔티티(SPEC-0017). 도메인 모델과 분리되며 `mapper` 패키지가 변환한다.
- *
- * 다른 도메인을 가리키는 id(sender_id·member_low·member_high)는 plain 컬럼이다 — 물리 FK도
- * 연관(@ManyToOne)도 두지 않는다(CommunityEntities와 같은 규약).
- */
+// DM JPA 엔티티(SPEC-0017). 다른 도메인 id는 plain 컬럼이다.
 
-/**
- * 1:1 대화. 참여자를 **정렬된 쌍**으로 들고 있다 — member_low < member_high가 DB의 CHECK로
- * 강제되며, 그것이 "같은 쌍에 대화는 하나"를 유일 제약으로 판정할 수 있는 근거다(AC7-2).
- */
+/** 1:1 대화. 참여자는 정렬된 쌍(member_low < member_high, DB CHECK)이며 쌍마다 대화는 하나다. */
 @Entity
 @Table(name = "community_conversation", schema = DbSchema.COMMUNITY)
 class ConversationEntity(
@@ -38,17 +30,14 @@ class ConversationEntity(
     @Column(name = "member_high", nullable = false)
     var memberHigh: Long,
 
-    /** 정렬 키(최근 활동순). 메시지가 없으면 생성 시각 그대로다 — 빈 대화가 존재할 수 있다. */
+    /** 정렬 키(최근 활동순). 메시지가 없으면 생성 시각이다. */
     @Column(name = "last_message_at", nullable = false)
     var lastMessageAt: Instant? = null,
 
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant? = null,
 
-    /**
-     * 각 참여자가 마지막으로 읽은 메시지 id. **null은 "아직 아무것도 읽지 않았다"이며 0이
-     * 아니다** — 0으로 두면 "id 0까지 읽었다"와 구분되지 않는다.
-     */
+    /** 각 참여자가 마지막으로 읽은 메시지 id. null은 "아직 아무것도 읽지 않음"이다. */
     @Column(name = "last_read_message_id_low")
     var lastReadMessageIdLow: Long? = null,
 
@@ -64,12 +53,7 @@ class ConversationEntity(
     }
 }
 
-/**
- * DM 메시지. **본문은 암호화되어 저장된다**(R16) — 매퍼가 암복호화를 하며 이 컬럼에 평문이
- * 들어가는 경로는 없다.
- *
- * 암호화 컬럼이라 LIKE·전문 검색의 대상이 아니다. 대화 검색은 비범위다.
- */
+/** DM 메시지. 본문은 매퍼가 암호화해 저장한다(R16) — 검색 대상이 될 수 없다. */
 @Entity
 @Table(name = "community_message", schema = DbSchema.COMMUNITY)
 class MessageEntity(
@@ -83,25 +67,18 @@ class MessageEntity(
     @Column(name = "sender_id", nullable = false)
     var senderId: Long,
 
-    /**
-     * base64(iv || ciphertext+tag). 평문 길이 판정은 도메인이 소유한다.
-     * **사진만 있는 메시지는 빈 문자열이다** — null과 구분해 복호화 실패와 헷갈리지 않게 한다.
-     */
+    /** base64(iv || ciphertext+tag). 사진만 있는 메시지는 빈 문자열이다. */
     @Column(name = "body_encrypted", nullable = false, columnDefinition = "TEXT")
     var bodyEncrypted: String,
 
-    /** 첨부 사진의 오브젝트 키. 글과 같은 업로드 경로를 쓴다(POL-042). */
+    /** 첨부 사진의 오브젝트 키(POL-042). */
     @Column(name = "photo_object_key", length = 512)
     var photoObjectKey: String? = null,
 
     /**
-     * 탈퇴 회원의 메시지를 가리는 표시(SPEC-0011 R17). null이면 살아 있다.
-     *
-     * **도메인 `Message`에는 없다** — 글·댓글과 같은 취급이다. 도메인이 이 값으로 분기하지
-     * 않고, 읽기 계층이 조회에서 거른다.
-     *
-     * **보관 기간 물리 삭제와 무관하다** — 정리 배치는 `created_at`으로만 고르므로 지워진
-     * 표시가 있어도 180일 뒤 행 자체가 사라진다.
+     * 탈퇴 회원의 메시지를 가리는 표시(SPEC-0011). null이면 살아 있다.
+     * - 도메인 `Message`에는 없다. 읽기 계층이 조회에서 거른다.
+     * - 보관 기간 물리 삭제는 `created_at`으로만 고른다(이 값과 무관).
      */
     @Column(name = "deleted_at")
     var deletedAt: Instant? = null,
@@ -116,13 +93,8 @@ class MessageEntity(
 }
 
 /**
- * 메시지가 인용한 대상의 스냅샷(SPEC-0026 R14). **메시지와 별도 표다.**
- *
- * 대상 종류를 [quoteType] **값으로** 표현한다 — 컬럼으로 두면 인용 대상이 늘 때마다
- * 컬럼이 여섯씩 붙는다(community_report가 target_type으로 이미 쓰는 방식이다).
- *
- * [targetId]에 FK를 걸 수 없다 — 가리키는 표가 행마다 다르고, 원본이 삭제돼도 인용은
- * 남아야 한다. 맥락을 남기는 것이 이 표의 존재 이유다.
+ * 메시지가 인용한 대상의 스냅샷(SPEC-0026 R14). 대상 종류는 [quoteType] 값으로 구분한다.
+ * - [targetId]에는 FK가 없다 — 원본이 삭제돼도 인용은 남는다.
  */
 @Entity
 @Table(name = "community_message_quote", schema = DbSchema.COMMUNITY)
@@ -145,7 +117,7 @@ class MessageQuoteEntity(
     @Column(name = "title_snapshot", nullable = false, length = 255)
     var titleSnapshot: String,
 
-    /** base64(iv || ciphertext+tag). 대화의 일부라 본문과 같이 암호화한다(POL-050). */
+    /** base64(iv || ciphertext+tag). 본문과 같이 암호화한다(POL-050). */
     @Column(name = "primary_excerpt_encrypted", nullable = false, columnDefinition = "TEXT")
     var primaryExcerptEncrypted: String,
 
@@ -168,10 +140,7 @@ class MessageQuoteEntity(
     }
 }
 
-/**
- * 인용 대상의 종류. **값이 늘어도 컬럼은 그대로다** — 커뮤니티 글·상품이 인용 대상이 되면
- * 여기 값과 DB의 CHECK만 넓힌다.
- */
+/** 인용 대상의 종류. 값을 늘릴 때는 DB의 CHECK도 함께 넓힌다. */
 enum class MessageQuoteType {
     /** 장소 질문의 답변. contextId=카탈로그 id, parentId=질문 id. */
     SPOT_ANSWER,
@@ -209,10 +178,8 @@ class MessageReportEntity(
 }
 
 /**
- * 신고에 포함된 메시지. **운영자의 열람 범위가 이 표로 한정된다**(POL-049).
- *
- * reporter_id를 함께 들고 있는 이유는 중복 판정이 신고자 단위이기 때문이다 — report_id로는
- * 다른 신고 건의 중복을 볼 수 없다(AC15-6).
+ * 신고에 포함된 메시지. 운영자의 열람 범위가 이 표로 한정된다(POL-049).
+ * - 중복 판정은 신고자 단위라 reporter_id를 함께 든다.
  */
 @Entity
 @Table(name = "community_message_report_item", schema = DbSchema.COMMUNITY)

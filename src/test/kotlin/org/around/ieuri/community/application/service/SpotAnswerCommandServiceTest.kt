@@ -28,9 +28,8 @@ import kotlin.test.assertFailsWith
 
 /**
  * 답변·답글 작성과 삭제(SPEC-0026 R4, R7, R10).
- *
- * **자격 게이팅이 없다** — 로그인 회원이면 반응과 무관하게 답변·답글을 쓸 수 있다.
- * 남는 규율은 1단계 제한(R7)과, 숨겨진 답변을 지울 때 답변 수를 **다시 내리지 않는 것**이다.
+ * - 자격 게이팅 없이 로그인 회원이면 쓸 수 있다.
+ * - 답글은 1단계뿐이고(R7), 숨겨진 답변을 지울 때 답변 수를 다시 내리지 않는다.
  */
 class SpotAnswerCommandServiceTest {
 
@@ -144,13 +143,7 @@ class SpotAnswerCommandServiceTest {
         verify(exactly = 0) { counterPort.increaseAnswerCount(any()) }
     }
 
-    /**
-     * 지워진 질문 아래에는 답글을 달 수 없다.
-     *
-     * **답변은 질문이 지워져도 행으로 남는다** — 자식을 훑지 않는 것이 설계이기 때문이다
-     * (탈퇴 소프트 삭제). 그래서 답변만 보고 통과시키면 읽을 수 없는 스레드에 답글이 쌓이고,
-     * 알림만 열리지 않는 화면으로 나간다. 답변 작성이 질문을 확인하는 것과 같은 규율이다.
-     */
+    /** 지워진 질문 아래에는 답글을 달 수 없다(답변 행이 남아 있어도). */
     @Test
     fun `부모 질문이 지워졌으면 답글을 달 수 없다`() {
         every { questionRepository.findById(questionId) } returns null
@@ -213,7 +206,7 @@ class SpotAnswerCommandServiceTest {
         service.deleteAnswer(DeleteSpotAnswerCommand(answerId), memberId)
 
         verify { answerRepository.deleteWithDescendants(answerId) }
-        // 숨김 시점에 이미 빠졌으므로 두 번 내리면 수가 실제보다 작아진다.
+        // 숨김 시점에 이미 빠졌으므로 다시 내리지 않는다.
         verify(exactly = 0) { counterPort.decreaseAnswerCount(any()) }
     }
 

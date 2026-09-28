@@ -63,10 +63,8 @@ import org.around.ieuri.community.infrastructure.locale.contentLanguage
 import org.springframework.stereotype.Component
 
 /**
- * 커뮤니티 쓰기 리졸버. 전부 인증이 필요하며, 비로그인은 UnauthorizedException이
- * withCommunityUserErrors에 붙잡히지 않고 최상위 errors[]로 전파된다.
- *
- * 리졸버는 얇게 둔다 — 입력을 커맨드로 옮기고 결과를 payload로 옮길 뿐 판단하지 않는다.
+ * 커뮤니티 쓰기 리졸버. 전부 인증이 필요하다.
+ * - 비로그인의 UnauthorizedException은 userErrors가 아니라 최상위 errors[]로 전파된다.
  */
 @DgsComponent
 @Component
@@ -81,10 +79,7 @@ class CommunityMutationResolver(
     private val currentMemberProvider: CurrentMemberProvider,
 ) {
 
-    /**
-     * 장소를 붙이면 **활성 언어에서 해소되는 장소만** 허용된다(SPEC-0029 R-16) — 언어는
-     * Accept-Language에서 오며 GraphQL 인자가 아니다.
-     */
+    /** 장소는 활성 언어(Accept-Language)에서 해소되는 것만 붙일 수 있다(SPEC-0029 R-16). */
     @DgsMutation
     fun createPost(
         @InputArgument input: CreatePostInput,
@@ -105,10 +100,7 @@ class CommunityMutationResolver(
             memberId = memberId,
             language = dfe.contentLanguage(),
         )
-        // **post는 항상 null이고 대신 postId를 준다.** 생성 타입 Post는 spot·author를 생성자에서
-        // 요구하는데, 그 둘은 필드 리졸버가 요청 시에만 가져오는 지연 필드다 — 여기서 채우려면
-        // 클라이언트가 고르지도 않은 다른 도메인 조회를 매번 왕복해야 한다.
-        // 클라이언트는 postId로 `post(id:)`를 조회한다.
+        // post는 싣지 않고 postId만 준다 — 클라이언트는 `post(id:)`로 조회한다.
         CreatePostPayload(success = true, userErrors = emptyList(), postId = postId)
     }
 
@@ -161,7 +153,7 @@ class CommunityMutationResolver(
             ),
             memberId,
         )
-        // comment가 null이고 commentId를 주는 이유는 createPost와 같다.
+        // createPost와 같이 commentId만 준다.
         CreateCommentPayload(
             success = true,
             userErrors = emptyList(),
@@ -229,10 +221,7 @@ class CommunityMutationResolver(
         )
     }
 
-    /**
-     * 확인은 **장별로 성패가 갈린다.** success는 전부 성공했을 때만 true이며, 일부만 실패해도
-     * 나머지 confirmed는 그대로 쓸 수 있다.
-     */
+    /** 장별로 성패가 갈린다. success는 전부 성공일 때만 true이고, 일부 실패여도 confirmed는 쓸 수 있다. */
     @DgsMutation
     fun confirmPostImageUploads(
         @InputArgument input: ConfirmPostImageUploadsInput,

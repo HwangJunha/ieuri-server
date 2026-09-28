@@ -10,10 +10,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import org.around.ieuri.common.graphql.generated.types.ReportReason as GqlReportReason
 
-/**
- * GraphQL 입력 → Command 변환(POL-033). **필드마다 다른 값을 준다** — 같은 값을 쓰면
- * 뒤바뀐 매핑이 통과한다.
- */
+/** GraphQL 입력 → Command 변환(POL-033). 필드마다 다른 값을 준다. */
 class ConversationInputMapperTest {
 
     @Test
@@ -31,7 +28,7 @@ class ConversationInputMapperTest {
         assertEquals("images/community/3/photo", command.photoKey)
     }
 
-    /** 사진 없이 본문만 보내는 것이 기본 경로다 — nullable 필드가 null로 옮겨져야 한다. */
+    /** 사진 없이 본문만 보내면 nullable 필드가 null로 옮겨진다. */
     @Test
     fun `SendMessageInput의 사진 키가 없으면 null로 옮겨진다`() {
         val command = SendMessageInput(conversationId = 12L, body = "본문", photoKey = null).toCommand()
@@ -49,7 +46,7 @@ class ConversationInputMapperTest {
         assertEquals(22L, command.upToMessageId)
     }
 
-    /** 생략하면 "마지막 메시지까지"를 뜻하므로 null이 그대로 실려야 한다. */
+    /** 생략(null)은 "마지막 메시지까지"이므로 null이 그대로 실린다. */
     @Test
     fun `MarkConversationReadInput의 읽은 지점이 없으면 null로 옮겨진다`() {
         val command = MarkConversationReadInput(conversationId = 23L, upToMessageId = null).toCommand()

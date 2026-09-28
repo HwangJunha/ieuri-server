@@ -24,10 +24,7 @@ class ConversationAndMessageTest {
 
     // ── Conversation ────────────────────────────────────────────────
 
-    /**
-     * 참여자 쌍이 **정렬되어** 저장되는 것이 유일 제약으로 "이미 있는 대화"를 판정할 수 있는
-     * 근거다(AC7-2). 인자 순서가 달라도 같은 모양이어야 한다.
-     */
+    /** AC7-2 — 인자 순서와 무관하게 참여자 쌍이 정렬되어 저장된다. */
     @Test
     fun `참여자 쌍은 인자 순서와 무관하게 정렬되어 저장된다`() {
         val one = Conversation.create(memberId = 9L, counterpartId = 3L, now = now)
@@ -65,7 +62,7 @@ class ConversationAndMessageTest {
         assertFailsWith<IllegalArgumentException> { conversation.counterpartOf(99L) }
     }
 
-    /** 빈 대화가 존재할 수 있다 — 대화 시작과 첫 전송이 별개 연산이기 때문이다. */
+    /** 빈 대화가 존재할 수 있다. */
     @Test
     fun `메시지가 오가면 최근 활동 시각이 갱신된다`() {
         val conversation = Conversation.create(3L, 9L, now = now)
@@ -87,10 +84,7 @@ class ConversationAndMessageTest {
         assertEquals(3L, message.senderId)
     }
 
-    /**
-     * AC9-2·SPEC-0021 AC3.5 — 본문도 사진도 없으면 보낼 것이 없는 전송이라 거부된다.
-     * 인용이 사라져 판정 조건이 둘로 줄었다.
-     */
+    /** AC9-2·SPEC-0021 AC3.5 — 본문도 사진도 없으면 거부된다. */
     @Test
     fun `본문도 사진도 없으면 전송되지 않는다`() {
         assertFailsWith<IllegalArgumentException> {
@@ -98,10 +92,7 @@ class ConversationAndMessageTest {
         }
     }
 
-    /**
-     * **사진만 있는 메시지가 성립한다**(SPEC-0021 AC3.4) — 본문이 비어도 사진이 있으면 보낼 수 있다.
-     * 본문 없음은 빈 문자열로 표현한다.
-     */
+    /** SPEC-0021 AC3.4 — 사진만 있는 메시지가 성립한다(본문은 빈 문자열). */
     @Test
     fun `본문 없이 사진만 보낼 수 있다`() {
         val key = confirmedKey(owner = 3L)
@@ -123,11 +114,7 @@ class ConversationAndMessageTest {
         assertEquals(key.value, message.photoKey?.value)
     }
 
-    /**
-     * SPEC-0021 AC4.1 — **복원은 빈 메시지를 거부하지 않는다.** 피드 인용만 있던 과거
-     * 메시지는 인용이 사라져 본문도 사진도 없는 상태로 남는데, 여기서 막으면 그 메시지가
-     * 든 대화 조회가 통째로 실패한다.
-     */
+    /** SPEC-0021 AC4.1 — 복원은 빈 메시지를 거부하지 않는다. */
     @Test
     fun `본문과 사진이 모두 빈 과거 메시지도 복원된다`() {
         val restored = Message.restore(
@@ -144,10 +131,7 @@ class ConversationAndMessageTest {
         assertEquals(null, restored.photoKey)
     }
 
-    /**
-     * SPEC-0021 AC4.3 — 과거 데이터를 허용하는 것이 새 빈 메시지를 허용한다는 뜻은 아니다.
-     * 복원은 통과하고 생성은 거부되는 것이 이 불변식의 요점이다.
-     */
+    /** SPEC-0021 AC4.3 — 복원은 통과해도 새 빈 메시지 생성은 거부된다. */
     @Test
     fun `과거 빈 메시지를 허용해도 새 빈 메시지는 거부된다`() {
         Message.restore(id = 500L, conversationId = 1L, senderId = 3L, body = "", createdAt = now)
@@ -224,10 +208,7 @@ class ConversationAndMessageTest {
         assertFalse(Message.isExpired(createdAt, now))
     }
 
-    /**
-     * AC16-3 — 대화가 활발해도 개별 메시지의 보관 기간은 늘어나지 않는다. 기준이 대화의
-     * 마지막 활동이 아니라 메시지 자신의 생성 시각이기 때문이다.
-     */
+    /** AC16-3 — 보관 기간은 대화 활동이 아니라 메시지 자신의 생성 시각 기준이다. */
     @Test
     fun `대화의 활성 여부가 개별 메시지의 보관 기간을 늘리지 않는다`() {
         val oldMessage = now.minus(Message.RETENTION).minus(Duration.ofDays(30))

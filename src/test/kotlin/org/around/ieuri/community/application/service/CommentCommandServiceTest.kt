@@ -24,8 +24,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * 댓글 생성·삭제(R13, R23). 핵심은 글의 commentCount가 실제 보이는 댓글 수와 어긋나지 않는 것이다 —
- * 숨겨진 댓글은 이미 수에서 빠져 있으므로 삭제 시 **다시 내리지 않는다**.
+ * 댓글 생성·삭제(R13, R23).
+ * - 숨겨진 댓글은 이미 수에서 빠져 있으므로 삭제 시 commentCount를 다시 내리지 않는다.
  */
 class CommentCommandServiceTest {
 
@@ -173,7 +173,7 @@ class CommentCommandServiceTest {
     @Test
     fun `다른 글의 댓글은 부모가 될 수 없다`() {
         givenPostExists()
-        // postId가 다른 댓글이다. 허용하면 글 A의 목록에 글 B의 답글이 섞인다.
+        // postId가 다른 댓글에는 답글을 달 수 없다.
         every { commentRepository.findById(5L) } returns Comment.restore(
             id = 5L,
             postId = postId + 999,
@@ -208,7 +208,7 @@ class CommentCommandServiceTest {
 
         service.createComment(CreateCommentCommand(postId, "답글", parentCommentId = 5L), memberId)
 
-        // "댓글 3개"인데 열어서 5개면 어긋나 보인다.
+        // 답글도 댓글 수에 포함된다.
         verify(exactly = 1) { counterPort.increaseCommentCount(postId) }
     }
 
@@ -233,7 +233,7 @@ class CommentCommandServiceTest {
         service.deleteComment(DeleteCommentCommand(commentId), memberId)
 
         assertTrue(target.deleted)
-        // 두 번 내리면 숫자가 실제보다 작아진다.
+        // 다시 내리지 않는다.
         verify(exactly = 0) { counterPort.decreaseCommentCount(any()) }
     }
 

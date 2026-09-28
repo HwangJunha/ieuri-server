@@ -26,14 +26,8 @@ import org.around.ieuri.common.graphql.generated.types.PostSpot as GqlPostSpot
 import org.around.ieuri.common.graphql.generated.types.TargetCategory as GqlTargetCategory
 
 /**
- * 장소 질문/답변 조회 리졸버(SPEC-0026).
- *
- * **인증 없이도 읽힌다**(AC-1.4) — `requireMemberId`가 아니라 `currentMemberId`를 쓰고,
- * 비로그인은 0으로 흘러 차단 집합도 소유 관계도 없는 호출자가 된다.
- *
- * 루트는 **read DTO를 노드로 실어 돌려준다** — 생성 타입은 non-null 필드를 생성자에서
- * 요구해 지연 필드를 비워 둘 수 없기 때문이다. 사진·작성자·장소·답글은 요청된 경우에만
- * @DgsData가 배치로 읽는다.
+ * 장소 질문/답변 조회 리졸버(SPEC-0026). read DTO를 노드로 반환하고 사진·작성자·장소·답글은 요청 시에만 배치로 읽는다.
+ * - 인증 없이도 읽힌다(AC-1.4). 비로그인은 뷰어 0 — 차단·소유 관계가 없는 호출자다.
  */
 @DgsComponent
 @Component
@@ -43,13 +37,9 @@ class SpotQaQueryResolver(
 ) {
 
     /**
-     * 질문 목록. 장소·작성자·id 세 필터가 독립적이며 함께 걸린다.
-     *
-     * **`mine = true`는 인증을 요구한다** — 비로그인은 좁힐 대상이 없어 빈 목록을 주는 대신
-     * `requireMemberId`가 최상위 errors[]로 UNAUTHENTICATED를 낸다. 조용히 빈 목록을 주면
-     * 클라이언트가 "질문을 쓴 적 없음"으로 오해한다.
-     *
-     * `catalogId` 필터의 존재 검사는 **활성 언어 기준이다**(SPEC-0029 R-16, AC-15.3).
+     * 질문 목록. 장소·작성자·id 세 필터는 독립적이며 함께 걸린다.
+     * - `mine = true`를 비로그인이 부르면 빈 목록이 아니라 UNAUTHENTICATED 오류다.
+     * - `catalogId`의 존재 검사는 활성 언어 기준이다(SPEC-0029 R-16).
      */
     @DgsQuery
     fun spotQuestions(
@@ -102,11 +92,8 @@ class SpotQaQueryResolver(
     // ── SpotQuestion 지연 필드 ────────────────────────────────────────
 
     /**
-     * 질문이 달린 장소. **질문은 언제나 장소에 속하므로 non-null이다** — 조회가 비면
-     * 카탈로그가 사라진 것이고, 그것은 데이터 손상이라 조용히 넘기지 않는다.
-     *
-     * **활성 언어에서 해소되지 않는 질문은 여기 오지 않는다**(SPEC-0029 R-23·AC-23.3) —
-     * 목록 조회가 이미 걸러낸다. 그러므로 여기서의 부재는 여전히 데이터 손상이다.
+     * 질문이 달린 장소. non-null이다.
+     * - 조회가 비면 데이터 손상으로 보고 실패한다(활성 언어 미해소 질문은 목록이 이미 거른다, SPEC-0029 R-23).
      */
     @DgsData(parentType = "SpotQuestion", field = "spot")
     fun questionSpot(dfe: DgsDataFetchingEnvironment): CompletableFuture<GqlPostSpot> {
@@ -133,10 +120,8 @@ class SpotQaQueryResolver(
     fun answerPhotoKeys(dfe: DgsDataFetchingEnvironment): CompletableFuture<List<String>> = dfe.loader<List<String>>(SpotAnswerPhotoDataLoader.NAME).load(dfe.answerSource().id)
 
     /**
-     * 답글. **요청된 경우에만** 배치로 읽는다 — 목록만 그리는 화면은 조회가 붙지 않는다.
-     *
-     * **뷰어를 여기서 확정해 실어 보낸다**(SPEC-0032 R27) — 로더가 자기 스레드에서 읽으면
-     * 가상 스레드 전환에 신원을 잃고 조용히 비로그인으로 강등된다.
+     * 답글. 요청된 경우에만 배치로 읽는다.
+     * - 뷰어는 여기서 확정해 로더에 넘긴다 — 로더 스레드에서 읽으면 비로그인으로 강등된다(SPEC-0032 R27).
      */
     @DgsData(parentType = "SpotAnswer", field = "replies")
     fun answerReplies(
@@ -155,29 +140,19 @@ class SpotQaQueryResolver(
     // ── 공통 ─────────────────────────────────────────────────────────
 
     /**
-     * 뷰어 신원. 비로그인은 0이다 — 차단 집합도 소유 관계도 없는 호출자를 뜻한다.
-     *
-     * **거절된 토큰은 0으로 흘리지 않는다**(SPEC-0032 R1). 만료를 비로그인으로 다루면 차단
-     * 관계와 소유 관계가 조용히 사라져 **그럴듯한 오답**이 나간다 — 오류보다 나쁘다.
+     * 뷰어 신원. 비로그인은 0이다.
+     * - 거절된(만료 등) 토큰은 비로그인(0)으로 흘리지 않는다(SPEC-0032 R1).
      */
     private fun viewerId(dfe: DgsDataFetchingEnvironment): Long = currentMemberProvider.optionalMemberId(dfe.tokenPresentation()) ?: ANONYMOUS
 
-    /**
-     * 작성자를 배치로 읽는다. 회원 정보가 없어도 질문·답변은 남으므로(탈퇴해도 보존한다)
-     * 대체 표기로 채운다.
-     */
+    /** 작성자를 배치로 읽는다. 회원 정보가 없으면(탈퇴) 대체 표기로 채운다. */
     private fun DgsDataFetchingEnvironment.loadAuthor(
         memberId: Long,
     ): CompletableFuture<GqlPostAuthor> = loader<PostAuthorView>(PostAuthorDataLoader.NAME)
         .load(memberId)
         .thenApply { it.toGqlOrPlaceholder(memberId) }
 
-    /**
-     * 부모 리졸버가 돌려준 read DTO를 꺼낸다.
-     *
-     * `!!` 대신 명시적으로 실패시킨다 — 부모가 반환한 값이라 실제로 null이 될 수 없지만,
-     * 그 보장은 DGS의 실행 순서에 달려 있어 타입이 증명하지 못한다.
-     */
+    /** 부모 리졸버가 돌려준 read DTO를 꺼낸다. 없으면 명시적으로 실패한다. */
     private fun DgsDataFetchingEnvironment.questionSource(): SpotQuestionView = getSource<SpotQuestionView>()
         ?: error("SpotQuestion 필드 리졸버는 부모가 반환한 SpotQuestionView를 소스로 받아야 한다.")
 

@@ -127,7 +127,7 @@ class PushDispatchServiceTest {
         service.dispatch(request(recipient = 5L, actor = 5L))
 
         verify(exactly = 0) { pushSender.send(any(), any()) }
-        // 걸러졌으면 토큰 조회조차 하지 않는다 — 판정은 싼 것부터다.
+        // 걸러졌으면 토큰 조회조차 하지 않는다.
         verify(exactly = 0) { store.findTokens(any()) }
     }
 
@@ -212,11 +212,7 @@ class PushDispatchServiceTest {
         assertEquals("JA제목", notification.captured.title)
     }
 
-    /**
-     * **본문이 반드시 실려야 한다.** iOS(APNs)는 본문 없는 알림을 표시하지 않아, 비면
-     * FCM은 성공으로 응답하는데 기기에는 아무것도 뜨지 않는다 — 오류가 없어 발견이 어렵다.
-     * 실제로 그 형태의 장애가 났다.
-     */
+    /** 본문이 반드시 실린다 — 비면 iOS가 알림을 조용히 버린다. */
     @Test
     fun `본문이 비지 않는다`() {
         givenTokens(token("d1", language = AlarmLocale.JA))
@@ -228,7 +224,7 @@ class PushDispatchServiceTest {
         assertEquals("JA본문", notification.captured.body)
     }
 
-    /** 알림 종류마다 다른 문구를 읽는다 — 답변과 답글이 한 카테고리지만 문구는 갈린다. */
+    /** 알림 종류마다 다른 문구를 읽는다(답변과 답글은 한 카테고리지만 문구가 갈린다). */
     @Test
     fun `알림 종류로 문구를 찾는다`() {
         givenTokens(token("d1"))
@@ -251,7 +247,7 @@ class PushDispatchServiceTest {
         assertEquals("EN제목", notification.captured.title)
     }
 
-    /** 문구가 아예 없으면 보낼 것이 없다 — 시드가 지워진 상태이므로 조용히 넘기지 않는다. */
+    /** 문구가 아예 없으면 발송하지 않는다. */
     @Test
     fun `문구가 하나도 없으면 발송하지 않는다`() {
         givenTokens(token("d1"))

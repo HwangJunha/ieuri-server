@@ -8,18 +8,9 @@ import org.springframework.transaction.event.TransactionPhase
 import org.springframework.transaction.event.TransactionalEventListener
 
 /**
- * 카탈로그 삭제를 받아 글-장소 연결을 정리한다(SPEC-0023 R11). **인바운드 어댑터다** —
- * tourism이 community를 호출하는 것이 아니라 community가 이벤트를 구독한다.
- *
- * `CommunityMemberWithdrawnListener`와 같은 형태이며 이유도 같다:
- *  - `AFTER_COMMIT` — 삭제가 확정된 뒤에만 정리한다.
- *  - **예외를 삼킨다** — 커밋 뒤라 되돌릴 수 없고, 던지면 같은 이벤트를 받는 다른 도메인의
- *    리스너까지 막힌다.
- *  - **클래스 이름에 도메인을 붙인다** — Spring이 단순 클래스명으로 빈 이름을 지어, 다른
- *    도메인의 같은 리스너와 겹치면 패키지가 달라도 기동이 실패한다.
- *
- * **오늘 이 리스너를 깨우는 발행 지점이 없다**(SpotCatalogDeleted 주석). 카탈로그 삭제 경로가
- * 생기는 시점에 발행만 추가하면 동작한다.
+ * 카탈로그 삭제(커밋 후)를 받아 글-장소 연결을 정리한다(SPEC-0023 R11).
+ * - 예외를 삼키고 로그만 남긴다 — 던지면 같은 이벤트의 다른 도메인 리스너까지 막힌다.
+ * - 현재 [SpotCatalogDeleted]를 발행하는 곳이 없다 — 삭제 경로가 생기면 발행만 추가하면 된다.
  */
 @Component
 class CommunitySpotCatalogDeletedListener(

@@ -266,7 +266,7 @@ class PostCommandServiceTest {
     private fun storedPost(hidden: Boolean = false, authorId: Long = memberId) = Post.restore(
         id = 1L, category = TargetCategory.TOURIST_SPOT,
         catalogId = catalogId, authorId = authorId, tags = emptyList(),
-        // 저장소가 좌표까지 복원한다 — 빠뜨리면 장소를 안 바꾼 수정에서도 연결이 지워진다.
+        // 저장소가 좌표까지 복원한다.
         spotPoint = SpotPoint(127.0, 37.5),
         title = "원래 제목", body = "원래 본문", photoKeys = emptyList(),
         likeCount = 0, commentCount = 0, hidden = hidden, deletedAt = null, createdAt = now,
@@ -296,7 +296,6 @@ class PostCommandServiceTest {
 
         service.editPost(EditPostCommand(1L, "새 제목", "새 본문", null), memberId, language)
 
-        // 좌표가 날아가면 연결 행이 지워져 그 글이 지역 피드에서 조용히 사라진다.
         assertEquals(SpotPoint(127.0, 37.5), post.spotPoint)
     }
 

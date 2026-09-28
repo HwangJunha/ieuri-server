@@ -4,15 +4,8 @@ import org.around.ieuri.community.domain.vo.PhotoObjectKey
 import java.time.Instant
 
 /**
- * 장소에 달린 질문. 애그리게이트 루트.
- *
- * 글([Post])과 달리 [catalogId]가 필수다 — 질문은 언제나 어떤 장소에 대한 것이다.
- *
- * **[resolved]는 양방향으로 전이한다**(R8). 그 뜻은 "이 답이 정답"이 아니라 "질문자가
- * 충분히 알게 되었다"이며, 그 판단이 바뀔 수 있으므로 되돌릴 수 있다.
- *
- * 좋아요 자격은 이 모델이 모른다 — 다른 애그리게이트(SpotReaction)의 상태이며 응용 계층이
- * 쓰기 시점에 판정한다.
+ * 장소에 달린 질문. 애그리게이트 루트. [catalogId]는 필수다.
+ * - [resolved]는 "질문자가 충분히 알게 되었다"이며 양방향으로 전이한다(R8).
  */
 class SpotQuestion private constructor(
     val id: Long?,
@@ -45,12 +38,8 @@ class SpotQuestion private constructor(
     val deleted: Boolean get() = deletedAt != null
 
     /**
-     * 해결 상태를 [resolved]로 바꾼다. **작성자 본인만 할 수 있고 양방향이다**(R8).
-     *
-     * 이미 그 상태여도 true다 — 양쪽 모두 멱등이라 재시도가 안전하다. 소유자가 아니면
-     * false이며 상태는 그대로다.
-     *
-     * 되돌려도 답변은 지우지 않는다 — 해결 표시는 답변을 막지도 지우지도 않는다.
+     * 해결 상태를 [resolved]로 바꾼다. 작성자 본인만 할 수 있다(R8).
+     * - 이미 그 상태여도 true(멱등). 소유자가 아니면 false이며 상태는 그대로다.
      */
     fun changeResolvedBy(memberId: Long, resolved: Boolean): Boolean {
         if (authorId != memberId) return false

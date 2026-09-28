@@ -12,18 +12,8 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 /**
- * 좋아요·취소. 양방향 모두 멱등이다 — 이미 좋아요한 글에 다시 눌러도, 좋아요하지 않은 글을
- * 취소해도 오류가 아니다.
- *
- * 멱등 판정을 저장소에 맡기고 그 결과로 집계를 올릴지 결정한다. 집계를 먼저 올리고 저장에서
- * 유일 제약에 걸리는 순서로 쓰면 카운트가 실제 좋아요 수보다 커진다.
- *
- * **애그리게이트를 복원하지 않는다.** 여기서 필요한 것은 좋아요 수 하나인데, 복원하면
- * 태그·사진·카테고리·장소까지 읽는다. 게다가 읽고 고쳐 쓰면 동시에 누른 두 요청이 서로의
- * 증가를 덮어써 카운트가 실제 좋아요 행 수보다 작아진다 — 계수는 DB가 원자적으로 올린다.
- *
- * 갱신값은 **읽기 포트로 다시 조회한다**(CQRS). 쓰기가 애그리게이트를 거치지 않으므로
- * 갱신값이 커맨드의 반환으로 따라오지 않기 때문이다.
+ * 좋아요·취소. 양방향 모두 멱등이며 갱신된 좋아요 수를 돌려준다.
+ * - 저장 결과(실제 삽입·삭제 여부)를 본 뒤에만 계수를 바꾼다. 계수는 DB가 원자적으로 올린다.
  */
 @Service
 class PostLikeCommandService(
@@ -60,6 +50,6 @@ class PostLikeCommandService(
         if (!postModerationPort.exists(postId)) throw PostNotFoundException()
     }
 
-    /** 방금 존재를 확인했으므로 없을 수 없다 — 그 사이에 사라졌다면 0으로 답한다. */
+    /** 그 사이에 글이 사라졌다면 0이다. */
     private fun currentLikeCount(postId: Long): Int = communityQueryPort.findLikeCount(postId) ?: 0
 }

@@ -20,19 +20,15 @@ import kotlin.test.assertNull
 
 /**
  * 메시지 인용 스냅샷의 변환 세 구간(SPEC-0026 R14).
- *
- * **필드마다 다른 값을 쓴다.** 여섯 필드 중 셋이 `Long`, 셋이 `String`이라 값을 공유하면
- * 뒤바뀌어도 통과한다 — 질문 발췌 자리에 답변 발췌가 실리면 인용 카드가 영구히 틀린 값을
- * 보여준다. 스냅샷은 전송 시 한 번 쓰이고 다시 만들어지지 않기 때문이다.
+ * - 필드마다 다른 값을 쓴다. 같은 타입 필드가 뒤바뀌면 잡아낸다.
  */
 class ConversationSpotQaOriginMapperTest {
 
     private val createdAt = Instant.parse("2026-08-18T01:02:03Z")
 
     /**
-     * 장소 답변 인용의 **자리 배치**. title=장소명, primary=질문, secondary=답변,
-     * context=카탈로그, parent=질문 id, target=답변 id다. 이 배치가 어긋나면 카드가
-     * 영구히 틀린 값을 보여준다.
+     * 장소 답변 인용의 자리 배치. title=장소명, primary=질문, secondary=답변,
+     * context=카탈로그, parent=질문 id, target=답변 id다.
      */
     private fun quoteEntity() = MessageQuoteEntity(
         id = 1L,
@@ -64,7 +60,7 @@ class ConversationSpotQaOriginMapperTest {
         assertEquals("답변 평문", origin.answerExcerpt)
     }
 
-    /** 인용 행이 없으면 메시지에 인용이 없다 — 별도 표라 호출자가 넘기지 않으면 그만이다. */
+    /** 인용 행이 없으면 메시지에 인용이 없다. */
     @Test
     fun `인용을 넘기지 않으면 메시지의 인용이 null이다`() {
         val entity = MessageEntity(

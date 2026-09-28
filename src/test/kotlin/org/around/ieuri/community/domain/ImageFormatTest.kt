@@ -5,14 +5,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
-/**
- * 매직바이트 판정. **이미지를 파싱하지 않고** 앞부분 몇 바이트만 본다 —
- * 파서를 태우면 이미지 파서 취약점에 노출되기 때문이다.
- *
- * 이 검사는 위조를 완전히 막지 못한다(시그니처만 맞춘 파일은 통과한다). 확장자만 바꾼
- * 파일을 걸러 내는 층일 뿐이며, 서명에 포함된 Content-Type·Content-Length와 확인 단계의
- * 실제 크기 검사가 나머지 층을 맡는다.
- */
+/** 매직바이트 판정. 이미지를 파싱하지 않고 앞부분 몇 바이트만 본다. */
 class ImageFormatTest {
 
     private fun bytes(vararg values: Int) = values.map { it.toByte() }.toByteArray()
@@ -23,7 +16,7 @@ class ImageFormatTest {
     private val jpeg = bytes(0xFF, 0xD8, 0xFF)
     private val png = bytes(0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)
 
-    /** RIFF 컨테이너: "RIFF" + 크기 4바이트 + "WEBP". 크기 구간은 값이 달라 무엇이든 된다. */
+    /** RIFF 컨테이너: "RIFF" + 크기 4바이트(무엇이든 된다) + "WEBP". */
     private val webp = bytes(
         0x52, 0x49, 0x46, 0x46,
         0x2A, 0x00, 0x00, 0x00,
@@ -100,7 +93,7 @@ class ImageFormatTest {
 
     @Test
     fun `읽어야 하는 길이는 가장 긴 시그니처를 담는다`() {
-        // 이 값보다 적게 읽으면 WEBP 판정이 조용히 실패한다.
+        // 이 값보다 적게 읽으면 WEBP 판정이 실패한다.
         assertEquals(12, ImageFormat.MAGIC_BYTES_LENGTH)
         assertEquals(ImageFormat.MAGIC_BYTES_LENGTH, webp.size)
     }

@@ -25,10 +25,7 @@ class NotificationMessageTest {
         assertFailsWith<IllegalArgumentException> { message(title = "   ") }
     }
 
-    /**
-     * **본문도 비울 수 없다.** iOS(APNs)가 본문 없는 알림을 표시하지 않으므로, 빈 본문을
-     * 허용하면 그 언어의 iOS 알림이 오류 없이 조용히 사라진다.
-     */
+    /** 본문도 비울 수 없다(iOS가 본문 없는 알림을 표시하지 않는다). */
     @Test
     fun `본문이 비면 만들 수 없다`() {
         assertFailsWith<IllegalArgumentException> { message(body = "") }

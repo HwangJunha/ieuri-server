@@ -75,7 +75,7 @@ class NotificationPreferenceServiceTest {
         assertEquals(false, saved.captured.enabled)
     }
 
-    /** 행이 있으면 갱신한다 — 같은 회원·카테고리에 행이 둘 생기면 안 된다. */
+    /** 행이 있으면 새로 저장하지 않고 갱신한다. */
     @Test
     fun `행이 있으면 갱신한다`() {
         val existing = preference(NotificationCategory.MESSAGE, true)
