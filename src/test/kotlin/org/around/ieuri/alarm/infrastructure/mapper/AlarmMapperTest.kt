@@ -1,9 +1,5 @@
 package org.around.ieuri.alarm.infrastructure.mapper
 
-import java.time.Instant
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import org.around.ieuri.alarm.domain.aggregate.DeviceToken
 import org.around.ieuri.alarm.domain.aggregate.NotificationPreference
 import org.around.ieuri.alarm.domain.vo.AlarmLocale
@@ -15,6 +11,10 @@ import org.around.ieuri.alarm.infrastructure.adapter.out.persistence.entity.Noti
 import org.around.ieuri.alarm.infrastructure.adapter.out.persistence.entity.NotificationPreferenceEntity
 import org.around.ieuri.alarm.infrastructure.adapter.out.persistence.mapper.toDomain
 import org.around.ieuri.alarm.infrastructure.adapter.out.persistence.mapper.toNewEntity
+import java.time.Instant
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 /**
  * 엔티티 ↔ 도메인 변환(POL-033).

@@ -91,7 +91,11 @@ class SpotCatalogSplitService(
 
         log.info(
             "catalog {} split into {} places: staying={} leaving={} translationsRemoved={}",
-            catalogId, clusters.size, stays.size, moved, departed.size,
+            catalogId,
+            clusters.size,
+            stays.size,
+            moved,
+            departed.size,
         )
         return CatalogSplitResult(catalogsSplit = 1, catalogsCreated = created, spotsMoved = moved)
     }
@@ -133,17 +137,15 @@ class SpotCatalogSplitService(
      * 제목 없이 카탈로그를 만들 수 없고(`SpotCatalog.from`이 거부한다), 그 한 건 때문에 분할
      * 전체를 롤백하는 것보다 낫다.
      */
-    private fun CatalogOrigin.displayTitle(): String =
-        if (language.isKorean) title else SpotTitleNormalizer.displayTitle(title) ?: title
+    private fun CatalogOrigin.displayTitle(): String = if (language.isKorean) title else SpotTitleNormalizer.displayTitle(title) ?: title
 
-    private fun CatalogOrigin.toStandardValues(): CatalogStandardValues =
-        CatalogStandardValues(
-            mapX = mapX,
-            mapY = mapY,
-            thumbnailImageUrl = thumbnailImageUrl,
-            category = category,
-            copyright = copyright,
-        )
+    private fun CatalogOrigin.toStandardValues(): CatalogStandardValues = CatalogStandardValues(
+        mapX = mapX,
+        mapY = mapY,
+        thumbnailImageUrl = thumbnailImageUrl,
+        category = category,
+        copyright = copyright,
+    )
 
     private companion object {
         /**

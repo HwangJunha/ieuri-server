@@ -1,8 +1,8 @@
 package org.around.ieuri.community.application.service
 
+import io.mockk.confirmVerified
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.confirmVerified
 import io.mockk.verify
 import org.around.ieuri.community.application.command.CreateSpotQuestionCommand
 import org.around.ieuri.community.application.command.DeleteSpotQuestionCommand
@@ -41,15 +41,21 @@ class SpotQuestionCommandServiceTest {
     private val photoKeyVerifier = mockk<SpotQaPhotoKeyVerifier>()
 
     private val service = SpotQuestionCommandService(
-        questionRepository, spotLookupPort, photoKeyVerifier,
+        questionRepository,
+        spotLookupPort,
+        photoKeyVerifier,
     )
 
     private fun givenSpotExists(exists: Boolean = true) {
         every { spotLookupPort.findSummary(catalogId, language) } returns
             if (exists) {
                 PostSpotView(
-                    id = catalogId, title = "경복궁", thumbnailImageUrl = "https://cdn/x.jpg",
-                    category = null, longitude = 127.0, latitude = 37.5,
+                    id = catalogId,
+                    title = "경복궁",
+                    thumbnailImageUrl = "https://cdn/x.jpg",
+                    category = null,
+                    longitude = 127.0,
+                    latitude = 37.5,
                 )
             } else {
                 null
@@ -67,15 +73,13 @@ class SpotQuestionCommandServiceTest {
         }
     }
 
-    private fun command(body: String = "웨이팅 있나요?", photoKeys: List<String> = emptyList()) =
-        CreateSpotQuestionCommand(catalogId = catalogId, body = body, photoKeys = photoKeys)
+    private fun command(body: String = "웨이팅 있나요?", photoKeys: List<String> = emptyList()) = CreateSpotQuestionCommand(catalogId = catalogId, body = body, photoKeys = photoKeys)
 
-    private fun question(authorId: Long = memberId, resolved: Boolean = false) =
-        SpotQuestion.restore(
-            id = questionId, catalogId = catalogId, authorId = authorId, body = "질문",
-            photoKeys = emptyList(), resolved = resolved, answerCount = 0,
-            hidden = false, deletedAt = null, createdAt = now,
-        )
+    private fun question(authorId: Long = memberId, resolved: Boolean = false) = SpotQuestion.restore(
+        id = questionId, catalogId = catalogId, authorId = authorId, body = "질문",
+        photoKeys = emptyList(), resolved = resolved, answerCount = 0,
+        hidden = false, deletedAt = null, createdAt = now,
+    )
 
     // ── 작성(R3) ───────────────────────────────────────────────────
 

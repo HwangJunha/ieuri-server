@@ -19,8 +19,7 @@ class MapOwnerLookupAdapter(
     private val memberQueryUseCase: MemberQueryUseCase,
 ) : MapOwnerLookupPort {
 
-    override fun findNickname(memberId: Long): String? =
-        memberQueryUseCase.memberPublicProfile(memberId)?.nickname
+    override fun findNickname(memberId: Long): String? = memberQueryUseCase.memberPublicProfile(memberId)?.nickname
 
     /** auth가 벌크 진입점을 이미 제공한다 — 목록 한 페이지가 왕복 1회로 끝난다. */
     override fun findNicknames(memberIds: Collection<Long>): Map<Long, String> {

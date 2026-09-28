@@ -3,10 +3,6 @@ package org.around.ieuri.alarm.application.service
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 import org.around.ieuri.alarm.application.port.out.persistence.DeviceTokenRepositoryPort
 import org.around.ieuri.alarm.application.port.out.persistence.NotificationMessageRepositoryPort
 import org.around.ieuri.alarm.application.port.out.persistence.NotificationPreferenceRepositoryPort
@@ -15,6 +11,10 @@ import org.around.ieuri.alarm.domain.aggregate.NotificationPreference
 import org.around.ieuri.alarm.domain.vo.AlarmLocale
 import org.around.ieuri.alarm.domain.vo.NotificationCategory
 import org.around.ieuri.alarm.domain.vo.NotificationType
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /** 발송 경로의 DB 접근(SPEC-0028 R4·R10). */
 class PushDispatchStoreTest {

@@ -38,28 +38,26 @@ class MemberPersistenceAdapter(
     private val passwordResetRepository: PasswordResetJpaRepository,
     private val encryptor: EmailEncryptorPort,
     private val identifierProtector: LoginIdentifierProtectorPort,
-) : MemberRepositoryPort, EmailVerificationStatusPort {
+) : MemberRepositoryPort,
+    EmailVerificationStatusPort {
 
     /**
      * 미인증 게이트(SPEC-0024 R9)가 매 요청 부른다. 없는 회원은 거짓 —
      * 존재하지 않는 주체를 통과시키지 않는다.
      */
-    override fun isEmailVerified(memberId: Long): Boolean =
-        memberRepository.findById(memberId).orElse(null)?.emailVerified ?: false
+    override fun isEmailVerified(memberId: Long): Boolean = memberRepository.findById(memberId).orElse(null)?.emailVerified ?: false
 
-    override fun existsByProviderAndProviderUserId(provider: Provider, providerUserId: ProviderUserId): Boolean =
-        memberRepository.existsByProviderAndProviderUserId(provider, providerUserId.value)
+    override fun existsByProviderAndProviderUserId(provider: Provider, providerUserId: ProviderUserId): Boolean = memberRepository.existsByProviderAndProviderUserId(provider, providerUserId.value)
 
     override fun existsByProviderAndEmailIdentifier(
         provider: Provider,
         emailIdentifier: String,
         excludingMemberId: Long?,
-    ): Boolean =
-        if (excludingMemberId == null) {
-            memberRepository.existsByProviderAndEmailIdentifier(provider, emailIdentifier)
-        } else {
-            memberRepository.existsByProviderAndEmailIdentifierAndIdNot(provider, emailIdentifier, excludingMemberId)
-        }
+    ): Boolean = if (excludingMemberId == null) {
+        memberRepository.existsByProviderAndEmailIdentifier(provider, emailIdentifier)
+    } else {
+        memberRepository.existsByProviderAndEmailIdentifierAndIdNot(provider, emailIdentifier, excludingMemberId)
+    }
 
     override fun existsById(memberId: Long): Boolean = memberRepository.existsById(memberId)
 

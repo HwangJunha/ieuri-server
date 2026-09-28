@@ -1,7 +1,7 @@
 package org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql
 
-import org.around.ieuri.tourism.application.exception.ReactionUserException
 import org.around.ieuri.common.graphql.generated.types.UserError
+import org.around.ieuri.tourism.application.exception.ReactionUserException
 
 /**
  * tourism 뮤테이션(reactToSpot)의 공통 오류 규약(BaseResponse). 예상 실패(ReactionUserException: SPOT_NOT_FOUND)와
@@ -18,10 +18,9 @@ fun toReactionUserErrorOrNull(e: Throwable): UserError? = when (e) {
     else -> null
 }
 
-inline fun <T> withReactionUserErrors(onError: (List<UserError>) -> T, block: () -> T): T =
-    try {
-        block()
-    } catch (e: Exception) {
-        val userError = toReactionUserErrorOrNull(e) ?: throw e
-        onError(listOf(userError))
-    }
+inline fun <T> withReactionUserErrors(onError: (List<UserError>) -> T, block: () -> T): T = try {
+    block()
+} catch (e: Exception) {
+    val userError = toReactionUserErrorOrNull(e) ?: throw e
+    onError(listOf(userError))
+}

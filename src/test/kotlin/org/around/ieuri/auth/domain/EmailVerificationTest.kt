@@ -18,15 +18,14 @@ class EmailVerificationTest {
     private val now: Instant = Instant.parse("2026-07-16T00:00:00Z")
     private val correctHash = "hash-correct"
 
-    private fun issue(maxAttempts: Int = 5): EmailVerification =
-        EmailVerification.issue(
-            publicId = UUID.randomUUID(),
-            memberId = 1L,
-            codeHash = correctHash,
-            ttl = Duration.ofMinutes(10),
-            now = now,
-            maxAttempts = maxAttempts,
-        )
+    private fun issue(maxAttempts: Int = 5): EmailVerification = EmailVerification.issue(
+        publicId = UUID.randomUUID(),
+        memberId = 1L,
+        codeHash = correctHash,
+        ttl = Duration.ofMinutes(10),
+        now = now,
+        maxAttempts = maxAttempts,
+    )
 
     @Test
     fun `올바른 코드면 성공하고 단회용으로 소진되며 verifiedAt이 기록된다`() {

@@ -10,6 +10,7 @@ import com.querydsl.core.types.dsl.NumberExpression
 import com.querydsl.core.types.dsl.NumberPath
 import com.querydsl.jpa.JPAExpressions
 import com.querydsl.jpa.impl.JPAQueryFactory
+import org.around.ieuri.common.context.AppKey
 import org.around.ieuri.common.pagination.CursorEdge
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.cursorPageOf
@@ -26,21 +27,20 @@ import org.around.ieuri.community.application.query.CommunityChipView
 import org.around.ieuri.community.application.query.PostAuthorView
 import org.around.ieuri.community.application.query.PostSpotView
 import org.around.ieuri.community.application.query.PostView
-import org.around.ieuri.common.context.AppKey
 import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.CommentEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QBlockEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QCommentEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostChipEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostHideEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostLikeEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostPhotoEntity
-import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostChipEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostSpotEntity
-import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QSpotCatalogLanguageEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostTagEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QSpotCatalogLanguageEntity
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
@@ -73,13 +73,13 @@ class CommunityQueryAdapter(
     private val block = QBlockEntity.blockEntity
     private val postHide = QPostHideEntity.postHideEntity
 
-
     /**
      * 글 피드. 대상 범위만 다르고 정렬·페이징·모더레이션 필터는 세 경우가 같다.
      *
      * [PostsSearch.targets]가 null이면 대상으로 좁히지 않고, 빈 목록이면 결과도 비어 있다 —
      * 빈 `IN` 절은 SQL에서 유효하지 않으므로 조기 반환한다.
      */
+
     /**
      * 최신순 피드.
      *
@@ -87,19 +87,18 @@ class CommunityQueryAdapter(
      * 그런 글이 지역 피드에서 영원히 보이지 않는다. 거리순은 [PostSpatialQueryAdapter]다.
      */
     @Transactional(readOnly = true)
-    override fun findPosts(search: PostsSearch): CursorPage<PostView> =
-        findPosts(
-            viewer = search.viewer,
-            first = search.first,
-            after = search.after,
-            extraConditions = listOfNotNull(
-                spotCondition(search.catalogId),
-                languageCondition(search.language),
-                categoryCondition(search.categories),
-                tagCondition(search.normalizedTag),
-                hideCondition(search),
-            ),
-        )
+    override fun findPosts(search: PostsSearch): CursorPage<PostView> = findPosts(
+        viewer = search.viewer,
+        first = search.first,
+        after = search.after,
+        extraConditions = listOfNotNull(
+            spotCondition(search.catalogId),
+            languageCondition(search.language),
+            categoryCondition(search.categories),
+            tagCondition(search.normalizedTag),
+            hideCondition(search),
+        ),
+    )
 
     /**
      * 활성 언어 필터(SPEC-0029 R-23). 붙은 장소가 이 언어에서 해소되지 않는 글을 뺀다 —
@@ -111,18 +110,17 @@ class CommunityQueryAdapter(
      * 언어 사본은 커뮤니티가 들고 있다 — tour 스키마를 조인하지 않으므로 이 쿼리 하나로
      * 끝나고 `first`가 곧 정확한 페이지 크기다.
      */
-    private fun languageCondition(language: ContentLanguage): BooleanExpression =
-        post.id.notIn(JPAExpressions.select(postSpot.postId).from(postSpot))
-            .or(
-                post.id.`in`(
-                    JPAExpressions.select(postSpot.postId).from(postSpot)
-                        .join(catalogLanguage)
-                        .on(
-                            catalogLanguage.catalogId.eq(postSpot.catalogId),
-                            catalogLanguage.language.eq(language),
-                        ),
-                ),
-            )
+    private fun languageCondition(language: ContentLanguage): BooleanExpression = post.id.notIn(JPAExpressions.select(postSpot.postId).from(postSpot))
+        .or(
+            post.id.`in`(
+                JPAExpressions.select(postSpot.postId).from(postSpot)
+                    .join(catalogLanguage)
+                    .on(
+                        catalogLanguage.catalogId.eq(postSpot.catalogId),
+                        catalogLanguage.language.eq(language),
+                    ),
+            ),
+        )
 
     /**
      * 개별 숨김 필터. **[PostsSearch.hiddenByViewer]가 true면 뒤집힌다** — 숨긴 글만 남긴다.
@@ -133,8 +131,11 @@ class CommunityQueryAdapter(
         return when {
             // 숨긴 글이 없는데 숨긴 글만 달라고 하면 결과도 없어야 한다.
             search.hiddenByViewer && hidden.isEmpty() -> post.id.isNull
+
             search.hiddenByViewer -> post.id.`in`(hidden)
+
             hidden.isEmpty() -> null
+
             else -> post.id.notIn(hidden)
         }
     }
@@ -143,35 +144,33 @@ class CommunityQueryAdapter(
      * 아래 셋은 **조건이 필요 없으면 null**을 돌려준다. QueryDSL의 where는 null을 무시하므로
      * 호출부에서 if로 리스트를 쌓지 않아도 된다 — 이 파일의 다른 필터와 같은 관용구다.
      */
+
     /**
      * 장소 필터. **카탈로그로 건다**(SPEC-0019 R-12) — `spot_id`로 걸면 일본어로 쓴 글이
      * 영어 피드에 나오지 않아 언어별로 피드가 갈린다.
      */
-    private fun spotCondition(catalogId: Long?): BooleanExpression? =
-        catalogId?.let {
-            // 연결 테이블을 서브쿼리로 걸어 조인이 행을 늘리지 않게 한다.
-            post.id.`in`(
-                JPAExpressions.select(postSpot.postId).from(postSpot)
-                    .where(postSpot.catalogId.eq(it)),
-            )
-        }
+    private fun spotCondition(catalogId: Long?): BooleanExpression? = catalogId?.let {
+        // 연결 테이블을 서브쿼리로 걸어 조인이 행을 늘리지 않게 한다.
+        post.id.`in`(
+            JPAExpressions.select(postSpot.postId).from(postSpot)
+                .where(postSpot.catalogId.eq(it)),
+        )
+    }
 
     /** 다중 선택은 OR이며 IN으로 표현한다(SPEC-0020). 비어 있으면 조건 자체를 걸지 않는다. */
-    private fun categoryCondition(categories: Set<TargetCategory>): BooleanExpression? =
-        categories.takeIf { it.isNotEmpty() }?.let {
-            post.id.`in`(
-                JPAExpressions.select(postChip.postId).from(postChip)
-                    .where(postChip.category.`in`(it)),
-            )
-        }
+    private fun categoryCondition(categories: Set<TargetCategory>): BooleanExpression? = categories.takeIf { it.isNotEmpty() }?.let {
+        post.id.`in`(
+            JPAExpressions.select(postChip.postId).from(postChip)
+                .where(postChip.category.`in`(it)),
+        )
+    }
 
-    private fun tagCondition(normalizedTag: String?): BooleanExpression? =
-        normalizedTag?.let {
-            post.id.`in`(
-                JPAExpressions.select(tag.postId).from(tag)
-                    .where(tag.normalized.eq(it)),
-            )
-        }
+    private fun tagCondition(normalizedTag: String?): BooleanExpression? = normalizedTag?.let {
+        post.id.`in`(
+            JPAExpressions.select(tag.postId).from(tag)
+                .where(tag.normalized.eq(it)),
+        )
+    }
 
     /**
      * 단건 조회. **피드와 같은 필터를 거친다** — 여기가 뚫리면 딥링크 하나로 차단과 자동 숨김이
@@ -258,12 +257,11 @@ class CommunityQueryAdapter(
 
     /** 커맨드가 원자적으로 갱신한 뒤 읽는다 — 쓰기가 애그리게이트를 거치지 않기 때문이다. */
     @Transactional(readOnly = true)
-    override fun findLikeCount(postId: Long): Int? =
-        queryFactory
-            .select(post.likeCount)
-            .from(post)
-            .where(post.id.eq(postId))
-            .fetchOne()
+    override fun findLikeCount(postId: Long): Int? = queryFactory
+        .select(post.likeCount)
+        .from(post)
+        .where(post.id.eq(postId))
+        .fetchOne()
 
     /**
      * 내가 쓴 글(SPEC-0011 R3). **[visibleToViewer]를 쓰지 않는다** — 자기 글은 자기가
@@ -381,26 +379,24 @@ class CommunityQueryAdapter(
      * 엔티티를 로드하지 않고 id만 프로젝션한다 — 필요한 것은 상대 id 하나뿐이다.
      */
     @Transactional(readOnly = true)
-    override fun findBlockedMemberIds(memberId: Long): Set<Long> =
-        queryFactory
-            .select(
-                Expressions.cases()
-                    .`when`(block.blockerId.eq(memberId)).then(block.blockedId)
-                    .otherwise(block.blockerId),
-            )
-            .from(block)
-            .where(block.blockerId.eq(memberId).or(block.blockedId.eq(memberId)))
-            .fetch()
-            .toSet()
+    override fun findBlockedMemberIds(memberId: Long): Set<Long> = queryFactory
+        .select(
+            Expressions.cases()
+                .`when`(block.blockerId.eq(memberId)).then(block.blockedId)
+                .otherwise(block.blockerId),
+        )
+        .from(block)
+        .where(block.blockerId.eq(memberId).or(block.blockedId.eq(memberId)))
+        .fetch()
+        .toSet()
 
     @Transactional(readOnly = true)
-    override fun findHiddenPostIds(memberId: Long): Set<Long> =
-        queryFactory
-            .select(postHide.postId)
-            .from(postHide)
-            .where(postHide.memberId.eq(memberId))
-            .fetch()
-            .toSet()
+    override fun findHiddenPostIds(memberId: Long): Set<Long> = queryFactory
+        .select(postHide.postId)
+        .from(postHide)
+        .where(postHide.memberId.eq(memberId))
+        .fetch()
+        .toSet()
 
     /**
      * 피드 공통 조회. spotPosts·nearbyPosts가 조건만 달리해 이 하나를 쓴다 —
@@ -481,9 +477,8 @@ class CommunityQueryAdapter(
         createdAtPath: DateTimePath<Instant>,
         idPath: NumberPath<Long>,
         cursor: CommunityCursor,
-    ): BooleanExpression =
-        createdAtPath.lt(cursor.createdAt)
-            .or(createdAtPath.eq(cursor.createdAt).and(idPath.lt(cursor.id)))
+    ): BooleanExpression = createdAtPath.lt(cursor.createdAt)
+        .or(createdAtPath.eq(cursor.createdAt).and(idPath.lt(cursor.id)))
 
     @Transactional(readOnly = true)
     override fun findCategoriesOf(postIds: List<Long>): Map<Long, TargetCategory> {
@@ -563,5 +558,4 @@ class CommunityQueryAdapter(
             .fetch()
             .toSet()
     }
-
 }

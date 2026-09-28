@@ -1,6 +1,5 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity
 
-import org.around.ieuri.common.persistence.DbSchema
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.GeneratedValue
@@ -8,6 +7,7 @@ import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.PrePersist
 import jakarta.persistence.Table
+import org.around.ieuri.common.persistence.DbSchema
 import java.time.Instant
 
 /** 약관 동의 이력 JPA 엔티티. append-only(수정/삭제하지 않음). */

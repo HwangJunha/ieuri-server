@@ -1,12 +1,14 @@
 package org.around.ieuri.community.infrastructure.adapter.out.persistence
 
+import com.querydsl.core.types.dsl.NumberPath
+import com.querydsl.jpa.impl.JPAQueryFactory
 import org.around.ieuri.community.application.port.out.persistence.BlockRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.CommentRepositoryPort
-import org.around.ieuri.community.application.port.out.persistence.PostLikeRepositoryPort
-import org.around.ieuri.community.application.port.out.persistence.PostRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.PostCounterPort
 import org.around.ieuri.community.application.port.out.persistence.PostHideRepositoryPort
+import org.around.ieuri.community.application.port.out.persistence.PostLikeRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.PostModerationPort
+import org.around.ieuri.community.application.port.out.persistence.PostRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.ReportRepositoryPort
 import org.around.ieuri.community.domain.aggregate.Block
 import org.around.ieuri.community.domain.aggregate.Comment
@@ -15,28 +17,26 @@ import org.around.ieuri.community.domain.aggregate.PostLike
 import org.around.ieuri.community.domain.aggregate.Report
 import org.around.ieuri.community.domain.vo.ReportTargetType
 import org.around.ieuri.community.domain.vo.SpotPoint
-import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toDomain
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostHideEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toChipEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toDomain
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toNewEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toPhotoEntities
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toPhotoKey
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toPostTag
-import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toTagEntities
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toSpotEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.mapper.toTagEntities
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.BlockJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.CommentJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.PostChipJpaRepository
-import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostHideEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.PostHideJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.PostJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.PostLikeJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.PostPhotoJpaRepository
-import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.PostTagJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.PostSpotJpaRepository
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.PostTagJpaRepository
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.repository.ReportJpaRepository
-import com.querydsl.core.types.dsl.NumberPath
-import com.querydsl.jpa.impl.JPAQueryFactory
-import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostEntity
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -161,8 +161,11 @@ class PostPersistenceAdapter(
         val next = post.toSpotEntity(postId)
         when {
             next == null && existing != null -> spotRepository.delete(existing)
+
             next == null -> Unit
+
             existing == null -> spotRepository.save(next)
+
             else -> {
                 // **catalogId를 빠뜨리면 장소를 바꿔도 글이 옛 장소의 피드에 남는다** —
                 // 조회 축이 이 컬럼이기 때문이다(SPEC-0019 R-12).
@@ -237,24 +240,22 @@ class PostModerationAdapter(
     private val post = QPostEntity.postEntity
 
     @Transactional(readOnly = true)
-    override fun exists(postId: Long): Boolean =
-        queryFactory
-            .selectOne()
-            .from(post)
-            .where(post.id.eq(postId), post.deletedAt.isNull)
-            .fetchFirst() != null
+    override fun exists(postId: Long): Boolean = queryFactory
+        .selectOne()
+        .from(post)
+        .where(post.id.eq(postId), post.deletedAt.isNull)
+        .fetchFirst() != null
 
     /**
      * 이미 숨겨진 글은 조건절에서 걸러져 0건이 갱신되고 false가 된다. 호출자가 그 값으로
      * 중복 처리를 건너뛰므로, 신고가 더 쌓여도 댓글 수를 두 번 내리는 일이 없다.
      */
     @Transactional
-    override fun hide(postId: Long): Boolean =
-        queryFactory
-            .update(post)
-            .set(post.hidden, true)
-            .where(post.id.eq(postId), post.deletedAt.isNull, post.hidden.isFalse)
-            .execute() > 0
+    override fun hide(postId: Long): Boolean = queryFactory
+        .update(post)
+        .set(post.hidden, true)
+        .where(post.id.eq(postId), post.deletedAt.isNull, post.hidden.isFalse)
+        .execute() > 0
 }
 
 @Component
@@ -262,8 +263,7 @@ class CommentPersistenceAdapter(
     private val repository: CommentJpaRepository,
 ) : CommentRepositoryPort {
 
-    override fun findById(commentId: Long): Comment? =
-        repository.findByIdAndDeletedAtIsNull(commentId)?.toDomain()
+    override fun findById(commentId: Long): Comment? = repository.findByIdAndDeletedAtIsNull(commentId)?.toDomain()
 
     override fun save(comment: Comment): Comment {
         val id = comment.id ?: return repository.save(comment.toNewEntity()).toDomain()
@@ -298,8 +298,7 @@ class PostLikePersistenceAdapter(
         }
     }
 
-    override fun delete(postId: Long, memberId: Long): Boolean =
-        repository.deleteByPostIdAndMemberId(postId, memberId) > 0
+    override fun delete(postId: Long, memberId: Long): Boolean = repository.deleteByPostIdAndMemberId(postId, memberId) > 0
 }
 
 /**
@@ -321,8 +320,7 @@ class PostHidePersistenceAdapter(
         }
     }
 
-    override fun delete(memberId: Long, postId: Long): Boolean =
-        repository.deleteByMemberIdAndPostId(memberId, postId) > 0
+    override fun delete(memberId: Long, postId: Long): Boolean = repository.deleteByMemberIdAndPostId(memberId, postId) > 0
 }
 
 @Component
@@ -340,8 +338,7 @@ class BlockPersistenceAdapter(
         }
     }
 
-    override fun delete(blockerId: Long, blockedId: Long): Boolean =
-        repository.deleteByBlockerIdAndBlockedId(blockerId, blockedId) > 0
+    override fun delete(blockerId: Long, blockedId: Long): Boolean = repository.deleteByBlockerIdAndBlockedId(blockerId, blockedId) > 0
 }
 
 @Component
@@ -351,7 +348,9 @@ class ReportPersistenceAdapter(
 
     override fun save(report: Report): Boolean {
         val duplicated = repository.existsByReporterIdAndTargetTypeAndTargetId(
-            report.reporterId, report.targetType, report.targetId,
+            report.reporterId,
+            report.targetType,
+            report.targetId,
         )
         if (duplicated) return false
         return try {
@@ -362,6 +361,5 @@ class ReportPersistenceAdapter(
         }
     }
 
-    override fun countDistinctReporters(targetType: ReportTargetType, targetId: Long): Int =
-        repository.countByTargetTypeAndTargetId(targetType, targetId).toInt()
+    override fun countDistinctReporters(targetType: ReportTargetType, targetId: Long): Int = repository.countByTargetTypeAndTargetId(targetType, targetId).toInt()
 }

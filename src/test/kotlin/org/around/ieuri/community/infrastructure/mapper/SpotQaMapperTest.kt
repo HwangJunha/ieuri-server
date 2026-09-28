@@ -32,8 +32,7 @@ class SpotQaMapperTest {
     private val createdAt = Instant.parse("2026-08-18T01:02:03.123456789Z")
     private val deletedAt = Instant.parse("2026-08-19T04:05:06Z")
 
-    private fun key(memberId: Long, uuid: UUID = UUID.randomUUID()) =
-        requireNotNull(PhotoObjectKey.parse("images/community/$memberId/$uuid"))
+    private fun key(memberId: Long, uuid: UUID = UUID.randomUUID()) = requireNotNull(PhotoObjectKey.parse("images/community/$memberId/$uuid"))
 
     // ── 질문 ──────────────────────────────────────────────────────
 
@@ -215,7 +214,10 @@ class SpotQaMapperTest {
     fun `사진 엔티티가 키로 옮겨진다`() {
         val raw = "images/community/5/${UUID.randomUUID()}"
         val entity = SpotQaPhotoEntity(
-            ownerType = SpotQaPhotoOwnerType.REPLY, ownerId = 3L, objectKey = raw, position = 0,
+            ownerType = SpotQaPhotoOwnerType.REPLY,
+            ownerId = 3L,
+            objectKey = raw,
+            position = 0,
         )
 
         val photoKey = entity.toPhotoKey()
@@ -229,8 +231,10 @@ class SpotQaMapperTest {
     @Test
     fun `형식이 깨진 사진 키는 실패시킨다`() {
         val entity = SpotQaPhotoEntity(
-            ownerType = SpotQaPhotoOwnerType.QUESTION, ownerId = 3L,
-            objectKey = "깨진키", position = 0,
+            ownerType = SpotQaPhotoOwnerType.QUESTION,
+            ownerId = 3L,
+            objectKey = "깨진키",
+            position = 0,
         )
 
         assertFailsWith<IllegalArgumentException> { entity.toPhotoKey() }

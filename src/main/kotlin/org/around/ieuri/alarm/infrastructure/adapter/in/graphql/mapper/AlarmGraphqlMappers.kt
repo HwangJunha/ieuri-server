@@ -33,11 +33,10 @@ fun DeleteDeviceTokenInput.toCommand(): DeleteDeviceTokenCommand = DeleteDeviceT
     deviceId = deviceId,
 )
 
-fun UpdateNotificationPreferenceInput.toCommand(): UpdateNotificationPreferenceCommand =
-    UpdateNotificationPreferenceCommand(
-        category = category.toDomain(),
-        enabled = enabled,
-    )
+fun UpdateNotificationPreferenceInput.toCommand(): UpdateNotificationPreferenceCommand = UpdateNotificationPreferenceCommand(
+    category = category.toDomain(),
+    enabled = enabled,
+)
 
 fun GqlDevicePlatform.toDomain(): DevicePlatform = DevicePlatform.valueOf(name)
 

@@ -13,15 +13,15 @@ import org.around.ieuri.common.security.AesGcmCipher
 import org.around.ieuri.community.application.port.out.query.ConversationMessagesSearch
 import org.around.ieuri.community.application.port.out.query.ConversationQueryPort
 import org.around.ieuri.community.application.port.out.query.ConversationsSearch
-import org.around.ieuri.community.application.query.ConversationView
 import org.around.ieuri.community.application.query.ConversationSpotQaOriginView
+import org.around.ieuri.community.application.query.ConversationView
 import org.around.ieuri.community.application.query.MessageView
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.ConversationEntity
-import org.around.ieuri.community.infrastructure.adapter.out.query.mapper.toSpotQaOriginView
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.MessageEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QConversationEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QMessageEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QMessageQuoteEntity
+import org.around.ieuri.community.infrastructure.adapter.out.query.mapper.toSpotQaOriginView
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
@@ -133,19 +133,18 @@ class ConversationQueryAdapter(
     }
 
     @Transactional(readOnly = true)
-    override fun findMessage(conversationId: Long, messageId: Long, memberId: Long): MessageView? =
-        queryFactory
-            .selectFrom(message)
-            // **대화로도 좁힌다** — 채널 이름이 인가의 근거가 되지 않게 한다.
-            // 지워진 메시지는 건너뛴다 — 구독이 id만 받아 여기서 다시 읽으므로, 발행과 읽기
-            // 사이에 탈퇴가 끼면 이 조건이 그것을 막는다(호출부가 null을 건너뛴다).
-            .where(
-                message.id.eq(messageId),
-                message.conversationId.eq(conversationId),
-                message.deletedAt.isNull,
-            )
-            .fetchOne()
-            ?.let { it.toMessageView(memberId, findQuotesOf(listOf(messageId))[messageId]) }
+    override fun findMessage(conversationId: Long, messageId: Long, memberId: Long): MessageView? = queryFactory
+        .selectFrom(message)
+        // **대화로도 좁힌다** — 채널 이름이 인가의 근거가 되지 않게 한다.
+        // 지워진 메시지는 건너뛴다 — 구독이 id만 받아 여기서 다시 읽으므로, 발행과 읽기
+        // 사이에 탈퇴가 끼면 이 조건이 그것을 막는다(호출부가 null을 건너뛴다).
+        .where(
+            message.id.eq(messageId),
+            message.conversationId.eq(conversationId),
+            message.deletedAt.isNull,
+        )
+        .fetchOne()
+        ?.let { it.toMessageView(memberId, findQuotesOf(listOf(messageId))[messageId]) }
 
     /**
      * 대화별 안 읽은 메시지 수를 **한 번에** 센다 — 대화마다 물으면 20건에 조회가 20번 붙는다.
@@ -187,13 +186,12 @@ class ConversationQueryAdapter(
     }
 
     @Transactional(readOnly = true)
-    override fun findLastMessageId(conversationId: Long): Long? =
-        queryFactory
-            .select(message.id.max())
-            .from(message)
-            // 읽음 지점을 지워진 메시지로 밀지 않는다 — 세는 쪽과 같은 집합을 봐야 한다.
-            .where(message.conversationId.eq(conversationId), message.deletedAt.isNull)
-            .fetchOne()
+    override fun findLastMessageId(conversationId: Long): Long? = queryFactory
+        .select(message.id.max())
+        .from(message)
+        // 읽음 지점을 지워진 메시지로 밀지 않는다 — 세는 쪽과 같은 집합을 봐야 한다.
+        .where(message.conversationId.eq(conversationId), message.deletedAt.isNull)
+        .fetchOne()
 
     /**
      * 대화별 마지막 메시지를 한 번에 읽는다.
@@ -260,16 +258,14 @@ class ConversationQueryAdapter(
             }
     }
 
-    private fun participantCondition(memberId: Long): BooleanExpression =
-        conversation.memberLow.eq(memberId).or(conversation.memberHigh.eq(memberId))
+    private fun participantCondition(memberId: Long): BooleanExpression = conversation.memberLow.eq(memberId).or(conversation.memberHigh.eq(memberId))
 
     private fun keysetCondition(
         timePath: DateTimePath<Instant>,
         idPath: NumberPath<Long>,
         cursor: CommunityCursor,
-    ): BooleanExpression =
-        timePath.lt(cursor.createdAt)
-            .or(timePath.eq(cursor.createdAt).and(idPath.lt(cursor.id)))
+    ): BooleanExpression = timePath.lt(cursor.createdAt)
+        .or(timePath.eq(cursor.createdAt).and(idPath.lt(cursor.id)))
 
     private fun ConversationEntity.toConversationView(
         memberId: Long,

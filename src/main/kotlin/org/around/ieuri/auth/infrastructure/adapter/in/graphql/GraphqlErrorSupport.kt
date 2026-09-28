@@ -12,8 +12,10 @@ import org.around.ieuri.common.graphql.generated.types.UserError
 /** 예외를 UserError로 매핑한다. userErrors 대상이 아니면 null(→ 상위에서 재던짐). */
 fun toUserErrorOrNull(e: Throwable): UserError? = when (e) {
     is UserFacingException -> userError(e.code, e.message ?: e.code, FIELD_BY_CODE[e.code])
+
     // Command 생성/도메인 require 위반 등 입력 형식·불변식 오류.
     is IllegalArgumentException -> userError(INVALID_INPUT, e.message ?: "잘못된 입력입니다.")
+
     else -> null
 }
 
@@ -50,10 +52,9 @@ private const val INVALID_INPUT = "INVALID_INPUT"
  * 유스케이스 호출을 감싸 예상 실패를 userErrors payload로 바꾼다.
  * [onError]는 userErrors만 채운 실패 payload를 만든다(성공 데이터 필드는 null).
  */
-inline fun <T> withUserErrors(onError: (List<UserError>) -> T, block: () -> T): T =
-    try {
-        block()
-    } catch (e: Exception) {
-        val userError = toUserErrorOrNull(e) ?: throw e
-        onError(listOf(userError))
-    }
+inline fun <T> withUserErrors(onError: (List<UserError>) -> T, block: () -> T): T = try {
+    block()
+} catch (e: Exception) {
+    val userError = toUserErrorOrNull(e) ?: throw e
+    onError(listOf(userError))
+}

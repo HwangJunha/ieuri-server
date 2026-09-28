@@ -110,16 +110,15 @@ class SpotCatalogStoreAdapter(
     }
 
     /** 지금 노출 중인 (카탈로그, 언어) 전부. 구독자가 사본을 맞추는 정본이다. */
-    private fun findVisible(): List<CatalogLanguage> =
-        queryFactory
-            .select(translation.catalogId, translation.language)
-            .from(translation)
-            .where(translation.visible.isTrue)
-            .fetch()
-            .map {
-                CatalogLanguage(
-                    catalogId = requireNotNull(it.get(translation.catalogId)),
-                    language = requireNotNull(it.get(translation.language)),
-                )
-            }
+    private fun findVisible(): List<CatalogLanguage> = queryFactory
+        .select(translation.catalogId, translation.language)
+        .from(translation)
+        .where(translation.visible.isTrue)
+        .fetch()
+        .map {
+            CatalogLanguage(
+                catalogId = requireNotNull(it.get(translation.catalogId)),
+                language = requireNotNull(it.get(translation.language)),
+            )
+        }
 }

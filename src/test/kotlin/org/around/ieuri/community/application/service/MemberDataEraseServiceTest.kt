@@ -4,12 +4,11 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import io.mockk.verifyOrder
+import org.around.ieuri.community.application.port.out.client.ClockPort
 import org.around.ieuri.community.application.port.out.persistence.MemberContentSoftDeletePort
 import org.around.ieuri.community.application.port.out.persistence.MemberDataErasePort
 import org.around.ieuri.community.application.port.out.persistence.SpotQuestionCounterPort
-import org.around.ieuri.community.application.port.out.client.ClockPort
 import java.time.Instant
-
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 

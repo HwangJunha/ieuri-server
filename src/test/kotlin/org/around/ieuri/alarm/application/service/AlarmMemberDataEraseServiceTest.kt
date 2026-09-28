@@ -2,9 +2,9 @@ package org.around.ieuri.alarm.application.service
 
 import io.mockk.mockk
 import io.mockk.verify
-import kotlin.test.Test
 import org.around.ieuri.alarm.application.port.out.persistence.DeviceTokenRepositoryPort
 import org.around.ieuri.alarm.application.port.out.persistence.NotificationPreferenceRepositoryPort
+import kotlin.test.Test
 
 /** 탈퇴 회원의 알림 데이터 파기(SPEC-0028 R3·AC3.1). */
 class AlarmMemberDataEraseServiceTest {

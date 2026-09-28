@@ -76,8 +76,8 @@ class MemberLifecycleTest {
         val member = activeMember()
         member.suspend("사유", now.plusSeconds(60), now)
 
-        assertFalse(member.isSuspensionExpired(now))                    // 아직
-        assertTrue(member.isSuspensionExpired(now.plusSeconds(61)))     // 만료
+        assertFalse(member.isSuspensionExpired(now)) // 아직
+        assertTrue(member.isSuspensionExpired(now.plusSeconds(61))) // 만료
     }
 
     @Test

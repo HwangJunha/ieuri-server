@@ -32,19 +32,17 @@ class RegionCandidateSelectionTest {
      * 지표 4종을 갖춘 지역의 항목 수는 5다. 4로 두면 지표 3종짜리(4항목)도 통과해 R30이
      * 아무것도 거르지 않는다.
      */
-    private fun policy(minFactorCount: Int = 5, minDistrictsPerProvince: Int = 3) =
-        RegionRecommendationPolicy(
-            weights = RegionScoreWeights.uniform(),
-            distanceScoring = DistanceScoring(30_000.0),
-            freshnessDecay = FreshnessDecay(plateauDays = 7, halfLifeDays = 23.0),
-            minFactorCount = minFactorCount,
-            minDistrictsPerProvince = minDistrictsPerProvince,
-            defaultLimit = 10,
-            maxLimit = 50,
-        )
+    private fun policy(minFactorCount: Int = 5, minDistrictsPerProvince: Int = 3) = RegionRecommendationPolicy(
+        weights = RegionScoreWeights.uniform(),
+        distanceScoring = DistanceScoring(30_000.0),
+        freshnessDecay = FreshnessDecay(plateauDays = 7, halfLifeDays = 23.0),
+        minFactorCount = minFactorCount,
+        minDistrictsPerProvince = minDistrictsPerProvince,
+        defaultLimit = 10,
+        maxLimit = 50,
+    )
 
-    private fun stub(fixtures: List<RegionFixture>, originDistrict: OriginDistrict?) =
-        RegionMetricQueryPortStub(fixtures, originDistrict)
+    private fun stub(fixtures: List<RegionFixture>, originDistrict: OriginDistrict?) = RegionMetricQueryPortStub(fixtures, originDistrict)
 
     private fun service(
         fixtures: List<RegionFixture>,
@@ -69,11 +67,9 @@ class RegionCandidateSelectionTest {
         metrics = factors.associateWith { RegionMetric(value) },
     )
 
-    private fun query(origin: Coordinates = GANGNAM) =
-        RecommendedRegionQuery(origin = origin, limit = 10)
+    private fun query(origin: Coordinates = GANGNAM) = RecommendedRegionQuery(origin = origin, limit = 10)
 
-    private fun RegionRecommendationService.codes(origin: Coordinates = GANGNAM): List<String> =
-        recommendedRegions(query(origin), DomainLocale.KO).regions.map { it.code }
+    private fun RegionRecommendationService.codes(origin: Coordinates = GANGNAM): List<String> = recommendedRegions(query(origin), DomainLocale.KO).regions.map { it.code }
 
     @Test
     fun `origin이 속한 시군구는 결과에 오지 않는다 — 현재 위치 확인이 아니라 추천이다`() {
@@ -95,8 +91,12 @@ class RegionCandidateSelectionTest {
             // 서울 3건 + 경기 3건. 경기도 자체는 시도 규모 필터를 통과하므로,
             // 빠진다면 그것은 오직 "다른 시도"이기 때문이다.
             fixtures = listOf(
-                fixture("11680"), fixture("11110"), fixture("11170"),
-                fixture("41110"), fixture("41130"), fixture("41190"),
+                fixture("11680"),
+                fixture("11110"),
+                fixture("11170"),
+                fixture("41110"),
+                fixture("41130"),
+                fixture("41190"),
             ),
             originDistrict = OriginDistrict(code = "11680", provinceCode = "11"),
         )
@@ -112,8 +112,12 @@ class RegionCandidateSelectionTest {
         // 전국을 읽어 뒤에서 버리는 형태로 되돌아가면 여기가 잡는다(226건 중 202건 폐기).
         val stub = stub(
             fixtures = listOf(
-                fixture("11680"), fixture("11110"), fixture("11170"),
-                fixture("41110"), fixture("41130"), fixture("41190"),
+                fixture("11680"),
+                fixture("11110"),
+                fixture("11170"),
+                fixture("41110"),
+                fixture("41130"),
+                fixture("41190"),
             ),
             originDistrict = OriginDistrict(code = "11680", provinceCode = "11"),
         )
@@ -132,8 +136,12 @@ class RegionCandidateSelectionTest {
     fun `어느 시군구에도 걸리지 않는 좌표는 빈 목록이다 — 오류도 전국 폴백도 아니다`() {
         val stub = stub(
             fixtures = listOf(
-                fixture("11680"), fixture("11110"), fixture("11170"),
-                fixture("41110"), fixture("41130"), fixture("41190"),
+                fixture("11680"),
+                fixture("11110"),
+                fixture("11170"),
+                fixture("41110"),
+                fixture("41130"),
+                fixture("41190"),
             ),
             // 바다·해외 — 경계 안에 있는 지역이 없다.
             originDistrict = null,
@@ -153,8 +161,11 @@ class RegionCandidateSelectionTest {
         val service = service(
             // 제주 2건(50)뿐이라 3 미만이다. 서울 3건은 다른 시도라 애초에 읽히지도 않는다.
             fixtures = listOf(
-                fixture("11680"), fixture("11110"), fixture("11170"),
-                fixture("50110"), fixture("50130"),
+                fixture("11680"),
+                fixture("11110"),
+                fixture("11170"),
+                fixture("50110"),
+                fixture("50130"),
             ),
             originDistrict = OriginDistrict(code = "50110", provinceCode = "50"),
         )
@@ -185,7 +196,9 @@ class RegionCandidateSelectionTest {
         val service = service(
             fixtures = listOf(
                 fixture("41590", factors = THREE_FACTORS, value = 100.0),
-                fixture("41110"), fixture("41130"), fixture("41190"),
+                fixture("41110"),
+                fixture("41130"),
+                fixture("41190"),
             ),
             originDistrict = OriginDistrict(code = "41210", provinceCode = "41"),
         )
@@ -203,7 +216,9 @@ class RegionCandidateSelectionTest {
         val service = service(
             fixtures = listOf(
                 fixture("41590", factors = THREE_FACTORS, value = 100.0),
-                fixture("41110"), fixture("41130"), fixture("41190"),
+                fixture("41110"),
+                fixture("41130"),
+                fixture("41190"),
             ),
             originDistrict = OriginDistrict(code = "41210", provinceCode = "41"),
             policy = policy(minFactorCount = 4),
@@ -218,8 +233,12 @@ class RegionCandidateSelectionTest {
         // 좁은 구간에 눌려 만점이 나오지 않는다.
         val service = service(
             fixtures = listOf(
-                fixture("11680"), fixture("11110", value = 10.0), fixture("11170", value = 20.0),
-                fixture("41110", value = 1_000_000.0), fixture("41130"), fixture("41190"),
+                fixture("11680"),
+                fixture("11110", value = 10.0),
+                fixture("11170", value = 20.0),
+                fixture("41110", value = 1_000_000.0),
+                fixture("41130"),
+                fixture("41190"),
             ),
             originDistrict = OriginDistrict(code = "11680", provinceCode = "11"),
         )

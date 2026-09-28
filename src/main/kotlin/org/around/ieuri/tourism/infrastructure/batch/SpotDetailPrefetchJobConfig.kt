@@ -3,9 +3,9 @@ package org.around.ieuri.tourism.infrastructure.batch
 import org.around.ieuri.tourism.application.port.`in`.command.SpotDetailPrefetchUseCase
 import org.around.ieuri.tourism.application.port.out.query.SpotDetailPart
 import org.springframework.batch.core.job.Job
+import org.springframework.batch.core.job.builder.FlowBuilder
 import org.springframework.batch.core.job.builder.JobBuilder
 import org.springframework.batch.core.job.flow.Flow
-import org.springframework.batch.core.job.builder.FlowBuilder
 import org.springframework.batch.core.repository.JobRepository
 import org.springframework.batch.core.step.Step
 import org.springframework.batch.core.step.builder.StepBuilder
@@ -56,13 +56,12 @@ class SpotDetailPrefetchJobConfig(
      * 한 갈래의 수집 Step. `allowStartIfComplete(false)`(기본값)라, 재실행 시 이미 완료된 갈래는
      * 건너뛰고 중단된 갈래부터 재개한다.
      */
-    private fun prefetchStep(part: SpotDetailPart): Step =
-        StepBuilder("${JOB_NAME}Step-$part", jobRepository)
-            .tasklet(
-                SpotDetailPrefetchTasklet(useCase, part, properties.batchSize, properties.dailyLimit),
-                transactionManager,
-            )
-            .build()
+    private fun prefetchStep(part: SpotDetailPart): Step = StepBuilder("${JOB_NAME}Step-$part", jobRepository)
+        .tasklet(
+            SpotDetailPrefetchTasklet(useCase, part, properties.batchSize, properties.dailyLimit),
+            transactionManager,
+        )
+        .build()
 
     companion object {
         const val JOB_NAME = "spotDetailPrefetchJob"

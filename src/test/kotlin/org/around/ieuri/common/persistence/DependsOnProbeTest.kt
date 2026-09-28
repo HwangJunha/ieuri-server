@@ -31,7 +31,9 @@ class DependsOnProbeTest {
 
         val dependsOn = bf.getBeanDefinition("entityManagerFactory").dependsOn
         assertTrue(dependsOn != null && "flyway" in dependsOn)
-        assertTrue(AbstractEntityManagerFactoryBean::class.java
-            .isAssignableFrom(LocalContainerEntityManagerFactoryBean::class.java))
+        assertTrue(
+            AbstractEntityManagerFactoryBean::class.java
+                .isAssignableFrom(LocalContainerEntityManagerFactoryBean::class.java),
+        )
     }
 }

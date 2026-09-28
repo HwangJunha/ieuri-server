@@ -56,15 +56,22 @@ class SpotQaQueryServiceTest {
     )
 
     private val service = SpotQaQueryService(
-        spotQaQueryPort, communityQueryPort, spotLookupPort, policy,
+        spotQaQueryPort,
+        communityQueryPort,
+        spotLookupPort,
+        policy,
     )
 
     private fun givenSpotExists(exists: Boolean = true) {
         every { spotLookupPort.findSummary(catalogId, language) } returns
             if (exists) {
                 PostSpotView(
-                    id = catalogId, title = "경복궁", thumbnailImageUrl = "https://cdn/x.jpg",
-                    category = null, longitude = 127.0, latitude = 37.5,
+                    id = catalogId,
+                    title = "경복궁",
+                    thumbnailImageUrl = "https://cdn/x.jpg",
+                    category = null,
+                    longitude = 127.0,
+                    latitude = 37.5,
                 )
             } else {
                 null
@@ -75,20 +82,24 @@ class SpotQaQueryServiceTest {
         every { communityQueryPort.findBlockedMemberIds(memberId) } returns ids
     }
 
-    private fun questionView(hidden: Boolean = false, ownedByViewer: Boolean = false) =
-        SpotQuestionView(
-            id = questionId, catalogId = catalogId, body = "질문", authorId = 99L,
-            resolved = false, answerCount = 1, ownedByViewer = ownedByViewer,
-            hidden = hidden, createdAt = now,
-        )
+    private fun questionView(hidden: Boolean = false, ownedByViewer: Boolean = false) = SpotQuestionView(
+        id = questionId, catalogId = catalogId, body = "질문", authorId = 99L,
+        resolved = false, answerCount = 1, ownedByViewer = ownedByViewer,
+        hidden = hidden, createdAt = now,
+    )
 
     private fun answerPage() = cursorPageOf(
         edges = listOf(
             CursorEdge(
                 cursor = "c1",
                 node = SpotAnswerView(
-                    id = 9L, questionId = questionId, body = "답변", authorId = 5L,
-                    ownedByViewer = false, hidden = false, createdAt = now,
+                    id = 9L,
+                    questionId = questionId,
+                    body = "답변",
+                    authorId = 5L,
+                    ownedByViewer = false,
+                    hidden = false,
+                    createdAt = now,
                 ),
             ),
         ),
@@ -120,8 +131,12 @@ class SpotQaQueryServiceTest {
         // 존재 검사도 그 언어로 간다 — 스텁을 JA로 둬야 통과한다는 것 자체가 R-16의 확인이다.
         every { spotLookupPort.findSummary(catalogId, ContentLanguage.JA) } returns
             PostSpotView(
-                id = catalogId, title = "景福宮", thumbnailImageUrl = "https://cdn/x.jpg",
-                category = null, longitude = 127.0, latitude = 37.5,
+                id = catalogId,
+                title = "景福宮",
+                thumbnailImageUrl = "https://cdn/x.jpg",
+                category = null,
+                longitude = 127.0,
+                latitude = 37.5,
             )
         givenBlockedMembers()
         val search = slot<SpotQuestionsSearch>()

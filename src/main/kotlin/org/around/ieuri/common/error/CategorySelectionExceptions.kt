@@ -10,8 +10,7 @@ package org.around.ieuri.common.error
  * `common`에 두는 이유는 두 도메인이 함께 던지기 때문이다. 한쪽 도메인에 두면 다른 쪽이
  * 그것을 import해야 해서 도메인 경계가 무너진다.
  */
-class EmptyCategorySetException(message: String = "카테고리를 하나 이상 선택해 주세요.") :
-    RuntimeException(message) {
+class EmptyCategorySetException(message: String = "카테고리를 하나 이상 선택해 주세요.") : RuntimeException(message) {
     val code: String = CODE
 
     companion object {

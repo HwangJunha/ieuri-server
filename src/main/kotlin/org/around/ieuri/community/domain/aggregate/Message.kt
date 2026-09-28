@@ -118,7 +118,6 @@ class Message private constructor(
         fun retentionCutoff(now: Instant): Instant = now.minus(RETENTION)
 
         /** [createdAt]이 보관 기간을 넘겼는지. 경계(정확히 6개월)는 아직 삭제 대상이 아니다. */
-        fun isExpired(createdAt: Instant, now: Instant): Boolean =
-            createdAt.isBefore(retentionCutoff(now))
+        fun isExpired(createdAt: Instant, now: Instant): Boolean = createdAt.isBefore(retentionCutoff(now))
     }
 }

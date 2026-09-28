@@ -1,17 +1,17 @@
 package org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql
 
-import org.around.ieuri.common.graphql.tokenPresentation
-import org.around.ieuri.common.security.CurrentMemberProvider
-import org.around.ieuri.common.event.LocationAccessed
-import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
 import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
+import org.around.ieuri.common.event.LocationAccessed
+import org.around.ieuri.common.graphql.tokenPresentation
+import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.tourism.application.exception.InvalidCoordinatesException
 import org.around.ieuri.tourism.application.exception.InvalidLimitException
 import org.around.ieuri.tourism.application.policy.RegionRecommendationPolicy
 import org.around.ieuri.tourism.application.port.`in`.query.RegionRecommendationUseCase
+import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
 import org.around.ieuri.tourism.application.query.RecommendedRegionItemView
 import org.around.ieuri.tourism.application.query.RecommendedRegionQuery
 import org.around.ieuri.tourism.application.query.RecommendedRegionView
@@ -80,9 +80,8 @@ class RegionRecommendationResolver(
     }
 
     /** 좌표 범위 위반은 `INVALID_COORDINATES`다(R29). 예외 메시지에 좌표를 담지 않는다(POL-013). */
-    private fun GqlCoordinatesInput.toDomain(): Coordinates =
-        runCatching { Coordinates(latitude = lat, longitude = lng) }
-            .getOrElse { throw InvalidCoordinatesException("좌표가 올바르지 않습니다.") }
+    private fun GqlCoordinatesInput.toDomain(): Coordinates = runCatching { Coordinates(latitude = lat, longitude = lng) }
+        .getOrElse { throw InvalidCoordinatesException("좌표가 올바르지 않습니다.") }
 
     private fun RecommendedRegionView.toGql() = GqlRecommendedRegionResult(
         regions = regions.map { it.toGql() },

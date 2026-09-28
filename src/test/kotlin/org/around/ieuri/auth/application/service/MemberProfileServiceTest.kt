@@ -143,8 +143,7 @@ class MemberProfileServiceTest {
 
     // --- R6 이미지 확인 ---
 
-    private fun pendingKey(owner: Long = memberId) =
-        "pending/profile/$owner/${UUID.randomUUID()}"
+    private fun pendingKey(owner: Long = memberId) = "pending/profile/$owner/${UUID.randomUUID()}"
 
     @Test
     fun `업로드가 확인되면 확정 위치로 옮기고 회원에 반영한다`() {

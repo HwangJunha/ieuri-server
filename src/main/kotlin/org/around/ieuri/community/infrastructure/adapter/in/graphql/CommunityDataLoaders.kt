@@ -68,8 +68,7 @@ class PostAuthorDataLoader(
     private val memberLookupPort: MemberLookupPort,
 ) : MappedBatchLoader<Long, PostAuthorView> {
 
-    override fun load(memberIds: Set<Long>): CompletionStage<Map<Long, PostAuthorView>> =
-        CompletableFuture.completedFuture(memberLookupPort.findAuthors(memberIds.toList()))
+    override fun load(memberIds: Set<Long>): CompletionStage<Map<Long, PostAuthorView>> = CompletableFuture.completedFuture(memberLookupPort.findAuthors(memberIds.toList()))
 
     companion object {
         const val NAME = "postAuthor"

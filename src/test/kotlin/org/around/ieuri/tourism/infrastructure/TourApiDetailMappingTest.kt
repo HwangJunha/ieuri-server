@@ -45,9 +45,7 @@ class TourApiDetailMappingTest {
         firstimage = firstimage, contenttypeid = contentTypeId, cpyrhtDivCd = cpyrht,
     )
 
-    private fun imageItem(url: String? = "http://tong.visitkorea.or.kr/g.jpg", cpyrht: String? = "Type3") =
-        TourApiDetailImageResponse.Item(originimgurl = url, smallimageurl = "http://tong/small.jpg", imgname = "설명", cpyrhtDivCd = cpyrht)
-
+    private fun imageItem(url: String? = "http://tong.visitkorea.or.kr/g.jpg", cpyrht: String? = "Type3") = TourApiDetailImageResponse.Item(originimgurl = url, smallimageurl = "http://tong/small.jpg", imgname = "설명", cpyrhtDivCd = cpyrht)
 
     // ── mapDetail: 본문(detailCommon2) ──────────────────────────────
 
@@ -104,8 +102,12 @@ class TourApiDetailMappingTest {
     fun `관광지 intro 필드를 공통 이름으로 정규화한다`() {
         val intro = client.mapIntro(
             TourApiDetailIntroResponse.Item(
-                usetime = "09:00~18:00", restdate = "화요일", parking = "가능(무료)",
-                infocenter = "02-1234", chkpet = "불가", chkcreditcard = "가능",
+                usetime = "09:00~18:00",
+                restdate = "화요일",
+                parking = "가능(무료)",
+                infocenter = "02-1234",
+                chkpet = "불가",
+                chkcreditcard = "가능",
             ),
         )
 
@@ -122,8 +124,11 @@ class TourApiDetailMappingTest {
         // 음식점은 opentimefood/restdatefood/parkingfood… 로 필드명이 완전히 다르다.
         val intro = client.mapIntro(
             TourApiDetailIntroResponse.Item(
-                opentimefood = "11:00~22:00", restdatefood = "연중무휴",
-                parkingfood = "주차장 있음", infocenterfood = "02-5678", chkcreditcardfood = "가능",
+                opentimefood = "11:00~22:00",
+                restdatefood = "연중무휴",
+                parkingfood = "주차장 있음",
+                infocenterfood = "02-5678",
+                chkcreditcardfood = "가능",
             ),
         )
 

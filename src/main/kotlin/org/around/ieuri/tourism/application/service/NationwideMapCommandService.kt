@@ -96,6 +96,5 @@ class NationwideMapCommandService(
      * 엉뚱한 값이면 폐기 대상을 못 찾아 false가 된다. 그것으로 충분하다.
      */
     @Transactional
-    override fun revokeShareLink(memberId: Long, shareUrl: String): Boolean =
-        mapShareLinkPort.revoke(memberId, ShareToken.extractFrom(shareUrl))
+    override fun revokeShareLink(memberId: Long, shareUrl: String): Boolean = mapShareLinkPort.revoke(memberId, ShareToken.extractFrom(shareUrl))
 }

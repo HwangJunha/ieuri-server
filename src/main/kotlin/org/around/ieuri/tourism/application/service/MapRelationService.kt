@@ -36,7 +36,8 @@ class MapRelationService(
     private val mapOwnerLookupPort: MapOwnerLookupPort,
     private val mapViewerBlockPort: MapViewerBlockPort,
     private val policy: NationwideMapPolicy,
-) : MapRelationQueryUseCase, MapRelationCommandUseCase {
+) : MapRelationQueryUseCase,
+    MapRelationCommandUseCase {
 
     @Transactional
     override fun createRelation(memberId: Long, shareUrl: String): Long {
@@ -57,8 +58,7 @@ class MapRelationService(
     }
 
     @Transactional
-    override fun removeRelation(memberId: Long, counterpartId: Long): Boolean =
-        mapRelationPort.removeFromMyList(memberId, counterpartId)
+    override fun removeRelation(memberId: Long, counterpartId: Long): Boolean = mapRelationPort.removeFromMyList(memberId, counterpartId)
 
     /**
      * 겹침은 포트가 한 질의로 계산해 오고, 닉네임만 다른 도메인에 **벌크로** 묻는다 —

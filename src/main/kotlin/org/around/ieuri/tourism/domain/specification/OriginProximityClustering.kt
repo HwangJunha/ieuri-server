@@ -42,6 +42,7 @@ object OriginProximityClustering {
             }
             when {
                 touching.isEmpty() -> clusters += mutableListOf(item)
+
                 else -> {
                     // 첫 군집에 합치고 나머지를 흡수한다 — 순서를 지키려면 앞선 군집이 남아야 한다.
                     val target = touching.first()

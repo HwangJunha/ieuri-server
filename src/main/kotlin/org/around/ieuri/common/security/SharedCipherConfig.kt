@@ -17,6 +17,5 @@ import org.springframework.context.annotation.Configuration
 class SharedCipherConfig {
 
     @Bean
-    fun aesGcmCipher(@Value("\${ieuri.encryption.key}") key: String): AesGcmCipher =
-        AesGcmCipher(key)
+    fun aesGcmCipher(@Value("\${ieuri.encryption.key}") key: String): AesGcmCipher = AesGcmCipher(key)
 }

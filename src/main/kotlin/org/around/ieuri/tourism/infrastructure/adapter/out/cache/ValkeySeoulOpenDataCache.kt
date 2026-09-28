@@ -38,15 +38,14 @@ class ValkeySeoulOpenDataCache(
 
     private val log = LoggerFactory.getLogger(javaClass)
 
-    override fun get(areaCode: String): CachedSeoulOpenData? =
-        try {
-            redis.opsForValue().get(key(areaCode))?.let {
-                objectMapper.readValue(it, CachedSeoulOpenDataPayload::class.java).toDomain()
-            }
-        } catch (e: Exception) {
-            log.warn("서울 실시간 도시데이터 캐시 조회 실패, upstream 폴백: {}", e.javaClass.simpleName)
-            null
+    override fun get(areaCode: String): CachedSeoulOpenData? = try {
+        redis.opsForValue().get(key(areaCode))?.let {
+            objectMapper.readValue(it, CachedSeoulOpenDataPayload::class.java).toDomain()
         }
+    } catch (e: Exception) {
+        log.warn("서울 실시간 도시데이터 캐시 조회 실패, upstream 폴백: {}", e.javaClass.simpleName)
+        null
+    }
 
     override fun put(areaCode: String, snapshot: SeoulOpenDataSnapshot, storedAt: Instant) {
         try {
@@ -122,8 +121,7 @@ data class CachedSnapshot(
     fun toDomain() = CongestionSnapshot(level, populationMin, populationMax, LocalDateTime.parse(observedAt))
 
     companion object {
-        fun from(v: CongestionSnapshot) =
-            CachedSnapshot(v.level, v.populationMin, v.populationMax, v.observedAt.toString())
+        fun from(v: CongestionSnapshot) = CachedSnapshot(v.level, v.populationMin, v.populationMax, v.observedAt.toString())
     }
 }
 
@@ -137,8 +135,7 @@ data class CachedForecast(
     fun toDomain() = CongestionForecast(LocalDateTime.parse(forecastTime), level, populationMin, populationMax)
 
     companion object {
-        fun from(v: CongestionForecast) =
-            CachedForecast(v.forecastTime.toString(), v.level, v.populationMin, v.populationMax)
+        fun from(v: CongestionForecast) = CachedForecast(v.forecastTime.toString(), v.level, v.populationMin, v.populationMax)
     }
 }
 

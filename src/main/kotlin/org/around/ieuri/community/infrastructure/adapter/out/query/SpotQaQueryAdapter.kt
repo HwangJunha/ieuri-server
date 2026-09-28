@@ -21,8 +21,8 @@ import org.around.ieuri.community.application.query.SpotQuestionView
 import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QSpotAnswerEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QSpotAnswerReplyEntity
-import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QSpotQaPhotoEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QSpotCatalogLanguageEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QSpotQaPhotoEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QSpotQuestionEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.SpotAnswerEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.SpotAnswerReplyEntity
@@ -93,19 +93,18 @@ class SpotQaQueryAdapter(
         questionId: Long,
         viewer: ViewerContext,
         includeHidden: Boolean,
-    ): SpotQuestionView? =
-        queryFactory
-            .selectFrom(question)
-            .where(
-                question.id.eq(questionId),
-                question.deletedAt.isNull,
-                // 차단은 언제나 건다 — 우회하면 답변 목록이 차단을 뚫는 통로가 된다.
-                blockExclusion(viewer, question.authorId),
-                // 숨김만 선택적으로 우회한다(R11 종속 판정용).
-                if (includeHidden) null else hiddenExclusion(viewer, question.hidden, question.authorId),
-            )
-            .fetchOne()
-            ?.toQuestionView(viewer)
+    ): SpotQuestionView? = queryFactory
+        .selectFrom(question)
+        .where(
+            question.id.eq(questionId),
+            question.deletedAt.isNull,
+            // 차단은 언제나 건다 — 우회하면 답변 목록이 차단을 뚫는 통로가 된다.
+            blockExclusion(viewer, question.authorId),
+            // 숨김만 선택적으로 우회한다(R11 종속 판정용).
+            if (includeHidden) null else hiddenExclusion(viewer, question.hidden, question.authorId),
+        )
+        .fetchOne()
+        ?.toQuestionView(viewer)
 
     /**
      * 답변 목록. 최신순.
@@ -170,16 +169,13 @@ class SpotQaQueryAdapter(
     }
 
     @Transactional(readOnly = true)
-    override fun findQuestionPhotoKeys(questionIds: List<Long>): Map<Long, List<String>> =
-        findPhotoKeys(SpotQaPhotoOwnerType.QUESTION, questionIds)
+    override fun findQuestionPhotoKeys(questionIds: List<Long>): Map<Long, List<String>> = findPhotoKeys(SpotQaPhotoOwnerType.QUESTION, questionIds)
 
     @Transactional(readOnly = true)
-    override fun findAnswerPhotoKeys(answerIds: List<Long>): Map<Long, List<String>> =
-        findPhotoKeys(SpotQaPhotoOwnerType.ANSWER, answerIds)
+    override fun findAnswerPhotoKeys(answerIds: List<Long>): Map<Long, List<String>> = findPhotoKeys(SpotQaPhotoOwnerType.ANSWER, answerIds)
 
     @Transactional(readOnly = true)
-    override fun findReplyPhotoKeys(replyIds: List<Long>): Map<Long, List<String>> =
-        findPhotoKeys(SpotQaPhotoOwnerType.REPLY, replyIds)
+    override fun findReplyPhotoKeys(replyIds: List<Long>): Map<Long, List<String>> = findPhotoKeys(SpotQaPhotoOwnerType.REPLY, replyIds)
 
     /**
      * 출처 스냅샷의 재료. 답변과 질문을 **한 번의 조인으로** 읽는다.
@@ -189,30 +185,29 @@ class SpotQaQueryAdapter(
      * 그 시점의 맥락을 남기는 것이 맞다.
      */
     @Transactional(readOnly = true)
-    override fun findAnswerOriginSource(answerId: Long): SpotQaOriginSource? =
-        queryFactory
-            .select(
-                answer.catalogId,
-                question.id,
-                question.body,
-                answer.id,
-                answer.body,
-                answer.authorId,
+    override fun findAnswerOriginSource(answerId: Long): SpotQaOriginSource? = queryFactory
+        .select(
+            answer.catalogId,
+            question.id,
+            question.body,
+            answer.id,
+            answer.body,
+            answer.authorId,
+        )
+        .from(answer)
+        .join(question).on(question.id.eq(answer.questionId), question.deletedAt.isNull)
+        .where(answer.id.eq(answerId), answer.deletedAt.isNull)
+        .fetchFirst()
+        ?.let { row ->
+            SpotQaOriginSource(
+                catalogId = row.get(answer.catalogId)!!,
+                questionId = row.get(question.id)!!,
+                questionBody = row.get(question.body)!!,
+                answerId = row.get(answer.id)!!,
+                answerBody = row.get(answer.body)!!,
+                answerAuthorId = row.get(answer.authorId)!!,
             )
-            .from(answer)
-            .join(question).on(question.id.eq(answer.questionId), question.deletedAt.isNull)
-            .where(answer.id.eq(answerId), answer.deletedAt.isNull)
-            .fetchFirst()
-            ?.let { row ->
-                SpotQaOriginSource(
-                    catalogId = row.get(answer.catalogId)!!,
-                    questionId = row.get(question.id)!!,
-                    questionBody = row.get(question.body)!!,
-                    answerId = row.get(answer.id)!!,
-                    answerBody = row.get(answer.body)!!,
-                    answerAuthorId = row.get(answer.authorId)!!,
-                )
-            }
+        }
 
     /** 첨부 순서대로. 셋이 한 표를 쓰므로 소유자 종류로 갈라 읽는다. */
     private fun findPhotoKeys(
@@ -263,11 +258,10 @@ class SpotQaQueryAdapter(
      *
      * 언어 사본은 커뮤니티가 들고 있어 tour 스키마를 조인하지 않는다.
      */
-    private fun languageCondition(language: ContentLanguage): BooleanExpression =
-        question.catalogId.`in`(
-            JPAExpressions.select(catalogLanguage.catalogId).from(catalogLanguage)
-                .where(catalogLanguage.language.eq(language)),
-        )
+    private fun languageCondition(language: ContentLanguage): BooleanExpression = question.catalogId.`in`(
+        JPAExpressions.select(catalogLanguage.catalogId).from(catalogLanguage)
+            .where(catalogLanguage.language.eq(language)),
+    )
 
     /** 차단 집합이 비면 조건을 붙이지 않는다 — QueryDSL은 null인 where 인자를 버린다. */
     private fun blockExclusion(
@@ -304,9 +298,8 @@ class SpotQaQueryAdapter(
         createdAtPath: DateTimePath<java.time.Instant>,
         idPath: NumberPath<Long>,
         cursor: CommunityCursor,
-    ): BooleanExpression =
-        createdAtPath.lt(cursor.createdAt)
-            .or(createdAtPath.eq(cursor.createdAt).and(idPath.lt(cursor.id)))
+    ): BooleanExpression = createdAtPath.lt(cursor.createdAt)
+        .or(createdAtPath.eq(cursor.createdAt).and(idPath.lt(cursor.id)))
 
     /**
      * 엔티티를 read DTO로. 사진·작성자는 다른 표라 지연 필드가 채운다 — 여기서 읽으면

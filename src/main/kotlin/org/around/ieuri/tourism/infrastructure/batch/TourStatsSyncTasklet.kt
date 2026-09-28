@@ -7,8 +7,8 @@ import org.slf4j.LoggerFactory
 import org.springframework.batch.core.scope.context.ChunkContext
 import org.springframework.batch.core.step.StepContribution
 import org.springframework.batch.core.step.tasklet.Tasklet
-import org.springframework.batch.infrastructure.repeat.RepeatStatus
 import org.springframework.batch.infrastructure.item.ExecutionContext
+import org.springframework.batch.infrastructure.repeat.RepeatStatus
 import java.time.LocalDate
 
 /**
@@ -121,7 +121,12 @@ class TourStatsSyncTasklet<T, R : Any>(
         // (응답 스키마가 문서로 확정되지 않았다). skipped가 크면 정적 시군구 테이블이 낡았다.
         log.info(
             "kto sync completed: dataset={} runDate={} regions={} written={} skippedUnknownCode={} dropped={}",
-            datasetName, runDate, loopTargets.size, totalWritten, totalSkipped, totalDropped,
+            datasetName,
+            runDate,
+            loopTargets.size,
+            totalWritten,
+            totalSkipped,
+            totalDropped,
         )
         return RepeatStatus.FINISHED
     }
@@ -131,7 +136,10 @@ class TourStatsSyncTasklet<T, R : Any>(
         if (total > 1 && nextRegionIndex % PROGRESS_LOG_INTERVAL == 0) {
             log.info(
                 "kto sync progress: dataset={} region={}/{} written={}",
-                datasetName, nextRegionIndex, total, written,
+                datasetName,
+                nextRegionIndex,
+                total,
+                written,
             )
         }
     }

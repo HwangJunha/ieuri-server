@@ -4,9 +4,6 @@ import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsMutation
 import com.netflix.graphql.dgs.InputArgument
-import org.around.ieuri.common.graphql.generated.types.HidePostInput
-import org.around.ieuri.common.graphql.generated.types.HidePostPayload
-import org.around.ieuri.common.graphql.generated.types.UnhidePostPayload
 import org.around.ieuri.common.graphql.generated.types.BlockUserInput
 import org.around.ieuri.common.graphql.generated.types.BlockUserPayload
 import org.around.ieuri.common.graphql.generated.types.ConfirmPostImageUploadsInput
@@ -15,39 +12,42 @@ import org.around.ieuri.common.graphql.generated.types.CreateCommentInput
 import org.around.ieuri.common.graphql.generated.types.CreateCommentPayload
 import org.around.ieuri.common.graphql.generated.types.CreatePostImageUploadUrlsInput
 import org.around.ieuri.common.graphql.generated.types.CreatePostImageUploadUrlsPayload
-import org.around.ieuri.common.graphql.generated.types.DeletePostImageInput
-import org.around.ieuri.common.graphql.generated.types.DeletePostImagePayload
-import org.around.ieuri.common.graphql.generated.types.PostImageUploadFailure
-import org.around.ieuri.common.graphql.generated.types.PostImageUploadUrl
 import org.around.ieuri.common.graphql.generated.types.CreatePostInput
 import org.around.ieuri.common.graphql.generated.types.CreatePostPayload
 import org.around.ieuri.common.graphql.generated.types.DeleteCommentInput
 import org.around.ieuri.common.graphql.generated.types.DeleteCommentPayload
+import org.around.ieuri.common.graphql.generated.types.DeletePostImageInput
+import org.around.ieuri.common.graphql.generated.types.DeletePostImagePayload
 import org.around.ieuri.common.graphql.generated.types.DeletePostInput
 import org.around.ieuri.common.graphql.generated.types.DeletePostPayload
 import org.around.ieuri.common.graphql.generated.types.EditPostInput
 import org.around.ieuri.common.graphql.generated.types.EditPostPayload
+import org.around.ieuri.common.graphql.generated.types.HidePostInput
+import org.around.ieuri.common.graphql.generated.types.HidePostPayload
 import org.around.ieuri.common.graphql.generated.types.LikePostInput
 import org.around.ieuri.common.graphql.generated.types.LikePostPayload
+import org.around.ieuri.common.graphql.generated.types.PostImageUploadFailure
+import org.around.ieuri.common.graphql.generated.types.PostImageUploadUrl
 import org.around.ieuri.common.graphql.generated.types.ReportContentInput
 import org.around.ieuri.common.graphql.generated.types.ReportContentPayload
 import org.around.ieuri.common.graphql.generated.types.UnblockUserInput
 import org.around.ieuri.common.graphql.generated.types.UnblockUserPayload
+import org.around.ieuri.common.graphql.generated.types.UnhidePostPayload
 import org.around.ieuri.common.graphql.generated.types.UnlikePostInput
 import org.around.ieuri.common.graphql.generated.types.UnlikePostPayload
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.community.application.command.BlockUserCommand
 import org.around.ieuri.community.application.command.ConfirmPostImageUploadsCommand
-import org.around.ieuri.community.application.command.DeletePostImageCommand
 import org.around.ieuri.community.application.command.CreateCommentCommand
 import org.around.ieuri.community.application.command.CreatePostCommand
 import org.around.ieuri.community.application.command.DeleteCommentCommand
 import org.around.ieuri.community.application.command.DeletePostCommand
+import org.around.ieuri.community.application.command.DeletePostImageCommand
 import org.around.ieuri.community.application.command.EditPostCommand
-import org.around.ieuri.community.application.command.IssuePostImageUploadUrlsCommand
-import org.around.ieuri.community.application.command.PostImageUploadRequest
 import org.around.ieuri.community.application.command.HidePostCommand
+import org.around.ieuri.community.application.command.IssuePostImageUploadUrlsCommand
 import org.around.ieuri.community.application.command.LikePostCommand
+import org.around.ieuri.community.application.command.PostImageUploadRequest
 import org.around.ieuri.community.application.command.ReportContentCommand
 import org.around.ieuri.community.application.port.`in`.command.BlockCommandUseCase
 import org.around.ieuri.community.application.port.`in`.command.CommentCommandUseCase
@@ -56,9 +56,9 @@ import org.around.ieuri.community.application.port.`in`.command.PostHideCommandU
 import org.around.ieuri.community.application.port.`in`.command.PostImageUploadUseCase
 import org.around.ieuri.community.application.port.`in`.command.PostLikeCommandUseCase
 import org.around.ieuri.community.application.port.`in`.command.ReportCommandUseCase
-import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.domain.vo.ReportReason
 import org.around.ieuri.community.domain.vo.ReportTargetType
+import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.infrastructure.locale.contentLanguage
 import org.springframework.stereotype.Component
 
@@ -147,38 +147,36 @@ class CommunityMutationResolver(
     }
 
     @DgsMutation
-    fun createComment(@InputArgument input: CreateCommentInput): CreateCommentPayload =
-        withCommunityUserErrors(
-            onError = {
-                CreateCommentPayload(success = false, userErrors = it, commentId = null)
-            },
-        ) {
-            val memberId = currentMemberProvider.requireMemberId()
-            val commentId = commentCommandUseCase.createComment(
-                CreateCommentCommand(
-                    postId = input.postId,
-                    body = input.body,
-                    parentCommentId = input.parentCommentId,
-                ),
-                memberId,
-            )
-            // comment가 null이고 commentId를 주는 이유는 createPost와 같다.
-            CreateCommentPayload(
-                success = true,
-                userErrors = emptyList(),
-                commentId = commentId,
-            )
-        }
+    fun createComment(@InputArgument input: CreateCommentInput): CreateCommentPayload = withCommunityUserErrors(
+        onError = {
+            CreateCommentPayload(success = false, userErrors = it, commentId = null)
+        },
+    ) {
+        val memberId = currentMemberProvider.requireMemberId()
+        val commentId = commentCommandUseCase.createComment(
+            CreateCommentCommand(
+                postId = input.postId,
+                body = input.body,
+                parentCommentId = input.parentCommentId,
+            ),
+            memberId,
+        )
+        // comment가 null이고 commentId를 주는 이유는 createPost와 같다.
+        CreateCommentPayload(
+            success = true,
+            userErrors = emptyList(),
+            commentId = commentId,
+        )
+    }
 
     @DgsMutation
-    fun deleteComment(@InputArgument input: DeleteCommentInput): DeleteCommentPayload =
-        withCommunityUserErrors(
-            onError = { DeleteCommentPayload(success = false, userErrors = it) },
-        ) {
-            val memberId = currentMemberProvider.requireMemberId()
-            commentCommandUseCase.deleteComment(DeleteCommentCommand(input.commentId), memberId)
-            DeleteCommentPayload(success = true, userErrors = emptyList())
-        }
+    fun deleteComment(@InputArgument input: DeleteCommentInput): DeleteCommentPayload = withCommunityUserErrors(
+        onError = { DeleteCommentPayload(success = false, userErrors = it) },
+    ) {
+        val memberId = currentMemberProvider.requireMemberId()
+        commentCommandUseCase.deleteComment(DeleteCommentCommand(input.commentId), memberId)
+        DeleteCommentPayload(success = true, userErrors = emptyList())
+    }
 
     @DgsMutation
     fun likePost(@InputArgument input: LikePostInput): LikePostPayload = withCommunityUserErrors(
@@ -241,7 +239,10 @@ class CommunityMutationResolver(
     ): ConfirmPostImageUploadsPayload = withCommunityUserErrors(
         onError = {
             ConfirmPostImageUploadsPayload(
-                success = false, userErrors = it, confirmed = emptyList(), failed = emptyList(),
+                success = false,
+                userErrors = it,
+                confirmed = emptyList(),
+                failed = emptyList(),
             )
         },
     ) {
@@ -308,20 +309,19 @@ class CommunityMutationResolver(
     }
 
     @DgsMutation
-    fun reportContent(@InputArgument input: ReportContentInput): ReportContentPayload =
-        withCommunityUserErrors(
-            onError = { ReportContentPayload(success = false, userErrors = it) },
-        ) {
-            val memberId = currentMemberProvider.requireMemberId()
-            reportCommandUseCase.report(
-                ReportContentCommand(
-                    targetType = ReportTargetType.valueOf(input.targetType.name),
-                    targetId = input.targetId,
-                    reason = ReportReason.valueOf(input.reason.name),
-                    detail = input.detail,
-                ),
-                memberId,
-            )
-            ReportContentPayload(success = true, userErrors = emptyList())
-        }
+    fun reportContent(@InputArgument input: ReportContentInput): ReportContentPayload = withCommunityUserErrors(
+        onError = { ReportContentPayload(success = false, userErrors = it) },
+    ) {
+        val memberId = currentMemberProvider.requireMemberId()
+        reportCommandUseCase.report(
+            ReportContentCommand(
+                targetType = ReportTargetType.valueOf(input.targetType.name),
+                targetId = input.targetId,
+                reason = ReportReason.valueOf(input.reason.name),
+                detail = input.detail,
+            ),
+            memberId,
+        )
+        ReportContentPayload(success = true, userErrors = emptyList())
+    }
 }

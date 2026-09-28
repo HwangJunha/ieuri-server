@@ -33,17 +33,18 @@ class MessageReportCommandServiceTest {
     private val conversationRepository = mockk<ConversationRepositoryPort>()
 
     private val service = MessageReportCommandService(
-        messageRepository, reportRepository, conversationRepository,
+        messageRepository,
+        reportRepository,
+        conversationRepository,
     )
 
-    private fun message(id: Long, sender: Long = counterpartId, conversation: Long = conversationId) =
-        Message.restore(
-            id = id,
-            conversationId = conversation,
-            senderId = sender,
-            body = "메시지 $id",
-            createdAt = Instant.EPOCH,
-        )
+    private fun message(id: Long, sender: Long = counterpartId, conversation: Long = conversationId) = Message.restore(
+        id = id,
+        conversationId = conversation,
+        senderId = sender,
+        body = "메시지 $id",
+        createdAt = Instant.EPOCH,
+    )
 
     private fun conversation() = Conversation.restore(
         id = conversationId,

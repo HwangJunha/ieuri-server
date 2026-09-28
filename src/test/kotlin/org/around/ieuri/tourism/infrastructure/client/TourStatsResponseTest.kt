@@ -25,8 +25,7 @@ class TourStatsResponseTest {
         .enable(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT)
         .build()
 
-    private fun parse(json: String): TourStatsResponse<TourStatsVisitorCountItem> =
-        mapper.readValue(json, object : TypeReference<TourStatsResponse<TourStatsVisitorCountItem>>() {})
+    private fun parse(json: String): TourStatsResponse<TourStatsVisitorCountItem> = mapper.readValue(json, object : TypeReference<TourStatsResponse<TourStatsVisitorCountItem>>() {})
 
     @Test
     fun `결과가 없으면 items가 빈 문자열로 오며 빈 목록으로 흡수된다`() {

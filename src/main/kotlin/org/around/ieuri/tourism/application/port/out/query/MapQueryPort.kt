@@ -2,8 +2,8 @@ package org.around.ieuri.tourism.application.port.out.query
 
 import org.around.ieuri.tourism.application.query.CongestionAreaBoundaryView
 import org.around.ieuri.tourism.application.query.MapSpotView
-import org.around.ieuri.tourism.domain.vo.CategorySelection
 import org.around.ieuri.tourism.domain.vo.AreaName
+import org.around.ieuri.tourism.domain.vo.CategorySelection
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.MapBounds
 import org.around.ieuri.tourism.domain.vo.SpotCategory
@@ -28,7 +28,6 @@ interface MapQueryPort {
      * 최종 순서는 점수가 정한다(호출자가 재배열한다).
      */
     fun findRecommendationCandidatesWithin(query: MapCandidateSearch): List<MapCandidateView>
-
 }
 
 /**
@@ -97,4 +96,3 @@ data class MapCandidateView(
     val lat: Double,
     val distanceMeters: Double,
 )
-

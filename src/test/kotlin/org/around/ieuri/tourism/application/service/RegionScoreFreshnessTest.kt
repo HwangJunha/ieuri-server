@@ -81,11 +81,9 @@ class RegionScoreFreshnessTest {
      * 기본 좌표는 픽스처의 대표 좌표와 같다 — 지역이 전부 같은 좌표라 거리 점수가 동일해지고,
      * 총점 비교에 남는 차이는 오직 감쇠에서 온다.
      */
-    private fun query(origin: Coordinates = Coordinates(latitude = 37.5, longitude = 127.05)) =
-        RecommendedRegionQuery(origin = origin, limit = 10)
+    private fun query(origin: Coordinates = Coordinates(latitude = 37.5, longitude = 127.05)) = RecommendedRegionQuery(origin = origin, limit = 10)
 
-    private fun RecommendedRegionItemView.score(factor: RegionScoreFactor) =
-        scores.single { it.score.factor == factor }
+    private fun RecommendedRegionItemView.score(factor: RegionScoreFactor) = scores.single { it.score.factor == factor }
 
     @Test
     fun `30일 지난 방문자수는 점수가 절반이 된다`() {

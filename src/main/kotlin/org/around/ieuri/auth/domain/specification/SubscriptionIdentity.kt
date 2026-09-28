@@ -20,8 +20,7 @@ object SubscriptionIdentity {
      * 연결 시각으로부터 [accessTtl]을 넘겼는지. 경계(정확히 TTL)는 아직 초과가 아니다 —
      * 토큰 만료 판정과 같은 방향으로 맞춘다.
      */
-    fun isExpired(connectedAt: Instant, now: Instant, accessTtl: Duration): Boolean =
-        now.isAfter(connectedAt.plus(accessTtl))
+    fun isExpired(connectedAt: Instant, now: Instant, accessTtl: Duration): Boolean = now.isAfter(connectedAt.plus(accessTtl))
 
     /**
      * 새 구독을 열 수 있는지. **둘 중 하나라도 걸리면 거부한다.**

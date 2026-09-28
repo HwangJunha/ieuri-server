@@ -37,16 +37,16 @@ class CommunitySpotCatalogLanguagesChangedListener(
         } catch (e: Exception) {
             log.error(
                 "failed to sync community spot catalog languages: resolved={}",
-                event.resolved.size, e,
+                event.resolved.size,
+                e,
             )
         }
     }
 
-    private fun List<CatalogLanguageRef>.toCatalogLanguages(): List<CatalogLanguage> =
-        mapNotNull { ref ->
-            ContentLanguage.entries.firstOrNull { it.name == ref.languageCode }
-                ?.let { CatalogLanguage(catalogId = ref.catalogId, language = it) }
-        }
+    private fun List<CatalogLanguageRef>.toCatalogLanguages(): List<CatalogLanguage> = mapNotNull { ref ->
+        ContentLanguage.entries.firstOrNull { it.name == ref.languageCode }
+            ?.let { CatalogLanguage(catalogId = ref.catalogId, language = it) }
+    }
 
     private companion object {
         private val log = LoggerFactory.getLogger(CommunitySpotCatalogLanguagesChangedListener::class.java)

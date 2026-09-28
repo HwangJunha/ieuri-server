@@ -24,15 +24,15 @@ import org.around.ieuri.community.application.port.out.persistence.PostRepositor
 import org.around.ieuri.community.application.query.PostSpotView
 import org.around.ieuri.community.domain.aggregate.Post
 import org.around.ieuri.community.domain.vo.ContentLanguage
-import org.around.ieuri.community.domain.vo.SpotPoint
 import org.around.ieuri.community.domain.vo.PostTag
+import org.around.ieuri.community.domain.vo.SpotPoint
 import org.around.ieuri.community.domain.vo.TargetCategory
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /** 글 생성·삭제(R1~R5, R19, R24). */
@@ -89,16 +89,18 @@ class PostCommandServiceTest {
         body: String = "본문",
         photoKeys: List<String> = emptyList(),
         title: String = "제목",
-    ) =
-        service.createPost(
-            CreatePostCommand(
-                category = TargetCategory.TOURIST_SPOT,
-                catalogId = catalogId, tags = emptyList(),
-                title = title, body = body, photoKeys = photoKeys,
-            ),
-            memberId,
-            language,
-        )
+    ) = service.createPost(
+        CreatePostCommand(
+            category = TargetCategory.TOURIST_SPOT,
+            catalogId = catalogId,
+            tags = emptyList(),
+            title = title,
+            body = body,
+            photoKeys = photoKeys,
+        ),
+        memberId,
+        language,
+    )
 
     @Test
     fun `본문 대상 topic이 갖춰지면 글이 생성된다`() {
@@ -116,8 +118,11 @@ class PostCommandServiceTest {
         service.createPost(
             CreatePostCommand(
                 category = TargetCategory.TOURIST_SPOT,
-                catalogId = null, tags = emptyList(),
-                title = "제목", body = "본문", photoKeys = emptyList(),
+                catalogId = null,
+                tags = emptyList(),
+                title = "제목",
+                body = "본문",
+                photoKeys = emptyList(),
             ),
             memberId,
             language,
@@ -316,8 +321,12 @@ class PostCommandServiceTest {
         every { postRepository.findById(1L) } returns post
         every { postRepository.save(any()) } returns post
         every { spotLookup.findSummary(990L, language) } returns PostSpotView(
-            id = 990L, title = "새 장소", thumbnailImageUrl = "url", category = null,
-            longitude = 128.5, latitude = 35.5,
+            id = 990L,
+            title = "새 장소",
+            thumbnailImageUrl = "url",
+            category = null,
+            longitude = 128.5,
+            latitude = 35.5,
         )
 
         service.editPost(

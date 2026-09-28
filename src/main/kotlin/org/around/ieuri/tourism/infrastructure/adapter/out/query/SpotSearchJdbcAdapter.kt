@@ -64,8 +64,10 @@ class SpotSearchJdbcAdapter(
         // **파라미터 순서는 `?` 등장 순서다.** SELECT의 거리·관련도가 CENTER를 하나씩 쓰고
         // 각각 좌표 둘을 소비하므로, WHERE 몫보다 먼저 넣는다.
         val params = mutableListOf<Any>(
-            query.center.longitude, query.center.latitude, // ST_Distance의 CENTER
-            query.center.longitude, query.center.latitude, // relevance 감쇠항의 CENTER
+            query.center.longitude,
+            query.center.latitude, // ST_Distance의 CENTER
+            query.center.longitude,
+            query.center.latitude, // relevance 감쇠항의 CENTER
         )
         params.addAll(whereParams)
 
@@ -219,8 +221,11 @@ class SpotSearchJdbcAdapter(
             LIMIT ?
             """.trimIndent(),
             { rs, _ -> rs.getLong("catalog_id") to rs.getString("title") },
-            language.name, toPhrase(prefix),
-            center.longitude, center.latitude, radiusMeters.toDouble(),
+            language.name,
+            toPhrase(prefix),
+            center.longitude,
+            center.latitude,
+            radiusMeters.toDouble(),
             limit,
         )
 
@@ -291,7 +296,8 @@ class SpotSearchJdbcAdapter(
         if (!fuzzyOnly) params += phrase
         params.addAll(
             listOf(
-                query.center.longitude, query.center.latitude, // ST_DWithin의 CENTER
+                query.center.longitude,
+                query.center.latitude, // ST_DWithin의 CENTER
                 query.radiusMeters.toDouble(),
             ),
         )
@@ -326,14 +332,12 @@ class SpotSearchJdbcAdapter(
      * 폴백에서 주소를 빼는 이유: 주소는 n-gram이라 2글자 조각이 아무 데나 걸려
      * `강남역데이원의원` 같은 무관한 항목이 1위로 올라온다(실측).
      */
-    private fun matchClause(titleField: String, text: String, fuzzyOnly: Boolean): String =
-        if (fuzzyOnly) {
-            "$titleField @@@ ?::pdb.fuzzy(1)"
-        } else {
-            "($titleField @@@ ?::pdb.boost(3)" +
-                " OR $ADDRESS_FIELD @@@ ?::pdb.boost($ADDRESS_WEIGHT))"
-        }
-
+    private fun matchClause(titleField: String, text: String, fuzzyOnly: Boolean): String = if (fuzzyOnly) {
+        "$titleField @@@ ?::pdb.fuzzy(1)"
+    } else {
+        "($titleField @@@ ?::pdb.boost(3)" +
+            " OR $ADDRESS_FIELD @@@ ?::pdb.boost($ADDRESS_WEIGHT))"
+    }
 
     /**
      * 질의 언어에 해당하는 제목 필드 식(AC-2.2).
@@ -348,7 +352,6 @@ class SpotSearchJdbcAdapter(
         DomainLocale.ZH -> "t.title::pdb.alias('title_zh')"
         DomainLocale.EN -> "t.title::pdb.alias('title_en')"
     }
-
 
     companion object {
         /**
@@ -418,6 +421,5 @@ class SpotSearchJdbcAdapter(
          * 토큰이 사라진다**(실측 0건). n-gram은 그 어긋남이 없다.
          */
         const val ADDRESS_FIELD = "coalesce(t.address, '')"
-
     }
 }

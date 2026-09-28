@@ -21,8 +21,7 @@ class MemberTest {
     private val now: Instant = Instant.parse("2026-07-16T00:00:00Z")
     private val requiredCodes = setOf("SERVICE", "PRIVACY")
 
-    private fun agreements(vararg agreed: Pair<String, Boolean>): List<Agreement> =
-        agreed.mapIndexed { idx, (code, ok) -> Agreement((idx + 1).toLong(), code, "1.0", ok, now) }
+    private fun agreements(vararg agreed: Pair<String, Boolean>): List<Agreement> = agreed.mapIndexed { idx, (code, ok) -> Agreement((idx + 1).toLong(), code, "1.0", ok, now) }
 
     private fun register(
         fallbackEmail: String = "user@example.com",

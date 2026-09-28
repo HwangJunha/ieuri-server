@@ -32,7 +32,6 @@ value class SpotCategory(val code: String) {
         val FESTIVAL_EVENT = SpotCategory("FESTIVAL_EVENT")
 
         /** DB·업스트림에서 읽은 문자열을 코드로. 비어 있으면 null이다. */
-        fun ofOrNull(code: String?): SpotCategory? =
-            code?.trim()?.takeIf { it.isNotEmpty() && it.length <= MAX_LENGTH }?.let { SpotCategory(it) }
+        fun ofOrNull(code: String?): SpotCategory? = code?.trim()?.takeIf { it.isNotEmpty() && it.length <= MAX_LENGTH }?.let { SpotCategory(it) }
     }
 }

@@ -33,24 +33,23 @@ class MapRecommendationResolver(
         @InputArgument excludedIds: List<String>?,
         @InputArgument categories: List<String>?,
         @InputArgument first: Int?,
-    ): List<GqlMapSpot> =
-        mapRecommendationUseCase.mapRecommendedSpots(
-            MapRecommendedSpotsQuery(
-                // **좌표를 그대로 넘긴다.** 도메인 VO 조립과 범위 검증은 응용 계층의 일이다 —
-                // 여기서 만들면 다른 인바운드가 같은 유스케이스를 부를 때 그것을 각자 반복한다.
-                minLat = bbox.minLat,
-                minLng = bbox.minLng,
-                maxLat = bbox.maxLat,
-                maxLng = bbox.maxLng,
-                // 숫자로 읽히지 않는 id는 어떤 행과도 일치할 수 없으므로 조용히 뺀다 — 거절과
-                // 결과가 같으면서, 클라이언트 목록이 한 건 상해도 추천이 통째로 실패하지 않는다.
-                excludedSpotIds = excludedIds.orEmpty().mapNotNull(String::toLongOrNull).toSet(),
-                categories = toCategorySelection(categories),
-                first = first ?: DEFAULT_FIRST,
-            ),
-            locale = dfe.domainLocale(),
-            memberId = currentMemberProvider.requireMemberId(),
-        ).map { it.toGql() }
+    ): List<GqlMapSpot> = mapRecommendationUseCase.mapRecommendedSpots(
+        MapRecommendedSpotsQuery(
+            // **좌표를 그대로 넘긴다.** 도메인 VO 조립과 범위 검증은 응용 계층의 일이다 —
+            // 여기서 만들면 다른 인바운드가 같은 유스케이스를 부를 때 그것을 각자 반복한다.
+            minLat = bbox.minLat,
+            minLng = bbox.minLng,
+            maxLat = bbox.maxLat,
+            maxLng = bbox.maxLng,
+            // 숫자로 읽히지 않는 id는 어떤 행과도 일치할 수 없으므로 조용히 뺀다 — 거절과
+            // 결과가 같으면서, 클라이언트 목록이 한 건 상해도 추천이 통째로 실패하지 않는다.
+            excludedSpotIds = excludedIds.orEmpty().mapNotNull(String::toLongOrNull).toSet(),
+            categories = toCategorySelection(categories),
+            first = first ?: DEFAULT_FIRST,
+        ),
+        locale = dfe.domainLocale(),
+        memberId = currentMemberProvider.requireMemberId(),
+    ).map { it.toGql() }
 
     private companion object {
         /** 계약의 기본값과 같아야 한다(`map.graphqls`). 화면에 몇 개를 그릴지는 클라이언트가 정한다. */

@@ -1,8 +1,8 @@
 package org.around.ieuri.alarm.infrastructure.config
 
-import java.time.Duration
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.core.io.Resource
+import java.time.Duration
 
 /**
  * FCM 발송 설정(SPEC-0028 §8, POL-046 준용).

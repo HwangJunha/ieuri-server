@@ -106,18 +106,14 @@ class SpotQaQueryService(
     override fun answerReplies(
         answerIds: List<Long>,
         memberId: Long,
-    ): Map<Long, List<SpotAnswerReplyView>> =
-        spotQaQueryPort.findRepliesOf(answerIds, viewerContext(memberId))
+    ): Map<Long, List<SpotAnswerReplyView>> = spotQaQueryPort.findRepliesOf(answerIds, viewerContext(memberId))
 
     // 사진 셋. 포트로 그대로 넘긴다 — 여기서 더할 규칙이 없다.
-    override fun questionPhotoKeys(questionIds: List<Long>): Map<Long, List<String>> =
-        spotQaQueryPort.findQuestionPhotoKeys(questionIds)
+    override fun questionPhotoKeys(questionIds: List<Long>): Map<Long, List<String>> = spotQaQueryPort.findQuestionPhotoKeys(questionIds)
 
-    override fun answerPhotoKeys(answerIds: List<Long>): Map<Long, List<String>> =
-        spotQaQueryPort.findAnswerPhotoKeys(answerIds)
+    override fun answerPhotoKeys(answerIds: List<Long>): Map<Long, List<String>> = spotQaQueryPort.findAnswerPhotoKeys(answerIds)
 
-    override fun replyPhotoKeys(replyIds: List<Long>): Map<Long, List<String>> =
-        spotQaQueryPort.findReplyPhotoKeys(replyIds)
+    override fun replyPhotoKeys(replyIds: List<Long>): Map<Long, List<String>> = spotQaQueryPort.findReplyPhotoKeys(replyIds)
 
     /**
      * 호출자의 차단 관계를 **양방향으로** 읽어 담는다. 커뮤니티 글과 같은 집합을 쓴다 —
@@ -128,11 +124,10 @@ class SpotQaQueryService(
     private fun viewerContext(memberId: Long): ViewerContext = ViewerContext(
         memberId = memberId,
         blockedMemberIds =
-            if (memberId > 0) communityQueryPort.findBlockedMemberIds(memberId) else emptySet(),
+        if (memberId > 0) communityQueryPort.findBlockedMemberIds(memberId) else emptySet(),
     )
 
-    private fun <T> emptyPage(): CursorPage<T> =
-        cursorPageOf(edges = emptyList(), hasNextPage = false, hasPreviousPage = false)
+    private fun <T> emptyPage(): CursorPage<T> = cursorPageOf(edges = emptyList(), hasNextPage = false, hasPreviousPage = false)
 
     private fun clampPageSize(first: Int): Int = first.coerceIn(1, policy.maxPageSize)
 }

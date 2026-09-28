@@ -10,8 +10,8 @@ import org.around.ieuri.community.domain.event.SpotAnswerReplyNotificationTrigge
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Component
-import org.springframework.transaction.event.TransactionalEventListener
 import org.springframework.transaction.event.TransactionPhase
+import org.springframework.transaction.event.TransactionalEventListener
 
 /**
  * community의 알림 트리거를 구독해 발송으로 옮긴다(SPEC-0028 §2, R5~R7).

@@ -50,8 +50,7 @@ class TourApiFestivalSyncClientTest {
         ),
     )
 
-    private fun map(vararg items: TourApiFestivalResponse.Item) =
-        client.mapPage(response(*items), DomainLocale.KO, runDate)
+    private fun map(vararg items: TourApiFestivalResponse.Item) = client.mapPage(response(*items), DomainLocale.KO, runDate)
 
     // ---------- 날짜 해석 (R-4) ----------
 

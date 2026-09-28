@@ -1,6 +1,5 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity
 
-import org.around.ieuri.common.persistence.DbSchema
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -13,6 +12,7 @@ import jakarta.persistence.PreUpdate
 import jakarta.persistence.Table
 import org.around.ieuri.auth.domain.vo.MemberStatus
 import org.around.ieuri.auth.domain.vo.Provider
+import org.around.ieuri.common.persistence.DbSchema
 import java.time.Instant
 
 /**

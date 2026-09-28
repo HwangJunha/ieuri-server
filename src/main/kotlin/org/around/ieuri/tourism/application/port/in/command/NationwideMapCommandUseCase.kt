@@ -1,8 +1,8 @@
 package org.around.ieuri.tourism.application.port.`in`.command
 
 import org.around.ieuri.tourism.application.command.RecordVisitsCommand
-import org.around.ieuri.tourism.application.command.RemoveVisitCommand
 import org.around.ieuri.tourism.application.command.RecordVisitsResult
+import org.around.ieuri.tourism.application.command.RemoveVisitCommand
 import org.around.ieuri.tourism.application.command.RemoveVisitResult
 import org.around.ieuri.tourism.application.query.MapShareLinkView
 import org.around.ieuri.tourism.domain.vo.DomainLocale

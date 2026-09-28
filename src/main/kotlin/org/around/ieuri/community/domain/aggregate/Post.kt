@@ -1,9 +1,9 @@
 package org.around.ieuri.community.domain.aggregate
 
 import org.around.ieuri.community.domain.vo.PhotoObjectKey
-import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.domain.vo.PostTag
 import org.around.ieuri.community.domain.vo.SpotPoint
+import org.around.ieuri.community.domain.vo.TargetCategory
 import java.time.Instant
 
 /**

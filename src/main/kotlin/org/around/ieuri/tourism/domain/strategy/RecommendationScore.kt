@@ -38,8 +38,7 @@ class RecommendationScore(
 
     fun distanceFactor(distanceMeters: Double): Double = 1.0 / (1.0 + distanceMeters / distanceHalfLifeMeters)
 
-    fun tasteFactor(likeSimilarity: Double, dislikeSimilarity: Double?): Double =
-        ((likeSimilarity - (dislikeSimilarity ?: 0.0) + 1.0) / 2.0).coerceIn(0.0, 1.0)
+    fun tasteFactor(likeSimilarity: Double, dislikeSimilarity: Double?): Double = ((likeSimilarity - (dislikeSimilarity ?: 0.0) + 1.0) / 2.0).coerceIn(0.0, 1.0)
 
     fun score(
         distanceMeters: Double,

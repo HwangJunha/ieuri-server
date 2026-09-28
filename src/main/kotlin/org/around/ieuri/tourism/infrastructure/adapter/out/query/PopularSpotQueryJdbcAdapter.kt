@@ -123,10 +123,11 @@ class PopularSpotQueryJdbcAdapter(
             "ST_DWithin(cat.location, c.center, ?)",
         )
         val params = mutableListOf<Any>(
-            query.center.longitude, query.center.latitude, // CTE의 center
-            ReactionType.LIKE.name,                        // spot_reaction JOIN: reaction
-            query.language.name,                           // spot_reaction JOIN: language
-            query.language.name,                           // translation JOIN 조건
+            query.center.longitude,
+            query.center.latitude, // CTE의 center
+            ReactionType.LIKE.name, // spot_reaction JOIN: reaction
+            query.language.name, // spot_reaction JOIN: language
+            query.language.name, // translation JOIN 조건
             query.radiusMeters.toDouble(),
         )
 

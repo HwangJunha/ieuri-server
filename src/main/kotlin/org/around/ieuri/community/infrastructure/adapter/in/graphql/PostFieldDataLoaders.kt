@@ -64,8 +64,7 @@ class PostCategoryDataLoader(
     private val communityQueryUseCase: CommunityQueryUseCase,
 ) : MappedBatchLoader<Long, TargetCategory> {
 
-    override fun load(postIds: Set<Long>): CompletionStage<Map<Long, TargetCategory>> =
-        CompletableFuture.completedFuture(communityQueryUseCase.postCategories(postIds.toList()))
+    override fun load(postIds: Set<Long>): CompletionStage<Map<Long, TargetCategory>> = CompletableFuture.completedFuture(communityQueryUseCase.postCategories(postIds.toList()))
 
     companion object {
         const val NAME = "postCategory"
@@ -82,8 +81,7 @@ class PostCatalogIdDataLoader(
     private val communityQueryUseCase: CommunityQueryUseCase,
 ) : MappedBatchLoader<Long, Long> {
 
-    override fun load(postIds: Set<Long>): CompletionStage<Map<Long, Long>> =
-        CompletableFuture.completedFuture(communityQueryUseCase.postCatalogIds(postIds.toList()))
+    override fun load(postIds: Set<Long>): CompletionStage<Map<Long, Long>> = CompletableFuture.completedFuture(communityQueryUseCase.postCatalogIds(postIds.toList()))
 
     companion object {
         const val NAME = "postCatalogId"

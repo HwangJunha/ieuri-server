@@ -40,29 +40,34 @@ class SpotDetailPrefetchTargetQueryAdapter(
         afterSpotId: Long,
         limit: Int,
         staleBefore: Instant,
-    ): List<PrefetchTarget> =
-        queryFactory
-            .select(
-                spot.id, spot.contentId, spot.language, spot.category,
-                spot.title, spot.thumbnailImageUrl, spot.copyright, spot.address,
+    ): List<PrefetchTarget> = queryFactory
+        .select(
+            spot.id,
+            spot.contentId,
+            spot.language,
+            spot.category,
+            spot.title,
+            spot.thumbnailImageUrl,
+            spot.copyright,
+            spot.address,
+        )
+        .from(spot)
+        .where(spot.id.gt(afterSpotId), needsFetch(part, staleBefore))
+        .orderBy(spot.id.asc())
+        .limit(limit.toLong())
+        .fetch()
+        .map { tuple ->
+            PrefetchTarget(
+                spotId = requireNotNull(tuple.get(spot.id)),
+                contentId = requireNotNull(tuple.get(spot.contentId)),
+                language = requireNotNull(tuple.get(spot.language)),
+                category = SpotCategory(requireNotNull(tuple.get(spot.category))),
+                title = requireNotNull(tuple.get(spot.title)),
+                thumbnailImageUrl = requireNotNull(tuple.get(spot.thumbnailImageUrl)),
+                copyright = requireNotNull(tuple.get(spot.copyright)),
+                address = tuple.get(spot.address),
             )
-            .from(spot)
-            .where(spot.id.gt(afterSpotId), needsFetch(part, staleBefore))
-            .orderBy(spot.id.asc())
-            .limit(limit.toLong())
-            .fetch()
-            .map { tuple ->
-                PrefetchTarget(
-                    spotId = requireNotNull(tuple.get(spot.id)),
-                    contentId = requireNotNull(tuple.get(spot.contentId)),
-                    language = requireNotNull(tuple.get(spot.language)),
-                    category = SpotCategory(requireNotNull(tuple.get(spot.category))),
-                    title = requireNotNull(tuple.get(spot.title)),
-                    thumbnailImageUrl = requireNotNull(tuple.get(spot.thumbnailImageUrl)),
-                    copyright = requireNotNull(tuple.get(spot.copyright)),
-                    address = tuple.get(spot.address),
-                )
-            }
+        }
 
     /**
      * 아직 확보하지 못했거나 신선도가 지난 장소. **확보실패와 미확보를 구분하지 않는다** —

@@ -5,9 +5,9 @@ import io.mockk.mockk
 import io.mockk.verify
 import org.around.ieuri.tourism.application.command.RecordVisitsCommand
 import org.around.ieuri.tourism.application.command.RemoveVisitCommand
+import org.around.ieuri.tourism.application.policy.NationwideMapPolicy
 import org.around.ieuri.tourism.application.port.out.persistence.DistrictVisitStorePort
 import org.around.ieuri.tourism.application.port.out.persistence.DistrictVisitUpsertPort
-import org.around.ieuri.tourism.application.policy.NationwideMapPolicy
 import org.around.ieuri.tourism.application.port.out.persistence.MapShareLinkIssuePort
 import org.around.ieuri.tourism.application.port.out.persistence.MapShareLinkPort
 import org.around.ieuri.tourism.application.port.out.persistence.MapShareLinkRecord

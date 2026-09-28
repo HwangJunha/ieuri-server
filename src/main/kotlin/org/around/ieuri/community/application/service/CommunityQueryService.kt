@@ -1,29 +1,29 @@
 package org.around.ieuri.community.application.service
 
+import org.around.ieuri.common.context.AppKey
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.cursorPageOf
 import org.around.ieuri.community.application.event.PostViewed
 import org.around.ieuri.community.application.policy.CommunityPolicy
 import org.around.ieuri.community.application.port.`in`.query.CommunityQueryUseCase
+import org.around.ieuri.community.application.port.out.client.CategoryConfigPort
 import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
 import org.around.ieuri.community.application.port.out.query.BlockedUsersSearch
-import org.around.ieuri.community.application.port.out.query.MyPostsSearch
-import org.around.ieuri.community.application.port.out.client.CategoryConfigPort
 import org.around.ieuri.community.application.port.out.query.CommunityQueryPort
+import org.around.ieuri.community.application.port.out.query.MyPostsSearch
 import org.around.ieuri.community.application.port.out.query.PostCommentsSearch
 import org.around.ieuri.community.application.port.out.query.PostSpatialQueryPort
 import org.around.ieuri.community.application.port.out.query.PostsArea
 import org.around.ieuri.community.application.port.out.query.PostsSearch
 import org.around.ieuri.community.application.port.out.query.ViewerContext
 import org.around.ieuri.community.application.query.BlockedUserView
-import org.around.ieuri.community.application.query.CommunityChipView
 import org.around.ieuri.community.application.query.BlockedUsersQuery
 import org.around.ieuri.community.application.query.CommentView
+import org.around.ieuri.community.application.query.CommunityChipView
+import org.around.ieuri.community.application.query.MyPostsQuery
 import org.around.ieuri.community.application.query.PostCommentsQuery
 import org.around.ieuri.community.application.query.PostView
-import org.around.ieuri.community.application.query.MyPostsQuery
 import org.around.ieuri.community.application.query.PostsQuery
-import org.around.ieuri.common.context.AppKey
 import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.around.ieuri.community.domain.vo.PostSortOrder
 import org.around.ieuri.community.domain.vo.PostTag
@@ -83,12 +83,11 @@ class CommunityQueryService(
      * 오류로 돌려주지 않는 이유는 클라이언트가 위치 권한을 못 받은 상태에서도 피드를
      * 그려야 하기 때문이다 — 정렬만 바뀌고 화면은 뜬다.
      */
-    private fun effectiveSort(query: PostsQuery): PostSortOrder =
-        if (query.sort == PostSortOrder.DISTANCE && !query.hasCoordinates) {
-            PostSortOrder.LATEST
-        } else {
-            query.sort
-        }
+    private fun effectiveSort(query: PostsQuery): PostSortOrder = if (query.sort == PostSortOrder.DISTANCE && !query.hasCoordinates) {
+        PostSortOrder.LATEST
+    } else {
+        query.sort
+    }
 
     /**
      * 좌표 반경. 좌표를 주지 않으면 null이고 반경으로 좁히지 않는다.
@@ -147,70 +146,58 @@ class CommunityQueryService(
     }
 
     /** 못 보는 글의 댓글. 첫 페이지이므로 양쪽 다 false다. */
-    private fun emptyCommentPage(): CursorPage<CommentView> =
-        cursorPageOf(edges = emptyList(), hasNextPage = false, hasPreviousPage = false)
+    private fun emptyCommentPage(): CursorPage<CommentView> = cursorPageOf(edges = emptyList(), hasNextPage = false, hasPreviousPage = false)
 
-    override fun commentPreviews(postIds: List<Long>, memberId: Long): Map<Long, List<CommentView>> =
-        communityQueryPort.findCommentPreviews(
-            postIds = postIds,
-            limitPerPost = policy.commentPreviewSize,
-            viewer = viewerContext(memberId),
-        )
+    override fun commentPreviews(postIds: List<Long>, memberId: Long): Map<Long, List<CommentView>> = communityQueryPort.findCommentPreviews(
+        postIds = postIds,
+        limitPerPost = policy.commentPreviewSize,
+        viewer = viewerContext(memberId),
+    )
 
     override fun commentReplies(
         parentCommentIds: List<Long>,
         memberId: Long,
-    ): Map<Long, List<CommentView>> =
-        communityQueryPort.findRepliesOf(parentCommentIds, viewerContext(memberId))
+    ): Map<Long, List<CommentView>> = communityQueryPort.findRepliesOf(parentCommentIds, viewerContext(memberId))
 
     // 지연 필드 다섯. 포트로 그대로 넘긴다 — 여기서 더할 규칙이 없다.
-    override fun postTags(postIds: List<Long>): Map<Long, List<String>> =
-        communityQueryPort.findTagsOf(postIds)
+    override fun postTags(postIds: List<Long>): Map<Long, List<String>> = communityQueryPort.findTagsOf(postIds)
 
-    override fun postPhotoKeys(postIds: List<Long>): Map<Long, List<String>> =
-        communityQueryPort.findPhotoKeysOf(postIds)
+    override fun postPhotoKeys(postIds: List<Long>): Map<Long, List<String>> = communityQueryPort.findPhotoKeysOf(postIds)
 
-    override fun postCategories(postIds: List<Long>): Map<Long, TargetCategory> =
-        communityQueryPort.findCategoriesOf(postIds)
+    override fun postCategories(postIds: List<Long>): Map<Long, TargetCategory> = communityQueryPort.findCategoriesOf(postIds)
 
-    override fun postCatalogIds(postIds: List<Long>): Map<Long, Long> =
-        communityQueryPort.findCatalogIdsOf(postIds)
+    override fun postCatalogIds(postIds: List<Long>): Map<Long, Long> = communityQueryPort.findCatalogIdsOf(postIds)
 
-    override fun likedPostIds(postIds: List<Long>, memberId: Long): Set<Long> =
-        communityQueryPort.findLikedPostIds(memberId, postIds)
+    override fun likedPostIds(postIds: List<Long>, memberId: Long): Set<Long> = communityQueryPort.findLikedPostIds(memberId, postIds)
 
-    override fun blockedUsers(query: BlockedUsersQuery, memberId: Long): CursorPage<BlockedUserView> =
-        communityQueryPort.findBlockedUsers(
-            BlockedUsersSearch(
-                memberId = memberId,
-                first = clampPageSize(query.first),
-                after = query.after,
-            ),
-        )
+    override fun blockedUsers(query: BlockedUsersQuery, memberId: Long): CursorPage<BlockedUserView> = communityQueryPort.findBlockedUsers(
+        BlockedUsersSearch(
+            memberId = memberId,
+            first = clampPageSize(query.first),
+            after = query.after,
+        ),
+    )
 
     /**
      * 양방향 차단 판정(POL-041). 상대 목록을 한 번 읽어 포함 여부를 본다 —
      * `ConversationCommandService.requireNotBlocked`와 같은 관용구다.
      */
-    override fun isBlockedBetween(memberId: Long, counterpartId: Long): Boolean =
-        counterpartId in communityQueryPort.findBlockedMemberIds(memberId)
+    override fun isBlockedBetween(memberId: Long, counterpartId: Long): Boolean = counterpartId in communityQueryPort.findBlockedMemberIds(memberId)
 
     /**
      * 내가 쓴 글. **[viewerContext]를 쓰지 않는다** — 차단·숨김 집합을 읽을 이유가 없고,
      * 자기 글은 자기가 숨겼더라도 마이페이지에 보여야 한다(R3).
      */
-    override fun myPosts(query: MyPostsQuery, memberId: Long): CursorPage<PostView> =
-        communityQueryPort.findMyPosts(
-            MyPostsSearch(
-                memberId = memberId,
-                first = clampPageSize(query.first),
-                after = query.after,
-            ),
-        )
+    override fun myPosts(query: MyPostsQuery, memberId: Long): CursorPage<PostView> = communityQueryPort.findMyPosts(
+        MyPostsSearch(
+            memberId = memberId,
+            first = clampPageSize(query.first),
+            after = query.after,
+        ),
+    )
 
     /** 구성은 tourism의 `app_category`가 소유한다(SPEC-0020) — 커뮤니티는 그 표를 읽을 뿐이다. */
-    override fun communityChips(appKey: AppKey, language: ContentLanguage): List<CommunityChipView> =
-        categoryConfigPort.findCategories(appKey, language)
+    override fun communityChips(appKey: AppKey, language: ContentLanguage): List<CommunityChipView> = categoryConfigPort.findCategories(appKey, language)
 
     /**
      * 호출자의 차단 관계를 **양방향으로** 읽어 담고, 개별로 숨긴 글 id도 함께 담는다.

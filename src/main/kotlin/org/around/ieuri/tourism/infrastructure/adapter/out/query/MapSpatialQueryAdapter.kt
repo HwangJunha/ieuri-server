@@ -35,8 +35,11 @@ class MapSpatialQueryAdapter(
         // 다중 선택은 OR이며 IN으로 표현한다(SPEC-0020). 비어 있으면 조건 자체를 걸지 않는다.
         val categoryCodes = query.categories.codes()
         val categoryCondition =
-            if (query.categories.isUnfiltered) ""
-            else "AND cat.category IN (${categoryCodes.joinToString(",") { "?" }})"
+            if (query.categories.isUnfiltered) {
+                ""
+            } else {
+                "AND cat.category IN (${categoryCodes.joinToString(",") { "?" }})"
+            }
 
         // **파라미터 순서는 SQL 문자열의 ? 등장 순서다.** 언어가 JOIN 조건에 있어 bbox보다 앞선다.
         val params = buildList<Any> {
@@ -93,12 +96,18 @@ class MapSpatialQueryAdapter(
     override fun findRecommendationCandidatesWithin(query: MapCandidateSearch): List<MapCandidateView> {
         val categoryCodes = query.categories.codes()
         val categoryCondition =
-            if (query.categories.isUnfiltered) ""
-            else "AND cat.category IN (${categoryCodes.joinToString(",") { "?" }})"
+            if (query.categories.isUnfiltered) {
+                ""
+            } else {
+                "AND cat.category IN (${categoryCodes.joinToString(",") { "?" }})"
+            }
         // 빈 배열에도 조건을 그대로 걸 수 있지만(전부 참) 불필요한 스캔 조건이라 비면 뺀다.
         val exclusionCondition =
-            if (query.excludedSpotIds.isEmpty()) ""
-            else "AND NOT (cat.id = ANY (?))"
+            if (query.excludedSpotIds.isEmpty()) {
+                ""
+            } else {
+                "AND NOT (cat.id = ANY (?))"
+            }
 
         val center = query.bounds.center
         // **파라미터 순서는 SQL 문자열의 ? 등장 순서다.** 중심점이 SELECT·ORDER BY 두 곳에
@@ -148,8 +157,7 @@ class MapSpatialQueryAdapter(
     }
 
     /** envelope 파라미터는 (minLng, minLat, maxLng, maxLat) 순서다 — 경도가 먼저다. */
-    private fun envelopeParams(bounds: MapBounds): List<Any> =
-        listOf(bounds.minLng, bounds.minLat, bounds.maxLng, bounds.maxLat)
+    private fun envelopeParams(bounds: MapBounds): List<Any> = listOf(bounds.minLng, bounds.minLat, bounds.maxLng, bounds.maxLat)
 
     private companion object {
         /**

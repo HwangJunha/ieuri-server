@@ -16,8 +16,7 @@ class UnauthorizedException(message: String) : RuntimeException(message)
  * 정답이지만, 이쪽은 **이미 로그인했던 세션이 만료된 것**이라 갱신이 정답이다. 뭉뚱그리면
  * 갱신으로 회복될 사용자를 로그인 화면으로 보내게 된다.
  */
-class StaleTokenException(message: String) :
-    TokenAuthenticationException("UNAUTHENTICATED_TOKEN_REJECTED", message)
+class StaleTokenException(message: String) : TokenAuthenticationException("UNAUTHENTICATED_TOKEN_REJECTED", message)
 
 /**
  * 소켓 신원이 더 이상 유효하지 않아 새 구독을 열 수 없을 때(SPEC-0032 R7).
@@ -27,8 +26,7 @@ class StaleTokenException(message: String) :
  * 소켓 신원은 `connection_init`에 고정되어 있어 **같은 토큰으로 다시 붙으면 결과가 같다.**
  * 재연결이 아니라 **갱신 후 재구독**이어야 하며, 이 구분이 없어서 무한 재연결이 발생했다.
  */
-class SubscriptionUnauthenticatedException(message: String) :
-    TokenAuthenticationException("SUBSCRIPTION_UNAUTHENTICATED", message)
+class SubscriptionUnauthenticatedException(message: String) : TokenAuthenticationException("SUBSCRIPTION_UNAUTHENTICATED", message)
 
 /** 인증은 됐으나 요구되는 권한(permission)이 없을 때. */
 class ForbiddenException(message: String) : RuntimeException(message)

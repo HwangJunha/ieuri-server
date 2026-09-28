@@ -25,8 +25,7 @@ data class MapCell(
      * 이 칸을 방문했는가. **칸에 속한 시군구 중 하나라도** 방문이면 참이다 —
      * 수원시 장안구를 방문하면 수원시 칸 전체가 방문으로 표시된다(R6).
      */
-    fun isVisitedBy(visitedDistrictCodes: Set<String>): Boolean =
-        districtCodes.any { it in visitedDistrictCodes }
+    fun isVisitedBy(visitedDistrictCodes: Set<String>): Boolean = districtCodes.any { it in visitedDistrictCodes }
 }
 
 /**
@@ -47,20 +46,19 @@ object MapCellGrouping {
      * 칸이라면 '서울특별시'처럼 시도 이름을 별도로 넘겨받아야 옳지만, 적재가 대표 시군구의
      * 이름을 그대로 칸 이름으로 삼는 것을 전제한다(§adapter).
      */
-    fun fold(rows: List<MapCellDistrictRow>): List<MapCell> =
-        rows.groupBy { it.cellId }
-            .map { (cellId, group) ->
-                val representative = group.minBy { it.districtCode }
-                MapCell(
-                    id = cellId,
-                    districtCodes = group.mapTo(LinkedHashSet()) { it.districtCode },
-                    name = representative.cellName,
-                    provinceName = representative.provinceName,
-                    provinceCode = representative.provinceCode,
-                    center = representative.center,
-                )
-            }
-            .sortedWith(compareBy({ it.provinceCode }, { it.id }))
+    fun fold(rows: List<MapCellDistrictRow>): List<MapCell> = rows.groupBy { it.cellId }
+        .map { (cellId, group) ->
+            val representative = group.minBy { it.districtCode }
+            MapCell(
+                id = cellId,
+                districtCodes = group.mapTo(LinkedHashSet()) { it.districtCode },
+                name = representative.cellName,
+                provinceName = representative.provinceName,
+                provinceCode = representative.provinceCode,
+                center = representative.center,
+            )
+        }
+        .sortedWith(compareBy({ it.provinceCode }, { it.id }))
 }
 
 /**

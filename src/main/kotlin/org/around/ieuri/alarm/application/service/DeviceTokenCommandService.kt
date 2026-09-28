@@ -57,5 +57,4 @@ class DeviceTokenCommandService(
         if (!existing.ownedBy(memberId)) return
         deviceTokenRepositoryPort.deleteByDeviceId(command.deviceId)
     }
-
 }

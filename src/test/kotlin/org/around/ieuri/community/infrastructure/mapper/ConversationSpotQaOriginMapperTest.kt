@@ -68,8 +68,11 @@ class ConversationSpotQaOriginMapperTest {
     @Test
     fun `인용을 넘기지 않으면 메시지의 인용이 null이다`() {
         val entity = MessageEntity(
-            id = 1L, conversationId = 2L, senderId = 3L,
-            bodyEncrypted = "암호화된-본문", createdAt = createdAt,
+            id = 1L,
+            conversationId = 2L,
+            senderId = 3L,
+            bodyEncrypted = "암호화된-본문",
+            createdAt = createdAt,
         )
 
         assertNull(entity.toDomain(decryptedBody = "본문").spotQaOrigin)

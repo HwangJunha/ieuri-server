@@ -27,11 +27,9 @@ class PepperedBCryptPasswordEncoder(
         pepperKey = SecretKeySpec(properties.pepper.toByteArray(Charsets.UTF_8), HMAC_ALGORITHM)
     }
 
-    override fun encode(rawPassword: String): String =
-        checkNotNull(bcrypt.encode(peppered(rawPassword))) { "비밀번호 해시 생성에 실패했습니다." }
+    override fun encode(rawPassword: String): String = checkNotNull(bcrypt.encode(peppered(rawPassword))) { "비밀번호 해시 생성에 실패했습니다." }
 
-    override fun matches(rawPassword: String, encodedPassword: String): Boolean =
-        bcrypt.matches(peppered(rawPassword), encodedPassword)
+    override fun matches(rawPassword: String, encodedPassword: String): Boolean = bcrypt.matches(peppered(rawPassword), encodedPassword)
 
     private fun peppered(rawPassword: String): String {
         val mac = Mac.getInstance(HMAC_ALGORITHM).apply { init(pepperKey) }

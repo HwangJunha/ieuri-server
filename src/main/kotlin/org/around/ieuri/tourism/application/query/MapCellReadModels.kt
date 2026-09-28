@@ -37,7 +37,6 @@ data class CellImageView(
     val attributionText: String,
 )
 
-
 /**
  * 칸에 속한 장소 1건.
  *

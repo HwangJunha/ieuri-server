@@ -17,8 +17,7 @@ class RoleQueryResolver(
 ) {
     @DgsQuery
     @RequiresPermission(Permission.ROLE_ASSIGN)
-    fun assignableRoles(): List<GqlRoleInfo> =
-        roleQueryUseCase.assignableRoles().map {
-            GqlRoleInfo(code = it.code, name = it.name, description = it.description)
-        }
+    fun assignableRoles(): List<GqlRoleInfo> = roleQueryUseCase.assignableRoles().map {
+        GqlRoleInfo(code = it.code, name = it.name, description = it.description)
+    }
 }

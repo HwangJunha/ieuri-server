@@ -22,7 +22,6 @@ class PostLike private constructor(
             return PostLike(id = null, postId = postId, memberId = memberId, createdAt = null)
         }
 
-        fun restore(id: Long, postId: Long, memberId: Long, createdAt: Instant): PostLike =
-            PostLike(id = id, postId = postId, memberId = memberId, createdAt = createdAt)
+        fun restore(id: Long, postId: Long, memberId: Long, createdAt: Instant): PostLike = PostLike(id = id, postId = postId, memberId = memberId, createdAt = createdAt)
     }
 }

@@ -108,8 +108,9 @@ class FestivalQueryJdbcAdapter(
             "ST_DWithin(cat.location, c.center, ?)",
         )
         val params = listOf<Any>(
-            query.center.longitude, query.center.latitude, // CTE의 center
-            query.language.name,                           // translation JOIN 조건
+            query.center.longitude,
+            query.center.latitude, // CTE의 center
+            query.language.name, // translation JOIN 조건
             Date.valueOf(query.asOf),
             Date.valueOf(query.asOf),
             query.radiusMeters.toDouble(),

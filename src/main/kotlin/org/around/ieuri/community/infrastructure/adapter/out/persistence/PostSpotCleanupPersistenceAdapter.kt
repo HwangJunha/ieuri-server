@@ -17,6 +17,5 @@ class PostSpotCleanupPersistenceAdapter(
 ) : PostSpotCleanupPort {
 
     @Transactional
-    override fun deleteByCatalogIds(catalogIds: List<Long>): Long =
-        postSpotRepository.deleteByCatalogIdIn(catalogIds)
+    override fun deleteByCatalogIds(catalogIds: List<Long>): Long = postSpotRepository.deleteByCatalogIdIn(catalogIds)
 }

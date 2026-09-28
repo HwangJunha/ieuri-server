@@ -29,7 +29,10 @@ class DistrictRepresentativeLocationTasklet(
         contribution.incrementWriteCount((result.selected + result.cleared).toLong())
         log.info(
             "district representative location refreshed: selected={} cleared={} cellSize={} minSpotCount={}",
-            result.selected, result.cleared, cellSizeDegrees, minSpotCount,
+            result.selected,
+            result.cleared,
+            cellSizeDegrees,
+            minSpotCount,
         )
         return RepeatStatus.FINISHED
     }

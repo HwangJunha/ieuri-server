@@ -1,30 +1,30 @@
 package org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql
 
-import org.around.ieuri.common.event.LocationAccessed
-import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
 import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsData
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
-import org.around.ieuri.tourism.application.port.`in`.query.SpotQueryUseCase
+import org.around.ieuri.common.event.LocationAccessed
+import org.around.ieuri.common.graphql.appKey
+import org.around.ieuri.common.graphql.tokenPresentation
+import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.tourism.application.exception.SpotDetailNotFoundException
+import org.around.ieuri.tourism.application.port.`in`.query.SpotQueryUseCase
+import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
 import org.around.ieuri.tourism.application.query.CategoryDisplay
 import org.around.ieuri.tourism.application.query.LikedSpotView
 import org.around.ieuri.tourism.application.query.LikedSpotsQuery
 import org.around.ieuri.tourism.application.query.SpotDetailView
-import org.around.ieuri.tourism.application.query.SpotIntroView
 import org.around.ieuri.tourism.application.query.SpotImageView
+import org.around.ieuri.tourism.application.query.SpotIntroView
 import org.around.ieuri.tourism.application.query.SpotPageView
 import org.around.ieuri.tourism.application.query.SpotView
 import org.around.ieuri.tourism.application.query.SpotsQuery
+import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toCategorySelection
 import org.around.ieuri.tourism.infrastructure.locale.domainLocale
-import org.around.ieuri.tourism.domain.vo.SpotCategory
-import org.around.ieuri.common.graphql.appKey
-import org.around.ieuri.common.pagination.CursorPage
-import org.around.ieuri.common.graphql.tokenPresentation
-import org.around.ieuri.common.security.CurrentMemberProvider
 import org.dataloader.DataLoader
 import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
 import org.around.ieuri.common.graphql.generated.types.LikedSpot as GqlLikedSpot
@@ -115,8 +115,7 @@ class SpotQueryResolver(
     fun spotDetail(
         dfe: DgsDataFetchingEnvironment,
         @InputArgument id: Long,
-    ): SpotDetailView =
-        spotQueryUseCase.spotDetail(catalogId = id, locale = dfe.domainLocale())
+    ): SpotDetailView = spotQueryUseCase.spotDetail(catalogId = id, locale = dfe.domainLocale())
 
     /**
      * 갤러리(SPEC-0008 R-5). **nullable이다** — 이 필드의 조회가 실패하면 DGS가 실패를 이 필드에
@@ -128,36 +127,32 @@ class SpotQueryResolver(
      * 경우만 빈 배열이 된다(AC-19).
      */
     @DgsData(parentType = "SpotDetail", field = "gallery")
-    fun gallery(dfe: DgsDataFetchingEnvironment): List<GqlSpotImage>? =
-        spotQueryUseCase.spotGallery(dfe.catalogId(), dfe.domainLocale())
-            .map { it.toGql() }
+    fun gallery(dfe: DgsDataFetchingEnvironment): List<GqlSpotImage>? = spotQueryUseCase.spotGallery(dfe.catalogId(), dfe.domainLocale())
+        .map { it.toGql() }
 
     @DgsData(parentType = "SpotDetail", field = "intro")
     fun intro(
         dfe: DgsDataFetchingEnvironment,
         @InputArgument categoryCode: String,
-    ): GqlSpotIntro? =
-        spotQueryUseCase.spotIntro(
-            catalogId = dfe.catalogId(),
-            category = SpotCategory(categoryCode),
-            locale = dfe.domainLocale(),
-        )?.toGql()
+    ): GqlSpotIntro? = spotQueryUseCase.spotIntro(
+        catalogId = dfe.catalogId(),
+        category = SpotCategory(categoryCode),
+        locale = dfe.domainLocale(),
+    )?.toGql()
 
     /** 이용안내(nullable — SPEC-0006 R10). 실패 전파 규약은 [gallery]와 동일하다. */
     @DgsData(parentType = "SpotDetail", field = "infoItems")
     fun infoItems(
         dfe: DgsDataFetchingEnvironment,
         @InputArgument categoryCode: String,
-    ): List<GqlSpotInfoItem>? =
-        spotQueryUseCase.spotInfoItems(
-            catalogId = dfe.catalogId(),
-            category = SpotCategory(categoryCode),
-            locale = dfe.domainLocale(),
-        ).map { GqlSpotInfoItem(name = it.name, text = it.text) }
+    ): List<GqlSpotInfoItem>? = spotQueryUseCase.spotInfoItems(
+        catalogId = dfe.catalogId(),
+        category = SpotCategory(categoryCode),
+        locale = dfe.domainLocale(),
+    ).map { GqlSpotInfoItem(name = it.name, text = it.text) }
 
     @DgsData(parentType = "SpotDetail", field = "likeCount")
-    fun likeCount(dfe: DgsDataFetchingEnvironment): Int =
-        // GraphQL likeCount는 Int!. 반응 수가 Int 범위를 넘을 일은 없다.
+    fun likeCount(dfe: DgsDataFetchingEnvironment): Int = // GraphQL likeCount는 Int!. 반응 수가 Int 범위를 넘을 일은 없다.
         spotQueryUseCase.spotLikeCount(dfe.catalogId(), dfe.domainLocale()).toInt()
 
     /**
@@ -178,8 +173,7 @@ class SpotQueryResolver(
      * 뷰어 신원. **비로그인은 null이지만 만료 토큰은 오류다**(SPEC-0032 R1) — 공개 조회라
      * 비로그인을 허용하되, 만료를 비로그인으로 다루면 이미 누른 반응이 조용히 되살아난다.
      */
-    private fun DgsDataFetchingEnvironment.viewerMemberId(): Long? =
-        currentMemberProvider.optionalMemberId(tokenPresentation())
+    private fun DgsDataFetchingEnvironment.viewerMemberId(): Long? = currentMemberProvider.optionalMemberId(tokenPresentation())
 
     /**
      * 인증된 회원이 좋아요한 spot 커넥션. 미인증이면 빈 목록이 아니라 UNAUTHENTICATED 오류다.
@@ -319,7 +313,6 @@ class SpotQueryResolver(
      * 그 보장은 DGS의 실행 순서에 달려 있어 타입이 증명하지 못한다. 단언 연산자는 그 사실을
      * 숨기는 반면 이 쪽은 왜 안전한지를 남긴다.
      */
-    private fun DgsDataFetchingEnvironment.catalogId(): Long =
-        getSource<SpotDetailView>()?.id
-            ?: error("SpotDetail 필드 리졸버는 부모가 반환한 SpotDetailView를 소스로 받아야 한다.")
+    private fun DgsDataFetchingEnvironment.catalogId(): Long = getSource<SpotDetailView>()?.id
+        ?: error("SpotDetail 필드 리졸버는 부모가 반환한 SpotDetailView를 소스로 받아야 한다.")
 }

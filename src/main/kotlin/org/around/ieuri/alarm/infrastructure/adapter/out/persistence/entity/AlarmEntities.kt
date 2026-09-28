@@ -10,12 +10,12 @@ import jakarta.persistence.Id
 import jakarta.persistence.PrePersist
 import jakarta.persistence.PreUpdate
 import jakarta.persistence.Table
-import java.time.Instant
 import org.around.ieuri.alarm.domain.vo.AlarmLocale
 import org.around.ieuri.alarm.domain.vo.DevicePlatform
 import org.around.ieuri.alarm.domain.vo.NotificationCategory
 import org.around.ieuri.alarm.domain.vo.NotificationType
 import org.around.ieuri.common.persistence.DbSchema
+import java.time.Instant
 
 /**
  * 기기 푸시 토큰(SPEC-0028 R1).

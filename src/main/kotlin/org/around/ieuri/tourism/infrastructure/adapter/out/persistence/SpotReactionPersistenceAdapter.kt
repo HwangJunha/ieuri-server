@@ -26,8 +26,7 @@ class SpotReactionPersistenceAdapter(
 
     private val catalog = QSpotCatalogEntity.spotCatalogEntity
 
-    override fun find(memberId: Long, catalogId: Long, language: DomainLocale): SpotReaction? =
-        repository.findByMemberIdAndCatalogIdAndLanguage(memberId, catalogId, language)?.toDomain()
+    override fun find(memberId: Long, catalogId: Long, language: DomainLocale): SpotReaction? = repository.findByMemberIdAndCatalogIdAndLanguage(memberId, catalogId, language)?.toDomain()
 
     override fun save(reaction: SpotReaction) {
         // 조회 키에 language가 빠지면 다른 언어의 행을 집어 덮어쓴다 — 자연키 전체로 찾는다.
@@ -45,12 +44,11 @@ class SpotReactionPersistenceAdapter(
     }
 
     @Transactional(readOnly = true)
-    override fun existsCatalog(catalogId: Long): Boolean =
-        queryFactory
-            .selectOne()
-            .from(catalog)
-            .where(catalog.id.eq(catalogId))
-            .fetchFirst() != null
+    override fun existsCatalog(catalogId: Long): Boolean = queryFactory
+        .selectOne()
+        .from(catalog)
+        .where(catalog.id.eq(catalogId))
+        .fetchFirst() != null
 
     /**
      * 파생 삭제라 영속성 컨텍스트를 우회한다. 이 트랜잭션에서 같은 엔티티를 다시 읽는 코드가

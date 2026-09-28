@@ -10,11 +10,9 @@ import org.springframework.stereotype.Component
 @Component
 class CurrentMemberProvider {
 
-    fun currentMemberId(): Long? =
-        SecurityContextHolder.getContext().authentication?.principal as? Long
+    fun currentMemberId(): Long? = SecurityContextHolder.getContext().authentication?.principal as? Long
 
-    fun requireMemberId(): Long =
-        currentMemberId() ?: throw UnauthorizedException("인증이 필요합니다.")
+    fun requireMemberId(): Long = currentMemberId() ?: throw UnauthorizedException("인증이 필요합니다.")
 
     /**
      * 신원이 **선택인** 연산의 회원 id(SPEC-0032 R1).

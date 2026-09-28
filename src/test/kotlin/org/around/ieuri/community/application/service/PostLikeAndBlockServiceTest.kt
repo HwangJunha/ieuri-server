@@ -10,8 +10,8 @@ import org.around.ieuri.community.application.exception.MemberNotFoundException
 import org.around.ieuri.community.application.exception.PostNotFoundException
 import org.around.ieuri.community.application.port.out.client.MemberLookupPort
 import org.around.ieuri.community.application.port.out.persistence.BlockRepositoryPort
-import org.around.ieuri.community.application.port.out.persistence.PostLikeRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.PostCounterPort
+import org.around.ieuri.community.application.port.out.persistence.PostLikeRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.PostModerationPort
 import org.around.ieuri.community.application.port.out.query.CommunityQueryPort
 import org.around.ieuri.community.application.query.PostAuthorView
@@ -36,7 +36,10 @@ class PostLikeCommandServiceTest {
     private val moderationPort = mockk<PostModerationPort>()
     private val queryPort = mockk<CommunityQueryPort>()
     private val service = PostLikeCommandService(
-        likeRepository, counterPort, moderationPort, queryPort,
+        likeRepository,
+        counterPort,
+        moderationPort,
+        queryPort,
     )
 
     private fun givenPostExists() {

@@ -15,6 +15,5 @@ class AlarmBlockLookupAdapter(
     private val communityQueryUseCase: CommunityQueryUseCase,
 ) : BlockLookupPort {
 
-    override fun isBlockedBetween(memberId: Long, counterpartId: Long): Boolean =
-        communityQueryUseCase.isBlockedBetween(memberId, counterpartId)
+    override fun isBlockedBetween(memberId: Long, counterpartId: Long): Boolean = communityQueryUseCase.isBlockedBetween(memberId, counterpartId)
 }

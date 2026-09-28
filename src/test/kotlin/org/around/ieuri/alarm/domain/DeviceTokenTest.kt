@@ -1,13 +1,13 @@
 package org.around.ieuri.alarm.domain
 
+import org.around.ieuri.alarm.domain.aggregate.DeviceToken
+import org.around.ieuri.alarm.domain.vo.AlarmLocale
+import org.around.ieuri.alarm.domain.vo.DevicePlatform
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import org.around.ieuri.alarm.domain.aggregate.DeviceToken
-import org.around.ieuri.alarm.domain.vo.AlarmLocale
-import org.around.ieuri.alarm.domain.vo.DevicePlatform
 
 /** 기기 토큰 불변식과 재등록 규칙(SPEC-0028 R1·R20·AC1.4). */
 class DeviceTokenTest {

@@ -25,7 +25,6 @@ interface MessageJpaRepository : JpaRepository<MessageEntity, Long> {
      */
     fun findByIdInAndDeletedAtIsNull(ids: List<Long>): List<MessageEntity>
 
-
     /**
      * 보관 기간이 지난 메시지를 회차 상한만큼 고른다(R16). **한 번에 다 지우지 않는다** —
      * 6개월치가 쌓인 상태에서 단일 트랜잭션으로 지우면 락과 WAL이 함께 커진다.

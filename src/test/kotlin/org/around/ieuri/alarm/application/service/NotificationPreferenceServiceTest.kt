@@ -4,13 +4,13 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import org.around.ieuri.alarm.application.command.UpdateNotificationPreferenceCommand
 import org.around.ieuri.alarm.application.port.out.persistence.NotificationPreferenceRepositoryPort
 import org.around.ieuri.alarm.domain.aggregate.NotificationPreference
 import org.around.ieuri.alarm.domain.vo.NotificationCategory
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /** 카테고리별 수신 설정(SPEC-0028 R19). */
 class NotificationPreferenceServiceTest {
@@ -20,8 +20,7 @@ class NotificationPreferenceServiceTest {
 
     private val memberId = 7L
 
-    private fun preference(category: NotificationCategory, enabled: Boolean) =
-        NotificationPreference.restore(1L, memberId, category, enabled)
+    private fun preference(category: NotificationCategory, enabled: Boolean) = NotificationPreference.restore(1L, memberId, category, enabled)
 
     /** AC19.1 — 설정을 바꾼 적 없는 회원도 두 항목이 켜짐으로 온다. */
     @Test

@@ -32,6 +32,5 @@ class MemberProfilePersistenceAdapter(
     }
 
     @Transactional(readOnly = true)
-    override fun findProfileImageKey(memberId: Long): String? =
-        profileRepository.findByMemberId(memberId)?.profileImageUrl
+    override fun findProfileImageKey(memberId: Long): String? = profileRepository.findByMemberId(memberId)?.profileImageUrl
 }

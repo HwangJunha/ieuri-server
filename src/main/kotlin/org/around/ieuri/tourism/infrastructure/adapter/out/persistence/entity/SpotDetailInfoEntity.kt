@@ -1,12 +1,12 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity
 
-import org.around.ieuri.common.persistence.DbSchema
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.Table
+import org.around.ieuri.common.persistence.DbSchema
 import java.time.Instant
 
 /** 관광지 이용안내 항목 JPA 엔티티. `display_order`가 표시 순서이자 upsert 키의 일부다. */

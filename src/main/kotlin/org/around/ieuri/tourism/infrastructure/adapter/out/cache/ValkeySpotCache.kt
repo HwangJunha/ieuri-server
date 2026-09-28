@@ -38,40 +38,32 @@ class ValkeySpotCache(
      * 호출자가 "미스"와 "부재를 확인함"을 구분한다. 부재를 미스로 오판하면 본문 없는 spot이
      * TTL 내내 매 조회마다 DB·upstream을 타게 된다.
      */
-    override fun getDetail(spotId: Long): CachedDetail? =
-        read(key("detail", spotId)) {
-            val cached = objectMapper.readValue(it, CachedSpotDetail::class.java)
-            CachedDetail(detail = cached.toDomain(), bodyAbsent = cached.bodyAbsent)
-        }
+    override fun getDetail(spotId: Long): CachedDetail? = read(key("detail", spotId)) {
+        val cached = objectMapper.readValue(it, CachedSpotDetail::class.java)
+        CachedDetail(detail = cached.toDomain(), bodyAbsent = cached.bodyAbsent)
+    }
 
-    override fun putDetail(spotId: Long, detail: SpotDetail) =
-        write(key("detail", spotId), CachedSpotDetail.from(detail))
+    override fun putDetail(spotId: Long, detail: SpotDetail) = write(key("detail", spotId), CachedSpotDetail.from(detail))
 
-    override fun putDetailAbsence(spotId: Long, fallback: SpotDetail) =
-        write(key("detail", spotId), CachedSpotDetail.from(fallback, bodyAbsent = true))
+    override fun putDetailAbsence(spotId: Long, fallback: SpotDetail) = write(key("detail", spotId), CachedSpotDetail.from(fallback, bodyAbsent = true))
 
-    override fun getGallery(spotId: Long): List<SpotImage>? =
-        read(key("gallery", spotId)) {
-            objectMapper.readValue(it, object : TypeReference<List<CachedSpotImage>>() {}).map(CachedSpotImage::toDomain)
-        }
+    override fun getGallery(spotId: Long): List<SpotImage>? = read(key("gallery", spotId)) {
+        objectMapper.readValue(it, object : TypeReference<List<CachedSpotImage>>() {}).map(CachedSpotImage::toDomain)
+    }
 
-    override fun putGallery(spotId: Long, gallery: List<SpotImage>) =
-        write(key("gallery", spotId), gallery.map(CachedSpotImage::from))
+    override fun putGallery(spotId: Long, gallery: List<SpotImage>) = write(key("gallery", spotId), gallery.map(CachedSpotImage::from))
 
-    override fun getIntro(spotId: Long, category: SpotCategory): CachedIntro? =
-        read(key("intro", spotId, category)) {
-            // 저장된 값이 "null"이면 값 없음으로 히트 — 미스와 구분한다.
-            CachedIntro(objectMapper.readValue(it, CachedSpotIntro::class.java)?.toDomain())
-        }
+    override fun getIntro(spotId: Long, category: SpotCategory): CachedIntro? = read(key("intro", spotId, category)) {
+        // 저장된 값이 "null"이면 값 없음으로 히트 — 미스와 구분한다.
+        CachedIntro(objectMapper.readValue(it, CachedSpotIntro::class.java)?.toDomain())
+    }
 
-    override fun putIntro(spotId: Long, category: SpotCategory, intro: SpotIntro?) =
-        write(key("intro", spotId, category), intro?.let(CachedSpotIntro::from))
+    override fun putIntro(spotId: Long, category: SpotCategory, intro: SpotIntro?) = write(key("intro", spotId, category), intro?.let(CachedSpotIntro::from))
 
-    override fun getInfoItems(spotId: Long, category: SpotCategory): List<SpotInfoItem>? =
-        read(key("info", spotId, category)) {
-            objectMapper.readValue(it, object : TypeReference<List<CachedSpotInfoItem>>() {})
-                .map(CachedSpotInfoItem::toDomain)
-        }
+    override fun getInfoItems(spotId: Long, category: SpotCategory): List<SpotInfoItem>? = read(key("info", spotId, category)) {
+        objectMapper.readValue(it, object : TypeReference<List<CachedSpotInfoItem>>() {})
+            .map(CachedSpotInfoItem::toDomain)
+    }
 
     override fun putInfoItems(
         spotId: Long,
@@ -80,13 +72,12 @@ class ValkeySpotCache(
     ) = write(key("info", spotId, category), items.map { CachedSpotInfoItem(it.name, it.text) })
 
     /** 캐시 조회 공통. 저장소·역직렬화 실패는 삼켜서 upstream 폴백(캐시는 정합성 소스가 아님). */
-    private fun <T> read(key: String, parse: (String) -> T): T? =
-        try {
-            redis.opsForValue().get(key)?.let(parse)
-        } catch (e: Exception) {
-            log.warn("관광지 캐시 조회 실패, upstream 폴백: {}", e.javaClass.simpleName)
-            null
-        }
+    private fun <T> read(key: String, parse: (String) -> T): T? = try {
+        redis.opsForValue().get(key)?.let(parse)
+    } catch (e: Exception) {
+        log.warn("관광지 캐시 조회 실패, upstream 폴백: {}", e.javaClass.simpleName)
+        null
+    }
 
     /** 캐시 저장 공통. 실패는 삼킨다(조회 실패로 이어지지 않게). */
     private fun write(key: String, value: Any?) {
@@ -105,12 +96,11 @@ class ValkeySpotCache(
      * 다른 의미가 담기게 되므로**, 옛 항목이 새 키로 잘못 읽히지 않도록 네임스페이스를 분리한다.
      * 남은 v1 항목은 TTL(24h)로 자연 소멸한다.
      */
-    private fun key(operation: String, spotId: Long, category: SpotCategory? = null) =
-        buildString {
-            append(KEY_PREFIX).append(operation).append(':')
-            category?.let { append(it.code).append(':') }
-            append(spotId)
-        }
+    private fun key(operation: String, spotId: Long, category: SpotCategory? = null) = buildString {
+        append(KEY_PREFIX).append(operation).append(':')
+        category?.let { append(it.code).append(':') }
+        append(spotId)
+    }
 
     private companion object {
         const val KEY_PREFIX = "ieuri:tourism:spot:v2:"

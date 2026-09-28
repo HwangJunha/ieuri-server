@@ -39,14 +39,13 @@ class ConversationQueryService(
         first: Int?,
         after: String?,
         memberId: Long,
-    ): CursorPage<ConversationView> =
-        conversationQueryPort.findConversations(
-            ConversationsSearch(
-                memberId = memberId,
-                first = clampPageSize(first, DEFAULT_CONVERSATIONS_PAGE_SIZE),
-                after = after,
-            ),
-        )
+    ): CursorPage<ConversationView> = conversationQueryPort.findConversations(
+        ConversationsSearch(
+            memberId = memberId,
+            first = clampPageSize(first, DEFAULT_CONVERSATIONS_PAGE_SIZE),
+            after = after,
+        ),
+    )
 
     override fun conversationMessages(
         conversationId: Long,
@@ -102,12 +101,10 @@ class ConversationQueryService(
     }
 
     /** 상한 초과는 오류가 아니라 절삭이다(POL-018). null이면 계약의 기본값이다. */
-    private fun clampPageSize(first: Int?, default: Int): Int =
-        (first ?: default).coerceIn(1, policy.maxPageSize)
+    private fun clampPageSize(first: Int?, default: Int): Int = (first ?: default).coerceIn(1, policy.maxPageSize)
 
     private companion object {
         const val DEFAULT_CONVERSATIONS_PAGE_SIZE = 20
         const val DEFAULT_MESSAGES_PAGE_SIZE = 30
     }
 }
-

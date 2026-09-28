@@ -29,13 +29,12 @@ class SpotCatalogSpatialQueryAdapter(
      * 자기 조인이 원본 수의 제곱으로 커진다. 실측상 행 수 조건을 통과하는 카탈로그는 한 자릿수다.
      */
     @Transactional(readOnly = true)
-    override fun findSplitCandidates(minOriginCount: Int, minDistanceMeters: Double): List<Long> =
-        jdbcTemplate.query(
-            SPLIT_CANDIDATE_SQL,
-            { rs, _ -> rs.getLong("catalog_id") },
-            minOriginCount,
-            minDistanceMeters,
-        )
+    override fun findSplitCandidates(minOriginCount: Int, minDistanceMeters: Double): List<Long> = jdbcTemplate.query(
+        SPLIT_CANDIDATE_SQL,
+        { rs, _ -> rs.getLong("catalog_id") },
+        minOriginCount,
+        minDistanceMeters,
+    )
 
     /**
      * 카탈로그에 매달린 원본 전부. 언어 순서로 읽는다 — 대표를 고르는 규칙이 그 순서이고,
@@ -46,28 +45,27 @@ class SpotCatalogSpatialQueryAdapter(
      * 전체가 롤백된다 — 그 한 건이 나머지를 막지 않도록 같은 조건으로 거른다.
      */
     @Transactional(readOnly = true)
-    override fun findOrigins(catalogId: Long): List<CatalogOrigin> =
-        jdbcTemplate.query(
-            ORIGIN_SQL,
-            { rs, _ ->
-                CatalogOrigin(
-                    spotId = rs.getLong("id"),
-                    language = DomainLocale.valueOf(rs.getString("language")),
-                    title = rs.getString("title"),
-                    address = rs.getString("address"),
-                    thumbnailImageUrl = rs.getString("thumbnail_image_url"),
-                    mapX = rs.getDouble("map_x"),
-                    mapY = rs.getDouble("map_y"),
-                    category = SpotCategory(rs.getString("category")),
-                    copyright = CopyrightType.valueOf(rs.getString("copyright")),
-                )
-            },
-            catalogId,
-            CatalogStandardValues.KOREA_LON_RANGE.start,
-            CatalogStandardValues.KOREA_LON_RANGE.endInclusive,
-            CatalogStandardValues.KOREA_LAT_RANGE.start,
-            CatalogStandardValues.KOREA_LAT_RANGE.endInclusive,
-        )
+    override fun findOrigins(catalogId: Long): List<CatalogOrigin> = jdbcTemplate.query(
+        ORIGIN_SQL,
+        { rs, _ ->
+            CatalogOrigin(
+                spotId = rs.getLong("id"),
+                language = DomainLocale.valueOf(rs.getString("language")),
+                title = rs.getString("title"),
+                address = rs.getString("address"),
+                thumbnailImageUrl = rs.getString("thumbnail_image_url"),
+                mapX = rs.getDouble("map_x"),
+                mapY = rs.getDouble("map_y"),
+                category = SpotCategory(rs.getString("category")),
+                copyright = CopyrightType.valueOf(rs.getString("copyright")),
+            )
+        },
+        catalogId,
+        CatalogStandardValues.KOREA_LON_RANGE.start,
+        CatalogStandardValues.KOREA_LON_RANGE.endInclusive,
+        CatalogStandardValues.KOREA_LAT_RANGE.start,
+        CatalogStandardValues.KOREA_LAT_RANGE.endInclusive,
+    )
 
     private companion object {
         /**

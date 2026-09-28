@@ -11,9 +11,9 @@ import org.around.ieuri.community.domain.vo.SpotPoint
 import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.BlockEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.CommentEntity
+import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostChipEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostLikeEntity
-import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostChipEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostPhotoEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostSpotEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostTagEntity
@@ -63,37 +63,32 @@ fun PostEntity.toDomain(
  * **자식(사진·태그·연결)은 붙이지 않는다.** 전부 글의 id가 정해진 뒤에야 만들 수 있어
  * 어댑터가 저장 후 따로 적재한다.
  */
-fun Post.toNewEntity(): PostEntity =
-    PostEntity(
-        authorId = authorId,
-        title = title,
-        body = body,
-        likeCount = likeCount,
-        commentCount = commentCount,
-        hidden = hidden,
-        edited = edited,
-        deletedAt = deletedAt,
-    )
+fun Post.toNewEntity(): PostEntity = PostEntity(
+    authorId = authorId,
+    title = title,
+    body = body,
+    likeCount = likeCount,
+    commentCount = commentCount,
+    hidden = hidden,
+    edited = edited,
+    deletedAt = deletedAt,
+)
 
 /** 배열 순서가 표시 순서다 — position에 그대로 싣는다. */
-fun Post.toPhotoEntities(postId: Long): List<PostPhotoEntity> =
-    photoKeys.mapIndexed { index, key ->
-        PostPhotoEntity(postId = postId, objectKey = key.value, position = index.toShort())
-    }
+fun Post.toPhotoEntities(postId: Long): List<PostPhotoEntity> = photoKeys.mapIndexed { index, key ->
+    PostPhotoEntity(postId = postId, objectKey = key.value, position = index.toShort())
+}
 
-fun Post.toTagEntities(postId: Long): List<PostTagEntity> =
-    tags.map { PostTagEntity(postId = postId, name = it.name, normalized = it.normalized) }
+fun Post.toTagEntities(postId: Long): List<PostTagEntity> = tags.map { PostTagEntity(postId = postId, name = it.name, normalized = it.normalized) }
 
-fun PostPhotoEntity.toPhotoKey(): PhotoObjectKey =
-    requireNotNull(PhotoObjectKey.parse(objectKey)) {
-        "적재된 사진 키(${objectKey})의 형식이 올바르지 않다."
-    }
+fun PostPhotoEntity.toPhotoKey(): PhotoObjectKey = requireNotNull(PhotoObjectKey.parse(objectKey)) {
+    "적재된 사진 키($objectKey)의 형식이 올바르지 않다."
+}
 
 fun PostTagEntity.toPostTag(): PostTag = PostTag.restore(name, normalized)
 
 /** 글의 id가 정해진 **뒤에** 만든다 — post_id가 PK다. */
-fun Post.toChipEntity(postId: Long): PostChipEntity =
-    PostChipEntity(postId = postId, category = category)
+fun Post.toChipEntity(postId: Long): PostChipEntity = PostChipEntity(postId = postId, category = category)
 
 /**
  * 장소는 선택이라 없으면 null이며, 그때는 연결 행 자체를 만들지 않는다.

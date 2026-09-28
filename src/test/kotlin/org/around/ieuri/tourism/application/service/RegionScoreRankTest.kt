@@ -66,14 +66,11 @@ class RegionScoreRankTest {
         metrics = metrics.mapValues { (_, value) -> RegionMetric(value) },
     )
 
-    private fun query(limit: Int = 10) =
-        RecommendedRegionQuery(origin = Coordinates(latitude = 37.5, longitude = 127.05), limit = limit)
+    private fun query(limit: Int = 10) = RecommendedRegionQuery(origin = Coordinates(latitude = 37.5, longitude = 127.05), limit = limit)
 
-    private fun RecommendedRegionItemView.rankOf(factor: RegionScoreFactor) =
-        scores.single { it.score.factor == factor }.rank
+    private fun RecommendedRegionItemView.rankOf(factor: RegionScoreFactor) = scores.single { it.score.factor == factor }.rank
 
-    private fun RecommendedRegionItemView.valueOf(factor: RegionScoreFactor) =
-        scores.single { it.score.factor == factor }.score.value
+    private fun RecommendedRegionItemView.valueOf(factor: RegionScoreFactor) = scores.single { it.score.factor == factor }.score.value
 
     @Test
     fun `순위 1위는 항목 값이 가장 높은 지역이다`() {

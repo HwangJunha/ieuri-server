@@ -30,18 +30,17 @@ class RecommendedSpotsResolver(
         @InputArgument radiusMeters: Int?,
         @InputArgument categories: List<String>?,
         @InputArgument first: Int?,
-    ): List<GqlSpot> =
-        recommendedSpotsUseCase.recommendedSpots(
-            RecommendedSpotsQuery(
-                latitude = latitude,
-                longitude = longitude,
-                radiusMeters = radiusMeters ?: DEFAULT_RADIUS_METERS,
-                categories = toCategorySelection(categories),
-                first = first ?: DEFAULT_FIRST,
-            ),
-            locale = dfe.domainLocale(),
-            memberId = currentMemberProvider.requireMemberId(),
-        ).map { it.toGql() }
+    ): List<GqlSpot> = recommendedSpotsUseCase.recommendedSpots(
+        RecommendedSpotsQuery(
+            latitude = latitude,
+            longitude = longitude,
+            radiusMeters = radiusMeters ?: DEFAULT_RADIUS_METERS,
+            categories = toCategorySelection(categories),
+            first = first ?: DEFAULT_FIRST,
+        ),
+        locale = dfe.domainLocale(),
+        memberId = currentMemberProvider.requireMemberId(),
+    ).map { it.toGql() }
 
     private companion object {
         const val DEFAULT_RADIUS_METERS = 20_000

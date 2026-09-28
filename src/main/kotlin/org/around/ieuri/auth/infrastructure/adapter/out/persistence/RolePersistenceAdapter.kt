@@ -44,17 +44,16 @@ class RolePersistenceAdapter(
     }
 
     /** 역할별 권한 코드를 한 번에 조회한다(역할별 N+1 회피). */
-    private fun permissionCodesByRoleIds(roleIds: Collection<Long>): Map<Long, List<String>> =
-        queryFactory
-            .select(rolePermission.roleId, permission.code)
-            .from(rolePermission)
-            .join(permission).on(permission.id.eq(rolePermission.permissionId))
-            .where(rolePermission.roleId.`in`(roleIds))
-            .fetch()
-            .groupBy(
-                { requireNotNull(it.get(rolePermission.roleId)) },
-                { requireNotNull(it.get(permission.code)) },
-            )
+    private fun permissionCodesByRoleIds(roleIds: Collection<Long>): Map<Long, List<String>> = queryFactory
+        .select(rolePermission.roleId, permission.code)
+        .from(rolePermission)
+        .join(permission).on(permission.id.eq(rolePermission.permissionId))
+        .where(rolePermission.roleId.`in`(roleIds))
+        .fetch()
+        .groupBy(
+            { requireNotNull(it.get(rolePermission.roleId)) },
+            { requireNotNull(it.get(permission.code)) },
+        )
 
     override fun assignRoleToMember(memberId: Long, roleCode: String): Boolean {
         val roleId = roleRepository.findByCode(roleCode)?.id ?: return false

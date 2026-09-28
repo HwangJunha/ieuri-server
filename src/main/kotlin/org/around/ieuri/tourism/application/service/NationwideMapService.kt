@@ -72,12 +72,10 @@ class NationwideMapService(
     }
 
     @Transactional(readOnly = true)
-    override fun allCellImages(): Map<Long, CellImageView> =
-        cellImageQueryPort.findAllRepresentativeImages()
+    override fun allCellImages(): Map<Long, CellImageView> = cellImageQueryPort.findAllRepresentativeImages()
 
     @Transactional(readOnly = true)
-    override fun cellSpots(cellId: Long, first: Int, locale: DomainLocale): List<CellSpotView> =
-        // 상한 초과는 오류가 아니라 절삭이다(POL-018).
+    override fun cellSpots(cellId: Long, first: Int, locale: DomainLocale): List<CellSpotView> = // 상한 초과는 오류가 아니라 절삭이다(POL-018).
         mapCellQueryPort.findCellSpots(
             cellId = cellId,
             language = locale,
@@ -115,8 +113,7 @@ class NationwideMapService(
     }
 
     /** 비인증이면 빈 집합이다 — 모든 칸이 미방문으로 나온다(R6). */
-    private fun visitedDistrictCodes(memberId: Long?): Set<String> =
-        memberId?.let { districtVisitQueryPort.findVisitedDistrictCodes(it) } ?: emptySet()
+    private fun visitedDistrictCodes(memberId: Long?): Set<String> = memberId?.let { districtVisitQueryPort.findVisitedDistrictCodes(it) } ?: emptySet()
 
     /**
      * 회원이 방문한 **칸** id. 시군구 하나만 방문해도 그 칸은 방문이다.

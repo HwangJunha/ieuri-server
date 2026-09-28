@@ -1,10 +1,10 @@
 package org.around.ieuri.auth.infrastructure.config
 
-import java.util.concurrent.Executor
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.scheduling.annotation.EnableAsync
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
+import java.util.concurrent.Executor
 
 /**
  * 접속기록 저장 전용 executor. alarm의 푸시, community의 조회수와 같은 관례다.

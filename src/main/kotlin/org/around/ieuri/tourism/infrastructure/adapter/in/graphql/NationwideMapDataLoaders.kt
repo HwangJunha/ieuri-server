@@ -36,8 +36,7 @@ class CellImageDataLoader(
     private val nationwideMapUseCase: NationwideMapUseCase,
 ) : MappedBatchLoader<Long, CellImageView> {
 
-    override fun load(cellIds: Set<Long>): CompletionStage<Map<Long, CellImageView>> =
-        // 부재 키를 채우지 않는다 — 이미지 없는 칸은 필드가 null이어야 한다.
+    override fun load(cellIds: Set<Long>): CompletionStage<Map<Long, CellImageView>> = // 부재 키를 채우지 않는다 — 이미지 없는 칸은 필드가 null이어야 한다.
         CompletableFuture.completedFuture(nationwideMapUseCase.allCellImages())
 
     companion object {

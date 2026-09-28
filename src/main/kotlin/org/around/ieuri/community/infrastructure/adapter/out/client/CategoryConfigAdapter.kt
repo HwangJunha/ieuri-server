@@ -21,8 +21,7 @@ class CategoryConfigAdapter(
 ) : CategoryConfigPort {
 
     /** 언어·카테고리를 문자열로 주고받는다 — tourism의 도메인 타입을 이 도메인이 알지 않는다. */
-    override fun findCategories(appKey: AppKey, language: ContentLanguage): List<CommunityChipView> =
-        spotQueryUseCase
-            .availableCategoryCodes(appKey, language.name)
-            .mapNotNull { it.toChipViewOrNull() }
+    override fun findCategories(appKey: AppKey, language: ContentLanguage): List<CommunityChipView> = spotQueryUseCase
+        .availableCategoryCodes(appKey, language.name)
+        .mapNotNull { it.toChipViewOrNull() }
 }

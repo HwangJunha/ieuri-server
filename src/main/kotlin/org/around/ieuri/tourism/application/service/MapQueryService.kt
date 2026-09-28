@@ -133,8 +133,7 @@ class MapQueryService(
         return SeoulCongestionView(areas = areas, degraded = degraded, staleSince = staleSince)
     }
 
-    override fun seoulCongestionAreas(locale: DomainLocale): List<CongestionAreaBoundaryView> =
-        congestionAreaQueryPort.findAllBoundaries(locale)
+    override fun seoulCongestionAreas(locale: DomainLocale): List<CongestionAreaBoundaryView> = congestionAreaQueryPort.findAllBoundaries(locale)
 
     /**
      * 조회 대상 구역과 그 이름. [areaIds]가 우선하고, 없으면 bbox에 걸치는 구역을 찾는다.
@@ -212,11 +211,10 @@ class MapQueryService(
      * 캐시가 비어 있으면 행사도 비어 있다. 혼잡도를 한 번이라도 조회한 구역은 같은 호출로
      * 행사까지 받아 두므로(seoulOpenData 1콜에 세 블록) 실사용에서는 대개 채워진다.
      */
-    private fun cachedEventsWithin(bounds: MapBounds): List<CulturalEventView> =
-        congestionAreaQueryPort.findAreaCodesWithin(bounds)
-            .mapNotNull { cachePort.get(it)?.snapshot?.events }
-            .flatten()
-            .distinctBy { it.id }
+    private fun cachedEventsWithin(bounds: MapBounds): List<CulturalEventView> = congestionAreaQueryPort.findAreaCodesWithin(bounds)
+        .mapNotNull { cachePort.get(it)?.snapshot?.events }
+        .flatten()
+        .distinctBy { it.id }
 
     /** 캐시·업스트림 해소 결과. [stale]은 만료된 캐시를 돌려주는 중이라는 뜻이다. */
     private data class ResolvedSnapshot(

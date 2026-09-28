@@ -4,8 +4,8 @@ import org.around.ieuri.alarm.application.port.`in`.command.AlarmMemberDataErase
 import org.around.ieuri.auth.domain.event.MemberWithdrawn
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
-import org.springframework.transaction.event.TransactionalEventListener
 import org.springframework.transaction.event.TransactionPhase
+import org.springframework.transaction.event.TransactionalEventListener
 
 /**
  * 탈퇴한 회원의 기기 토큰과 수신 설정을 지운다(SPEC-0028 R3, POL-009).

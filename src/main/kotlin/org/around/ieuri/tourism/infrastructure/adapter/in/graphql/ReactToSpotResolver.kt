@@ -1,17 +1,17 @@
 package org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql
 
 import com.netflix.graphql.dgs.DgsComponent
+import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsMutation
 import com.netflix.graphql.dgs.InputArgument
-import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
-import org.around.ieuri.tourism.application.command.ReactToSpotCommand
-import org.around.ieuri.tourism.infrastructure.locale.domainLocale
-import org.around.ieuri.tourism.application.port.`in`.command.ReactToSpotUseCase
-import org.around.ieuri.tourism.domain.vo.ReactionType
-import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.common.graphql.generated.types.ReactToSpotInput
 import org.around.ieuri.common.graphql.generated.types.ReactToSpotPayload
 import org.around.ieuri.common.graphql.generated.types.UserError
+import org.around.ieuri.common.security.CurrentMemberProvider
+import org.around.ieuri.tourism.application.command.ReactToSpotCommand
+import org.around.ieuri.tourism.application.port.`in`.command.ReactToSpotUseCase
+import org.around.ieuri.tourism.domain.vo.ReactionType
+import org.around.ieuri.tourism.infrastructure.locale.domainLocale
 
 /**
  * 좋아요/싫어요 기록 GraphQL 뮤테이션 리졸버(인바운드 어댑터, 쓰기). 언어는 Accept-Language 헤더에서,
@@ -49,6 +49,5 @@ class ReactToSpotResolver(
         ReactToSpotPayload(success = true, userErrors = emptyList())
     }
 
-    private fun failure(userErrors: List<UserError>): ReactToSpotPayload =
-        ReactToSpotPayload(success = false, userErrors = userErrors)
+    private fun failure(userErrors: List<UserError>): ReactToSpotPayload = ReactToSpotPayload(success = false, userErrors = userErrors)
 }

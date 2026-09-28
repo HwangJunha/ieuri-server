@@ -1,8 +1,8 @@
 package org.around.ieuri.alarm.domain.aggregate
 
-import java.time.Instant
 import org.around.ieuri.alarm.domain.vo.AlarmLocale
 import org.around.ieuri.alarm.domain.vo.DevicePlatform
+import java.time.Instant
 
 /**
  * 한 기기의 푸시 토큰(SPEC-0028 R1).

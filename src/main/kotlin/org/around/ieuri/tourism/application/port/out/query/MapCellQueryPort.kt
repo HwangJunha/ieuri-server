@@ -31,7 +31,6 @@ interface MapCellQueryPort {
      */
     fun findCellDistrictsIn(cellIds: Collection<Long>): List<MapCellDistrictRow>
 
-
     /**
      * 칸에 속한 장소(R11). 좋아요 수 내림차순, 같은 수는 id 오름차순이다.
      *
@@ -42,7 +41,6 @@ interface MapCellQueryPort {
         language: DomainLocale,
         limit: Int,
     ): List<CellSpotView>
-
 }
 
 /**

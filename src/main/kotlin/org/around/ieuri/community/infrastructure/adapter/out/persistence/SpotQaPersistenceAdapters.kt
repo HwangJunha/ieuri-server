@@ -101,9 +101,8 @@ class SpotQuestionPersistenceAdapter(
         repository.deleteById(questionId)
     }
 
-    private fun photoKeysOf(ownerType: SpotQaPhotoOwnerType, ownerId: Long) =
-        photoRepository.findByOwnerTypeAndOwnerIdOrderByPositionAsc(ownerType, ownerId)
-            .map { it.toPhotoKey() }
+    private fun photoKeysOf(ownerType: SpotQaPhotoOwnerType, ownerId: Long) = photoRepository.findByOwnerTypeAndOwnerIdOrderByPositionAsc(ownerType, ownerId)
+        .map { it.toPhotoKey() }
 }
 
 @Component
@@ -250,37 +249,33 @@ class SpotQaModerationAdapter(
     private val reply = QSpotAnswerReplyEntity.spotAnswerReplyEntity
 
     @Transactional(readOnly = true)
-    override fun questionExists(questionId: Long): Boolean =
-        queryFactory
-            .selectOne()
-            .from(question)
-            .where(question.id.eq(questionId), question.deletedAt.isNull)
-            .fetchFirst() != null
+    override fun questionExists(questionId: Long): Boolean = queryFactory
+        .selectOne()
+        .from(question)
+        .where(question.id.eq(questionId), question.deletedAt.isNull)
+        .fetchFirst() != null
 
     @Transactional(readOnly = true)
-    override fun answerExists(answerId: Long): Boolean =
-        queryFactory
-            .selectOne()
-            .from(answer)
-            .where(answer.id.eq(answerId), answer.deletedAt.isNull)
-            .fetchFirst() != null
+    override fun answerExists(answerId: Long): Boolean = queryFactory
+        .selectOne()
+        .from(answer)
+        .where(answer.id.eq(answerId), answer.deletedAt.isNull)
+        .fetchFirst() != null
 
     @Transactional(readOnly = true)
-    override fun replyExists(replyId: Long): Boolean =
-        queryFactory
-            .selectOne()
-            .from(reply)
-            .where(reply.id.eq(replyId), reply.deletedAt.isNull)
-            .fetchFirst() != null
+    override fun replyExists(replyId: Long): Boolean = queryFactory
+        .selectOne()
+        .from(reply)
+        .where(reply.id.eq(replyId), reply.deletedAt.isNull)
+        .fetchFirst() != null
 
     /** 이미 숨겨져 있으면 조건절에서 걸러져 0건이 갱신되고 false다 — 중복 처리를 막는다. */
     @Transactional
-    override fun hideQuestion(questionId: Long): Boolean =
-        queryFactory
-            .update(question)
-            .set(question.hidden, true)
-            .where(question.id.eq(questionId), question.deletedAt.isNull, question.hidden.isFalse)
-            .execute() > 0
+    override fun hideQuestion(questionId: Long): Boolean = queryFactory
+        .update(question)
+        .set(question.hidden, true)
+        .where(question.id.eq(questionId), question.deletedAt.isNull, question.hidden.isFalse)
+        .execute() > 0
 
     /**
      * 답변을 숨기고 **그 답변이 달린 질문 id를 돌려준다** — 호출자가 answerCount를 줄여야
@@ -307,10 +302,9 @@ class SpotQaModerationAdapter(
     }
 
     @Transactional
-    override fun hideReply(replyId: Long): Boolean =
-        queryFactory
-            .update(reply)
-            .set(reply.hidden, true)
-            .where(reply.id.eq(replyId), reply.deletedAt.isNull, reply.hidden.isFalse)
-            .execute() > 0
+    override fun hideReply(replyId: Long): Boolean = queryFactory
+        .update(reply)
+        .set(reply.hidden, true)
+        .where(reply.id.eq(replyId), reply.deletedAt.isNull, reply.hidden.isFalse)
+        .execute() > 0
 }

@@ -64,32 +64,30 @@ class ConversationMutationResolver(
     fun sendMessage(
         @InputArgument input: SendMessageInput,
         dfe: DgsDataFetchingEnvironment,
-    ): SendMessagePayload =
-        withCommunityUserErrors(
-            onError = { SendMessagePayload(success = false, userErrors = it, messageId = null) },
-        ) {
-            val memberId = currentMemberProvider.requireMemberId()
-            val messageId = conversationCommandUseCase.sendMessage(
-                input.toCommand(),
-                memberId,
-                dfe.contentLanguage(),
-            )
-            SendMessagePayload(success = true, userErrors = emptyList(), messageId = messageId)
-        }
+    ): SendMessagePayload = withCommunityUserErrors(
+        onError = { SendMessagePayload(success = false, userErrors = it, messageId = null) },
+    ) {
+        val memberId = currentMemberProvider.requireMemberId()
+        val messageId = conversationCommandUseCase.sendMessage(
+            input.toCommand(),
+            memberId,
+            dfe.contentLanguage(),
+        )
+        SendMessagePayload(success = true, userErrors = emptyList(), messageId = messageId)
+    }
 
     /** 수신자가 없어도 성공한다(AC10-2) — 받을 사람이 없는 것은 실패가 아니다. */
     @DgsMutation
-    fun notifyTyping(@InputArgument input: NotifyTypingInput): NotifyTypingPayload =
-        withCommunityUserErrors(
-            onError = { NotifyTypingPayload(success = false, userErrors = it) },
-        ) {
-            val memberId = currentMemberProvider.requireMemberId()
-            conversationCommandUseCase.notifyTyping(
-                NotifyTypingCommand(input.conversationId),
-                memberId,
-            )
-            NotifyTypingPayload(success = true, userErrors = emptyList())
-        }
+    fun notifyTyping(@InputArgument input: NotifyTypingInput): NotifyTypingPayload = withCommunityUserErrors(
+        onError = { NotifyTypingPayload(success = false, userErrors = it) },
+    ) {
+        val memberId = currentMemberProvider.requireMemberId()
+        conversationCommandUseCase.notifyTyping(
+            NotifyTypingCommand(input.conversationId),
+            memberId,
+        )
+        NotifyTypingPayload(success = true, userErrors = emptyList())
+    }
 
     /**
      * 읽음 처리. **조회가 아니라 명시적 호출로만 읽음이 된다** — 목록 미리보기나 알림에서
@@ -98,26 +96,24 @@ class ConversationMutationResolver(
     @DgsMutation
     fun markConversationRead(
         @InputArgument input: MarkConversationReadInput,
-    ): MarkConversationReadPayload =
-        withCommunityUserErrors(
-            onError = { MarkConversationReadPayload(success = false, userErrors = it, unreadCount = 0) },
-        ) {
-            val memberId = currentMemberProvider.requireMemberId()
-            val remaining = conversationCommandUseCase.markConversationRead(input.toCommand(), memberId)
-            MarkConversationReadPayload(
-                success = true,
-                userErrors = emptyList(),
-                unreadCount = remaining,
-            )
-        }
+    ): MarkConversationReadPayload = withCommunityUserErrors(
+        onError = { MarkConversationReadPayload(success = false, userErrors = it, unreadCount = 0) },
+    ) {
+        val memberId = currentMemberProvider.requireMemberId()
+        val remaining = conversationCommandUseCase.markConversationRead(input.toCommand(), memberId)
+        MarkConversationReadPayload(
+            success = true,
+            userErrors = emptyList(),
+            unreadCount = remaining,
+        )
+    }
 
     @DgsMutation
-    fun reportMessages(@InputArgument input: ReportMessagesInput): ReportMessagesPayload =
-        withCommunityUserErrors(
-            onError = { ReportMessagesPayload(success = false, userErrors = it) },
-        ) {
-            val memberId = currentMemberProvider.requireMemberId()
-            messageReportCommandUseCase.reportMessages(input.toCommand(), memberId)
-            ReportMessagesPayload(success = true, userErrors = emptyList())
-        }
+    fun reportMessages(@InputArgument input: ReportMessagesInput): ReportMessagesPayload = withCommunityUserErrors(
+        onError = { ReportMessagesPayload(success = false, userErrors = it) },
+    ) {
+        val memberId = currentMemberProvider.requireMemberId()
+        messageReportCommandUseCase.reportMessages(input.toCommand(), memberId)
+        ReportMessagesPayload(success = true, userErrors = emptyList())
+    }
 }

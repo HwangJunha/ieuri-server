@@ -179,8 +179,7 @@ class LayeredArchitectureTest {
         // 호출 대상 타입 → 그 타입 자신과, 그 타입을 구현한 클래스들.
         // 인터페이스로 호출하므로 구현으로 되짚어야 하고, PushDispatchStore처럼 인터페이스가
         // 없는 빈은 자기 자신으로 잡힌다.
-        fun implementationsOf(target: JavaClass): List<JavaClass> =
-            classes.filter { it == target || it.allRawInterfaces.contains(target) }
+        fun implementationsOf(target: JavaClass): List<JavaClass> = classes.filter { it == target || it.allRawInterfaces.contains(target) }
 
         // 리스너에서 도달 가능한 우리 코드 전부. 방문 집합으로 순환을 끊는다.
         val reachable = mutableSetOf<JavaClass>()

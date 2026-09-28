@@ -58,15 +58,16 @@ class TourApiSyncClientTest {
         showflag = showflag,
     )
 
-    private fun response(items: List<TourApiResponse.Item>, totalCount: Int = items.size) =
-        TourApiResponse(
-            TourApiResponse.Response(
-                body = TourApiResponse.Body(
-                    totalCount = totalCount, numOfRows = 1000, pageNo = 1,
-                    items = TourApiResponse.Items(item = items),
-                ),
+    private fun response(items: List<TourApiResponse.Item>, totalCount: Int = items.size) = TourApiResponse(
+        TourApiResponse.Response(
+            body = TourApiResponse.Body(
+                totalCount = totalCount,
+                numOfRows = 1000,
+                pageNo = 1,
+                items = TourApiResponse.Items(item = items),
             ),
-        )
+        ),
+    )
 
     @Test
     fun `이미지 URL을 https로 정규화해 적재한다`() {

@@ -80,12 +80,11 @@ class SeoulOpenDataClient(
      * 장소는 **국문명**으로 지정한다(장소코드도 되지만 우리는 이름을 쓴다). 경로 세그먼트라
      * 인코딩이 필요하다 — 구역명에 `·`과 공백이 들어간다.
      */
-    private fun uriFor(areaName: String) =
-        UriComponentsBuilder.fromUriString(properties.baseUrl)
-            .pathSegment(properties.apiKey, "json", SERVICE, "1", "1", areaName)
-            .build()
-            .encode()
-            .toUri()
+    private fun uriFor(areaName: String) = UriComponentsBuilder.fromUriString(properties.baseUrl)
+        .pathSegment(properties.apiKey, "json", SERVICE, "1", "1", areaName)
+        .build()
+        .encode()
+        .toUri()
 
     private companion object {
         /** 인구·상권·문화행사 세 블록을 한 번에 주는 오퍼레이션. */

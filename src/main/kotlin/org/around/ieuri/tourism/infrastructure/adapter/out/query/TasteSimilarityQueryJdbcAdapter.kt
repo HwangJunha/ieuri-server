@@ -79,5 +79,4 @@ class TasteSimilarityQueryJdbcAdapter(
             WHERE e.model = ? AND t.language = ? AND $filter
         """.trimIndent()
     }
-
 }

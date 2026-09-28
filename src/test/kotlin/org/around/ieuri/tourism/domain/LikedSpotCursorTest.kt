@@ -80,6 +80,5 @@ class LikedSpotCursorTest {
         }
     }
 
-    private fun encodeRaw(raw: String): String =
-        Base64.getUrlEncoder().withoutPadding().encodeToString(raw.toByteArray(StandardCharsets.UTF_8))
+    private fun encodeRaw(raw: String): String = Base64.getUrlEncoder().withoutPadding().encodeToString(raw.toByteArray(StandardCharsets.UTF_8))
 }

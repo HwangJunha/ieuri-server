@@ -31,16 +31,14 @@ class ObservabilityConfig {
         // `No qualifying bean of type ...ManagementServerProperties` 로 부팅이 실패한다.
         // 속성은 그와 무관하게 읽히므로 값으로 받는다.
         @Value("\${management.endpoints.web.base-path:/actuator}") basePath: String,
-    ): ObservationPredicate {
-        return ObservationPredicate { name, context ->
-            if (name == "http.server.requests" && context is ServerRequestObservationContext) {
-                // carrier 는 상위 타입(ReceiverContext)의 제네릭이라 Kotlin 에서 nullable 로
-                // 보인다. 값을 얻지 못하면 판단할 근거가 없으므로 남기는 쪽을 택한다 —
-                // 관측을 잃는 것보다 actuator 가 섞이는 편이 덜 나쁘다.
-                context.carrier?.requestURI?.startsWith(basePath) != true
-            } else {
-                true
-            }
+    ): ObservationPredicate = ObservationPredicate { name, context ->
+        if (name == "http.server.requests" && context is ServerRequestObservationContext) {
+            // carrier 는 상위 타입(ReceiverContext)의 제네릭이라 Kotlin 에서 nullable 로
+            // 보인다. 값을 얻지 못하면 판단할 근거가 없으므로 남기는 쪽을 택한다 —
+            // 관측을 잃는 것보다 actuator 가 섞이는 편이 덜 나쁘다.
+            context.carrier?.requestURI?.startsWith(basePath) != true
+        } else {
+            true
         }
     }
 

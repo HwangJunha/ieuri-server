@@ -47,8 +47,7 @@ class FestivalSyncTaskletTest {
         festivalType = null,
     )
 
-    private fun page(records: List<SyncFestivalCommand>, totalCount: Int, dropped: Int = 0) =
-        FestivalSyncPage(records = records, totalCount = totalCount, droppedCount = dropped)
+    private fun page(records: List<SyncFestivalCommand>, totalCount: Int, dropped: Int = 0) = FestivalSyncPage(records = records, totalCount = totalCount, droppedCount = dropped)
 
     /** 실제 StepExecution — runDate 잡 파라미터가 실려 있어야 Step이 실행일을 읽을 수 있다. */
     private fun stepExecution(language: DomainLocale = DomainLocale.KO): StepExecution {
@@ -62,17 +61,15 @@ class FestivalSyncTaskletTest {
         )
     }
 
-    private fun run(tasklet: FestivalSyncTasklet, stepExecution: StepExecution): RepeatStatus? =
-        tasklet.execute(StepContribution(stepExecution), ChunkContext(StepContext(stepExecution)))
+    private fun run(tasklet: FestivalSyncTasklet, stepExecution: StepExecution): RepeatStatus? = tasklet.execute(StepContribution(stepExecution), ChunkContext(StepContext(stepExecution)))
 
-    private fun tasklet(language: DomainLocale = DomainLocale.KO, pageSize: Int = 1_000) =
-        FestivalSyncTasklet(
-            language = language,
-            syncPort = syncPort,
-            storePort = storePort,
-            upsertPort = upsertPort,
-            pageSize = pageSize,
-        )
+    private fun tasklet(language: DomainLocale = DomainLocale.KO, pageSize: Int = 1_000) = FestivalSyncTasklet(
+        language = language,
+        syncPort = syncPort,
+        storePort = storePort,
+        upsertPort = upsertPort,
+        pageSize = pageSize,
+    )
 
     // ---------- 수집 (R-3) ----------
 

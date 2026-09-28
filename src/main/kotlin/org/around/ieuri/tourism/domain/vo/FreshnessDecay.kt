@@ -21,10 +21,8 @@ data class FreshnessDecay(
     }
 
     /** 경과 일수에 대한 감쇠 계수(0~1]. 미래 날짜(음수 경과)도 유예 구간과 같이 1.0이다. */
-    fun factor(ageDays: Long): Double =
-        if (ageDays <= plateauDays) 1.0 else 0.5.pow((ageDays - plateauDays) / halfLifeDays)
+    fun factor(ageDays: Long): Double = if (ageDays <= plateauDays) 1.0 else 0.5.pow((ageDays - plateauDays) / halfLifeDays)
 
     /** 점수에 계수를 곱한 새 점수. 항목은 그대로 유지된다 — 감쇠는 값만 낮춘다. */
-    fun apply(score: RegionScore, ageDays: Long): RegionScore =
-        score.copy(value = score.value * factor(ageDays))
+    fun apply(score: RegionScore, ageDays: Long): RegionScore = score.copy(value = score.value * factor(ageDays))
 }

@@ -1,10 +1,10 @@
 package org.around.ieuri.alarm.domain
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
 import org.around.ieuri.alarm.domain.vo.NotificationCategory
 import org.around.ieuri.alarm.domain.vo.NotificationType
 import org.around.ieuri.alarm.domain.vo.PushDestination
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
 /**
  * FCM 데이터 페이로드(SPEC-0028 R11).

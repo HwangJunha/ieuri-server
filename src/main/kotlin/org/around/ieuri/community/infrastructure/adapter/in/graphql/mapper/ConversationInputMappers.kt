@@ -19,8 +19,7 @@ import org.around.ieuri.community.domain.vo.ReportReason
  * 호출자(memberId)는 인증 컨텍스트에서 오므로 커맨드에 담지 않는다.
  */
 
-fun StartConversationInput.toCommand(): StartConversationCommand =
-    StartConversationCommand(counterpartMemberId = counterpartMemberId)
+fun StartConversationInput.toCommand(): StartConversationCommand = StartConversationCommand(counterpartMemberId = counterpartMemberId)
 
 /**
  * 메시지 전송. **[SendMessageInput.sourceAnswerId]는 선택이다** — 없으면 인용 없는 일반

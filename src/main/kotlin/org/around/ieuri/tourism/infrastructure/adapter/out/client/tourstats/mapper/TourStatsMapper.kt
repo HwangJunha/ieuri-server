@@ -80,16 +80,13 @@ fun TourStatsDemandIntensityItem.toSyncCommandOrNull(): SyncDemandIntensityComma
     )
 }
 
-private fun String?.toLocalDateOrNull(): LocalDate? =
-    this?.trim()?.takeIf { it.isNotEmpty() }?.let {
-        runCatching { LocalDate.parse(it, DATE_FORMAT) }.getOrNull()
-    }
+private fun String?.toLocalDateOrNull(): LocalDate? = this?.trim()?.takeIf { it.isNotEmpty() }?.let {
+    runCatching { LocalDate.parse(it, DATE_FORMAT) }.getOrNull()
+}
 
 /** `"202601"` → `2026-01-01`. 컬럼이 date라 해당 월 1일로 정규화한다(V44 주석). */
-private fun String?.toBaseMonthOrNull(): LocalDate? =
-    this?.trim()?.takeIf { it.isNotEmpty() }?.let {
-        runCatching { java.time.YearMonth.parse(it, MONTH_FORMAT).atDay(1) }.getOrNull()
-    }
+private fun String?.toBaseMonthOrNull(): LocalDate? = this?.trim()?.takeIf { it.isNotEmpty() }?.let {
+    runCatching { java.time.YearMonth.parse(it, MONTH_FORMAT).atDay(1) }.getOrNull()
+}
 
-private fun String?.toBigDecimalOrNull(): BigDecimal? =
-    this?.trim()?.takeIf { it.isNotEmpty() }?.let { runCatching { BigDecimal(it) }.getOrNull() }
+private fun String?.toBigDecimalOrNull(): BigDecimal? = this?.trim()?.takeIf { it.isNotEmpty() }?.let { runCatching { BigDecimal(it) }.getOrNull() }

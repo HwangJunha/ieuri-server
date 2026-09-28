@@ -62,18 +62,17 @@ fun SpotAnswer.toNewEntity(): SpotAnswerEntity = SpotAnswerEntity(
     deletedAt = deletedAt,
 )
 
-fun SpotAnswerReplyEntity.toDomain(photoKeys: List<PhotoObjectKey>): SpotAnswerReply =
-    SpotAnswerReply.restore(
-        id = requireNotNull(id) { "적재된 답글에는 id가 있어야 한다." },
-        answerId = answerId,
-        catalogId = catalogId,
-        authorId = authorId,
-        body = body,
-        photoKeys = photoKeys,
-        hidden = hidden,
-        deletedAt = deletedAt,
-        createdAt = requireNotNull(createdAt) { "적재된 답글에는 createdAt이 있어야 한다." },
-    )
+fun SpotAnswerReplyEntity.toDomain(photoKeys: List<PhotoObjectKey>): SpotAnswerReply = SpotAnswerReply.restore(
+    id = requireNotNull(id) { "적재된 답글에는 id가 있어야 한다." },
+    answerId = answerId,
+    catalogId = catalogId,
+    authorId = authorId,
+    body = body,
+    photoKeys = photoKeys,
+    hidden = hidden,
+    deletedAt = deletedAt,
+    createdAt = requireNotNull(createdAt) { "적재된 답글에는 createdAt이 있어야 한다." },
+)
 
 fun SpotAnswerReply.toNewEntity(): SpotAnswerReplyEntity = SpotAnswerReplyEntity(
     answerId = answerId,
@@ -106,7 +105,6 @@ fun List<PhotoObjectKey>.toPhotoEntities(
  * 적재된 사진 키. **파싱되지 않으면 조용히 버리지 않고 실패시킨다** — 적재 시점에 형식을
  * 통과한 값이므로 파싱 실패는 데이터 손상이며, 넘기면 사진 한 장이 이유 없이 사라진다.
  */
-fun SpotQaPhotoEntity.toPhotoKey(): PhotoObjectKey =
-    requireNotNull(PhotoObjectKey.parse(objectKey)) {
-        "적재된 사진 키(${objectKey})의 형식이 올바르지 않다."
-    }
+fun SpotQaPhotoEntity.toPhotoKey(): PhotoObjectKey = requireNotNull(PhotoObjectKey.parse(objectKey)) {
+    "적재된 사진 키($objectKey)의 형식이 올바르지 않다."
+}

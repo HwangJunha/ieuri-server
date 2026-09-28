@@ -7,9 +7,9 @@ import org.around.ieuri.tourism.application.port.out.client.NearbySpotQuery
 import org.around.ieuri.tourism.application.port.out.client.NearbySpotResult
 import org.around.ieuri.tourism.application.port.out.client.SpotDetailQuery
 import org.around.ieuri.tourism.application.port.out.client.TourInfoPort
+import org.around.ieuri.tourism.application.port.out.query.CategoryExternalMappingPort
 import org.around.ieuri.tourism.domain.aggregate.SpotDetail
 import org.around.ieuri.tourism.domain.vo.DomainLocale
-import org.around.ieuri.tourism.application.port.out.query.CategoryExternalMappingPort
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.tourism.domain.vo.SpotImage
 import org.around.ieuri.tourism.domain.vo.SpotInfoItem
@@ -108,13 +108,12 @@ class TourApiClient(
      * HTTP 429만 초당 한도로 가르고 나머지는 전부 장애다 — 4xx도 포함되는 것은 배치 관점에서
      * 결론(넘어간다)이 같기 때문이다. **URI는 로그에 싣지 않는다**(serviceKey 누출).
      */
-    private fun <T : Any> call(uri: URI, type: Class<T>): T =
-        try {
-            tourApiRestClient.get().uri(uri).retrieve().body(type)
-                ?: throw UpstreamUnavailableException("TourAPI 응답이 비어 있습니다.")
-        } catch (e: RestClientException) {
-            throw translate(e)
-        }
+    private fun <T : Any> call(uri: URI, type: Class<T>): T = try {
+        tourApiRestClient.get().uri(uri).retrieve().body(type)
+            ?: throw UpstreamUnavailableException("TourAPI 응답이 비어 있습니다.")
+    } catch (e: RestClientException) {
+        throw translate(e)
+    }
 
     fun translate(e: RestClientException): RuntimeException {
         val status = (e as? RestClientResponseException)?.statusCode?.value()
@@ -123,7 +122,9 @@ class TourApiClient(
         }
         log.warn(
             "TourAPI 호출 실패: {} status={} cause={}",
-            e.javaClass.simpleName, status, e.cause?.javaClass?.simpleName ?: "-",
+            e.javaClass.simpleName,
+            status,
+            e.cause?.javaClass?.simpleName ?: "-",
         )
         return UpstreamUnavailableException("TourAPI 호출에 실패했습니다(${e.javaClass.simpleName}).", e)
     }
@@ -145,8 +146,11 @@ class TourApiClient(
         val code = header.resultCode
         when {
             code.isBlank() || code == RESULT_OK -> return
+
             code == RESULT_DAILY_LIMIT -> throw UpstreamRateLimitedException("TourAPI 일일 호출 한도를 초과했습니다.")
+
             code == RESULT_PER_SECOND_LIMIT -> throw UpstreamTooManyRequestsException("TourAPI 초당 호출 한도를 초과했습니다.")
+
             else -> {
                 log.warn("TourAPI 오류 응답: code={}", code)
                 throw UpstreamUnavailableException("TourAPI 오류 응답: $code")
@@ -165,8 +169,7 @@ class TourApiClient(
     }
 
     /** detailCommon2 item → 도메인 SpotDetail(본문). */
-    fun mapDetail(common: TourApiDetailCommonResponse.Item, locale: DomainLocale): SpotDetail =
-        common.toSpotDetail(category(common.contenttypeid, locale))
+    fun mapDetail(common: TourApiDetailCommonResponse.Item, locale: DomainLocale): SpotDetail = common.toSpotDetail(category(common.contenttypeid, locale))
 
     /** detailImage2 item → 갤러리. TourAPI 반환 순서 유지, 앞 10장까지(AC-8). */
     fun mapGallery(images: List<TourApiDetailImageResponse.Item>): List<SpotImage> = images.toGallery()
@@ -178,41 +181,36 @@ class TourApiClient(
     fun mapInfoItems(info: List<TourApiDetailInfoResponse.Item>): List<SpotInfoItem> = info.toInfoItems()
 
     /** [contentTypeId]는 detailIntro2·detailInfo2에서 필수다(없으면 upstream이 필수 파라미터 누락으로 거절). */
-    private fun detailUri(query: SpotDetailQuery, operation: String, contentTypeId: String? = null): URI =
-        UriComponentsBuilder.fromUriString(baseUrl(query.locale))
-            .path("/$operation")
-            .common()
-            .queryParam("contentId", query.contentId)
-            .apply { contentTypeId?.let { queryParam("contentTypeId", it) } }
-            .build(true)
-            .toUri()
+    private fun detailUri(query: SpotDetailQuery, operation: String, contentTypeId: String? = null): URI = UriComponentsBuilder.fromUriString(baseUrl(query.locale))
+        .path("/$operation")
+        .common()
+        .queryParam("contentId", query.contentId)
+        .apply { contentTypeId?.let { queryParam("contentTypeId", it) } }
+        .build(true)
+        .toUri()
 
     /** 모든 오퍼레이션 공통 파라미터. serviceKey는 이미 인코딩된 값이라 build(true)로 재인코딩을 막는다. */
-    private fun UriComponentsBuilder.common(): UriComponentsBuilder =
-        queryParam("serviceKey", properties.serviceKey)
-            .queryParam("MobileOS", properties.mobileOs)
-            .queryParam("MobileApp", properties.mobileApp)
-            .queryParam("_type", "json")
+    private fun UriComponentsBuilder.common(): UriComponentsBuilder = queryParam("serviceKey", properties.serviceKey)
+        .queryParam("MobileOS", properties.mobileOs)
+        .queryParam("MobileApp", properties.mobileApp)
+        .queryParam("_type", "json")
 
     private fun baseUrl(locale: DomainLocale): String = properties.baseUrls.getValue(locale.name)
 
-    private fun codeset(locale: DomainLocale): String =
-        if (locale.isKorean) TourApiProperties.CODESET_KO else TourApiProperties.CODESET_FOREIGN
+    private fun codeset(locale: DomainLocale): String = if (locale.isKorean) TourApiProperties.CODESET_KO else TourApiProperties.CODESET_FOREIGN
 
     /**
      * 이 카테고리의 contentTypeId. **없으면 null이며 호출자가 upstream 호출을 생략한다** —
      * 그 코드셋에 대응 코드가 없는 카테고리가 실제로 있다(여행코스는 외국어, 교통은 국문에 없다).
      */
-    private fun categoryCode(category: SpotCategory?, locale: DomainLocale): String? =
-        category?.let {
-            categoryMapping.externalCode(it, CategoryExternalMappingPort.PROVIDER_TOUR_API, codeset(locale))
-        }
+    private fun categoryCode(category: SpotCategory?, locale: DomainLocale): String? = category?.let {
+        categoryMapping.externalCode(it, CategoryExternalMappingPort.PROVIDER_TOUR_API, codeset(locale))
+    }
 
     /** contentTypeId가 가리키는 우리 카테고리. 모르는 코드는 관광지로 떨어뜨린다(기존 동작). */
-    private fun category(contentTypeId: String?, locale: DomainLocale): SpotCategory =
-        contentTypeId?.let {
-            categoryMapping.categoryOf(it, CategoryExternalMappingPort.PROVIDER_TOUR_API, codeset(locale))
-        } ?: SpotCategory.TOURIST_SPOT
+    private fun category(contentTypeId: String?, locale: DomainLocale): SpotCategory = contentTypeId?.let {
+        categoryMapping.categoryOf(it, CategoryExternalMappingPort.PROVIDER_TOUR_API, codeset(locale))
+    } ?: SpotCategory.TOURIST_SPOT
 
     companion object {
         private val log = LoggerFactory.getLogger(TourApiClient::class.java)

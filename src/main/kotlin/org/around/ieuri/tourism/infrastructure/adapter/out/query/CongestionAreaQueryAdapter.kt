@@ -30,22 +30,21 @@ class CongestionAreaQueryAdapter(
      * `ST_AsGeoJSON`이 좌표 순서(`[lng, lat]`)와 닫힘을 그대로 보존한다.
      */
     @Transactional(readOnly = true)
-    override fun findAllBoundaries(locale: DomainLocale): List<CongestionAreaBoundaryView> =
-        jdbcTemplate.query(
-            """
+    override fun findAllBoundaries(locale: DomainLocale): List<CongestionAreaBoundaryView> = jdbcTemplate.query(
+        """
             SELECT area_cd, category, name_ko, name_en, name_ja, name_zh,
                    ST_AsGeoJSON(boundary) AS boundary_json
             FROM congestion_area
             ORDER BY area_cd
-            """.trimIndent(),
-        ) { rs, _ ->
-            CongestionAreaBoundaryView(
-                id = rs.getString("area_cd"),
-                name = rs.areaName().resolve(locale),
-                category = rs.getString("category"),
-                polygon = parseOuterRing(rs.getString("boundary_json")),
-            )
-        }
+        """.trimIndent(),
+    ) { rs, _ ->
+        CongestionAreaBoundaryView(
+            id = rs.getString("area_cd"),
+            name = rs.areaName().resolve(locale),
+            category = rs.getString("category"),
+            polygon = parseOuterRing(rs.getString("boundary_json")),
+        )
+    }
 
     /**
      * bbox에 걸치는 구역 코드(R6). 폴리곤이 뷰포트와 겹치면 포함이다.
@@ -54,19 +53,18 @@ class CongestionAreaQueryAdapter(
      * `&&`만 쓰면 폴리곤의 사각 외접이 겹칠 뿐 실제로는 벗어난 구역이 섞인다.
      */
     @Transactional(readOnly = true)
-    override fun findAreaCodesWithin(bounds: MapBounds): List<String> =
-        jdbcTemplate.query(
-            """
+    override fun findAreaCodesWithin(bounds: MapBounds): List<String> = jdbcTemplate.query(
+        """
             SELECT area_cd FROM congestion_area
             WHERE boundary && ST_MakeEnvelope(?, ?, ?, ?, 4326)::geography
               AND ST_Intersects(boundary, ST_MakeEnvelope(?, ?, ?, ?, 4326)::geography)
             ORDER BY area_cd
-            """.trimIndent(),
-            { rs, _ -> rs.getString("area_cd") },
-            // envelope은 (minLng, minLat, maxLng, maxLat) 순서다 — 두 조건에 각각 넘긴다.
-            bounds.minLng, bounds.minLat, bounds.maxLng, bounds.maxLat,
-            bounds.minLng, bounds.minLat, bounds.maxLng, bounds.maxLat,
-        )
+        """.trimIndent(),
+        { rs, _ -> rs.getString("area_cd") },
+        // envelope은 (minLng, minLat, maxLng, maxLat) 순서다 — 두 조건에 각각 넘긴다.
+        bounds.minLng, bounds.minLat, bounds.maxLng, bounds.maxLat,
+        bounds.minLng, bounds.minLat, bounds.maxLng, bounds.maxLat,
+    )
 
     /** 실재하는 구역의 이름만. 없는 코드는 빠지므로 호출자가 부재를 판정한다(R6). */
     @Transactional(readOnly = true)

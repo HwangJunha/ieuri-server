@@ -31,9 +31,8 @@ class SpotEmbeddingUpsertJdbcAdapter(
      * 가장 최근에 적재된 하나만 고른다 — 조인이 행을 불리면 대상이 중복된다.
      */
     @Transactional(readOnly = true)
-    override fun findTargets(afterTranslationId: Long, limit: Int, model: String): List<EmbeddingTarget> =
-        jdbcTemplate.query(
-            """
+    override fun findTargets(afterTranslationId: Long, limit: Int, model: String): List<EmbeddingTarget> = jdbcTemplate.query(
+        """
             SELECT t.id, t.language, t.title, t.category, t.address, d.overview
             FROM spot_catalog_translation t
             LEFT JOIN LATERAL (
@@ -54,19 +53,22 @@ class SpotEmbeddingUpsertJdbcAdapter(
               )
             ORDER BY t.id
             LIMIT ?
-            """.trimIndent(),
-            { rs, _ ->
-                EmbeddingTarget(
-                    translationId = rs.getLong("id"),
-                    language = DomainLocale.valueOf(rs.getString("language")),
-                    title = rs.getString("title"),
-                    categoryCode = rs.getString("category"),
-                    address = rs.getString("address"),
-                    overview = rs.getString("overview"),
-                )
-            },
-            afterTranslationId, model, properties.embedding.overviewMaxChars, limit,
-        )
+        """.trimIndent(),
+        { rs, _ ->
+            EmbeddingTarget(
+                translationId = rs.getLong("id"),
+                language = DomainLocale.valueOf(rs.getString("language")),
+                title = rs.getString("title"),
+                categoryCode = rs.getString("category"),
+                address = rs.getString("address"),
+                overview = rs.getString("overview"),
+            )
+        },
+        afterTranslationId,
+        model,
+        properties.embedding.overviewMaxChars,
+        limit,
+    )
 
     /** 번역 행에서 해시를 다시 계산해 벡터와 함께 upsert한다. */
     @Transactional

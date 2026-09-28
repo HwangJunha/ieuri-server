@@ -14,9 +14,8 @@ class TermsPersistenceAdapter(
     private val termsRepository: TermsJpaRepository,
 ) : TermsRepositoryPort {
 
-    override fun findActiveTerms(now: Instant): List<TermsView> =
-        termsRepository.findByEffectiveAtLessThanEqual(now)
-            .groupBy { it.code }
-            .mapNotNull { (_, versions) -> versions.maxByOrNull { it.version } }
-            .map { TermsView(id = requireNotNull(it.id), code = it.code, version = it.version, required = it.required) }
+    override fun findActiveTerms(now: Instant): List<TermsView> = termsRepository.findByEffectiveAtLessThanEqual(now)
+        .groupBy { it.code }
+        .mapNotNull { (_, versions) -> versions.maxByOrNull { it.version } }
+        .map { TermsView(id = requireNotNull(it.id), code = it.code, version = it.version, required = it.required) }
 }

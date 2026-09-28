@@ -19,7 +19,6 @@ data class RegionScoreWeights(
         const val DEFAULT_WEIGHT = 1.0
 
         /** 다섯 항목 균등 가중. */
-        fun uniform(): RegionScoreWeights =
-            RegionScoreWeights(RegionScoreFactor.entries.associateWith { DEFAULT_WEIGHT })
+        fun uniform(): RegionScoreWeights = RegionScoreWeights(RegionScoreFactor.entries.associateWith { DEFAULT_WEIGHT })
     }
 }

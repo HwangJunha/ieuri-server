@@ -21,8 +21,7 @@ object SpotTitleNormalizer {
      *
      * 한글이 없으면 null이다. 빈 키는 서로 전부 일치하므로 매칭에 쓸 수 없다.
      */
-    fun matchKey(title: String): String? =
-        title.filter { it in HANGUL_SYLLABLES || it in HANGUL_JAMO }.takeIf { it.isNotEmpty() }
+    fun matchKey(title: String): String? = title.filter { it in HANGUL_SYLLABLES || it in HANGUL_JAMO }.takeIf { it.isNotEmpty() }
 
     /**
      * **비한국어 제목이 KO를 찾을 때 쓰는 키.** [matchKey]와 같은 규칙이며, 제목 어디에 있든
@@ -85,7 +84,9 @@ object SpotTitleNormalizer {
                     opener = char
                     depth = 1
                 }
+
                 char == opener && depth > 0 -> depth++
+
                 depth > 0 && char == closerOf(opener) -> {
                     depth--
                     if (depth == 0) {
@@ -94,6 +95,7 @@ object SpotTitleNormalizer {
                         segmentStart = -1
                     }
                 }
+
                 depth == 0 -> result.append(char)
             }
         }
@@ -112,10 +114,9 @@ object SpotTitleNormalizer {
      *
      * 괄호만 바꾼다 — 전각 영숫자까지 접으면 원문 표기가 달라져 제목 값 자체가 훼손된다.
      */
-    private fun toHalfWidthParens(value: String): String =
-        value
-            .replace('（', '(').replace('）', ')')
-            .replace('［', '[').replace('］', ']')
+    private fun toHalfWidthParens(value: String): String = value
+        .replace('（', '(').replace('）', ')')
+        .replace('［', '[').replace('］', ']')
 
     /** 인증·면세 태그를 제거한다 — `[한국관광 품질인증]`, `[유네스코 세계문화유산]`, `[백년가게]`. */
     private fun stripBracketTags(value: String): String = value.replace(BRACKET_TAG, "")

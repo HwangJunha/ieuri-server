@@ -70,6 +70,5 @@ object EmailVerificationGate {
      * 루트 필드가 하나도 없는 요청(빈 셀렉션)은 통과시킨다 — 판정할 대상이 없고, 그런 문서는
      * 검증 단계에서 이미 걸린다.
      */
-    fun isAllowed(rootFieldNames: Collection<String>, emailVerified: Boolean): Boolean =
-        emailVerified || rootFieldNames.all { it in ALLOWED_OPERATIONS }
+    fun isAllowed(rootFieldNames: Collection<String>, emailVerified: Boolean): Boolean = emailVerified || rootFieldNames.all { it in ALLOWED_OPERATIONS }
 }

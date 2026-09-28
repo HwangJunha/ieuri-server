@@ -33,9 +33,12 @@ class SnsTokenExchangeClient(
 
     override fun exchangeForRefreshToken(provider: Provider, authorizationCode: String): String? = when (provider) {
         Provider.APPLE -> exchangeApple(authorizationCode)
+
         Provider.GOOGLE -> exchangeGoogle(authorizationCode)
+
         // 어드민 키 + 회원번호로 해제하므로 토큰이 필요 없다.
         Provider.KAKAO -> null
+
         Provider.EMAIL -> null
     }
 

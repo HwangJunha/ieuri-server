@@ -79,16 +79,18 @@ class EmailVerificationGateInstrumentation(
     private fun rootFieldNames(
         selectionSet: SelectionSet,
         fragments: Map<String, FragmentDefinition>,
-    ): List<String> =
-        selectionSet.selections.flatMap { selection ->
-            when (selection) {
-                is Field -> listOf(selection.name)
-                is InlineFragment -> rootFieldNames(selection.selectionSet, fragments)
-                is FragmentSpread ->
-                    fragments[selection.name]?.let { rootFieldNames(it.selectionSet, fragments) }.orEmpty()
-                else -> emptyList()
-            }
+    ): List<String> = selectionSet.selections.flatMap { selection ->
+        when (selection) {
+            is Field -> listOf(selection.name)
+
+            is InlineFragment -> rootFieldNames(selection.selectionSet, fragments)
+
+            is FragmentSpread ->
+                fragments[selection.name]?.let { rootFieldNames(it.selectionSet, fragments) }.orEmpty()
+
+            else -> emptyList()
         }
+    }
 
     private companion object {
         /** 코드 문자열은 SPEC-0024 이전과 같다. 위치만 payload에서 최상위 오류로 옮겼다. */

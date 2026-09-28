@@ -17,18 +17,16 @@ class OrphanPhotoQueryAdapter(
     private val orphan = QOrphanPhotoObjectEntity.orphanPhotoObjectEntity
     private val postPhoto = QPostPhotoEntity.postPhotoEntity
 
-    override fun findOrphanPhotoKeys(): List<String> =
-        queryFactory
-            .select(orphan.objectKey)
-            .from(orphan)
-            .fetch()
+    override fun findOrphanPhotoKeys(): List<String> = queryFactory
+        .select(orphan.objectKey)
+        .from(orphan)
+        .fetch()
 
     /** 두 표를 조인한다 — 보존 목록을 끌어와 `IN`으로 되물으면 키 개수만큼 SQL이 길어진다. */
-    override fun findOrphanKeysStillUsedByPosts(): Set<String> =
-        queryFactory
-            .select(orphan.objectKey)
-            .from(orphan)
-            .join(postPhoto).on(postPhoto.objectKey.eq(orphan.objectKey))
-            .fetch()
-            .toSet()
+    override fun findOrphanKeysStillUsedByPosts(): Set<String> = queryFactory
+        .select(orphan.objectKey)
+        .from(orphan)
+        .join(postPhoto).on(postPhoto.objectKey.eq(orphan.objectKey))
+        .fetch()
+        .toSet()
 }

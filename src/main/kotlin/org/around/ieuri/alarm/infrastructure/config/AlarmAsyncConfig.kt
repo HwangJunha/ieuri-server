@@ -1,12 +1,12 @@
 package org.around.ieuri.alarm.infrastructure.config
 
-import java.util.concurrent.Executor
-import java.util.concurrent.atomic.AtomicLong
 import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.scheduling.annotation.EnableAsync
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
+import java.util.concurrent.Executor
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * 푸시 발송 전용 executor. community의 조회수 executor, tourism의 write-behind와 같은 관례다.

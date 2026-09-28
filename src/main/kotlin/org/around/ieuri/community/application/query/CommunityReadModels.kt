@@ -1,8 +1,8 @@
 package org.around.ieuri.community.application.query
 
-import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.domain.vo.PostSortOrder
 import org.around.ieuri.community.domain.vo.PostTag
+import org.around.ieuri.community.domain.vo.TargetCategory
 import java.time.Instant
 
 /**

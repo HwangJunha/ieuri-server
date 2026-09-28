@@ -1,9 +1,8 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity
 
-import org.around.ieuri.common.persistence.DbSchema
 import jakarta.persistence.Column
-import jakarta.persistence.EnumType
 import jakarta.persistence.Entity
+import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
@@ -11,6 +10,7 @@ import jakarta.persistence.Id
 import jakarta.persistence.PrePersist
 import jakarta.persistence.Table
 import org.around.ieuri.auth.domain.vo.VerificationPurpose
+import org.around.ieuri.common.persistence.DbSchema
 import java.time.Instant
 import java.util.UUID
 

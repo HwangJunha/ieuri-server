@@ -9,8 +9,7 @@ import kotlin.test.assertTrue
 /** Role 도메인 — 권한 판정과 "관리 역할" 판정(자기 강등 방지의 기준). */
 class RoleTest {
 
-    private fun role(vararg codes: String) =
-        Role("ADMIN", "관리자", codes.map { Permission(it) }.toSet())
+    private fun role(vararg codes: String) = Role("ADMIN", "관리자", codes.map { Permission(it) }.toSet())
 
     @Test
     fun `grants는 보유 권한을 판정한다`() {

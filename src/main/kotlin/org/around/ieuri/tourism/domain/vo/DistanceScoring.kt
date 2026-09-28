@@ -14,8 +14,7 @@ value class DistanceScoring(val halfLifeMeters: Double) {
     }
 
     /** 사용자 위치와 지역 대표 좌표 사이의 거리 점수. 같은 좌표면 100이다(R13). */
-    fun score(origin: Coordinates, regionCenter: Coordinates): RegionScore =
-        score(Distance.between(origin, regionCenter))
+    fun score(origin: Coordinates, regionCenter: Coordinates): RegionScore = score(Distance.between(origin, regionCenter))
 
     /** 반감 거리에서 계수가 0.5가 되어 50점이 된다. 가까울수록 높다. */
     fun score(distance: Distance): RegionScore {

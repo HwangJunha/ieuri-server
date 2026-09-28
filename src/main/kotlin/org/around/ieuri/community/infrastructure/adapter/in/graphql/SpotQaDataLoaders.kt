@@ -71,12 +71,11 @@ value class ViewerId(val value: Long)
  * **폴백하지 않는다.** 요청이 언제나 갖는 값이라 부재는 리졸버가 `load(key, viewer)`를
  * 빠뜨렸다는 뜻이고, 비로그인으로 흘리면 차단·소유 관계가 사라진 그럴듯한 오답이 나간다.
  */
-internal fun BatchLoaderEnvironment.requireViewer(loaderName: String): Long =
-    keyContexts.values
-        .filterIsInstance<ViewerId>()
-        .firstOrNull()
-        ?.value
-        ?: error("${loaderName}은 keyContext로 뷰어를 받아야 한다 — 리졸버가 load(key, ViewerId(...))로 부른다.")
+internal fun BatchLoaderEnvironment.requireViewer(loaderName: String): Long = keyContexts.values
+    .filterIsInstance<ViewerId>()
+    .firstOrNull()
+    ?.value
+    ?: error("${loaderName}은 keyContext로 뷰어를 받아야 한다 — 리졸버가 load(key, ViewerId(...))로 부른다.")
 
 @DgsDataLoader(name = SpotQuestionPhotoDataLoader.NAME)
 @Component

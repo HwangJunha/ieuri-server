@@ -68,8 +68,7 @@ class AuthErrorSurfaceContractTest {
     }
 
     /** 최상위 오류로만 나가야 하는 예외 전부. 코드를 싣지 않는 두 종류는 별도 계층이다. */
-    private fun topLevelOnlyExceptions(): List<Throwable> =
-        tokenExceptions() + listOf(UnauthorizedException("m"), ForbiddenException("m"))
+    private fun topLevelOnlyExceptions(): List<Throwable> = tokenExceptions() + listOf(UnauthorizedException("m"), ForbiddenException("m"))
 
     /**
      * **이것이 R3의 핵심 단언이다.** 어떤 인증 예외도 `userErrors`로 변환되지 않는다.

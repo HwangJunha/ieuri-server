@@ -17,11 +17,10 @@ class RoleQueryAdapter(
 
     private val role = QRoleEntity.roleEntity
 
-    override fun findAssignableRoles(): List<RoleInfoView> =
-        queryFactory
-            .select(role.code, role.name, role.description)
-            .from(role)
-            .orderBy(role.code.asc())
-            .fetch()
-            .map { RoleInfoView(requireNotNull(it.get(role.code)), requireNotNull(it.get(role.name)), it.get(role.description)) }
+    override fun findAssignableRoles(): List<RoleInfoView> = queryFactory
+        .select(role.code, role.name, role.description)
+        .from(role)
+        .orderBy(role.code.asc())
+        .fetch()
+        .map { RoleInfoView(requireNotNull(it.get(role.code)), requireNotNull(it.get(role.name)), it.get(role.description)) }
 }

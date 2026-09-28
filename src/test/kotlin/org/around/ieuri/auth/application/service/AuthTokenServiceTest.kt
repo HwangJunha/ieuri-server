@@ -16,8 +16,8 @@ import org.around.ieuri.auth.application.exception.TokenReuseDetectedException
 import org.around.ieuri.auth.application.port.`in`.command.TokenPairResult
 import org.around.ieuri.auth.application.port.out.client.SnsIdentity
 import org.around.ieuri.auth.application.port.out.client.SnsIdentityVerifierPort
-import org.around.ieuri.auth.application.port.out.event.DomainEventPublisherPort
 import org.around.ieuri.auth.application.port.out.client.SnsTokenExchangerPort
+import org.around.ieuri.auth.application.port.out.event.DomainEventPublisherPort
 import org.around.ieuri.auth.application.port.out.persistence.EmailAuthentication
 import org.around.ieuri.auth.application.port.out.persistence.MemberAuthentication
 import org.around.ieuri.auth.application.port.out.persistence.MemberRepositoryPort

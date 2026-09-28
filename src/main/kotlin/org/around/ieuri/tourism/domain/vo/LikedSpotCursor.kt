@@ -17,9 +17,8 @@ import java.util.Base64
  */
 data class LikedSpotCursor(val updatedAt: Instant, val catalogId: Long) {
 
-    fun encode(): String =
-        Base64.getUrlEncoder().withoutPadding()
-            .encodeToString("$PREFIX|$updatedAt|$catalogId".toByteArray(StandardCharsets.UTF_8))
+    fun encode(): String = Base64.getUrlEncoder().withoutPadding()
+        .encodeToString("$PREFIX|$updatedAt|$catalogId".toByteArray(StandardCharsets.UTF_8))
 
     companion object {
         /** 참조 축이 카탈로그로 바뀐 뒤의 형식임을 나타낸다. 구 커서에는 이 필드가 아예 없다. */
@@ -31,17 +30,16 @@ data class LikedSpotCursor(val updatedAt: Instant, val catalogId: Long) {
          *
          * 이관 시점에 살아 있던 커서는 무효가 되며 사용자는 목록을 처음부터 받는다.
          */
-        fun decode(cursor: String): LikedSpotCursor =
-            try {
-                val decoded = String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8)
-                val parts = decoded.split("|")
-                // 필드 수와 접두사를 먼저 본다. 값 해석이 앞서면 구 커서가 통과한다.
-                require(parts.size == 3 && parts[0] == PREFIX) { "구버전 커서입니다." }
-                LikedSpotCursor(updatedAt = Instant.parse(parts[1]), catalogId = parts[2].toLong())
-            } catch (e: RuntimeException) {
-                // 조용히 첫 페이지로 되돌리면 클라이언트가 무한 루프에 빠질 수 있어 명시적으로 거부한다.
-                // 애플리케이션 계층이 이것을 INVALID_CURSOR로 승격한다 — 도메인은 GraphQL을 알지 않는다.
-                throw IllegalArgumentException("유효하지 않은 커서입니다.", e)
-            }
+        fun decode(cursor: String): LikedSpotCursor = try {
+            val decoded = String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8)
+            val parts = decoded.split("|")
+            // 필드 수와 접두사를 먼저 본다. 값 해석이 앞서면 구 커서가 통과한다.
+            require(parts.size == 3 && parts[0] == PREFIX) { "구버전 커서입니다." }
+            LikedSpotCursor(updatedAt = Instant.parse(parts[1]), catalogId = parts[2].toLong())
+        } catch (e: RuntimeException) {
+            // 조용히 첫 페이지로 되돌리면 클라이언트가 무한 루프에 빠질 수 있어 명시적으로 거부한다.
+            // 애플리케이션 계층이 이것을 INVALID_CURSOR로 승격한다 — 도메인은 GraphQL을 알지 않는다.
+            throw IllegalArgumentException("유효하지 않은 커서입니다.", e)
+        }
     }
 }

@@ -26,6 +26,7 @@ interface ConversationQueryPort {
      *
      * [memberId]는 ownedByViewer 판정에 쓴다. 참여자 검사는 구독 시작 시점에 이미 끝났다.
      */
+
     /**
      * 구독 스트림이 이벤트의 id로 메시지를 다시 읽는다.
      *

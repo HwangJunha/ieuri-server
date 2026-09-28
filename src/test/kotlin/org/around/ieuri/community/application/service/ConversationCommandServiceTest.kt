@@ -1,13 +1,14 @@
 package org.around.ieuri.community.application.service
 
 import io.mockk.every
-import io.mockk.slot
 import io.mockk.mockk
+import io.mockk.slot
 import io.mockk.verify
-import org.around.ieuri.community.application.command.NotifyTypingCommand
 import org.around.ieuri.community.application.command.MarkConversationReadCommand
+import org.around.ieuri.community.application.command.NotifyTypingCommand
 import org.around.ieuri.community.application.command.SendMessageCommand
 import org.around.ieuri.community.application.command.StartConversationCommand
+import org.around.ieuri.community.application.event.NewMessageStored
 import org.around.ieuri.community.application.exception.BlockedException
 import org.around.ieuri.community.application.exception.ConversationNotFoundException
 import org.around.ieuri.community.application.exception.MemberNotFoundException
@@ -17,7 +18,6 @@ import org.around.ieuri.community.application.port.out.client.ClockPort
 import org.around.ieuri.community.application.port.out.client.MemberLookupPort
 import org.around.ieuri.community.application.port.out.client.ObjectStoragePort
 import org.around.ieuri.community.application.port.out.client.SpotLookupPort
-import org.around.ieuri.community.application.event.NewMessageStored
 import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
 import org.around.ieuri.community.application.port.out.event.ConversationEventPort
 import org.around.ieuri.community.application.port.out.persistence.ConversationRepositoryPort
@@ -58,6 +58,7 @@ class ConversationCommandServiceTest {
     private val conversationQueryPort = mockk<ConversationQueryPort>(relaxed = true)
     private val storage = mockk<ObjectStoragePort> { every { findSize(any()) } returns 1_024L }
     private val clock = mockk<ClockPort> { every { now() } returns now }
+
     // 출처 없는 대화가 기본이다(SPEC-0026 R13) — 주지 않으면 스냅샷 조회 자체가 일어나지 않는다.
     private val spotQaQueryPort = mockk<SpotQaQueryPort>(relaxed = true)
     private val spotLookupPort = mockk<SpotLookupPort>(relaxed = true)

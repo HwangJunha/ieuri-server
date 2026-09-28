@@ -42,8 +42,7 @@ class TourStatsSyncTaskletTest {
         DistrictRegion(code = "26410", provinceCode = "26"),
     )
 
-    private fun page(rows: List<Row>, totalCount: Int, dropped: Int = 0) =
-        TourStatsSyncPage(records = rows, totalCount = totalCount, droppedCount = dropped)
+    private fun page(rows: List<Row>, totalCount: Int, dropped: Int = 0) = TourStatsSyncPage(records = rows, totalCount = totalCount, droppedCount = dropped)
 
     private fun stepExecution(): StepExecution {
         val parameters = JobParametersBuilder()
@@ -56,8 +55,7 @@ class TourStatsSyncTaskletTest {
         )
     }
 
-    private fun <R : Any> run(tasklet: TourStatsSyncTasklet<Row, R>, execution: StepExecution): RepeatStatus? =
-        tasklet.execute(StepContribution(execution), ChunkContext(StepContext(execution)))
+    private fun <R : Any> run(tasklet: TourStatsSyncTasklet<Row, R>, execution: StepExecution): RepeatStatus? = tasklet.execute(StepContribution(execution), ChunkContext(StepContext(execution)))
 
     /** 끝날 때까지 돌린다 — 순회가 여러 번의 execute로 나뉘므로 루프가 필요하다. */
     private fun <R : Any> runToCompletion(tasklet: TourStatsSyncTasklet<Row, R>, execution: StepExecution): Int {
@@ -147,7 +145,10 @@ class TourStatsSyncTaskletTest {
                 page(listOf(Row("11110"), Row("11140"), Row(areaCd)), totalCount = 3)
             },
             districtCodeOf = Row::code,
-            upsert = { upserted += it; it.size },
+            upsert = {
+                upserted += it
+                it.size
+            },
             targetsOf = { listOf("11") },
         )
 
@@ -303,7 +304,10 @@ class TourStatsSyncTaskletTest {
             fetchPage = { _, _, _ ->
                 page(listOf(Row("11110"), Row("99999")), totalCount = 1, dropped = 2)
             },
-            upsert = { upserted += it; it.size },
+            upsert = {
+                upserted += it
+                it.size
+            },
         )
 
         val execution = stepExecution()

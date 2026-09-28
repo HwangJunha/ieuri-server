@@ -6,7 +6,6 @@ import org.springframework.beans.factory.BeanFactoryUtils
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor
-import org.springframework.orm.jpa.AbstractEntityManagerFactoryBean
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.jdbc.autoconfigure.DataSourceProperties
@@ -15,6 +14,7 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Primary
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.datasource.LazyConnectionDataSourceProxy
+import org.springframework.orm.jpa.AbstractEntityManagerFactoryBean
 import javax.sql.DataSource
 
 /**
@@ -53,8 +53,7 @@ class DataSourceConfig {
      */
     @Bean
     @ConfigurationProperties(prefix = "spring.datasource.hikari")
-    fun primaryDataSource(properties: DataSourceProperties): DataSource =
-        properties.initializeDataSourceBuilder().build()
+    fun primaryDataSource(properties: DataSourceProperties): DataSource = properties.initializeDataSourceBuilder().build()
 
     /**
      * 조회(replica)용 풀(PERF-20260921). `ieuri.read-replica.url`이 비면 만들지 않는다 —
@@ -74,12 +73,11 @@ class DataSourceConfig {
     fun replicaDataSource(
         properties: DataSourceProperties,
         replica: ReadReplicaProperties,
-    ): DataSource? =
-        replica.url.takeIf { it.isNotBlank() }?.let { url ->
-            properties.initializeDataSourceBuilder()
-                .url(url)
-                .build()
-        }
+    ): DataSource? = replica.url.takeIf { it.isNotBlank() }?.let { url ->
+        properties.initializeDataSourceBuilder()
+            .url(url)
+            .build()
+    }
 
     /**
      * JPA·배치가 타입으로 주입받는 기본 DataSource.
@@ -158,35 +156,34 @@ class DataSourceConfig {
         dataSourceProperties: DataSourceProperties,
         properties: FlywayProperties,
         javaMigrations: ObjectProvider<JavaMigration>,
-    ): Flyway =
-        Flyway.configure()
-            .dataSource(
-                dataSourceProperties.url,
-                dataSourceProperties.username,
-                dataSourceProperties.password,
-            )
-            .locations(*properties.locations.toTypedArray())
-            // **`flyway_schema_history`가 `public`에 남게 못 박는다**(SPEC-0023).
-            // 지정하지 않으면 Flyway는 커넥션의 기본 스키마에서 이력을 찾는데, 지금 그것이
-            // `public`인 것은 우연이다 — 누가 롤이나 DB의 search_path를 바꾸면 이력을 찾지
-            // 못하고 **V1부터 다시 적용하려 든다.** 테이블이 이미 있는 DB에서는 통째로 실패한다.
-            //
-            // V62는 이력 테이블을 옮기지 않는다. 옮기면 기존 환경이 이력을 잃는다.
-            //
-            // **`schemas(...)`로 5개를 나열하지 않는다.** 그 목록은 Flyway가 소유를 주장하는
-            // 대상이라 없으면 만들고 `clean`에서 지운다 — 스키마 생성은 V1 베이스라인과 CNPG
-            // 매니페스트가 이미 나눠 갖고 있으므로 소유자를 셋으로 늘릴 이유가 없다.
-            //
-            // **주의: `spring.datasource.hikari.connection-init-sql`이 여기 닿지 않는다.**
-            // 위에 적었듯 Flyway는 풀을 쓰지 않고 자체 커넥션을 만들기 때문이다. 그래서
-            // **모든 마이그레이션은 스키마 한정으로 써야 한다** — `ALTER TABLE community_post`가
-            // 아니라 `ALTER TABLE community.community_post`.
-            .defaultSchema("public")
-            .baselineOnMigrate(properties.baselineOnMigrate)
-            .baselineVersion(properties.baselineVersion)
-            .ignoreMigrationPatterns(*properties.ignoreMigrationPatterns.toTypedArray())
-            .javaMigrations(*javaMigrations.orderedStream().toList().toTypedArray())
-            .load()
+    ): Flyway = Flyway.configure()
+        .dataSource(
+            dataSourceProperties.url,
+            dataSourceProperties.username,
+            dataSourceProperties.password,
+        )
+        .locations(*properties.locations.toTypedArray())
+        // **`flyway_schema_history`가 `public`에 남게 못 박는다**(SPEC-0023).
+        // 지정하지 않으면 Flyway는 커넥션의 기본 스키마에서 이력을 찾는데, 지금 그것이
+        // `public`인 것은 우연이다 — 누가 롤이나 DB의 search_path를 바꾸면 이력을 찾지
+        // 못하고 **V1부터 다시 적용하려 든다.** 테이블이 이미 있는 DB에서는 통째로 실패한다.
+        //
+        // V62는 이력 테이블을 옮기지 않는다. 옮기면 기존 환경이 이력을 잃는다.
+        //
+        // **`schemas(...)`로 5개를 나열하지 않는다.** 그 목록은 Flyway가 소유를 주장하는
+        // 대상이라 없으면 만들고 `clean`에서 지운다 — 스키마 생성은 V1 베이스라인과 CNPG
+        // 매니페스트가 이미 나눠 갖고 있으므로 소유자를 셋으로 늘릴 이유가 없다.
+        //
+        // **주의: `spring.datasource.hikari.connection-init-sql`이 여기 닿지 않는다.**
+        // 위에 적었듯 Flyway는 풀을 쓰지 않고 자체 커넥션을 만들기 때문이다. 그래서
+        // **모든 마이그레이션은 스키마 한정으로 써야 한다** — `ALTER TABLE community_post`가
+        // 아니라 `ALTER TABLE community.community_post`.
+        .defaultSchema("public")
+        .baselineOnMigrate(properties.baselineOnMigrate)
+        .baselineVersion(properties.baselineVersion)
+        .ignoreMigrationPatterns(*properties.ignoreMigrationPatterns.toTypedArray())
+        .javaMigrations(*javaMigrations.orderedStream().toList().toTypedArray())
+        .load()
 
     /**
      * `entityManagerFactory`가 [flyway] **뒤에** 만들어지도록 강제한다.
@@ -204,15 +201,14 @@ class DataSourceConfig {
          */
         @Bean
         @JvmStatic
-        fun entityManagerFactoryDependsOnFlyway(): BeanFactoryPostProcessor =
-            BeanFactoryPostProcessor { beanFactory ->
-                for (name in beanFactory.getBeanNamesForType(AbstractEntityManagerFactoryBean::class.java, true, false)) {
-                    // FactoryBean 조회는 `&`가 붙은 이름을 주는데 빈 정의는 그 접두사 없이 등록돼 있다.
-                    val definitionName = BeanFactoryUtils.transformedBeanName(name)
-                    val definition = beanFactory.getBeanDefinition(definitionName)
-                    definition.setDependsOn(*((definition.dependsOn ?: emptyArray()) + "flyway"))
-                }
+        fun entityManagerFactoryDependsOnFlyway(): BeanFactoryPostProcessor = BeanFactoryPostProcessor { beanFactory ->
+            for (name in beanFactory.getBeanNamesForType(AbstractEntityManagerFactoryBean::class.java, true, false)) {
+                // FactoryBean 조회는 `&`가 붙은 이름을 주는데 빈 정의는 그 접두사 없이 등록돼 있다.
+                val definitionName = BeanFactoryUtils.transformedBeanName(name)
+                val definition = beanFactory.getBeanDefinition(definitionName)
+                definition.setDependsOn(*((definition.dependsOn ?: emptyArray()) + "flyway"))
             }
+        }
     }
 }
 

@@ -37,15 +37,13 @@ class ConversationEventAdapterTest {
             Flux.fromIterable(payloads.map { message(channel, it) })
     }
 
-    private fun message(channel: String, payload: String): ReactiveSubscription.Message<String, String> =
-        object : ReactiveSubscription.Message<String, String> {
-            override fun getChannel() = channel
-            override fun getMessage() = payload
-        }
+    private fun message(channel: String, payload: String): ReactiveSubscription.Message<String, String> = object : ReactiveSubscription.Message<String, String> {
+        override fun getChannel() = channel
+        override fun getMessage() = payload
+    }
 
     // 테스트는 스레드를 바꾸지 않는다 — 바꾸면 검증이 비동기가 되어 불안정해진다.
-    private fun adapter() =
-        ValkeyConversationEventAdapter(redis, container, objectMapper, Schedulers.immediate())
+    private fun adapter() = ValkeyConversationEventAdapter(redis, container, objectMapper, Schedulers.immediate())
 
     /** **이것이 원래 깨져 있던 동작이다.** 새 메시지는 유실 허용이 아니다. */
     @Test

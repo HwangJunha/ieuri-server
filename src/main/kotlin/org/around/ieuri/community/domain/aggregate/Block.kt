@@ -26,7 +26,6 @@ class Block private constructor(
             return Block(id = null, blockerId = blockerId, blockedId = blockedId, createdAt = null)
         }
 
-        fun restore(id: Long, blockerId: Long, blockedId: Long, createdAt: Instant): Block =
-            Block(id = id, blockerId = blockerId, blockedId = blockedId, createdAt = createdAt)
+        fun restore(id: Long, blockerId: Long, blockedId: Long, createdAt: Instant): Block = Block(id = id, blockerId = blockerId, blockedId = blockedId, createdAt = createdAt)
     }
 }
