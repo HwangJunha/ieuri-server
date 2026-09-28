@@ -1,6 +1,5 @@
 package org.around.ieuri.tourism.infrastructure.batch
 
-import tools.jackson.databind.ObjectMapper
 import org.around.ieuri.tourism.application.port.`in`.command.SpotCatalogSplitUseCase
 import org.around.ieuri.tourism.application.port.`in`.command.SpotCatalogUseCase
 import org.around.ieuri.tourism.application.port.out.client.FestivalSyncPort
@@ -19,6 +18,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Profile
 import org.springframework.transaction.PlatformTransactionManager
+import tools.jackson.databind.ObjectMapper
 
 /**
  * 관광지·축제 동기화 잡 구성.
@@ -72,60 +72,55 @@ class SpotSyncJobConfig(
     }
 
     /** 미배정 spot을 카탈로그에 배정한다. 대상이 소진될 때까지 회차를 반복한다. */
-    private fun catalogAssignmentStep(): Step =
-        StepBuilder("catalogAssignmentStep", jobRepository)
-            .tasklet(SpotCatalogAssignmentTasklet(catalogUseCase), transactionManager)
-            .build()
+    private fun catalogAssignmentStep(): Step = StepBuilder("catalogAssignmentStep", jobRepository)
+        .tasklet(SpotCatalogAssignmentTasklet(catalogUseCase), transactionManager)
+        .build()
 
     /**
      * 서로 다른 장소가 접힌 카탈로그를 가른다(SPEC-0029).
      *
      * **배정 뒤여야 한다** — 전량이 붙고 난 뒤라야 한 카탈로그가 몇 장소인지 물을 수 있다.
      */
-    private fun catalogSplitStep(): Step =
-        StepBuilder("catalogSplitStep", jobRepository)
-            .tasklet(SpotCatalogSplitTasklet(catalogSplitUseCase, catalogUseCase), transactionManager)
-            .build()
+    private fun catalogSplitStep(): Step = StepBuilder("catalogSplitStep", jobRepository)
+        .tasklet(SpotCatalogSplitTasklet(catalogSplitUseCase, catalogUseCase), transactionManager)
+        .build()
 
     /**
      * 언어 1개를 전량 수집하는 Step. `allowStartIfComplete(false)`(기본값)라, 재실행 시 이미 완료된 언어
      * Step은 건너뛰고 실패한 언어부터 재개한다.
      */
-    private fun syncStep(language: DomainLocale): Step =
-        StepBuilder("syncLanguageStep-${language.name}", jobRepository)
-            .tasklet(
-                SpotSyncTasklet(
-                    language = language,
-                    syncPort = syncPort,
-                    storePort = storePort,
-                    upsertPort = upsertPort,
-                    pageSize = properties.pageSize,
-                    // 조회를 Step 실행 시점으로 미룬다 — 람다를 벗기면 부팅 때 잡은 낡은 집합으로
-                    // 걸러 종료 축제가 되살아난다.
-                    endedFestivalIds = { runDate -> festivalStorePort.findEndedContentIds(language, runDate) },
-                ),
-                transactionManager,
-            )
-            .build()
-
+    private fun syncStep(language: DomainLocale): Step = StepBuilder("syncLanguageStep-${language.name}", jobRepository)
+        .tasklet(
+            SpotSyncTasklet(
+                language = language,
+                syncPort = syncPort,
+                storePort = storePort,
+                upsertPort = upsertPort,
+                pageSize = properties.pageSize,
+                // 조회를 Step 실행 시점으로 미룬다 — 람다를 벗기면 부팅 때 잡은 낡은 집합으로
+                // 걸러 종료 축제가 되살아난다.
+                endedFestivalIds = { runDate -> festivalStorePort.findEndedContentIds(language, runDate) },
+            ),
+            transactionManager,
+        )
+        .build()
 
     /**
      * 언어 1개의 축제 정보를 수집·적재하고 정리하는 Step. Step이 분리되어 있어 한 언어의 실패가
      * 앞 언어의 커밋을 되돌리지 않는다.
      */
-    private fun festivalStep(language: DomainLocale): Step =
-        StepBuilder("festivalSyncStep-${language.name}", jobRepository)
-            .tasklet(
-                FestivalSyncTasklet(
-                    language = language,
-                    syncPort = festivalSyncPort,
-                    storePort = festivalStorePort,
-                    upsertPort = festivalUpsertPort,
-                    pageSize = festivalProperties.pageSize,
-                ),
-                transactionManager,
-            )
-            .build()
+    private fun festivalStep(language: DomainLocale): Step = StepBuilder("festivalSyncStep-${language.name}", jobRepository)
+        .tasklet(
+            FestivalSyncTasklet(
+                language = language,
+                syncPort = festivalSyncPort,
+                storePort = festivalStorePort,
+                upsertPort = festivalUpsertPort,
+                pageSize = festivalProperties.pageSize,
+            ),
+            transactionManager,
+        )
+        .build()
 
     companion object {
         const val JOB_NAME = "spotSyncJob"

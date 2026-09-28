@@ -1,7 +1,5 @@
 package org.around.ieuri.alarm.infrastructure.mapper
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
 import org.around.ieuri.alarm.application.query.NotificationPreferenceView
 import org.around.ieuri.alarm.domain.vo.AlarmLocale
 import org.around.ieuri.alarm.domain.vo.DevicePlatform
@@ -9,10 +7,12 @@ import org.around.ieuri.alarm.domain.vo.NotificationCategory
 import org.around.ieuri.alarm.infrastructure.adapter.`in`.graphql.mapper.toCommand
 import org.around.ieuri.alarm.infrastructure.adapter.`in`.graphql.mapper.toGql
 import org.around.ieuri.common.graphql.generated.types.DeleteDeviceTokenInput
-import org.around.ieuri.common.graphql.generated.types.Locale as GqlLocale
 import org.around.ieuri.common.graphql.generated.types.RegisterDeviceTokenInput
 import org.around.ieuri.common.graphql.generated.types.UpdateNotificationPreferenceInput
+import kotlin.test.Test
+import kotlin.test.assertEquals
 import org.around.ieuri.common.graphql.generated.types.DevicePlatform as GqlDevicePlatform
+import org.around.ieuri.common.graphql.generated.types.Locale as GqlLocale
 import org.around.ieuri.common.graphql.generated.types.NotificationCategory as GqlNotificationCategory
 
 /**

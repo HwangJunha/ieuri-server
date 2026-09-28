@@ -23,7 +23,6 @@ enum class TargetCategory {
 
     companion object {
         /** 상대 도메인의 카테고리 문자열을 옮긴다. 모르는 값이면 null(칩으로 걸러지지 않음). */
-        fun fromOrNull(name: String?): TargetCategory? =
-            name?.let { v -> entries.firstOrNull { it.name == v } }
+        fun fromOrNull(name: String?): TargetCategory? = name?.let { v -> entries.firstOrNull { it.name == v } }
     }
 }

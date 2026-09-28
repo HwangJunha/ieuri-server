@@ -61,10 +61,12 @@ class PostSpatialQueryAdapter(
         val hiddenPostIds = search.viewer.hiddenPostIds
         when {
             search.hiddenByViewer && hiddenPostIds.isEmpty() -> conditions += "FALSE"
+
             search.hiddenByViewer -> {
                 conditions += "p.id IN (${placeholders(hiddenPostIds.size)})"
                 params.addAll(hiddenPostIds)
             }
+
             hiddenPostIds.isNotEmpty() -> {
                 conditions += "p.id NOT IN (${placeholders(hiddenPostIds.size)})"
                 params.addAll(hiddenPostIds)

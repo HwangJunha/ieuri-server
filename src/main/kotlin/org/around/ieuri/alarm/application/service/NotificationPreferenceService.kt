@@ -20,11 +20,11 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class NotificationPreferenceService(
     private val repositoryPort: NotificationPreferenceRepositoryPort,
-) : NotificationPreferenceCommandUseCase, NotificationPreferenceQueryUseCase {
+) : NotificationPreferenceCommandUseCase,
+    NotificationPreferenceQueryUseCase {
 
     @Transactional(readOnly = true)
-    override fun findByMemberId(memberId: Long): List<NotificationPreferenceView> =
-        assemble(repositoryPort.findByMemberId(memberId))
+    override fun findByMemberId(memberId: Long): List<NotificationPreferenceView> = assemble(repositoryPort.findByMemberId(memberId))
 
     @Transactional
     override fun update(

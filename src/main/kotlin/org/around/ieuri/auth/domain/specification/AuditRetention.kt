@@ -60,8 +60,7 @@ object AuditRetention {
      *
      * 달의 길이를 따르므로 회차마다 경계 간격이 다르다 — 그것이 "6개월"의 의미다.
      */
-    fun cutoff(now: Instant, retention: Period): Instant =
-        now.atZone(ZONE).minus(retention).toInstant()
+    fun cutoff(now: Instant, retention: Period): Instant = now.atZone(ZONE).minus(retention).toInstant()
 
     /**
      * [createdAt]이 보관 기간을 넘겼는지.
@@ -69,6 +68,5 @@ object AuditRetention {
      * **경계는 배타적이다** — 정확히 기간에 걸친 기록은 아직 삭제 대상이 아니다
      * (`Message.isExpired`와 같은 방향).
      */
-    fun isExpired(createdAt: Instant, now: Instant, retention: Duration): Boolean =
-        createdAt.isBefore(cutoff(now, retention))
+    fun isExpired(createdAt: Instant, now: Instant, retention: Duration): Boolean = createdAt.isBefore(cutoff(now, retention))
 }

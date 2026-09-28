@@ -51,12 +51,10 @@ class TourStatsUpsertJdbcAdapter(
     }
 
     @Transactional
-    override fun upsertStayIntensities(records: List<SyncDemandIntensityCommand>): Int =
-        upsertDemandIntensity(STAY_INTENSITY_SQL, records)
+    override fun upsertStayIntensities(records: List<SyncDemandIntensityCommand>): Int = upsertDemandIntensity(STAY_INTENSITY_SQL, records)
 
     @Transactional
-    override fun upsertSpendingIntensities(records: List<SyncDemandIntensityCommand>): Int =
-        upsertDemandIntensity(SPENDING_INTENSITY_SQL, records)
+    override fun upsertSpendingIntensities(records: List<SyncDemandIntensityCommand>): Int = upsertDemandIntensity(SPENDING_INTENSITY_SQL, records)
 
     /** 체류·소비 강도는 컬럼 구성이 같아 SQL만 갈린다. */
     private fun upsertDemandIntensity(sql: String, records: List<SyncDemandIntensityCommand>): Int {
@@ -71,9 +69,8 @@ class TourStatsUpsertJdbcAdapter(
     }
 
     /** batchUpdate는 청크별 결과를 배열의 배열로 돌려준다 — 반영된 행만 센다. */
-    private fun <T : Any> batch(sql: String, records: List<T>, setter: ParameterizedPreparedStatementSetter<T>): Int =
-        jdbcTemplate.batchUpdate(sql, records, records.size, setter)
-            .sumOf { chunk -> chunk.count { it != 0 } }
+    private fun <T : Any> batch(sql: String, records: List<T>, setter: ParameterizedPreparedStatementSetter<T>): Int = jdbcTemplate.batchUpdate(sql, records, records.size, setter)
+        .sumOf { chunk -> chunk.count { it != 0 } }
 
     private companion object {
         /**

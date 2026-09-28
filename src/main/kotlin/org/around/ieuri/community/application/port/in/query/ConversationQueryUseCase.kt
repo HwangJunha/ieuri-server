@@ -43,4 +43,3 @@ interface ConversationQueryUseCase {
      */
     fun newMessage(conversationId: Long, memberId: Long): Flux<MessageView>
 }
-

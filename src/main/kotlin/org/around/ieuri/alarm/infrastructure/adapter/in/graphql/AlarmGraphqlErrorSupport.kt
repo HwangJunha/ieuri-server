@@ -11,13 +11,12 @@ import org.around.ieuri.common.graphql.generated.types.UserError
  *
  * 인증 실패는 여기서 잡지 않고 최상위 `errors[]`로 나간다(POL-016).
  */
-inline fun <T> withAlarmUserErrors(onError: (List<UserError>) -> T, block: () -> T): T =
-    try {
-        block()
-    } catch (e: IllegalArgumentException) {
-        // Command 생성과 도메인 require 위반. 그 밖의 예외는 잡지 않고 최상위로 흘린다.
-        onError(listOf(invalidInput(e.message ?: "잘못된 입력입니다.")))
-    }
+inline fun <T> withAlarmUserErrors(onError: (List<UserError>) -> T, block: () -> T): T = try {
+    block()
+} catch (e: IllegalArgumentException) {
+    // Command 생성과 도메인 require 위반. 그 밖의 예외는 잡지 않고 최상위로 흘린다.
+    onError(listOf(invalidInput(e.message ?: "잘못된 입력입니다.")))
+}
 
 fun invalidInput(message: String): UserError = UserError(
     code = INVALID_INPUT,

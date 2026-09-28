@@ -56,31 +56,28 @@ class MapQueryResolver(
         @InputArgument bbox: GqlMapBoundsInput,
         @InputArgument zoom: Int,
         @InputArgument categories: List<String>?,
-    ): GqlMapViewportResult =
-        mapQueryUseCase.mapViewport(
-            MapViewportQuery(
-                bounds = bbox.toBounds(),
-                zoom = zoom,
-                categories = toCategorySelection(categories),
-            ),
-            locale = dfe.domainLocale(),
-        ).toGql()
+    ): GqlMapViewportResult = mapQueryUseCase.mapViewport(
+        MapViewportQuery(
+            bounds = bbox.toBounds(),
+            zoom = zoom,
+            categories = toCategorySelection(categories),
+        ),
+        locale = dfe.domainLocale(),
+    ).toGql()
 
     @DgsQuery
     fun seoulCongestion(
         dfe: DgsDataFetchingEnvironment,
         @InputArgument areaIds: List<String>?,
         @InputArgument bbox: GqlMapBoundsInput?,
-    ): GqlSeoulCongestionResult =
-        mapQueryUseCase.seoulCongestion(
-            areaIds = areaIds,
-            bounds = bbox?.toBounds(),
-            locale = dfe.domainLocale(),
-        ).toGql()
+    ): GqlSeoulCongestionResult = mapQueryUseCase.seoulCongestion(
+        areaIds = areaIds,
+        bounds = bbox?.toBounds(),
+        locale = dfe.domainLocale(),
+    ).toGql()
 
     @DgsQuery
-    fun seoulCongestionAreas(dfe: DgsDataFetchingEnvironment): List<GqlCongestionAreaBoundary> =
-        mapQueryUseCase.seoulCongestionAreas(dfe.domainLocale()).map { it.toGql() }
+    fun seoulCongestionAreas(dfe: DgsDataFetchingEnvironment): List<GqlCongestionAreaBoundary> = mapQueryUseCase.seoulCongestionAreas(dfe.domainLocale()).map { it.toGql() }
 
     /**
      * 입력 bbox → 도메인 VO. 좌표 범위·뒤집힘 검증이 여기서 일어나며, 실패는 `INVALID_BBOX`다(R4).
@@ -91,9 +88,8 @@ class MapQueryResolver(
      * 만든다. 여기를 그대로 두는 것은 SPEC-0014의 기존 동작을 건드리지 않기 위해서이며,
      * 일괄 정리는 별도 리팩토링에서 한다.
      */
-    private fun GqlMapBoundsInput.toBounds(): MapBounds =
-        MapBounds.ofOrNull(minLat = minLat, minLng = minLng, maxLat = maxLat, maxLng = maxLng)
-            ?: throw InvalidBboxException("지도 영역이 올바르지 않습니다.")
+    private fun GqlMapBoundsInput.toBounds(): MapBounds = MapBounds.ofOrNull(minLat = minLat, minLng = minLng, maxLat = maxLat, maxLng = maxLng)
+        ?: throw InvalidBboxException("지도 영역이 올바르지 않습니다.")
 
     private fun MapViewportView.toGql() = GqlMapViewportResult(
         spots = spots.map { it.toGql() },

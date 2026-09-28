@@ -19,7 +19,13 @@ data class SpotIntro(
 ) {
     /** 모든 필드가 비었으면 true — 빈 껍데기를 응답에 내리지 않기 위한 판정. */
     fun isEmpty(): Boolean = listOf(
-        businessHours, closedDays, parking, inquiryPhone, fee, petAllowed, creditCardAccepted,
+        businessHours,
+        closedDays,
+        parking,
+        inquiryPhone,
+        fee,
+        petAllowed,
+        creditCardAccepted,
     ).all { it == null }
 }
 

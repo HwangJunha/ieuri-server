@@ -62,7 +62,8 @@ class SpotCatalogAssignmentTasklet(
         if (result.processed == 0) {
             log.info(
                 "catalog assignment: language={} exhausted (skipped={})",
-                language, executionContext.getInt(KEY_SKIPPED, 0),
+                language,
+                executionContext.getInt(KEY_SKIPPED, 0),
             )
             executionContext.putInt(KEY_LANGUAGE_INDEX, languageIndex + 1)
             // 다음 언어는 처음부터 읽는다.
@@ -113,7 +114,9 @@ class SpotCatalogSplitTasklet(
 
         log.info(
             "catalog split finished: split={} created={} moved={}",
-            result.catalogsSplit, result.catalogsCreated, result.spotsMoved,
+            result.catalogsSplit,
+            result.catalogsCreated,
+            result.spotsMoved,
         )
         return RepeatStatus.FINISHED
     }

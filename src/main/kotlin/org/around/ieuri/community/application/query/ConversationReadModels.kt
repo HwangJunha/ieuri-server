@@ -2,7 +2,7 @@ package org.around.ieuri.community.application.query
 
 import java.time.Instant
 
-/**
+/*
  * DM 읽기(CQRS) 전용 read model(SPEC-0017). QueryDSL이 직접 프로젝션한 결과이며
  * 도메인/JPA 어느 쪽도 아니다. 리졸버가 이 DTO를 GraphQL 응답 타입으로 매핑한다.
  */

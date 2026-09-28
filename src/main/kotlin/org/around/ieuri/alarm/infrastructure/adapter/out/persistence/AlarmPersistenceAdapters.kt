@@ -20,14 +20,11 @@ class DeviceTokenPersistenceAdapter(
     private val repository: DeviceTokenJpaRepository,
 ) : DeviceTokenRepositoryPort {
 
-    override fun findByDeviceId(deviceId: String): DeviceToken? =
-        repository.findByDeviceId(deviceId)?.toDomain()
+    override fun findByDeviceId(deviceId: String): DeviceToken? = repository.findByDeviceId(deviceId)?.toDomain()
 
-    override fun findByMemberId(memberId: Long): List<DeviceToken> =
-        repository.findByMemberId(memberId).map { it.toDomain() }
+    override fun findByMemberId(memberId: Long): List<DeviceToken> = repository.findByMemberId(memberId).map { it.toDomain() }
 
-    override fun save(deviceToken: DeviceToken): DeviceToken =
-        repository.save(deviceToken.toNewEntity()).toDomain()
+    override fun save(deviceToken: DeviceToken): DeviceToken = repository.save(deviceToken.toNewEntity()).toDomain()
 
     override fun update(deviceToken: DeviceToken) {
         val entity = repository.findByDeviceId(deviceToken.deviceId) ?: return
@@ -53,8 +50,7 @@ class NotificationMessagePersistenceAdapter(
     private val repository: NotificationMessageJpaRepository,
 ) : NotificationMessageRepositoryPort {
 
-    override fun findByType(type: NotificationType): List<NotificationMessage> =
-        repository.findByNotificationType(type).map { it.toDomain() }
+    override fun findByType(type: NotificationType): List<NotificationMessage> = repository.findByNotificationType(type).map { it.toDomain() }
 }
 
 @Component
@@ -62,17 +58,14 @@ class NotificationPreferencePersistenceAdapter(
     private val repository: NotificationPreferenceJpaRepository,
 ) : NotificationPreferenceRepositoryPort {
 
-    override fun findByMemberId(memberId: Long): List<NotificationPreference> =
-        repository.findByMemberId(memberId).map { it.toDomain() }
+    override fun findByMemberId(memberId: Long): List<NotificationPreference> = repository.findByMemberId(memberId).map { it.toDomain() }
 
     override fun findByMemberIdAndCategory(
         memberId: Long,
         category: NotificationCategory,
-    ): NotificationPreference? =
-        repository.findByMemberIdAndCategory(memberId, category)?.toDomain()
+    ): NotificationPreference? = repository.findByMemberIdAndCategory(memberId, category)?.toDomain()
 
-    override fun save(preference: NotificationPreference): NotificationPreference =
-        repository.save(preference.toNewEntity()).toDomain()
+    override fun save(preference: NotificationPreference): NotificationPreference = repository.save(preference.toNewEntity()).toDomain()
 
     override fun update(preference: NotificationPreference) {
         val entity = repository.findByMemberIdAndCategory(preference.memberId, preference.category)

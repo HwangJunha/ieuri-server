@@ -1,7 +1,7 @@
 package org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper
 
-import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.common.error.EmptyCategorySetException
+import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.common.graphql.generated.types.TargetCategory as GqlTargetCategory
 
 /**

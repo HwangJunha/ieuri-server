@@ -5,12 +5,13 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
+import org.around.ieuri.common.context.AppKey
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.CursorPageInfo
 import org.around.ieuri.community.application.event.PostViewed
 import org.around.ieuri.community.application.policy.CommunityPolicy
-import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
 import org.around.ieuri.community.application.port.out.client.CategoryConfigPort
+import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
 import org.around.ieuri.community.application.port.out.query.BlockedUsersSearch
 import org.around.ieuri.community.application.port.out.query.CommunityQueryPort
 import org.around.ieuri.community.application.port.out.query.MyPostsSearch
@@ -24,7 +25,6 @@ import org.around.ieuri.community.application.query.MyPostsQuery
 import org.around.ieuri.community.application.query.PostCommentsQuery
 import org.around.ieuri.community.application.query.PostView
 import org.around.ieuri.community.application.query.PostsQuery
-import org.around.ieuri.common.context.AppKey
 import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.around.ieuri.community.domain.vo.PostSortOrder
 import org.around.ieuri.community.domain.vo.TargetCategory
@@ -66,7 +66,11 @@ class CommunityQueryServiceTest {
     private val categoryConfigPort = mockk<CategoryConfigPort>()
 
     private val service = CommunityQueryService(
-        queryPort, spatialPort, categoryConfigPort, eventPublisher, policy,
+        queryPort,
+        spatialPort,
+        categoryConfigPort,
+        eventPublisher,
+        policy,
     )
 
     private fun <T> emptyPage() = CursorPage<T>(
@@ -646,5 +650,4 @@ class CommunityQueryServiceTest {
         edited = false,
         createdAt = Instant.parse("2026-08-05T00:00:00Z"),
     )
-
 }

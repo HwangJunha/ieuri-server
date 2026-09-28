@@ -5,11 +5,11 @@ import org.around.ieuri.tourism.application.command.SyncDemandIntensityCommand
 import org.around.ieuri.tourism.application.command.SyncVisitorCountCommand
 import org.around.ieuri.tourism.application.exception.UpstreamRateLimitedException
 import org.around.ieuri.tourism.application.exception.UpstreamUnavailableException
-import org.around.ieuri.tourism.application.port.out.client.TourStatsSyncPort
 import org.around.ieuri.tourism.application.port.out.client.TourStatsSyncPage
-import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourstats.dto.TourStatsResponse
+import org.around.ieuri.tourism.application.port.out.client.TourStatsSyncPort
 import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourstats.dto.TourStatsConcentrationRateItem
 import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourstats.dto.TourStatsDemandIntensityItem
+import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourstats.dto.TourStatsResponse
 import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourstats.dto.TourStatsVisitorCountItem
 import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourstats.mapper.toSyncCommandOrNull
 import org.around.ieuri.tourism.infrastructure.config.TourStatsProperties
@@ -86,32 +86,30 @@ class TourStatsClient(
         baseMonth: YearMonth,
         pageNo: Int,
         numOfRows: Int,
-    ): TourStatsSyncPage<SyncDemandIntensityCommand> =
-        fetchDemandIntensity(
-            OP_STAY_INTENSITY,
-            PARAM_STAY_INDEX_CODE,
-            properties.stayIndexCode,
-            areaCd,
-            baseMonth,
-            pageNo,
-            numOfRows,
-        )
+    ): TourStatsSyncPage<SyncDemandIntensityCommand> = fetchDemandIntensity(
+        OP_STAY_INTENSITY,
+        PARAM_STAY_INDEX_CODE,
+        properties.stayIndexCode,
+        areaCd,
+        baseMonth,
+        pageNo,
+        numOfRows,
+    )
 
     override fun fetchSpendingIntensities(
         areaCd: String,
         baseMonth: YearMonth,
         pageNo: Int,
         numOfRows: Int,
-    ): TourStatsSyncPage<SyncDemandIntensityCommand> =
-        fetchDemandIntensity(
-            OP_SPENDING_INTENSITY,
-            PARAM_SPENDING_INDEX_CODE,
-            properties.spendingIndexCode,
-            areaCd,
-            baseMonth,
-            pageNo,
-            numOfRows,
-        )
+    ): TourStatsSyncPage<SyncDemandIntensityCommand> = fetchDemandIntensity(
+        OP_SPENDING_INTENSITY,
+        PARAM_SPENDING_INDEX_CODE,
+        properties.spendingIndexCode,
+        areaCd,
+        baseMonth,
+        pageNo,
+        numOfRows,
+    )
 
     /**
      * 체류·소비 강도는 같은 서비스의 다른 오퍼레이션이다.
@@ -170,8 +168,7 @@ class TourStatsClient(
      * 둘 다 도메인 오류로 바꾼다. 그대로 두면 업스트림 장애가 INTERNAL로 새어 나가
      * `UPSTREAM_UNAVAILABLE`이 도달 불가능해진다(§5의 기존 결함).
      */
-    private fun <I : Any> call(uri: URI, type: ParameterizedTypeReference<TourStatsResponse<I>>):
-        TourStatsResponse<I> {
+    private fun <I : Any> call(uri: URI, type: ParameterizedTypeReference<TourStatsResponse<I>>): TourStatsResponse<I> {
         val response = try {
             ktoBigDataRestClient.get().uri(uri).retrieve().body(type)
                 ?: throw UpstreamUnavailableException("KTO 빅데이터 응답이 비어 있습니다.")
@@ -225,22 +222,20 @@ class TourStatsClient(
         pageNo: Int,
         numOfRows: Int,
         extra: UriComponentsBuilder.() -> Unit,
-    ): URI =
-        UriComponentsBuilder.fromUriString(baseUrl(service))
-            .path("/$operation")
-            .queryParam("serviceKey", properties.serviceKey)
-            .queryParam("MobileOS", MOBILE_OS)
-            .queryParam("MobileApp", MOBILE_APP)
-            .queryParam("_type", "json")
-            .queryParam("pageNo", pageNo)
-            .queryParam("numOfRows", numOfRows)
-            .apply(extra)
-            .build(true)
-            .toUri()
+    ): URI = UriComponentsBuilder.fromUriString(baseUrl(service))
+        .path("/$operation")
+        .queryParam("serviceKey", properties.serviceKey)
+        .queryParam("MobileOS", MOBILE_OS)
+        .queryParam("MobileApp", MOBILE_APP)
+        .queryParam("_type", "json")
+        .queryParam("pageNo", pageNo)
+        .queryParam("numOfRows", numOfRows)
+        .apply(extra)
+        .build(true)
+        .toUri()
 
-    private fun baseUrl(service: String): String =
-        properties.baseUrls[service]
-            ?: throw UpstreamUnavailableException("KTO 빅데이터 base-url이 설정되지 않았습니다: $service")
+    private fun baseUrl(service: String): String = properties.baseUrls[service]
+        ?: throw UpstreamUnavailableException("KTO 빅데이터 base-url이 설정되지 않았습니다: $service")
 
     private companion object {
         const val OP_VISITOR_COUNT = "locgoRegnVisitrDDList"

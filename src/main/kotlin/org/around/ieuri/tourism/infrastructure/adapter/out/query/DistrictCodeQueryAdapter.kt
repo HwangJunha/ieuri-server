@@ -25,17 +25,14 @@ class DistrictCodeQueryAdapter(
 ) : DistrictCodeQueryPort {
 
     @Transactional(readOnly = true)
-    override fun findAllCodes(): Set<String> =
-        districtRepository.findAll().mapTo(mutableSetOf()) { it.code }
+    override fun findAllCodes(): Set<String> = districtRepository.findAll().mapTo(mutableSetOf()) { it.code }
 
     /** 코드 오름차순 — 배치가 인덱스로 진행 위치를 기억하므로 순서가 안정적이어야 한다. */
     @Transactional(readOnly = true)
-    override fun findAllRegions(): List<DistrictRegion> =
-        districtRepository.findAll(Sort.by("code"))
-            .map { DistrictRegion(code = it.code, provinceCode = it.areaCd) }
+    override fun findAllRegions(): List<DistrictRegion> = districtRepository.findAll(Sort.by("code"))
+        .map { DistrictRegion(code = it.code, provinceCode = it.areaCd) }
 
     /** 17행. `area`가 원본의 상위 계층이라 DISTINCT 없이 그대로 읽는다(V74). */
     @Transactional(readOnly = true)
-    override fun findAllProvinceCodes(): List<String> =
-        areaRepository.findAll(Sort.by("areaCd")).map { it.areaCd }
+    override fun findAllProvinceCodes(): List<String> = areaRepository.findAll(Sort.by("areaCd")).map { it.areaCd }
 }

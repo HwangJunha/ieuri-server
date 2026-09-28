@@ -99,12 +99,12 @@ data class TourApiDetailIntroResponse(
     @JsonIgnoreProperties(ignoreUnknown = true)
     data class Item(
         // 이용/영업 시간
-        val usetime: String? = null,          // 12 관광지
-        val usetimeculture: String? = null,   // 14 문화시설
-        val usetimefestival: String? = null,  // 15 축제
-        val usetimeleports: String? = null,   // 28 레포츠
-        val opentime: String? = null,         // 38 쇼핑 (주의: opentimeshopping 아님)
-        val opentimefood: String? = null,     // 39 음식점
+        val usetime: String? = null, // 12 관광지
+        val usetimeculture: String? = null, // 14 문화시설
+        val usetimefestival: String? = null, // 15 축제
+        val usetimeleports: String? = null, // 28 레포츠
+        val opentime: String? = null, // 38 쇼핑 (주의: opentimeshopping 아님)
+        val opentimefood: String? = null, // 39 음식점
         // 휴무일
         val restdate: String? = null,
         val restdateculture: String? = null,
@@ -127,8 +127,8 @@ data class TourApiDetailIntroResponse(
         val infocenterfood: String? = null,
         val infocentertourcourse: String? = null, // 25 여행코스
         // 요금
-        val usefee: String? = null,           // 14 문화시설
-        val usefeeleports: String? = null,    // 28 레포츠
+        val usefee: String? = null, // 14 문화시설
+        val usefeeleports: String? = null, // 28 레포츠
         // 반려동물
         val chkpet: String? = null,
         val chkpetculture: String? = null,

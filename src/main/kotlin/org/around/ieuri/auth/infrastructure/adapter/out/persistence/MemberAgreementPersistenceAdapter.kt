@@ -28,11 +28,10 @@ class MemberAgreementPersistenceAdapter(
      * 새 버전이 시행되면 그 버전의 행이 없으므로 미동의로 떨어진다.
      */
     @Transactional(readOnly = true)
-    override fun findCurrentAgreements(memberId: Long): Map<TermsKey, AgreementRecord> =
-        agreementRepository.findByMemberId(memberId).associate { row ->
-            TermsKey(row.termsCode, row.termsVersion) to
-                AgreementRecord(agreed = row.agreed, agreedAt = requireNotNull(row.agreedAt))
-        }
+    override fun findCurrentAgreements(memberId: Long): Map<TermsKey, AgreementRecord> = agreementRepository.findByMemberId(memberId).associate { row ->
+        TermsKey(row.termsCode, row.termsVersion) to
+            AgreementRecord(agreed = row.agreed, agreedAt = requireNotNull(row.agreedAt))
+    }
 
     /**
      * 동의/철회를 반영한다. 기존 행이 있으면 **관리 엔티티를 고쳐 dirty-checking에 맡기고**,

@@ -70,15 +70,14 @@ data class PhotoObjectKey(
     fun ownedBy(callerId: Long): Boolean = memberId == callerId
 
     /** 검증을 통과한 키의 확정 위치. `pending/` 구간만 바뀌고 나머지는 그대로다. */
-    fun toConfirmed(): PhotoObjectKey =
-        if (confirmed) {
-            this
-        } else {
-            // 접두어(value)와 confirmed는 함께 움직여야 하는 값이라 한 자리에서 전부 지정한다.
-            PhotoObjectKey(
-                value = value.replaceFirst("$PENDING_PREFIX/", "$CONFIRMED_PREFIX/"),
-                memberId = memberId,
-                confirmed = true,
-            )
-        }
+    fun toConfirmed(): PhotoObjectKey = if (confirmed) {
+        this
+    } else {
+        // 접두어(value)와 confirmed는 함께 움직여야 하는 값이라 한 자리에서 전부 지정한다.
+        PhotoObjectKey(
+            value = value.replaceFirst("$PENDING_PREFIX/", "$CONFIRMED_PREFIX/"),
+            memberId = memberId,
+            confirmed = true,
+        )
+    }
 }

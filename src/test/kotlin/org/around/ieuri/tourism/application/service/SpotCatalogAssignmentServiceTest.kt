@@ -2,9 +2,9 @@ package org.around.ieuri.tourism.application.service
 
 import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
 import org.around.ieuri.tourism.application.port.out.persistence.CatalogLanguage
-import org.around.ieuri.tourism.application.port.out.persistence.VisibilityRefreshResult
 import org.around.ieuri.tourism.application.port.out.persistence.SpotCatalogStorePort
 import org.around.ieuri.tourism.application.port.out.persistence.SpotCatalogUpsertPort
+import org.around.ieuri.tourism.application.port.out.persistence.VisibilityRefreshResult
 import org.around.ieuri.tourism.application.port.out.query.CatalogCandidate
 import org.around.ieuri.tourism.application.port.out.query.SpotCatalogQueryPort
 import org.around.ieuri.tourism.application.port.out.query.UnassignedSpot
@@ -52,8 +52,7 @@ class SpotCatalogAssignmentServiceTest {
         copyright = CopyrightType.TYPE1,
     )
 
-    private fun koreanSpot(spotId: Long = 12, title: String = "마린시티", mapX: Double = this.mapX) =
-        spot(spotId = spotId, language = DomainLocale.KO, title = title, address = "부산", mapX = mapX)
+    private fun koreanSpot(spotId: Long = 12, title: String = "마린시티", mapX: Double = this.mapX) = spot(spotId = spotId, language = DomainLocale.KO, title = title, address = "부산", mapX = mapX)
 
     private fun service(
         query: StubQueryPort,
@@ -416,8 +415,7 @@ class SpotCatalogAssignmentServiceTest {
         var indexLoads = 0
             private set
 
-        override fun findUnassigned(language: DomainLocale, afterSpotId: Long, limit: Int): List<UnassignedSpot> =
-            unassigned.filter { it.language == language && it.spotId > afterSpotId }.take(limit)
+        override fun findUnassigned(language: DomainLocale, afterSpotId: Long, limit: Int): List<UnassignedSpot> = unassigned.filter { it.language == language && it.spotId > afterSpotId }.take(limit)
 
         override fun loadKoreanTitleIndex(): Map<String, List<CatalogCandidate>> {
             indexLoads++
@@ -482,6 +480,5 @@ class SpotCatalogAssignmentServiceTest {
         override fun refreshFestivalPeriod(catalogId: Long) {
             festivalRefreshed += catalogId
         }
-
     }
 }

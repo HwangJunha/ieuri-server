@@ -35,8 +35,7 @@ class MemberAgreementService(
 ) : MemberAgreementUseCase {
 
     @Transactional(readOnly = true)
-    override fun agreements(memberId: Long): List<AgreementStatusView> =
-        statusesOf(memberId, termsRepository.findActiveTerms(clock.instant()))
+    override fun agreements(memberId: Long): List<AgreementStatusView> = statusesOf(memberId, termsRepository.findActiveTerms(clock.instant()))
 
     /**
      * 약관 동의를 켜고 끈다. **필수 약관도 철회할 수 있다** — 동의 철회권은 동의와 대등한

@@ -152,12 +152,11 @@ class SpotAnswerCommandService(
      * 답변으로 찾지 못한 부모 id의 정체를 가른다. 답글이면 1단계 위반이고, 아무것도 아니면
      * 사라진 답변이다.
      */
-    private fun parentNotAnswerException(parentId: Long): RuntimeException =
-        if (replyRepositoryPort.findById(parentId) != null) {
-            ReplyToReplyNotAllowedException()
-        } else {
-            AnswerNotFoundException()
-        }
+    private fun parentNotAnswerException(parentId: Long): RuntimeException = if (replyRepositoryPort.findById(parentId) != null) {
+        ReplyToReplyNotAllowedException()
+    } else {
+        AnswerNotFoundException()
+    }
 
     private fun requireValidBody(raw: String): String {
         val body = raw.trim()

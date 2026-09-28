@@ -55,7 +55,6 @@ class Report private constructor(
          * 신고자 수가 자동 숨김 임계값에 도달했는지. 대상 종류가 자동 숨김 대상이 아니면
          * 아무리 쌓여도 false다.
          */
-        fun reachesAutoHideThreshold(targetType: ReportTargetType, distinctReporters: Int): Boolean =
-            targetType.autoHideable && distinctReporters >= AUTO_HIDE_THRESHOLD
+        fun reachesAutoHideThreshold(targetType: ReportTargetType, distinctReporters: Int): Boolean = targetType.autoHideable && distinctReporters >= AUTO_HIDE_THRESHOLD
     }
 }

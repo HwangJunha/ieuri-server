@@ -47,12 +47,12 @@ class MemberAgreementServiceTest {
         Clock.fixed(now, ZoneOffset.UTC),
     )
 
-    private val service_v1 = TermsView(id = 1, code = "SERVICE", version = "1.0", required = true)
-    private val privacy_v1 = TermsView(id = 2, code = "PRIVACY", version = "1.0", required = true)
-    private val location_v1 = TermsView(id = 3, code = "LOCATION", version = "1.0", required = false)
-    private val marketing_v1 = TermsView(id = 4, code = "MARKETING", version = "1.0", required = false)
+    private val serviceV1 = TermsView(id = 1, code = "SERVICE", version = "1.0", required = true)
+    private val privacyV1 = TermsView(id = 2, code = "PRIVACY", version = "1.0", required = true)
+    private val locationV1 = TermsView(id = 3, code = "LOCATION", version = "1.0", required = false)
+    private val marketingV1 = TermsView(id = 4, code = "MARKETING", version = "1.0", required = false)
 
-    private val allTerms = listOf(service_v1, privacy_v1, location_v1, marketing_v1)
+    private val allTerms = listOf(serviceV1, privacyV1, locationV1, marketingV1)
 
     private fun givenTerms(terms: List<TermsView> = allTerms) {
         every { termsRepository.findActiveTerms(now) } returns terms
@@ -121,7 +121,7 @@ class MemberAgreementServiceTest {
     @Test
     fun `새 버전이 시행되면 이전 버전의 동의는 이월되지 않는다`() {
         // 시행 중인 것은 2.0인데 회원의 동의는 1.0에만 있다.
-        givenTerms(listOf(service_v1.copy(version = "2.0")))
+        givenTerms(listOf(serviceV1.copy(version = "2.0")))
         givenHistory(TermsKey("SERVICE", "1.0") to AgreementRecord(true, agreedAt))
 
         val status = service.agreements(memberId).single()
@@ -222,7 +222,7 @@ class MemberAgreementServiceTest {
 
     @Test
     fun `시행 중이지 않은 코드는 거절한다`() {
-        givenTerms(listOf(service_v1))
+        givenTerms(listOf(serviceV1))
 
         assertFailsWith<TermsNotFoundException> {
             service.updateAgreement(UpdateAgreementCommand(memberId, "MARKETING", agreed = true))

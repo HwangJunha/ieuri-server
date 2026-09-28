@@ -18,8 +18,7 @@ class ImageFormatTest {
     private fun bytes(vararg values: Int) = values.map { it.toByte() }.toByteArray()
 
     /** 시그니처 뒤를 0으로 채워 읽어 온 길이만큼 만든다. */
-    private fun padded(prefix: ByteArray) =
-        prefix + ByteArray(ImageFormat.MAGIC_BYTES_LENGTH - prefix.size)
+    private fun padded(prefix: ByteArray) = prefix + ByteArray(ImageFormat.MAGIC_BYTES_LENGTH - prefix.size)
 
     private val jpeg = bytes(0xFF, 0xD8, 0xFF)
     private val png = bytes(0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)
@@ -41,8 +40,10 @@ class ImageFormatTest {
     @Test
     fun `webp는 크기 구간의 값과 무관하게 알아본다`() {
         val otherSize = webp.copyOf().also {
-            it[4] = 0xFF.toByte(); it[5] = 0xFF.toByte()
-            it[6] = 0xFF.toByte(); it[7] = 0xFF.toByte()
+            it[4] = 0xFF.toByte()
+            it[5] = 0xFF.toByte()
+            it[6] = 0xFF.toByte()
+            it[7] = 0xFF.toByte()
         }
 
         assertEquals(ImageFormat.WEBP, ImageFormat.detect(otherSize))
@@ -52,8 +53,10 @@ class ImageFormatTest {
     fun `RIFF지만 WEBP가 아니면 거부한다`() {
         // WAV도 RIFF 컨테이너다 — 앞 네 바이트만 보면 통과해 버린다.
         val wav = webp.copyOf().also {
-            it[8] = 0x57.toByte(); it[9] = 0x41.toByte()
-            it[10] = 0x56.toByte(); it[11] = 0x45.toByte()
+            it[8] = 0x57.toByte()
+            it[9] = 0x41.toByte()
+            it[10] = 0x56.toByte()
+            it[11] = 0x45.toByte()
         }
 
         assertNull(ImageFormat.detect(wav))

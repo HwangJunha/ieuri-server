@@ -20,8 +20,7 @@ class SpotQuestionTest {
     private val catalogId = 11L
     private val now = Instant.parse("2026-08-18T00:00:00Z")
 
-    private fun confirmedKey(memberId: Long = authorId) =
-        requireNotNull(PhotoObjectKey.parse("images/community/$memberId/${UUID.randomUUID()}"))
+    private fun confirmedKey(memberId: Long = authorId) = requireNotNull(PhotoObjectKey.parse("images/community/$memberId/${UUID.randomUUID()}"))
 
     private fun create(
         body: String = "웨이팅 있나요?",
@@ -194,26 +193,23 @@ class SpotAnswerTest {
     private val catalogId = 11L
     private val now = Instant.parse("2026-08-18T00:00:00Z")
 
-    private fun confirmedKey(memberId: Long = authorId) =
-        requireNotNull(PhotoObjectKey.parse("images/community/$memberId/${UUID.randomUUID()}"))
+    private fun confirmedKey(memberId: Long = authorId) = requireNotNull(PhotoObjectKey.parse("images/community/$memberId/${UUID.randomUUID()}"))
 
-    private fun answer(body: String = "지금은 없어요", photoKeys: List<PhotoObjectKey> = emptyList()) =
-        SpotAnswer.create(
-            questionId = questionId,
-            catalogId = catalogId,
-            authorId = authorId,
-            body = body,
-            photoKeys = photoKeys,
-        )
+    private fun answer(body: String = "지금은 없어요", photoKeys: List<PhotoObjectKey> = emptyList()) = SpotAnswer.create(
+        questionId = questionId,
+        catalogId = catalogId,
+        authorId = authorId,
+        body = body,
+        photoKeys = photoKeys,
+    )
 
-    private fun reply(body: String = "감사합니다", photoKeys: List<PhotoObjectKey> = emptyList()) =
-        SpotAnswerReply.create(
-            answerId = answerId,
-            catalogId = catalogId,
-            authorId = authorId,
-            body = body,
-            photoKeys = photoKeys,
-        )
+    private fun reply(body: String = "감사합니다", photoKeys: List<PhotoObjectKey> = emptyList()) = SpotAnswerReply.create(
+        answerId = answerId,
+        catalogId = catalogId,
+        authorId = authorId,
+        body = body,
+        photoKeys = photoKeys,
+    )
 
     @Test
     fun `답변 본문 경계 - 1자와 500자는 허용되고 501자는 거부된다`() {

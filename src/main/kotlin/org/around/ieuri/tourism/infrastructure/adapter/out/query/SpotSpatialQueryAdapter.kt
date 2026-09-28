@@ -120,7 +120,8 @@ class SpotSpatialQueryAdapter(
             "ST_DWithin(t.location, c.center, ?)",
         )
         val params = mutableListOf<Any>(
-            query.center.longitude, query.center.latitude,
+            query.center.longitude,
+            query.center.latitude,
             query.language.name,
             query.radiusMeters.toDouble(),
         )

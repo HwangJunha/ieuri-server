@@ -20,8 +20,7 @@ class MapShareLinkStoreAdapter(
 ) : MapShareLinkPort {
 
     @Transactional(readOnly = true)
-    override fun findActiveByToken(token: String): MapShareLinkRecord? =
-        repository.findByTokenAndRevokedAtIsNull(token)?.toRecord()
+    override fun findActiveByToken(token: String): MapShareLinkRecord? = repository.findByTokenAndRevokedAtIsNull(token)?.toRecord()
 
     /**
      * 본인 것이 아니거나 이미 폐기됐으면 아무 일도 없다.

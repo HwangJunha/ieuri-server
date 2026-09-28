@@ -57,9 +57,8 @@ class Comment private constructor(
          * 최상위 댓글에 답글을 달면 그 댓글이 부모이고, **대댓글에 답글을 달면 그 대댓글의
          * 부모**(= 최상위)가 부모다. 3단계를 만들려는 시도를 거부하는 대신 2단계로 눕힌다.
          */
-        fun replyParentIdFor(parent: Comment): Long =
-            parent.parentCommentId
-                ?: requireNotNull(parent.id) { "적재된 댓글에는 id가 있어야 한다." }
+        fun replyParentIdFor(parent: Comment): Long = parent.parentCommentId
+            ?: requireNotNull(parent.id) { "적재된 댓글에는 id가 있어야 한다." }
 
         fun create(
             postId: Long,

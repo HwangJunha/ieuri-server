@@ -1,12 +1,12 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity
 
-import org.around.ieuri.common.persistence.DbSchema
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Id
 import jakarta.persistence.IdClass
 import jakarta.persistence.PrePersist
 import jakarta.persistence.Table
+import org.around.ieuri.common.persistence.DbSchema
 import java.io.Serializable
 import java.time.Instant
 

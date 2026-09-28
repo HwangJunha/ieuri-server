@@ -1,11 +1,11 @@
 package org.around.ieuri.community.application.query
 
-import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.domain.vo.PostSortOrder
 import org.around.ieuri.community.domain.vo.PostTag
+import org.around.ieuri.community.domain.vo.TargetCategory
 import java.time.Instant
 
-/**
+/*
  * 읽기(CQRS) 전용 read model. 애그리게이트를 우회해 QueryDSL이 직접 프로젝션한 결과이며
  * 도메인/JPA 어느 쪽도 아니다. 리졸버가 이 DTO를 GraphQL 응답 타입으로 매핑한다.
  */

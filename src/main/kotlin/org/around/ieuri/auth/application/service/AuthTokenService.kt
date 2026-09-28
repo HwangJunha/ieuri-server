@@ -13,6 +13,7 @@ import org.around.ieuri.auth.application.port.`in`.command.AuthTokenUseCase
 import org.around.ieuri.auth.application.port.`in`.command.LogoutResult
 import org.around.ieuri.auth.application.port.`in`.command.TokenPairResult
 import org.around.ieuri.auth.application.port.out.client.SnsIdentityVerifierPort
+import org.around.ieuri.auth.application.port.out.event.DomainEventPublisherPort
 import org.around.ieuri.auth.application.port.out.persistence.MemberRepositoryPort
 import org.around.ieuri.auth.application.port.out.security.LoginIdentifierProtectorPort
 import org.around.ieuri.auth.application.port.out.security.PasswordEncoderPort
@@ -21,10 +22,9 @@ import org.around.ieuri.auth.application.port.out.token.TokenProviderPort
 import org.around.ieuri.auth.domain.vo.Email
 import org.around.ieuri.auth.domain.vo.MemberStatus
 import org.around.ieuri.auth.domain.vo.ProviderUserId
-import org.springframework.stereotype.Service
-import org.around.ieuri.auth.application.port.out.event.DomainEventPublisherPort
 import org.around.ieuri.common.event.AccessType
 import org.around.ieuri.common.event.MemberAccessed
+import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.time.Instant
@@ -62,7 +62,11 @@ class AuthTokenService(
             ?: throw MemberNotFoundException("가입되지 않은 계정입니다. 회원가입이 필요합니다.")
 
         ensureLoginable(
-            authentication.memberId, authentication.status, authentication.suspendedUntil, authentication.suspensionReason, now,
+            authentication.memberId,
+            authentication.status,
+            authentication.suspendedUntil,
+            authentication.suspensionReason,
+            now,
         )
 
         // 탈퇴 시 연결 해제용 토큰 보충. 실패해도 로그인은 성공한다(R7).
@@ -111,6 +115,7 @@ class AuthTokenService(
     ) {
         when (status) {
             MemberStatus.ACTIVE -> Unit
+
             MemberStatus.SUSPENDED -> {
                 if (suspendedUntil != null && !now.isBefore(suspendedUntil)) {
                     // 기간제 정지 만료 → 자동 복구 후 로그인 허용.

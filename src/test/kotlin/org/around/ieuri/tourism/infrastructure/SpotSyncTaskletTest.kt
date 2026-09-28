@@ -4,9 +4,9 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
+import org.around.ieuri.tourism.application.command.SyncSpotCommand
 import org.around.ieuri.tourism.application.port.out.client.SpotSyncPage
 import org.around.ieuri.tourism.application.port.out.client.SpotSyncPort
-import org.around.ieuri.tourism.application.command.SyncSpotCommand
 import org.around.ieuri.tourism.application.port.out.persistence.SpotStorePort
 import org.around.ieuri.tourism.application.port.out.persistence.SpotUpsertPort
 import org.around.ieuri.tourism.domain.vo.Coordinates
@@ -54,8 +54,7 @@ class SpotSyncTaskletTest {
         copyright = CopyrightType.UNSPECIFIED,
     )
 
-    private fun page(records: List<SyncSpotCommand>, totalCount: Int) =
-        SpotSyncPage(records = records, totalCount = totalCount, droppedCount = 0, categoryFallbackCount = 0)
+    private fun page(records: List<SyncSpotCommand>, totalCount: Int) = SpotSyncPage(records = records, totalCount = totalCount, droppedCount = 0, categoryFallbackCount = 0)
 
     /**
      * 실제 StepExecution — ExecutionContext가 진짜로 유지되어야 재개 동작을 검증할 수 있다.
@@ -304,7 +303,10 @@ class SpotSyncTaskletTest {
             storePort = storePort,
             upsertPort = upsertPort,
             pageSize = 1_000,
-            endedFestivalIds = { lookups++; emptySet() },
+            endedFestivalIds = {
+                lookups++
+                emptySet()
+            },
         )
 
         val execution = stepExecution()

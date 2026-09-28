@@ -1,6 +1,5 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity
 
-import org.around.ieuri.common.persistence.DbSchema
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -11,6 +10,7 @@ import jakarta.persistence.Id
 import jakarta.persistence.PrePersist
 import jakarta.persistence.PreUpdate
 import jakarta.persistence.Table
+import org.around.ieuri.common.persistence.DbSchema
 import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import java.time.Instant
@@ -83,7 +83,6 @@ class SpotEntity(
      */
     @Column(name = "catalog_id")
     var catalogId: Long? = null,
-
 
     @Column(name = "created_at", nullable = false)
     var createdAt: Instant? = null,

@@ -43,8 +43,7 @@ class CommunityConfig {
     @Bean
     fun reactiveRedisMessageListenerContainer(
         connectionFactory: ReactiveRedisConnectionFactory,
-    ): ReactiveRedisMessageListenerContainer =
-        ReactiveRedisMessageListenerContainer(connectionFactory)
+    ): ReactiveRedisMessageListenerContainer = ReactiveRedisMessageListenerContainer(connectionFactory)
 
     /**
      * 구독 이벤트가 DB를 읽을 때 쓰는 스케줄러(SPEC-0017 R14).
@@ -59,13 +58,12 @@ class CommunityConfig {
      * 리액티브면 그 경로에서 제외하는데, Subscription은 Publisher 반환이 강제라 전부 걸린다.
      */
     @Bean(destroyMethod = "dispose")
-    fun conversationEventScheduler(): Scheduler =
-        Schedulers.fromExecutorService(
-            Executors.newThreadPerTaskExecutor(
-                Thread.ofVirtual().name("conversation-event-", 0).factory(),
-            ),
-            "conversation-event",
-        )
+    fun conversationEventScheduler(): Scheduler = Schedulers.fromExecutorService(
+        Executors.newThreadPerTaskExecutor(
+            Thread.ofVirtual().name("conversation-event-", 0).factory(),
+        ),
+        "conversation-event",
+    )
 
     @Bean
     fun communityPolicy(
@@ -88,25 +86,22 @@ class CommunityConfig {
      * R2 엔드포인트가 그 형태를 쓰지 않기 때문이다.
      */
     @Bean
-    fun r2S3Client(properties: R2Properties): S3Client =
-        S3Client.builder()
-            .endpointOverride(URI.create(properties.s3Endpoint))
-            .region(Region.of("auto"))
-            .credentialsProvider(credentials(properties))
-            .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
-            .build()
+    fun r2S3Client(properties: R2Properties): S3Client = S3Client.builder()
+        .endpointOverride(URI.create(properties.s3Endpoint))
+        .region(Region.of("auto"))
+        .credentialsProvider(credentials(properties))
+        .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
+        .build()
 
     @Bean
-    fun r2S3Presigner(properties: R2Properties): S3Presigner =
-        S3Presigner.builder()
-            .endpointOverride(URI.create(properties.s3Endpoint))
-            .region(Region.of("auto"))
-            .credentialsProvider(credentials(properties))
-            .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
-            .build()
+    fun r2S3Presigner(properties: R2Properties): S3Presigner = S3Presigner.builder()
+        .endpointOverride(URI.create(properties.s3Endpoint))
+        .region(Region.of("auto"))
+        .credentialsProvider(credentials(properties))
+        .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
+        .build()
 
     private fun credentials(properties: R2Properties) = StaticCredentialsProvider.create(
         AwsBasicCredentials.create(properties.accessKey, properties.secretAccessKey),
     )
-
 }

@@ -30,11 +30,9 @@ fun CreateSpotQuestionInput.toCommand(): CreateSpotQuestionCommand = CreateSpotQ
     photoKeys = photoKeys,
 )
 
-fun DeleteSpotQuestionInput.toCommand(): DeleteSpotQuestionCommand =
-    DeleteSpotQuestionCommand(questionId = questionId)
+fun DeleteSpotQuestionInput.toCommand(): DeleteSpotQuestionCommand = DeleteSpotQuestionCommand(questionId = questionId)
 
-fun ResolveSpotQuestionInput.toCommand(): ResolveSpotQuestionCommand =
-    ResolveSpotQuestionCommand(questionId = questionId, resolved = resolved)
+fun ResolveSpotQuestionInput.toCommand(): ResolveSpotQuestionCommand = ResolveSpotQuestionCommand(questionId = questionId, resolved = resolved)
 
 fun CreateSpotAnswerInput.toCommand(): CreateSpotAnswerCommand = CreateSpotAnswerCommand(
     questionId = questionId,
@@ -42,15 +40,12 @@ fun CreateSpotAnswerInput.toCommand(): CreateSpotAnswerCommand = CreateSpotAnswe
     photoKeys = photoKeys,
 )
 
-fun DeleteSpotAnswerInput.toCommand(): DeleteSpotAnswerCommand =
-    DeleteSpotAnswerCommand(answerId = answerId)
+fun DeleteSpotAnswerInput.toCommand(): DeleteSpotAnswerCommand = DeleteSpotAnswerCommand(answerId = answerId)
 
-fun CreateSpotAnswerReplyInput.toCommand(): CreateSpotAnswerReplyCommand =
-    CreateSpotAnswerReplyCommand(
-        parentAnswerId = parentAnswerId,
-        body = body,
-        photoKeys = photoKeys,
-    )
+fun CreateSpotAnswerReplyInput.toCommand(): CreateSpotAnswerReplyCommand = CreateSpotAnswerReplyCommand(
+    parentAnswerId = parentAnswerId,
+    body = body,
+    photoKeys = photoKeys,
+)
 
-fun DeleteSpotAnswerReplyInput.toCommand(): DeleteSpotAnswerReplyCommand =
-    DeleteSpotAnswerReplyCommand(replyId = replyId)
+fun DeleteSpotAnswerReplyInput.toCommand(): DeleteSpotAnswerReplyCommand = DeleteSpotAnswerReplyCommand(replyId = replyId)

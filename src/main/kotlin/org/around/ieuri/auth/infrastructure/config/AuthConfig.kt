@@ -44,22 +44,20 @@ class AuthConfig {
     }
 
     @Bean
-    fun profileImagePolicy(properties: ProfileImageProperties): ProfileImagePolicy =
-        ProfileImagePolicy(
-            uploadUrlTtl = properties.uploadUrlTtl,
-            maxUploadBytes = properties.maxUploadBytes,
-            allowedContentTypes = properties.allowedContentTypes.map { it.lowercase() }.toSet(),
-        )
+    fun profileImagePolicy(properties: ProfileImageProperties): ProfileImagePolicy = ProfileImagePolicy(
+        uploadUrlTtl = properties.uploadUrlTtl,
+        maxUploadBytes = properties.maxUploadBytes,
+        allowedContentTypes = properties.allowedContentTypes.map { it.lowercase() }.toSet(),
+    )
 
     /** 가입 시 닉네임 자동 생성(SPEC-0011 R20). 난수원은 기본값을 쓰고 테스트가 주입한다. */
     @Bean
     fun nicknameGenerator(): NicknameGenerator = NicknameGenerator()
 
     @Bean
-    fun verificationPolicy(properties: VerificationProperties): VerificationPolicy =
-        VerificationPolicy(
-            ttl = Duration.ofMinutes(properties.ttlMinutes),
-            maxAttempts = properties.maxAttempts,
-            resendCooldown = Duration.ofSeconds(properties.resendCooldownSeconds),
-        )
+    fun verificationPolicy(properties: VerificationProperties): VerificationPolicy = VerificationPolicy(
+        ttl = Duration.ofMinutes(properties.ttlMinutes),
+        maxAttempts = properties.maxAttempts,
+        resendCooldown = Duration.ofSeconds(properties.resendCooldownSeconds),
+    )
 }

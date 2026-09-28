@@ -73,7 +73,6 @@ class RegionRecommendationService(
         return RecommendedRegionView(regions = regions)
     }
 
-
     /**
      * 항목별 순위를 **후보 전체에서** 매긴다 — 반환 건수와 무관한 값이어야 한다.
      *
@@ -193,8 +192,7 @@ class RegionRecommendationService(
     }
 
     /** 거리 항목은 origin이 필수라 항상 붙는다(R21). */
-    private fun RegionMetricRow.distanceScore(origin: Coordinates): ScoredFactor =
-        ScoredFactor(policy.distanceScoring.score(origin, center))
+    private fun RegionMetricRow.distanceScore(origin: Coordinates): ScoredFactor = ScoredFactor(policy.distanceScoring.score(origin, center))
 
     /**
      * 총점까지 산출된 후보 1건 — 순위를 매기고 자르기 전의 중간 상태다.

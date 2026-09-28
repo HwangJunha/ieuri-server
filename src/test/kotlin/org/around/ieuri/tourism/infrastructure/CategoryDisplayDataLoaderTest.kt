@@ -25,13 +25,11 @@ class CategoryDisplayDataLoaderTest {
     private val spotQueryUseCase = mockk<SpotQueryUseCase>()
     private val loader = CategoryDisplayDataLoader(spotQueryUseCase)
 
-    private fun environment(vararg keyContexts: Pair<Any, Any>): BatchLoaderEnvironment =
-        BatchLoaderEnvironment.newBatchLoaderEnvironment()
-            .keyContexts(keyContexts.map { it.first }, keyContexts.map { it.second })
-            .build()
+    private fun environment(vararg keyContexts: Pair<Any, Any>): BatchLoaderEnvironment = BatchLoaderEnvironment.newBatchLoaderEnvironment()
+        .keyContexts(keyContexts.map { it.first }, keyContexts.map { it.second })
+        .build()
 
-    private fun display(code: String, label: String, iconUrl: String?) =
-        CategoryDisplay(category = SpotCategory(code), label = label, iconUrl = iconUrl)
+    private fun display(code: String, label: String, iconUrl: String?) = CategoryDisplay(category = SpotCategory(code), label = label, iconUrl = iconUrl)
 
     @Test
     fun `키를 모아 유스케이스를 한 번만 부른다`() {

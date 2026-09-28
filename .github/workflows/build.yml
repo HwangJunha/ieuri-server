@@ -5,7 +5,7 @@ on:
   # 이 파일 밖) 여기 걸리는 건 사실상 머지뿐이다.
   #
   # PR에서는 이 워크플로를 돌리지 않는다 — 같은 코드를 PR과 머지에서 두 번 빌드하는 낭비다.
-  # master로 향하는 PR의 사전 검증은 test.yml이 테스트만 돌려 맡는다.
+  # master로 향하는 PR의 사전 검증은 test.yml이 check(테스트·스타일)를 돌려 맡는다.
   push:
     branches: [dev, master]
   # 재배포·복구용 수동 실행. 브랜치를 오지선택으로 제한해 feature 브랜치가 실수로
@@ -66,14 +66,14 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
 
-      - name: Test and build jar
+      - name: Check and build jar
         # **--no-daemon을 쓰지 않는다.** CI는 일회성이니 데몬이 무의미하다는 것이 오래된
         # 관행이었으나, 지금은 손해다 — 데몬이 없으면 Kotlin 컴파일러가 매번 별도 JVM을
         # 띄우고(gradle.properties의 in-process 전략이 무력화된다) 설정 캐시도 쓰지 못한다.
         #
-        # 빌드 시간의 대부분은 QueryDSL kapt와 Kotlin 컴파일이다(실제 테스트는 41초).
+        # 빌드 시간의 대부분은 QueryDSL kapt와 Kotlin 컴파일이다.
         # 그 둘이 데몬 안에서 큰 힙을 쓰며 도는 편이 훨씬 빠르다.
-        run: ./gradlew test bootJar --build-cache
+        run: ./gradlew check bootJar --build-cache
 
       # JAR은 아키텍처 독립이라 빌드는 x86 네이티브로 돌리고 이미지 조립만 arm64로 한다.
       - uses: docker/setup-qemu-action@v4

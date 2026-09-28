@@ -2,17 +2,17 @@ package org.around.ieuri.auth.infrastructure
 
 import io.mockk.every
 import io.mockk.mockk
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneOffset
 import org.around.ieuri.auth.application.exception.InvalidTokenException
 import org.around.ieuri.auth.application.port.out.token.AccessTokenClaims
 import org.around.ieuri.auth.application.port.out.token.TokenProviderPort
 import org.around.ieuri.auth.infrastructure.security.GraphqlWebSocketAuthInterceptor
 import org.around.ieuri.common.security.UnauthorizedException
-import org.springframework.http.HttpHeaders
 import org.springframework.graphql.server.WebSocketSessionInfo
+import org.springframework.http.HttpHeaders
 import org.springframework.security.core.context.SecurityContextHolder
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -49,8 +49,7 @@ class GraphqlWebSocketAuthInterceptorTest {
         every { this@mockk.headers } returns headers
     }
 
-    private fun headersWith(authorization: String) =
-        HttpHeaders().apply { set("Authorization", authorization) }
+    private fun headersWith(authorization: String) = HttpHeaders().apply { set("Authorization", authorization) }
 
     private fun givenValidToken() {
         every { tokenProvider.parseAccessToken("valid") } returns

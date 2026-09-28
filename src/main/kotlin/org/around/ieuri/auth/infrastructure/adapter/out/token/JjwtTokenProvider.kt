@@ -86,8 +86,7 @@ class JjwtTokenProvider(
     }
 
     /** 문자열 리스트 클레임을 Set<String>으로 안전하게 읽는다(누락/타입 불일치 시 빈 집합). */
-    private fun io.jsonwebtoken.Claims.stringSet(name: String): Set<String> =
-        (this[name] as? Collection<*>)?.mapNotNull { it as? String }?.toSet() ?: emptySet()
+    private fun io.jsonwebtoken.Claims.stringSet(name: String): Set<String> = (this[name] as? Collection<*>)?.mapNotNull { it as? String }?.toSet() ?: emptySet()
 
     /** 서명·발급자·만료를 검증하고 typ 클레임을 확인한 뒤 Claims를 반환. 실패 시 InvalidTokenException. */
     private fun parseAndVerify(token: String, expectedType: String): io.jsonwebtoken.Claims {

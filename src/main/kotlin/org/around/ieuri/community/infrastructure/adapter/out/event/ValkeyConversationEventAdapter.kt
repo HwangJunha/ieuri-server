@@ -72,24 +72,21 @@ class ValkeyConversationEventAdapter(
      * 전용 스케줄러로 옮겨서 넘긴다. 어느 스레드에서 올라오는지는 이 어댑터만 아는 사실이라
      * 결정도 여기서 한다.
      */
-    override fun subscribeTyping(conversationId: Long): Flux<TypingEventView> =
-        receive(typingTopic(conversationId)) { payload ->
-            read(payload, TypingEventPayload::class.java)?.toView(conversationId)
-        }
+    override fun subscribeTyping(conversationId: Long): Flux<TypingEventView> = receive(typingTopic(conversationId)) { payload ->
+        read(payload, TypingEventPayload::class.java)?.toView(conversationId)
+    }
 
-    override fun subscribeNewMessage(conversationId: Long): Flux<Long> =
-        receive(messageTopic(conversationId)) { payload ->
-            read(payload, NewMessagePayload::class.java)?.messageId
-        }
+    override fun subscribeNewMessage(conversationId: Long): Flux<Long> = receive(messageTopic(conversationId)) { payload ->
+        read(payload, NewMessagePayload::class.java)?.messageId
+    }
 
     /**
      * 채널 하나를 구독해 페이로드를 [parse]로 옮긴다. [parse]가 null이면 그 이벤트는 조용히
      * 버린다 — 형식이 어긋난 페이로드를 구독자에게 전달할 방법이 없다.
      */
-    private fun <T : Any> receive(channel: String, parse: (String) -> T?): Flux<T> =
-        listenerContainer.receive(ChannelTopic(channel))
-            .publishOn(eventScheduler)
-            .mapNotNull<T> { parse(it.message) }
+    private fun <T : Any> receive(channel: String, parse: (String) -> T?): Flux<T> = listenerContainer.receive(ChannelTopic(channel))
+        .publishOn(eventScheduler)
+        .mapNotNull<T> { parse(it.message) }
 
     /**
      * 깨진 페이로드는 **조용히 버린다**(null 반환) — 구독자에게 전달할 방법이 없는데 예외를
@@ -98,13 +95,12 @@ class ValkeyConversationEventAdapter(
      *
      * 대상 타입을 인자로 받는다 — 호출부에서 `::class.java`를 반복하지만 그 편이 명시적이다.
      */
-    private fun <T> read(payload: String, type: Class<T>): T? =
-        try {
-            objectMapper.readValue(payload, type)
-        } catch (e: RuntimeException) {
-            log.warn("대화 이벤트 페이로드를 해석할 수 없다: {}", e.message)
-            null
-        }
+    private fun <T> read(payload: String, type: Class<T>): T? = try {
+        objectMapper.readValue(payload, type)
+    } catch (e: RuntimeException) {
+        log.warn("대화 이벤트 페이로드를 해석할 수 없다: {}", e.message)
+        null
+    }
 
     private fun publishQuietly(topic: String, payload: String, conversationId: Long) {
         try {
@@ -130,4 +126,3 @@ class ValkeyConversationEventAdapter(
         fun messageTopic(conversationId: Long) = "ieuri:community:message:$conversationId"
     }
 }
-

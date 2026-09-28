@@ -18,8 +18,7 @@ class CommentTest {
 
     private val authorId = 3L
 
-    private fun create(body: String = "댓글") =
-        Comment.create(postId = 1L, authorId = authorId, body = body)
+    private fun create(body: String = "댓글") = Comment.create(postId = 1L, authorId = authorId, body = body)
 
     @Test
     fun `본문 경계 - 1자와 500자는 허용되고 501자는 거부된다`() {
@@ -52,8 +51,13 @@ class CommentTest {
     @Test
     fun `최상위 댓글에 답글을 달면 그 댓글이 부모다`() {
         val top = Comment.restore(
-            id = 5L, postId = 1L, authorId = authorId, body = "댓글",
-            hidden = false, deletedAt = null, createdAt = Instant.EPOCH,
+            id = 5L,
+            postId = 1L,
+            authorId = authorId,
+            body = "댓글",
+            hidden = false,
+            deletedAt = null,
+            createdAt = Instant.EPOCH,
         )
 
         assertEquals(5L, Comment.replyParentIdFor(top))
@@ -64,8 +68,13 @@ class CommentTest {
         // 거부하는 대신 부모의 부모를 실제 부모로 잡는다 — 사용자에게는 답글이 정상적으로
         // 달린 것으로 보이고, 트리는 2단계로 유지된다.
         val reply = Comment.restore(
-            id = 9L, postId = 1L, authorId = authorId, body = "답글",
-            hidden = false, deletedAt = null, createdAt = Instant.EPOCH,
+            id = 9L,
+            postId = 1L,
+            authorId = authorId,
+            body = "답글",
+            hidden = false,
+            deletedAt = null,
+            createdAt = Instant.EPOCH,
             parentCommentId = 5L,
         )
 

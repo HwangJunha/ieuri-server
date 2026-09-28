@@ -5,8 +5,14 @@ import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
 import org.around.ieuri.auth.application.command.AgreementInput
+import org.around.ieuri.auth.application.command.RegisterEmailMemberCommand
 import org.around.ieuri.auth.application.command.RegisterMemberCommand
+import org.around.ieuri.auth.application.command.RequestPasswordResetCommand
+import org.around.ieuri.auth.application.command.ResendVerificationCommand
+import org.around.ieuri.auth.application.command.ResetPasswordCommand
+import org.around.ieuri.auth.application.command.RetargetEmailVerificationCommand
 import org.around.ieuri.auth.application.command.VerifyEmailCommand
+import org.around.ieuri.auth.application.event.PasswordResetRequested
 import org.around.ieuri.auth.application.event.VerificationEmailRequested
 import org.around.ieuri.auth.application.exception.AlreadyVerifiedException
 import org.around.ieuri.auth.application.exception.EmailAlreadyInUseException
@@ -23,19 +29,13 @@ import org.around.ieuri.auth.application.port.out.client.SnsIdentityVerifierPort
 import org.around.ieuri.auth.application.port.out.client.SnsTokenExchangerPort
 import org.around.ieuri.auth.application.port.out.event.DomainEventPublisherPort
 import org.around.ieuri.auth.application.port.out.persistence.AuditLogPort
+import org.around.ieuri.auth.application.port.out.persistence.EmailAuthentication
 import org.around.ieuri.auth.application.port.out.persistence.EmailVerificationRepositoryPort
+import org.around.ieuri.auth.application.port.out.persistence.MemberProfileRepositoryPort
 import org.around.ieuri.auth.application.port.out.persistence.MemberRepositoryPort
+import org.around.ieuri.auth.application.port.out.persistence.PasswordResetRepositoryPort
 import org.around.ieuri.auth.application.port.out.persistence.RoleRepositoryPort
 import org.around.ieuri.auth.application.port.out.persistence.TermsRepositoryPort
-import org.around.ieuri.auth.application.command.RegisterEmailMemberCommand
-import org.around.ieuri.auth.application.command.RequestPasswordResetCommand
-import org.around.ieuri.auth.application.command.ResendVerificationCommand
-import org.around.ieuri.auth.application.command.ResetPasswordCommand
-import org.around.ieuri.auth.application.command.RetargetEmailVerificationCommand
-import org.around.ieuri.auth.application.event.PasswordResetRequested
-import org.around.ieuri.auth.application.port.out.persistence.EmailAuthentication
-import org.around.ieuri.auth.application.port.out.persistence.MemberProfileRepositoryPort
-import org.around.ieuri.auth.application.port.out.persistence.PasswordResetRepositoryPort
 import org.around.ieuri.auth.application.port.out.persistence.TermsView
 import org.around.ieuri.auth.application.port.out.security.EmailEncryptorPort
 import org.around.ieuri.auth.application.port.out.security.LoginIdentifierProtectorPort
@@ -47,19 +47,19 @@ import org.around.ieuri.auth.domain.aggregate.Member
 import org.around.ieuri.auth.domain.aggregate.PasswordReset
 import org.around.ieuri.auth.domain.event.EmailVerified
 import org.around.ieuri.auth.domain.event.MemberRegistered
+import org.around.ieuri.auth.domain.strategy.NicknameGenerator
 import org.around.ieuri.auth.domain.vo.Email
 import org.around.ieuri.auth.domain.vo.MemberStatus
 import org.around.ieuri.auth.domain.vo.Nickname
 import org.around.ieuri.auth.domain.vo.Provider
-import org.around.ieuri.auth.domain.strategy.NicknameGenerator
 import org.around.ieuri.auth.domain.vo.ProviderUserId
 import org.around.ieuri.auth.domain.vo.VerificationPurpose
-import kotlin.random.Random
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
 import java.util.UUID
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -122,8 +122,7 @@ class MemberRegistrationServiceTest {
         TermsView(3, "MARKETING", "1.0", required = false),
     )
 
-    private fun identity(email: String? = "user@example.com", nickname: String? = "여행자") =
-        SnsIdentity("google-sub-1", email, nickname, null)
+    private fun identity(email: String? = "user@example.com", nickname: String? = "여행자") = SnsIdentity("google-sub-1", email, nickname, null)
 
     private fun command(email: String = "user@example.com") = RegisterMemberCommand(
         provider = Provider.GOOGLE,
@@ -405,16 +404,15 @@ class MemberRegistrationServiceTest {
 
     // --- registerByEmail ---
 
-    private fun emailCommand(email: String = "user@example.com", password: String = "Passw0rd!") =
-        RegisterEmailMemberCommand(
-            email = email,
-            password = password,
-            ageVerified = true,
-            agreements = listOf(
-                AgreementInput("SERVICE", true),
-                AgreementInput("PRIVACY", true),
-            ),
-        )
+    private fun emailCommand(email: String = "user@example.com", password: String = "Passw0rd!") = RegisterEmailMemberCommand(
+        email = email,
+        password = password,
+        ageVerified = true,
+        agreements = listOf(
+            AgreementInput("SERVICE", true),
+            AgreementInput("PRIVACY", true),
+        ),
+    )
 
     @Test
     fun `이메일 가입은 미검증으로 시작하고 비밀번호 해시 저장·검증코드 발급한다`() {
@@ -483,8 +481,7 @@ class MemberRegistrationServiceTest {
 
     // --- requestPasswordReset / resetPassword ---
 
-    private fun emailAuth(passwordHash: String? = "hashed-pw") =
-        EmailAuthentication(300L, MemberStatus.ACTIVE, null, null, passwordHash, true)
+    private fun emailAuth(passwordHash: String? = "hashed-pw") = EmailAuthentication(300L, MemberStatus.ACTIVE, null, null, passwordHash, true)
 
     private fun activeReset(codeHash: String = "reset-correct") = PasswordReset.issue(
         publicId = UUID.randomUUID(),
@@ -539,13 +536,6 @@ class MemberRegistrationServiceTest {
         verify(exactly = 0) { eventPublisher.publish(any<PasswordResetRequested>()) }
     }
 
-    /**
-     * **비밀번호가 없는 계정에는 코드를 발급하지도 메일을 보내지도 않는다.**
-     *
-     * 재설정할 비밀번호가 없어 성립하지 않는 요청이고, 보냈다면 주소를 아는 제3자가 메일
-     * 발송을 반복 유발할 수 있다. 응답은 계정 열거 방지를 위해 그대로 성공이다 —
-     * 막는 것은 발송이지 응답이 아니다.
-     */
     /** SNS 계정은 재설정할 비밀번호가 없어 성립하지 않는다. 발송하지 않고 코드로 알린다. */
     @Test
     fun `재설정 요청은 SNS 계정이면 NOT_EMAIL_MEMBER로 거부한다`() {

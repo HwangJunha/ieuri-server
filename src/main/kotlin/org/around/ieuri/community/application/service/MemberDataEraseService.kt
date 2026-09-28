@@ -1,9 +1,9 @@
 package org.around.ieuri.community.application.service
 
 import org.around.ieuri.community.application.port.`in`.command.MemberDataEraseUseCase
+import org.around.ieuri.community.application.port.out.client.ClockPort
 import org.around.ieuri.community.application.port.out.persistence.MemberContentSoftDeletePort
 import org.around.ieuri.community.application.port.out.persistence.MemberDataErasePort
-import org.around.ieuri.community.application.port.out.client.ClockPort
 import org.around.ieuri.community.application.port.out.persistence.SpotQuestionCounterPort
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service

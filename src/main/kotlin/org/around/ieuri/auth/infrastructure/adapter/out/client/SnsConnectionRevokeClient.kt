@@ -35,8 +35,11 @@ class SnsConnectionRevokeClient(
     override fun revoke(command: RevokeSnsConnectionCommand): SnsRevokeResult = try {
         when (command.provider) {
             Provider.APPLE -> revokeApple(command.providerRefreshToken)
+
             Provider.GOOGLE -> revokeGoogle(command.providerRefreshToken)
+
             Provider.KAKAO -> unlinkKakao(command.providerUserId)
+
             // 자체 가입 회원은 연결된 provider가 없다.
             Provider.EMAIL -> SnsRevokeResult.Skipped
         }

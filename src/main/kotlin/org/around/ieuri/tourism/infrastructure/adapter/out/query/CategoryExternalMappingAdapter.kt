@@ -23,29 +23,27 @@ class CategoryExternalMappingAdapter(
     private val category = QCategoryEntity.categoryEntity
 
     @Transactional(readOnly = true)
-    override fun externalCode(category: SpotCategory, provider: String, codeset: String): String? =
-        queryFactory
-            .select(mapping.externalCode)
-            .from(mapping)
-            .join(this.category).on(this.category.id.eq(mapping.categoryId))
-            .where(
-                this.category.code.eq(category.code),
-                mapping.provider.eq(provider),
-                mapping.codeset.eq(codeset),
-            )
-            .fetchFirst()
+    override fun externalCode(category: SpotCategory, provider: String, codeset: String): String? = queryFactory
+        .select(mapping.externalCode)
+        .from(mapping)
+        .join(this.category).on(this.category.id.eq(mapping.categoryId))
+        .where(
+            this.category.code.eq(category.code),
+            mapping.provider.eq(provider),
+            mapping.codeset.eq(codeset),
+        )
+        .fetchFirst()
 
     @Transactional(readOnly = true)
-    override fun categoryOf(externalCode: String, provider: String, codeset: String): SpotCategory? =
-        queryFactory
-            .select(category.code)
-            .from(mapping)
-            .join(category).on(category.id.eq(mapping.categoryId))
-            .where(
-                mapping.externalCode.eq(externalCode),
-                mapping.provider.eq(provider),
-                mapping.codeset.eq(codeset),
-            )
-            .fetchFirst()
-            ?.let { SpotCategory(it) }
+    override fun categoryOf(externalCode: String, provider: String, codeset: String): SpotCategory? = queryFactory
+        .select(category.code)
+        .from(mapping)
+        .join(category).on(category.id.eq(mapping.categoryId))
+        .where(
+            mapping.externalCode.eq(externalCode),
+            mapping.provider.eq(provider),
+            mapping.codeset.eq(codeset),
+        )
+        .fetchFirst()
+        ?.let { SpotCategory(it) }
 }

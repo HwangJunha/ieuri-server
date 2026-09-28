@@ -4,10 +4,10 @@ import org.around.ieuri.community.application.command.CreatePostCommand
 import org.around.ieuri.community.application.command.DeletePostCommand
 import org.around.ieuri.community.application.command.EditPostCommand
 import org.around.ieuri.community.application.exception.HiddenPostNotEditableException
+import org.around.ieuri.community.application.exception.InvalidTagException
 import org.around.ieuri.community.application.exception.NotPostOwnerException
 import org.around.ieuri.community.application.exception.PhotoNotUploadedException
 import org.around.ieuri.community.application.exception.PostBodyLengthInvalidException
-import org.around.ieuri.community.application.exception.InvalidTagException
 import org.around.ieuri.community.application.exception.PostBodyRequiredException
 import org.around.ieuri.community.application.exception.PostNotFoundException
 import org.around.ieuri.community.application.exception.PostTitleLengthInvalidException

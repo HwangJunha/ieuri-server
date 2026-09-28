@@ -13,9 +13,9 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Component
+import reactor.core.publisher.Mono
 import java.time.Clock
 import java.time.Instant
-import reactor.core.publisher.Mono
 
 /**
  * WebSocket 연결 수립(`connection_init`) 시 1회 인증하고, 이후 프레임마다 인증 주체를
@@ -91,18 +91,15 @@ class GraphqlWebSocketAuthInterceptor(
     }
 
     /** `connection_init` 페이로드의 토큰. 대소문자가 갈리는 클라이언트가 있어 둘 다 본다. */
-    private fun payloadToken(payload: Map<String, Any>): String? =
-        (payload[AUTHORIZATION] ?: payload[AUTHORIZATION.lowercase()])
-            ?.let { it as? String }
-            ?.let(::bearerToken)
+    private fun payloadToken(payload: Map<String, Any>): String? = (payload[AUTHORIZATION] ?: payload[AUTHORIZATION.lowercase()])
+        ?.let { it as? String }
+        ?.let(::bearerToken)
 
     /** 핸드셰이크 헤더의 토큰. HttpHeaders는 헤더 이름의 대소문자를 가리지 않는다. */
-    private fun headerToken(sessionInfo: WebSocketSessionInfo): String? =
-        sessionInfo.headers.getFirst(AUTHORIZATION)?.let(::bearerToken)
+    private fun headerToken(sessionInfo: WebSocketSessionInfo): String? = sessionInfo.headers.getFirst(AUTHORIZATION)?.let(::bearerToken)
 
     /** `Bearer <token>` 형식일 때만 토큰을 돌려준다. 접두어가 없으면 받지 않는다. */
-    private fun bearerToken(raw: String): String? =
-        raw.takeIf { it.startsWith(BEARER_PREFIX) }?.removePrefix(BEARER_PREFIX)?.takeIf { it.isNotBlank() }
+    private fun bearerToken(raw: String): String? = raw.takeIf { it.startsWith(BEARER_PREFIX) }?.removePrefix(BEARER_PREFIX)?.takeIf { it.isNotBlank() }
 
     /**
      * 구독 요청이 실행되기 직전에 세션의 인증 주체를 **현재 스레드의 SecurityContext로 옮기고,

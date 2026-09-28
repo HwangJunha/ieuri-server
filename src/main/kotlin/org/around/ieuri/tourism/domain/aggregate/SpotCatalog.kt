@@ -105,8 +105,7 @@ data class CatalogStandardValues(
         val KOREA_LAT_RANGE = 33.0..39.0
 
         /** 이 좌표로 카탈로그를 만들 수 있는가. 배치가 적재 전에 묻는다. */
-        fun isValidCoordinate(mapX: Double, mapY: Double): Boolean =
-            mapX in KOREA_LON_RANGE && mapY in KOREA_LAT_RANGE
+        fun isValidCoordinate(mapX: Double, mapY: Double): Boolean = mapX in KOREA_LON_RANGE && mapY in KOREA_LAT_RANGE
     }
 }
 

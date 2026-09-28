@@ -1,37 +1,37 @@
 package org.around.ieuri.tourism.infrastructure.config
 
-import tools.jackson.databind.DeserializationFeature
-import tools.jackson.databind.json.JsonMapper
-import tools.jackson.module.kotlin.kotlinModule
-import org.around.ieuri.tourism.application.policy.MapViewportPolicy
-import org.around.ieuri.tourism.application.policy.NationwideMapPolicy
-import org.around.ieuri.tourism.application.policy.EmbeddingSpec
-import org.around.ieuri.tourism.application.policy.RecommendationPolicy
-import org.around.ieuri.tourism.application.policy.RegionRecommendationPolicy
-import org.around.ieuri.tourism.domain.specification.TaxRefundTitleRule
-import org.around.ieuri.tourism.domain.strategy.CategoryDiversity
-import org.around.ieuri.tourism.domain.strategy.RecommendationScore
-import org.around.ieuri.tourism.application.policy.SeoulOpenDataPolicy
-import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
-import org.around.ieuri.tourism.domain.vo.DistanceScoring
-import org.around.ieuri.tourism.domain.vo.FreshnessDecay
-import org.around.ieuri.tourism.domain.specification.SpotExclusionRule
-import org.around.ieuri.tourism.domain.vo.RegionScoreWeights
-import org.around.ieuri.tourism.infrastructure.batch.FestivalSyncProperties
-import org.around.ieuri.tourism.infrastructure.batch.TourStatsSyncProperties
-import org.around.ieuri.tourism.infrastructure.batch.SpotSyncProperties
-import org.springframework.boot.context.properties.EnableConfigurationProperties
-import org.springframework.context.annotation.Bean
-import org.springframework.context.annotation.Configuration
 import org.apache.hc.client5.http.config.ConnectionConfig
 import org.apache.hc.client5.http.impl.classic.HttpClients
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder
 import org.apache.hc.core5.util.TimeValue
 import org.apache.hc.core5.util.Timeout
+import org.around.ieuri.tourism.application.policy.EmbeddingSpec
+import org.around.ieuri.tourism.application.policy.MapViewportPolicy
+import org.around.ieuri.tourism.application.policy.NationwideMapPolicy
+import org.around.ieuri.tourism.application.policy.RecommendationPolicy
+import org.around.ieuri.tourism.application.policy.RegionRecommendationPolicy
+import org.around.ieuri.tourism.application.policy.SeoulOpenDataPolicy
+import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
+import org.around.ieuri.tourism.domain.specification.SpotExclusionRule
+import org.around.ieuri.tourism.domain.specification.TaxRefundTitleRule
+import org.around.ieuri.tourism.domain.strategy.CategoryDiversity
+import org.around.ieuri.tourism.domain.strategy.RecommendationScore
+import org.around.ieuri.tourism.domain.vo.DistanceScoring
+import org.around.ieuri.tourism.domain.vo.FreshnessDecay
+import org.around.ieuri.tourism.domain.vo.RegionScoreWeights
+import org.around.ieuri.tourism.infrastructure.batch.FestivalSyncProperties
+import org.around.ieuri.tourism.infrastructure.batch.SpotSyncProperties
+import org.around.ieuri.tourism.infrastructure.batch.TourStatsSyncProperties
+import org.springframework.boot.context.properties.EnableConfigurationProperties
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Configuration
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory
 import org.springframework.http.client.SimpleClientHttpRequestFactory
 import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter
 import org.springframework.web.client.RestClient
+import tools.jackson.databind.DeserializationFeature
+import tools.jackson.databind.json.JsonMapper
+import tools.jackson.module.kotlin.kotlinModule
 import java.time.Duration
 
 /**
@@ -61,26 +61,25 @@ class TourismConfig {
      * 도메인은 설정 메커니즘을 알지 않는다.
      */
     @Bean
-    fun recommendationPolicy(properties: RecommendationProperties): RecommendationPolicy =
-        RecommendationPolicy(
-            score = RecommendationScore(
-                distanceHalfLifeMeters = properties.distanceHalfLifeMeters,
-                taxRefundMultiplier = properties.taxRefundMultiplier,
-                taxRefundTitleRule = TaxRefundTitleRule(properties.taxRefundTitlePatterns),
-                tasteWeight = properties.tasteWeight,
-                likedMultiplier = properties.likedMultiplier,
-                dislikedMultiplier = properties.dislikedMultiplier,
-            ),
-            diversity = CategoryDiversity(properties.categoryRepeatPenalty),
-            candidateCap = properties.candidateCap,
-            tasteMinReactions = properties.tasteMinReactions,
-            embedding = EmbeddingSpec(
-                model = properties.embedding.model,
-                dimension = properties.embedding.dimension,
-                retryCount = properties.embedding.retryCount,
-                overviewMaxChars = properties.embedding.overviewMaxChars,
-            ),
-        )
+    fun recommendationPolicy(properties: RecommendationProperties): RecommendationPolicy = RecommendationPolicy(
+        score = RecommendationScore(
+            distanceHalfLifeMeters = properties.distanceHalfLifeMeters,
+            taxRefundMultiplier = properties.taxRefundMultiplier,
+            taxRefundTitleRule = TaxRefundTitleRule(properties.taxRefundTitlePatterns),
+            tasteWeight = properties.tasteWeight,
+            likedMultiplier = properties.likedMultiplier,
+            dislikedMultiplier = properties.dislikedMultiplier,
+        ),
+        diversity = CategoryDiversity(properties.categoryRepeatPenalty),
+        candidateCap = properties.candidateCap,
+        tasteMinReactions = properties.tasteMinReactions,
+        embedding = EmbeddingSpec(
+            model = properties.embedding.model,
+            dimension = properties.embedding.dimension,
+            retryCount = properties.embedding.retryCount,
+            overviewMaxChars = properties.embedding.overviewMaxChars,
+        ),
+    )
 
     /**
      * Voyage 임베딩 호출용 RestClient(SPEC-0035 S2). 배치 경로라 읽기 타임아웃을 길게 잡는다 —
@@ -100,25 +99,22 @@ class TourismConfig {
      * 함수다 — 도메인은 설정 메커니즘을 알지 않는다.
      */
     @Bean
-    fun spotExclusionRule(properties: SpotExclusionProperties): SpotExclusionRule =
-        SpotExclusionRule(
-            keywords = properties.keywords,
-            branchNamePatterns = properties.branchNamePatterns,
-        )
-
+    fun spotExclusionRule(properties: SpotExclusionProperties): SpotExclusionRule = SpotExclusionRule(
+        keywords = properties.keywords,
+        branchNamePatterns = properties.branchNamePatterns,
+    )
 
     @Bean
-    fun spotQueryPolicy(properties: TourApiProperties): SpotQueryPolicy =
-        SpotQueryPolicy(
-            maxRadiusMeters = properties.maxRadiusMeters,
-            maxPageSize = properties.maxPageSize,
-            maxLikedPageSize = properties.maxLikedPageSize,
-            maxSearchPageSize = properties.maxSearchPageSize,
-            maxSuggestionCount = properties.maxSuggestionCount,
-            maxSearchQueryLength = properties.maxSearchQueryLength,
-            maxSearchPage = properties.maxSearchPage,
-            minPopularLikeCount = properties.minPopularLikeCount,
-        )
+    fun spotQueryPolicy(properties: TourApiProperties): SpotQueryPolicy = SpotQueryPolicy(
+        maxRadiusMeters = properties.maxRadiusMeters,
+        maxPageSize = properties.maxPageSize,
+        maxLikedPageSize = properties.maxLikedPageSize,
+        maxSearchPageSize = properties.maxSearchPageSize,
+        maxSuggestionCount = properties.maxSuggestionCount,
+        maxSearchQueryLength = properties.maxSearchQueryLength,
+        maxSearchPage = properties.maxSearchPage,
+        minPopularLikeCount = properties.minPopularLikeCount,
+    )
 
     /**
      * TourAPI 호출용 RestClient. **커넥션을 재사용한다** — `SimpleClientHttpRequestFactory`는
@@ -159,31 +155,28 @@ class TourismConfig {
     }
 
     @Bean
-    fun nationwideMapPolicy(properties: NationwideMapProperties): NationwideMapPolicy =
-        NationwideMapPolicy(
-            maxCellSpotPageSize = properties.maxCellSpotPageSize,
-            shareUrlBase = properties.shareUrlBase,
-            maxRelationPageSize = properties.maxRelationPageSize,
-        )
+    fun nationwideMapPolicy(properties: NationwideMapProperties): NationwideMapPolicy = NationwideMapPolicy(
+        maxCellSpotPageSize = properties.maxCellSpotPageSize,
+        shareUrlBase = properties.shareUrlBase,
+        maxRelationPageSize = properties.maxRelationPageSize,
+    )
 
     @Bean
-    fun mapViewportPolicy(properties: MapViewportProperties): MapViewportPolicy =
-        MapViewportPolicy(
-            minZoom = properties.minZoom,
-            maxZoom = properties.maxZoom,
-            maxAreaInSquareDegrees = properties.maxAreaSquareDegrees,
-            maxSpotMarkers = properties.maxSpotMarkers,
-            maxEventMarkers = properties.maxEventMarkers,
-            recommendationCandidateCap = properties.recommendationCandidateCap,
-            maxRecommendationSize = properties.maxRecommendationSize,
-        )
+    fun mapViewportPolicy(properties: MapViewportProperties): MapViewportPolicy = MapViewportPolicy(
+        minZoom = properties.minZoom,
+        maxZoom = properties.maxZoom,
+        maxAreaInSquareDegrees = properties.maxAreaSquareDegrees,
+        maxSpotMarkers = properties.maxSpotMarkers,
+        maxEventMarkers = properties.maxEventMarkers,
+        recommendationCandidateCap = properties.recommendationCandidateCap,
+        maxRecommendationSize = properties.maxRecommendationSize,
+    )
 
     @Bean
-    fun seoulOpenDataPolicy(properties: SeoulOpenDataProperties): SeoulOpenDataPolicy =
-        SeoulOpenDataPolicy(
-            minRefetchInterval = properties.minRefetchInterval,
-            maxAreaIds = properties.maxAreaIds,
-        )
+    fun seoulOpenDataPolicy(properties: SeoulOpenDataProperties): SeoulOpenDataPolicy = SeoulOpenDataPolicy(
+        minRefetchInterval = properties.minRefetchInterval,
+        maxAreaIds = properties.maxAreaIds,
+    )
 
     /**
      * 지역 추천 정책(SPEC-0015 §3.3). 계수는 전부 설정에서 온 잠정값이다(POL-044).
@@ -192,23 +185,22 @@ class TourismConfig {
      * 않겠다"로 해석하지 않는다.
      */
     @Bean
-    fun regionRecommendationPolicy(properties: TourStatsProperties): RegionRecommendationPolicy =
-        RegionRecommendationPolicy(
-            weights = if (properties.scoreWeights.isEmpty()) {
-                RegionScoreWeights.uniform()
-            } else {
-                RegionScoreWeights(properties.scoreWeights)
-            },
-            distanceScoring = DistanceScoring(properties.distanceHalfLifeMeters),
-            freshnessDecay = FreshnessDecay(
-                plateauDays = properties.freshnessPlateauDays,
-                halfLifeDays = properties.freshnessHalfLifeDays,
-            ),
-            minFactorCount = properties.minFactorCount,
-            minDistrictsPerProvince = properties.minDistrictsPerProvince,
-            defaultLimit = properties.defaultLimit,
-            maxLimit = properties.maxLimit,
-        )
+    fun regionRecommendationPolicy(properties: TourStatsProperties): RegionRecommendationPolicy = RegionRecommendationPolicy(
+        weights = if (properties.scoreWeights.isEmpty()) {
+            RegionScoreWeights.uniform()
+        } else {
+            RegionScoreWeights(properties.scoreWeights)
+        },
+        distanceScoring = DistanceScoring(properties.distanceHalfLifeMeters),
+        freshnessDecay = FreshnessDecay(
+            plateauDays = properties.freshnessPlateauDays,
+            halfLifeDays = properties.freshnessHalfLifeDays,
+        ),
+        minFactorCount = properties.minFactorCount,
+        minDistrictsPerProvince = properties.minDistrictsPerProvince,
+        defaultLimit = properties.defaultLimit,
+        maxLimit = properties.maxLimit,
+    )
 
     /**
      * 관광통계 호출용 RestClient(SPEC-0015). TourAPI 쪽과 분리한다 — 서비스 경로가 셋으로

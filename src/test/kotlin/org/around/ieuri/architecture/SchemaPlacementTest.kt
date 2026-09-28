@@ -1,8 +1,6 @@
 package org.around.ieuri.architecture
 
 import com.tngtech.archunit.core.domain.JavaClass
-import com.tngtech.archunit.core.importer.ClassFileImporter
-import com.tngtech.archunit.core.importer.ImportOption
 import jakarta.persistence.Entity
 import jakarta.persistence.Table
 import kotlin.test.Test
@@ -70,12 +68,13 @@ class SchemaPlacementTest {
         "congestion_area",
         // vector 타입은 JPA가 표현하지 못한다(SPEC-0035 S2) — 전용 JDBC 어댑터만 건드린다.
         "spot_embedding",
-        "kto_visitor_count", "kto_concentration_rate", "kto_stay_intensity", "kto_spending_intensity",
+        "kto_visitor_count",
+        "kto_concentration_rate",
+        "kto_stay_intensity",
+        "kto_spending_intensity",
     )
 
-    private val entities: List<JavaClass> = ClassFileImporter()
-        .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-        .importPackages("org.around.ieuri")
+    private val entities: List<JavaClass> = ArchitectureClasses.main
         .filter { it.isAnnotatedWith(Entity::class.java) }
 
     /** AC-6 — 전량 배정, 중복 0, 미배정 0. Map이므로 중복 키는 구조적으로 불가능하다. */
@@ -131,14 +130,13 @@ class SchemaPlacementTest {
         val actuallyMissing = placement.keys - mappedTables
 
         assertEquals(
-            tablesWithoutEntity, actuallyMissing,
+            tablesWithoutEntity,
+            actuallyMissing,
             "엔티티가 없는 테이블 목록이 달라졌다 — 새 엔티티를 추가했거나 매핑이 빠졌다",
         )
     }
 
-    private fun tableOf(entity: JavaClass): String =
-        entity.tryGetAnnotationOfType(Table::class.java).map { it.name }.orElse("")
+    private fun tableOf(entity: JavaClass): String = entity.tryGetAnnotationOfType(Table::class.java).map { it.name }.orElse("")
 
-    private fun schemaOf(entity: JavaClass): String =
-        entity.tryGetAnnotationOfType(Table::class.java).map { it.schema }.orElse("")
+    private fun schemaOf(entity: JavaClass): String = entity.tryGetAnnotationOfType(Table::class.java).map { it.schema }.orElse("")
 }

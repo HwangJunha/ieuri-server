@@ -1,17 +1,17 @@
 package org.around.ieuri.community.domain
 
 import org.around.ieuri.community.domain.aggregate.Post
+import org.around.ieuri.community.domain.vo.PhotoObjectKey
 import org.around.ieuri.community.domain.vo.PostTag
 import org.around.ieuri.community.domain.vo.SpotPoint
 import org.around.ieuri.community.domain.vo.TargetCategory
-import org.around.ieuri.community.domain.vo.PhotoObjectKey
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /** 글 도메인 불변식(R1~R4). 본문 길이 경계와 사진 개수·소유권을 고정한다. */
@@ -20,8 +20,7 @@ class PostTest {
     private val authorId = 7L
     private val catalogId = 420L
 
-    private fun confirmedKey(memberId: Long = authorId): PhotoObjectKey =
-        PhotoObjectKey.issue(memberId, UUID.randomUUID()).toConfirmed()
+    private fun confirmedKey(memberId: Long = authorId): PhotoObjectKey = PhotoObjectKey.issue(memberId, UUID.randomUUID()).toConfirmed()
 
     private fun create(
         title: String = "제목",

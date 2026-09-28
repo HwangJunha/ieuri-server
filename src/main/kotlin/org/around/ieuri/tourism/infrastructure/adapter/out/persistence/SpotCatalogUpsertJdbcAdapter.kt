@@ -31,7 +31,11 @@ class SpotCatalogUpsertJdbcAdapter(
     ) {
         jdbcTemplate.update(
             UPSERT_TRANSLATION_SQL,
-            catalogId, language.name, title, address, catalogId,
+            catalogId,
+            language.name,
+            title,
+            address,
+            catalogId,
         )
     }
 

@@ -6,15 +6,15 @@ import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.auth.application.port.`in`.query.MemberQueryUseCase
-import org.around.ieuri.auth.application.query.MembersQuery
 import org.around.ieuri.auth.application.query.MeView
 import org.around.ieuri.auth.application.query.MemberDetailView
 import org.around.ieuri.auth.application.query.MemberSummaryView
+import org.around.ieuri.auth.application.query.MembersQuery
 import org.around.ieuri.auth.domain.vo.MemberStatus
 import org.around.ieuri.auth.domain.vo.Permission
-import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.auth.infrastructure.security.RequiresPermission
 import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.common.graphql.generated.types.MemberConnection as GqlMemberConnection
 import org.around.ieuri.common.graphql.generated.types.MemberDetail as GqlMemberDetail
 import org.around.ieuri.common.graphql.generated.types.MemberEdge as GqlMemberEdge
@@ -51,19 +51,16 @@ class MemberQueryResolver(
     fun meId(dfe: DgsDataFetchingEnvironment): Long = dfe.meSource().memberId
 
     @DgsData(parentType = "Me", field = "status")
-    fun meStatus(dfe: DgsDataFetchingEnvironment): GqlMemberStatus =
-        GqlMemberStatus.valueOf(dfe.meSource().status.name)
+    fun meStatus(dfe: DgsDataFetchingEnvironment): GqlMemberStatus = GqlMemberStatus.valueOf(dfe.meSource().status.name)
 
     @DgsData(parentType = "Me", field = "createdAt")
     fun meCreatedAt(dfe: DgsDataFetchingEnvironment): String = dfe.meSource().createdAt.toString()
 
-    private fun DgsDataFetchingEnvironment.meSource(): MeView =
-        getSource<MeView>() ?: error("Me 필드 리졸버는 부모가 반환한 MeView를 소스로 받아야 한다.")
+    private fun DgsDataFetchingEnvironment.meSource(): MeView = getSource<MeView>() ?: error("Me 필드 리졸버는 부모가 반환한 MeView를 소스로 받아야 한다.")
 
     @DgsQuery
     @RequiresPermission(Permission.MEMBER_READ)
-    fun member(@InputArgument id: Long): GqlMemberDetail =
-        memberQueryUseCase.member(id).toGql()
+    fun member(@InputArgument id: Long): GqlMemberDetail = memberQueryUseCase.member(id).toGql()
 
     @DgsQuery
     @RequiresPermission(Permission.MEMBER_READ)

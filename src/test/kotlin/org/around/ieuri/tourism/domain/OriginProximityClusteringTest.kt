@@ -14,8 +14,7 @@ class OriginProximityClusteringTest {
     private val incheon = 126.4158814558 to 37.4393229658
     private val gwangju = 126.9500493009 to 35.2538411163
 
-    private fun cluster(vararg points: Pair<Double, Double>) =
-        OriginProximityClustering.cluster(points.toList()) { it }
+    private fun cluster(vararg points: Pair<Double, Double>) = OriginProximityClustering.cluster(points.toList()) { it }
 
     @Test
     @DisplayName("1km 밖의 점은 다른 군집이다")

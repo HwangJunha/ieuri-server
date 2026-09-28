@@ -28,18 +28,16 @@ class MapCellQueryJdbcAdapter(
 ) : MapCellQueryPort {
 
     @Transactional(readOnly = true)
-    override fun findAllCellDistricts(): List<MapCellDistrictRow> =
-        jdbcTemplate.query("$CELL_DISTRICT_SELECT ORDER BY mc.id, d.code") { rs, _ ->
-            rs.toCellDistrictRow()
-        }
+    override fun findAllCellDistricts(): List<MapCellDistrictRow> = jdbcTemplate.query("$CELL_DISTRICT_SELECT ORDER BY mc.id, d.code") { rs, _ ->
+        rs.toCellDistrictRow()
+    }
 
     @Transactional(readOnly = true)
-    override fun findCellDistricts(cellId: Long): List<MapCellDistrictRow> =
-        jdbcTemplate.query(
-            "$CELL_DISTRICT_SELECT WHERE mc.id = ? ORDER BY d.code",
-            { rs, _ -> rs.toCellDistrictRow() },
-            cellId,
-        )
+    override fun findCellDistricts(cellId: Long): List<MapCellDistrictRow> = jdbcTemplate.query(
+        "$CELL_DISTRICT_SELECT WHERE mc.id = ? ORDER BY d.code",
+        { rs, _ -> rs.toCellDistrictRow() },
+        cellId,
+    )
 
     @Transactional(readOnly = true)
     override fun findCellDistrictsIn(cellIds: Collection<Long>): List<MapCellDistrictRow> {
@@ -70,9 +68,8 @@ class MapCellQueryJdbcAdapter(
         cellId: Long,
         language: DomainLocale,
         limit: Int,
-    ): List<CellSpotView> =
-        jdbcTemplate.query(
-            """
+    ): List<CellSpotView> = jdbcTemplate.query(
+        """
             SELECT cat.id, t.title, cat.thumbnail_image_url, cat.category, cat.map_x, cat.map_y,
                    COUNT(r.id) AS like_count
             FROM tour.spot_catalog cat
@@ -85,26 +82,26 @@ class MapCellQueryJdbcAdapter(
             GROUP BY cat.id, t.title, cat.thumbnail_image_url, cat.category, cat.map_x, cat.map_y
             ORDER BY like_count DESC, cat.id ASC
             LIMIT ?
-            """.trimIndent(),
-            { rs, _ ->
-                CellSpotView(
-                    id = rs.getLong("id"),
-                    title = rs.getString("title"),
-                    thumbnailImageUrl = rs.getString("thumbnail_image_url"),
-                    categoryCode = rs.getString("category"),
-                    coordinates = Coordinates(
-                        latitude = rs.getDouble("map_y"),
-                        longitude = rs.getDouble("map_x"),
-                    ),
-                    likeCount = rs.getLong("like_count"),
-                )
-            },
-            language.name,
-            ReactionType.LIKE.name,
-            language.name,
-            cellId,
-            limit,
-        )
+        """.trimIndent(),
+        { rs, _ ->
+            CellSpotView(
+                id = rs.getLong("id"),
+                title = rs.getString("title"),
+                thumbnailImageUrl = rs.getString("thumbnail_image_url"),
+                categoryCode = rs.getString("category"),
+                coordinates = Coordinates(
+                    latitude = rs.getDouble("map_y"),
+                    longitude = rs.getDouble("map_x"),
+                ),
+                likeCount = rs.getLong("like_count"),
+            )
+        },
+        language.name,
+        ReactionType.LIKE.name,
+        language.name,
+        cellId,
+        limit,
+    )
 
     private fun ResultSet.toCellDistrictRow(): MapCellDistrictRow = MapCellDistrictRow(
         cellId = getLong("cell_id"),

@@ -19,5 +19,4 @@ import org.springframework.http.HttpHeaders
  * `DataFetchingEnvironment.locale`은 구독에서 null로 넘어와 시스템 기본값으로 폴백하므로
  * 쓰지 않는다.
  */
-fun DataFetchingEnvironment.acceptLanguage(): String? =
-    DgsContext.getRequestData(this)?.headers?.getFirst(HttpHeaders.ACCEPT_LANGUAGE)
+fun DataFetchingEnvironment.acceptLanguage(): String? = DgsContext.getRequestData(this)?.headers?.getFirst(HttpHeaders.ACCEPT_LANGUAGE)

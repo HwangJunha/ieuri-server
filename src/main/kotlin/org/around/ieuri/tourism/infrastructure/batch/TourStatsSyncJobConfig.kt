@@ -3,8 +3,8 @@ package org.around.ieuri.tourism.infrastructure.batch
 import org.around.ieuri.tourism.application.command.SyncDemandIntensityCommand
 import org.around.ieuri.tourism.application.port.out.client.TourStatsSyncPage
 import org.around.ieuri.tourism.application.port.out.client.TourStatsSyncPort
-import org.around.ieuri.tourism.application.port.out.persistence.TourStatsStorePort
 import org.around.ieuri.tourism.application.port.out.persistence.DistrictCodeQueryPort
+import org.around.ieuri.tourism.application.port.out.persistence.TourStatsStorePort
 import org.around.ieuri.tourism.infrastructure.config.TourStatsProperties
 import org.springframework.batch.core.job.Job
 import org.springframework.batch.core.job.builder.JobBuilder
@@ -110,17 +110,15 @@ class TourStatsSyncJobConfig(
     )
 
     @Bean
-    fun tourStatsStayIntensitySyncJob(): Job =
-        intensityJob(JOB_STAY_INTENSITY, "stayIntensity", storePort::upsertStayIntensities, syncPort::fetchStayIntensities)
+    fun tourStatsStayIntensitySyncJob(): Job = intensityJob(JOB_STAY_INTENSITY, "stayIntensity", storePort::upsertStayIntensities, syncPort::fetchStayIntensities)
 
     @Bean
-    fun tourStatsSpendingIntensitySyncJob(): Job =
-        intensityJob(
-            JOB_SPENDING_INTENSITY,
-            "spendingIntensity",
-            storePort::upsertSpendingIntensities,
-            syncPort::fetchSpendingIntensities,
-        )
+    fun tourStatsSpendingIntensitySyncJob(): Job = intensityJob(
+        JOB_SPENDING_INTENSITY,
+        "spendingIntensity",
+        storePort::upsertSpendingIntensities,
+        syncPort::fetchSpendingIntensities,
+    )
 
     /**
      * 강도 2종은 순회 단위·월 탐색·필터가 전부 같고 오퍼레이션과 적재 대상만 다르다.

@@ -39,19 +39,18 @@ class JwtAuthenticationFilter(
         filterChain.doFilter(request, response)
     }
 
-    private fun authenticate(token: String): TokenPresentation =
-        try {
-            val claims = tokenProvider.parseAccessToken(token)
-            // 권한(perms)을 authority로 세팅 → Authorizer가 권한 코드로 인가를 판정한다.
-            val authorities = claims.permissions.map { SimpleGrantedAuthority(it) }
-            val authentication = UsernamePasswordAuthenticationToken(claims.memberId, null, authorities)
-            SecurityContextHolder.getContext().authentication = authentication
-            TokenPresentation.VALID
-        } catch (ex: InvalidTokenException) {
-            // 무효 토큰은 인증 없이 통과. SecurityContext는 설정하지 않는다.
-            SecurityContextHolder.clearContext()
-            TokenPresentation.REJECTED
-        }
+    private fun authenticate(token: String): TokenPresentation = try {
+        val claims = tokenProvider.parseAccessToken(token)
+        // 권한(perms)을 authority로 세팅 → Authorizer가 권한 코드로 인가를 판정한다.
+        val authorities = claims.permissions.map { SimpleGrantedAuthority(it) }
+        val authentication = UsernamePasswordAuthenticationToken(claims.memberId, null, authorities)
+        SecurityContextHolder.getContext().authentication = authentication
+        TokenPresentation.VALID
+    } catch (ex: InvalidTokenException) {
+        // 무효 토큰은 인증 없이 통과. SecurityContext는 설정하지 않는다.
+        SecurityContextHolder.clearContext()
+        TokenPresentation.REJECTED
+    }
 
     private companion object {
         const val BEARER_PREFIX = "Bearer "

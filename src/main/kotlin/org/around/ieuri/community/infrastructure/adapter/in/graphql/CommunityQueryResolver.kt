@@ -1,34 +1,34 @@
 package org.around.ieuri.community.infrastructure.adapter.`in`.graphql
 
-import org.around.ieuri.common.event.LocationAccessed
-import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
 import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsData
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
+import org.around.ieuri.common.event.LocationAccessed
+import org.around.ieuri.common.graphql.appKey
 import org.around.ieuri.common.graphql.loader
-import java.util.concurrent.CompletableFuture
+import org.around.ieuri.common.pagination.CursorPageInfo
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.community.application.port.`in`.query.CommunityQueryUseCase
 import org.around.ieuri.community.application.port.out.client.MemberLookupPort
+import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
 import org.around.ieuri.community.application.query.BlockedUsersQuery
-import org.around.ieuri.common.pagination.CursorPageInfo
 import org.around.ieuri.community.application.query.CommentView
-import org.around.ieuri.community.application.query.PostAuthorView
-import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper.toGql
-import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper.toGqlOrPlaceholder
-import org.around.ieuri.community.application.query.PostSpotView
-import org.around.ieuri.community.application.query.PostCommentsQuery
-import org.around.ieuri.community.application.query.PostView
 import org.around.ieuri.community.application.query.MyPostsQuery
+import org.around.ieuri.community.application.query.PostAuthorView
+import org.around.ieuri.community.application.query.PostCommentsQuery
+import org.around.ieuri.community.application.query.PostSpotView
+import org.around.ieuri.community.application.query.PostView
 import org.around.ieuri.community.application.query.PostsQuery
 import org.around.ieuri.community.domain.vo.PostSortOrder
 import org.around.ieuri.community.domain.vo.TargetCategory
+import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper.toGql
+import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper.toGqlOrPlaceholder
 import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper.toTargetCategories
-import org.around.ieuri.common.graphql.appKey
 import org.around.ieuri.community.infrastructure.locale.contentLanguage
 import org.springframework.stereotype.Component
+import java.util.concurrent.CompletableFuture
 import org.around.ieuri.common.graphql.generated.types.BlockedUserConnection as GqlBlockedUserConnection
 import org.around.ieuri.common.graphql.generated.types.BlockedUserEdge as GqlBlockedUserEdge
 import org.around.ieuri.common.graphql.generated.types.PageInfo as GqlPageInfo
@@ -146,8 +146,7 @@ class CommunityQueryResolver(
 
     /** 차단·숨김에 걸리면 오류가 아니라 null이다 — 통상적인 부재로 다룬다. */
     @DgsQuery
-    fun post(@InputArgument id: Long): PostView? =
-        communityQueryUseCase.post(id, currentMemberProvider.requireMemberId())
+    fun post(@InputArgument id: Long): PostView? = communityQueryUseCase.post(id, currentMemberProvider.requireMemberId())
 
     @DgsQuery
     fun blockedUsers(
@@ -179,19 +178,16 @@ class CommunityQueryResolver(
      * 클라이언트가 고르는 값이 아니라 요청의 속성이기 때문이다(Accept-Language와 같은 이유).
      */
     @DgsQuery
-    fun communityChips(dfe: DgsDataFetchingEnvironment): List<GqlTargetCategory> =
-        communityQueryUseCase.communityChips(dfe.appKey(), dfe.contentLanguage())
-            .map { GqlTargetCategory.valueOf(it.category.name) }
+    fun communityChips(dfe: DgsDataFetchingEnvironment): List<GqlTargetCategory> = communityQueryUseCase.communityChips(dfe.appKey(), dfe.contentLanguage())
+        .map { GqlTargetCategory.valueOf(it.category.name) }
 
     /** 사용자가 입력한 태그. 별도 테이블이라 요청된 경우에만 배치로 읽는다. */
     @DgsData(parentType = "Post", field = "tags")
-    fun postTags(dfe: DgsDataFetchingEnvironment): CompletableFuture<List<String>> =
-        dfe.loader<List<String>>(PostTagsDataLoader.NAME).load(dfe.postSource().id)
+    fun postTags(dfe: DgsDataFetchingEnvironment): CompletableFuture<List<String>> = dfe.loader<List<String>>(PostTagsDataLoader.NAME).load(dfe.postSource().id)
 
     /** 사진 키. 배열 순서가 표시 순서다. */
     @DgsData(parentType = "Post", field = "photoKeys")
-    fun postPhotoKeys(dfe: DgsDataFetchingEnvironment): CompletableFuture<List<String>> =
-        dfe.loader<List<String>>(PostPhotoKeysDataLoader.NAME).load(dfe.postSource().id)
+    fun postPhotoKeys(dfe: DgsDataFetchingEnvironment): CompletableFuture<List<String>> = dfe.loader<List<String>>(PostPhotoKeysDataLoader.NAME).load(dfe.postSource().id)
 
     /** 글의 카테고리. 연결 테이블에 있어 요청된 경우에만 읽는다. */
     @DgsData(parentType = "Post", field = "category")
@@ -211,10 +207,9 @@ class CommunityQueryResolver(
      * 가상 스레드 전환에 신원을 잃는다.
      */
     @DgsData(parentType = "Post", field = "likedByViewer")
-    fun postLikedByViewer(dfe: DgsDataFetchingEnvironment): CompletableFuture<Boolean> =
-        dfe.loader<Boolean>(PostLikedDataLoader.NAME)
-            .load(dfe.postSource().id, ViewerId(currentMemberProvider.requireMemberId()))
-            .thenApply { it ?: false }
+    fun postLikedByViewer(dfe: DgsDataFetchingEnvironment): CompletableFuture<Boolean> = dfe.loader<Boolean>(PostLikedDataLoader.NAME)
+        .load(dfe.postSource().id, ViewerId(currentMemberProvider.requireMemberId()))
+        .thenApply { it ?: false }
 
     /**
      * 장소 칩. **장소는 선택이라 없으면 null이다.** 연결을 먼저 배치로 확인하고, 있을 때만
@@ -225,23 +220,21 @@ class CommunityQueryResolver(
      * 걸러지므로(R-23) 정상 경로에서는 여기가 null이 될 일이 거의 없다.
      */
     @DgsData(parentType = "Post", field = "spot")
-    fun postSpot(dfe: DgsDataFetchingEnvironment): CompletableFuture<GqlPostSpot?> =
-        dfe.loader<Long>(PostCatalogIdDataLoader.NAME)
-            .load(dfe.postSource().id)
-            .thenCompose { catalogId ->
-                if (catalogId == null) {
-                    CompletableFuture.completedFuture(null)
-                } else {
-                    dfe.loader<PostSpotView>(PostSpotDataLoader.NAME)
-                        .load(catalogId, dfe.contentLanguage())
-                        .thenApply { it?.toGql() }
-                }
+    fun postSpot(dfe: DgsDataFetchingEnvironment): CompletableFuture<GqlPostSpot?> = dfe.loader<Long>(PostCatalogIdDataLoader.NAME)
+        .load(dfe.postSource().id)
+        .thenCompose { catalogId ->
+            if (catalogId == null) {
+                CompletableFuture.completedFuture(null)
+            } else {
+                dfe.loader<PostSpotView>(PostSpotDataLoader.NAME)
+                    .load(catalogId, dfe.contentLanguage())
+                    .thenApply { it?.toGql() }
             }
+        }
 
     /** 작성자. auth를 물어야 하므로 요청된 경우에만 조회한다. */
     @DgsData(parentType = "Post", field = "author")
-    fun postAuthor(dfe: DgsDataFetchingEnvironment): CompletableFuture<GqlPostAuthor> =
-        dfe.loadAuthor(dfe.postSource().authorId)
+    fun postAuthor(dfe: DgsDataFetchingEnvironment): CompletableFuture<GqlPostAuthor> = dfe.loadAuthor(dfe.postSource().authorId)
 
     /**
      * 답글. **요청된 경우에만** 배치로 읽는다 — 목록만 그리는 화면은 조회가 붙지 않는다.
@@ -266,10 +259,9 @@ class CommunityQueryResolver(
      * 작성자를 배치로 읽는다. 글과 댓글이 같은 로더를 쓰므로 같은 사람이면 조회가 합쳐진다.
      * 회원 정보가 없어도 글은 남으므로(탈퇴해도 글은 보존한다) 대체 표기로 채운다.
      */
-    private fun DgsDataFetchingEnvironment.loadAuthor(memberId: Long): CompletableFuture<GqlPostAuthor> =
-        loader<PostAuthorView>(PostAuthorDataLoader.NAME)
-            .load(memberId)
-            .thenApply { it.toGqlOrPlaceholder(memberId) }
+    private fun DgsDataFetchingEnvironment.loadAuthor(memberId: Long): CompletableFuture<GqlPostAuthor> = loader<PostAuthorView>(PostAuthorDataLoader.NAME)
+        .load(memberId)
+        .thenApply { it.toGqlOrPlaceholder(memberId) }
 
     /**
      * 댓글 미리보기. **DataLoader가 글 id를 모아 한 번에 읽는다** — 카드마다 물으면
@@ -278,17 +270,15 @@ class CommunityQueryResolver(
      * 여기에 페이지네이션은 없다. 전체 목록과 더 보기는 루트의 `comments(postId:)`다.
      */
     @DgsData(parentType = "Post", field = "commentPreview")
-    fun commentPreview(dfe: DgsDataFetchingEnvironment): CompletableFuture<List<CommentView>> =
-        dfe.loader<List<CommentView>>(CommentPreviewDataLoader.NAME)
-            .load(dfe.postSource().id, ViewerId(currentMemberProvider.requireMemberId()))
+    fun commentPreview(dfe: DgsDataFetchingEnvironment): CompletableFuture<List<CommentView>> = dfe.loader<List<CommentView>>(CommentPreviewDataLoader.NAME)
+        .load(dfe.postSource().id, ViewerId(currentMemberProvider.requireMemberId()))
 
     /**
      * 부모 리졸버가 돌려준 read DTO. `!!` 대신 명시적으로 실패시킨다 — 실제로 null이 될 수
      * 없지만 그 보장은 DGS의 실행 순서에 달려 있어 타입이 증명하지 못한다.
      */
-    private fun DgsDataFetchingEnvironment.postSource(): PostView =
-        getSource<PostView>()
-            ?: error("Post 필드 리졸버는 부모가 반환한 PostView를 소스로 받아야 한다.")
+    private fun DgsDataFetchingEnvironment.postSource(): PostView = getSource<PostView>()
+        ?: error("Post 필드 리졸버는 부모가 반환한 PostView를 소스로 받아야 한다.")
 
     private fun TargetCategory.toGql() = GqlTargetCategory.valueOf(name)
 

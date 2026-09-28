@@ -26,7 +26,8 @@ class SpotEmbeddingTasklet(
         if (result.processed == 0) {
             log.info(
                 "spot embedding finished: embedded={} failed={}",
-                executionContext.getInt(KEY_EMBEDDED, 0), executionContext.getInt(KEY_FAILED, 0),
+                executionContext.getInt(KEY_EMBEDDED, 0),
+                executionContext.getInt(KEY_FAILED, 0),
             )
             return RepeatStatus.FINISHED
         }

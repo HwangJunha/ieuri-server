@@ -7,11 +7,11 @@ import org.around.ieuri.auth.application.command.AssignRoleCommand
 import org.around.ieuri.auth.application.command.RevokeRoleCommand
 import org.around.ieuri.auth.application.port.`in`.command.RoleUseCase
 import org.around.ieuri.auth.domain.vo.Permission
+import org.around.ieuri.auth.infrastructure.security.RequiresPermission
 import org.around.ieuri.common.graphql.generated.types.AssignRoleInput
 import org.around.ieuri.common.graphql.generated.types.RevokeRoleInput
 import org.around.ieuri.common.graphql.generated.types.RoleChangePayload
 import org.around.ieuri.common.security.CurrentMemberProvider
-import org.around.ieuri.auth.infrastructure.security.RequiresPermission
 
 /**
  * 역할 부여/회수 GraphQL 뮤테이션 리졸버. 각각 role:assign/role:revoke 권한을 요구하고,

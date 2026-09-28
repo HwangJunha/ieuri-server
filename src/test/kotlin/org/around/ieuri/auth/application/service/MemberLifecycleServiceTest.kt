@@ -46,7 +46,12 @@ class MemberLifecycleServiceTest {
     private val clock = Clock.fixed(now, ZoneOffset.UTC)
 
     private val service = MemberLifecycleService(
-        memberRepository, refreshTokenStore, snsTokenRevoker, auditLog, eventPublisher, clock,
+        memberRepository,
+        refreshTokenStore,
+        snsTokenRevoker,
+        auditLog,
+        eventPublisher,
+        clock,
     )
 
     private fun member(status: MemberStatus, provider: Provider = Provider.GOOGLE, providerUserId: String = "g1") = Member.reconstitute(
@@ -175,7 +180,9 @@ class MemberLifecycleServiceTest {
     @Test
     fun `해제가 실패해도 탈퇴는 완료되고 provider와 사유만 감사에 남긴다`() {
         givenWithdrawable(
-            Provider.APPLE, "apple-sub-1", token = "apple-refresh-1",
+            Provider.APPLE,
+            "apple-sub-1",
+            token = "apple-refresh-1",
             revokeResult = SnsRevokeResult.Failed("HTTP 400 invalid_grant"),
         )
         val payload = slot<Map<String, Any?>>()

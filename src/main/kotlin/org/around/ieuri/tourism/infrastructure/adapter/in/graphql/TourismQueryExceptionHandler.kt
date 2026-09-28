@@ -66,8 +66,7 @@ private class SpotQueryGraphQLError(
 
     override fun getPath(): List<Any>? = path?.toList()
 
-    override fun getErrorType(): graphql.ErrorClassification =
-        graphql.ErrorClassification.errorClassification(classification.name)
+    override fun getErrorType(): graphql.ErrorClassification = graphql.ErrorClassification.errorClassification(classification.name)
 
     override fun getExtensions(): Map<String, Any> = mapOf(
         "classification" to classification.name,

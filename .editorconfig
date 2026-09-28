@@ -1,0 +1,7 @@
+root = true
+
+[*.{kt,kts}]
+# 스타일 센서(ktlint) 규칙 — SPEC-0039 D-21
+ktlint_code_style = intellij_idea
+# 헥사고날 레이아웃의 `port.in`·`adapter.in` 패키지(백틱 `in`)와 충돌하는 규칙이라 끈다
+ktlint_standard_package-name = disabled

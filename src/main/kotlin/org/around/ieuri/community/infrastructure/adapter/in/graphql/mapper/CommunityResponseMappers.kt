@@ -7,7 +7,7 @@ import org.around.ieuri.common.graphql.generated.types.ConversationSpotQaOrigin 
 import org.around.ieuri.common.graphql.generated.types.PageInfo as GqlPageInfo
 import org.around.ieuri.common.graphql.generated.types.PostAuthor as GqlPostAuthor
 
-/**
+/*
  * 커뮤니티 표면이 공유하는 응답 변환. 글·댓글·장소 질문/답변이 같은 모양을 쓴다 —
  * 리졸버마다 복사하면 한 곳만 고쳐지는 날이 온다.
  */

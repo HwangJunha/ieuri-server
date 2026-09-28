@@ -48,7 +48,10 @@ class TourStatsMonthResolver(
                 executionContext.putString(KEY_BASE_MONTH, candidate.toString())
                 log.info(
                     "kto sync month resolved: dataset={} baseMonth={} probedArea={} probes={}",
-                    datasetName, candidate, areaCd, offset + 1,
+                    datasetName,
+                    candidate,
+                    areaCd,
+                    offset + 1,
                 )
                 return page
             }
@@ -56,15 +59,16 @@ class TourStatsMonthResolver(
 
         log.info(
             "kto sync month unresolved: dataset={} area={} lookback={}개월 — 다음 시도에서 재탐색합니다.",
-            datasetName, areaCd, lookbackMonths,
+            datasetName,
+            areaCd,
+            lookbackMonths,
         )
         return EMPTY_PAGE
     }
 
-    private fun resolvedMonth(executionContext: ExecutionContext): YearMonth? =
-        executionContext.getString(KEY_BASE_MONTH, "")
-            .takeIf { it.isNotEmpty() }
-            ?.let { YearMonth.parse(it) }
+    private fun resolvedMonth(executionContext: ExecutionContext): YearMonth? = executionContext.getString(KEY_BASE_MONTH, "")
+        .takeIf { it.isNotEmpty() }
+        ?.let { YearMonth.parse(it) }
 
     companion object {
         /** 확정된 기준월(`uuuu-MM`). 재시작해도 재탐색하지 않도록 ExecutionContext에 남긴다. */

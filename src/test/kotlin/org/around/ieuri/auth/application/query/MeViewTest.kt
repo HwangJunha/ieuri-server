@@ -1,11 +1,11 @@
 package org.around.ieuri.auth.application.query
 
+import org.around.ieuri.auth.domain.vo.MemberStatus
+import org.around.ieuri.auth.domain.vo.Provider
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import org.around.ieuri.auth.domain.vo.MemberStatus
-import org.around.ieuri.auth.domain.vo.Provider
 
 /**
  * `MeView`의 파생 값 검증(SPEC-0024 R6).

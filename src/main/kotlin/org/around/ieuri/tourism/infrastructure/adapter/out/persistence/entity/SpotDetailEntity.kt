@@ -1,6 +1,5 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity
 
-import org.around.ieuri.common.persistence.DbSchema
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -9,6 +8,7 @@ import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.Table
+import org.around.ieuri.common.persistence.DbSchema
 import org.around.ieuri.tourism.domain.vo.CopyrightType
 import java.time.Instant
 

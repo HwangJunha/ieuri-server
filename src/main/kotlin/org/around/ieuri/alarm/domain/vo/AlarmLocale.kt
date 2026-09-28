@@ -19,7 +19,6 @@ enum class AlarmLocale {
          * 지원하지 않는 값은 [EN]으로 떨어뜨린다(AC20.3, POL-039의 폴백 규약).
          * 대소문자를 가리지 않으며, null·빈 값도 [EN]이다.
          */
-        fun ofOrFallback(raw: String?): AlarmLocale =
-            entries.firstOrNull { it.name.equals(raw?.trim(), ignoreCase = true) } ?: EN
+        fun ofOrFallback(raw: String?): AlarmLocale = entries.firstOrNull { it.name.equals(raw?.trim(), ignoreCase = true) } ?: EN
     }
 }

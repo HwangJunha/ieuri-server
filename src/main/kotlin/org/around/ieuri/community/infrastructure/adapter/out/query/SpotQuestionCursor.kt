@@ -23,24 +23,22 @@ data class SpotQuestionCursor(
     val id: Long,
 )
 
-fun encodeSpotQuestionCursor(resolved: Boolean, createdAt: Instant, id: Long): String =
-    Base64.getUrlEncoder().withoutPadding()
-        .encodeToString("q:$resolved|$createdAt|$id".toByteArray(StandardCharsets.UTF_8))
+fun encodeSpotQuestionCursor(resolved: Boolean, createdAt: Instant, id: Long): String = Base64.getUrlEncoder().withoutPadding()
+    .encodeToString("q:$resolved|$createdAt|$id".toByteArray(StandardCharsets.UTF_8))
 
 /**
  * 조작·구버전 커서는 [IllegalArgumentException]으로 거부한다 — 조용히 첫 페이지로 되돌리면
  * 클라이언트가 무한 루프에 빠질 수 있다.
  */
-fun decodeSpotQuestionCursor(cursor: String): SpotQuestionCursor =
-    try {
-        val decoded = String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8)
-        require(decoded.startsWith("q:")) { "질문 목록 커서가 아닙니다." }
-        val (resolved, instant, id) = decoded.removePrefix("q:").split("|", limit = 3)
-        SpotQuestionCursor(
-            resolved = resolved.toBooleanStrict(),
-            createdAt = Instant.parse(instant),
-            id = id.toLong(),
-        )
-    } catch (e: RuntimeException) {
-        throw IllegalArgumentException("유효하지 않은 커서입니다.", e)
-    }
+fun decodeSpotQuestionCursor(cursor: String): SpotQuestionCursor = try {
+    val decoded = String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8)
+    require(decoded.startsWith("q:")) { "질문 목록 커서가 아닙니다." }
+    val (resolved, instant, id) = decoded.removePrefix("q:").split("|", limit = 3)
+    SpotQuestionCursor(
+        resolved = resolved.toBooleanStrict(),
+        createdAt = Instant.parse(instant),
+        id = id.toLong(),
+    )
+} catch (e: RuntimeException) {
+    throw IllegalArgumentException("유효하지 않은 커서입니다.", e)
+}

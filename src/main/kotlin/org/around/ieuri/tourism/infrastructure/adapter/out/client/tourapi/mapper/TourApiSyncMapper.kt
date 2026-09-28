@@ -19,16 +19,15 @@ import java.time.format.DateTimeFormatter
  *
  * [category]를 인자로 받는다 — contentTypeId 해석은 언어별 코드표에 의존하므로 클라이언트가 정한다.
  */
-fun TourApiResponse.Item.toNearbySpotDataOrNull(category: SpotCategory): NearbySpotData? =
-    NearbySpotData(
-        id = contentid ?: return null,
-        title = title ?: return null,
-        address = listOfNotNull(addr1, addr2).joinToString(" ").ifBlank { null },
-        thumbnailImageUrl = (firstimage ?: return null).toHttps(),
-        coordinates = Coordinates(latitude = mapy ?: return null, longitude = mapx ?: return null),
-        category = category,
-        copyright = CopyrightType.fromCode(cpyrhtDivCd),
-    )
+fun TourApiResponse.Item.toNearbySpotDataOrNull(category: SpotCategory): NearbySpotData? = NearbySpotData(
+    id = contentid ?: return null,
+    title = title ?: return null,
+    address = listOfNotNull(addr1, addr2).joinToString(" ").ifBlank { null },
+    thumbnailImageUrl = (firstimage ?: return null).toHttps(),
+    coordinates = Coordinates(latitude = mapy ?: return null, longitude = mapx ?: return null),
+    category = category,
+    copyright = CopyrightType.fromCode(cpyrhtDivCd),
+)
 
 /**
  * areaBasedSyncList2 item을 적재 [SyncSpotCommand]로 옮긴다. 필수 필드가 비거나 좌표가 범위를 벗어나면

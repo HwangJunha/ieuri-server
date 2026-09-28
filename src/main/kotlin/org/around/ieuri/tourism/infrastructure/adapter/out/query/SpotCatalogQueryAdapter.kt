@@ -34,43 +34,42 @@ class SpotCatalogQueryAdapter(
      * 카탈로그를 내주면 지도·반경 조회에서 빠지는 "존재하지만 안 보이는" 데이터가 된다.
      */
     @Transactional(readOnly = true)
-    override fun findUnassigned(language: DomainLocale, afterSpotId: Long, limit: Int): List<UnassignedSpot> =
-        queryFactory
-            .select(
-                spot.id, spot.language, spot.title, spot.address,
-                spot.thumbnailImageUrl, spot.mapX, spot.mapY,
-                spot.category, spot.copyright,
+    override fun findUnassigned(language: DomainLocale, afterSpotId: Long, limit: Int): List<UnassignedSpot> = queryFactory
+        .select(
+            spot.id, spot.language, spot.title, spot.address,
+            spot.thumbnailImageUrl, spot.mapX, spot.mapY,
+            spot.category, spot.copyright,
+        )
+        .from(spot)
+        .where(
+            spot.catalogId.isNull,
+            spot.language.eq(language),
+            spot.id.gt(afterSpotId),
+            spot.mapX.between(
+                CatalogStandardValues.KOREA_LON_RANGE.start,
+                CatalogStandardValues.KOREA_LON_RANGE.endInclusive,
+            ),
+            spot.mapY.between(
+                CatalogStandardValues.KOREA_LAT_RANGE.start,
+                CatalogStandardValues.KOREA_LAT_RANGE.endInclusive,
+            ),
+        )
+        .orderBy(spot.id.asc())
+        .limit(limit.toLong())
+        .fetch()
+        .map {
+            UnassignedSpot(
+                spotId = requireNotNull(it.get(spot.id)),
+                language = requireNotNull(it.get(spot.language)),
+                title = requireNotNull(it.get(spot.title)),
+                address = it.get(spot.address),
+                thumbnailImageUrl = requireNotNull(it.get(spot.thumbnailImageUrl)),
+                mapX = requireNotNull(it.get(spot.mapX)),
+                mapY = requireNotNull(it.get(spot.mapY)),
+                category = SpotCategory(requireNotNull(it.get(spot.category))),
+                copyright = requireNotNull(it.get(spot.copyright)),
             )
-            .from(spot)
-            .where(
-                spot.catalogId.isNull,
-                spot.language.eq(language),
-                spot.id.gt(afterSpotId),
-                spot.mapX.between(
-                    CatalogStandardValues.KOREA_LON_RANGE.start,
-                    CatalogStandardValues.KOREA_LON_RANGE.endInclusive,
-                ),
-                spot.mapY.between(
-                    CatalogStandardValues.KOREA_LAT_RANGE.start,
-                    CatalogStandardValues.KOREA_LAT_RANGE.endInclusive,
-                ),
-            )
-            .orderBy(spot.id.asc())
-            .limit(limit.toLong())
-            .fetch()
-            .map {
-                UnassignedSpot(
-                    spotId = requireNotNull(it.get(spot.id)),
-                    language = requireNotNull(it.get(spot.language)),
-                    title = requireNotNull(it.get(spot.title)),
-                    address = it.get(spot.address),
-                    thumbnailImageUrl = requireNotNull(it.get(spot.thumbnailImageUrl)),
-                    mapX = requireNotNull(it.get(spot.mapX)),
-                    mapY = requireNotNull(it.get(spot.mapY)),
-                    category = SpotCategory(requireNotNull(it.get(spot.category))),
-                    copyright = requireNotNull(it.get(spot.copyright)),
-                )
-            }
+        }
 
     /**
      * KO 카탈로그의 제목 키 → 후보 맵. 배정 회차마다 한 번 읽어 메모리에서 대조한다.
@@ -82,25 +81,24 @@ class SpotCatalogQueryAdapter(
      * KO 카탈로그 수만큼(실측 56,413) 메모리를 쓴다 — 키가 평균 수십 바이트라 수 MB 수준이다.
      */
     @Transactional(readOnly = true)
-    override fun loadKoreanTitleIndex(): Map<String, List<CatalogCandidate>> =
-        queryFactory
-            .select(catalog.id, catalog.mapX, catalog.mapY, catalog.thumbnailImageUrl, translation.title)
-            .from(translation)
-            .join(catalog).on(catalog.id.eq(translation.catalogId))
-            .where(translation.language.eq(DomainLocale.KO))
-            .fetch()
-            .mapNotNull { row ->
-                // **배정 쪽과 같은 함수여야 한다** — 규칙이 갈리면 맵의 키와 조회 키가 어긋난다.
-                val key = SpotTitleNormalizer.lookupKey(requireNotNull(row.get(translation.title)))
-                    ?: return@mapNotNull null
-                key to CatalogCandidate(
-                    catalogId = requireNotNull(row.get(catalog.id)),
-                    mapX = requireNotNull(row.get(catalog.mapX)),
-                    mapY = requireNotNull(row.get(catalog.mapY)),
-                    thumbnailImageUrl = requireNotNull(row.get(catalog.thumbnailImageUrl)),
-                )
-            }
-            .groupBy({ it.first }) { it.second }
+    override fun loadKoreanTitleIndex(): Map<String, List<CatalogCandidate>> = queryFactory
+        .select(catalog.id, catalog.mapX, catalog.mapY, catalog.thumbnailImageUrl, translation.title)
+        .from(translation)
+        .join(catalog).on(catalog.id.eq(translation.catalogId))
+        .where(translation.language.eq(DomainLocale.KO))
+        .fetch()
+        .mapNotNull { row ->
+            // **배정 쪽과 같은 함수여야 한다** — 규칙이 갈리면 맵의 키와 조회 키가 어긋난다.
+            val key = SpotTitleNormalizer.lookupKey(requireNotNull(row.get(translation.title)))
+                ?: return@mapNotNull null
+            key to CatalogCandidate(
+                catalogId = requireNotNull(row.get(catalog.id)),
+                mapX = requireNotNull(row.get(catalog.mapX)),
+                mapY = requireNotNull(row.get(catalog.mapY)),
+                thumbnailImageUrl = requireNotNull(row.get(catalog.thumbnailImageUrl)),
+            )
+        }
+        .groupBy({ it.first }) { it.second }
 
     /**
      * 썸네일 URL → KO 카탈로그 id. **KO spot이 정확히 하나인 URL만 담는다.**
@@ -109,19 +107,18 @@ class SpotCatalogQueryAdapter(
      * 되지 못하므로 애초에 후보에서 뺀다.
      */
     @Transactional(readOnly = true)
-    override fun loadKoreanThumbnailIndex(): Map<String, Long> =
-        queryFactory
-            .select(spot.thumbnailImageUrl, spot.catalogId.min())
-            .from(spot)
-            .where(
-                spot.language.eq(DomainLocale.KO),
-                spot.catalogId.isNotNull,
-                spot.thumbnailImageUrl.isNotEmpty,
-            )
-            .groupBy(spot.thumbnailImageUrl)
-            .having(spot.id.count().eq(1L))
-            .fetch()
-            .associate {
-                requireNotNull(it.get(spot.thumbnailImageUrl)) to requireNotNull(it.get(spot.catalogId.min()))
-            }
+    override fun loadKoreanThumbnailIndex(): Map<String, Long> = queryFactory
+        .select(spot.thumbnailImageUrl, spot.catalogId.min())
+        .from(spot)
+        .where(
+            spot.language.eq(DomainLocale.KO),
+            spot.catalogId.isNotNull,
+            spot.thumbnailImageUrl.isNotEmpty,
+        )
+        .groupBy(spot.thumbnailImageUrl)
+        .having(spot.id.count().eq(1L))
+        .fetch()
+        .associate {
+            requireNotNull(it.get(spot.thumbnailImageUrl)) to requireNotNull(it.get(spot.catalogId.min()))
+        }
 }

@@ -35,17 +35,17 @@ class MapRelationJdbcAdapter(
             VALUES (?, ?), (?, ?)
             ON CONFLICT (owner_id, counterpart_id) DO NOTHING
             """.trimIndent(),
-            memberId, counterpartId,
-            counterpartId, memberId,
+            memberId,
+            counterpartId,
+            counterpartId,
+            memberId,
         )
     }
 
     @Transactional
-    override fun removeFromMyList(memberId: Long, counterpartId: Long): Boolean =
-        repository.deleteByOwnerIdAndCounterpartId(memberId, counterpartId) > 0
+    override fun removeFromMyList(memberId: Long, counterpartId: Long): Boolean = repository.deleteByOwnerIdAndCounterpartId(memberId, counterpartId) > 0
 
     /** 탈퇴 정리 — 양쪽 방향을 모두 지운다(§6). */
     @Transactional
-    override fun deleteAllInvolving(memberId: Long): Int =
-        repository.deleteByOwnerIdOrCounterpartId(memberId, memberId)
+    override fun deleteAllInvolving(memberId: Long): Int = repository.deleteByOwnerIdOrCounterpartId(memberId, memberId)
 }

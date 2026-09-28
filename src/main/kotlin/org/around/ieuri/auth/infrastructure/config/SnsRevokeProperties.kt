@@ -32,9 +32,8 @@ data class SnsRevokeProperties(
         val clientId: String = "",
         val privateKeyLocation: Resource? = null,
     ) {
-        fun isConfigured(): Boolean =
-            teamId.isNotBlank() && keyId.isNotBlank() && clientId.isNotBlank() &&
-                privateKeyLocation?.exists() == true
+        fun isConfigured(): Boolean = teamId.isNotBlank() && keyId.isNotBlank() && clientId.isNotBlank() &&
+            privateKeyLocation?.exists() == true
     }
 
     /** client secret 문자열을 그대로 쓴다. */

@@ -1,10 +1,10 @@
 package org.around.ieuri.auth.application.port.out.query
 
-import org.around.ieuri.auth.application.query.MembersQuery
 import org.around.ieuri.auth.application.query.MeView
 import org.around.ieuri.auth.application.query.MemberDetailView
 import org.around.ieuri.auth.application.query.MemberPublicProfileView
 import org.around.ieuri.auth.application.query.MemberSummaryView
+import org.around.ieuri.auth.application.query.MembersQuery
 import org.around.ieuri.common.pagination.CursorPage
 
 /**

@@ -24,14 +24,11 @@ class MemberDataErasePersistenceAdapter(
 ) : MemberDataErasePort {
 
     @Transactional
-    override fun deleteLikesByMember(memberId: Long): Long =
-        likeRepository.deleteByMemberId(memberId)
+    override fun deleteLikesByMember(memberId: Long): Long = likeRepository.deleteByMemberId(memberId)
 
     @Transactional
-    override fun deleteHidesByMember(memberId: Long): Long =
-        hideRepository.deleteByMemberId(memberId)
+    override fun deleteHidesByMember(memberId: Long): Long = hideRepository.deleteByMemberId(memberId)
 
     @Transactional
-    override fun deleteBlocksInvolving(memberId: Long): Long =
-        blockRepository.deleteByBlockerIdOrBlockedId(memberId, memberId)
+    override fun deleteBlocksInvolving(memberId: Long): Long = blockRepository.deleteByBlockerIdOrBlockedId(memberId, memberId)
 }

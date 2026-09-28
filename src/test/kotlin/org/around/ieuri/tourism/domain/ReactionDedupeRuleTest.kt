@@ -18,8 +18,7 @@ class ReactionDedupeRuleTest {
     private val earlier = Instant.parse("2026-08-13T00:00:00Z")
     private val later = Instant.parse("2026-08-14T00:00:00Z")
 
-    private fun row(id: Long, updatedAt: Instant, memberId: Long = 7, catalogId: Long = 900) =
-        ReactionRow(id = id, memberId = memberId, catalogId = catalogId, updatedAt = updatedAt)
+    private fun row(id: Long, updatedAt: Instant, memberId: Long = 7, catalogId: Long = 900) = ReactionRow(id = id, memberId = memberId, catalogId = catalogId, updatedAt = updatedAt)
 
     @Test
     @DisplayName("updated_at이 최신인 행을 남긴다")

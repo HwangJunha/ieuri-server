@@ -3,14 +3,14 @@ package org.around.ieuri.community.infrastructure.mapper
 import org.around.ieuri.community.domain.aggregate.Block
 import org.around.ieuri.community.domain.aggregate.Comment
 import org.around.ieuri.community.domain.aggregate.Post
-import org.around.ieuri.community.domain.vo.PostTag
-import org.around.ieuri.community.domain.vo.SpotPoint
-import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.domain.aggregate.PostLike
 import org.around.ieuri.community.domain.aggregate.Report
 import org.around.ieuri.community.domain.vo.PhotoObjectKey
+import org.around.ieuri.community.domain.vo.PostTag
 import org.around.ieuri.community.domain.vo.ReportReason
 import org.around.ieuri.community.domain.vo.ReportTargetType
+import org.around.ieuri.community.domain.vo.SpotPoint
+import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.BlockEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.CommentEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostEntity
@@ -87,8 +87,13 @@ class CommunityMapperTest {
         val keyB = PhotoObjectKey.issue(3L, UUID.randomUUID()).toConfirmed()
         val domain = Post.create(
             category = TargetCategory.TOURIST_SPOT,
-            catalogId = 20L, spotPoint = SpotPoint(127.0, 37.5), authorId = 3L, tags = emptyList(),
-            title = "제목", body = "본문", photoKeys = listOf(keyA, keyB),
+            catalogId = 20L,
+            spotPoint = SpotPoint(127.0, 37.5),
+            authorId = 3L,
+            tags = emptyList(),
+            title = "제목",
+            body = "본문",
+            photoKeys = listOf(keyA, keyB),
         )
 
         val photos = domain.toPhotoEntities(postId = 1L)
@@ -104,8 +109,13 @@ class CommunityMapperTest {
         // catalogId·mapX·mapY 셋이 전부 숫자라 뒤바뀌어도 컴파일된다 — 값을 서로 다르게 둔다.
         val domain = Post.create(
             category = TargetCategory.TOURIST_SPOT,
-            catalogId = 20L, spotPoint = SpotPoint(127.0, 37.5), authorId = 3L, tags = emptyList(),
-            title = "제목", body = "본문", photoKeys = emptyList(),
+            catalogId = 20L,
+            spotPoint = SpotPoint(127.0, 37.5),
+            authorId = 3L,
+            tags = emptyList(),
+            title = "제목",
+            body = "본문",
+            photoKeys = emptyList(),
         )
 
         val entity = requireNotNull(domain.toSpotEntity(postId = 1L))
@@ -121,8 +131,13 @@ class CommunityMapperTest {
     fun `장소가 없는 글은 연결 행을 만들지 않는다`() {
         val domain = Post.create(
             category = TargetCategory.TOURIST_SPOT,
-            catalogId = null, spotPoint = null, authorId = 3L, tags = emptyList(),
-            title = "제목", body = "본문", photoKeys = emptyList(),
+            catalogId = null,
+            spotPoint = null,
+            authorId = 3L,
+            tags = emptyList(),
+            title = "제목",
+            body = "본문",
+            photoKeys = emptyList(),
         )
 
         assertNull(domain.toSpotEntity(postId = 1L))
@@ -150,9 +165,13 @@ class CommunityMapperTest {
     @Test
     fun `nullable 필드가 모두 null인 글도 옮겨진다`() {
         val entity = PostEntity(
-            id = 1L, authorId = 3L,
-            title = "제목", body = "본문",
-            deletedAt = null, createdAt = createdAt, updatedAt = createdAt,
+            id = 1L,
+            authorId = 3L,
+            title = "제목",
+            body = "본문",
+            deletedAt = null,
+            createdAt = createdAt,
+            updatedAt = createdAt,
         )
 
         val domain = entity.toDomain(
@@ -176,8 +195,13 @@ class CommunityMapperTest {
         val keyB = PhotoObjectKey.issue(3L, UUID.randomUUID()).toConfirmed()
         val domain = Post.create(
             category = TargetCategory.TOURIST_SPOT,
-            catalogId = 20L, spotPoint = SpotPoint(127.0, 37.5), authorId = 3L, tags = emptyList(),
-            title = "제목", body = "본문", photoKeys = listOf(keyA, keyB),
+            catalogId = 20L,
+            spotPoint = SpotPoint(127.0, 37.5),
+            authorId = 3L,
+            tags = emptyList(),
+            title = "제목",
+            body = "본문",
+            photoKeys = listOf(keyA, keyB),
         )
 
         val entity = domain.toNewEntity()
@@ -194,8 +218,14 @@ class CommunityMapperTest {
     @Test
     fun `댓글 엔티티가 도메인으로 필드마다 옮겨진다`() {
         val entity = CommentEntity(
-            id = 1L, postId = 2L, authorId = 3L, body = "댓글",
-            hidden = true, deletedAt = deletedAt, createdAt = createdAt, updatedAt = createdAt,
+            id = 1L,
+            postId = 2L,
+            authorId = 3L,
+            body = "댓글",
+            hidden = true,
+            deletedAt = deletedAt,
+            createdAt = createdAt,
+            updatedAt = createdAt,
         )
 
         val domain = entity.toDomain()
@@ -212,8 +242,14 @@ class CommunityMapperTest {
     @Test
     fun `nullable 필드가 null인 댓글도 옮겨진다`() {
         val entity = CommentEntity(
-            id = 1L, postId = 2L, authorId = 3L, body = "댓글",
-            hidden = false, deletedAt = null, createdAt = createdAt, updatedAt = createdAt,
+            id = 1L,
+            postId = 2L,
+            authorId = 3L,
+            body = "댓글",
+            hidden = false,
+            deletedAt = null,
+            createdAt = createdAt,
+            updatedAt = createdAt,
         )
         assertNull(entity.toDomain().deletedAt)
     }
@@ -283,8 +319,11 @@ class CommunityMapperTest {
     @Test
     fun `상세 사유가 null인 신고도 옮겨진다`() {
         val entity = Report.create(
-            reporterId = 1L, targetType = ReportTargetType.MEMBER, targetId = 2L,
-            reason = ReportReason.SPAM, detail = null,
+            reporterId = 1L,
+            targetType = ReportTargetType.MEMBER,
+            targetId = 2L,
+            reason = ReportReason.SPAM,
+            detail = null,
         ).toNewEntity()
 
         assertNull(entity.detail)

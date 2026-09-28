@@ -31,26 +31,20 @@ class RegionMetricQueryPortStub(
 
     override fun findDistrictAt(origin: Coordinates): OriginDistrict? = originDistrict
 
-    override fun findRegions(provinceCode: String): List<RegionRow> =
-        inProvince(provinceCode).map { it.region }
+    override fun findRegions(provinceCode: String): List<RegionRow> = inProvince(provinceCode).map { it.region }
 
-    override fun findConcentrationRates(provinceCode: String) =
-        metricsOf(RegionScoreFactor.CONGESTION, provinceCode)
+    override fun findConcentrationRates(provinceCode: String) = metricsOf(RegionScoreFactor.CONGESTION, provinceCode)
 
-    override fun findVisitorCounts(provinceCode: String) =
-        metricsOf(RegionScoreFactor.VISITOR_VOLUME, provinceCode)
+    override fun findVisitorCounts(provinceCode: String) = metricsOf(RegionScoreFactor.VISITOR_VOLUME, provinceCode)
 
-    override fun findStayIntensities(provinceCode: String) =
-        metricsOf(RegionScoreFactor.STAY_INTENSITY, provinceCode)
+    override fun findStayIntensities(provinceCode: String) = metricsOf(RegionScoreFactor.STAY_INTENSITY, provinceCode)
 
-    override fun findSpendingIntensities(provinceCode: String) =
-        metricsOf(RegionScoreFactor.SPENDING_INTENSITY, provinceCode)
+    override fun findSpendingIntensities(provinceCode: String) = metricsOf(RegionScoreFactor.SPENDING_INTENSITY, provinceCode)
 
     /** 그 항목에 값이 있는 지역만 들어간다 — 결측은 키 자체가 없다(POL-043). */
-    private fun metricsOf(factor: RegionScoreFactor, provinceCode: String): Map<String, RegionMetric> =
-        inProvince(provinceCode).mapNotNull { fixture ->
-            fixture.metrics[factor]?.let { fixture.region.code to it }
-        }.toMap()
+    private fun metricsOf(factor: RegionScoreFactor, provinceCode: String): Map<String, RegionMetric> = inProvince(provinceCode).mapNotNull { fixture ->
+        fixture.metrics[factor]?.let { fixture.region.code to it }
+    }.toMap()
 
     private fun inProvince(provinceCode: String): List<RegionFixture> {
         askedProvinceCodes += provinceCode

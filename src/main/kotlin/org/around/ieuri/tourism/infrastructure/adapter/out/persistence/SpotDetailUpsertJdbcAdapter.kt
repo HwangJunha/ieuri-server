@@ -124,7 +124,8 @@ class SpotDetailUpsertJdbcAdapter(
     override fun saveInfoItems(spotId: Long, category: SpotCategory, items: List<SpotInfoItem>) {
         jdbcTemplate.update(
             "DELETE FROM spot_detail_info WHERE spot_id = ? AND category = ?",
-            spotId, category.code,
+            spotId,
+            category.code,
         )
         if (items.isEmpty()) return
         jdbcTemplate.batchUpdate(

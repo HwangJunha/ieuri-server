@@ -42,46 +42,40 @@ class MemberContentSoftDeleteAdapter(
     private val reply = QSpotAnswerReplyEntity.spotAnswerReplyEntity
 
     @Transactional
-    override fun softDeletePostsByAuthor(memberId: Long, now: Instant): Long =
-        queryFactory.update(post)
-            .set(post.deletedAt, now)
-            .where(post.authorId.eq(memberId), post.deletedAt.isNull)
-            .execute()
+    override fun softDeletePostsByAuthor(memberId: Long, now: Instant): Long = queryFactory.update(post)
+        .set(post.deletedAt, now)
+        .where(post.authorId.eq(memberId), post.deletedAt.isNull)
+        .execute()
 
     @Transactional
-    override fun softDeleteCommentsByAuthor(memberId: Long, now: Instant): Long =
-        queryFactory.update(comment)
-            .set(comment.deletedAt, now)
-            .where(comment.authorId.eq(memberId), comment.deletedAt.isNull)
-            .execute()
+    override fun softDeleteCommentsByAuthor(memberId: Long, now: Instant): Long = queryFactory.update(comment)
+        .set(comment.deletedAt, now)
+        .where(comment.authorId.eq(memberId), comment.deletedAt.isNull)
+        .execute()
 
     @Transactional
-    override fun softDeleteSpotQuestionsByAuthor(memberId: Long, now: Instant): Long =
-        queryFactory.update(question)
-            .set(question.deletedAt, now)
-            .where(question.authorId.eq(memberId), question.deletedAt.isNull)
-            .execute()
+    override fun softDeleteSpotQuestionsByAuthor(memberId: Long, now: Instant): Long = queryFactory.update(question)
+        .set(question.deletedAt, now)
+        .where(question.authorId.eq(memberId), question.deletedAt.isNull)
+        .execute()
 
     @Transactional
-    override fun softDeleteSpotAnswersByAuthor(memberId: Long, now: Instant): Long =
-        queryFactory.update(answer)
-            .set(answer.deletedAt, now)
-            .where(answer.authorId.eq(memberId), answer.deletedAt.isNull)
-            .execute()
+    override fun softDeleteSpotAnswersByAuthor(memberId: Long, now: Instant): Long = queryFactory.update(answer)
+        .set(answer.deletedAt, now)
+        .where(answer.authorId.eq(memberId), answer.deletedAt.isNull)
+        .execute()
 
     @Transactional
-    override fun softDeleteSpotAnswerRepliesByAuthor(memberId: Long, now: Instant): Long =
-        queryFactory.update(reply)
-            .set(reply.deletedAt, now)
-            .where(reply.authorId.eq(memberId), reply.deletedAt.isNull)
-            .execute()
+    override fun softDeleteSpotAnswerRepliesByAuthor(memberId: Long, now: Instant): Long = queryFactory.update(reply)
+        .set(reply.deletedAt, now)
+        .where(reply.authorId.eq(memberId), reply.deletedAt.isNull)
+        .execute()
 
     @Transactional
-    override fun softDeleteMessagesBySender(memberId: Long, now: Instant): Long =
-        queryFactory.update(message)
-            .set(message.deletedAt, now)
-            .where(message.senderId.eq(memberId), message.deletedAt.isNull)
-            .execute()
+    override fun softDeleteMessagesBySender(memberId: Long, now: Instant): Long = queryFactory.update(message)
+        .set(message.deletedAt, now)
+        .where(message.senderId.eq(memberId), message.deletedAt.isNull)
+        .execute()
 
     /**
      * `answerCount`를 내려야 할 질문 id(SPEC-0026 R17).
@@ -94,14 +88,13 @@ class MemberContentSoftDeleteAdapter(
      * 수가 실제보다 작아진다. **중복은 접지 않는다**: 같은 질문에 여러 건이면 그만큼 내린다.
      */
     @Transactional(readOnly = true)
-    override fun findQuestionIdsToDecrease(memberId: Long): List<Long> =
-        queryFactory
-            .select(answer.questionId)
-            .from(answer)
-            .where(
-                answer.authorId.eq(memberId),
-                answer.hidden.isFalse,
-                answer.deletedAt.isNull,
-            )
-            .fetch()
+    override fun findQuestionIdsToDecrease(memberId: Long): List<Long> = queryFactory
+        .select(answer.questionId)
+        .from(answer)
+        .where(
+            answer.authorId.eq(memberId),
+            answer.hidden.isFalse,
+            answer.deletedAt.isNull,
+        )
+        .fetch()
 }

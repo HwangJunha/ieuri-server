@@ -32,6 +32,5 @@ object ShareToken {
      * 같은 자리에서 나오므로, 딥링크에서 웹으로 옮겨 갈 때 이 함수가 바뀌지 않아야 한다.
      * 토큰이 유효한지는 조회가 판정하며(없으면 SHARE_LINK_NOT_FOUND) 여기서는 형태만 본다.
      */
-    fun extractFrom(shareUrl: String): String =
-        shareUrl.substringAfterLast('/').substringBefore('?').trim()
+    fun extractFrom(shareUrl: String): String = shareUrl.substringAfterLast('/').substringBefore('?').trim()
 }

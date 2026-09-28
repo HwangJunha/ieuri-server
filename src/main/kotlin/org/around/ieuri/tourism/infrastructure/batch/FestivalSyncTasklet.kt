@@ -65,7 +65,9 @@ class FestivalSyncTasklet(
         if (!hasMore) {
             log.info(
                 "festival sync completed: language={} written={} dropped={}",
-                language, totalWritten, totalDropped,
+                language,
+                totalWritten,
+                totalDropped,
             )
             executionContext.putInt(KEY_COLLECTED, collectedIds.size)
             cleanup(executionContext, runDate)
@@ -108,7 +110,11 @@ class FestivalSyncTasklet(
 
         log.info(
             "festival cleanup: language={} deleted={} (ended={} missing={}) surviving={}",
-            language, deleted, endedDeleted, missingDeleted, collected,
+            language,
+            deleted,
+            endedDeleted,
+            missingDeleted,
+            collected,
         )
         executionContext.putInt(KEY_DELETED, deleted)
         executionContext.putInt(KEY_DELETED_ENDED, endedDeleted)

@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 
-/**
+/*
  * 장소 질문/답변의 배치 로더(SPEC-0026).
  *
  * 지연 필드는 요청당 과다 조회를 막고 DataLoader는 요청 **안**의 N+1을 막는 것이라,
@@ -71,12 +71,11 @@ value class ViewerId(val value: Long)
  * **폴백하지 않는다.** 요청이 언제나 갖는 값이라 부재는 리졸버가 `load(key, viewer)`를
  * 빠뜨렸다는 뜻이고, 비로그인으로 흘리면 차단·소유 관계가 사라진 그럴듯한 오답이 나간다.
  */
-internal fun BatchLoaderEnvironment.requireViewer(loaderName: String): Long =
-    keyContexts.values
-        .filterIsInstance<ViewerId>()
-        .firstOrNull()
-        ?.value
-        ?: error("${loaderName}은 keyContext로 뷰어를 받아야 한다 — 리졸버가 load(key, ViewerId(...))로 부른다.")
+internal fun BatchLoaderEnvironment.requireViewer(loaderName: String): Long = keyContexts.values
+    .filterIsInstance<ViewerId>()
+    .firstOrNull()
+    ?.value
+    ?: error("${loaderName}은 keyContext로 뷰어를 받아야 한다 — 리졸버가 load(key, ViewerId(...))로 부른다.")
 
 @DgsDataLoader(name = SpotQuestionPhotoDataLoader.NAME)
 @Component

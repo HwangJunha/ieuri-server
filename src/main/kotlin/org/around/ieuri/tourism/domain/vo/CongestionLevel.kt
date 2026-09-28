@@ -36,7 +36,6 @@ enum class CongestionLevel {
          * 잘못된 색을 칠하는 것보다 표시하지 않는 편이 낫다. 호출자는 null을 매핑 실패로
          * 다루고 그 구역을 건너뛴다.
          */
-        fun fromUpstreamOrNull(raw: String?): CongestionLevel? =
-            BY_UPSTREAM[raw?.trim() ?: return null]
+        fun fromUpstreamOrNull(raw: String?): CongestionLevel? = BY_UPSTREAM[raw?.trim() ?: return null]
     }
 }

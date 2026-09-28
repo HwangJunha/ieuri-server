@@ -40,7 +40,10 @@ class CommentCommandServiceTest {
     private val clock = mockk<ClockPort> { every { now() } returns now }
 
     private val service = CommentCommandService(
-        commentRepository, counterPort, moderationPort, clock,
+        commentRepository,
+        counterPort,
+        moderationPort,
+        clock,
     )
 
     private fun givenPostExists(exists: Boolean = true) {
@@ -53,17 +56,27 @@ class CommentCommandServiceTest {
         id: Long = commentId,
         parentCommentId: Long? = null,
     ) = Comment.restore(
-        id = id, postId = postId, parentCommentId = parentCommentId,
-        authorId = authorId, body = "댓글",
-        hidden = hidden, deletedAt = null, createdAt = now,
+        id = id,
+        postId = postId,
+        parentCommentId = parentCommentId,
+        authorId = authorId,
+        body = "댓글",
+        hidden = hidden,
+        deletedAt = null,
+        createdAt = now,
     )
 
     private fun givenSaveEchoesBackWithId() {
         every { commentRepository.save(any()) } answers {
             val c = firstArg<Comment>()
             Comment.restore(
-                id = commentId, postId = c.postId, authorId = c.authorId, body = c.body,
-                hidden = c.hidden, deletedAt = c.deletedAt, createdAt = now,
+                id = commentId,
+                postId = c.postId,
+                authorId = c.authorId,
+                body = c.body,
+                hidden = c.hidden,
+                deletedAt = c.deletedAt,
+                createdAt = now,
             )
         }
     }
@@ -112,9 +125,14 @@ class CommentCommandServiceTest {
         every { commentRepository.save(capture(saved)) } answers {
             firstArg<Comment>().let {
                 Comment.restore(
-                    id = commentId, postId = it.postId, parentCommentId = it.parentCommentId,
-                    authorId = it.authorId, body = it.body, hidden = it.hidden,
-                    deletedAt = it.deletedAt, createdAt = now,
+                    id = commentId,
+                    postId = it.postId,
+                    parentCommentId = it.parentCommentId,
+                    authorId = it.authorId,
+                    body = it.body,
+                    hidden = it.hidden,
+                    deletedAt = it.deletedAt,
+                    createdAt = now,
                 )
             }
         }
@@ -134,9 +152,14 @@ class CommentCommandServiceTest {
         every { commentRepository.save(capture(saved)) } answers {
             firstArg<Comment>().let {
                 Comment.restore(
-                    id = commentId, postId = it.postId, parentCommentId = it.parentCommentId,
-                    authorId = it.authorId, body = it.body, hidden = it.hidden,
-                    deletedAt = it.deletedAt, createdAt = now,
+                    id = commentId,
+                    postId = it.postId,
+                    parentCommentId = it.parentCommentId,
+                    authorId = it.authorId,
+                    body = it.body,
+                    hidden = it.hidden,
+                    deletedAt = it.deletedAt,
+                    createdAt = now,
                 )
             }
         }
@@ -152,8 +175,13 @@ class CommentCommandServiceTest {
         givenPostExists()
         // postId가 다른 댓글이다. 허용하면 글 A의 목록에 글 B의 답글이 섞인다.
         every { commentRepository.findById(5L) } returns Comment.restore(
-            id = 5L, postId = postId + 999, authorId = memberId, body = "남의 글 댓글",
-            hidden = false, deletedAt = null, createdAt = now,
+            id = 5L,
+            postId = postId + 999,
+            authorId = memberId,
+            body = "남의 글 댓글",
+            hidden = false,
+            deletedAt = null,
+            createdAt = now,
         )
 
         assertFailsWith<CommentNotFoundException> {

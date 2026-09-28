@@ -51,7 +51,10 @@ class MemberReactionEraseService(
         // 개인정보를 담지 않는다(POL-013) — 식별자와 건수만 남긴다. 시군구 코드는 남기지 않는다.
         log.info(
             "tourism map data erased for withdrawn member {}: visits={} shareLinks={} relations={}",
-            memberId, visits, links, relations,
+            memberId,
+            visits,
+            links,
+            relations,
         )
     }
 

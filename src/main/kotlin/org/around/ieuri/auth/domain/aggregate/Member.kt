@@ -109,8 +109,7 @@ class Member private constructor(
     }
 
     /** 기간제 정지가 만료됐는지(로그인 시 자동 복구 판정). 무기한 정지(until=null)는 만료되지 않는다. */
-    fun isSuspensionExpired(now: Instant): Boolean =
-        status == MemberStatus.SUSPENDED && suspendedUntil != null && !now.isBefore(suspendedUntil)
+    fun isSuspensionExpired(now: Instant): Boolean = status == MemberStatus.SUSPENDED && suspendedUntil != null && !now.isBefore(suspendedUntil)
 
     companion object {
         /**

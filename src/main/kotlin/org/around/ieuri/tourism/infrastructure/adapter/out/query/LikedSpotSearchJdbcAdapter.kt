@@ -56,8 +56,7 @@ class LikedSpotSearchJdbcAdapter(
      * 못 얻고 `@@@`만 하나 늘어 느려진다.
      */
     @Transactional(readOnly = true)
-    override fun searchLikedSpots(query: LikedSpotsSearch, text: String): CursorPage<LikedSpotView> =
-        page(query, runSearch(query, text))
+    override fun searchLikedSpots(query: LikedSpotsSearch, text: String): CursorPage<LikedSpotView> = page(query, runSearch(query, text))
 
     private fun runSearch(query: LikedSpotsSearch, text: String): List<LikedSpotView> {
         val limit = query.first + 1
@@ -82,7 +81,8 @@ class LikedSpotSearchJdbcAdapter(
             query.language.name,
             query.language.name,
             // 제목·주소 두 자리([matchClause] 참조).
-            phrase, phrase,
+            phrase,
+            phrase,
         )
 
         if (!query.categories.isUnfiltered) {
@@ -173,8 +173,7 @@ class LikedSpotSearchJdbcAdapter(
      * **가중치(boost)를 쓰지 않는다** — `searchSpots`는 순위를 다투므로 제목 3·주소 0.2로
      * 눌러야 하지만, 이쪽은 정렬이 `likedAt DESC` 고정이라 점수가 순서에 관여하지 않는다.
      */
-    private fun matchClause(): String =
-        "($TITLE_NGRAM_FIELD @@@ ? OR ${SpotSearchJdbcAdapter.ADDRESS_FIELD} @@@ ?)"
+    private fun matchClause(): String = "($TITLE_NGRAM_FIELD @@@ ? OR ${SpotSearchJdbcAdapter.ADDRESS_FIELD} @@@ ?)"
 
     /**
      * 질의 언어에 해당하는 제목 필드 식. BM25 인덱스는 테이블당 하나뿐이라 언어별로 나눌 수

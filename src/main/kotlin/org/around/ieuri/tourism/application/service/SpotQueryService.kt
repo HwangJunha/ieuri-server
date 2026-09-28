@@ -1,38 +1,38 @@
 package org.around.ieuri.tourism.application.service
 
-import org.around.ieuri.tourism.application.exception.EmptyQueryException
-import org.around.ieuri.tourism.application.exception.QueryTooLongException
-import org.around.ieuri.tourism.application.exception.SpotDetailNotFoundException
-import org.around.ieuri.tourism.application.exception.SpotNotFoundInLocaleQueryException
-import org.around.ieuri.tourism.application.exception.SpotQueryException
-import org.around.ieuri.tourism.application.exception.UnknownCategoryException
-import org.around.ieuri.tourism.application.exception.InvalidCoordinatesException
-import org.around.ieuri.tourism.application.exception.RadiusTooLargeException
-import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
-import org.around.ieuri.tourism.application.port.`in`.query.SpotQueryUseCase
-import org.around.ieuri.tourism.application.port.out.cache.SpotCachePort
-import org.around.ieuri.tourism.application.port.out.client.SpotDetailQuery
-import org.around.ieuri.tourism.application.port.out.client.TourInfoPort
-import org.around.ieuri.tourism.application.port.out.persistence.SpotDetailStorePort
-import org.around.ieuri.tourism.application.port.out.persistence.StoredDetail
+import org.around.ieuri.common.context.AppKey
+import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.tourism.application.event.SpotDetailAbsent
 import org.around.ieuri.tourism.application.event.SpotDetailFetched
 import org.around.ieuri.tourism.application.event.SpotGalleryFetched
 import org.around.ieuri.tourism.application.event.SpotInfoItemsFetched
 import org.around.ieuri.tourism.application.event.SpotIntroFetched
+import org.around.ieuri.tourism.application.exception.EmptyQueryException
+import org.around.ieuri.tourism.application.exception.InvalidCoordinatesException
+import org.around.ieuri.tourism.application.exception.QueryTooLongException
+import org.around.ieuri.tourism.application.exception.RadiusTooLargeException
+import org.around.ieuri.tourism.application.exception.SpotDetailNotFoundException
+import org.around.ieuri.tourism.application.exception.SpotNotFoundInLocaleQueryException
+import org.around.ieuri.tourism.application.exception.SpotQueryException
+import org.around.ieuri.tourism.application.exception.UnknownCategoryException
+import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
+import org.around.ieuri.tourism.application.port.`in`.query.SpotQueryUseCase
+import org.around.ieuri.tourism.application.port.out.cache.SpotCachePort
+import org.around.ieuri.tourism.application.port.out.client.SpotDetailQuery
+import org.around.ieuri.tourism.application.port.out.client.TourInfoPort
 import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
+import org.around.ieuri.tourism.application.port.out.persistence.SpotDetailStorePort
+import org.around.ieuri.tourism.application.port.out.persistence.StoredDetail
+import org.around.ieuri.tourism.application.port.out.query.AppCategoryQueryPort
+import org.around.ieuri.tourism.application.port.out.query.LikedSpotSearchPort
 import org.around.ieuri.tourism.application.port.out.query.LikedSpotsSearch
 import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch
 import org.around.ieuri.tourism.application.port.out.query.SpotIdentity
-import org.around.ieuri.tourism.application.port.out.query.LikedSpotSearchPort
 import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
 import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
 import org.around.ieuri.tourism.application.port.out.query.SpotSpatialQueryPort
-import org.around.ieuri.common.context.AppKey
-import org.around.ieuri.tourism.application.port.out.query.AppCategoryQueryPort
 import org.around.ieuri.tourism.application.query.AppCategoryCode
 import org.around.ieuri.tourism.application.query.AppCategoryView
-import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.tourism.application.query.CategoryDisplay
 import org.around.ieuri.tourism.application.query.LikedSpotView
 import org.around.ieuri.tourism.application.query.LikedSpotsQuery
@@ -46,10 +46,10 @@ import org.around.ieuri.tourism.application.query.SpotView
 import org.around.ieuri.tourism.application.query.SpotsQuery
 import org.around.ieuri.tourism.domain.aggregate.SpotDetail
 import org.around.ieuri.tourism.domain.vo.Coordinates
-import org.around.ieuri.tourism.domain.vo.SpotImage
-import org.around.ieuri.tourism.domain.vo.SpotIntro
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
+import org.around.ieuri.tourism.domain.vo.SpotImage
+import org.around.ieuri.tourism.domain.vo.SpotIntro
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
@@ -118,18 +118,16 @@ class SpotQueryService(
         )
     }
 
-    override fun availableCategories(appKey: AppKey, locale: DomainLocale): List<AppCategoryView> =
-        appCategoryQueryPort.findCategories(appKey, locale)
+    override fun availableCategories(appKey: AppKey, locale: DomainLocale): List<AppCategoryView> = appCategoryQueryPort.findCategories(appKey, locale)
 
-    override fun availableCategoryCodes(appKey: AppKey, languageCode: String): List<AppCategoryCode> =
-        availableCategories(appKey, DomainLocale.fromLanguageTag(languageCode))
-            .map {
-                AppCategoryCode(
-                    category = it.category.code,
-                    label = it.label,
-                    iconUrl = it.iconUrl,
-                )
-            }
+    override fun availableCategoryCodes(appKey: AppKey, languageCode: String): List<AppCategoryCode> = availableCategories(appKey, DomainLocale.fromLanguageTag(languageCode))
+        .map {
+            AppCategoryCode(
+                category = it.category.code,
+                label = it.label,
+                iconUrl = it.iconUrl,
+            )
+        }
 
     /** 폴백까지 채워 돌려준다 — 호출자가 코드마다 빈 값을 분기하지 않게 한다. */
     override fun categoryDisplays(codes: Set<String>, locale: DomainLocale): Map<String, CategoryDisplay> {
@@ -290,15 +288,13 @@ class SpotQueryService(
      * **3단 폴백 경로에 넣지 않는다**(AC-38) — spot_reaction 기반이라 TourInfoPort와 완전히 다른
      * 포트이며, write-behind는 upstream 파생 데이터만 다룬다.
      */
-    override fun spotLikeCount(catalogId: Long, locale: DomainLocale): Long =
-        spotQueryPort.countLikes(catalogId, locale)
+    override fun spotLikeCount(catalogId: Long, locale: DomainLocale): Long = spotQueryPort.countLikes(catalogId, locale)
 
     /**
      * 최신 반응 코드. 좋아요 수와 같은 이유로 캐시 비대상이다 — 판정 시점의 상태여야 하고
      * (SPEC-0026 R5), 반응은 언제든 덮어써진다.
      */
-    override fun spotViewerReaction(catalogId: Long, memberId: Long, locale: DomainLocale): String? =
-        spotQueryPort.findReaction(catalogId, memberId, locale)?.name
+    override fun spotViewerReaction(catalogId: Long, memberId: Long, locale: DomainLocale): String? = spotQueryPort.findReaction(catalogId, memberId, locale)?.name
 
     /**
      * 카탈로그 여러 행을 읽는다 — 캐시도 upstream도 타지 않는다.
@@ -307,34 +303,32 @@ class SpotQueryService(
      * 그것을 "이 언어에 없는 장소"로 해석한다 — 존재 검사도 이 규칙을 따르므로, 활성 언어에
      * 없는 spot은 첨부·조회 어느 쪽에서도 성립하지 않는다(R-25).
      */
-    override fun spotSummaries(catalogIds: List<Long>, languageCode: String): Map<Long, SpotSummaryView> =
-        spotQueryPort.findSpotBasicsIn(catalogIds, DomainLocale.fromLanguageTag(languageCode))
-            .mapValues { (catalogId, basics) ->
-                SpotSummaryView(
-                    id = catalogId,
-                    title = basics.title,
-                    thumbnailImageUrl = basics.thumbnailImageUrl,
-                    categoryCode = basics.category.code,
-                    longitude = basics.longitude,
-                    latitude = basics.latitude,
-                )
-            }
+    override fun spotSummaries(catalogIds: List<Long>, languageCode: String): Map<Long, SpotSummaryView> = spotQueryPort.findSpotBasicsIn(catalogIds, DomainLocale.fromLanguageTag(languageCode))
+        .mapValues { (catalogId, basics) ->
+            SpotSummaryView(
+                id = catalogId,
+                title = basics.title,
+                thumbnailImageUrl = basics.thumbnailImageUrl,
+                categoryCode = basics.category.code,
+                longitude = basics.longitude,
+                latitude = basics.latitude,
+            )
+        }
 
     /**
      * 카탈로그 한 행만 읽는다. **[languageCode]에서 해소되지 않으면 null이다**(AC-24.2) — 다른 언어
      * 이름으로 대신하지 않는다. 호출자가 그것을 "이 언어에 없는 장소"로 해석한다.
      */
-    override fun spotSummary(catalogId: Long, languageCode: String): SpotSummaryView? =
-        spotQueryPort.findSpotBasics(catalogId, DomainLocale.fromLanguageTag(languageCode))?.let {
-            SpotSummaryView(
-                id = catalogId,
-                title = it.title,
-                thumbnailImageUrl = it.thumbnailImageUrl,
-                categoryCode = it.category.code,
-                longitude = it.longitude,
-                latitude = it.latitude,
-            )
-        }
+    override fun spotSummary(catalogId: Long, languageCode: String): SpotSummaryView? = spotQueryPort.findSpotBasics(catalogId, DomainLocale.fromLanguageTag(languageCode))?.let {
+        SpotSummaryView(
+            id = catalogId,
+            title = it.title,
+            thumbnailImageUrl = it.thumbnailImageUrl,
+            categoryCode = it.category.code,
+            longitude = it.longitude,
+            latitude = it.latitude,
+        )
+    }
 
     /**
      * 좋아요 목록(SPEC-0008 R-15~R-17). LIKE만·본인 것만·요청 언어만 — 세 조건 모두 조회 포트가
@@ -348,8 +342,7 @@ class SpotQueryService(
         query: LikedSpotsQuery,
         locale: DomainLocale,
         memberId: Long,
-    ): CursorPage<LikedSpotView> =
-        // 카테고리 가용성 판정은 spots와 같다 — 같은 축을 쓰므로 달라질 이유가 없다.
+    ): CursorPage<LikedSpotView> = // 카테고리 가용성 판정은 spots와 같다 — 같은 축을 쓰므로 달라질 이유가 없다.
         spotQueryPort.findLikedSpots(searchOf(query, locale, memberId))
 
     /**
@@ -365,8 +358,7 @@ class SpotQueryService(
         text: String,
         locale: DomainLocale,
         memberId: Long,
-    ): CursorPage<LikedSpotView> =
-        likedSpotSearchPort.searchLikedSpots(searchOf(query, locale, memberId), validatedSearchText(text))
+    ): CursorPage<LikedSpotView> = likedSpotSearchPort.searchLikedSpots(searchOf(query, locale, memberId), validatedSearchText(text))
 
     /** 두 조회가 같은 조건을 쓰도록 한 곳에서 만든다 — 갈리면 페이지 상한·언어 한정이 어긋난다. */
     private fun searchOf(query: LikedSpotsQuery, locale: DomainLocale, memberId: Long) = LikedSpotsSearch(
@@ -403,34 +395,30 @@ class SpotQueryService(
      * `SPOT_NOT_FOUND_IN_LOCALE`로 실패한다 — 없는 것은 없는 것이다(POL-043).
      * 카탈로그 자체가 없는 경우와는 다른 코드다(AC-12.3).
      */
-    private fun resolve(catalogId: Long, locale: DomainLocale): SpotIdentity =
-        spotQueryPort.findIdentity(catalogId, locale) ?: throw spotAbsenceFor(catalogId)
+    private fun resolve(catalogId: Long, locale: DomainLocale): SpotIdentity = spotQueryPort.findIdentity(catalogId, locale) ?: throw spotAbsenceFor(catalogId)
 
     /**
      * 해소 실패의 원인을 갈라 예외를 만든다. 카탈로그가 있으면 "이 언어에 없음", 없으면 "그런 장소 없음".
      *
      * **카탈로그 존재 확인은 실패 경로에서만 한다** — 성공 경로에 조회를 하나 더 붙이지 않는다.
      */
-    private fun spotAbsenceFor(catalogId: Long): SpotQueryException =
-        if (spotQueryPort.existsCatalog(catalogId)) {
-            SpotNotFoundInLocaleQueryException()
-        } else {
-            SpotDetailNotFoundException()
-        }
+    private fun spotAbsenceFor(catalogId: Long): SpotQueryException = if (spotQueryPort.existsCatalog(catalogId)) {
+        SpotNotFoundInLocaleQueryException()
+    } else {
+        SpotDetailNotFoundException()
+    }
 
     /**
      * upstream 조회 좌표. TourAPI는 우리 PK를 모르므로 해석된 contentId로 묻는다.
      * contentId가 언어별이라 [locale]은 이 contentId를 해석한 언어여야 한다.
      */
-    private fun SpotIdentity.toQuery(locale: DomainLocale) =
-        SpotDetailQuery(contentId = contentId, locale = locale)
+    private fun SpotIdentity.toQuery(locale: DomainLocale) = SpotDetailQuery(contentId = contentId, locale = locale)
 
-    private fun validatedCenter(latitude: Double, longitude: Double): Coordinates =
-        try {
-            Coordinates(latitude, longitude)
-        } catch (e: IllegalArgumentException) {
-            throw InvalidCoordinatesException(e.message ?: "유효하지 않은 좌표입니다.")
-        }
+    private fun validatedCenter(latitude: Double, longitude: Double): Coordinates = try {
+        Coordinates(latitude, longitude)
+    } catch (e: IllegalArgumentException) {
+        throw InvalidCoordinatesException(e.message ?: "유효하지 않은 좌표입니다.")
+    }
 
     private fun validateRadius(radiusMeters: Int) {
         if (radiusMeters <= 0) throw InvalidCoordinatesException("반경은 양수여야 합니다.")

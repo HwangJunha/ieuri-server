@@ -43,16 +43,14 @@ class PushDispatchStore(
 
     /** 저장된 행이 없으면 켜진 것으로 본다(AC10.3). */
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
-    fun categoryEnabled(memberId: Long, category: NotificationCategory): Boolean =
-        preferenceRepositoryPort
-            .findByMemberIdAndCategory(memberId, category)
-            ?.enabled
-            ?: NotificationPreference.DEFAULT_ENABLED
+    fun categoryEnabled(memberId: Long, category: NotificationCategory): Boolean = preferenceRepositoryPort
+        .findByMemberIdAndCategory(memberId, category)
+        ?.enabled
+        ?: NotificationPreference.DEFAULT_ENABLED
 
     /** 수신자의 기기 전부(AC5.3). 없으면 빈 목록이다. */
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
-    fun findTokens(memberId: Long): List<DeviceToken> =
-        deviceTokenRepositoryPort.findByMemberId(memberId)
+    fun findTokens(memberId: Long): List<DeviceToken> = deviceTokenRepositoryPort.findByMemberId(memberId)
 
     /**
      * 이 종류의 언어별 문구(R13). 언어로 바로 찾을 수 있게 맵으로 돌려준다.
@@ -61,8 +59,7 @@ class PushDispatchStore(
      * 그때마다 조회하면 발송 1건에 조회가 여러 번 붙는다.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
-    fun findMessages(type: NotificationType): Map<AlarmLocale, NotificationMessage> =
-        notificationMessageRepositoryPort.findByType(type).associateBy { it.locale }
+    fun findMessages(type: NotificationType): Map<AlarmLocale, NotificationMessage> = notificationMessageRepositoryPort.findByType(type).associateBy { it.locale }
 
     /** FCM이 무효로 판정한 기기를 지운다(R4). */
     @Transactional(propagation = Propagation.REQUIRES_NEW)

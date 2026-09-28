@@ -20,10 +20,10 @@ import org.around.ieuri.community.application.port.out.persistence.SpotQuestionC
 import org.around.ieuri.community.application.query.PostAuthorView
 import org.around.ieuri.community.domain.aggregate.Comment
 import org.around.ieuri.community.domain.aggregate.Post
-import org.around.ieuri.community.domain.vo.TargetCategory
 import org.around.ieuri.community.domain.aggregate.Report
 import org.around.ieuri.community.domain.vo.ReportReason
 import org.around.ieuri.community.domain.vo.ReportTargetType
+import org.around.ieuri.community.domain.vo.TargetCategory
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -47,26 +47,29 @@ class ReportCommandServiceTest {
     private val spotQuestionCounterPort = mockk<SpotQuestionCounterPort>(relaxed = true)
 
     private val service = ReportCommandService(
-        reportRepository, counterPort, moderationPort, commentRepository, memberLookup,
-        spotQaModerationPort, spotQuestionCounterPort,
+        reportRepository,
+        counterPort,
+        moderationPort,
+        commentRepository,
+        memberLookup,
+        spotQaModerationPort,
+        spotQuestionCounterPort,
     )
 
-    private fun comment(id: Long = targetCommentId, postId: Long = targetPostId, hidden: Boolean = false) =
-        Comment.restore(
-            id = id,
-            postId = postId,
-            authorId = 43L,
-            body = "댓글",
-            hidden = hidden,
-            deletedAt = null,
-            createdAt = Instant.EPOCH,
-        )
+    private fun comment(id: Long = targetCommentId, postId: Long = targetPostId, hidden: Boolean = false) = Comment.restore(
+        id = id,
+        postId = postId,
+        authorId = 43L,
+        body = "댓글",
+        hidden = hidden,
+        deletedAt = null,
+        createdAt = Instant.EPOCH,
+    )
 
-    private fun reportPost(reason: ReportReason = ReportReason.SPAM, detail: String? = null) =
-        service.report(
-            ReportContentCommand(ReportTargetType.POST, targetPostId, reason, detail),
-            reporterId,
-        )
+    private fun reportPost(reason: ReportReason = ReportReason.SPAM, detail: String? = null) = service.report(
+        ReportContentCommand(ReportTargetType.POST, targetPostId, reason, detail),
+        reporterId,
+    )
 
     @Test
     fun `신고가 기록된다`() {

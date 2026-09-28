@@ -2,9 +2,9 @@ package org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi
 
 import org.around.ieuri.tourism.application.port.out.client.SpotSyncPage
 import org.around.ieuri.tourism.application.port.out.client.SpotSyncPort
+import org.around.ieuri.tourism.application.port.out.query.CategoryExternalMappingPort
 import org.around.ieuri.tourism.domain.specification.SpotExclusionRule
 import org.around.ieuri.tourism.domain.vo.DomainLocale
-import org.around.ieuri.tourism.application.port.out.query.CategoryExternalMappingPort
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi.mapper.toSyncSpotCommandOrNull
 import org.around.ieuri.tourism.infrastructure.config.TourApiProperties

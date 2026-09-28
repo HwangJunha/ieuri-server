@@ -21,11 +21,10 @@ import org.springframework.context.annotation.Profile
 class SpotDetailPrefetchConfig {
 
     @Bean
-    fun spotDetailPrefetchPolicy(properties: SpotDetailPrefetchProperties): SpotDetailPrefetchPolicy =
-        SpotDetailPrefetchPolicy(
-            refreshAfter = properties.refreshAfter,
-            callsPerSecond = properties.callsPerSecond,
-        )
+    fun spotDetailPrefetchPolicy(properties: SpotDetailPrefetchProperties): SpotDetailPrefetchPolicy = SpotDetailPrefetchPolicy(
+        refreshAfter = properties.refreshAfter,
+        callsPerSecond = properties.callsPerSecond,
+    )
 
     @Bean
     fun spotDetailPrefetchService(
@@ -33,6 +32,5 @@ class SpotDetailPrefetchConfig {
         tourInfoPort: TourInfoPort,
         upsertPort: SpotDetailUpsertPort,
         policy: SpotDetailPrefetchPolicy,
-    ): SpotDetailPrefetchUseCase =
-        SpotDetailPrefetchService(targetQueryPort, tourInfoPort, upsertPort, policy)
+    ): SpotDetailPrefetchUseCase = SpotDetailPrefetchService(targetQueryPort, tourInfoPort, upsertPort, policy)
 }

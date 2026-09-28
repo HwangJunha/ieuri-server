@@ -62,37 +62,35 @@ class R2ObjectStorageAdapter(
         ).url().toString()
     }
 
-    override fun findSize(objectKey: String): Long? =
-        try {
-            s3Client.headObject(
-                HeadObjectRequest.builder().bucket(properties.bucket).key(objectKey).build(),
-            ).contentLength()
-        } catch (e: NoSuchKeyException) {
-            null
-        } catch (e: S3Exception) {
-            // R2의 HeadObject는 부재를 404로 돌려주며 NoSuchKeyException으로 매핑되지 않는
-            // 경우가 있다. 부재와 장애를 구분하되, 부재는 예외가 아니라 null이다.
-            if (e.statusCode() == 404) null else throw e
-        }
+    override fun findSize(objectKey: String): Long? = try {
+        s3Client.headObject(
+            HeadObjectRequest.builder().bucket(properties.bucket).key(objectKey).build(),
+        ).contentLength()
+    } catch (e: NoSuchKeyException) {
+        null
+    } catch (e: S3Exception) {
+        // R2의 HeadObject는 부재를 404로 돌려주며 NoSuchKeyException으로 매핑되지 않는
+        // 경우가 있다. 부재와 장애를 구분하되, 부재는 예외가 아니라 null이다.
+        if (e.statusCode() == 404) null else throw e
+    }
 
     /**
      * 앞부분 [length] 바이트만 Range로 읽는다. 전체를 받으면 10MiB 파일 하나에 그만큼의
      * 대역폭과 힙을 쓰는데, 매직바이트 판정에 필요한 것은 12바이트뿐이다.
      */
-    override fun readPrefix(objectKey: String, length: Int): ByteArray? =
-        try {
-            s3Client.getObjectAsBytes(
-                GetObjectRequest.builder()
-                    .bucket(properties.bucket)
-                    .key(objectKey)
-                    .range("bytes=0-${length - 1}")
-                    .build(),
-            ).asByteArray()
-        } catch (e: NoSuchKeyException) {
-            null
-        } catch (e: S3Exception) {
-            if (e.statusCode() == 404) null else throw e
-        }
+    override fun readPrefix(objectKey: String, length: Int): ByteArray? = try {
+        s3Client.getObjectAsBytes(
+            GetObjectRequest.builder()
+                .bucket(properties.bucket)
+                .key(objectKey)
+                .range("bytes=0-${length - 1}")
+                .build(),
+        ).asByteArray()
+    } catch (e: NoSuchKeyException) {
+        null
+    } catch (e: S3Exception) {
+        if (e.statusCode() == 404) null else throw e
+    }
 
     /**
      * 복사 후 원본 삭제. S3에는 이동이 없다.

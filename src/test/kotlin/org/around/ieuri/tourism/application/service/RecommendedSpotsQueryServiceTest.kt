@@ -56,7 +56,12 @@ class RecommendedSpotsQueryServiceTest {
         embedding = EmbeddingSpec(model = "voyage-4", dimension = 4, retryCount = 1, overviewMaxChars = 500),
     )
     private val service = RecommendedSpotsQueryService(
-        spotQueryPort, spotSpatialQueryPort, tasteSimilarityQueryPort, eventPublisher, spotQueryPolicy, policy,
+        spotQueryPort,
+        spotSpatialQueryPort,
+        tasteSimilarityQueryPort,
+        eventPublisher,
+        spotQueryPolicy,
+        policy,
     )
 
     private val shopping = SpotCategory("SHOPPING")
@@ -93,8 +98,11 @@ class RecommendedSpotsQueryServiceTest {
         noReactions()
         every { spotSpatialQueryPort.searchNearby(any()) } returns listOf(
             // 거리 요인: 100m≈0.980, 110m≈0.978, 300m≈0.943, 500m≈0.909. 옷가게 두 번째는 0.1 깎여 0.878.
-            card(1, 100.0, shopping), card(2, 110.0, shopping), card(3, 120.0, shopping),
-            card(4, 300.0, restaurant), card(5, 500.0, SpotCategory.TOURIST_SPOT),
+            card(1, 100.0, shopping),
+            card(2, 110.0, shopping),
+            card(3, 120.0, shopping),
+            card(4, 300.0, restaurant),
+            card(5, 500.0, SpotCategory.TOURIST_SPOT),
         )
 
         val result = service.recommendedSpots(query(first = 4), DomainLocale.EN, 7L)

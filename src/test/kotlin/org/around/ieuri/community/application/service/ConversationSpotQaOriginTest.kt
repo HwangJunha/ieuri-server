@@ -116,24 +116,27 @@ class ConversationSpotQaOriginTest {
         every { spotLookupPort.findSummary(catalogId, language) } returns
             if (exists) {
                 PostSpotView(
-                    id = catalogId, title = title, thumbnailImageUrl = "https://cdn/x.jpg",
-                    category = null, longitude = 127.0, latitude = 37.5,
+                    id = catalogId,
+                    title = title,
+                    thumbnailImageUrl = "https://cdn/x.jpg",
+                    category = null,
+                    longitude = 127.0,
+                    latitude = 37.5,
                 )
             } else {
                 null
             }
     }
 
-    private fun send(body: String = "이것도 궁금해요", sourceAnswerId: Long? = answerId) =
-        service.sendMessage(
-            SendMessageCommand(
-                conversationId = conversationId,
-                body = body,
-                sourceAnswerId = sourceAnswerId,
-            ),
-            memberId,
-            language,
-        )
+    private fun send(body: String = "이것도 궁금해요", sourceAnswerId: Long? = answerId) = service.sendMessage(
+        SendMessageCommand(
+            conversationId = conversationId,
+            body = body,
+            sourceAnswerId = sourceAnswerId,
+        ),
+        memberId,
+        language,
+    )
 
     @Test
     fun `인용을 실으면 스냅샷이 메시지에 남는다`() {

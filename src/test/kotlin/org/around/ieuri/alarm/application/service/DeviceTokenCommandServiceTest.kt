@@ -4,9 +4,6 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
-import java.time.Instant
-import kotlin.test.Test
-import kotlin.test.assertEquals
 import org.around.ieuri.alarm.application.command.DeleteDeviceTokenCommand
 import org.around.ieuri.alarm.application.command.RegisterDeviceTokenCommand
 import org.around.ieuri.alarm.application.port.out.persistence.DeviceTokenRepositoryPort
@@ -14,6 +11,9 @@ import org.around.ieuri.alarm.application.port.out.persistence.NotificationPrefe
 import org.around.ieuri.alarm.domain.aggregate.DeviceToken
 import org.around.ieuri.alarm.domain.vo.AlarmLocale
 import org.around.ieuri.alarm.domain.vo.DevicePlatform
+import java.time.Instant
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
 /** 기기 토큰 수명주기(SPEC-0028 R1·R2·R3·R20). */
 class DeviceTokenCommandServiceTest {
@@ -126,5 +126,4 @@ class DeviceTokenCommandServiceTest {
 
         verify(exactly = 0) { deviceTokenRepository.deleteByDeviceId(any()) }
     }
-
 }

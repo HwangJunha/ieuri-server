@@ -48,8 +48,7 @@ class ValkeyRefreshTokenStore(
         }
     }
 
-    override fun existsActive(jti: String): Boolean =
-        translatingFailure { redis.hasKey(jtiKey(jti)) == true }
+    override fun existsActive(jti: String): Boolean = translatingFailure { redis.hasKey(jtiKey(jti)) == true }
 
     override fun revoke(jti: String) {
         translatingFailure {
@@ -87,12 +86,11 @@ class ValkeyRefreshTokenStore(
      *
      * **메시지에 키나 jti를 담지 않는다**(POL-013). 원인 예외는 cause로만 남아 로그에 실린다.
      */
-    private fun <T> translatingFailure(block: () -> T): T =
-        try {
-            block()
-        } catch (e: DataAccessException) {
-            throw AuthStoreUnavailableException("인증 저장소에 일시적으로 접근할 수 없습니다.", e)
-        }
+    private fun <T> translatingFailure(block: () -> T): T = try {
+        block()
+    } catch (e: DataAccessException) {
+        throw AuthStoreUnavailableException("인증 저장소에 일시적으로 접근할 수 없습니다.", e)
+    }
 
     private companion object {
         const val JTI_PREFIX = "ieuri:auth:refresh:jti:"

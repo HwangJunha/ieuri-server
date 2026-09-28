@@ -28,8 +28,7 @@ class EmailVerificationPersistenceAdapter(
         repository.save(verification.toNewEntity())
     }
 
-    override fun findByPublicId(publicId: UUID): EmailVerification? =
-        repository.findByPublicId(publicId)?.toDomain()
+    override fun findByPublicId(publicId: UUID): EmailVerification? = repository.findByPublicId(publicId)?.toDomain()
 
     override fun update(verification: EmailVerification) {
         val entity = repository.findByPublicId(verification.publicId) ?: return

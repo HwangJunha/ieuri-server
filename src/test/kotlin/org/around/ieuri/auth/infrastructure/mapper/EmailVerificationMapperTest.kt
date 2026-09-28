@@ -37,21 +37,20 @@ class EmailVerificationMapperTest {
         targetEmailEncrypted = "enc:new@example.com",
     )
 
-    private fun domain(verifiedAt: Instant? = this.verifiedAt): EmailVerification =
-        EmailVerification.reconstitute(
-            id = 13L,
-            publicId = publicId,
-            memberId = 77L,
-            codeHash = "hash-abc",
-            expiresAt = expiresAt,
-            attempts = 2,
-            maxAttempts = 5,
-            consumed = true,
-            verifiedAt = verifiedAt,
-            createdAt = createdAt,
-            purpose = VerificationPurpose.EMAIL_CHANGE,
-            targetEmailEncrypted = "enc:new@example.com",
-        )
+    private fun domain(verifiedAt: Instant? = this.verifiedAt): EmailVerification = EmailVerification.reconstitute(
+        id = 13L,
+        publicId = publicId,
+        memberId = 77L,
+        codeHash = "hash-abc",
+        expiresAt = expiresAt,
+        attempts = 2,
+        maxAttempts = 5,
+        consumed = true,
+        verifiedAt = verifiedAt,
+        createdAt = createdAt,
+        purpose = VerificationPurpose.EMAIL_CHANGE,
+        targetEmailEncrypted = "enc:new@example.com",
+    )
 
     @Test
     fun `모든 필드가 채워진 엔티티를 도메인으로 옮긴다`() {

@@ -301,8 +301,7 @@ class SpotCatalogSplitServiceTest {
 
         override fun assign(spotId: Long, catalogId: Long) = error("분할은 최초 배정을 부르지 않는다")
 
-        override fun refreshTranslationVisibility(): VisibilityRefreshResult =
-            VisibilityRefreshResult(0, 0, listOf(CatalogLanguage(NEW_CATALOG_ID, DomainLocale.KO)))
+        override fun refreshTranslationVisibility(): VisibilityRefreshResult = VisibilityRefreshResult(0, 0, listOf(CatalogLanguage(NEW_CATALOG_ID, DomainLocale.KO)))
 
         companion object {
             const val NEW_CATALOG_ID = 8888L

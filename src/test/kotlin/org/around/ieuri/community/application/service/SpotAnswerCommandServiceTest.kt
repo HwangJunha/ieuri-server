@@ -4,7 +4,6 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import org.around.ieuri.community.application.command.CreateSpotAnswerCommand
-import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
 import org.around.ieuri.community.application.command.CreateSpotAnswerReplyCommand
 import org.around.ieuri.community.application.command.DeleteSpotAnswerCommand
 import org.around.ieuri.community.application.command.DeleteSpotAnswerReplyCommand
@@ -14,6 +13,7 @@ import org.around.ieuri.community.application.exception.NotReplyOwnerException
 import org.around.ieuri.community.application.exception.QuestionNotFoundException
 import org.around.ieuri.community.application.exception.ReplyNotFoundException
 import org.around.ieuri.community.application.exception.ReplyToReplyNotAllowedException
+import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
 import org.around.ieuri.community.application.port.out.persistence.SpotAnswerReplyRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.SpotAnswerRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.SpotQuestionCounterPort
@@ -49,7 +49,11 @@ class SpotAnswerCommandServiceTest {
     private val eventPublisher = mockk<CommunityEventPublisherPort>(relaxed = true)
 
     private val service = SpotAnswerCommandService(
-        answerRepository, replyRepository, questionRepository, counterPort, photoKeyVerifier,
+        answerRepository,
+        replyRepository,
+        questionRepository,
+        counterPort,
+        photoKeyVerifier,
         eventPublisher,
     )
 

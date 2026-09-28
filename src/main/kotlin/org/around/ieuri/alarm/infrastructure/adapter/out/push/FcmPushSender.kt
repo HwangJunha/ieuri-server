@@ -72,23 +72,22 @@ class FcmPushSender(
         }
     }
 
-    private fun PushTarget.toMessage(notification: PushNotification): Message =
-        Message.builder()
-            .setToken(fcmToken)
-            // **본문은 서버가 정한 안내 문구다** — 사용자가 쓴 메시지·답변 내용은 싣지 않는다(R13).
-            //
-            // 제목만 보내면 안 된다: iOS(APNs)는 본문 없는 알림을 표시하지 않아, FCM이 정상
-            // 접수하고도 기기에서 조용히 버려진다. 오류가 나지 않아 발견이 어렵다.
-            .setNotification(
-                Notification.builder()
-                    .setTitle(notification.title)
-                    .setBody(notification.body)
-                    .build(),
-            )
-            // 목적지 식별자. 클라이언트가 추가 왕복 없이 라우트를 만든다(R11·AC11.4).
-            .putAllData(notification.destination.asData())
-            .setApnsConfig(iosConfig())
-            .build()
+    private fun PushTarget.toMessage(notification: PushNotification): Message = Message.builder()
+        .setToken(fcmToken)
+        // **본문은 서버가 정한 안내 문구다** — 사용자가 쓴 메시지·답변 내용은 싣지 않는다(R13).
+        //
+        // 제목만 보내면 안 된다: iOS(APNs)는 본문 없는 알림을 표시하지 않아, FCM이 정상
+        // 접수하고도 기기에서 조용히 버려진다. 오류가 나지 않아 발견이 어렵다.
+        .setNotification(
+            Notification.builder()
+                .setTitle(notification.title)
+                .setBody(notification.body)
+                .build(),
+        )
+        // 목적지 식별자. 클라이언트가 추가 왕복 없이 라우트를 만든다(R11·AC11.4).
+        .putAllData(notification.destination.asData())
+        .setApnsConfig(iosConfig())
+        .build()
 
     /**
      * iOS 전용 설정. **Android에는 영향이 없다.**

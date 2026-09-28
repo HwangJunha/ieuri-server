@@ -15,20 +15,18 @@ import java.util.Base64
  */
 data class CommunityCursor(val createdAt: Instant, val id: Long)
 
-fun encodeCursor(createdAt: Instant, id: Long): String =
-    Base64.getUrlEncoder().withoutPadding()
-        .encodeToString("$createdAt|$id".toByteArray(StandardCharsets.UTF_8))
+fun encodeCursor(createdAt: Instant, id: Long): String = Base64.getUrlEncoder().withoutPadding()
+    .encodeToString("$createdAt|$id".toByteArray(StandardCharsets.UTF_8))
 
 /** 조작·구버전 커서는 [IllegalArgumentException]으로 거부한다 — 조용히 첫 페이지로 되돌리면
  *  클라이언트가 무한 루프에 빠질 수 있다. */
-fun decodeCursor(cursor: String): CommunityCursor =
-    try {
-        val decoded = String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8)
-        val (instant, id) = decoded.split("|", limit = 2)
-        CommunityCursor(createdAt = Instant.parse(instant), id = id.toLong())
-    } catch (e: RuntimeException) {
-        throw IllegalArgumentException("유효하지 않은 커서입니다.", e)
-    }
+fun decodeCursor(cursor: String): CommunityCursor = try {
+    val decoded = String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8)
+    val (instant, id) = decoded.split("|", limit = 2)
+    CommunityCursor(createdAt = Instant.parse(instant), id = id.toLong())
+} catch (e: RuntimeException) {
+    throw IllegalArgumentException("유효하지 않은 커서입니다.", e)
+}
 
 /**
  * 거리순 피드의 커서. 정렬 키 (거리, createdAt, id)를 담는다.
@@ -41,20 +39,18 @@ fun decodeCursor(cursor: String): CommunityCursor =
  */
 data class DistanceCursor(val distanceMeters: Double, val createdAt: Instant, val id: Long)
 
-fun encodeDistanceCursor(distanceMeters: Double, createdAt: Instant, id: Long): String =
-    Base64.getUrlEncoder().withoutPadding()
-        .encodeToString("d:$distanceMeters|$createdAt|$id".toByteArray(StandardCharsets.UTF_8))
+fun encodeDistanceCursor(distanceMeters: Double, createdAt: Instant, id: Long): String = Base64.getUrlEncoder().withoutPadding()
+    .encodeToString("d:$distanceMeters|$createdAt|$id".toByteArray(StandardCharsets.UTF_8))
 
-fun decodeDistanceCursor(cursor: String): DistanceCursor =
-    try {
-        val decoded = String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8)
-        require(decoded.startsWith("d:")) { "거리순 커서가 아닙니다." }
-        val (distance, instant, id) = decoded.removePrefix("d:").split("|", limit = 3)
-        DistanceCursor(
-            distanceMeters = distance.toDouble(),
-            createdAt = Instant.parse(instant),
-            id = id.toLong(),
-        )
-    } catch (e: RuntimeException) {
-        throw IllegalArgumentException("유효하지 않은 커서입니다.", e)
-    }
+fun decodeDistanceCursor(cursor: String): DistanceCursor = try {
+    val decoded = String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8)
+    require(decoded.startsWith("d:")) { "거리순 커서가 아닙니다." }
+    val (distance, instant, id) = decoded.removePrefix("d:").split("|", limit = 3)
+    DistanceCursor(
+        distanceMeters = distance.toDouble(),
+        createdAt = Instant.parse(instant),
+        id = id.toLong(),
+    )
+} catch (e: RuntimeException) {
+    throw IllegalArgumentException("유효하지 않은 커서입니다.", e)
+}

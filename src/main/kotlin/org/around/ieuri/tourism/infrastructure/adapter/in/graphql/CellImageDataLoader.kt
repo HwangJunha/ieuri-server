@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 
-/**
+/*
  * 전국 지도 칸의 배치 로더(SPEC-0032 R25).
  *
  * community의 13종과 같은 형태를 쓴다 — `MappedBatchLoader`, 키는 `Long`,
@@ -36,8 +36,7 @@ class CellImageDataLoader(
     private val nationwideMapUseCase: NationwideMapUseCase,
 ) : MappedBatchLoader<Long, CellImageView> {
 
-    override fun load(cellIds: Set<Long>): CompletionStage<Map<Long, CellImageView>> =
-        // 부재 키를 채우지 않는다 — 이미지 없는 칸은 필드가 null이어야 한다.
+    override fun load(cellIds: Set<Long>): CompletionStage<Map<Long, CellImageView>> = // 부재 키를 채우지 않는다 — 이미지 없는 칸은 필드가 null이어야 한다.
         CompletableFuture.completedFuture(nationwideMapUseCase.allCellImages())
 
     companion object {

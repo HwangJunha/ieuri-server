@@ -10,8 +10,7 @@ package org.around.ieuri.tourism.domain.specification
 object EmbeddingText {
     private val SENTENCE_ENDS = charArrayOf('.', '。', '!', '?', '\n')
 
-    fun of(title: String, categoryLabel: String, address: String?, overview: String? = null, maxOverviewChars: Int = 500): String =
-        "$title | $categoryLabel | ${address.orEmpty()} | ${truncateOverview(overview, maxOverviewChars)}".trim()
+    fun of(title: String, categoryLabel: String, address: String?, overview: String? = null, maxOverviewChars: Int = 500): String = "$title | $categoryLabel | ${address.orEmpty()} | ${truncateOverview(overview, maxOverviewChars)}".trim()
 
     fun truncateOverview(overview: String?, maxChars: Int): String {
         val text = overview.orEmpty().trim()

@@ -39,18 +39,17 @@ class SpotDetailStoreAdapter(
      * 있으면 `bodyAbsent`가 부재 여부를 가른다.
      */
     @Transactional(readOnly = true)
-    override fun findDetail(spotId: Long): StoredDetail? =
-        queryFactory
-            .selectFrom(detail)
-            .where(detail.spotId.eq(spotId))
-            .fetchFirst()
-            ?.let {
-                StoredDetail(
-                    detail = it.toDomain(),
-                    bodyAbsent = it.bodyAbsent,
-                    fetchedAt = it.fetchedAt,
-                )
-            }
+    override fun findDetail(spotId: Long): StoredDetail? = queryFactory
+        .selectFrom(detail)
+        .where(detail.spotId.eq(spotId))
+        .fetchFirst()
+        ?.let {
+            StoredDetail(
+                detail = it.toDomain(),
+                bodyAbsent = it.bodyAbsent,
+                fetchedAt = it.fetchedAt,
+            )
+        }
 
     // ---------- 갤러리 ----------
 
@@ -59,36 +58,33 @@ class SpotDetailStoreAdapter(
      * 간주해 null을 돌려준다 — 빈 갤러리는 드물고 재조회 비용도 1콜이다.
      */
     @Transactional(readOnly = true)
-    override fun findGallery(spotId: Long): List<SpotImage>? =
-        queryFactory
-            .selectFrom(image)
-            .where(image.spotId.eq(spotId))
-            .orderBy(image.displayOrder.asc())
-            .fetch()
-            .map { it.toDomain() }
-            .ifEmpty { null }
+    override fun findGallery(spotId: Long): List<SpotImage>? = queryFactory
+        .selectFrom(image)
+        .where(image.spotId.eq(spotId))
+        .orderBy(image.displayOrder.asc())
+        .fetch()
+        .map { it.toDomain() }
+        .ifEmpty { null }
 
     // ---------- 운영 정보 ----------
 
     @Transactional(readOnly = true)
-    override fun findIntro(spotId: Long, category: SpotCategory): StoredIntro? =
-        queryFactory
-            .selectFrom(intro)
-            .where(intro.spotId.eq(spotId), intro.category.eq(category.code))
-            .fetchFirst()
-            // 전 컬럼이 null이면 "조회했으나 값 없음"으로 적재된 행이다 — 래퍼는 non-null,
-            // 값만 null로 돌려줘야 다음 조회가 미스로 오판하지 않는다.
-            ?.let { StoredIntro(it.toDomain().takeUnless { value -> value.isEmpty() }) }
+    override fun findIntro(spotId: Long, category: SpotCategory): StoredIntro? = queryFactory
+        .selectFrom(intro)
+        .where(intro.spotId.eq(spotId), intro.category.eq(category.code))
+        .fetchFirst()
+        // 전 컬럼이 null이면 "조회했으나 값 없음"으로 적재된 행이다 — 래퍼는 non-null,
+        // 값만 null로 돌려줘야 다음 조회가 미스로 오판하지 않는다.
+        ?.let { StoredIntro(it.toDomain().takeUnless { value -> value.isEmpty() }) }
 
     // ---------- 이용안내 ----------
 
     @Transactional(readOnly = true)
-    override fun findInfoItems(spotId: Long, category: SpotCategory): List<SpotInfoItem>? =
-        queryFactory
-            .selectFrom(info)
-            .where(info.spotId.eq(spotId), info.category.eq(category.code))
-            .orderBy(info.displayOrder.asc())
-            .fetch()
-            .map { it.toDomain() }
-            .ifEmpty { null }
+    override fun findInfoItems(spotId: Long, category: SpotCategory): List<SpotInfoItem>? = queryFactory
+        .selectFrom(info)
+        .where(info.spotId.eq(spotId), info.category.eq(category.code))
+        .orderBy(info.displayOrder.asc())
+        .fetch()
+        .map { it.toDomain() }
+        .ifEmpty { null }
 }

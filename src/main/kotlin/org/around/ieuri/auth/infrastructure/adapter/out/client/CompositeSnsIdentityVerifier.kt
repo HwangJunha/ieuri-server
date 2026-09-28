@@ -44,8 +44,11 @@ class CompositeSnsIdentityVerifier(
     override fun verify(provider: Provider, idToken: String): SnsIdentity {
         val claims = when (provider) {
             Provider.GOOGLE -> google.verify(idToken)
+
             Provider.APPLE -> apple.verify(idToken)
+
             Provider.KAKAO -> kakao.verify(idToken)
+
             Provider.EMAIL ->
                 throw SnsVerificationFailedException("EMAIL은 SNS 검증 대상이 아닙니다.")
         }
@@ -63,10 +66,7 @@ class CompositeSnsIdentityVerifier(
         )
     }
 
-    private fun JWTClaimsSet.stringOrNull(name: String): String? =
-        getClaim(name)?.toString()?.takeIf { it.isNotBlank() }
+    private fun JWTClaimsSet.stringOrNull(name: String): String? = getClaim(name)?.toString()?.takeIf { it.isNotBlank() }
 
-    private fun JWTClaimsSet.firstStringOrNull(vararg names: String): String? =
-        names.firstNotNullOfOrNull { stringOrNull(it) }
-
+    private fun JWTClaimsSet.firstStringOrNull(vararg names: String): String? = names.firstNotNullOfOrNull { stringOrNull(it) }
 }

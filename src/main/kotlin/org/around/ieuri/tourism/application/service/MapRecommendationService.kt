@@ -147,15 +147,14 @@ class MapRecommendationService(
      */
     private fun foldByCoordinate(
         scored: List<Pair<MapCandidateView, Double>>,
-    ): List<Pair<MapCandidateView, Double>> =
-        scored.groupBy { (candidate, _) -> candidate.lng to candidate.lat }
-            .values
-            .map { group ->
-                group.sortedWith(
-                    compareByDescending<Pair<MapCandidateView, Double>> { it.second }
-                        .thenBy { it.first.id },
-                ).first()
-            }
+    ): List<Pair<MapCandidateView, Double>> = scored.groupBy { (candidate, _) -> candidate.lng to candidate.lat }
+        .values
+        .map { group ->
+            group.sortedWith(
+                compareByDescending<Pair<MapCandidateView, Double>> { it.second }
+                    .thenBy { it.first.id },
+            ).first()
+        }
 
     private fun reactionOf(id: Long, liked: Set<Long>, disliked: Set<Long>): ScoreReaction = when (id) {
         in liked -> ScoreReaction.LIKED

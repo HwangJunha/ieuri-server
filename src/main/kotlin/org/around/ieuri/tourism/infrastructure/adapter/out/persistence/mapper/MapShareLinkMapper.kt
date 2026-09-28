@@ -16,5 +16,4 @@ fun MapShareLinkEntity.toRecord(): MapShareLinkRecord = MapShareLinkRecord(
 )
 
 /** `@PrePersist`가 채우므로 조회된 행에서는 null일 수 없다. 타입이 그것을 증명하지 못할 뿐이다. */
-private fun MapShareLinkEntity.requireNonNullCreatedAt() =
-    createdAt ?: error("저장된 공유 링크에는 createdAt이 있어야 한다.")
+private fun MapShareLinkEntity.requireNonNullCreatedAt() = createdAt ?: error("저장된 공유 링크에는 createdAt이 있어야 한다.")

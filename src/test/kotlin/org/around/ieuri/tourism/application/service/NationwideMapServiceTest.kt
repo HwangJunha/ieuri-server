@@ -58,7 +58,9 @@ class NationwideMapServiceTest {
     @Test
     fun `방문한 칸만 viewerVisited가 참이다`() {
         every { mapCellQueryPort.findAllCellDistricts() } returns listOf(
-            row(1L, "11110"), row(2L, "41111"), row(3L, "41210"),
+            row(1L, "11110"),
+            row(2L, "41111"),
+            row(3L, "41210"),
         )
         every { districtVisitQueryPort.findVisitedDistrictCodes(7L) } returns setOf("11110")
 
@@ -219,6 +221,5 @@ class NationwideMapServiceTest {
         likeCount = likeCount,
     )
 
-    private fun link(ownerId: Long) =
-        MapShareLinkRecord(memberId = ownerId, token = "t", createdAt = Instant.parse("2026-08-21T00:00:00Z"))
+    private fun link(ownerId: Long) = MapShareLinkRecord(memberId = ownerId, token = "t", createdAt = Instant.parse("2026-08-21T00:00:00Z"))
 }

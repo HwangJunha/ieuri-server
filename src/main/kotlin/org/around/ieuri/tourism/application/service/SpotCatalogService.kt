@@ -115,7 +115,10 @@ class SpotCatalogService(
 
         log.info(
             "catalog assignment: language={} joined={} created={} skipped={}",
-            language, joined, created, skipped,
+            language,
+            joined,
+            created,
+            skipped,
         )
         return CatalogAssignmentResult(
             joined = joined,
@@ -137,8 +140,7 @@ class SpotCatalogService(
      * **null이면 그 언어의 제목이 아니다** — 한글만 남는 제목은 TourAPI가 번역을 주지 않고
      * 원문을 그대로 넣은 것이며, 호출자가 그 spot을 미배정으로 남긴다.
      */
-    private fun UnassignedSpot.displayTitle(): String? =
-        if (language.isKorean) title else SpotTitleNormalizer.displayTitle(title)
+    private fun UnassignedSpot.displayTitle(): String? = if (language.isKorean) title else SpotTitleNormalizer.displayTitle(title)
 
     /**
      * 후보 중 이 spot의 카탈로그를 고른다. 좌표 일치가 없거나 둘 이상이면 붙이지 않고 새
@@ -171,14 +173,13 @@ class SpotCatalogService(
     /**
      * 카탈로그의 표준값. **좌표 유효성은 조회 포트가 이미 걸렀다** — 여기 온 행은 전부 유효하다.
      */
-    private fun UnassignedSpot.toStandardValues(): CatalogStandardValues =
-        CatalogStandardValues(
-            mapX = mapX,
-            mapY = mapY,
-            thumbnailImageUrl = thumbnailImageUrl,
-            category = category,
-            copyright = copyright,
-        )
+    private fun UnassignedSpot.toStandardValues(): CatalogStandardValues = CatalogStandardValues(
+        mapX = mapX,
+        mapY = mapY,
+        thumbnailImageUrl = thumbnailImageUrl,
+        category = category,
+        copyright = copyright,
+    )
 
     /**
      * 원본 상태를 번역 행의 `visible`에 반영한다 — 그 언어에 원본이 있는가.
@@ -198,7 +199,9 @@ class SpotCatalogService(
 
         log.info(
             "catalog visibility refreshed: hidden={} shown={} visible={}",
-            changes.hiddenCount, changes.shownCount, changes.visible.size,
+            changes.hiddenCount,
+            changes.shownCount,
+            changes.visible.size,
         )
         // **변경이 없어도 발행한다.** 구독자가 받는 것은 델타가 아니라 정본이며, 빈 상태에서
         // 출발한 사본은 "아무것도 안 바뀐" 회차에 채워진다 — 전량 재적재 직후가 정확히 그
@@ -209,8 +212,7 @@ class SpotCatalogService(
     }
 
     /** 이벤트는 도메인 간 계약이라 언어를 문자열로 싣는다 — 구독자가 `DomainLocale`을 알지 않게. */
-    private fun CatalogLanguage.toRef() =
-        CatalogLanguageRef(catalogId = catalogId, languageCode = language.name)
+    private fun CatalogLanguage.toRef() = CatalogLanguageRef(catalogId = catalogId, languageCode = language.name)
 
     private companion object {
         /**

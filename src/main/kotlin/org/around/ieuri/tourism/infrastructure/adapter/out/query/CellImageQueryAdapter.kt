@@ -22,9 +22,8 @@ class CellImageQueryAdapter(
 ) : CellImageQueryPort {
 
     @Transactional(readOnly = true)
-    override fun findAllRepresentativeImages(): Map<Long, CellImageView> =
-        repository.findAllByDisplayOrder(REPRESENTATIVE_ORDER)
-            .associate { it.cellId to it.toCellImageView() }
+    override fun findAllRepresentativeImages(): Map<Long, CellImageView> = repository.findAllByDisplayOrder(REPRESENTATIVE_ORDER)
+        .associate { it.cellId to it.toCellImageView() }
 
     private companion object {
         /** 0이 대표다(V77). */

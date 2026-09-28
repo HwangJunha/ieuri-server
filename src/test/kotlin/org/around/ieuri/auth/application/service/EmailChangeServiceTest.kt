@@ -242,12 +242,16 @@ class EmailChangeServiceTest {
         // 가입 검증이 진행 중이면 그건 건드리지 않는다.
         verify {
             verificationRepository.consumeActiveByMemberIdAndPurpose(
-                memberId, VerificationPurpose.EMAIL_CHANGE, now,
+                memberId,
+                VerificationPurpose.EMAIL_CHANGE,
+                now,
             )
         }
         verify(exactly = 0) {
             verificationRepository.consumeActiveByMemberIdAndPurpose(
-                memberId, VerificationPurpose.REGISTRATION, any(),
+                memberId,
+                VerificationPurpose.REGISTRATION,
+                any(),
             )
         }
     }
@@ -478,8 +482,7 @@ private class FakeMemberRepository : MemberRepositoryPort {
 
     override fun findEmailByMemberId(memberId: Long): Email? = currentEmail
 
-    override fun existsByProviderAndProviderUserId(provider: Provider, providerUserId: ProviderUserId): Boolean =
-        identifierTaken
+    override fun existsByProviderAndProviderUserId(provider: Provider, providerUserId: ProviderUserId): Boolean = identifierTaken
 
     /** 선점 여부는 [identifierTaken] 하나로 흉내낸다 — 테스트가 고정하는 것은 판정 결과뿐이다. */
     override fun existsByProviderAndEmailIdentifier(

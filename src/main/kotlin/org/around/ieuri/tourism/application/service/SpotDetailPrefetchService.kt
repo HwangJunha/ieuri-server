@@ -1,6 +1,7 @@
 package org.around.ieuri.tourism.application.service
 
 import io.github.resilience4j.ratelimiter.RateLimiter
+import io.github.resilience4j.ratelimiter.RateLimiterConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -20,7 +21,6 @@ import org.around.ieuri.tourism.domain.aggregate.SpotDetail
 import org.around.ieuri.tourism.domain.vo.SpotImage
 import org.around.ieuri.tourism.domain.vo.SpotInfoItem
 import org.around.ieuri.tourism.domain.vo.SpotIntro
-import io.github.resilience4j.ratelimiter.RateLimiterConfig
 import org.slf4j.LoggerFactory
 import java.time.Duration
 import java.time.Instant
@@ -92,19 +92,18 @@ class SpotDetailPrefetchService(
      * 한 장소가 [UpstreamRateLimitedException]을 던지면 스코프가 나머지를 취소하고 그 예외를
      * 그대로 올린다 — 그날 쿼터가 끝났으므로 남은 호출은 낭비다(AC-018).
      */
-    private suspend fun fetchAll(part: SpotDetailPart, targets: List<PrefetchTarget>): List<Detail?> =
-        coroutineScope {
-            val limiter = limiters.getValue(part)
-            targets
-                .map { target ->
-                    async(Dispatchers.IO) {
-                        // 창이 열릴 때까지 대기한다. 대기는 스레드를 잡지만 Dispatchers.IO의 몫이다.
-                        limiter.acquirePermission()
-                        fetch(part, target)
-                    }
+    private suspend fun fetchAll(part: SpotDetailPart, targets: List<PrefetchTarget>): List<Detail?> = coroutineScope {
+        val limiter = limiters.getValue(part)
+        targets
+            .map { target ->
+                async(Dispatchers.IO) {
+                    // 창이 열릴 때까지 대기한다. 대기는 스레드를 잡지만 Dispatchers.IO의 몫이다.
+                    limiter.acquirePermission()
+                    fetch(part, target)
                 }
-                .awaitAll()
-        }
+            }
+            .awaitAll()
+    }
 
     /**
      * 한 장소의 한 갈래를 원본에서 받아 온다. 실패하면 null이며 **적재하지 않는다** — 답을 듣지
@@ -113,15 +112,14 @@ class SpotDetailPrefetchService(
      * **일일 한도는 잡지 않는다.** 그날 쿼터가 끝났다는 뜻이라 이 장소만의 문제가 아니고, 그대로
      * 올라가 호출자가 그 갈래를 멈춘다(AC-018).
      */
-    private fun fetch(part: SpotDetailPart, target: PrefetchTarget): Detail? =
-        try {
-            read(part, target)
-        } catch (e: UpstreamRateLimitedException) {
-            throw e
-        } catch (e: RuntimeException) {
-            log.warn("상세 확보 실패: part={} spotId={} cause={}", part, target.spotId, e.javaClass.simpleName)
-            null
-        }
+    private fun fetch(part: SpotDetailPart, target: PrefetchTarget): Detail? = try {
+        read(part, target)
+    } catch (e: UpstreamRateLimitedException) {
+        throw e
+    } catch (e: RuntimeException) {
+        log.warn("상세 확보 실패: part={} spotId={} cause={}", part, target.spotId, e.javaClass.simpleName)
+        null
+    }
 
     /** 갈래별 조회. 빈 응답도 결과다 — "물었고 없었다"를 적재해야 미확보와 구분된다(AC-005). */
     private fun read(part: SpotDetailPart, target: PrefetchTarget): Detail {
@@ -144,7 +142,9 @@ class SpotDetailPrefetchService(
             }
 
         is Detail.Gallery -> upsertPort.saveGallery(target.spotId, detail.value)
+
         is Detail.Intro -> upsertPort.saveIntro(target.spotId, target.category, detail.value)
+
         is Detail.Info -> upsertPort.saveInfoItems(target.spotId, target.category, detail.value)
     }
 

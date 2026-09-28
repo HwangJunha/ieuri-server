@@ -52,5 +52,4 @@ class MapGqlMapperTest {
         assertEquals("SHOPPING", gql.category.label)
         assertNull(gql.category.iconUrl)
     }
-
 }

@@ -211,27 +211,29 @@ class SpotDiscoveryService(
     private fun validateSearchInput(trimmed: String, page: Int): SearchUserError? = when {
         trimmed.isEmpty() ->
             SearchUserError("EMPTY_QUERY", "검색어를 입력해 주세요.", FIELD_QUERY)
+
         trimmed.length > policy.maxSearchQueryLength ->
             SearchUserError(
                 "QUERY_TOO_LONG",
                 "검색어는 최대 ${policy.maxSearchQueryLength}자까지 입력할 수 있습니다.",
                 FIELD_QUERY,
             )
+
         page > policy.maxSearchPage ->
             SearchUserError(
                 "PAGE_TOO_DEEP",
                 "검색 결과는 ${policy.maxSearchPage}페이지까지 볼 수 있습니다. 검색어를 좁혀 주세요.",
                 FIELD_PAGE,
             )
+
         else -> null
     }
 
-    private fun validatedCenter(latitude: Double, longitude: Double): Coordinates =
-        try {
-            Coordinates(latitude, longitude)
-        } catch (e: IllegalArgumentException) {
-            throw InvalidCoordinatesException(e.message ?: "유효하지 않은 좌표입니다.")
-        }
+    private fun validatedCenter(latitude: Double, longitude: Double): Coordinates = try {
+        Coordinates(latitude, longitude)
+    } catch (e: IllegalArgumentException) {
+        throw InvalidCoordinatesException(e.message ?: "유효하지 않은 좌표입니다.")
+    }
 
     private fun validateRadius(radiusMeters: Int) {
         if (radiusMeters <= 0) throw InvalidCoordinatesException("반경은 양수여야 합니다.")

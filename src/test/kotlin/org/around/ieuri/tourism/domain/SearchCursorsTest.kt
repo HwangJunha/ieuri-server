@@ -45,9 +45,6 @@ class SearchCursorsTest {
         assertFailsWith<IllegalArgumentException> { DistanceCursor.decode("") }
     }
 
-
-
-
     @Test
     fun `관계 커서는 왕복해도 같다`() {
         val original = RelationCursor(

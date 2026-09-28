@@ -29,8 +29,7 @@ data class CategoryDisplay(
 ) {
     companion object {
         /** 번역·정의가 없는 코드의 표현. 코드를 그대로 라벨로 쓴다 — 빈 칩보다 낫다. */
-        fun fallback(category: SpotCategory) =
-            CategoryDisplay(category = category, label = category.code, iconUrl = null)
+        fun fallback(category: SpotCategory) = CategoryDisplay(category = category, label = category.code, iconUrl = null)
     }
 }
 

@@ -4,6 +4,12 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
+import org.around.ieuri.common.context.AppKey
+import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.common.pagination.CursorPageInfo
+import org.around.ieuri.tourism.application.event.SpotDetailAbsent
+import org.around.ieuri.tourism.application.event.SpotDetailFetched
+import org.around.ieuri.tourism.application.event.SpotGalleryFetched
 import org.around.ieuri.tourism.application.exception.EmptyQueryException
 import org.around.ieuri.tourism.application.exception.InvalidCoordinatesException
 import org.around.ieuri.tourism.application.exception.QueryTooLongException
@@ -13,21 +19,15 @@ import org.around.ieuri.tourism.application.exception.SpotNotFoundInLocaleQueryE
 import org.around.ieuri.tourism.application.exception.UnknownCategoryException
 import org.around.ieuri.tourism.application.exception.UpstreamUnavailableException
 import org.around.ieuri.tourism.application.policy.SpotQueryPolicy
-import org.around.ieuri.common.context.AppKey
-import org.around.ieuri.common.pagination.CursorPage
-import org.around.ieuri.common.pagination.CursorPageInfo
 import org.around.ieuri.tourism.application.port.out.cache.CachedDetail
 import org.around.ieuri.tourism.application.port.out.cache.CachedIntro
 import org.around.ieuri.tourism.application.port.out.cache.SpotCachePort
 import org.around.ieuri.tourism.application.port.out.client.SpotDetailQuery
 import org.around.ieuri.tourism.application.port.out.client.TourInfoPort
+import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
 import org.around.ieuri.tourism.application.port.out.persistence.SpotDetailStorePort
 import org.around.ieuri.tourism.application.port.out.persistence.StoredDetail
 import org.around.ieuri.tourism.application.port.out.persistence.StoredIntro
-import org.around.ieuri.tourism.application.event.SpotDetailAbsent
-import org.around.ieuri.tourism.application.event.SpotDetailFetched
-import org.around.ieuri.tourism.application.event.SpotGalleryFetched
-import org.around.ieuri.tourism.application.port.out.event.TourismEventPublisherPort
 import org.around.ieuri.tourism.application.port.out.query.AppCategoryQueryPort
 import org.around.ieuri.tourism.application.port.out.query.LikedSpotSearchPort
 import org.around.ieuri.tourism.application.port.out.query.LikedSpotsSearch
@@ -35,8 +35,8 @@ import org.around.ieuri.tourism.application.port.out.query.NearbySpotSearch
 import org.around.ieuri.tourism.application.port.out.query.SpotBasics
 import org.around.ieuri.tourism.application.port.out.query.SpotIdentity
 import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
-import org.around.ieuri.tourism.application.port.out.query.SpotSpatialQueryPort
 import org.around.ieuri.tourism.application.port.out.query.SpotSearchResult
+import org.around.ieuri.tourism.application.port.out.query.SpotSpatialQueryPort
 import org.around.ieuri.tourism.application.query.AppCategoryView
 import org.around.ieuri.tourism.application.query.CategoryDisplay
 import org.around.ieuri.tourism.application.query.LikedSpotView
@@ -57,8 +57,8 @@ import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertNull
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /** SpotQueryService — DTO→Domain 변환·거리계산·정렬(AC-1/2), 오프셋 페이지, 검증(AC-6/9), 가용성(AC-8). */
@@ -157,8 +157,7 @@ class SpotQueryServiceTest {
     )
 
     /** 적재된 본문(존재). */
-    private fun stored(detail: SpotDetail = detail()) =
-        StoredDetail(detail = detail, bodyAbsent = false, fetchedAt = Instant.now())
+    private fun stored(detail: SpotDetail = detail()) = StoredDetail(detail = detail, bodyAbsent = false, fetchedAt = Instant.now())
 
     /** 적재된 부재 행. [age]로 신선도 경과를 만든다. */
     private fun storedAbsence(age: Duration = Duration.ZERO) = StoredDetail(
@@ -184,14 +183,16 @@ class SpotQueryServiceTest {
     )
 
     /** 단일 카테고리 인자를 다중 선택으로 옮긴다. null이면 필터 없음. */
-    private fun selection(category: SpotCategory?) =
-        category?.let { CategorySelection.ofValues(setOf(it)) } ?: CategorySelection.UNFILTERED
+    private fun selection(category: SpotCategory?) = category?.let { CategorySelection.ofValues(setOf(it)) } ?: CategorySelection.UNFILTERED
 
-    private fun query(page: Int = 1, size: Int = 100, category: SpotCategory? = null, radius: Int = 20000) =
-        SpotsQuery(
-            latitude = 37.5665, longitude = 126.9780,
-            radiusMeters = radius, categories = selection(category), page = page, size = size,
-        )
+    private fun query(page: Int = 1, size: Int = 100, category: SpotCategory? = null, radius: Int = 20000) = SpotsQuery(
+        latitude = 37.5665,
+        longitude = 126.9780,
+        radiusMeters = radius,
+        categories = selection(category),
+        page = page,
+        size = size,
+    )
 
     @Test
     fun `DB가 돌려준 순서를 그대로 유지한다(AC-25)`() {
@@ -509,8 +510,13 @@ class SpotQueryServiceTest {
     )
 
     private fun intro() = SpotIntro(
-        businessHours = "09:00~18:00", closedDays = "화요일", parking = "가능",
-        inquiryPhone = null, fee = null, petAllowed = null, creditCardAccepted = null,
+        businessHours = "09:00~18:00",
+        closedDays = "화요일",
+        parking = "가능",
+        inquiryPhone = null,
+        fee = null,
+        petAllowed = null,
+        creditCardAccepted = null,
     )
 
     @Test
@@ -832,7 +838,6 @@ class SpotQueryServiceTest {
         verify { spotQueryPort.findReactedSpotIds(7L, DomainLocale.JA) }
     }
 
-
     // ══════════════════════════════════════════════════════════════════
     // SPEC-0008 : 상세 본문 부재 (R-1 ~ R-4)
     //
@@ -1020,18 +1025,17 @@ class SpotQueryServiceTest {
     // SPEC-0008 : 좋아요 목록 (R-15 ~ R-17)
     // ══════════════════════════════════════════════════════════════════
 
-    private fun likedSpot(id: Long, likedAt: Instant = Instant.parse("2026-08-01T00:00:00Z")) =
-        LikedSpotView(
-            id = id,
-            title = "spot-$id",
-            thumbnailImageUrl = "https://img/$id.jpg",
-            address = null,
-            category = SpotCategory.TOURIST_SPOT,
-            copyright = CopyrightType.TYPE1,
-            attributionText = CopyrightType.TYPE1.attributionText,
-            likedAt = likedAt,
-            catalogId = id * 10,
-        )
+    private fun likedSpot(id: Long, likedAt: Instant = Instant.parse("2026-08-01T00:00:00Z")) = LikedSpotView(
+        id = id,
+        title = "spot-$id",
+        thumbnailImageUrl = "https://img/$id.jpg",
+        address = null,
+        category = SpotCategory.TOURIST_SPOT,
+        copyright = CopyrightType.TYPE1,
+        attributionText = CopyrightType.TYPE1.attributionText,
+        likedAt = likedAt,
+        catalogId = id * 10,
+    )
 
     private fun likedPage(vararg nodes: LikedSpotView) = CursorPage(
         edges = nodes.map { org.around.ieuri.common.pagination.CursorEdge("c-${it.id}", it) },

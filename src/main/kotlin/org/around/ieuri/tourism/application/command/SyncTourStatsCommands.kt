@@ -3,7 +3,7 @@ package org.around.ieuri.tourism.application.command
 import java.math.BigDecimal
 import java.time.LocalDate
 
-/**
+/*
  * 한국관광공사 관광통계 4종의 적재 입력(SPEC-0015 R4~R6).
  *
  * **업스트림 필드명이 여기까지 오지 않는다** — 세 가지 시군구 코드 표기(`signguCode` ·

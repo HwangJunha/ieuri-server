@@ -1,17 +1,16 @@
 package org.around.ieuri.alarm.domain
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import org.around.ieuri.alarm.domain.aggregate.NotificationMessage
 import org.around.ieuri.alarm.domain.vo.AlarmLocale
 import org.around.ieuri.alarm.domain.vo.NotificationType
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 /** 알림 문구 불변식(SPEC-0028 R13). */
 class NotificationMessageTest {
 
-    private fun message(title: String = "제목", body: String = "본문") =
-        NotificationMessage.restore(1L, NotificationType.DM, AlarmLocale.KO, title, body)
+    private fun message(title: String = "제목", body: String = "본문") = NotificationMessage.restore(1L, NotificationType.DM, AlarmLocale.KO, title, body)
 
     @Test
     fun `제목과 본문의 앞뒤 공백은 제거된다`() {

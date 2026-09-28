@@ -20,8 +20,7 @@ class SpotDistrictAssignmentJdbcAdapter(
     override fun assignUnassignedDistricts(): Int = jdbcTemplate.update(ASSIGN_SQL)
 
     @Transactional(readOnly = true)
-    override fun countUnassigned(): Int =
-        jdbcTemplate.queryForObject(COUNT_UNASSIGNED_SQL, Int::class.java) ?: 0
+    override fun countUnassigned(): Int = jdbcTemplate.queryForObject(COUNT_UNASSIGNED_SQL, Int::class.java) ?: 0
 
     private companion object {
         /**

@@ -44,16 +44,17 @@ class TourApiClientTest {
         cpyrhtDivCd = cpyrht,
     )
 
-    private fun response(items: List<TourApiResponse.Item>, totalCount: Int = items.size, resultCode: String = "0000") =
-        TourApiResponse(
-            TourApiResponse.Response(
-                header = TourApiResponse.Header(resultCode = resultCode, resultMsg = "OK"),
-                body = TourApiResponse.Body(
-                    totalCount = totalCount, numOfRows = 100, pageNo = 1,
-                    items = TourApiResponse.Items(item = items),
-                ),
+    private fun response(items: List<TourApiResponse.Item>, totalCount: Int = items.size, resultCode: String = "0000") = TourApiResponse(
+        TourApiResponse.Response(
+            header = TourApiResponse.Header(resultCode = resultCode, resultMsg = "OK"),
+            body = TourApiResponse.Body(
+                totalCount = totalCount,
+                numOfRows = 100,
+                pageNo = 1,
+                items = TourApiResponse.Items(item = items),
             ),
-        )
+        ),
+    )
 
     @Test
     fun `여러 건 item을 매핑한다`() {

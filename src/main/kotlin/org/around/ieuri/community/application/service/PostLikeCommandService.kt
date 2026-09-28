@@ -61,6 +61,5 @@ class PostLikeCommandService(
     }
 
     /** 방금 존재를 확인했으므로 없을 수 없다 — 그 사이에 사라졌다면 0으로 답한다. */
-    private fun currentLikeCount(postId: Long): Int =
-        communityQueryPort.findLikeCount(postId) ?: 0
+    private fun currentLikeCount(postId: Long): Int = communityQueryPort.findLikeCount(postId) ?: 0
 }

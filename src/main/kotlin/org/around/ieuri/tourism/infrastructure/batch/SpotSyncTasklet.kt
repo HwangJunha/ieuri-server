@@ -6,9 +6,9 @@ import org.around.ieuri.tourism.application.port.out.persistence.SpotUpsertPort
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.slf4j.LoggerFactory
 import org.springframework.batch.core.scope.context.ChunkContext
-import org.springframework.batch.infrastructure.item.ExecutionContext
 import org.springframework.batch.core.step.StepContribution
 import org.springframework.batch.core.step.tasklet.Tasklet
+import org.springframework.batch.infrastructure.item.ExecutionContext
 import org.springframework.batch.infrastructure.repeat.RepeatStatus
 import java.time.Instant
 import java.time.LocalDate
@@ -92,7 +92,11 @@ class SpotSyncTasklet(
             // 제외(excluded) 건수도 마찬가지로 키워드 설정 오류의 신호다(SPEC-0018).
             log.info(
                 "spot sync completed: language={} written={} dropped={} categoryFallback={} excluded={}",
-                language, totalWritten, totalDropped, totalFallback, totalExcluded,
+                language,
+                totalWritten,
+                totalDropped,
+                totalFallback,
+                totalExcluded,
             )
             executionContext.putInt(KEY_COLLECTED, collectedIds.size)
             cleanup(executionContext, pageNo)
@@ -117,7 +121,9 @@ class SpotSyncTasklet(
             // 1페이지부터 시작하지 않았다면 재개 실행이다 — 집합에 앞 페이지가 없다.
             executionContext.getInt(KEY_RESUMED_FROM, 1) > 1 ->
                 "resumed run (incomplete id set)"
+
             collected == 0 -> "collected 0 items"
+
             else -> null
         }
 

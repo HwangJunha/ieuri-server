@@ -24,8 +24,7 @@ class DistrictVisitQueryAdapter(
      * EXISTS를 던지면 161왕복이 된다. 한 사람의 방문은 최대 252건이라 전량을 올려도 싸다.
      */
     @Transactional(readOnly = true)
-    override fun findVisitedDistrictCodes(memberId: Long): Set<String> =
-        repository.findAllByMemberId(memberId).mapTo(mutableSetOf()) { it.districtCode }
+    override fun findVisitedDistrictCodes(memberId: Long): Set<String> = repository.findAllByMemberId(memberId).mapTo(mutableSetOf()) { it.districtCode }
 
     @Transactional(readOnly = true)
     override fun filterExistingDistrictCodes(districtCodes: Collection<String>): Set<String> {

@@ -103,14 +103,13 @@ class MemberRegistrationService(
      * 클레임에 닉네임이 실릴지는 provider 동의 항목 설정에 달려 있어 서버가 통제하지 못한다 —
      * 실리지 않아도 이 폴백으로 가입은 성공한다.
      */
-    private fun nicknameFrom(vararg candidates: String?): Nickname =
-        candidates.asSequence()
-            .filterNotNull()
-            // **형식을 벗어나면 조용히 다음 후보로 넘어간다.** provider가 주는 값이라
-            // 사용자가 고칠 수 없고, 가입을 막을 이유가 없다(SPEC-0032 R30).
-            .mapNotNull { runCatching { Nickname(it) }.getOrNull() }
-            .firstOrNull()
-            ?: generateNickname()
+    private fun nicknameFrom(vararg candidates: String?): Nickname = candidates.asSequence()
+        .filterNotNull()
+        // **형식을 벗어나면 조용히 다음 후보로 넘어간다.** provider가 주는 값이라
+        // 사용자가 고칠 수 없고, 가입을 막을 이유가 없다(SPEC-0032 R30).
+        .mapNotNull { runCatching { Nickname(it) }.getOrNull() }
+        .firstOrNull()
+        ?: generateNickname()
 
     @Transactional
     override fun registerBySns(command: RegisterMemberCommand): RegisterMemberResult {
@@ -279,6 +278,7 @@ class MemberRegistrationService(
                 eventPublisher.publish(EmailVerified(verification.memberId, now))
                 VerifyEmailResult(verified = true, failureReason = null)
             }
+
             is VerificationResult.Failure -> VerifyEmailResult(verified = false, failureReason = result.reason.name)
         }
     }
@@ -406,10 +406,9 @@ class MemberRegistrationService(
      * 확인하지 않는다. 예전에는 가입 챌린지에 대상 주소가 없다는 것이 사실상의 방어였으나,
      * 주소 정정(R7)이 그 전제를 없앴다 — 거르지 않으면 이메일 변경이 이 경로로 확정된다.
      */
-    private fun loadRegistrationChallenge(publicId: UUID): EmailVerification =
-        verificationRepository.findByPublicId(publicId)
-            ?.takeIf { it.purpose == VerificationPurpose.REGISTRATION }
-            ?: throw VerificationNotFoundException("유효하지 않은 검증 요청입니다.")
+    private fun loadRegistrationChallenge(publicId: UUID): EmailVerification = verificationRepository.findByPublicId(publicId)
+        ?.takeIf { it.purpose == VerificationPurpose.REGISTRATION }
+        ?: throw VerificationNotFoundException("유효하지 않은 검증 요청입니다.")
 
     /**
      * 가입 인증 코드를 발급하고 평문 코드를 이벤트로만 전달한다(AFTER_COMMIT 발송).
@@ -527,6 +526,7 @@ class MemberRegistrationService(
                 auditLog.record(auth.memberId, "PASSWORD_RESET", emptyMap())
                 ResetPasswordResult(success = true, failureReason = null)
             }
+
             is VerificationResult.Failure -> ResetPasswordResult(success = false, failureReason = result.reason.name)
         }
     }

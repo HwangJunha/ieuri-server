@@ -30,7 +30,6 @@ interface SpotAnswerJpaRepository : JpaRepository<SpotAnswerEntity, Long> {
      * 지우지만 사진은 FK가 없어 id를 알아야 지울 수 있다.
      */
     fun findByQuestionId(questionId: Long): List<SpotAnswerEntity>
-
 }
 
 interface SpotAnswerReplyJpaRepository : JpaRepository<SpotAnswerReplyEntity, Long> {

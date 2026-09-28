@@ -1,22 +1,22 @@
 package org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper
 
-import org.around.ieuri.common.graphql.generated.types.CellSpot as GqlCellSpot
-import org.around.ieuri.common.graphql.generated.types.Coordinates as GqlCoordinates
-import org.around.ieuri.common.graphql.generated.types.PageInfo as GqlPageInfo
-import org.around.ieuri.common.graphql.generated.types.RecordVisitsInput as GqlRecordVisitsInput
-import org.around.ieuri.common.graphql.generated.types.RemoveVisitInput as GqlRemoveVisitInput
-import org.around.ieuri.common.graphql.generated.types.SpotCategory as GqlSpotCategory
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.tourism.application.command.RecordVisitsCommand
 import org.around.ieuri.tourism.application.command.RemoveVisitCommand
-import org.around.ieuri.common.graphql.generated.types.MapRelation as GqlMapRelation
-import org.around.ieuri.common.graphql.generated.types.CellImage as GqlCellImage
-import org.around.ieuri.common.graphql.generated.types.CellImageKind as GqlCellImageKind
-import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
 import org.around.ieuri.tourism.application.query.CellImageView
 import org.around.ieuri.tourism.application.query.CellSpotView
 import org.around.ieuri.tourism.application.query.MapRelationView
 import org.around.ieuri.tourism.domain.vo.Coordinates
+import org.around.ieuri.common.graphql.generated.types.CellImage as GqlCellImage
+import org.around.ieuri.common.graphql.generated.types.CellImageKind as GqlCellImageKind
+import org.around.ieuri.common.graphql.generated.types.CellSpot as GqlCellSpot
+import org.around.ieuri.common.graphql.generated.types.Coordinates as GqlCoordinates
+import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
+import org.around.ieuri.common.graphql.generated.types.MapRelation as GqlMapRelation
+import org.around.ieuri.common.graphql.generated.types.PageInfo as GqlPageInfo
+import org.around.ieuri.common.graphql.generated.types.RecordVisitsInput as GqlRecordVisitsInput
+import org.around.ieuri.common.graphql.generated.types.RemoveVisitInput as GqlRemoveVisitInput
+import org.around.ieuri.common.graphql.generated.types.SpotCategory as GqlSpotCategory
 
 /**
  * 전국 지도 GraphQL 경계 변환(POL-033).

@@ -25,13 +25,17 @@ class SpotExclusionRuleTest {
             "Medical Center", "Oriental Medicine", "Veterinary",
         ),
         branchNamePatterns = listOf(
-            "병원점", "병원 지점", "Hospital Branch", "의원점", "약국점", "Clinic Branch",
+            "병원점",
+            "병원 지점",
+            "Hospital Branch",
+            "의원점",
+            "약국점",
+            "Clinic Branch",
         ),
     )
 
     /** SHOPPING은 보호 카테고리가 아니라 판정이 그대로 걸린다 — 실측 216건 전량이 이 카테고리다. */
-    private fun excluded(title: String, category: SpotCategory = SpotCategory("SHOPPING")) =
-        rule.isExcluded(title, category)
+    private fun excluded(title: String, category: SpotCategory = SpotCategory("SHOPPING")) = rule.isExcluded(title, category)
 
     // ── R4: 키워드 일치 ──────────────────────────────────────────────────────
 

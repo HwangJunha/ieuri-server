@@ -34,7 +34,8 @@ class SpotSyncLauncher(
     private val jobs: List<Job>,
     private val properties: SpotSyncProperties,
     private val context: ApplicationContext,
-) : ApplicationRunner, ExitCodeGenerator {
+) : ApplicationRunner,
+    ExitCodeGenerator {
 
     private val log = LoggerFactory.getLogger(javaClass)
 

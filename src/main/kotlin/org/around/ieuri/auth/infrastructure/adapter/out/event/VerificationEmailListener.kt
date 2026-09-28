@@ -3,9 +3,9 @@ package org.around.ieuri.auth.infrastructure.adapter.out.event
 import org.around.ieuri.auth.application.event.PasswordResetRequested
 import org.around.ieuri.auth.application.event.VerificationEmailRequested
 import org.around.ieuri.auth.application.port.out.client.EmailSenderPort
+import org.springframework.stereotype.Component
 import org.springframework.transaction.event.TransactionPhase
 import org.springframework.transaction.event.TransactionalEventListener
-import org.springframework.stereotype.Component
 
 /**
  * 코드 메일 발송 트리거. 가입/재발송/비밀번호 재설정 트랜잭션이 커밋된 뒤에만 발송하여

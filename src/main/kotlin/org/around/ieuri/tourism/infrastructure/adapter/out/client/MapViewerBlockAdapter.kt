@@ -17,6 +17,5 @@ class MapViewerBlockAdapter(
     private val communityQueryUseCase: CommunityQueryUseCase,
 ) : MapViewerBlockPort {
 
-    override fun isBlockedBetween(memberId: Long, counterpartId: Long): Boolean =
-        communityQueryUseCase.isBlockedBetween(memberId, counterpartId)
+    override fun isBlockedBetween(memberId: Long, counterpartId: Long): Boolean = communityQueryUseCase.isBlockedBetween(memberId, counterpartId)
 }

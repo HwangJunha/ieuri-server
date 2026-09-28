@@ -36,8 +36,7 @@ class ConversationPersistenceAdapter(
     private val repository: ConversationJpaRepository,
 ) : ConversationRepositoryPort {
 
-    override fun findById(conversationId: Long): Conversation? =
-        repository.findById(conversationId).orElse(null)?.toDomain()
+    override fun findById(conversationId: Long): Conversation? = repository.findById(conversationId).orElse(null)?.toDomain()
 
     @Transactional
     override fun saveIfAbsent(conversation: Conversation): Conversation {

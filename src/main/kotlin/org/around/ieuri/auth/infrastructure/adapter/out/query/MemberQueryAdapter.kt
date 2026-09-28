@@ -6,20 +6,20 @@ import com.querydsl.jpa.JPAExpressions
 import com.querydsl.jpa.impl.JPAQueryFactory
 import org.around.ieuri.auth.application.port.out.query.MemberQueryPort
 import org.around.ieuri.auth.application.port.out.security.EmailEncryptorPort
-import org.around.ieuri.auth.application.query.MembersQuery
 import org.around.ieuri.auth.application.query.MeView
 import org.around.ieuri.auth.application.query.MemberDetailView
 import org.around.ieuri.auth.application.query.MemberPublicProfileView
 import org.around.ieuri.auth.application.query.MemberSummaryView
-import org.around.ieuri.common.pagination.CursorEdge
-import org.around.ieuri.common.pagination.CursorPage
-import org.around.ieuri.common.pagination.CursorPageInfo
+import org.around.ieuri.auth.application.query.MembersQuery
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.QMemberEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.QMemberProfileEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.QMemberRoleEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.QPermissionEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.QRoleEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.QRolePermissionEntity
+import org.around.ieuri.common.pagination.CursorEdge
+import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.common.pagination.CursorPageInfo
 import org.springframework.stereotype.Component
 
 /**
@@ -43,8 +43,13 @@ class MemberQueryAdapter(
     override fun findMe(memberId: Long): MeView? {
         val row = queryFactory
             .select(
-                member.emailEncrypted, member.emailVerified, member.status, member.createdAt,
-                member.provider, profile.nickname, profile.profileImageUrl,
+                member.emailEncrypted,
+                member.emailVerified,
+                member.status,
+                member.createdAt,
+                member.provider,
+                profile.nickname,
+                profile.profileImageUrl,
             )
             .from(member)
             .leftJoin(profile).on(profile.memberId.eq(member.id))
@@ -97,20 +102,19 @@ class MemberQueryAdapter(
      * 표시용 최소 정보. `member` 존재를 확인하고 프로필을 얹는다 — 프로필이 없어도 회원은
      * 존재하므로 leftJoin이며, 닉네임은 기존 조회와 같은 기본값으로 채운다.
      */
-    override fun findPublicProfile(memberId: Long): MemberPublicProfileView? =
-        queryFactory
-            .select(profile.nickname, profile.profileImageUrl)
-            .from(member)
-            .leftJoin(profile).on(profile.memberId.eq(member.id))
-            .where(member.id.eq(memberId))
-            .fetchOne()
-            ?.let {
-                MemberPublicProfileView(
-                    memberId = memberId,
-                    nickname = it.get(profile.nickname) ?: DEFAULT_NICKNAME,
-                    profileImageUrl = it.get(profile.profileImageUrl),
-                )
-            }
+    override fun findPublicProfile(memberId: Long): MemberPublicProfileView? = queryFactory
+        .select(profile.nickname, profile.profileImageUrl)
+        .from(member)
+        .leftJoin(profile).on(profile.memberId.eq(member.id))
+        .where(member.id.eq(memberId))
+        .fetchOne()
+        ?.let {
+            MemberPublicProfileView(
+                memberId = memberId,
+                nickname = it.get(profile.nickname) ?: DEFAULT_NICKNAME,
+                profileImageUrl = it.get(profile.profileImageUrl),
+            )
+        }
 
     /**
      * 여러 회원을 한 번에. 목록을 그리는 호출자가 행마다 묻지 않게 한다 —
@@ -192,27 +196,25 @@ class MemberQueryAdapter(
     }
 
     /** 역할 코드 필터: 해당 코드의 역할을 가진 회원만(중복 행 방지를 위해 exists 서브쿼리 사용). */
-    private fun hasRole(code: String): BooleanExpression =
-        JPAExpressions.selectOne()
-            .from(memberRole)
-            .where(
-                memberRole.memberId.eq(member.id).and(
-                    memberRole.roleId.`in`(
-                        JPAExpressions.select(role.id).from(role).where(role.code.eq(code)),
-                    ),
+    private fun hasRole(code: String): BooleanExpression = JPAExpressions.selectOne()
+        .from(memberRole)
+        .where(
+            memberRole.memberId.eq(member.id).and(
+                memberRole.roleId.`in`(
+                    JPAExpressions.select(role.id).from(role).where(role.code.eq(code)),
                 ),
-            )
-            .exists()
+            ),
+        )
+        .exists()
 
     /** 회원의 역할 코드 목록. */
-    private fun roleCodesOf(memberId: Long): List<String> =
-        queryFactory
-            .select(role.code)
-            .from(memberRole)
-            .join(role).on(role.id.eq(memberRole.roleId))
-            .where(memberRole.memberId.eq(memberId))
-            .orderBy(role.code.asc())
-            .fetch()
+    private fun roleCodesOf(memberId: Long): List<String> = queryFactory
+        .select(role.code)
+        .from(memberRole)
+        .join(role).on(role.id.eq(memberRole.roleId))
+        .where(memberRole.memberId.eq(memberId))
+        .orderBy(role.code.asc())
+        .fetch()
 
     /** 여러 회원의 역할 코드를 한 번에 조회(목록 N+1 회피). */
     private fun roleCodesOf(memberIds: List<Long>): Map<Long, List<String>> {
@@ -228,15 +230,14 @@ class MemberQueryAdapter(
     }
 
     /** 회원의 유효 권한 코드(역할들의 권한 합집합). */
-    private fun permissionCodesOf(memberId: Long): List<String> =
-        queryFactory
-            .selectDistinct(permission.code)
-            .from(memberRole)
-            .join(rolePermission).on(rolePermission.roleId.eq(memberRole.roleId))
-            .join(permission).on(permission.id.eq(rolePermission.permissionId))
-            .where(memberRole.memberId.eq(memberId))
-            .orderBy(permission.code.asc())
-            .fetch()
+    private fun permissionCodesOf(memberId: Long): List<String> = queryFactory
+        .selectDistinct(permission.code)
+        .from(memberRole)
+        .join(rolePermission).on(rolePermission.roleId.eq(memberRole.roleId))
+        .join(permission).on(permission.id.eq(rolePermission.permissionId))
+        .where(memberRole.memberId.eq(memberId))
+        .orderBy(permission.code.asc())
+        .fetch()
 
     private companion object {
         const val DEFAULT_NICKNAME = "여행자"

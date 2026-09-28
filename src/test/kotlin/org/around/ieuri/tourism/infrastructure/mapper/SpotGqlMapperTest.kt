@@ -4,10 +4,10 @@ import org.around.ieuri.tourism.application.query.SpotView
 import org.around.ieuri.tourism.domain.vo.CopyrightType
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.tourism.infrastructure.adapter.`in`.graphql.mapper.toGql
-import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
 
 /** `SpotView` → GraphQL `Spot` 필드별 매핑. mapX·mapY·distanceMeters가 모두 Double이라 값을 다르게 준다. */
 class SpotGqlMapperTest {

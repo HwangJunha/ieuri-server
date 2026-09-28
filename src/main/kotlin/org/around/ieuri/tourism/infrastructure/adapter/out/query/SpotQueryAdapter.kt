@@ -4,11 +4,11 @@ import com.querydsl.jpa.impl.JPAQueryFactory
 import org.around.ieuri.common.pagination.CursorEdge
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.CursorPageInfo
+import org.around.ieuri.tourism.application.exception.InvalidCursorException
 import org.around.ieuri.tourism.application.port.out.query.LikedSpotsSearch
 import org.around.ieuri.tourism.application.port.out.query.SpotBasics
 import org.around.ieuri.tourism.application.port.out.query.SpotIdentity
 import org.around.ieuri.tourism.application.port.out.query.SpotQueryPort
-import org.around.ieuri.tourism.application.exception.InvalidCursorException
 import org.around.ieuri.tourism.application.query.LikedSpotView
 import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.LikedSpotCursor
@@ -49,25 +49,23 @@ class SpotQueryAdapter(
      * **[language]로 한정한다**(SPEC-0029 R-13). 반응이 언어별로 갈리므로 제외 집합도 같은
      * 축이어야 한다 — 언어를 빼면 영어로 반응한 장소가 일본어 발견 큐에서도 사라진다.
      */
-    override fun findReactedSpotIds(memberId: Long, language: DomainLocale): Set<Long> =
-        queryFactory
-            .select(reaction.catalogId)
-            .from(reaction)
-            .where(reaction.memberId.eq(memberId), reaction.language.eq(language))
-            .fetch()
-            .toSet()
+    override fun findReactedSpotIds(memberId: Long, language: DomainLocale): Set<Long> = queryFactory
+        .select(reaction.catalogId)
+        .from(reaction)
+        .where(reaction.memberId.eq(memberId), reaction.language.eq(language))
+        .fetch()
+        .toSet()
 
-    override fun findReactedSpotIdsByReaction(memberId: Long, language: DomainLocale): Map<ReactionType, Set<Long>> =
-        queryFactory
-            .select(reaction.catalogId, reaction.reaction)
-            .from(reaction)
-            .where(reaction.memberId.eq(memberId), reaction.language.eq(language))
-            .fetch()
-            .groupBy(
-                { requireNotNull(it.get(reaction.reaction)) },
-                { requireNotNull(it.get(reaction.catalogId)) },
-            )
-            .mapValues { (_, ids) -> ids.toSet() }
+    override fun findReactedSpotIdsByReaction(memberId: Long, language: DomainLocale): Map<ReactionType, Set<Long>> = queryFactory
+        .select(reaction.catalogId, reaction.reaction)
+        .from(reaction)
+        .where(reaction.memberId.eq(memberId), reaction.language.eq(language))
+        .fetch()
+        .groupBy(
+            { requireNotNull(it.get(reaction.reaction)) },
+            { requireNotNull(it.get(reaction.catalogId)) },
+        )
+        .mapValues { (_, ids) -> ids.toSet() }
 
     /**
      * LIKE 반응 수. **활성 언어 안에서만 센다**(SPEC-0029 AC-13.5) — 다른 언어의 좋아요는
@@ -75,16 +73,15 @@ class SpotQueryAdapter(
      *
      * 인자는 카탈로그 id다 — 반응 테이블이 이미 그 축이라 `spot`을 경유할 이유가 없다.
      */
-    override fun countLikes(catalogId: Long, language: DomainLocale): Long =
-        queryFactory
-            .select(reaction.count())
-            .from(reaction)
-            .where(
-                reaction.catalogId.eq(catalogId),
-                reaction.language.eq(language),
-                reaction.reaction.eq(ReactionType.LIKE),
-            )
-            .fetchOne() ?: 0L
+    override fun countLikes(catalogId: Long, language: DomainLocale): Long = queryFactory
+        .select(reaction.count())
+        .from(reaction)
+        .where(
+            reaction.catalogId.eq(catalogId),
+            reaction.language.eq(language),
+            reaction.reaction.eq(ReactionType.LIKE),
+        )
+        .fetchOne() ?: 0L
 
     /**
      * 이 회원이 이 언어에서 남긴 최신 반응. 반응한 적 없으면 null이며 그것이 정상적인 부재다.
@@ -93,16 +90,15 @@ class SpotQueryAdapter(
      * 읽는다. 영어로 누른 좋아요를 일본어로 물으면 null이다(AC-13.2).
      */
     @Transactional(readOnly = true)
-    override fun findReaction(catalogId: Long, memberId: Long, language: DomainLocale): ReactionType? =
-        queryFactory
-            .select(reaction.reaction)
-            .from(reaction)
-            .where(
-                reaction.catalogId.eq(catalogId),
-                reaction.memberId.eq(memberId),
-                reaction.language.eq(language),
-            )
-            .fetchFirst()
+    override fun findReaction(catalogId: Long, memberId: Long, language: DomainLocale): ReactionType? = queryFactory
+        .select(reaction.reaction)
+        .from(reaction)
+        .where(
+            reaction.catalogId.eq(catalogId),
+            reaction.memberId.eq(memberId),
+            reaction.language.eq(language),
+        )
+        .fetchFirst()
 
     /**
      * (카탈로그 id, 언어) → upstream 식별 정보. 상세 조회가 캐시·DB를 모두 놓쳤을 때만 쓴다.
@@ -122,31 +118,29 @@ class SpotQueryAdapter(
      * where가 `catalogId`(non-null)로 이미 좁혀 두어 안전하지만, 그 조건을 완화하면 조인이
      * 필터로 바뀌어 배정되지 않은 spot이 조용히 null이 된다.
      */
-    override fun findIdentity(catalogId: Long, language: DomainLocale): SpotIdentity? =
-        queryFactory
-            .select(spot.id, spot.contentId, catalog.mapX, catalog.mapY)
-            .from(spot)
-            .join(catalog).on(catalog.id.eq(spot.catalogId))
-            .where(spot.catalogId.eq(catalogId), spot.language.eq(language))
-            .fetchFirst()
-            ?.let {
-                SpotIdentity(
-                    spotId = requireNotNull(it.get(spot.id)),
-                    contentId = requireNotNull(it.get(spot.contentId)),
-                    mapX = requireNotNull(it.get(catalog.mapX)),
-                    mapY = requireNotNull(it.get(catalog.mapY)),
-                )
-            }
+    override fun findIdentity(catalogId: Long, language: DomainLocale): SpotIdentity? = queryFactory
+        .select(spot.id, spot.contentId, catalog.mapX, catalog.mapY)
+        .from(spot)
+        .join(catalog).on(catalog.id.eq(spot.catalogId))
+        .where(spot.catalogId.eq(catalogId), spot.language.eq(language))
+        .fetchFirst()
+        ?.let {
+            SpotIdentity(
+                spotId = requireNotNull(it.get(spot.id)),
+                contentId = requireNotNull(it.get(spot.contentId)),
+                mapX = requireNotNull(it.get(catalog.mapX)),
+                mapY = requireNotNull(it.get(catalog.mapY)),
+            )
+        }
 
     /**
      * 카탈로그 존재 여부 — 언어와 무관하다. 두 오류 코드를 가르기 위해서만 쓴다(AC-12.3).
      */
-    override fun existsCatalog(catalogId: Long): Boolean =
-        queryFactory
-            .selectOne()
-            .from(catalog)
-            .where(catalog.id.eq(catalogId))
-            .fetchFirst() != null
+    override fun existsCatalog(catalogId: Long): Boolean = queryFactory
+        .selectOne()
+        .from(catalog)
+        .where(catalog.id.eq(catalogId))
+        .fetchFirst() != null
 
     /**
      * 상세 본문이 부재할 때 응답을 구성할 카탈로그의 값. 인자는 **카탈로그 id**다(SPEC-0019).
@@ -156,35 +150,32 @@ class SpotQueryAdapter(
      *
      * 카탈로그가 없어도 null이다 — 두 경우를 구분해야 하는 호출자는 [existsCatalog]를 함께 본다.
      */
-    override fun findSpotBasics(catalogId: Long, language: DomainLocale): SpotBasics? =
-        queryFactory
-            .select(
-                translation.title, translation.address, catalog.thumbnailImageUrl,
-                catalog.category, catalog.copyright, catalog.mapX, catalog.mapY,
+    override fun findSpotBasics(catalogId: Long, language: DomainLocale): SpotBasics? = queryFactory
+        .select(
+            translation.title,
+            translation.address,
+            catalog.thumbnailImageUrl,
+            catalog.category,
+            catalog.copyright,
+            catalog.mapX,
+            catalog.mapY,
+        )
+        .from(catalog)
+        .join(translation).on(translation.catalogId.eq(catalog.id), translation.visible.isTrue)
+        .where(catalog.id.eq(catalogId), translation.language.eq(language))
+        .fetchFirst()
+        ?.let {
+            SpotBasics(
+                title = requireNotNull(it.get(translation.title)),
+                address = it.get(translation.address),
+                thumbnailImageUrl = requireNotNull(it.get(catalog.thumbnailImageUrl)),
+                category = SpotCategory(requireNotNull(it.get(catalog.category))),
+                copyright = requireNotNull(it.get(catalog.copyright)),
+                longitude = requireNotNull(it.get(catalog.mapX)),
+                latitude = requireNotNull(it.get(catalog.mapY)),
             )
-            .from(catalog)
-            .join(translation).on(translation.catalogId.eq(catalog.id), translation.visible.isTrue)
-            .where(catalog.id.eq(catalogId), translation.language.eq(language))
-            .fetchFirst()
-            ?.let {
-                SpotBasics(
-                    title = requireNotNull(it.get(translation.title)),
-                    address = it.get(translation.address),
-                    thumbnailImageUrl = requireNotNull(it.get(catalog.thumbnailImageUrl)),
-                    category = SpotCategory(requireNotNull(it.get(catalog.category))),
-                    copyright = requireNotNull(it.get(catalog.copyright)),
-                    longitude = requireNotNull(it.get(catalog.mapX)),
-                    latitude = requireNotNull(it.get(catalog.mapY)),
-                )
-            }
+        }
 
-    /**
-     * 좋아요 목록 한 페이지. `spot`을 조인해 카드에 쓸 값과 언어·카테고리를 함께 판정한다.
-     * `spot_detail`은 조인하지 않는다 — 상세가 부재한 spot도 목록에는 정상적으로 나타나야 한다.
-     *
-     * keyset 페이징: (updated_at, spot_id) 내림차순이 정렬 키이자 커서다. `first + 1`을 읽어
-     * hasNextPage를 판정한다.
-     */
     /**
      * 여러 카탈로그를 한 번에. 호출자가 목록을 들고 있을 때 행마다 묻지 않게 한다 —
      * 피드 한 페이지에 20번, 지역 피드에서는 수천 번이 될 수 있다.
@@ -198,8 +189,14 @@ class SpotQueryAdapter(
 
         return queryFactory
             .select(
-                catalog.id, translation.title, translation.address, catalog.thumbnailImageUrl,
-                catalog.category, catalog.copyright, catalog.mapX, catalog.mapY,
+                catalog.id,
+                translation.title,
+                translation.address,
+                catalog.thumbnailImageUrl,
+                catalog.category,
+                catalog.copyright,
+                catalog.mapX,
+                catalog.mapY,
             )
             .from(catalog)
             .join(translation).on(translation.catalogId.eq(catalog.id), translation.visible.isTrue)
@@ -231,8 +228,12 @@ class SpotQueryAdapter(
 
         val rows = queryFactory
             .select(
-                catalog.id, translation.title, translation.address,
-                catalog.thumbnailImageUrl, catalog.category, catalog.copyright,
+                catalog.id,
+                translation.title,
+                translation.address,
+                catalog.thumbnailImageUrl,
+                catalog.category,
+                catalog.copyright,
                 reaction.updatedAt,
             )
             .from(reaction)

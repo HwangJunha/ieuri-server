@@ -26,11 +26,9 @@ class PasswordResetPersistenceAdapter(
         repository.save(reset.toNewEntity())
     }
 
-    override fun findLatestCreatedAtByMemberId(memberId: Long): Instant? =
-        repository.findFirstByMemberIdOrderByCreatedAtDesc(memberId)?.createdAt
+    override fun findLatestCreatedAtByMemberId(memberId: Long): Instant? = repository.findFirstByMemberIdOrderByCreatedAtDesc(memberId)?.createdAt
 
-    override fun findActiveByMemberId(memberId: Long): PasswordReset? =
-        repository.findFirstByMemberIdAndConsumedFalseOrderByCreatedAtDesc(memberId)?.toDomain()
+    override fun findActiveByMemberId(memberId: Long): PasswordReset? = repository.findFirstByMemberIdAndConsumedFalseOrderByCreatedAtDesc(memberId)?.toDomain()
 
     override fun update(reset: PasswordReset) {
         val entity = repository.findByPublicId(reset.publicId) ?: return

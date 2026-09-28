@@ -35,8 +35,7 @@ class ConversationSubscriptionResolver(
     fun typingIndicator(
         @InputArgument conversationId: Long,
         dfe: DgsDataFetchingEnvironment,
-    ): Publisher<TypingEventView> =
-        conversationQueryUseCase.typingIndicator(conversationId, liveMemberId(dfe))
+    ): Publisher<TypingEventView> = conversationQueryUseCase.typingIndicator(conversationId, liveMemberId(dfe))
 
     /**
      * 새 메시지. **타이핑과 달리 유실되면 안 된다** — 끊긴 동안의 메시지는 클라이언트가
@@ -46,8 +45,7 @@ class ConversationSubscriptionResolver(
     fun newMessage(
         @InputArgument conversationId: Long,
         dfe: DgsDataFetchingEnvironment,
-    ): Publisher<MessageView> =
-        conversationQueryUseCase.newMessage(conversationId, liveMemberId(dfe))
+    ): Publisher<MessageView> = conversationQueryUseCase.newMessage(conversationId, liveMemberId(dfe))
 
     /**
      * 구독을 열 자격이 있는 회원 id(SPEC-0032 R7).

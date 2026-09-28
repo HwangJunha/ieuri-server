@@ -35,29 +35,28 @@ class AppCategoryQueryAdapter(
      * 정하고 배열 순서는 클라이언트가 정한다. 재현 가능하도록 코드 오름차순으로만 고정한다.
      */
     @Transactional(readOnly = true)
-    override fun findCategories(appKey: AppKey, language: DomainLocale): List<AppCategoryView> =
-        queryFactory
-            .select(category.code, translation.label, category.iconUrl)
-            .from(appCategory)
-            .join(category).on(category.id.eq(appCategory.categoryId))
-            .leftJoin(translation)
-            .on(translation.categoryId.eq(category.id), translation.language.eq(language))
-            .where(
-                appCategory.appKey.eq(appKey.value),
-                appCategory.language.eq(language),
-                appCategory.active.isTrue,
+    override fun findCategories(appKey: AppKey, language: DomainLocale): List<AppCategoryView> = queryFactory
+        .select(category.code, translation.label, category.iconUrl)
+        .from(appCategory)
+        .join(category).on(category.id.eq(appCategory.categoryId))
+        .leftJoin(translation)
+        .on(translation.categoryId.eq(category.id), translation.language.eq(language))
+        .where(
+            appCategory.appKey.eq(appKey.value),
+            appCategory.language.eq(language),
+            appCategory.active.isTrue,
+        )
+        .orderBy(category.code.asc())
+        .fetch()
+        .map {
+            val code = requireNotNull(it.get(category.code))
+            AppCategoryView(
+                category = SpotCategory(code),
+                // 번역이 없으면 코드가 라벨이다 — 빈 칩보다 낫다.
+                label = it.get(translation.label) ?: code,
+                iconUrl = it.get(category.iconUrl),
             )
-            .orderBy(category.code.asc())
-            .fetch()
-            .map {
-                val code = requireNotNull(it.get(category.code))
-                AppCategoryView(
-                    category = SpotCategory(code),
-                    // 번역이 없으면 코드가 라벨이다 — 빈 칩보다 낫다.
-                    label = it.get(translation.label) ?: code,
-                    iconUrl = it.get(category.iconUrl),
-                )
-            }
+        }
 
     /**
      * 코드별 표시 정보를 한 번에. 정의가 없는 코드는 결과에 키가 없다 — 호출자가 폴백을 택한다.
