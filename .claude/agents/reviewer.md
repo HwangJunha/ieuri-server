@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: Reviews a finished slice against the ieuri principles before the PR. Reads the diff against dev, applies the architecture, JPA, GraphQL, and simplicity skills, and reports what the implementer missed. Read-only — it never edits code. Delegate when work is done, or when the user asks for a review.
+description: Reviews a finished slice against the ieuri principles before the PR. Reads the decision record and the diff against dev, applies the architecture, JPA, GraphQL, security, concurrency, and simplicity skills, and reports what the implementer missed. Read-only — it never edits code. Delegate when work is done, or when the user asks for a review.
 tools: Read, Grep, Glob, Bash
 model: opus
 skills:
@@ -61,7 +61,7 @@ migration — but do not review code the diff did not touch.
 
 ## Scope yourself by domain
 
-`ieuri` is split into `auth`, `tourism`, and `community` precisely so a change is readable without
+`ieuri` is split into `auth`, `tourism`, `community`, and `alarm` precisely so a change is readable without
 the rest. Work out which domain(s) the diff touches and read only those plus `common/`. Do not
 sweep the other domains — if the diff genuinely required them, that itself is a finding
 (domains must stay independent).
@@ -103,8 +103,7 @@ still wrong.
 
 Two caveats worth knowing, because they look enforced and are not. **POL-033 mapper shape is not
 sensed yet** — conversions written as private members inside resolvers and adapters still pass the
-build (33 such cases predate the rule — 28 of them inline `toGql` in resolvers), so flag a new one
-yourself. And the naming rules above cover
+build, so flag a new one yourself. And the naming rules above cover
 only `Repository`/`Dto`/`Test`; `UseCase`, `Adapter` and `View` naming is deliberately unsensed
 while it is still being settled.
 
