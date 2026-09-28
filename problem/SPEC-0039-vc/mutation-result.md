@@ -1,7 +1,7 @@
 # SPEC-0039 VC-001 — GraphQL 동작 비교 결과 (2026-09-28)
 
 비교 대상: 로컬 = `feature/SPEC-0039-comment-trim`(#166, #165 포함) · dev = `api-dev.ieuri.co.kr`. 두 서버는 같은 dev DB·Valkey를 쓴다.
-계획은 `mutation-plan.md`, 실행기는 `scripts/`. 원본 응답은 커밋하지 않는다(POL-013).
+계획은 `mutation-plan.md`. 이번 실행은 임시 스크립트로 했고, 케이스는 `ieuri-QA/graphql` 스위트로 옮긴다(서버 레포에는 두지 않는다). 원본 응답은 커밋하지 않는다(POL-013).
 
 ## 요약
 
