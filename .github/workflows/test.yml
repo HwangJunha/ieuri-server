@@ -33,4 +33,4 @@ jobs:
       - name: Test
         # --no-daemon을 쓰지 않는 이유는 build.yml과 같다 — 데몬이 없으면 Kotlin
         # 컴파일러가 별도 JVM으로 돌아 gradle.properties의 in-process 전략이 무력화된다.
-        run: ./gradlew test --build-cache
+        run: ./gradlew check --build-cache

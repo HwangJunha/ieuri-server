@@ -41,6 +41,8 @@ Uses the Gradle wrapper (`./gradlew`); Gradle 9.5.1, Java toolchain 25.
 - Build: `./gradlew build`
 - Run the app: `./gradlew bootRun` (local profile serves on port **8888**; deployed environments use 8080)
 - Run all tests: `./gradlew test`
+- Run every gate (tests + style): `./gradlew check` — this is what CI runs
+- Style: `./gradlew lintKotlin` to check, `./gradlew formatKotlin` to auto-fix (ktlint via kotlinter; rules in `.editorconfig`)
 - Run a single test class: `./gradlew test --tests "org.around.ieuri.architecture.LayeredArchitectureTest"`
 - Run a single test method: `./gradlew test --tests "<fully.qualified.ClassName>.<methodName>"`
 - Package a runnable jar: `./gradlew bootJar`
@@ -90,7 +92,7 @@ Uses the Gradle wrapper (`./gradlew`); Gradle 9.5.1, Java toolchain 25.
   ```
 
   **Immediately before opening the PR**, write the tests for the domain and application logic this
-  slice added, and make `./gradlew test` pass. The `test-strategy` skill has the required shape.
+  slice added, and make `./gradlew check` pass. The `test-strategy` skill has the required shape.
   If a policy changed, leave a request document in `ieuri-recorder/problem/`.
 
 - **Design by domain, for future extraction.** Keep domain logic at the core and independent of delivery/persistence adapters, following hexagonal ports-and-adapters. All domains share this one application today, so structure each domain so it can be lifted out into its own application later without rewriting the core.

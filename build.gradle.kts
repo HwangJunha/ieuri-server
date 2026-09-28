@@ -8,6 +8,8 @@ plugins {
     kotlin("kapt") version "2.3.0"
     // 스키마 우선(schema-first): auth.graphqls로부터 GraphQL input/output/enum 타입을 생성한다.
     id("com.netflix.dgs.codegen") version "8.6.0"
+    // 스타일 센서(ktlint). `check`에 lintKotlin이 붙는다 — 규칙은 .editorconfig.
+    id("org.jmailen.kotlinter") version "5.7.0"
 }
 
 group = "org.around"
@@ -203,6 +205,14 @@ sourceSets {
 // 소스 루트는 등록돼 있는데 안이 비어 미해결로 보인다.
 tasks.named("compileKotlin") {
     dependsOn(tasks.withType<com.netflix.graphql.dgs.codegen.gradle.GenerateJavaTask>())
+}
+
+// 자동 생성 코드는 스타일 검사 대상이 아니다 — 위 srcDir 등록 때문에 main 소스셋에 들어온다.
+tasks.withType<org.jmailen.gradle.kotlinter.tasks.LintTask>().configureEach {
+    exclude { it.file.path.contains("/build/generated/") }
+}
+tasks.withType<org.jmailen.gradle.kotlinter.tasks.FormatTask>().configureEach {
+    exclude { it.file.path.contains("/build/generated/") }
 }
 
 // plain jar는 라이브러리로 배포할 때 쓰는 산출물이라 이 프로젝트에는 쓸모가 없다. 켜 두면

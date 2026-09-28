@@ -73,7 +73,7 @@ jobs:
         #
         # 빌드 시간의 대부분은 QueryDSL kapt와 Kotlin 컴파일이다(실제 테스트는 41초).
         # 그 둘이 데몬 안에서 큰 힙을 쓰며 도는 편이 훨씬 빠르다.
-        run: ./gradlew test bootJar --build-cache
+        run: ./gradlew check bootJar --build-cache
 
       # JAR은 아키텍처 독립이라 빌드는 x86 네이티브로 돌리고 이미지 조립만 arm64로 한다.
       - uses: docker/setup-qemu-action@v4
