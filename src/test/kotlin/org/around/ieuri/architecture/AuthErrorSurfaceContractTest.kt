@@ -1,8 +1,6 @@
 package org.around.ieuri.architecture
 
 import com.tngtech.archunit.core.domain.JavaModifier
-import com.tngtech.archunit.core.importer.ClassFileImporter
-import com.tngtech.archunit.core.importer.ImportOption
 import org.around.ieuri.auth.application.exception.AuthStoreUnavailableException
 import org.around.ieuri.auth.application.exception.InvalidTokenException
 import org.around.ieuri.auth.application.exception.TokenReuseDetectedException
@@ -32,9 +30,7 @@ import kotlin.test.assertTrue
  */
 class AuthErrorSurfaceContractTest {
 
-    private val classes = ClassFileImporter()
-        .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-        .importPackages("org.around.ieuri")
+    private val classes = ArchitectureClasses.main
 
     /**
      * 코드를 싣는 토큰 계열 예외 전부. **클래스패스에서 찾는다** — 손으로 열거하면 새 예외가

@@ -2,8 +2,6 @@ package org.around.ieuri.architecture
 
 import com.tngtech.archunit.base.DescribedPredicate
 import com.tngtech.archunit.core.domain.JavaClass
-import com.tngtech.archunit.core.importer.ClassFileImporter
-import com.tngtech.archunit.core.importer.ImportOption
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
 import com.tngtech.archunit.library.Architectures.layeredArchitecture
@@ -19,9 +17,7 @@ import kotlin.test.Test
  */
 class LayeredArchitectureTest {
 
-    private val classes = ClassFileImporter()
-        .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-        .importPackages("org.around.ieuri")
+    private val classes = ArchitectureClasses.main
 
     @Test
     fun `의존성은 infrastructure → application → domain 방향만 허용한다`() {
@@ -69,6 +65,22 @@ class LayeredArchitectureTest {
                 "graphql..",
             )
             .because("read DTO → 응답 타입 매핑은 graphql 리졸버(adapter/in)의 책임이다")
+            .check(classes)
+    }
+
+    /**
+     * 경계 타입은 infrastructure에서 멈춘다(FR-008, POL-033). DGS 생성 타입은 `common.graphql.generated`에
+     * 있어 위 규칙(`com.netflix..`·`graphql..`)에 걸리지 않으므로 따로 막는다.
+     */
+    @Test
+    fun `application과 domain은 GraphQL 생성 타입과 JPA 엔티티에 의존하지 않는다`() {
+        noClasses().that().resideInAnyPackage("..application..", "..domain..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                "org.around.ieuri.common.graphql.generated..",
+                "..persistence.entity..",
+            )
+            .orShould().dependOnClassesThat().areAnnotatedWith("jakarta.persistence.Entity")
+            .because("경계 타입 ↔ 도메인 변환은 infrastructure 어댑터의 mapper에서 한다 — application·domain은 원시값·도메인 모델·read DTO만 안다")
             .check(classes)
     }
 

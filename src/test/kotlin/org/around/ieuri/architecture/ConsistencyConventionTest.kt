@@ -1,8 +1,6 @@
 package org.around.ieuri.architecture
 
 import com.tngtech.archunit.base.DescribedPredicate
-import com.tngtech.archunit.core.importer.ClassFileImporter
-import com.tngtech.archunit.core.importer.ImportOption
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods
@@ -34,13 +32,9 @@ import kotlin.test.Test
  */
 class ConsistencyConventionTest {
 
-    private val classes = ClassFileImporter()
-        .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-        .importPackages("org.around.ieuri")
+    private val classes = ArchitectureClasses.main
 
-    private val testClasses = ClassFileImporter()
-        .withImportOption(ImportOption.Predefined.ONLY_INCLUDE_TESTS)
-        .importPackages("org.around.ieuri")
+    private val testClasses = ArchitectureClasses.test
 
     // ── 의존·import ────────────────────────────────────────────────────────────
 
@@ -115,6 +109,20 @@ class ConsistencyConventionTest {
             .should().haveSimpleNameEndingWith("Repository")
             .andShould().resideInAPackage("..persistence.repository..")
             .because("리포지토리는 한 곳에 모인다 — 어디를 봐야 하는지가 이름과 위치로 정해진다")
+            .check(classes)
+    }
+
+    /**
+     * 아웃바운드 포트 인터페이스는 `Port`로 끝난다(SPEC-0039 D-17). 연산이 없는 인터페이스는 포트가 아니라
+     * 포트가 돌려주는 결과 타입(`sealed interface SnsRevokeResult`)이라 대상에서 뺀다.
+     */
+    @Test
+    fun `아웃바운드 포트 인터페이스는 Port로 끝난다`() {
+        classes().that().resideInAPackage("..application.port.out..")
+            .and().areInterfaces()
+            .and(DescribedPredicate.describe("연산을 선언한") { it.methods.isNotEmpty() })
+            .should().haveSimpleNameEndingWith("Port")
+            .because("포트는 이름으로 식별된다 — port/out의 인터페이스 이름을 XxxPort로 바꾼다")
             .check(classes)
     }
 

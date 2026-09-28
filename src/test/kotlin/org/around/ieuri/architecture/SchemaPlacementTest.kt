@@ -1,8 +1,6 @@
 package org.around.ieuri.architecture
 
 import com.tngtech.archunit.core.domain.JavaClass
-import com.tngtech.archunit.core.importer.ClassFileImporter
-import com.tngtech.archunit.core.importer.ImportOption
 import jakarta.persistence.Entity
 import jakarta.persistence.Table
 import kotlin.test.Test
@@ -76,9 +74,7 @@ class SchemaPlacementTest {
         "kto_spending_intensity",
     )
 
-    private val entities: List<JavaClass> = ClassFileImporter()
-        .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-        .importPackages("org.around.ieuri")
+    private val entities: List<JavaClass> = ArchitectureClasses.main
         .filter { it.isAnnotatedWith(Entity::class.java) }
 
     /** AC-6 — 전량 배정, 중복 0, 미배정 0. Map이므로 중복 키는 구조적으로 불가능하다. */

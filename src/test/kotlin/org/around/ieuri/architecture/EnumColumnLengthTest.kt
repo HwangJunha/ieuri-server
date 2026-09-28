@@ -1,8 +1,6 @@
 package org.around.ieuri.architecture
 
 import com.tngtech.archunit.core.domain.JavaClass
-import com.tngtech.archunit.core.importer.ClassFileImporter
-import com.tngtech.archunit.core.importer.ImportOption
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -24,9 +22,7 @@ import kotlin.test.assertTrue
  */
 class EnumColumnLengthTest {
 
-    private val entities: List<JavaClass> = ClassFileImporter()
-        .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-        .importPackages("org.around.ieuri")
+    private val entities: List<JavaClass> = ArchitectureClasses.main
         .filter { it.isAnnotatedWith(Entity::class.java) }
 
     @Test
