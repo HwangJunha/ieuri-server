@@ -7,10 +7,7 @@ import kotlin.test.assertEquals
 
 /**
  * 배치 메타데이터가 `batch` 스키마를 가리키는지 검증한다(SPEC-0023 AC-7).
- *
- * **`spring.batch.jdbc.table-prefix`가 아니다.** Boot 4에 없는 키라 조용히 무시되며, 그러면
- * 배치는 search_path로 테이블을 찾는다 — 스펙 §5의 지정 수단은 여기서 어긋난다.
- * 실제 접두사는 `@EnableJdbcJobRepository(tablePrefix = ...)`가 소유한다.
+ * - 접두사는 `@EnableJdbcJobRepository(tablePrefix)`가 소유한다. `spring.batch.jdbc.table-prefix`는 Boot 4에서 무시된다.
  */
 class BatchSchemaConfigTest {
 
