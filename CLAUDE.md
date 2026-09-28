@@ -200,9 +200,11 @@ classes under `src/test/kotlin/org/around/ieuri/architecture/` hold the mechanic
 skill re-checks them:
 
 - `LayeredArchitectureTest` — dependency direction, domain purity, `@Entity` confinement, DGS
-  isolation, cross-domain slices, bean-name collisions, `AFTER_COMMIT`/`REQUIRES_NEW`.
+  isolation, generated GraphQL types and JPA entities out of `application`/`domain`, cross-domain
+  slices, bean-name collisions, `AFTER_COMMIT`/`REQUIRES_NEW`.
 - `ConsistencyConventionTest` — persistence tech out of `application`, `common` out of `domain`,
-  `@Transactional` off domain and resolvers, repository/`Dto`/test naming.
+  `@Transactional` off domain and resolvers, repository/`Port`/`Dto`/test naming.
+- ktlint via kotlinter (`./gradlew lintKotlin`, part of `check`) — code style, rules in `.editorconfig`.
 - `ImportStyleTest` — no wildcard imports (source-level, so Konsist rather than ArchUnit).
 
 `ConsistencyConventionTest` and `ImportStyleTest` fix **what is already consistent**, chosen because
@@ -220,9 +222,9 @@ so the reader can tell a real violation from a rule that is wrong for this slice
 **A sensor that is wrong for the slice is a finding, not an obstacle.** When one fires on something
 you believe is correct, say so and record why in the decision table rather than reshaping the code
 to get past it — a rule nobody is allowed to question stops being a rule and becomes a ritual. That
-belongs in the design agreement, not in every failure string; ArchUnit's `because` renders as the
-rule's description rather than as failure output, so putting it there only makes the rule read
-oddly.
+belongs in the design agreement, not in every failure string. ArchUnit appends `because` to the
+rule description, and the failure header prints that description (`Rule '…, because …' was
+violated`) — so write in `because` what to do, not why the rule exists.
 
 - `architecture-review` — CQRS rails, mapper placement and purity, framework leaking below
   infrastructure, domain independence, `common/` bloat, required values weakened to nullable.
