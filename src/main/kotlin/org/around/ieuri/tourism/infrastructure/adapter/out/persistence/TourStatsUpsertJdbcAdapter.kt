@@ -12,14 +12,9 @@ import java.sql.Date
 import java.sql.PreparedStatement
 
 /**
- * KTO 빅데이터 4종 upsert 어댑터(SPEC-0015 R7). JPA에 이식 가능한 upsert가 없어 이 어댑터에만
- * 생 SQL이 남는다([SpotUpsertJdbcAdapter]와 같은 처리).
- *
- * **네 테이블 모두 자연키 UNIQUE에 `ON CONFLICT`가 걸린다** — 제약 이름이 아니라 컬럼 목록으로
- * 지정하므로 V44의 UNIQUE 정의가 바뀌면 여기도 함께 고쳐야 한다. 충돌 시 값과 `updated_at`을
- * 무조건 덮어쓴다: 업스트림이 같은 자연키로 값을 정정할 수 있고, 그때 낡은 값이 남으면 안 된다.
- *
- * 한 페이지를 한 번의 `executeBatch`로 보낸다.
+ * KTO 빅데이터 4종 upsert 어댑터(SPEC-0015 R7). JPA에 이식 가능한 upsert가 없어 생 SQL이다.
+ * - `ON CONFLICT`는 컬럼 목록으로 지정한다 — V44의 UNIQUE 정의가 바뀌면 여기도 고쳐야 한다.
+ * - 충돌 시 값을 덮어쓴다(업스트림 정정 반영). 한 페이지를 한 번의 배치로 보낸다.
  */
 @Component
 class TourStatsUpsertJdbcAdapter(
@@ -68,15 +63,12 @@ class TourStatsUpsertJdbcAdapter(
         return batch(sql, records, setter)
     }
 
-    /** batchUpdate는 청크별 결과를 배열의 배열로 돌려준다 — 반영된 행만 센다. */
+    /** 반영된 행 수를 센다. */
     private fun <T : Any> batch(sql: String, records: List<T>, setter: ParameterizedPreparedStatementSetter<T>): Int = jdbcTemplate.batchUpdate(sql, records, records.size, setter)
         .sumOf { chunk -> chunk.count { it != 0 } }
 
     private companion object {
-        /**
-         * `updated_at`은 값이 실제로 바뀐 경우에만 올린다. 무조건 갱신하면 매일 전 행이 변경된
-         * 것처럼 보여 "언제 값이 바뀌었나"를 알 수 없다.
-         */
+        /** `updated_at`은 값이 실제로 바뀐 경우에만 올린다. */
         val VISITOR_COUNT_SQL = """
             INSERT INTO kto_visitor_count (district_code, base_date, visitor_type, tou_num)
             VALUES (?, ?, ?, ?)

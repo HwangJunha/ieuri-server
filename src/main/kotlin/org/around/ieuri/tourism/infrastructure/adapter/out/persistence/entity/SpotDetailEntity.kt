@@ -13,10 +13,7 @@ import org.around.ieuri.tourism.domain.vo.CopyrightType
 import java.time.Instant
 
 /**
- * 관광지 상세 본문 JPA 엔티티. 애그리거트가 아니라 upstream 응답의 적재 계층이다.
- *
- * 쓰기는 전부 upsert라 [org.around.ieuri.tourism.infrastructure.adapter.out.persistence.SpotDetailUpsertJdbcAdapter]가
- * 담당하고, 이 엔티티는 조회의 QueryDSL 대상이자 스키마 대조 기준이다.
+ * 관광지 상세 본문 JPA 엔티티(upstream 응답의 적재 계층). 쓰기(upsert)는 SpotDetailUpsertJdbcAdapter가 한다.
  */
 @Entity
 @Table(name = "spot_detail", schema = DbSchema.TOUR)

@@ -13,25 +13,10 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 /**
- * 인기 spot 조회 어댑터(SPEC-0013 R18). `spot_reaction`의 LIKE를 **카탈로그(장소) 단위로,
- * 활성 언어 안에서** 집계하며 기간 제한이 없다. PostGIS 거리 계산 때문에 생 SQL이다.
- *
- * 반경 조건이 `spot_catalog`에 걸리므로 조인 단계에서 이미 범위가 좁혀진다. 좋아요 하한은
- * 집계 **후** HAVING으로 적용한다(AC-18.2).
- *
- * **`spot`을 읽지 않는다**(SPEC-0019). 제목·주소는 번역에서, 좌표·썸네일·분류·저작권은
- * 카탈로그에서 온다 — 그 언어의 spot 행이 없어도 번역만 있으면 순위에 오른다.
- *
- * **메인 DB가 아니라 검색 노드를 본다**(searchJdbcTemplate) — 홈 세 섹션이 같은 노드를 보게
- * 맞춘다. 좋아요는 메인에 쓰이고 논리 복제로 넘어오므로 **집계에 복제 지연이 반영된다**:
- * 방금 누른 좋아요가 인기 순위에 즉시 반영되지 않을 수 있다. 순위는 누적 총합이라 한두 건의
- * 지연이 순서를 뒤집지 않는다.
- *
- * `idx_spot_reaction_catalog_reaction (catalog_id, language, reaction)`이 이 집계를 받친다.
- *
- * **SPEC-0029로 집계가 언어별로 다시 갈리면서 값이 작아진다** — SPEC-0019가 합쳤던 언어별
- * 좋아요를 되돌린다. `minLikeCount` 하한을 그대로 두면 통과하는 spot이 줄어드므로, 배포 전
- * 현재 값과 새 분포를 대조해 조정할 것.
+ * 인기 spot 조회 어댑터(SPEC-0013 R18). LIKE를 카탈로그 단위로, 활성 언어 안에서, 기간 제한 없이 집계한다.
+ * - PostGIS 거리 계산 때문에 생 SQL이다. 좋아요 하한은 집계 후 HAVING으로 적용한다(AC-18.2).
+ * - `spot`을 읽지 않는다(SPEC-0019). 제목·주소는 번역, 나머지는 카탈로그에서 온다.
+ * - 검색 노드를 본다 — 방금 누른 좋아요는 복제 지연만큼 늦게 반영된다.
  */
 @Component
 class PopularSpotQueryJdbcAdapter(
@@ -40,10 +25,7 @@ class PopularSpotQueryJdbcAdapter(
 
     /**
      * 좋아요 내림차순 + id 오름차순. `limit + 1`건을 읽어 호출자가 다음 페이지 존재를 판정한다.
-     *
-     * 집계값이라 별칭을 WHERE에서 참조할 수 없어 서브쿼리로 한 겹 감싼다. 정렬 두 축의 방향이
-     * 달라 like_count에 -1을 곱해 부호를 맞추면 seek이 행 값 비교 한 줄이 된다. 부호 반전은
-     * 여기서만 하며 커서에는 원래 값이 실린다.
+     * - seek을 한 줄로 쓰려고 like_count 부호를 뒤집는다. 커서에는 원래 값이 실린다.
      */
     @Transactional(readOnly = true)
     override fun findPopular(query: PopularSpotSearch): List<PopularSpotView> {
@@ -92,7 +74,7 @@ class PopularSpotQueryJdbcAdapter(
                 val copyright = CopyrightType.valueOf(rs.getString("copyright"))
                 PopularSpotView(
                     spot = SpotView(
-                        // **클라이언트에 나가는 id는 카탈로그 id다**(SPEC-0019).
+                        // 클라이언트에 나가는 id는 카탈로그 id다(SPEC-0019).
                         id = rs.getLong("id"),
                         title = rs.getString("title"),
                         address = rs.getString("address"),
@@ -112,13 +94,10 @@ class PopularSpotQueryJdbcAdapter(
     }
 
     /**
-     * 파라미터는 SQL의 `?` 등장 순서대로 담아 함께 반환한다. CTE의 center가 먼저이고, 그다음이
-     * 두 JOIN 조건(reaction → translation의 language), 그다음이 WHERE 순서다 — HAVING의 하한은
-     * 호출자가 이어 붙인다.
+     * 조건과, `?` 등장 순서대로 담은 파라미터: CTE center → 두 JOIN 조건 → WHERE. HAVING 하한은 호출자가 붙인다.
      */
     private fun whereClause(query: PopularSpotSearch): Pair<String, List<Any>> {
-        // 카테고리 없는 카탈로그는 카드를 그릴 수 없다 — 도메인 enum에 미분류 값이 없다.
-        // 좌표 없는 카탈로그는 ST_DWithin이 참을 돌려주지 않아 자연히 빠진다.
+        // 카테고리 없는 카탈로그는 빠진다. 좌표 없는 카탈로그는 ST_DWithin에서 빠진다.
         val conditions = mutableListOf(
             "ST_DWithin(cat.location, c.center, ?)",
         )
@@ -131,7 +110,7 @@ class PopularSpotQueryJdbcAdapter(
             query.radiusMeters.toDouble(),
         )
 
-        // 다중 선택은 OR이며 IN으로 표현한다(SPEC-0020). 비어 있으면 조건 자체를 걸지 않는다.
+        // 다중 선택은 OR(SPEC-0020). 비어 있으면 조건을 걸지 않는다.
         if (!query.categories.isUnfiltered) {
             val codes = query.categories.codes()
             conditions += "cat.category IN (${codes.joinToString(",") { "?" }})"

@@ -3,14 +3,8 @@ package org.around.ieuri.tourism.infrastructure.adapter.out.client.seoulopendata
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 
 /**
- * 서울시 실시간 도시데이터(`seoulOpenData`) 응답 DTO(SPEC-0014 §3).
- *
- * **필드 타입이 일관되지 않다** — 인구 관련 값은 문자열로 오는데(`"3000"`)
- * `AREA_SH_PAYMENT_AMT_MIN`은 숫자로 온다. 그래서 숫자 자리도 `String`으로 받아
- * 매퍼에서 관대하게 파싱한다. Jackson이 숫자를 문자열로 읽어 주므로 양쪽 다 통과한다.
- *
- * 이 응답에는 도로·주차·지하철·날씨 등 훨씬 많은 블록이 있으나 본 spec이 쓰는 셋만
- * 선언한다 — `ignoreUnknown`이 나머지를 흡수한다.
+ * 서울시 실시간 도시데이터(`seoulOpenData`) 응답 DTO(SPEC-0014 §3). 쓰는 세 블록만 선언한다.
+ * - 필드 타입이 일관되지 않아 숫자 자리도 `String`으로 받고 매퍼가 관대하게 파싱한다.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class SeoulOpenDataResponse(
@@ -20,12 +14,8 @@ data class SeoulOpenDataResponse(
     val cityData: CityData? = null,
 ) {
     /**
-     * 업스트림 처리 결과. 정상은 `INFO-000`이며, 그 외(인증키 무효 `INFO-100`, 쿼터 초과 등)는
-     * 전부 실패로 다룬다.
-     *
-     * **HTTP 상태는 오류일 때도 200이라** 이 값을 봐야 실패를 알 수 있다. 다만 인증키가
-     * 아예 틀린 경우는 JSON을 요청해도 **XML로** 응답이 와서 역직렬화 단계에서 먼저
-     * 깨진다 — 그쪽은 호출부의 catch가 흡수한다.
+     * 업스트림 처리 결과. 정상은 `INFO-000`이며 그 외는 전부 실패다(HTTP 상태는 오류여도 200).
+     * - 인증키가 틀리면 XML로 응답이 와서 역직렬화에서 먼저 깨진다 — 호출부의 catch가 흡수한다.
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     data class Result(
@@ -83,11 +73,8 @@ data class SeoulOpenDataResponse(
     )
 
     /**
-     * 상권 블록. **`CMRCL_TIME`은 `"20260810 0600"` 형식으로 인구 블록과 다르다**
-     * (2026-08-10 실측). 매퍼가 두 형식을 모두 읽는다.
-     *
-     * `AREA_SH_PAYMENT_CNT`는 실측 기준선 유무의 단서다 — 결제 건수가 없으면 업스트림이
-     * `보통`을 고정 반환한 자리표시자일 가능성이 높다.
+     * 상권 블록. `CMRCL_TIME`은 `"20260810 0600"` 형식으로 인구 블록과 다르다.
+     * - `AREA_SH_PAYMENT_CNT`가 없으면 `보통`이 기준선 없는 자리표시자일 가능성이 높다.
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     data class Commercial(
@@ -99,12 +86,7 @@ data class SeoulOpenDataResponse(
         val observedAt: String? = null,
     )
 
-    /**
-     * 문화행사. **`EVENT_X`가 경도, `EVENT_Y`가 위도로 이름이 직관과 반대다**(spec §7.7).
-     *
-     * `THUMBNAIL`·`PAY_YN`·`EVENT_ETC_DETAIL`은 의도적으로 선언하지 않는다 — 계약에
-     * 넣지 않기로 했다(spec §7.9).
-     */
+    /** 문화행사. `EVENT_X`가 경도, `EVENT_Y`가 위도다(spec §7.7). */
     @JsonIgnoreProperties(ignoreUnknown = true)
     data class Event(
         @get:com.fasterxml.jackson.annotation.JsonProperty("EVENT_NM")

@@ -9,18 +9,13 @@ import org.around.ieuri.tourism.domain.vo.SpotInfoItem
 import org.around.ieuri.tourism.domain.vo.SpotIntro
 
 /**
- * 상세 캐시 직렬화 전용 DTO(어댑터 내부). 도메인 모델을 Jackson으로 직접 굽지 않는 이유:
- *  - 도메인 순수성: 도메인 타입은 Jackson 애노테이션을 모른다.
- *  - 파생 필드 배제: attributionText는 copyright에서 도출되는 계산값이라 저장할 필요가 없다.
- *  - likeCount 배제: 캐시 경계상 담지 않는다(§4). 복원 시 domain 기본값 0.
- *
- * 오퍼레이션별로 따로 캐시되므로 여기 갤러리·운영정보·이용안내를 중첩하지 않는다(각자 자기 키에 저장).
- * 스키마 변화에 견디도록 미정의 필드는 무시한다.
+ * 상세 캐시 직렬화 전용 DTO(어댑터 내부). 미정의 필드는 무시한다.
+ * - attributionText(파생값)·likeCount(캐시 비대상)는 담지 않는다. 갤러리 등은 각자 자기 키에 저장된다.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class CachedSpotDetail(
     val title: String = "",
-    /** 카테고리 **코드 문자열**로 담는다 — 값 클래스는 Jackson 왕복이 보장되지 않는다. */
+    /** 카테고리 코드 문자열 — 값 클래스는 Jackson 왕복이 보장되지 않는다. */
     val category: String = SpotCategory.TOURIST_SPOT.code,
     val thumbnailImageUrl: String = "",
     val overview: String? = null,
@@ -29,11 +24,8 @@ data class CachedSpotDetail(
     val tel: String? = null,
     val copyright: CopyrightType = CopyrightType.UNSPECIFIED,
     /**
-     * 업스트림에 본문이 없음을 확인한 값인지(SPEC-0008 R-3). true면 위 값들은 `spot` 행에서
-     * 구성된 것이고 overview·homepage·tel은 null이다.
-     *
-     * **기본값 false가 하위 호환을 준다** — 이 필드가 없던 시절 캐시된 항목은 본문이 있는 값이므로
-     * false가 곧 맞는 해석이다. TTL 24h 안에 자연히 교체된다.
+     * 업스트림에 본문이 없음을 확인한 값인지(SPEC-0008 R-3). true면 overview·homepage·tel은 null이다.
+     * - 기본값 false가 이 필드가 없던 옛 항목의 올바른 해석이다.
      */
     val bodyAbsent: Boolean = false,
 ) {
@@ -46,7 +38,7 @@ data class CachedSpotDetail(
         homepage = homepage,
         tel = tel,
         copyright = copyright,
-        // likeCount는 캐시 비대상 — 복원 시 0(application이 실시간 집계로 덮어씀).
+        // likeCount는 캐시 비대상 — 복원 시 0(application이 덮어쓴다).
     )
 
     companion object {

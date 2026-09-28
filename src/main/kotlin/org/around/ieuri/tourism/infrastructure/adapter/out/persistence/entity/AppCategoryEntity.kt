@@ -16,7 +16,7 @@ import java.time.Instant
 
 /**
  * 앱·언어별 카테고리 노출 구성(V57). tourism과 community가 함께 읽는 유일한 출처다.
- * 표시 문구는 `category_translation`이 갖는다(V58) — 이 표는 노출 여부와 순서만 정한다.
+ * - 표시 문구는 `category_translation`이 갖는다(V58).
  */
 @Entity
 @Table(name = "app_category", schema = DbSchema.CATEGORY)
@@ -36,10 +36,7 @@ class AppCategoryEntity(
     @Column(name = "category_id", nullable = false)
     var categoryId: Long,
 
-    /**
-     * 노출 여부. **순서는 담지 않는다**(V59) — 서버는 무엇을 보일지만 정하고 배열 순서는
-     * 클라이언트가 자기 화면 기준으로 정한다.
-     */
+    /** 노출 여부. 순서는 담지 않는다(V59) — 배열 순서는 클라이언트가 정한다. */
     @Column(name = "active", nullable = false)
     var active: Boolean = true,
 

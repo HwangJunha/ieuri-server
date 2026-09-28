@@ -13,31 +13,17 @@ import java.sql.Date
 
 /**
  * 진행 중 축제 조회 어댑터(SPEC-0013 R17). PostGIS 거리 계산·정렬 때문에 생 SQL이다.
- *
- * **`spot`도 `spot_festival`도 읽지 않는다**(SPEC-0019). 기간은 언어와 무관한 장소 자체의
- * 속성이라 `spot_catalog_festival`이 카탈로그 단위로 확정해 둔다 — `spot_festival`은 원본
- * 보관용으로 남는다. 제목·주소는 번역에서, 좌표·썸네일·분류·저작권은 카탈로그에서 온다.
- *
- * 언어 격리는 번역 조인의 `t.language = ?`가 전담하며, `UNIQUE(catalog_id, language)`가
- * 카탈로그당 1행을 보장한다. 그 언어의 spot 행이 없어도 번역만 있으면 목록에 나온다.
- *
- * **메인 DB가 아니라 검색 노드를 본다**(searchJdbcTemplate) — 홈 화면 세 섹션이 한 노드를
- * 보게 해서, 검색과 같은 복제 지연을 공유하도록 맞춘다. 섹션마다 데이터 신선도가 다르면
- * 같은 spot이 섹션에 따라 있고 없고 하는 상태가 된다.
- *
- * **날짜 필터를 조회 시점에 적용한다** — 배치의 종료 축제 정리에 기대지 않는다. 배치가 실패해
- * 종료된 축제가 남아 있어도 결과는 R17을 지킨다.
+ * - `spot`·`spot_festival`을 읽지 않는다(SPEC-0019). 기간은 `spot_catalog_festival`에서 온다.
+ * - 언어 격리는 번역 조인의 `t.language = ?`가 전담한다.
+ * - 검색 노드를 본다(홈 세 섹션이 같은 노드).
+ * - 날짜 필터를 조회 시점에 적용한다 — 배치의 종료 축제 정리에 기대지 않는다.
  */
 @Component
 class FestivalQueryJdbcAdapter(
     @Qualifier("searchJdbcTemplate") private val jdbcTemplate: JdbcTemplate,
 ) : FestivalQueryPort {
 
-    /**
-     * 거리 오름차순 + id 오름차순. `limit + 1`건을 읽어 호출자가 다음 페이지 존재를 판정한다.
-     * 거리가 계산식이라 별칭을 WHERE에서 참조할 수 없어 서브쿼리로 한 겹 감싼다.
-     * 두 정렬 축이 모두 오름차순이라 seek은 행 값 비교 한 줄이다.
-     */
+    /** 거리 오름차순 + id 오름차순. `limit + 1`건을 읽어 호출자가 다음 페이지 존재를 판정한다. */
     @Transactional(readOnly = true)
     override fun findOngoing(query: OngoingFestivalSearch): List<FestivalView> {
         val (where, whereParams) = whereClause(query)
@@ -74,7 +60,7 @@ class FestivalQueryJdbcAdapter(
             { rs, _ ->
                 val copyright = CopyrightType.valueOf(rs.getString("copyright"))
                 FestivalView(
-                    // **클라이언트에 나가는 id는 카탈로그 id다**(SPEC-0019).
+                    // 클라이언트에 나가는 id는 카탈로그 id다(SPEC-0019).
                     id = rs.getLong("id"),
                     title = rs.getString("title"),
                     address = rs.getString("address"),
@@ -94,14 +80,11 @@ class FestivalQueryJdbcAdapter(
     }
 
     /**
-     * 파라미터는 SQL의 `?` 등장 순서대로 담아 함께 반환한다. CTE의 center가 항상 앞선다.
-     *
-     * 기간 판정은 **경계를 포함한다**(AC-17.3) — 오늘이 시작일 또는 종료일과 같아도 진행 중이다.
-     * '오늘'은 서비스가 시계에서 읽어 넘긴 값이며 `CURRENT_DATE`를 쓰지 않는다.
+     * 조건과 `?` 등장 순서대로 담은 파라미터(CTE center가 앞선다).
+     * - 기간 판정은 경계를 포함한다(AC-17.3). '오늘'은 서비스가 넘긴 값이며 `CURRENT_DATE`를 쓰지 않는다.
      */
     private fun whereClause(query: OngoingFestivalSearch): Pair<String, List<Any>> {
-        // 카테고리 없는 카탈로그는 카드를 그릴 수 없다 — 도메인 enum에 미분류 값이 없다.
-        // 좌표 없는 카탈로그는 ST_DWithin이 참을 돌려주지 않아 자연히 빠진다.
+        // 카테고리 없는 카탈로그는 빠진다. 좌표 없는 카탈로그는 ST_DWithin에서 빠진다.
         val conditions = listOf(
             "f.event_start_date <= ?",
             "f.event_end_date >= ?",

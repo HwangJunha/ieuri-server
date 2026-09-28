@@ -14,9 +14,7 @@ import java.time.LocalDate
 
 /**
  * 축제 전용 정보 JPA 엔티티. `spot`의 자식이며 적재 단위는 `spot_id`다(V20).
- *
- * 적재는 upsert라 [org.around.ieuri.tourism.infrastructure.adapter.out.persistence.FestivalUpsertJdbcAdapter]가
- * 담당하고, 이 엔티티는 조회·삭제의 QueryDSL 대상이자 `ddl-auto: validate`의 스키마 대조 기준이다.
+ * - 적재(upsert)는 FestivalUpsertJdbcAdapter가 하고, 이 엔티티는 조회·삭제 대상이다.
  */
 @Entity
 @Table(name = "spot_festival", schema = DbSchema.TOUR)
@@ -25,7 +23,7 @@ class SpotFestivalEntity(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long? = null,
 
-    /** 부모 `spot` 행의 surrogate PK. 연관이 아니라 plain 컬럼이다(애그리거트 간 참조는 id로 한다). */
+    /** 부모 `spot` 행의 PK. 연관이 아니라 plain 컬럼이다. */
     @Column(name = "spot_id", nullable = false)
     var spotId: Long,
 

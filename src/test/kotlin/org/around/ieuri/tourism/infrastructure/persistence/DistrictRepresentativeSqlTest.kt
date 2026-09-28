@@ -10,9 +10,7 @@ import kotlin.test.assertEquals
 
 /**
  * 대표 위치 SQL의 바인딩 인자 수 검증(SPEC-0015 · V46).
- *
- * **컴파일로 잡히지 않는 결함이다.** 인자를 하나 더 넘겨도 빌드는 통과하고, 배치를 실제로
- * 돌린 뒤에야 `column index is out of range`로 터진다 — 실제로 그렇게 터졌다.
+ * - 인자 수가 어긋나도 컴파일은 통과하고 실행 시 `column index is out of range`로 터진다.
  */
 class DistrictRepresentativeSqlTest {
 

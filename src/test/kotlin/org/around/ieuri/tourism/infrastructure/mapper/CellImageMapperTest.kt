@@ -8,11 +8,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
-/**
- * 엔티티 → 칸 이미지 읽기 모델(POL-033).
- *
- * **필드마다 값을 다르게 준다** — 같은 값을 쓰면 두 문자열 필드가 뒤바뀌어도 통과한다.
- */
+/** 엔티티 → 칸 이미지 읽기 모델(POL-033). 필드마다 값을 다르게 준다. */
 class CellImageMapperTest {
 
     @Test

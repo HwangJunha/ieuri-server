@@ -16,15 +16,8 @@ import org.around.ieuri.tourism.domain.vo.DomainLocale
 import java.time.Instant
 
 /**
- * 관광지 목록 JPA 엔티티. 도메인 모델 `Spot`과 별개 클래스이며 `mapper` 패키지가 변환한다 — 둘을 한 클래스로
- * 합치지 말 것(프로젝트 전역 규칙).
- *
- * PK는 surrogate id, upsert 단위는 자연키 (content_id, language) UNIQUE(uq_spot).
- *
- * 도메인 `Spot`에 있으나 여기 없는 필드가 둘 있고, 둘 다 의도적이다:
- *  - `distance`      : 요청 좌표에 종속되므로 적재 대상이 아니다(조회 시 계산).
- *  - `attributionText`: [copyright]에서 결정론적으로 파생되므로 컬럼으로 두면 둘이 어긋날 수 있다.
- * 반대로 여기 있으나 도메인에 없는 [contentTypeId]는 적재 전용 관측 필드다.
+ * 관광지 목록 JPA 엔티티. PK는 surrogate id, upsert 단위는 자연키 (content_id, language) UNIQUE(uq_spot).
+ * - 도메인 `Spot`의 `distance`(조회 시 계산)·`attributionText`(copyright에서 파생)는 컬럼이 없다.
  */
 @Entity
 @Table(name = "spot", schema = DbSchema.TOUR)
@@ -60,11 +53,7 @@ class SpotEntity(
     @Column(name = "category", nullable = false, length = 30)
     var category: String,
 
-    /**
-     * 해석 이전의 TourAPI 원본 contentTypeId. **적재 전용 — 응답·로그로 내보내지 말 것**(SPEC-0002 R8·AC-21).
-     * [category] 해석 실패 시 조용히 TOURIST_SPOT으로 떨어지는 폴백을 사후에 감지·교정하기 위해 보관한다
-     * (런타임 계약 위험 4번).
-     */
+    /** 해석 이전의 TourAPI 원본 contentTypeId. 적재 전용 — 응답·로그로 내보내지 않는다(SPEC-0002 R8·AC-21). */
     @Column(name = "content_type_id")
     var contentTypeId: Int? = null,
 
@@ -76,11 +65,7 @@ class SpotEntity(
     @Column(name = "last_synced_at", nullable = false)
     var lastSyncedAt: Instant = Instant.now(),
 
-    /**
-     * 소속 카탈로그(SPEC-0019). **배정 배치가 채우므로 nullable이다** — 새로 적재된 행은
-     * 다음 배정까지 null이다. 전량 배정 후에도 컬럼을 조이지 않는 이유는 적재와 배정이
-     * 다른 Step이라 그 사이에 항상 null인 구간이 존재하기 때문이다.
-     */
+    /** 소속 카탈로그(SPEC-0019). 배정 배치가 채우므로 새로 적재된 행은 다음 배정까지 null이다. */
     @Column(name = "catalog_id")
     var catalogId: Long? = null,
 

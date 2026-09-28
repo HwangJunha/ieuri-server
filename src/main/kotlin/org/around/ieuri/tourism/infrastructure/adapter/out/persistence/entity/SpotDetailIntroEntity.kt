@@ -10,9 +10,8 @@ import org.around.ieuri.common.persistence.DbSchema
 import java.time.Instant
 
 /**
- * 관광지 운영 정보 JPA 엔티티. 카테고리별로 upstream 응답이 갈리므로 `category`가 키에 남는다.
- *
- * 전 컬럼이 null인 행은 "조회했으나 값 없음"을 뜻한다 — 미적재와 구분된다.
+ * 관광지 운영 정보 JPA 엔티티. 카테고리별로 upstream 응답이 갈려 `category`가 키에 남는다.
+ * - 전 컬럼이 null인 행은 "조회했으나 값 없음"이다(미적재와 구분).
  */
 @Entity
 @Table(name = "spot_detail_intro", schema = DbSchema.TOUR)

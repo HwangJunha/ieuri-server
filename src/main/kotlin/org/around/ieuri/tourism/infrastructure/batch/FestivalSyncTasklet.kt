@@ -14,21 +14,16 @@ import java.time.Instant
 import java.time.LocalDate
 
 /**
- * 한 언어의 축제 정보를 전량 수집·적재하고 정리하는 Step 본체. 페이지 루프 구조는 [SpotSyncTasklet]과
- * 같고, [SpotSyncTasklet]과 다른 점은 셋이다.
- *  1. 수집 호출에 실행일을 함께 넘긴다 — `searchFestival2`의 필수 파라미터다.
- *  2. 정리에 급감 비율 게이트를 적용하지 않는다. 축제는 계절에 따라 절반 이하로 흔들리는 것이
- *     정상이라, 비율 게이트를 걸면 정리가 영구히 막힌다.
- *  3. 정리가 두 갈래다 — [FestivalStorePort.deleteMissing]과 [FestivalStorePort.deleteEnded].
- *
- * **실행일은 잡 파라미터(`runDate`)에서 읽고 `LocalDate.now()`를 부르지 않는다** — Step마다 `now()`를
- * 부르면 자정을 걸쳐 도는 실행에서 방금 적재한 축제를 같은 실행의 정리가 지운다.
+ * 한 언어의 축제 정보를 전량 수집·적재하고 정리하는 Step 본체. 페이지 루프는 [SpotSyncTasklet]과 같다.
+ * - 수집 호출에 실행일을 넘긴다(`searchFestival2` 필수 파라미터).
+ * - 정리가 두 갈래다 — [FestivalStorePort.deleteMissing]과 [FestivalStorePort.deleteEnded].
+ * - 실행일은 잡 파라미터(`runDate`)에서 읽는다 — `now()`를 부르면 자정을 걸친 실행에서 방금 적재한 축제를 지운다.
  */
 class FestivalSyncTasklet(
     private val language: DomainLocale,
     private val syncPort: FestivalSyncPort,
     private val storePort: FestivalStorePort,
-    // 생 SQL(upsert) 경로는 포트가 갈린다 — 어느 쓰기가 그쪽인지 여기서 보인다.
+    // 생 SQL(upsert) 경로의 포트.
     private val upsertPort: FestivalUpsertPort,
     private val pageSize: Int,
 ) : Tasklet {
@@ -77,14 +72,9 @@ class FestivalSyncTasklet(
     }
 
     /**
-     * 축제 정리. **수집이 모두 끝난 뒤 한 번만** 수행한다 — 수집 중간에 지우면 페이지 경계에서 방금
-     * 넣은 행을 지울 수 있다.
-     *
-     * 게이트는 두 겹이다:
-     *  1. **재개 실행 아님** — 앞 페이지를 다시 읽지 않아 수집 집합이 불완전하다.
-     *  2. **0건 아님** — 업스트림 일시 오류로 빈 목록을 받으면 그 언어의 축제가 전량 삭제된다.
-     *
-     * 게이트에 걸리면 종료 축제 삭제도 함께 건너뛴다.
+     * 축제 정리. 수집이 모두 끝난 뒤 한 번만 한다. 두 게이트에 걸리면 종료 축제 삭제도 건너뛴다:
+     *  1. 재개 실행이 아니다 — 재시작하면 수집 집합이 불완전하다.
+     *  2. 0건이 아니다 — 업스트림 일시 오류로 빈 목록을 받으면 그 언어의 축제가 전량 삭제된다.
      */
     private fun cleanup(executionContext: ExecutionContext, runDate: LocalDate) {
         val collected = collectedIds.size
@@ -101,9 +91,7 @@ class FestivalSyncTasklet(
             return
         }
 
-        // 두 삭제 대상은 겹치며, 순서가 건수 배분을 정한다 — deleteEnded를 먼저 부르므로 종료분이
-        // endedDeleted에 잡히고 이어지는 deleteMissing은 나머지만 센다. 순서를 바꾸면 삭제 사유별
-        // 관측값이 뒤섞인다.
+        // 두 삭제 대상은 겹친다 — deleteEnded가 먼저여야 삭제 사유별 건수가 섞이지 않는다.
         val endedDeleted = storePort.deleteEnded(language, runDate)
         val missingDeleted = storePort.deleteMissing(language, collectedIds)
         val deleted = endedDeleted + missingDeleted

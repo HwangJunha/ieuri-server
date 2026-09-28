@@ -12,12 +12,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * 월 지표 기준월 탐색(SPEC-0015 R6 · R8).
- *
- * 검증 대상은 **호출 횟수**다 — 시도마다 탐색하면 17배로 곱해지고, 찾은 뒤 같은 요청을 다시
- * 보내면 두 배가 된다. 둘 다 컴파일러가 잡아 주지 않는다.
- */
+/** 월 지표 기준월 탐색(SPEC-0015 R6 · R8). 호출 횟수를 검증한다 — 시도마다 탐색하거나 찾은 뒤 재요청하면 곱해진다. */
 class TourStatsMonthResolverTest {
 
     private val runMonth = YearMonth.of(2026, 8)
@@ -52,7 +47,7 @@ class TourStatsMonthResolverTest {
 
     @Test
     fun `이번 달부터 거슬러 올라가 데이터가 있는 첫 달을 쓴다`() {
-        // 실측(2026-08-11): 202608·202607은 0행이고 202606에 데이터가 있었다.
+        // 최근 두 달은 0행이고 그 전 달에 데이터가 있는 상황.
         val context = ExecutionContext()
         val resolver = resolver(dataMonths = setOf(YearMonth.of(2026, 6)))
 
@@ -87,7 +82,7 @@ class TourStatsMonthResolverTest {
 
     @Test
     fun `두 번째 시도부터는 탐색 없이 확정된 달로 바로 부른다`() {
-        // 핵심 — 시도마다 탐색하면 17 시도 × lookback 6 = 102 호출이 된다.
+        // 시도마다 탐색하면 17 시도 × lookback만큼 호출이 곱해진다.
         val context = ExecutionContext()
         val resolver = resolver(dataMonths = setOf(YearMonth.of(2026, 6)))
 
@@ -118,7 +113,7 @@ class TourStatsMonthResolverTest {
 
     @Test
     fun `데이터가 없는 시도를 만나도 달을 확정하지 않고 다음 시도에서 다시 탐색한다`() {
-        // 그 시도가 정말로 데이터가 없을 수 있다 — 첫 시도로 창 전체를 판정하면 안 된다.
+        // 첫 시도가 비었다고 창 전체를 판정하면 안 된다.
         val context = ExecutionContext()
         val resolver = resolver(dataMonths = setOf(YearMonth.of(2026, 6)), emptyAreas = setOf("11"))
 
@@ -161,7 +156,7 @@ class TourStatsMonthResolverTest {
 
     @Test
     fun `달이 확정된 뒤에는 요청한 페이지 번호를 그대로 넘긴다`() {
-        // 2페이지 이후가 1페이지로 되돌아가면 같은 페이지를 무한히 다시 받는다.
+        // 2페이지 이후가 1페이지로 되돌아가면 같은 페이지를 무한히 받는다.
         val context = ExecutionContext()
         context.putString(TourStatsMonthResolver.KEY_BASE_MONTH, "2026-06")
 
@@ -172,7 +167,7 @@ class TourStatsMonthResolverTest {
 
     @Test
     fun `확정 전이면 탐색도 요청한 페이지 번호로 한다`() {
-        // 재시작 직후 2페이지에서 이어지는 경우. 페이지가 1로 고정되면 앞부분을 다시 적재한다.
+        // 재시작 직후 2페이지에서 이어지는 경우.
         val context = ExecutionContext()
         resolver(dataMonths = setOf(YearMonth.of(2026, 7))).fetchPage(context, runMonth, "11", 2)
 

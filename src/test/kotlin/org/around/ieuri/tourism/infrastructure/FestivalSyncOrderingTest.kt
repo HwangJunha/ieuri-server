@@ -22,12 +22,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * 잡의 Step 구성과 순서(SPEC-0007 §4.2).
- *
- * **축제 수집이 관광지 수집 뒤에 와야 한다**(R-2·AC-5). `spot_festival`이 `spot`에 FK를 걸므로 부모
- * 행이 먼저 있어야 하며, 반대 순서면 첫 실행에서 축제가 전부 건너뛰어진다. 순서는 잡 조립 시점에
- * 결정되므로 Spring 컨텍스트 없이 [SpotSyncJobConfig]를 직접 만들어 확인한다 — 배선이 아니라
- * **어떤 Step이 어떤 순서로 들어가는가**가 검증 대상이다.
+ * 잡의 Step 구성과 순서(SPEC-0007 §4.2). [SpotSyncJobConfig]를 직접 만들어 확인한다.
+ * - 축제 수집은 관광지 수집 뒤다(R-2·AC-5) — `spot_festival`이 `spot`에 FK를 건다.
  */
 class FestivalSyncOrderingTest {
 
@@ -70,17 +66,15 @@ class FestivalSyncOrderingTest {
 
     @Test
     fun `축제 전용 잡을 따로 만들지 않는다`() {
-        // 스펙 §선행 조사·§비범위. 별도 잡이면 두 잡의 정리가 서로의 행을 지우고, 관광지 수집이
-        // 종료 축제를 되살린다 — R-9가 성립하려면 한 잡 안에서 순서가 보장되어야 한다.
+        // 관광지·축제 정리가 서로의 행을 지우지 않도록 한 잡 안에서 순서를 보장한다(R-9).
         assertEquals(SpotSyncJobConfig.JOB_NAME, config.spotSyncJob().name)
-        // 관광지 4 + 축제 4 + 카탈로그 배정 1 + 분할 1. 번역 대상 조회 Step은 SPEC-0029 R-6이 제거했다.
+        // 관광지 4 + 축제 4 + 카탈로그 배정 1 + 분할 1.
         assertEquals(10, stepNames.size)
     }
 
     @Test
     fun `카탈로그 분할 Step이 배정 Step 뒤에 온다`() {
-        // SPEC-0029. 전량이 붙고 난 뒤라야 "이 카탈로그가 몇 장소인가"를 물을 수 있다 —
-        // 앞에 두면 아직 안 붙은 원본을 빼고 판정해 멀쩡한 카탈로그를 가른다.
+        // SPEC-0029. 분할은 배정이 전량 끝난 뒤여야 한다.
         assertTrue(
             stepNames.indexOf("catalogSplitStep") > stepNames.indexOf("catalogAssignmentStep"),
             "분할이 배정보다 먼저 온다: $stepNames",

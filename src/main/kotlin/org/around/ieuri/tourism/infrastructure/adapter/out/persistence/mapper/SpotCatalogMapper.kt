@@ -10,12 +10,7 @@ import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.Sp
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.SpotCatalogFestivalEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.SpotCatalogTranslationEntity
 
-/**
- * 카탈로그 엔티티 ↔ 도메인 변환(POL-033).
- *
- * 번역과 축제는 별도 테이블이라 [toDomain]이 밖에서 받는다 — 엔티티에 연관을 두지 않는
- * 프로젝트 규칙 때문이며, 조회 시점에 필요한 것만 읽어 오기 위해서다.
- */
+/** 카탈로그 엔티티 ↔ 도메인 변환(POL-033). 번역과 축제는 별도 테이블이라 [toDomain]이 밖에서 받는다. */
 fun SpotCatalogEntity.toDomain(
     translations: Map<DomainLocale, CatalogTranslation> = emptyMap(),
     festival: SpotCatalogFestivalEntity? = null,
@@ -38,11 +33,7 @@ fun SpotCatalogTranslationEntity.toDomain(): CatalogTranslation = CatalogTransla
 /** 축제 기간 엔티티를 도메인 값으로. */
 fun SpotCatalogFestivalEntity.toDomain(): CatalogFestivalPeriod = CatalogFestivalPeriod(startDate = eventStartDate, endDate = eventEndDate)
 
-/**
- * 도메인 카탈로그를 새 엔티티로. id는 DB가 채우므로 넘기지 않는다.
- *
- * 번역과 축제는 별도 엔티티라 여기서 만들지 않는다 — [toNewTranslationEntities]가 담당한다.
- */
+/** 도메인 카탈로그를 새 엔티티로(id는 DB가 채운다). 번역은 [toNewTranslationEntities]가 만든다. */
 fun SpotCatalog.toNewEntity(): SpotCatalogEntity = SpotCatalogEntity(
     mapX = standard.mapX,
     mapY = standard.mapY,
@@ -52,13 +43,8 @@ fun SpotCatalog.toNewEntity(): SpotCatalogEntity = SpotCatalogEntity(
 )
 
 /**
- * 도메인 카탈로그의 번역들을 새 엔티티 목록으로.
- *
- * [catalogId]를 받는 이유는 신규 카탈로그의 id가 저장 이후에야 정해지기 때문이다 —
- * 부모를 먼저 persist한 뒤 그 id로 자식을 만든다.
- *
- * **카탈로그의 좌표를 번역 행에 함께 심는다.** 검색은 평면 질의라 조인을 받지 못해
- * 이 사본만 보며, 비면 그 카탈로그는 검색에서 사라진다.
+ * 도메인 카탈로그의 번역들을 새 엔티티 목록으로. [catalogId]는 부모를 persist한 뒤의 id다.
+ * - 카탈로그의 좌표를 번역 행에 함께 심는다 — 비면 그 카탈로그는 검색에서 사라진다.
  */
 fun SpotCatalog.toNewTranslationEntities(catalogId: Long): List<SpotCatalogTranslationEntity> = translations.map { (language, translation) ->
     translation.toNewEntity(catalogId, language, standard.mapX, standard.mapY, standard.category)
@@ -79,11 +65,11 @@ fun CatalogTranslation.toNewEntity(
     mapX = mapX,
     mapY = mapY,
     category = category.code,
-    // 이 경로는 그 언어의 spot에서 카탈로그를 만드는 중이라 정의상 그 언어에서 해소된다.
+    // 그 언어의 spot에서 만드는 중이라 정의상 그 언어에서 해소된다.
     visible = true,
 )
 
-/** 축제 기간을 새 엔티티로. PK가 catalogId라 upsert 단위이기도 하다. */
+/** 축제 기간을 새 엔티티로. */
 fun CatalogFestivalPeriod.toNewEntity(catalogId: Long): SpotCatalogFestivalEntity = SpotCatalogFestivalEntity(
     catalogId = catalogId,
     eventStartDate = startDate,

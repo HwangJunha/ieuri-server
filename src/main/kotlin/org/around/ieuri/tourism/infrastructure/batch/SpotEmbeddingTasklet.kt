@@ -8,8 +8,8 @@ import org.springframework.batch.core.step.tasklet.Tasklet
 import org.springframework.batch.infrastructure.repeat.RepeatStatus
 
 /**
- * 장소 임베딩 적재 단계(SPEC-0035 S2). 번역 행 id 키셋 커서로 한 묶음씩 유스케이스를 부른다.
- * 제공자 실패는 단계를 실패시키지 않는다 — 실패 건수만 남기고 커서를 옮긴다(다음 실행의 대상으로 남는다).
+ * 장소 임베딩 적재 단계(SPEC-0035). 번역 행 id 키셋 커서로 한 묶음씩 유스케이스를 부른다.
+ * - 제공자 실패는 단계를 실패시키지 않고 건수만 남긴다 — 그 행은 다음 실행의 대상으로 남는다.
  */
 class SpotEmbeddingTasklet(
     private val useCase: SpotEmbeddingSyncUseCase,

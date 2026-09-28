@@ -11,9 +11,7 @@ import java.sql.PreparedStatement
 import java.sql.Timestamp
 import java.time.Instant
 
-/**
- * 축제 정보 upsert 전용 어댑터. [SpotUpsertJdbcAdapter]와 같은 이유로 이 어댑터에만 생 SQL이 남는다.
- */
+/** 축제 정보 upsert 전용 어댑터. JPA에 이식 가능한 upsert가 없어 생 SQL이다. */
 @Component
 class FestivalUpsertJdbcAdapter(
     private val jdbcTemplate: JdbcTemplate,
@@ -30,7 +28,7 @@ class FestivalUpsertJdbcAdapter(
             ps.setString(3, festival.progressType)
             ps.setString(4, festival.festivalType)
             ps.setTimestamp(5, syncedTimestamp)
-            // 부모 조회가 자연키를 요구한다 — 적재 입력은 TourAPI contentId 기반이므로 여기서 spot.id로 해석한다.
+            // 부모 spot.id는 자연키(contentId)로 SQL 안에서 해석한다.
             ps.setString(6, festival.contentId)
             ps.setString(7, festival.language.name)
         }
@@ -40,11 +38,8 @@ class FestivalUpsertJdbcAdapter(
 
     private companion object {
         /**
-         * `updated_at`은 실제로 값이 바뀐 경우에만 올리고 `last_synced_at`은 항상 갱신한다.
-         *
-         * `VALUES`가 아니라 `SELECT ... FROM spot`으로 삽입해 부모의 surrogate id를 가져오고,
-         * 부모가 없으면 0행이 삽입되어 FK 위반 예외 대신 조용한 건너뜀이 된다 — 한 건의 부모 없는
-         * 축제가 페이지 전체를 롤백시킬 이유가 없다.
+         * `updated_at`은 값이 바뀐 경우에만 올리고 `last_synced_at`은 항상 갱신한다.
+         * - `SELECT ... FROM spot`으로 삽입한다 — 부모가 없으면 FK 위반 대신 0행으로 건너뛴다.
          */
         val UPSERT_SQL = """
             INSERT INTO spot_festival (

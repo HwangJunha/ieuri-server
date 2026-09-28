@@ -14,11 +14,8 @@ import org.around.ieuri.common.graphql.generated.types.MapBoundsInput as GqlMapB
 import org.around.ieuri.common.graphql.generated.types.MapSpot as GqlMapSpot
 
 /**
- * `Query.mapRecommendedSpots`(SPEC-0036). 인자를 옮기고 응답을 변환할 뿐이다 — 면적 검증·제외·
- * 점수·감사는 유스케이스가 한다. 미인증은 빈 목록이 아니라 UNAUTHENTICATED 오류다.
- *
- * `MapQueryResolver`와 갈라 두는 이유는 인증 경계가 다르기 때문이다 — 뷰포트 마커·문화행사·
- * 혼잡도는 비로그인에서도 동작해야 하고 이 필드는 회원 단위다.
+ * `Query.mapRecommendedSpots`(SPEC-0036). 인자를 옮기고 응답을 변환할 뿐이다 — 검증·제외·점수·감사는 유스케이스가 한다.
+ * - 미인증은 빈 목록이 아니라 UNAUTHENTICATED 오류다.
  */
 @DgsComponent
 class MapRecommendationResolver(
@@ -35,14 +32,12 @@ class MapRecommendationResolver(
         @InputArgument first: Int?,
     ): List<GqlMapSpot> = mapRecommendationUseCase.mapRecommendedSpots(
         MapRecommendedSpotsQuery(
-            // **좌표를 그대로 넘긴다.** 도메인 VO 조립과 범위 검증은 응용 계층의 일이다 —
-            // 여기서 만들면 다른 인바운드가 같은 유스케이스를 부를 때 그것을 각자 반복한다.
+            // 좌표를 그대로 넘긴다 — VO 조립과 범위 검증은 응용 계층이 한다.
             minLat = bbox.minLat,
             minLng = bbox.minLng,
             maxLat = bbox.maxLat,
             maxLng = bbox.maxLng,
-            // 숫자로 읽히지 않는 id는 어떤 행과도 일치할 수 없으므로 조용히 뺀다 — 거절과
-            // 결과가 같으면서, 클라이언트 목록이 한 건 상해도 추천이 통째로 실패하지 않는다.
+            // 숫자로 읽히지 않는 id는 어떤 행과도 일치할 수 없으므로 조용히 뺀다.
             excludedSpotIds = excludedIds.orEmpty().mapNotNull(String::toLongOrNull).toSet(),
             categories = toCategorySelection(categories),
             first = first ?: DEFAULT_FIRST,
@@ -52,7 +47,7 @@ class MapRecommendationResolver(
     ).map { it.toGql() }
 
     private companion object {
-        /** 계약의 기본값과 같아야 한다(`map.graphqls`). 화면에 몇 개를 그릴지는 클라이언트가 정한다. */
+        /** 계약(`map.graphqls`)의 기본값과 같아야 한다. */
         const val DEFAULT_FIRST = 10
     }
 }

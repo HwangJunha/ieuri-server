@@ -14,12 +14,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 
-/**
- * 카테고리 표시 로더의 배치·언어 규약(PERF-20260921).
- *
- * 인프라 배선이 아니라 **어떤 I/O가 몇 번 나가는지**를 고정한다 — 1건씩 부르던 것이
- * 이 슬라이스가 고친 결함이고, 되돌아가도 컴파일은 통과한다.
- */
+/** 카테고리 표시 로더의 배치·언어 규약. 어떤 I/O가 몇 번 나가는지를 고정한다. */
 class CategoryDisplayDataLoaderTest {
 
     private val spotQueryUseCase = mockk<SpotQueryUseCase>()
@@ -33,7 +28,7 @@ class CategoryDisplayDataLoaderTest {
 
     @Test
     fun `키를 모아 유스케이스를 한 번만 부른다`() {
-        // 이 로더가 존재하는 이유. 코드마다 setOf(it)으로 부르던 것이 종류 수만큼 쿼리를 냈다.
+        // 코드 수가 아니라 한 번만 조회한다.
         val codes = setOf("RESTAURANT", "LODGING", "SHOPPING")
         every { spotQueryUseCase.categoryDisplays(any(), any()) } returns
             codes.associateWith { display(it, "label-$it", null) }
@@ -45,7 +40,7 @@ class CategoryDisplayDataLoaderTest {
 
     @Test
     fun `keyContext의 언어를 그대로 넘긴다`() {
-        // 언어가 어긋나면 오류가 아니라 다른 언어의 라벨이 나간다 — 조용한 오답이다.
+        // 언어가 어긋나면 다른 언어의 라벨이 조용히 나간다.
         every { spotQueryUseCase.categoryDisplays(any(), any()) } returns emptyMap()
 
         loader.load(setOf("RESTAURANT"), environment("RESTAURANT" to DomainLocale.JA))
@@ -55,7 +50,7 @@ class CategoryDisplayDataLoaderTest {
 
     @Test
     fun `유스케이스가 돌려준 표시 정보를 코드별로 그대로 싣는다`() {
-        // 필드마다 다른 값을 둬 뒤바뀐 매핑이 통과하지 못하게 한다.
+        // 필드마다 다른 값을 둔다.
         every { spotQueryUseCase.categoryDisplays(any(), any()) } returns mapOf(
             "RESTAURANT" to display("RESTAURANT", "음식점", "https://cdn/restaurant.png"),
             "LODGING" to display("LODGING", "숙박", null),
@@ -76,8 +71,7 @@ class CategoryDisplayDataLoaderTest {
 
     @Test
     fun `미리 채운 코드는 조회하지 않는다`() {
-        // availableSpotCategories가 구성 조회로 이미 읽어 온 값을 prime으로 심는다. 등록된 필드
-        // 리졸버는 소스에 값이 있어도 언제나 실행되므로, 심지 않으면 칩 목록이 한 번 더 조회된다.
+        // prime으로 심은 값은 다시 조회하지 않는다.
         every { spotQueryUseCase.categoryDisplays(any(), any()) } returns emptyMap()
         val dataLoader = DataLoaderFactory.newMappedDataLoader(loader)
         val primed = display("RESTAURANT", "음식점", "https://cdn/restaurant.png")
@@ -92,7 +86,7 @@ class CategoryDisplayDataLoaderTest {
 
     @Test
     fun `채우지 않은 코드는 같은 배치에서 함께 조회된다`() {
-        // prime이 나머지 키의 배치를 깨지 않는지 — 심은 것만 빠지고 한 번에 나가야 한다.
+        // prime이 나머지 키의 배치를 깨지 않는다 — 심은 것만 빠지고 한 번에 나간다.
         every { spotQueryUseCase.categoryDisplays(any(), any()) } returns
             mapOf("LODGING" to display("LODGING", "숙박", null))
         val dataLoader = DataLoaderFactory.newMappedDataLoader(loader)
@@ -108,7 +102,7 @@ class CategoryDisplayDataLoaderTest {
 
     @Test
     fun `언어가 실리지 않으면 폴백하지 않고 실패한다`() {
-        // 기본 언어로 흘리면 JA 사용자에게 EN 라벨이 나가고, 그 오답은 어디서도 드러나지 않는다.
+        // 기본 언어로 흘리지 않고 실패한다.
         val error = assertThrows(IllegalStateException::class.java) {
             loader.load(setOf("RESTAURANT"), environment())
         }

@@ -7,11 +7,8 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 /**
- * 시군구 대표 위치 선정 어댑터(SPEC-0015 · V46). PostGIS 함수와 대량 UPDATE라 생 SQL이며,
- * `boundary` · `representative_location`은 JPA로 표현할 수 없어 엔티티에 매핑되어 있지도 않다.
- *
- * **두 문장이 한 트랜잭션이어야 한다** — 선정과 정리 사이에서 실패하면 문턱에 미달한 시군구에
- * 낡은 대표 위치가 남는다.
+ * 시군구 대표 위치 선정 어댑터(SPEC-0015 · V46). PostGIS 함수와 대량 UPDATE라 생 SQL이다.
+ * - 두 문장이 한 트랜잭션이어야 한다 — 사이에서 실패하면 문턱 미달 시군구에 낡은 대표 위치가 남는다.
  */
 @Component
 class DistrictRepresentativeJdbcAdapter(
@@ -23,31 +20,20 @@ class DistrictRepresentativeJdbcAdapter(
         cellSizeDegrees: Double,
         minSpotCount: Int,
     ): DistrictRepresentativeRefreshResult {
-        // 순서가 중요하다 — 먼저 채우고 나서, 이번에 채워지지 않은 것을 지운다.
-        // 정리 문장이 선정 조건을 다시 계산하는 이유는 CLEAR_SQL 주석 참조.
-        //
-        // 두 문장 모두 인자가 (격자 크기, 최소 개수) 둘뿐이다 — SQL의 `?` 개수와 반드시
-        // 맞아야 하며, 어긋나면 실행 시점에야 "column index is out of range"로 드러난다.
+        // 순서: 먼저 채우고, 이번에 채워지지 않은 것을 지운다.
+        // 두 문장 모두 인자가 (격자 크기, 최소 개수) 둘이다 — SQL의 `?` 개수와 맞아야 한다.
         val selected = jdbcTemplate.update(SELECT_SQL, cellSizeDegrees, minSpotCount)
         val cleared = jdbcTemplate.update(CLEAR_SQL, cellSizeDegrees, minSpotCount)
         return DistrictRepresentativeRefreshResult(selected = selected, cleared = cleared)
     }
 
-    /** SQL의 `?` 개수와 인자 개수가 어긋나면 실행 시점에야 드러나므로 테스트가 여기 접근한다. */
+    /** 테스트가 SQL의 `?` 개수를 확인하려고 접근한다. */
     internal companion object {
         /**
-         * 시군구별로 spot이 가장 밀집한 격자를 찾아 **그 격자 안의 실제 spot 좌표**를 대표 위치로 넣는다.
-         *
-         * **격자 중심(ST_Centroid)을 그대로 저장하면 안 된다** — 실측에서 252개 중 2개가 자기
-         * 시군구 경계 밖으로 나갔다(오목·해안 지형). 실제 spot으로 스냅하면 0개이며, 그 지점에
-         * spot이 존재한다는 것도 함께 보장된다.
-         *
-         * `ST_Within`이 아니라 `ST_Intersects`다 — 경계선 위의 점을 배제하지 않는다(SPEC-0014).
-         *
-         * **`language = 'KO'`로 거르는 이유**: spot은 언어마다 다른 행이라(같은 장소가 최대 4행)
-         * 거르지 않으면 번역이 잘 된 지역일수록 밀집도가 부풀어 문턱을 쉽게 넘는다. 대표 위치는
-         * "번역이 많은 곳"이 아니라 "갈 곳이 많은 곳"이어야 하므로 KO 행만으로 장소 수를 센다.
-         * KO는 전 지역에 존재한다(실측: 252개 시군구 전부).
+         * 시군구별로 spot이 가장 밀집한 격자를 찾아 그 격자 안의 실제 spot 좌표를 대표 위치로 넣는다.
+         * - 격자 중심을 저장하면 시군구 경계 밖으로 나갈 수 있다 — 실제 spot으로 스냅한다.
+         * - `ST_Intersects`라 경계선 위의 점을 포함한다(SPEC-0014).
+         * - KO 행만으로 장소 수를 센다 — 언어별 행을 세면 번역이 많은 지역이 부풀는다.
          */
         val SELECT_SQL = """
             WITH gridded AS (
@@ -95,14 +81,8 @@ class DistrictRepresentativeJdbcAdapter(
         """.trimIndent()
 
         /**
-         * 이번 실행에서 선정되지 못한 시군구의 낡은 값을 지운다. **spot이 줄어 문턱 아래로
-         * 내려간 지역이 예전 대표 위치를 계속 쓰는 것을 막는다.**
-         *
-         * 갱신 시각으로 판정하지 않는다 — `now()`는 트랜잭션 내내 같은 값이라 "방금 갱신됨"과
-         * "예전에 갱신됨"을 시각만으로 가를 수 없다. 대신 선정 조건을 그대로 다시 세워
-         * **문턱을 넘긴 시군구 집합에 없는 행**을 지운다.
-         *
-         * 이미 NULL인 행은 제외해 `cleared`가 "이번에 값을 잃은 지역 수"만 세도록 한다.
+         * 이번 실행에서 선정되지 못한 시군구의 낡은 값을 지운다. 선정 조건을 다시 세워 그 집합에 없는 행을 지운다.
+         * - 이미 NULL인 행은 제외한다 — `cleared`는 이번에 값을 잃은 지역 수다.
          */
         val CLEAR_SQL = """
             UPDATE district

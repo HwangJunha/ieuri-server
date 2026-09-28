@@ -7,10 +7,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
-/**
- * GraphQL 인자 → 카테고리 선택(SPEC-0020 R5·R6). 5개 조회 연산이 모두 이 함수를 지난다.
- * 규칙 자체의 검증은 CategorySelectionTest에 있고, 여기서는 GraphQL 문자열 경계를 본다.
- */
+/** GraphQL 인자 → 카테고리 선택(SPEC-0020 R5·R6)의 문자열 경계. 규칙 자체는 CategorySelectionTest가 본다. */
 class CategoryArgumentMapperTest {
 
     @Test

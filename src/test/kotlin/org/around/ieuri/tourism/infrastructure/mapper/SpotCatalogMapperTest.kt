@@ -18,13 +18,7 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 import java.time.LocalDate
 
-/**
- * 카탈로그 매퍼 필드별 매핑 검증 — 순수 단위테스트(Spring/DB 없음).
- *
- * **`mapX`·`mapY`가 둘 다 Double이라 서로 뒤바뀌어도 컴파일된다.** 그래서 필드마다 다른 값을
- * 주고 개별로 단언한다 — 통째 assertEquals는 어느 필드가 틀렸는지 말해 주지 못한다.
- * 좌표가 뒤바뀌면 전 국토가 지도 밖으로 나간다.
- */
+/** 카탈로그 매퍼 필드별 매핑 검증. `mapX`·`mapY`처럼 같은 타입 필드가 뒤바뀌지 않도록 필드마다 다른 값을 쓴다. */
 class SpotCatalogMapperTest {
 
     private fun entity(id: Long? = 4321L) = SpotCatalogEntity(
@@ -98,7 +92,7 @@ class SpotCatalogMapperTest {
 
     @Test
     fun `주소가 없는 번역도 옮긴다`() {
-        // 원문에 주소가 없는 spot이 실재한다(KO 기준 1.5%).
+        // 원문에 주소가 없는 spot이 있다.
         val translation = SpotCatalogTranslationEntity(
             catalogId = 4321L,
             language = DomainLocale.KO,
@@ -144,10 +138,10 @@ class SpotCatalogMapperTest {
         val entities = catalog.toNewTranslationEntities(catalogId = 5555).associateBy { it.language }
 
         assertEquals(2, entities.size)
-        // 부모 id는 인자로 받은 값이지 도메인의 id가 아니다 — 신규 저장 시 둘이 다르다.
+        // 부모 id는 인자로 받은 값이지 도메인의 id가 아니다.
         assertEquals(5555L, entities[DomainLocale.KO]?.catalogId)
         assertEquals("마린시티", entities[DomainLocale.KO]?.title)
-        // 주소도 함께 옮겨져야 한다(R-4) — 제목만 흐르면 그 언어 사용자가 찾아갈 수 없다.
+        // 주소도 함께 옮겨져야 한다(R-4).
         assertEquals("부산광역시 해운대구", entities[DomainLocale.KO]?.address)
         assertEquals("マリンシティ", entities[DomainLocale.JA]?.title)
         assertEquals("釜山広域市 海雲台区", entities[DomainLocale.JA]?.address)
@@ -155,8 +149,7 @@ class SpotCatalogMapperTest {
 
     @Test
     fun `번역 엔티티는 카탈로그의 분류를 사본으로 갖는다`() {
-        // 검색이 평면 질의라 spot_catalog를 조인 못 해 이 사본으로 카테고리를 거른다.
-        // 비면 필터가 죽어 "문화시설로 걸러도 쇼핑이 나오는" 상태가 된다.
+        // 검색이 이 사본으로 카테고리를 거른다.
         val catalog = SpotCatalog.restore(
             id = 4321,
             standard = standard(),
@@ -165,14 +158,14 @@ class SpotCatalogMapperTest {
 
         val entity = catalog.toNewTranslationEntities(catalogId = 5555).single()
 
-        // 표준값의 분류가 그대로 와야 한다. copyright와 뒤바뀌면 컴파일은 되지만 값이 다르다.
+        // copyright와 뒤바뀌어도 컴파일되므로 값으로 확인한다.
         assertEquals("CULTURAL_FACILITY", entity.category)
         assertEquals(SpotCategory("CULTURAL_FACILITY"), catalog.standard.category)
     }
 
     @Test
     fun `번역 엔티티는 카탈로그의 좌표를 사본으로 갖는다`() {
-        // 검색은 평면 질의라 조인을 못 받고 이 사본만 본다. 비면 그 카탈로그는 검색에서 사라진다.
+        // 검색은 이 좌표 사본만 본다.
         val catalog = SpotCatalog.restore(
             id = 4321,
             standard = standard(),

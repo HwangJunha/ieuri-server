@@ -8,13 +8,7 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import java.sql.Timestamp
 
-/**
- * 지도 관계 조회 어댑터(SPEC-0030 확장).
- *
- * **집계라 생 SQL이다.** 관계 목록 한 페이지를 그리려면 각 상대의 방문 칸 집합이 필요한데,
- * 상대마다 따로 읽으면 20명에 왕복이 40번이 된다. 방문은 회원당 최대 252행이고 칸은
- * 161개라 관계가 수백이어도 전체가 수만 행을 넘지 않아 한 문장으로 끝난다.
- */
+/** 지도 관계 조회 어댑터(SPEC-0030 확장). 상대별 겹친 칸까지 한 문장으로 집계하느라 생 SQL이다. */
 @Component
 class MapRelationQueryJdbcAdapter(
     private val jdbcTemplate: JdbcTemplate,
@@ -76,8 +70,7 @@ class MapRelationQueryJdbcAdapter(
             ORDER BY t.created_at DESC, t.counterpart_id DESC
             """.trimIndent(),
             { rs, _ ->
-                // JDBC 배열은 박싱된 원소를 담아 온다(PostgreSQL 드라이버는 Long[]). Array<Long>으로
-                // 캐스팅하면 코틀린 Long으로 해석돼 런타임에 깨지므로, Number로 받아 내린다.
+                // JDBC 배열 원소는 박싱돼 온다 — Array<Long>으로 캐스팅하면 런타임에 깨지므로 Number로 받아 내린다.
                 val ids = (rs.getArray("overlap_cell_ids").array as Array<*>)
                     .map { (it as Number).toLong() }
                 MapRelationOverlap(

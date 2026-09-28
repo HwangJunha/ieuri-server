@@ -26,20 +26,10 @@ import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 
 /**
- * KTO 빅데이터 4종 어댑터(SPEC-0015 §5). [TourStatsSyncPort]의 유일한 구현체로, 업스트림
- * 세부(서비스 경로 · 필드명 · 오류 코드)를 여기 가둔다.
- *
- * **4개 오퍼레이션을 한 클래스에 둔다** — serviceKey · 응답 봉투 · 예외 변환 규칙이 전부 같아
- * 나누면 그 규칙이 네 벌로 복제된다. 서비스 경로만 갈리며 그것은 설정값이다.
- *
- * **예외를 변환한다 — 기존 [org.around.ieuri.tourism.infrastructure.adapter.out.client.tourapi.TourApiClient]의
- * 결함을 물려받지 않는다**(§5 · R8). 변환 규칙은 [translate] 참조.
- *
- * **호출량 주의** — 집중률만 `signguCd`가 필수라 252개 시군구를 순회한다(1회 실행 252 호출).
- * 강도 2종은 `areaCd`만으로 시도 전체가 와서 17 호출이다. page-size를 낮추면 호출이 배가되어
- * 일 한도 1,000건에 걸린다 — 10,000이면 지역별 최대(제주시 7,320행)도 1페이지에 들어간다.
- *
- * serviceKey는 로그에 남기지 않는다. URI를 통째로 로깅하지 않는 것도 같은 이유다.
+ * KTO 빅데이터 4종 어댑터(SPEC-0015 §5). 업스트림 세부(서비스 경로·필드명·오류 코드)를 여기 가둔다.
+ * - 전송·본문 오류를 도메인 예외로 변환한다([translate], R8).
+ * - 집중률은 시군구마다 호출한다(1회 실행 252 호출). page-size를 낮추면 일 한도 1,000건에 걸린다.
+ * - serviceKey가 담긴 URI는 로그에 남기지 않는다.
  */
 @Component
 class TourStatsClient(
@@ -56,7 +46,7 @@ class TourStatsClient(
         numOfRows: Int,
     ): TourStatsSyncPage<SyncVisitorCountCommand> {
         val uri = uriFor(TourStatsProperties.SERVICE_DATA_LAB, OP_VISITOR_COUNT, pageNo, numOfRows) {
-            // 구간을 통째로 받는다 — 지역 필터 파라미터가 없어 날짜만 주면 전 지역이 온다(§4.3).
+            // 지역 필터가 없어 날짜 구간만 주면 전 지역이 온다(§4.3).
             queryParam("startYmd", startDate.format(DATE_FORMAT))
             queryParam("endYmd", endDate.format(DATE_FORMAT))
         }
@@ -64,9 +54,8 @@ class TourStatsClient(
     }
 
     /**
-     * **날짜 파라미터를 보내지 않는다**(2026-08-11 실측). `baseYmd` · `startYmd` · `baseYm` 어느
-     * 것을 보내도 `INVALID_REQUEST_PARAMETER_ERROR`가 온다. 시군구 하나를 요청하면 향후 예측일이
-     * 전부 오며(종로구 3,390행) 대상일은 행의 `baseYmd`에 실린다.
+     * 집중률. 날짜 파라미터를 보내면 `INVALID_REQUEST_PARAMETER_ERROR`가 온다.
+     * - 시군구 하나에 향후 예측일이 전부 오며, 대상일은 행의 `baseYmd`에 실린다.
      */
     override fun fetchConcentrationRates(
         areaCd: String,
@@ -112,15 +101,9 @@ class TourStatsClient(
     )
 
     /**
-     * 체류·소비 강도는 같은 서비스의 다른 오퍼레이션이다.
-     *
-     * **`signguCd`를 보내지 않는다**(실측 2026-08-11) — `areaCd`만 주면 그 시도의 시군구 전체가
-     * 한 응답에 온다. 시도 단위 집계 행이 섞여 올 수 있으며 그 행은 R9 필터가 걸러낸다.
-     *
-     * **월 인자는 `baseYm` 하나다** — `startYm`/`endYm` 구간이 아니다.
-     *
-     * **지표 코드가 필수다**. 빼면 오류 없이 `totalCount:0`이 와서 "데이터가 없다"로 오해하기
-     * 쉽다 — 실제로는 요청이 불완전한 것이다. 파라미터명도 오퍼레이션마다 다르다.
+     * 체류·소비 강도. `areaCd`만 주면 그 시도의 시군구 전체가 오며, 시도 집계 행은 R9 필터가 거른다.
+     * - 월 인자는 `baseYm` 하나다.
+     * - 지표 코드가 빠지면 오류 없이 `totalCount:0`이 온다. 파라미터명은 오퍼레이션마다 다르다.
      */
     private fun fetchDemandIntensity(
         operation: String,
@@ -140,10 +123,8 @@ class TourStatsClient(
     }
 
     /**
-     * 한 페이지를 받아 적재 명령으로 옮긴다. 매핑 실패 행은 드랍하고 건수만 센다 — 한 행의
-     * 결손이 페이지 전체를 실패시키지 않는다.
-     *
-     * **빈 응답은 정상이다** — 빈 [TourStatsSyncPage]로 돌아가며 예외가 되지 않는다(R8 · §5).
+     * 한 페이지를 적재 명령으로 옮긴다. 매핑 실패 행은 드랍하고 건수만 센다.
+     * - 빈 응답은 예외가 아니라 빈 [TourStatsSyncPage]다(R8).
      */
     private fun <I : Any, R : Any> fetchPage(
         uri: URI,
@@ -160,14 +141,7 @@ class TourStatsClient(
         )
     }
 
-    /**
-     * HTTP 호출 + 오류 판정. 두 종류의 실패가 여기로 모인다:
-     *  1. **전송 계층 실패** — 연결 거부 · 타임아웃 · 5xx. [RestClientException]으로 온다.
-     *  2. **본문 오류** — KTO는 오류도 **HTTP 200**으로 주며 `resultCode`에만 나타난다.
-     *
-     * 둘 다 도메인 오류로 바꾼다. 그대로 두면 업스트림 장애가 INTERNAL로 새어 나가
-     * `UPSTREAM_UNAVAILABLE`이 도달 불가능해진다(§5의 기존 결함).
-     */
+    /** HTTP 호출 + 오류 판정. 전송 실패와 HTTP 200에 `resultCode`로만 오는 본문 오류를 모두 도메인 오류로 바꾼다. */
     private fun <I : Any> call(uri: URI, type: ParameterizedTypeReference<TourStatsResponse<I>>): TourStatsResponse<I> {
         val response = try {
             ktoBigDataRestClient.get().uri(uri).retrieve().body(type)
@@ -177,8 +151,7 @@ class TourStatsClient(
         }
 
         if (response.isRateLimited) {
-            // 한도 초과를 장애와 구분해 표면화한다 — 조용히 실패하면 데이터가 비는 것을
-            // 나중에야 알게 된다(설계 §2.3).
+            // 한도 초과는 장애와 구분해 표면화한다.
             throw UpstreamRateLimitedException("KTO 빅데이터 호출 한도를 초과했습니다.")
         }
         if (!response.isSuccess) {
@@ -190,19 +163,14 @@ class TourStatsClient(
 
     /**
      * 전송 계층 예외 → 도메인 오류(R8).
-     *
-     * HTTP 429와 공공데이터포털의 한도 초과 응답만 [UpstreamRateLimitedException]이고 나머지는
-     * 전부 [UpstreamUnavailableException]이다 — 연결 실패 · 타임아웃 · 4xx · 5xx · 역직렬화 실패.
-     * 4xx도 여기 포함되는 것은 배치 관점에서 재시도 불가라는 결론이 같기 때문이다.
+     * - HTTP 429·한도 초과만 [UpstreamRateLimitedException], 나머지(4xx 포함)는 [UpstreamUnavailableException]이다.
      */
     private fun translate(e: RestClientException): RuntimeException {
         val status = (e as? RestClientResponseException)?.statusCode?.value()
         if (status == HTTP_TOO_MANY_REQUESTS) {
             return UpstreamRateLimitedException("KTO 빅데이터 호출 한도를 초과했습니다.", e)
         }
-        // **URI는 절대 싣지 않는다** — serviceKey가 로그로 샌다. 대신 원인 예외의 클래스명까지
-        // 남긴다: 역직렬화 실패와 네트워크 실패가 여기서 같은 메시지로 합쳐지면 원인을 가릴 수
-        // 없다(실측: `"items": ""` 역직렬화 실패가 네트워크 장애처럼 보였다).
+        // URI는 싣지 않는다(serviceKey 노출). 원인 예외의 클래스명은 남긴다.
         log.warn(
             "관광통계 호출 실패: {} status={} cause={}",
             e.javaClass.simpleName,
@@ -212,10 +180,7 @@ class TourStatsClient(
         return UpstreamUnavailableException("관광통계 호출에 실패했습니다(${e.javaClass.simpleName}).", e)
     }
 
-    /**
-     * 요청 URI. **serviceKey는 이미 인코딩된 값이라 `build(true)`로 재인코딩을 막는다** —
-     * 재인코딩하면 `%2B`가 `%252B`가 되어 인증이 실패한다(TourApiClient와 같은 처리).
-     */
+    /** 요청 URI. serviceKey는 이미 인코딩된 값이라 `build(true)`로 재인코딩을 막는다(`%2B`→`%252B`면 인증 실패). */
     private fun uriFor(
         service: String,
         operation: String,
@@ -243,7 +208,7 @@ class TourStatsClient(
         const val OP_STAY_INTENSITY = "areaTarSjrnDsList"
         const val OP_SPENDING_INTENSITY = "areaTarExpDsList"
 
-        /** 지표 코드 파라미터명. 오퍼레이션마다 다르다(실측 2026-08-11). */
+        /** 지표 코드 파라미터명. 오퍼레이션마다 다르다. */
         const val PARAM_STAY_INDEX_CODE = "tarSjrnDsIxCd"
         const val PARAM_SPENDING_INDEX_CODE = "tarExpDsIxCd"
 

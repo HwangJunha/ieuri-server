@@ -13,14 +13,8 @@ import org.springframework.transaction.annotation.Transactional
 import java.sql.ResultSet
 
 /**
- * 전국 지도 칸 조회 어댑터(SPEC-0030).
- *
- * `district.boundary`·`center`가 `geography`라 JPA에 매핑되어 있지 않고, 그래서 이 테이블을
- * 읽는 질의는 생 SQL로 남는다([RegionMetricQueryAdapter]와 같은 선례).
- *
- * **컬럼을 캐스팅하지 않는다.** `boundary`가 geography GiST 인덱스라 리터럴 쪽을 geography로
- * 맞춰야 인덱스를 탄다 — 반대로 컬럼을 `::geometry`로 바꾸면 인덱스가 죽는다(실측 선례).
- * `ST_X`/`ST_Y`는 geography를 받지 않아 `::geometry`가 불가피하지만 SELECT 목록이라 무해하다.
+ * 전국 지도 칸 조회 어댑터(SPEC-0030). `district`의 geography 컬럼이 JPA에 매핑되지 않아 생 SQL이다.
+ * - 컬럼을 `::geometry`로 캐스팅하지 않는다 — GiST 인덱스가 죽는다. SELECT 목록의 `ST_X`/`ST_Y`만 예외다.
  */
 @Component
 class MapCellQueryJdbcAdapter(
@@ -52,16 +46,8 @@ class MapCellQueryJdbcAdapter(
 
     /**
      * 칸에 속한 장소(R11). 좋아요 내림차순, 같은 수는 id 오름차순.
-     *
-     * **번역은 `JOIN`, 반응은 `LEFT JOIN`이다.** 활성 언어에 보이지 않는 장소는 통째로
-     * 빠져야 하고(계약), 아무도 좋아요를 누르지 않은 장소는 0으로 남아야 한다 — 반응을
-     * INNER로 바꾸면 후자가 목록에서 사라진다.
-     *
-     * **반응의 조건이 `ON`에 있는 것도 같은 이유다.** `WHERE`로 내리면 `LEFT JOIN`이
-     * INNER처럼 동작해 좋아요 0건인 장소가 걸러진다.
-     *
-     * `COUNT(*)`가 아니라 `COUNT(r.id)`인 것도 그 연장이다 — 조인이 맞지 않으면 `r.id`가
-     * null이고 `COUNT`는 null을 세지 않아 0이 된다. `COUNT(*)`는 행이 하나라 1을 준다.
+     * - 활성 언어에 번역이 없는 장소는 빠지고, 좋아요 0건인 장소는 0으로 남는다.
+     * - 그래서 반응은 `LEFT JOIN`이고 조건이 `ON`에 있으며 `COUNT(r.id)`다 — 하나라도 바꾸면 0건 장소가 사라지거나 1이 된다.
      */
     @Transactional(readOnly = true)
     override fun findCellSpots(
@@ -124,15 +110,9 @@ class MapCellQueryJdbcAdapter(
 
     private companion object {
         /**
-         * 칸 대표 좌표는 `center`를 쓴다 — `representative_location`은 26개 시군구에서 null이라
-         * 그 칸이 지도에서 사라진다. 추천(관광지 밀집 지점)과 지도(칸을 가리키는 점)는 다른 요구다.
-         *
-         * **시도는 `district`에서 온다.** 한 칸의 시군구가 전부 같은 시도라(실측) 어느 행을
-         * 골라도 같으며, 칸이 시도를 따로 들고 있을 이유가 없다.
-         *
-         * **정렬은 여기서 하지 않는다.** 칸의 최종 순서는 도메인(`MapCellGrouping.fold`)이
-         * 정한다 — `groupBy`가 입력 순서를 보존하지 않으므로 SQL에서 정렬해도 무의미하다.
-         * `ORDER BY`가 남아 있는 것은 한 칸의 시군구가 붙어 나오게 하기 위함이다.
+         * 칸 ↔ 시군구 행. 대표 좌표는 `center`다(`representative_location`은 일부 시군구에서 null).
+         * - 시도는 `district`에서 온다(한 칸의 시군구는 같은 시도).
+         * - 칸의 최종 순서는 도메인(`MapCellGrouping.fold`)이 정한다. `ORDER BY`는 한 칸의 시군구를 붙여 놓기 위함이다.
          */
         const val CELL_DISTRICT_SELECT = """
             SELECT d.code, mcd.cell_id, d.area_cd,

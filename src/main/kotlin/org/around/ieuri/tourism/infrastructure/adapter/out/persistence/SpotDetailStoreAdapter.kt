@@ -16,11 +16,8 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 /**
- * 상세 **조회** 포트 구현. 쓰기는 전부 `INSERT ... ON CONFLICT`라 생 SQL이며,
- * `SpotDetailUpsertPort`(→ [SpotDetailUpsertJdbcAdapter])로 갈라져 있다 — 호출자가 두 포트를
- * 함께 주입받는다.
- *
- * 모든 키가 `spot_id` 하나다 — 호출자가 이미 유효한 `spot.id`를 들고 온다.
+ * 상세 조회 포트 구현. 쓰기(upsert)는 [SpotDetailUpsertJdbcAdapter]가 따로 맡는다.
+ * - 모든 키가 `spot_id` 하나다.
  */
 @Component
 class SpotDetailStoreAdapter(
@@ -34,10 +31,7 @@ class SpotDetailStoreAdapter(
 
     // ---------- 본문 ----------
 
-    /**
-     * 적재된 본문. [StoredDetail]로 감싸 부재와 미적재를 구분한다 — 행이 없으면 미조회(null),
-     * 있으면 `bodyAbsent`가 부재 여부를 가른다.
-     */
+    /** 적재된 본문. 행이 없으면 미적재(null), 있으면 `bodyAbsent`가 부재 여부를 가른다. */
     @Transactional(readOnly = true)
     override fun findDetail(spotId: Long): StoredDetail? = queryFactory
         .selectFrom(detail)
@@ -53,10 +47,7 @@ class SpotDetailStoreAdapter(
 
     // ---------- 갤러리 ----------
 
-    /**
-     * 적재된 갤러리. 행이 없으면 "미적재"인지 "이미지가 없는 관광지"인지 알 수 없으므로 미적재로
-     * 간주해 null을 돌려준다 — 빈 갤러리는 드물고 재조회 비용도 1콜이다.
-     */
+    /** 적재된 갤러리. 행이 없으면 미적재로 간주해 null이다(이미지 없는 관광지와 구분하지 않는다). */
     @Transactional(readOnly = true)
     override fun findGallery(spotId: Long): List<SpotImage>? = queryFactory
         .selectFrom(image)
@@ -73,8 +64,7 @@ class SpotDetailStoreAdapter(
         .selectFrom(intro)
         .where(intro.spotId.eq(spotId), intro.category.eq(category.code))
         .fetchFirst()
-        // 전 컬럼이 null이면 "조회했으나 값 없음"으로 적재된 행이다 — 래퍼는 non-null,
-        // 값만 null로 돌려줘야 다음 조회가 미스로 오판하지 않는다.
+        // 전 컬럼이 null인 행은 "조회했으나 값 없음"이다 — 래퍼는 non-null, 값만 null로 돌려준다.
         ?.let { StoredIntro(it.toDomain().takeUnless { value -> value.isEmpty() }) }
 
     // ---------- 이용안내 ----------

@@ -5,14 +5,7 @@ import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.repositor
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
-/**
- * 시군구 방문 기록 삭제 어댑터(SPEC-0030 R4 · §9.1).
- *
- * 등록은 `ON CONFLICT`가 필요해 [DistrictVisitUpsertJdbcAdapter]에 있다 — 포트도 그렇게
- * 갈려 있어 애플리케이션이 둘을 각각 주입한다.
- *
- * **이 어댑터는 시각을 쓰지 않는다.** 표에 시각 컬럼이 없다(V76).
- */
+/** 시군구 방문 기록 삭제 어댑터(SPEC-0030 R4 · §9.1). 등록은 [DistrictVisitUpsertJdbcAdapter]가 한다. */
 @Component
 class DistrictVisitStoreAdapter(
     private val repository: MemberDistrictVisitJpaRepository,

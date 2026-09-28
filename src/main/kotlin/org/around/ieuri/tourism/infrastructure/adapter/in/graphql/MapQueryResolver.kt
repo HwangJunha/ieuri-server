@@ -32,18 +32,9 @@ import org.around.ieuri.common.graphql.generated.types.MapViewportResult as GqlM
 import org.around.ieuri.common.graphql.generated.types.SeoulCongestionResult as GqlSeoulCongestionResult
 
 /**
- * 지도 조회 GraphQL 리졸버(인바운드 어댑터, CQRS 읽기, SPEC-0014). 언어는 요청 스코프
- * Accept-Language 헤더에서 읽어 유스케이스에 넘긴다(GraphQL 인자 아님, Accept-Language 기반).
- *
- * **지연 필드(@DgsData)가 없다.** 세 쿼리 모두 자기 필드를 채우는 데 필요한 I/O가 하나로
- * 묶여 있어, 필드를 나눠도 호출 수가 줄지 않는다:
- *  - `mapViewport`의 spots는 한 번의 공간 질의, events는 그 구역들의 캐시에서 나온다
- *  - `seoulCongestion`의 congestion·forecast·commercial은 **업스트림 1회 응답의 세 블록**이다.
- *    나눠 부르면 같은 구역에 대해 호출이 배가되는데, 일일 쿼터 1000건에서 치명적이다
- *  - `seoulCongestionAreas`는 단일 테이블 조회다
- *
- * 세 쿼리를 **별개 최상위 필드**로 둔 것이 부분 실패 설계의 핵심이다 — 혼잡도의 업스트림
- * 장애가 spot·문화행사 마커에 전파되지 않는다.
+ * 지도 조회 GraphQL 리졸버(CQRS 읽기, SPEC-0014). 언어는 Accept-Language 헤더에서 읽는다.
+ * - 세 쿼리는 각자 I/O가 하나로 묶여 지연 필드가 없다.
+ * - 세 쿼리를 별개 루트로 두어 혼잡도의 업스트림 장애가 spot·문화행사 마커에 번지지 않는다.
  */
 @DgsComponent
 class MapQueryResolver(
@@ -80,13 +71,8 @@ class MapQueryResolver(
     fun seoulCongestionAreas(dfe: DgsDataFetchingEnvironment): List<GqlCongestionAreaBoundary> = mapQueryUseCase.seoulCongestionAreas(dfe.domainLocale()).map { it.toGql() }
 
     /**
-     * 입력 bbox → 도메인 VO. 좌표 범위·뒤집힘 검증이 여기서 일어나며, 실패는 `INVALID_BBOX`다(R4).
-     *
-     * **새 코드는 이 형태를 따르지 않는다.** 어댑터가 도메인 VO를 조립하면 외부 입력을 도메인
-     * 언어로 옮기는 책임이 전송 계층에 남아, 다른 인바운드가 같은 유스케이스를 부를 때 조립을
-     * 반복하게 된다 — `mapRecommendedSpots`는 좌표를 그대로 넘기고 응용 계층의 `boundsOf`가
-     * 만든다. 여기를 그대로 두는 것은 SPEC-0014의 기존 동작을 건드리지 않기 위해서이며,
-     * 일괄 정리는 별도 리팩토링에서 한다.
+     * 입력 bbox → 도메인 VO. 실패는 `INVALID_BBOX`다(R4).
+     * - 어댑터가 VO를 조립하는 기존 형태다 — 새 코드는 따르지 않는다(원시값을 넘기고 응용 계층이 조립한다).
      */
     private fun GqlMapBoundsInput.toBounds(): MapBounds = MapBounds.ofOrNull(minLat = minLat, minLng = minLng, maxLat = maxLat, maxLng = maxLng)
         ?: throw InvalidBboxException("지도 영역이 올바르지 않습니다.")

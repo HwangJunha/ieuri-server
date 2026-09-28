@@ -10,25 +10,13 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import java.sql.ResultSet
 
-/**
- * 서울 구역 메타데이터 조회 어댑터(SPEC-0014 R6·R16·R17).
- *
- * `congestion_area.boundary`가 `geography(Polygon,4326)`이라 **JPA 엔티티에 매핑되어 있지
- * 않다** — 매핑하면 `ddl-auto: validate`가 기동 시 실패한다. 그래서 이 테이블을 읽는 질의는
- * 전부 여기 생 SQL로 남는다(`SpotSpatialQueryAdapter`와 같은 선례).
- */
+/** 서울 구역 메타데이터 조회 어댑터(SPEC-0014 R6·R16·R17). `boundary`가 geography라 JPA 대신 생 SQL이다. */
 @Component
 class CongestionAreaQueryAdapter(
     private val jdbcTemplate: JdbcTemplate,
 ) : CongestionAreaQueryPort {
 
-    /**
-     * 121곳 전체의 경계와 메타데이터(R17).
-     *
-     * 폴리곤은 `ST_AsText`가 아니라 좌표 배열로 뽑는다 — WKT를 문자열 파싱하면 구분자
-     * 처리에 실수가 끼기 쉽고, `ST_DumpPoints`는 점마다 행이 생겨 12,226행이 된다.
-     * `ST_AsGeoJSON`이 좌표 순서(`[lng, lat]`)와 닫힘을 그대로 보존한다.
-     */
+    /** 121곳 전체의 경계와 메타데이터(R17). 폴리곤은 `ST_AsGeoJSON`의 좌표 배열(`[lng, lat]`)로 뽑는다. */
     @Transactional(readOnly = true)
     override fun findAllBoundaries(locale: DomainLocale): List<CongestionAreaBoundaryView> = jdbcTemplate.query(
         """
@@ -48,9 +36,7 @@ class CongestionAreaQueryAdapter(
 
     /**
      * bbox에 걸치는 구역 코드(R6). 폴리곤이 뷰포트와 겹치면 포함이다.
-     *
-     * `&&`(바운딩박스 겹침)로 인덱스를 먼저 태우고 `ST_Intersects`로 정확히 판정한다 —
-     * `&&`만 쓰면 폴리곤의 사각 외접이 겹칠 뿐 실제로는 벗어난 구역이 섞인다.
+     * - `&&`로 인덱스를 태우고 `ST_Intersects`로 정확히 판정한다.
      */
     @Transactional(readOnly = true)
     override fun findAreaCodesWithin(bounds: MapBounds): List<String> = jdbcTemplate.query(
@@ -90,13 +76,7 @@ class CongestionAreaQueryAdapter(
         zh = getString("name_zh"),
     )
 
-    /**
-     * GeoJSON Polygon → 외곽 링 `[[lng, lat], ...]`.
-     *
-     * **첫 번째 링만 취한다.** 원본에서 홀이 있는 곳은 POI096 하나뿐이고 적재 시 외곽만
-     * 넣었으므로 실제로 링이 둘인 행은 없지만, 나중에 홀이 있는 구역이 적재돼도 계약
-     * (단일 폐곡선)이 깨지지 않게 여기서도 방어한다.
-     */
+    /** GeoJSON Polygon → 외곽 링 `[[lng, lat], ...]`. 첫 번째 링만 취한다(홀 무시). */
     private fun parseOuterRing(geoJson: String): List<List<Double>> {
         val coordinates = MAPPER.readTree(geoJson).get("coordinates") ?: return emptyList()
         val outerRing = coordinates.firstOrNull() ?: return emptyList()

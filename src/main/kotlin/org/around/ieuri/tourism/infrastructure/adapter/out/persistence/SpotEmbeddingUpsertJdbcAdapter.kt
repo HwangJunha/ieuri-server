@@ -11,12 +11,9 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 /**
- * 장소 임베딩 저장 어댑터(SPEC-0035 S2). `vector` 타입을 JPA가 표현하지 못해 이 어댑터에만 생 SQL이 있다.
- *
- * 두 SQL은 같은 두 조각을 담고 있다 — 소개문을 붙이는 LATERAL 조인과 텍스트 해시 `md5(...)`. **둘이 글자까지
- * 같아야 한다.** 대상 판정이 계산한 해시와 저장한 해시가 다르면 그 행은 매 실행 다시 대상이 된다.
- * 해시의 소개문은 임베딩 텍스트와 같은 상한(`embedding.overview-max-chars`)으로 자른다 — 상한 밖만 바뀐
- * 소개문으로 같은 벡터를 다시 만들지 않기 위해서다. 벡터는 `[0.1,0.2,...]` 문자열로 넘겨 `::vector`로 캐스팅한다.
+ * 장소 임베딩 저장 어댑터(SPEC-0035). `vector` 타입을 JPA가 표현하지 못해 생 SQL이다.
+ * - 두 SQL의 LATERAL 조인과 `md5(...)`는 글자까지 같아야 한다 — 다르면 그 행이 매 실행 다시 대상이 된다.
+ * - 벡터는 `[0.1,0.2,...]` 문자열로 넘겨 `::vector`로 캐스팅한다.
  */
 @Component
 class SpotEmbeddingUpsertJdbcAdapter(
@@ -26,9 +23,7 @@ class SpotEmbeddingUpsertJdbcAdapter(
 
     /**
      * 보이는 번역 행 중 벡터가 없거나, 제목·분류·주소·소개문이 바뀌었거나, 다른 모델로 만든 행. id 오름차순 키셋.
-     *
-     * 소개문은 원본 `spot` 행의 상세에서 온다. `(catalog_id, language)`당 `spot`이 둘 이상일 수 있어(실측 13쌍)
-     * 가장 최근에 적재된 하나만 고른다 — 조인이 행을 불리면 대상이 중복된다.
+     * - 소개문은 `(catalog_id, language)`의 가장 최근 `spot` 하나에서 온다 — 조인이 행을 불리지 않게 한다.
      */
     @Transactional(readOnly = true)
     override fun findTargets(afterTranslationId: Long, limit: Int, model: String): List<EmbeddingTarget> = jdbcTemplate.query(

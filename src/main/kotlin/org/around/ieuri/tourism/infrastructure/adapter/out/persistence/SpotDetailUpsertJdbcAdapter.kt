@@ -13,10 +13,8 @@ import org.springframework.transaction.annotation.Transactional
 import java.sql.PreparedStatement
 
 /**
- * 상세 적재 전용 어댑터. 쓰기가 전부 `INSERT ... ON CONFLICT`라 이 어댑터에만 생 SQL이 남는다.
- *
- * **트랜잭션은 메서드마다 여기서 연다.** 묶여야 하는 것은 한 메서드 안의 "삭제 후 삽입"이며
- * (갤러리·이용안내 전량 교체), 삭제만 되고 삽입이 안 되는 상태가 생기지 않게 한다.
+ * 상세 적재 전용 어댑터. 쓰기가 전부 `INSERT ... ON CONFLICT`라 생 SQL이다.
+ * - 트랜잭션은 메서드마다 연다 — 전량 교체의 삭제와 삽입이 함께 커밋된다.
  */
 @Component
 class SpotDetailUpsertJdbcAdapter(
@@ -28,23 +26,16 @@ class SpotDetailUpsertJdbcAdapter(
         upsertDetail(spotId, detail, bodyAbsent = false)
     }
 
-    /**
-     * 본문 부재 적재. NOT NULL 컬럼은 `spot` 행에서 온 [fallback] 값으로 채우고
-     * overview·homepage·tel은 null로 남긴다.
-     */
+    /** 본문 부재 적재. NOT NULL 컬럼은 [fallback] 값으로 채우고 overview·homepage·tel은 null로 남긴다. */
     @Transactional
     override fun saveDetailAbsence(spotId: Long, fallback: SpotDetail) {
         upsertDetail(spotId, fallback, bodyAbsent = true)
     }
 
     /**
-     * 본문 upsert. [bodyAbsent]가 두 경로의 유일한 차이다 — 부재였던 항목에 나중에 본문이 생기면
-     * 이 플래그가 false로 되돌아가며 상태가 전환된다.
-     *
-     * 부재 행이 이미 있어도 `fetched_at`을 갱신하므로 다음 신선도 창이 새로 시작된다.
-     *
-     * **private 헬퍼다** — 같은 클래스의 `@Transactional` 메서드를 자기호출하면 프록시를
-     * 우회하므로, 두 진입점이 공용 본문을 부르는 형태로 둔다.
+     * 본문 upsert. [bodyAbsent]만 두 경로가 다르며, 부재였던 항목에 본문이 생기면 false로 되돌아간다.
+     * - 항상 `fetched_at`을 갱신해 신선도 창을 새로 시작한다.
+     * - private 헬퍼다 — `@Transactional` 메서드끼리 자기호출하면 프록시를 우회한다.
      */
     private fun upsertDetail(spotId: Long, detail: SpotDetail, bodyAbsent: Boolean) {
         jdbcTemplate.update(
@@ -65,12 +56,7 @@ class SpotDetailUpsertJdbcAdapter(
         )
     }
 
-    /**
-     * 갤러리 전량 교체. upstream이 이미지를 지우거나 순서를 바꿨을 때 낡은 행이 남지 않는다.
-     *
-     * 삽입을 `ON CONFLICT`로 두는 이유는 같은 항목을 두 워커가 동시에 교체할 때 유니크 제약 위반으로
-     * 실패하는 대신 덮어쓰게 하기 위해서다.
-     */
+    /** 갤러리 전량 교체. 삽입은 `ON CONFLICT`라 동시 교체가 제약 위반 대신 덮어쓴다. */
     @Transactional
     override fun saveGallery(spotId: Long, gallery: List<SpotImage>) {
         jdbcTemplate.update("DELETE FROM spot_detail_image WHERE spot_id = ?", spotId)
@@ -119,7 +105,7 @@ class SpotDetailUpsertJdbcAdapter(
         )
     }
 
-    /** 이용안내 항목 전량 교체. 갤러리와 같은 이유로 삭제 후 배치 삽입한다. */
+    /** 이용안내 항목 전량 교체. 삭제 후 배치 삽입한다. */
     @Transactional
     override fun saveInfoItems(spotId: Long, category: SpotCategory, items: List<SpotInfoItem>) {
         jdbcTemplate.update(

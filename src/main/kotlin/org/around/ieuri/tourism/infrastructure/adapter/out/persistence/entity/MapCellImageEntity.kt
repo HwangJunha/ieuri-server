@@ -16,13 +16,9 @@ import org.around.ieuri.tourism.domain.vo.CopyrightType
 import java.time.Instant
 
 /**
- * 칸 대표 이미지 JPA 엔티티(SPEC-0030 R9·R10).
- *
- * **`attributionText` 컬럼이 없다.** 출처 문구는 [CopyrightType]이 소유하며 저장하지 않는다 —
- * 적재해 두면 둘이 어긋난다(기존 `SpotImage`의 규약과 같다).
- *
- * `displayOrder` 0이 대표다. 이미지가 없는 칸은 이 표에 행이 없을 뿐이며 조회에서 빠지지
- * 않는다(R10).
+ * 칸 대표 이미지 JPA 엔티티(SPEC-0030 R9·R10). `displayOrder` 0이 대표다.
+ * - 출처 문구 컬럼이 없다 — [CopyrightType]에서 파생한다.
+ * - 이미지가 없는 칸은 행이 없을 뿐 조회에서 빠지지 않는다(R10).
  */
 @Entity
 @Table(name = "map_cell_image", schema = DbSchema.TOUR)

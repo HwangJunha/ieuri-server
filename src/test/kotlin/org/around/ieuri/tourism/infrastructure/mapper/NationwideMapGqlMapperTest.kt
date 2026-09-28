@@ -11,11 +11,7 @@ import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * GraphQL 경계 변환(POL-033).
- *
- * **위도·경도는 둘 다 Double이라 뒤바뀌어도 컴파일된다** — 값을 다르게 주어 자리를 고정한다.
- */
+/** GraphQL 경계 변환(POL-033). 위도·경도는 둘 다 Double이라 값을 다르게 주어 자리를 고정한다. */
 class NationwideMapGqlMapperTest {
 
     @Test
@@ -42,7 +38,7 @@ class NationwideMapGqlMapperTest {
 
     @Test
     fun `방문 등록 입력은 회원 id를 인자에서 받는다`() {
-        // 입력에 회원 id가 없다는 것이 계약이다 — 클라이언트가 "누구의 기록인지"를 주장할 수 없다.
+        // 입력에 회원 id가 없다 — 인증 컨텍스트가 정한다.
         val command = RecordVisitsInput(districtCodes = listOf("11110", "41111")).toCommand(memberId = 7L)
 
         assertEquals(7L, command.memberId)
@@ -66,8 +62,7 @@ class NationwideMapGqlMapperTest {
 
     @Test
     fun `도메인 좌표는 lat lng으로 이름이 바뀌어 나간다`() {
-        // 도메인은 latitude/longitude, 스키마는 lat/lng — 이름이 달라 변환이 필수다.
-        // 이 변환을 빠뜨리면 DGS가 필드를 못 찾아 응답 전체가 null이 된다(실측으로 겪었다).
+        // 도메인은 latitude/longitude, 스키마는 lat/lng다.
         val gql = Coordinates(latitude = 37.5665, longitude = 126.9780).toGql()
 
         assertEquals(37.5665, gql.lat)

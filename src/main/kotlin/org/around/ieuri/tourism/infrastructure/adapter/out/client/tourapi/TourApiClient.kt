@@ -30,10 +30,7 @@ import org.springframework.web.util.UriComponentsBuilder
 import java.net.URI
 
 /**
- * TourAPI 어댑터. TourInfoPort의 유일한 구현체로, TourAPI 세부(필드명·코드 체계)를 여기 가둔다.
- *
- * 책임은 딱 둘이다: **요청 URI 빌드**와 **응답 → 도메인/중립 DTO 매핑**. 그 외(재시도·캐시·거리계산·정렬)는
- * 여기서 하지 않는다. 캐시는 SpotDetailCache, 거리·정렬은 application이 담당한다.
+ * TourAPI 어댑터. 요청 URI 빌드와 응답 → 도메인 매핑만 한다(재시도·캐시·정렬은 하지 않는다).
  */
 @Component
 class TourApiClient(
@@ -61,14 +58,8 @@ class TourApiClient(
     }
 
     /**
-     * 상세 본문(detailCommon2 1콜). 갤러리·운영정보·이용안내는 각 필드가 요청될 때 따로 가져온다.
-     *
-     * **본문이 없으면 null**(SPEC-0008 R-1). upstream이 결과 없음을 주면 items가 빈 리스트가 된다
-     * (`"items": ""` → [CommonItemsDeserializer]가 흡수). 이전에는 `first()`가
-     * NoSuchElementException을 던져 **부재가 장애로 둔갑했다** — 재시도가 무의미한 사실이 재시도
-     * 가능한 실패로 표면화되고, 매 조회마다 upstream을 다시 두드렸다.
-     *
-     * HTTP·역직렬화 실패는 여전히 예외로 나간다(그쪽은 진짜 실패다).
+     * 상세 본문(detailCommon2 1콜). 본문이 없으면 null이다(SPEC-0008 R-1).
+     * - HTTP·역직렬화 실패는 예외로 나간다.
      */
     override fun findDetail(query: SpotDetailQuery): SpotDetail? {
         val response: TourApiDetailCommonResponse = call(detailUri(query, "detailCommon2"), TourApiDetailCommonResponse::class.java)
@@ -101,12 +92,8 @@ class TourApiClient(
     }
 
     /**
-     * 상세 오퍼레이션 호출 + **전송 계층 예외의 도메인 변환**(SPEC-0037). 연결 실패·타임아웃·
-     * 5xx·역직렬화 실패가 그대로 새면 재시도 대상인지 판단할 수 없어, FR-008이 지정한
-     * "네트워크 오류는 재시도한다"가 성립하지 않는다.
-     *
-     * HTTP 429만 초당 한도로 가르고 나머지는 전부 장애다 — 4xx도 포함되는 것은 배치 관점에서
-     * 결론(넘어간다)이 같기 때문이다. **URI는 로그에 싣지 않는다**(serviceKey 누출).
+     * 상세 오퍼레이션 호출 + 전송 계층 예외의 도메인 변환(SPEC-0037).
+     * - HTTP 429만 초당 한도이고 나머지(4xx 포함)는 장애다. URI는 로그에 싣지 않는다(serviceKey).
      */
     private fun <T : Any> call(uri: URI, type: Class<T>): T = try {
         tourApiRestClient.get().uri(uri).retrieve().body(type)
@@ -130,17 +117,9 @@ class TourApiClient(
     }
 
     /**
-     * 공공데이터포털 응답 코드 판정(SPEC-0037). **호출자가 구분해야 하는 세 결론만** 가른다 —
-     * 오늘은 그만둔다(일일 한도 `22`) · 잠시 뒤 다시 한다(초당 한도 `23`) · 넘어간다(그 밖의 전부).
-     * 나머지 코드는 배치에서 결론이 같으므로 타입을 나누지 않는다.
-     *
-     * **빈 코드는 성공으로 본다** — DTO 기본값이 빈 문자열이라, 헤더 없는 응답을 실패로 만들면
-     * 정상 조회가 장애로 둔갑한다(`TourStatsClient`와 같은 규율). 결과 없음은 items가 비어 오는
-     * 것으로 이미 표현되며 여기서 예외가 되지 않는다(SPEC-0008 R-1).
-     *
-     * **resultMsg는 로그에 싣지 않는다** — 오류 메시지에 요청 URI가 섞여 오면 serviceKey가 샌다.
-     *
-     * HTTP·역직렬화와 분리돼 있어 단위 테스트가 가능하다([translate]도 같다).
+     * 공공데이터포털 응답 코드 판정(SPEC-0037): 일일 한도 `22` · 초당 한도 `23` · 그 밖은 장애.
+     * - 빈 코드는 성공으로 본다. 결과 없음은 빈 items로 표현되며 예외가 아니다.
+     * - resultMsg는 로그에 싣지 않는다(serviceKey가 섞일 수 있다).
      */
     fun verify(header: TourApiResponse.Header) {
         val code = header.resultCode
@@ -158,7 +137,7 @@ class TourApiClient(
         }
     }
 
-    /** TourAPI 응답 DTO → 중립 결과. HTTP·역직렬화와 분리해 단위 테스트 가능. */
+    /** TourAPI 응답 DTO → 중립 결과. */
     fun mapResponse(response: TourApiResponse, locale: DomainLocale): NearbySpotResult {
         val body = response.response.body
         return NearbySpotResult(
@@ -174,13 +153,13 @@ class TourApiClient(
     /** detailImage2 item → 갤러리. TourAPI 반환 순서 유지, 앞 10장까지(AC-8). */
     fun mapGallery(images: List<TourApiDetailImageResponse.Item>): List<SpotImage> = images.toGallery()
 
-    /** detailIntro2 item → 운영 정보. 표시할 값이 하나도 없으면 null(빈 껍데기 방지). */
+    /** detailIntro2 item → 운영 정보. 표시할 값이 하나도 없으면 null. */
     fun mapIntro(intro: TourApiDetailIntroResponse.Item?): SpotIntro? = intro?.toSpotIntroOrNull()
 
     /** detailInfo2 item → 이용안내 항목. 항목명·내용 중 하나라도 비면 제외. */
     fun mapInfoItems(info: List<TourApiDetailInfoResponse.Item>): List<SpotInfoItem> = info.toInfoItems()
 
-    /** [contentTypeId]는 detailIntro2·detailInfo2에서 필수다(없으면 upstream이 필수 파라미터 누락으로 거절). */
+    /** [contentTypeId]는 detailIntro2·detailInfo2에서 필수다. */
     private fun detailUri(query: SpotDetailQuery, operation: String, contentTypeId: String? = null): URI = UriComponentsBuilder.fromUriString(baseUrl(query.locale))
         .path("/$operation")
         .common()
@@ -199,15 +178,12 @@ class TourApiClient(
 
     private fun codeset(locale: DomainLocale): String = if (locale.isKorean) TourApiProperties.CODESET_KO else TourApiProperties.CODESET_FOREIGN
 
-    /**
-     * 이 카테고리의 contentTypeId. **없으면 null이며 호출자가 upstream 호출을 생략한다** —
-     * 그 코드셋에 대응 코드가 없는 카테고리가 실제로 있다(여행코스는 외국어, 교통은 국문에 없다).
-     */
+    /** 이 카테고리의 contentTypeId. 그 언어 코드셋에 대응 코드가 없으면 null이며 호출자가 upstream 호출을 생략한다. */
     private fun categoryCode(category: SpotCategory?, locale: DomainLocale): String? = category?.let {
         categoryMapping.externalCode(it, CategoryExternalMappingPort.PROVIDER_TOUR_API, codeset(locale))
     }
 
-    /** contentTypeId가 가리키는 우리 카테고리. 모르는 코드는 관광지로 떨어뜨린다(기존 동작). */
+    /** contentTypeId가 가리키는 우리 카테고리. 모르는 코드는 관광지로 떨어뜨린다. */
     private fun category(contentTypeId: String?, locale: DomainLocale): SpotCategory = contentTypeId?.let {
         categoryMapping.categoryOf(it, CategoryExternalMappingPort.PROVIDER_TOUR_API, codeset(locale))
     } ?: SpotCategory.TOURIST_SPOT

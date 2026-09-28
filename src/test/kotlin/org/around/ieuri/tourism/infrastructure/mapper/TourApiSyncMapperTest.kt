@@ -75,7 +75,7 @@ class TourApiSyncMapperTest {
 
     @Test
     fun `nullable 필드가 모두 null이어도 예외 없이 옮긴다`() {
-        // 주소(addr1·addr2)와 저작권 코드만이 없어도 되는 필드다.
+        // 주소(addr1·addr2)와 저작권 코드만 없어도 되는 필드다.
         val data = assertNotNull(
             item(addr1 = null, addr2 = null, cpyrhtDivCd = null)
                 .toNearbySpotDataOrNull(SpotCategory.TOURIST_SPOT),
@@ -88,7 +88,7 @@ class TourApiSyncMapperTest {
 
     @Test
     fun `NearbySpotData는 위경도를 mapy·mapx 순으로 옮긴다`() {
-        // mapy가 위도, mapx가 경도다 — 뒤바뀌면 지도상 위치가 통째로 달라진다.
+        // mapy가 위도, mapx가 경도다.
         val data = assertNotNull(
             item(mapx = 100.0, mapy = 20.0).toNearbySpotDataOrNull(SpotCategory.TOURIST_SPOT),
         )
@@ -140,9 +140,7 @@ class TourApiSyncMapperTest {
 
     @Test
     fun `SyncSpotCommand도 위경도를 mapy·mapx 순으로 옮긴다`() {
-        // **한국 범위 안의 값을 쓴다** — 적재 경로는 범위 밖 좌표를 드랍하므로(아래 테스트),
-        // 임의의 값을 쓰면 순서가 아니라 필터를 검증하게 된다. 경도·위도를 서로 다른 자릿수로
-        // 두어 뒤바뀌면 반드시 깨지게 한다.
+        // 한국 범위 안의 값을 쓰되 경도·위도의 자릿수를 달리 둔다 — 범위 필터가 아니라 순서를 검증한다.
         val command = assertNotNull(
             item(mapx = 128.5, mapy = 35.25)
                 .toSyncSpotCommandOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT),
@@ -161,23 +159,20 @@ class TourApiSyncMapperTest {
 
     @Test
     fun `showflag가 1이 아닌 항목은 적재하지 않는다`() {
-        // AC-2.2. 요청에 showflag=1을 넘기지만 그 보장에만 기대지 않는다(arrange=Q와 같은 규율).
+        // AC-2.2. 요청의 showflag=1에만 기대지 않는다.
         assertNull(item(showflag = "0").toSyncSpotCommandOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
     }
 
     @Test
     fun `showflag가 없는 항목은 적재하지 않는다`() {
-        // AC-2.3. **결측을 `"1"`로 간주하면 표출이 중단된 항목이 그대로 들어온다.**
-        // 이 스펙에서 가장 조용히 틀리기 쉬운 지점이라 별도로 고정한다.
+        // AC-2.3. 결측을 `"1"`로 간주하면 안 된다.
         assertNull(item(showflag = null).toSyncSpotCommandOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
         assertNull(item(showflag = "  ").toSyncSpotCommandOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
     }
 
     @Test
     fun `한국 범위를 벗어난 좌표는 적재하지 않는다`() {
-        // **실측 79건이 이 경로로 들어와 있었다.** `Coordinates`는 지구 전체를 유효로 보므로
-        // (0,0)과 상류 플레이스홀더가 통과했고, 적재된 뒤 배정에서만 빠져 "존재하지만 아무
-        // 데도 안 나오는" spot이 됐다.
+        // `Coordinates`는 지구 전체를 유효로 보므로 (0,0)과 상류 플레이스홀더를 여기서 막는다.
         assertNull(item(mapx = 0.0, mapy = 0.0).toSyncSpotCommandOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
         // 상류가 좌표를 모를 때 넣는 값 — 남중국해다.
         assertNull(
@@ -190,15 +185,14 @@ class TourApiSyncMapperTest {
 
     @Test
     fun `한국 범위 경계값은 적재한다`() {
-        // 경계를 배타로 잡으면 국토 끝의 정상 spot이 조용히 사라진다.
+        // 경계는 포함이다.
         assertNotNull(item(mapx = 124.0, mapy = 33.0).toSyncSpotCommandOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
         assertNotNull(item(mapx = 132.0, mapy = 39.0).toSyncSpotCommandOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
     }
 
     @Test
     fun `showflag 판정은 조회 경로에 걸리지 않는다`() {
-        // locationBasedList2 응답에는 showflag가 없다 — 조회 매퍼가 같은 판정을 하면
-        // 실시간 조회가 전량 빈 결과가 된다. 두 매퍼의 규칙이 다르다는 사실을 고정한다.
+        // locationBasedList2 응답에는 showflag가 없다 — 조회 매퍼는 이 판정을 하지 않는다.
         assertNotNull(item(showflag = null).toNearbySpotDataOrNull(SpotCategory.TOURIST_SPOT))
     }
 
