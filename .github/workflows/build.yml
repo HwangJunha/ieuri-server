@@ -71,7 +71,7 @@ jobs:
         # 관행이었으나, 지금은 손해다 — 데몬이 없으면 Kotlin 컴파일러가 매번 별도 JVM을
         # 띄우고(gradle.properties의 in-process 전략이 무력화된다) 설정 캐시도 쓰지 못한다.
         #
-        # 빌드 시간의 대부분은 QueryDSL kapt와 Kotlin 컴파일이다(실제 테스트는 41초).
+        # 빌드 시간의 대부분은 QueryDSL kapt와 Kotlin 컴파일이다.
         # 그 둘이 데몬 안에서 큰 힙을 쓰며 도는 편이 훨씬 빠르다.
         run: ./gradlew check bootJar --build-cache
 

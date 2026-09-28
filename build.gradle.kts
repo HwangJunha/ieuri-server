@@ -208,11 +208,7 @@ tasks.named("compileKotlin") {
 }
 
 // 자동 생성 코드는 스타일 검사 대상이 아니다 — 위 srcDir 등록 때문에 main 소스셋에 들어온다.
-tasks.withType<org.jmailen.gradle.kotlinter.tasks.LintTask>().configureEach {
-    val generatedDir = layout.buildDirectory.dir("generated").get().asFile
-    exclude { it.file.startsWith(generatedDir) }
-}
-tasks.withType<org.jmailen.gradle.kotlinter.tasks.FormatTask>().configureEach {
+tasks.withType<org.jmailen.gradle.kotlinter.tasks.ConfigurableKtLintTask>().configureEach {
     val generatedDir = layout.buildDirectory.dir("generated").get().asFile
     exclude { it.file.startsWith(generatedDir) }
 }
