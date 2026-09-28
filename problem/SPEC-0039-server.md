@@ -45,14 +45,14 @@
 | D-09 | S6 | **변환 위치 규칙(FR-009)**: application·infrastructure에서 이름이 `to[A-Z]…`이거나 `from`인 메서드는 **`..mapper..` 패키지의 최상위 함수에만** 있다. 클래스·`object`·companion 멤버 변환 금지. `toString`은 제외. application 쪽 변환(도메인 → View 등)은 `application/mapper/`로 모은다. domain은 대상 아님 | 전수: infrastructure 멤버 변환 63건(리졸버 30 등) + mapper 밖 최상위 1, application 14건. 규칙을 "클래스 멤버인가"로 쓰는 것은 1차 조사(`HARNESS-server-sensors.md`)의 교훈. 패키지 패턴은 `..mapper..` | **생성 타입 생성자 호출 금지**: 186곳, payload 조립까지 걸린다(D-10). **Konsist로 작성**: 멤버 vs 최상위 함수는 바이트코드로 구별된다(`*Kt`) |
 | D-10 | S6 | **리졸버의 payload 조립은 리졸버에 남긴다.** 변환 규칙의 대상은 "경계 값 ↔ 도메인/View"로 한정 | 성공/실패 봉투를 채우는 것은 요청 흐름의 일부다 | **payload까지 mapper로**: D-09의 186곳 문제 |
 | D-11 | S6 | **리졸버가 도메인 VO를 조립하는 2곳**(`RegionRecommendationResolver`, `MapQueryResolver`)은 **오류 응답이 동일함을 확인할 수 있으면** `application/validation`으로 옮기고, 아니면 in/graphql `mapper`로만 옮긴다 | "인바운드 어댑터는 도메인 VO를 조립하지 않는다"는 합의. FR-003이 우선이다 | **무조건 application으로**: 실패 경로가 `errors[]` ↔ `userErrors[]`로 바뀔 위험 |
-| D-12 | S7 | **`port.in.command`는 `*CommandUseCase`, `port.in.query`는 `*QueryUseCase`.** 48개 중 25개 개명, 파일명도 맞춘다 | CLAUDE.md Layout이 이미 이 이름을 규정. 방향 없는 이름은 과거 이름 충돌을 낳았다 | **`*UseCase`로 통일**: 개명 수는 비슷하고 import만 보고 방향을 모른다 |
+| D-12 | S7 | **`port.in.command`는 `*CommandUseCase`, `port.in.query`는 `*QueryUseCase`.** 48개 중 25개 개명, 파일명도 맞춘다 | CLAUDE.md Layout이 이미 이 이름을 규정. 참고 프로젝트(splearn)의 역할 명사(`MemberRegister`·`MemberFinder`)와 비교 후 유지(사용자 동의 2026-09-28) — 접미사는 센서로 강제되지만(FR-011) 역할 명사의 적절성은 기계가 판정할 수 없다. 방향 없는 이름은 과거 이름 충돌을 낳았다 | **`*UseCase`로 통일**: 개명 수는 비슷하고 import만 보고 방향을 모른다 |
 | D-13 | S7 | **`application/service`의 최상위 클래스는 전부 `*Service`.** 5개 개명(`TokenIssuer`, `ProviderEmailUniqueness`, `ProviderTokenCollector`, `SpotQaPhotoKeyVerifier`, `PushDispatchStore`) | 한 패키지 한 규칙 | **협력 객체용 패키지 신설**: 규칙 없는 패키지가 하나 더 생길 뿐이다 |
 | D-14 | S7 | **`adapter.out.persistence`는 `*PersistenceAdapter`, `adapter.out.query`는 `*QueryAdapter`, `JdbcTemplate`·`NamedParameterJdbcTemplate`에 의존하는 클래스는 `*JdbcAdapter`**(역방향도). config의 DataSource 설정은 대상 밖. 20개 개명 | 현재 persistence 56개가 네 갈래, JdbcTemplate 어댑터 25개 중 `Jdbc` 표시 19 | **`Spatial`도 raw SQL 표시로 허용**: 같은 사실에 단어가 둘. **tourism의 `Store` 유지**: FR-011 위반 그 자체 |
 | D-15 | S7 | **`application/query`의 타입은 `*View` 또는 `*Query`로 끝난다.** 그 밖의 11개는 개명하거나 제자리로 옮긴다 | "읽기 모델"이라는 한 역할에 단어 하나 | **자유 명명 유지**: 센서가 검사할 것이 없다 |
 | D-16 | — | **`toNewEntity`는 유지한다.** 규칙 문서에 이유를 적는다 | 갱신은 관리 엔티티에 쓰고 더티체킹에 맡긴다. 새 엔티티를 만드는 변환은 생성 경로에서만 쓴다 — `New`가 그 구분을 이름으로 강제한다 | **`toEntity`로 개명**: 갱신 경로에서 새 엔티티를 만들어 `save()`하는 오용을 부른다 |
 | D-17 | S2 | **`port.out`의 인터페이스 중 infrastructure가 구현하는 것은 `*Port`.** 116/116 | 비용 0으로 FR-011을 넓힌다. 대상을 "infrastructure가 구현하는"으로 두는 것은 포트의 정의 그대로다 — 같은 패키지의 결과 타입 `sealed interface SnsRevokeResult`가 첫 구현에서 거짓 양성으로 걸렸다 | **"연산을 선언한 인터페이스"**: 결과 타입에 프로퍼티가 생기면 getter가 메서드로 잡혀 다시 거짓 양성이 된다(리뷰 지적). **sealed 제외**: Kotlin sealed 여부는 바이트코드로 안정적으로 보이지 않는다 |
 | D-18 | S7 | **패키지·이름 규칙 문서(FR-011)는 CLAUDE.md Naming 절을 표로 확장해 둔다.** 1차 센서 KDoc의 "임시 규칙" 경고도 갱신 | CLAUDE.md가 규칙의 권위 문서다. 별도 문서는 드리프트한다 | **`docs/conventions.md` 신설**: 두 사본이 어긋난다 |
-| D-19 | — | **사용자 정의 스테레오타입 애노테이션은 들이지 않는다** | 패키지 + 접미사로 역할이 이미 결정된다 | **도입**: 같은 사실의 세 번째 표시가 된다 |
+| D-19 | — | **사용자 정의 스테레오타입 애노테이션은 들이지 않는다** | 사용자 결정(2026-09-28, splearn 비교 후). 패키지 + 접미사로 역할이 이미 결정되고, splearn의 `@ApplicationService`는 클래스 단위 `@Transactional`을 묶어 우리의 메서드별 `readOnly`·`REQUIRES_NEW`와 충돌한다 | **도입**: 같은 사실의 세 번째 표시가 된다 |
 | D-20 | S1 | **ktlint는 kotlinter 5.7.0(ktlint 1.8.0)으로 붙인다.** **CI를 `./gradlew test` → `./gradlew check`로 바꾼다.** CI는 dev→master PR(test.yml)과 머지 후 빌드(build.yml)에서만 돌므로, feature→dev PR의 스타일 위반은 **머지 후 build.yml에서 드러나 dev 배포를 막는다** — 로컬 `check`가 1차 게이트다— 이를 막으려 **feature→dev PR에 `lintKotlin`만 도는 `lint.yml`을 둔다**(로컬 실측 5초, 컴파일 없음. 사용자 승인 2026-09-28) | 현재 CI는 `test`만 돌려 `check`에 걸린 린트가 CI에서 실행되지 않는다. 인프라 규칙: 관용(플러그인)이 있으면 손으로 만들지 않는다. kotlinter를 먼저 시험해 Gradle 9.5.1·설정 캐시·Kotlin 2.3.0에서 통과했고(위반 수가 CLI 실측과 일치), 생성 코드 제외도 태스크 설정으로 된다 — 기준(먼저 통과하는 쪽)을 만족해 ktlint-gradle은 시험하지 않았다 | **`Exec`로 CLI 호출**: 수제 통합. **JUnit 안에서 룰 엔진 호출**: 포맷 태스크를 따로 만들어야 한다 |
 | D-21 | S1 | **ktlint 구성: `ktlint_code_style = intellij_idea`, `package-name` 규칙은 끈다**, 자동 생성 코드는 경로 제외. 기준선 0건은 **일괄 포맷 커밋 → 수작업 → 린트 활성화** 순서 | 실측(ktlint 1.8.0): intellij_idea 1364건 중 1226 자동 수정, 잔여 138. 그중 **98건이 `port.in`·`adapter.in`의 `` `in` `` 패키지**다 — CLAUDE.md가 정한 레이아웃과 충돌하는 규칙이지 기존 부채가 아니므로 규칙 비활성화이지 FR-014의 억제가 아니다(사용자 승인 2026-09-28). ktlint_official은 7194건·24.6k줄 변경 | **ktlint_official**: diff가 약 4배. **`in` 패키지 개명(`inbound`)**: 수백 파일의 import가 바뀌고 CLAUDE.md 레이아웃을 뒤집는다. **baseline.xml**: FR-014 금지 |
 | D-22 | S2·S6·S7 | **실패 메시지(FR-015)**: ArchUnit은 `because("…")`에 무엇을 고칠지 쓴다 — 실패 헤더 `Rule '<술어>, because <이유>' was violated`에 규칙과 이유가 함께 찍히고 위반 줄이 위치(`(File.kt:line)`)를 준다. Konsist는 `additionalMessage`. ktlint는 기본 출력(`파일:줄:열 [규칙 id]`) | B1 탐침으로 실제 출력을 확인했다(D-08·D-17). **초안의 `as(…)`를 뒤집는다** — `as`는 술어 설명을 통째로 덮어써 무엇을 검사했는지가 사라진다(리뷰 지적) | **`as("…")`**: 위 이유. **기본 규칙 설명만**: 무엇을 할지 말하지 않는다 |
@@ -123,6 +123,8 @@ grep으로 확인한 수(worktree `82fdd48`):
 - 도메인 상수 한도를 설정값으로 승격
 - 애그리게이트 병합·공통 기반 클래스·애그리게이트 내 이벤트 수집(D-04), 필드별 VO 신설(D-02)
 - 사용자 정의 스테레오타입 애노테이션(D-19)
+- 도메인모델·용어사전 문서 — 리팩토링 완료 후 마지막에 별도로 작성(사용자 결정 2026-09-28)
+- Instancio(무작위 테스트 데이터) — 리팩토링 완료 후 도입(사용자 결정 2026-09-28)
 - `!!` 제거, `inline fun <reified T>` 1건, `MemberAgreementPersistenceAdapter`의 루프 조회 — 이 spec의 FR이 아니다
 - `out/event` 리스너를 `adapter/in/event`로 옮기는 구조 결정, 리졸버의 감사 이벤트 발행 정리
 - 리졸버·DataLoader·in/graphql 보조 파일의 이름 규칙
@@ -172,3 +174,4 @@ grep으로 확인한 수(worktree `82fdd48`):
 | 2026-09-28 | D-21(intellij_idea·package-name 끔), D-24(Q02 +25%), D-25(dev DB 사용), D-28(그대로 옮긴 변환 테스트 면제) 사용자 승인 | 설계 합의 |
 | 2026-09-28 | B1 완료 기록: D-07 보류, D-17 대상 기준, D-20 kotlinter 선택 근거·CI 경로, D-22 `because`로 뒤집음, 기준 시간 | 구현과 reviewer 지적 반영 |
 | 2026-09-28 | D-06·D-07 뒤집음(Policy 제거·규칙 객체), D-23 확정(Q01), D-20 dev PR lint job, D-30·D-31 주석 정리·센서 추가 | 사용자 결정 |
+| 2026-09-28 | splearn 비교 후 D-12·D-19 확인, 도메인 문서·Instancio를 리팩토링 후로 미룸 | 사용자 결정 |
