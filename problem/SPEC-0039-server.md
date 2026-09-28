@@ -40,7 +40,7 @@
 | D-04 | — | **애그리게이트 루트 구조를 새로 들이지 않는다.** 이미 있는 `domain/aggregate`(20개)에 규칙을 옮겨 담을 뿐, 공통 기반 클래스·애그리게이트 병합·애그리게이트 내 이벤트 수집은 하지 않는다 | spec은 도입을 요구도 금지도 하지 않는다. 현재 코드가 이미 애그리게이트 단위(`create`·`restore`·Boolean 결과 상태 변경)로 짜여 있어, 부족한 것은 구조가 아니라 **규칙이 서비스에 있다**는 점이다 | **splearn식(JPA 엔티티 = 도메인)**: apps.md·POL-033과 충돌. **애그리게이트 병합**: 로딩 단위·트랜잭션 모양이 바뀌어 조회 성능이 달라진다(SPEC-0038 목표 유지) — 동작 불변 리팩토링에서 가장 위험한 변경이다 |
 | D-05 | S3 | **`createPost`와 `editPost`의 태그 개수 초과 응답 비대칭을 유지한다.** 생성은 도메인 `require`가 `INVALID_INPUT`("태그는 최대 5개입니다."), 수정은 `TOO_MANY_TAGS`. 판정은 한 함수(D-02)로, **번역만 경로별로** 지금과 같게 둔다. AC-004는 "같은 도메인 판정이 같은 위반을 돌려준다"로 domain 단위에서 검증한다 | BR-001·FR-003을 함께 만족하는 길은 판정 일원화 + 번역 보존뿐이다. 결함은 별도 spec 대상으로 보고한다 | **둘 다 `TOO_MANY_TAGS`로 통일**: 생성 경로 응답 코드가 바뀐다(POL-054) |
 | D-06 | S5 | **설정값으로 조정되는 한도는 application에서 판정하되, 규칙마다 판정 함수 하나로 모은다**(`application/validation`, 정책값을 인자로 받는 순수 함수). 반경 3곳, 좌표 번역 3곳, bbox 면적 2곳을 하나씩으로 | FR-006 + FR-007. 값의 출처가 운영 튜닝(POL-044)이라 domain 불변식이 아니다 | **한도를 domain VO에 인자로 넘김**: "설정이 domain까지 흐른다"는 새 모양을 만들고 얻는 것은 같다. **그대로 둠**: FR-006 위반이 남는다 |
-| D-07 | S2 | **`application/policy`의 10개 묶음은 이름·위치·값을 그대로 둔다.** 센서만 더한다: `application.policy`의 클래스는 `Policy`로 끝난다 | 전부 프레임워크 무의존 `data class *Policy`이고 인프라 `@ConfigurationProperties` → `@Bean`에서 조립된다. FR-007은 모양 변경을 요구하지 않는다 | **`*Settings`로 개명 / `*Properties`와 병합**: 병합하면 application이 Spring 바인딩 타입을 알게 된다. **domain으로 이동**: POL-044 취지와 반대 |
+| D-07 | S2 | **`application/policy`의 10개 묶음은 이름·위치·값을 그대로 둔다.** 센서(`application.policy`의 클래스는 `Policy`로 끝난다)는 **B1에서 보류** — `RecommendationPolicy.kt`의 `data class EmbeddingSpec`(정책의 하위 묶음)이 어긋나 "현재 0건" 전제가 틀렸다. 개명할지 규칙을 좁힐지 사용자 결정 대기 | 전부 프레임워크 무의존 data class이고 인프라 `@ConfigurationProperties` → `@Bean`에서 조립된다. FR-007은 모양 변경을 요구하지 않는다 | **`*Settings`로 개명 / `*Properties`와 병합**: 병합하면 application이 Spring 바인딩 타입을 알게 된다. **domain으로 이동**: POL-044 취지와 반대 |
 | D-08 | S2 | **FR-008 센서를 명시 규칙으로 둔다**: `..application..`·`..domain..`은 `org.around.ieuri.common.graphql.generated..`와 `..persistence.entity..`에 의존하지 않는다. 현재 위반 0건 | 기존 규칙은 `com.netflix..`·`graphql..`만 본다. **생성 타입은 `common.graphql.generated`에 있어 지금 무방비다.** 실패 메시지가 FR-008을 가리켜야 한다(FR-015) | **기존 계층 규칙으로 충분하다고 보고 생략**: 생성 타입 경로가 실제로 빠져 있다 |
 | D-09 | S6 | **변환 위치 규칙(FR-009)**: application·infrastructure에서 이름이 `to[A-Z]…`이거나 `from`인 메서드는 **`..mapper..` 패키지의 최상위 함수에만** 있다. 클래스·`object`·companion 멤버 변환 금지. `toString`은 제외. application 쪽 변환(도메인 → View 등)은 `application/mapper/`로 모은다. domain은 대상 아님 | 전수: infrastructure 멤버 변환 63건(리졸버 30 등) + mapper 밖 최상위 1, application 14건. 규칙을 "클래스 멤버인가"로 쓰는 것은 1차 조사(`HARNESS-server-sensors.md`)의 교훈. 패키지 패턴은 `..mapper..` | **생성 타입 생성자 호출 금지**: 186곳, payload 조립까지 걸린다(D-10). **Konsist로 작성**: 멤버 vs 최상위 함수는 바이트코드로 구별된다(`*Kt`) |
 | D-10 | S6 | **리졸버의 payload 조립은 리졸버에 남긴다.** 변환 규칙의 대상은 "경계 값 ↔ 도메인/View"로 한정 | 성공/실패 봉투를 채우는 것은 요청 흐름의 일부다 | **payload까지 mapper로**: D-09의 186곳 문제 |
@@ -50,12 +50,12 @@
 | D-14 | S7 | **`adapter.out.persistence`는 `*PersistenceAdapter`, `adapter.out.query`는 `*QueryAdapter`, `JdbcTemplate`·`NamedParameterJdbcTemplate`에 의존하는 클래스는 `*JdbcAdapter`**(역방향도). config의 DataSource 설정은 대상 밖. 20개 개명 | 현재 persistence 56개가 네 갈래, JdbcTemplate 어댑터 25개 중 `Jdbc` 표시 19 | **`Spatial`도 raw SQL 표시로 허용**: 같은 사실에 단어가 둘. **tourism의 `Store` 유지**: FR-011 위반 그 자체 |
 | D-15 | S7 | **`application/query`의 타입은 `*View` 또는 `*Query`로 끝난다.** 그 밖의 11개는 개명하거나 제자리로 옮긴다 | "읽기 모델"이라는 한 역할에 단어 하나 | **자유 명명 유지**: 센서가 검사할 것이 없다 |
 | D-16 | — | **`toNewEntity`는 유지한다.** 규칙 문서에 이유를 적는다 | 갱신은 관리 엔티티에 쓰고 더티체킹에 맡긴다. 새 엔티티를 만드는 변환은 생성 경로에서만 쓴다 — `New`가 그 구분을 이름으로 강제한다 | **`toEntity`로 개명**: 갱신 경로에서 새 엔티티를 만들어 `save()`하는 오용을 부른다 |
-| D-17 | S2 | **`port.out`의 인터페이스는 `*Port`.** 116/116 | 비용 0으로 FR-011을 넓힌다 | 없음 — 이미 지켜지는 것을 고정할 뿐이다 |
+| D-17 | S2 | **`port.out`의 인터페이스 중 infrastructure가 구현하는 것은 `*Port`.** 116/116 | 비용 0으로 FR-011을 넓힌다. 대상을 "infrastructure가 구현하는"으로 두는 것은 포트의 정의 그대로다 — 같은 패키지의 결과 타입 `sealed interface SnsRevokeResult`가 첫 구현에서 거짓 양성으로 걸렸다 | **"연산을 선언한 인터페이스"**: 결과 타입에 프로퍼티가 생기면 getter가 메서드로 잡혀 다시 거짓 양성이 된다(리뷰 지적). **sealed 제외**: Kotlin sealed 여부는 바이트코드로 안정적으로 보이지 않는다 |
 | D-18 | S7 | **패키지·이름 규칙 문서(FR-011)는 CLAUDE.md Naming 절을 표로 확장해 둔다.** 1차 센서 KDoc의 "임시 규칙" 경고도 갱신 | CLAUDE.md가 규칙의 권위 문서다. 별도 문서는 드리프트한다 | **`docs/conventions.md` 신설**: 두 사본이 어긋난다 |
 | D-19 | — | **사용자 정의 스테레오타입 애노테이션은 들이지 않는다** | 패키지 + 접미사로 역할이 이미 결정된다 | **도입**: 같은 사실의 세 번째 표시가 된다 |
-| D-20 | S1 | **ktlint는 Gradle 플러그인으로 붙인다.** 후보 kotlinter / jlleitschuh `ktlint-gradle` 중 Gradle 9.5.1 · 설정 캐시 · Kotlin 2.3.0에서 먼저 통과하는 쪽. **CI를 `./gradlew test` → `./gradlew check`로 바꾼다** | 현재 CI는 `test`만 돌려 `check`에 걸린 린트가 CI에서 실행되지 않는다. 인프라 규칙: 관용(플러그인)이 있으면 손으로 만들지 않는다 | **`Exec`로 CLI 호출**: 수제 통합. **JUnit 안에서 룰 엔진 호출**: 포맷 태스크를 따로 만들어야 한다 |
+| D-20 | S1 | **ktlint는 kotlinter 5.7.0(ktlint 1.8.0)으로 붙인다.** **CI를 `./gradlew test` → `./gradlew check`로 바꾼다.** CI는 dev→master PR(test.yml)과 머지 후 빌드(build.yml)에서만 돌므로, feature→dev PR의 스타일 위반은 **머지 후 build.yml에서 드러나 dev 배포를 막는다** — 로컬 `check`가 1차 게이트다(PR 단계 lint 게이트 여부는 사용자 결정 대기) | 현재 CI는 `test`만 돌려 `check`에 걸린 린트가 CI에서 실행되지 않는다. 인프라 규칙: 관용(플러그인)이 있으면 손으로 만들지 않는다. kotlinter를 먼저 시험해 Gradle 9.5.1·설정 캐시·Kotlin 2.3.0에서 통과했고(위반 수가 CLI 실측과 일치), 생성 코드 제외도 태스크 설정으로 된다 — 기준(먼저 통과하는 쪽)을 만족해 ktlint-gradle은 시험하지 않았다 | **`Exec`로 CLI 호출**: 수제 통합. **JUnit 안에서 룰 엔진 호출**: 포맷 태스크를 따로 만들어야 한다 |
 | D-21 | S1 | **ktlint 구성: `ktlint_code_style = intellij_idea`, `package-name` 규칙은 끈다**, 자동 생성 코드는 경로 제외. 기준선 0건은 **일괄 포맷 커밋 → 수작업 → 린트 활성화** 순서 | 실측(ktlint 1.8.0): intellij_idea 1364건 중 1226 자동 수정, 잔여 138. 그중 **98건이 `port.in`·`adapter.in`의 `` `in` `` 패키지**다 — CLAUDE.md가 정한 레이아웃과 충돌하는 규칙이지 기존 부채가 아니므로 규칙 비활성화이지 FR-014의 억제가 아니다(사용자 승인 2026-09-28). ktlint_official은 7194건·24.6k줄 변경 | **ktlint_official**: diff가 약 4배. **`in` 패키지 개명(`inbound`)**: 수백 파일의 import가 바뀌고 CLAUDE.md 레이아웃을 뒤집는다. **baseline.xml**: FR-014 금지 |
-| D-22 | S2·S6·S7 | **실패 메시지(FR-015)**: ArchUnit `as("…")`로 "무엇이 금지이고 어디로 옮기는가", 위치는 `(File.kt:line)`. Konsist는 `additionalMessage`. ktlint는 기본 출력 | CLAUDE.md "센서의 실패 메시지는 무엇을 할지 말한다". `because`는 실패 출력이 아니다 | **기본 규칙 설명**: 술어 나열이라 무엇을 할지 말하지 않는다 |
+| D-22 | S2·S6·S7 | **실패 메시지(FR-015)**: ArchUnit은 `because("…")`에 무엇을 고칠지 쓴다 — 실패 헤더 `Rule '<술어>, because <이유>' was violated`에 규칙과 이유가 함께 찍히고 위반 줄이 위치(`(File.kt:line)`)를 준다. Konsist는 `additionalMessage`. ktlint는 기본 출력(`파일:줄:열 [규칙 id]`) | B1 탐침으로 실제 출력을 확인했다(D-08·D-17). **초안의 `as(…)`를 뒤집는다** — `as`는 술어 설명을 통째로 덮어써 무엇을 검사했는지가 사라진다(리뷰 지적) | **`as("…")`**: 위 이유. **기본 규칙 설명만**: 무엇을 할지 말하지 않는다 |
 | D-23 | S8 | **FR-013 도구·한도는 승인 대기(Q01).** 실측: detekt 2.0.0-alpha.6이 Gradle 9.5.1/Kotlin 2.3/JDK 25에서 동작, 기본 한도(함수 60 · 클래스 600 · CC 14 초과)로 main 8 · test 2건. detekt 1.23.8 플러그인은 JDK 25 jvmTarget에서 실패. 사용자가 detekt 외 업계 대안 조사를 요청(2026-09-28) | spec 제약: ktlint는 길이·복잡도를 검사하지 않는다 | 조사 결과와 함께 이 행을 확정한다 |
 | D-24 | S1·S2 | **센서 실행 비용(QR-001)**: 상한은 **도입 전 대비 +25%**(사용자 승인 2026-09-28). 측정은 같은 머신에서 `./gradlew clean check --no-build-cache` 3회 중앙값. 새 ArchUnit 규칙은 클래스 임포트를 공유한다 | 기준(단독 1회): `clean test` 93초 · `clean build` 111초. 스위트 48초 중 아키텍처 테스트 약 39초 — 임포트 공유가 가장 큰 절감 여지다 | **측정 없이 상한 제안**: 근거 없는 숫자 |
 | D-25 | S0·S9 | **VC-001 하네스: 두 서버 교차(A/B) 실행.** 기준 커밋 서버(A)와 리팩토링 후 서버(B)를 **같은 dev DB·Valkey**에 붙여 로컬 포트 두 곳(8080·8888 제외)에 띄우고, 요청 하나를 A·B에 연달아 보내 HTTP 상태 + 본문을 비교한다. 요청 집합은 99개 연산 × (성공 ≥1, 오류 ≥1). 변경 연산은 A용·B용 계정을 따로 둔다. 정규화는 호출마다 달라지는 값만, 목록을 결과에 남기고 **배열은 정렬하지 않는다**(POL-019·055). 산출물: `problem/SPEC-0039-vc/`. **원본 응답은 커밋하지 않는다**(POL-013) | 외부 실시간 데이터·시계·캐시가 결과를 흔든다 — 교차 실행이 그 차이를 최소화한다. CLAUDE.md: 인프라 테스트를 스위트에 넣지 않는다. dev DB에 테스트 데이터가 생기는 것은 사용자 동의(2026-09-28) | **스위트 안 DGS 골든 테스트**: CLAUDE.md가 금지하는 컨텍스트 부팅 테스트. **기준 응답을 먼저 캡처해 두고 나중에 비교**: 실시간 데이터·시각 차이가 거짓 양성으로 쏟아진다 |
@@ -82,7 +82,7 @@ spec이 `미정`으로 둔 것 — 실측값은 spec.md에 되쓴다.
 | 항목 | 값 (2026-09-28 실측) | 이 숫자로 내린 판단 |
 |---|---|---|
 | GraphQL 연산 수 | Query 35 · Mutation 62 · Subscription 2 = **99**. Mutation은 전부 `userErrors` payload | VC-001 요청 집합 ≥ 198. 구독 때문에 하네스에 WebSocket 클라이언트가 필요하다(D-25) |
-| 현재 빌드·테스트 시간 | `clean test` 93초 · `clean build` 111초(단독 1회), 1664 테스트 | Q02 상한의 기준(D-24). S1 착수 전 `clean check` 3회 중앙값으로 다시 잰다 |
+| 현재 빌드·테스트 시간 | `clean test` 93초 · `clean build` 111초(단독 1회), 1664 테스트. **기준 `clean check --no-build-cache` 3회: 89·87·104초, 중앙값 89초** → QR-001 상한 약 111초. **B1 후 3회: 73·105·107초, 중앙값 105초(+18%, 상한 안)** — 아키텍처 테스트 약 39초 → 6.5초로 줄었으나 ktlint 태스크가 더해졌다. 같은 머신에서도 편차가 커(73~107초) S9에서 다시 잰다 | Q02 상한의 기준(D-24) |
 | ktlint 초기 위반 | intellij_idea 1364(자동 수정 1226, 잔여 138: package-name 98 · kdoc 30 · filename 6 · property-naming 4) / official 7194 | D-21 |
 | 함수·클래스 길이·복잡도 분포 | 함수 LOC main p99 35 · max 99, CC main p99 8 · max 19, 클래스 main max 520줄 / test max 1318줄 | Q01(D-23) |
 
@@ -97,9 +97,9 @@ grep으로 확인한 수(worktree `82fdd48`):
 
 | # | 브랜치 | 인수 조건 / 확인 항목 | 내용 | 상태 |
 |---|---|---|---|---|
-| S0 | B1 | VC-001·VC-007 준비 | 이 문서, 기준 커밋 테스트 목록 추출 | |
-| S1 | B1 | FR-012 · FR-014 · VC-004(스타일) · VC-005 | ktlint 플러그인(D-20) → 일괄 포맷 커밋 → 수작업 수정 → 린트 활성화, CI `check` 전환 | |
-| S2 | B1 | FR-008 · FR-010 · FR-015 | 이미 0건인 센서: 생성 타입·엔티티 누출 금지(D-08), `*Port`(D-17), `*Policy`(D-07). 임포트 공유(D-24) | |
+| S0 | B1 | VC-001·VC-007 준비 | 이 문서, 기준 커밋 테스트 목록 추출 | 완료 |
+| S1 | B1 | FR-012 · FR-014 · VC-004(스타일) · VC-005 | ktlint 플러그인(D-20) → 일괄 포맷 커밋 → 수작업 수정 → 린트 활성화, CI `check` 전환 | 완료. VC-004(스타일) 탐침 확인 |
+| S2 | B1 | FR-008 · FR-010 · FR-015 | 이미 0건인 센서: 생성 타입·엔티티 누출 금지(D-08), `*Port`(D-17). 임포트 공유(D-24) | 완료. VC-003 탐침 확인. `*Policy`(D-07)는 보류 |
 | S3 | B2 | AC-001 · AC-002 · AC-004 · AC-005 | community 규칙을 domain 판정 + `application/validation` 번역으로(D-02·D-03·D-05) | |
 | S4 | B2 | AC-003 | 상태 전이 규칙을 애그리게이트 결과로 | |
 | S5 | B2 | AC-006 · AC-007 | 설정 한도 판정 한곳으로(D-06), 값 불변 확인 | |
@@ -157,7 +157,7 @@ grep으로 확인한 수(worktree `82fdd48`):
 - `PushDispatchStore`는 `REQUIRES_NEW` 전파를 `LayeredArchitectureTest`가 강제한다 — 개명(D-13) 시 규칙이 새 이름을 계속 잡는지 확인한다.
 - 자동 생성 코드 제외: ArchUnit은 QueryDSL Q클래스를 구조로 제외, DGS 생성 타입은 `common` 패키지라 새 규칙 범위 밖. ktlint는 경로로 제외(D-21).
 
-**센서 목록(최종).** 기존 규칙은 유지한다. 새로 켜는 것: 생성 타입·엔티티 누출(D-08), `*Port`(D-17), `*Policy`(D-07), 변환 위치(D-09), 이름 규칙(D-12~D-15), ktlint(D-20·D-21), 길이·복잡도(D-23, Q01 후).
+**센서 목록(최종).** 기존 규칙은 유지한다. 새로 켜는 것: 생성 타입·엔티티 누출(D-08), `*Port`(D-17), `*Policy`(D-07, 보류 중), 변환 위치(D-09), 이름 규칙(D-12~D-15), ktlint(D-20·D-21), 길이·복잡도(D-23, Q01 후).
 
 ## 변경 이력
 
@@ -165,3 +165,4 @@ grep으로 확인한 수(worktree `82fdd48`):
 |---|---|---|
 | 2026-09-28 | 초안 작성(D-01~D-29), 실측값 기록 | SPEC-0039 착수 전 설계 기록 |
 | 2026-09-28 | D-21(intellij_idea·package-name 끔), D-24(Q02 +25%), D-25(dev DB 사용), D-28(그대로 옮긴 변환 테스트 면제) 사용자 승인 | 설계 합의 |
+| 2026-09-28 | B1 완료 기록: D-07 보류, D-17 대상 기준, D-20 kotlinter 선택 근거·CI 경로, D-22 `because`로 뒤집음, 기준 시간 | 구현과 reviewer 지적 반영 |

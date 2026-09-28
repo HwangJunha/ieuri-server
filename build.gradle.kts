@@ -209,10 +209,12 @@ tasks.named("compileKotlin") {
 
 // 자동 생성 코드는 스타일 검사 대상이 아니다 — 위 srcDir 등록 때문에 main 소스셋에 들어온다.
 tasks.withType<org.jmailen.gradle.kotlinter.tasks.LintTask>().configureEach {
-    exclude { it.file.path.contains("/build/generated/") }
+    val generatedDir = layout.buildDirectory.dir("generated").get().asFile
+    exclude { it.file.startsWith(generatedDir) }
 }
 tasks.withType<org.jmailen.gradle.kotlinter.tasks.FormatTask>().configureEach {
-    exclude { it.file.path.contains("/build/generated/") }
+    val generatedDir = layout.buildDirectory.dir("generated").get().asFile
+    exclude { it.file.startsWith(generatedDir) }
 }
 
 // plain jar는 라이브러리로 배포할 때 쓰는 산출물이라 이 프로젝트에는 쓸모가 없다. 켜 두면

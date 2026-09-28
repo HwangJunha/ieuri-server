@@ -113,14 +113,18 @@ class ConsistencyConventionTest {
     }
 
     /**
-     * 아웃바운드 포트 인터페이스는 `Port`로 끝난다(SPEC-0039 D-17). 연산이 없는 인터페이스는 포트가 아니라
-     * 포트가 돌려주는 결과 타입(`sealed interface SnsRevokeResult`)이라 대상에서 뺀다.
+     * 아웃바운드 포트 인터페이스는 `Port`로 끝난다(SPEC-0039 D-17). 포트는 infrastructure가 구현하는
+     * 인터페이스다 — 같은 패키지의 결과 타입(`sealed interface SnsRevokeResult`)은 대상이 아니다.
      */
     @Test
     fun `아웃바운드 포트 인터페이스는 Port로 끝난다`() {
         classes().that().resideInAPackage("..application.port.out..")
             .and().areInterfaces()
-            .and(DescribedPredicate.describe("연산을 선언한") { it.methods.isNotEmpty() })
+            .and(
+                DescribedPredicate.describe("infrastructure가 구현하는") { port ->
+                    port.allSubclasses.any { it.packageName.contains(".infrastructure.") }
+                },
+            )
             .should().haveSimpleNameEndingWith("Port")
             .because("포트는 이름으로 식별된다 — port/out의 인터페이스 이름을 XxxPort로 바꾼다")
             .check(classes)
