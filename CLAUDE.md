@@ -83,20 +83,11 @@ Uses the Gradle wrapper (`./gradlew`); Gradle 9.5.1, Java toolchain 25.
   written early get rewritten every time a requirement moves, and that cost exceeds the feedback
   gained.
 
-  **Structure sensors are the exception — run them as you finish each piece, not once at the end.**
+  **While writing code, keep it compiling and run no tests — the architecture tests included.**
 
   ```
-  ./gradlew compileKotlin compileTestKotlin test --tests "org.around.ieuri.architecture.*"
+  ./gradlew compileKotlin compileTestKotlin
   ```
-
-  Run it when a piece of the slice stands on its own — a resolver wired up, a mapper written, a
-  migration added — not after every edit. The point is that a violation surfaces while you still
-  remember why you wrote it that way; a check saved for just before the PR arrives when the fix is
-  a rewrite. It takes well under a minute, so the cost of running it a few times per slice is
-  nothing against finding out late.
-
-  This does not conflict with the rule above: what that rule prevents is **tests that move with the
-  requirements**, and structure rules do not move.
 
   **Immediately before opening the PR**, write the tests for the domain and application logic this
   slice added, and make `./gradlew test` pass. The `test-strategy` skill has the required shape.
