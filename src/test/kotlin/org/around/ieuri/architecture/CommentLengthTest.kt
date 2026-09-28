@@ -9,8 +9,10 @@ class CommentLengthTest {
 
     @Test
     fun `주석 한 덩어리는 15줄 미만이다`() {
-        // 자동 생성 코드(build/generated)는 검사 대상이 아니다.
-        val sources = Konsist.scopeFromProject().files.filterNot { "/build/" in it.path }
+        // 프로젝트 루트 기준: 자동 생성 코드(build/)와 다른 worktree(.claude/)는 검사 대상이 아니다.
+        val sources = Konsist.scopeFromProject().files.filterNot {
+            it.projectPath.startsWith("/build/") || it.projectPath.startsWith("/.claude/")
+        }
         val violations = sources.flatMap { file ->
             commentBlocks(file.text)
                 .filter { it.lines >= MAX_LINES }

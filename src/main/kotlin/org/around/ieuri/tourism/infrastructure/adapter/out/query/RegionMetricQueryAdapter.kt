@@ -24,6 +24,7 @@ class RegionMetricQueryAdapter(
     /**
      * origin 좌표를 품은 시군구 1건. 경계 안에 없으면(바다·해외) null이다.
      * - `ST_MakePoint`는 (경도, 위도) 순서다 — 뒤집으면 조용히 0건이 된다.
+     * - 경계선 위 좌표는 2건을 낼 수 있어 `LIMIT 1`이 필요하다. geography 캐스팅을 빼면 공간 인덱스를 타지 않는다.
      */
     @Transactional(readOnly = true)
     override fun findDistrictAt(origin: Coordinates): OriginDistrict? = jdbcTemplate.query(

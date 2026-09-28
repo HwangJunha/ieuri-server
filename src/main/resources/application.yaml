@@ -25,6 +25,7 @@ spring:
       connection-init-sql: SET search_path TO auth, community, tour, category, alarm, public
       # 쓰기·읽기 두 풀 각각에 적용된다(replicaDataSource가 이 블록을 공유) — 파드당 쓰기 60 + 읽기 60.
       # 올리기 전에 DB max_connections(ieuri-manifest)가 먼저 올라가 있어야 한다. 아니면 기동 즉시 거절된다.
+      # 풀 증설은 임시 처방이다(근본은 recommendedSpots 쿼리 경량화). 올리기 전 replica의 work_mem×동시성이 2Gi 안인지 확인한다.
       maximum-pool-size: 60
       keepalive-time: 120000
       # 첫 커넥션 확보를 30초까지 재시도한다(기본 1초는 즉시 실패).
@@ -371,7 +372,7 @@ ieuri:
       # 같은 카테고리 n번째 장소에 깎는 penalty × (n − 1). 0이면 순수 점수순.
       category-repeat-penalty: 0.1
       # 후보 상한 N — 거리 가까운 순 N건만 점수·재배열 대상이다.
-      # 이 값이 DB 작업량을 직접 정한다. 350 아래로 내리면 FR-006(카테고리 60% 이하)을 어긴다(SPEC-0038).
+      # 이 값이 DB 작업량을 직접 정한다. 300에서 FR-006(카테고리 60% 이하) 위반, 350에서 통과(3지점 실측, SPEC-0038).
       candidate-cap: 500
       # 취향이 있으면 (1 − w)·거리 + w·취향. 반응(좋아요 + 싫어요)이 최소 수 미만이면 취향 없음.
       taste-weight: 0.5
@@ -439,6 +440,7 @@ ieuri:
     timeout: 3s
   fcm:
     # 앱 푸시 발송(SPEC-0028, POL-027). 서비스 계정 JSON 경로이며 파일은 커밋하지 않는다.
+    # JSON을 환경변수에 통째로 넣지 않는다 — 개행이 깨지고 /proc/<pid>/environ으로 노출된다. Secret 볼륨 경로로 준다.
     # 빈 값이면 기동은 되고 발송만 실패한다.
     service-account-location: ${IEURI_FCM_SERVICE_ACCOUNT_PATH:}
     # FCM 호출 대기 상한. 기본값(무제한)이면 응답 없는 FCM이 발송 워커를 붙들어 큐가 막힌다.

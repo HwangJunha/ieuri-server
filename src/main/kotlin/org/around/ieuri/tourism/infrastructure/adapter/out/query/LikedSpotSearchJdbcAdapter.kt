@@ -19,7 +19,7 @@ import java.sql.Timestamp
 /**
  * 좋아요 목록 내 검색 어댑터(SPEC-0033). pg_search 연산자(`@@@`) 때문에 생 SQL이다.
  * - 검색 노드(searchJdbcTemplate)를 본다. 방금 누른 좋아요는 복제 전이면 잠시 검색에 안 잡힌다.
- * - `spot_reaction`을 조인한다. 정렬이 고정이라 `LIMIT` 조기 종료를 잃어도 손해가 없다.
+ * - `spot_reaction`을 조인하므로 매칭 집합 전체를 읽는다 — 넓은 검색어일수록 느려진다(정렬이 고정이라 top-K 조기 종료는 애초에 못 쓴다).
  */
 @Component
 class LikedSpotSearchJdbcAdapter(
