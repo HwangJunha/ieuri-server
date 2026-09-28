@@ -1,6 +1,6 @@
 package org.around.ieuri.community.domain.event
 
-/**
+/*
  * 알림 트리거 3종(SPEC-0028 R5~R7).
  *
  * **`application/event`가 아니라 여기 있는 이유는 구독자가 다른 도메인(alarm)이기 때문이다** —

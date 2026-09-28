@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 
-/**
+/*
  * 장소 질문/답변의 배치 로더(SPEC-0026).
  *
  * 지연 필드는 요청당 과다 조회를 막고 DataLoader는 요청 **안**의 N+1을 막는 것이라,

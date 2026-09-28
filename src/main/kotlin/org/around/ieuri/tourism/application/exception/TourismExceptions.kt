@@ -1,6 +1,6 @@
 package org.around.ieuri.tourism.application.exception
 
-/**
+/*
  * tourism 도메인 예외 taxonomy.
  *
  * 두 갈래로 나뉜다:
@@ -94,7 +94,7 @@ class UpstreamRateLimitedException(message: String = "잠시 후 다시 시도�
  */
 class UpstreamTooManyRequestsException(message: String = "잠시 후 다시 시도해 주세요.", cause: Throwable? = null) : SpotQueryException("UPSTREAM_RATE_LIMITED", Classification.RESOURCE_EXHAUSTED, message, cause)
 
-/**
+/*
  * 지도 뷰포트·혼잡도 조회의 실패(SPEC-0014 §10). 기존 쿼리 오류와 같은 경로로 최상위
  * errors[]에 실린다.
  *

@@ -4,7 +4,7 @@ import org.around.ieuri.auth.application.exception.UserFacingException
 import org.around.ieuri.common.graphql.generated.types.ErrorCode
 import org.around.ieuri.common.graphql.generated.types.UserError
 
-/**
+/*
  * mutation 리졸버의 공통 오류 규약(BaseResponse). 예상 가능한 도메인/입력 실패는 payload의 userErrors로
  * 변환하고, 그 외(인증/인가/토큰/시스템 오류)는 다시 던져 GraphQL 최상위 error로 전파한다.
  */

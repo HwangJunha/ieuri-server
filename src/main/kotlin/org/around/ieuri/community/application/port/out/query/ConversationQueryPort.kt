@@ -20,7 +20,7 @@ interface ConversationQueryPort {
     /** 대화 단건. 존재·참여자 판정에 쓴다. 없으면 null. */
     fun findConversation(conversationId: Long, memberId: Long): ConversationView?
 
-    /**
+    /*
      * 메시지 단건. 새 메시지 구독이 이벤트의 id로 **DB에서 다시 읽을 때** 쓴다 —
      * 본문을 브로커에 싣지 않으므로(POL-013) 값의 원본은 항상 DB다.
      *

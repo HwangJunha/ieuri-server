@@ -19,11 +19,11 @@ import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostTagEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.ReportEntity
 
-/**
+/*
  * 엔티티↔도메인 변환. 형태만 옮기며 업무 규칙도 I/O도 없다.
  */
 
-/**
+/*
  * 글 엔티티를 도메인으로.
  *
  * 파싱되지 않는 사진 키는 **조용히 버리지 않고 실패시킨다**. 적재 시점에 형식을 통과한

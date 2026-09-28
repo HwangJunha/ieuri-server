@@ -536,7 +536,7 @@ class MemberRegistrationServiceTest {
         verify(exactly = 0) { eventPublisher.publish(any<PasswordResetRequested>()) }
     }
 
-    /**
+    /*
      * **비밀번호가 없는 계정에는 코드를 발급하지도 메일을 보내지도 않는다.**
      *
      * 재설정할 비밀번호가 없어 성립하지 않는 요청이고, 보냈다면 주소를 아는 제3자가 메일

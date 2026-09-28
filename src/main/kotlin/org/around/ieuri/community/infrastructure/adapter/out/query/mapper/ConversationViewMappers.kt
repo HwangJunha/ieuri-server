@@ -3,7 +3,7 @@ package org.around.ieuri.community.infrastructure.adapter.out.query.mapper
 import org.around.ieuri.community.application.query.ConversationSpotQaOriginView
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.MessageQuoteEntity
 
-/**
+/*
  * 메시지 엔티티 → 읽기 모델 변환(SPEC-0026, POL-033).
  *
  * **암복호화를 하지 않는다** — 복호화한 평문을 파라미터로 받아 순수 함수로 남는다.

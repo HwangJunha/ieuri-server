@@ -33,7 +33,7 @@ data class CommunityProperties(
     /** 피드 카드에 얹는 댓글 미리보기 개수. 전체 목록은 comments(postId:)가 따로 낸다. */
     val commentPreviewSize: Int = 3,
     val maxRadiusMeters: Int = 100_000,
-    /** 지역 피드가 한 번에 다룰 spot 수 상한. 넘으면 잘린다. */
+    /* 지역 피드가 한 번에 다룰 spot 수 상한. 넘으면 잘린다. */
 )
 
 /**

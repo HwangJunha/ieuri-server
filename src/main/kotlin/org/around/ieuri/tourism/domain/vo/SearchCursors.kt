@@ -3,7 +3,7 @@ package org.around.ieuri.tourism.domain.vo
 import java.nio.charset.StandardCharsets
 import java.util.Base64
 
-/**
+/*
  * SPEC-0013 커서 커넥션 2종(진행 중 축제·인기)의 keyset 커서.
  *
  * **검색은 여기 없다.** BM25 관련도는 검색 엔진이 계산하는 값이라 "이 점수보다 뒤"를 조건절로

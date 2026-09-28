@@ -23,7 +23,7 @@ data class CreatePostCommand(
     val photoKeys: List<String>,
 )
 
-/**
+/*
  * 글 수정 입력. 제목·본문만 바꾼다 — 사진·주제·대상은 불변이다.
  */
 

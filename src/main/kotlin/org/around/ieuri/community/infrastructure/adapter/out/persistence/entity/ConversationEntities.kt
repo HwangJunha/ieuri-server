@@ -14,7 +14,7 @@ import org.around.ieuri.common.persistence.DbSchema
 import org.around.ieuri.community.domain.vo.ReportReason
 import java.time.Instant
 
-/**
+/*
  * DM JPA 엔티티(SPEC-0017). 도메인 모델과 분리되며 `mapper` 패키지가 변환한다.
  *
  * 다른 도메인을 가리키는 id(sender_id·member_low·member_high)는 plain 컬럼이다 — 물리 FK도

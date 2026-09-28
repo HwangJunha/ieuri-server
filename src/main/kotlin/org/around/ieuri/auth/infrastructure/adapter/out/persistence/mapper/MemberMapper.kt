@@ -33,7 +33,7 @@ fun MemberEntity.toDomain(profile: MemberProfileEntity?, decryptedEmail: String)
     createdAt = requireNotNull(createdAt),
 )
 
-/**
+/*
  * 도메인 [Member]를 새 엔티티로 옮긴다. id는 DB가 채운다.
  *
  * [encryptedEmail]을 인자로 받는다 — 암호화는 암호화 포트의 책임이므로 여기서 하지 않는다.

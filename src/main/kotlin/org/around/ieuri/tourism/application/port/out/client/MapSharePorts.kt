@@ -1,6 +1,6 @@
 package org.around.ieuri.tourism.application.port.out.client
 
-/**
+/*
  * 공유 지도가 다른 도메인에 묻는 두 가지(SPEC-0030 R13·R16).
  *
  * **tourism이 소유하는 포트다.** 상대 도메인의 `port/in`을 서비스가 직접 주입하면 애플리케이션

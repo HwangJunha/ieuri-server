@@ -10,7 +10,7 @@ import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
-/**
+/*
  * KTO 빅데이터 응답 행 → 적재 명령(POL-033).
  *
  * **세 가지 시군구 코드 표기가 여기서 하나가 된다** — `signguCode`(방문자수) ·

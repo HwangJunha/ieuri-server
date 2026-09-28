@@ -11,7 +11,7 @@ import org.around.ieuri.tourism.infrastructure.adapter.out.client.seoulopendata.
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-/**
+/*
  * 서울 실시간 도시데이터 응답 → 도메인 변환(POL-033).
  *
  * 방어 원칙 셋(spec §3.4):

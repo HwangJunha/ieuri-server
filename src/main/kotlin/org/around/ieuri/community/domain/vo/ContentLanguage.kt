@@ -18,7 +18,7 @@ enum class ContentLanguage {
         /** 헤더 부재·미지원 언어 시 폴백. 외국인 방문객 우선. */
         val FALLBACK: ContentLanguage = EN
 
-        /** BCP-47/ISO 언어 태그("ko-KR", "ja", "zh-Hant")를 도메인 언어로 정규화한다. */
+        /* BCP-47/ISO 언어 태그("ko-KR", "ja", "zh-Hant")를 도메인 언어로 정규화한다. */
 
         /**
          * `Accept-Language` 헤더를 콘텐츠 언어로 정규화한다. **첫 항목만 본다** —
