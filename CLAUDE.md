@@ -206,6 +206,7 @@ skill re-checks them:
   `@Transactional` off domain and resolvers, repository/`Port`/`Dto`/test naming.
 - ktlint via kotlinter (`./gradlew lintKotlin`, part of `check`) — code style, rules in `.editorconfig`.
 - `ImportStyleTest` — no wildcard imports (source-level, so Konsist rather than ArchUnit).
+- `CommentLengthTest` — no comment block (KDoc, block, or a run of `//`) of 15 lines or more (Konsist).
 
 `ConsistencyConventionTest` and `ImportStyleTest` fix **what is already consistent**, chosen because
 a full survey found zero violations — not because the convention has been settled. They are
