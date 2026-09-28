@@ -172,9 +172,7 @@ class RecommendedSpotsQueryServiceTest {
     fun `취향 요인이 압축돼 있어도 후보 안에서 펼쳐져 순서를 가른다`() {
         every { spotQueryPort.findReactedSpotIdsByReaction(7L, DomainLocale.EN) } returns
             mapOf(ReactionType.LIKE to setOf(8L, 9L), ReactionType.DISLIKE to setOf(6L))
-        // 1번이 더 멀지만(2,000m vs 1,000m) 취향이 높다. 실측에서 관찰된 압축 구간을 그대로 쓴다 —
-        // 원값 그대로면 두 취향 요인의 차가 0.0035라 거리 격차(0.03)에 묻혀 2번이 앞선다.
-        // 정규화하면 0과 1로 펼쳐져 1번이 앞선다.
+        // 1번이 더 멀지만 취향이 높다. 압축된 취향 값도 정규화로 펼쳐져 1번이 앞선다.
         every { spotSpatialQueryPort.searchNearby(any()) } returns
             listOf(card(1, 2_000.0, shopping), card(2, 1_000.0, restaurant))
         every { tasteSimilarityQueryPort.findSimilarities(any(), any(), any(), any(), any()) } returns mapOf(

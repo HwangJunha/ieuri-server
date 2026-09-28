@@ -81,8 +81,7 @@ class MapRecommendationServiceTest {
         excluded: Set<Long> = emptySet(),
         first: Int = 10,
     ) = MapRecommendedSpotsQuery(
-        // 쿼리 입력은 원시 좌표다 — 도메인 VO 조립은 서비스가 한다. 테스트에서는 읽기 쉽도록
-        // MapBounds로 케이스를 쓰고 여기서 풀어 넘긴다.
+        // 쿼리 입력은 원시 좌표다 — 케이스는 MapBounds로 쓰고 여기서 풀어 넘긴다.
         minLat = bounds.minLat,
         minLng = bounds.minLng,
         maxLat = bounds.maxLat,
@@ -92,10 +91,7 @@ class MapRecommendationServiceTest {
         first = first,
     )
 
-    /**
-     * 후보 1건. **좌표는 id마다 다르게 준다** — 같은 좌표는 대표 1건으로 접히므로(D-14),
-     * 접기를 검증하지 않는 케이스에서 후보가 조용히 줄어드는 것을 막는다.
-     */
+    /** 후보 1건. 좌표는 id마다 다르게 준다 — 같은 좌표는 대표 1건으로 접힌다(D-14). */
     private fun candidate(
         id: Long,
         distanceMeters: Double,
@@ -175,7 +171,7 @@ class MapRecommendationServiceTest {
 
         service.mapRecommendedSpots(query(excluded = setOf(11L, 12L)), DomainLocale.EN, 7L)
 
-        // 반응한 2·5는 제외되지 않는다(D-13) — 지도는 화면 안의 것을 그리고 반응은 순서만 바꾼다.
+        // 반응한 2·5는 제외되지 않는다(D-13).
         assertEquals(setOf(11L, 12L), search.captured.excludedSpotIds)
         assertEquals(DomainLocale.EN, search.captured.language)
         assertEquals(2_000, search.captured.limit)
@@ -228,7 +224,7 @@ class MapRecommendationServiceTest {
     @Test
     fun `AC-016 같은 좌표의 후보는 점수가 가장 높은 1건만 남는다`() {
         noReactions()
-        // 한 지점에 3건, 다른 지점에 1건. 지도는 좌표 하나에 마커 하나를 그린다(D-14).
+        // 한 지점에 3건, 다른 지점에 1건(D-14).
         candidatesAre(
             candidate(1L, 500.0, shopping, lng = 126.99, lat = 37.55),
             candidate(2L, 300.0, shopping, lng = 126.99, lat = 37.55),
@@ -266,8 +262,6 @@ class MapRecommendationServiceTest {
 
     @Test
     fun `뒤집히거나 범위 밖인 좌표는 응용 계층에서 거절된다`() {
-        // 검증은 어댑터가 아니라 여기서 한다 — 다른 인바운드가 같은 유스케이스를 불러도
-        // 같은 규칙이 걸린다. 도메인 불변식 실패를 INVALID_BBOX로 번역하는 것이 boundsOf다.
         val flipped = query().copy(minLat = 37.56, maxLat = 37.54)
         val outOfRange = query().copy(minLat = -91.0)
 

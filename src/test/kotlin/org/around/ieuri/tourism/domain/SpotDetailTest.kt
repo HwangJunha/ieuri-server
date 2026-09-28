@@ -54,7 +54,6 @@ class SpotDetailTest {
 
     @Test
     fun `title이 비면 거부한다`() {
-        // id 불변식은 사라졌다(V20) — 이 모델은 식별자를 담지 않고 읽기 DTO가 소유한다.
         assertFailsWith<IllegalArgumentException> { detail().copy(title = " ") }
     }
 

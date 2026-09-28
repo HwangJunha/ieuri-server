@@ -11,9 +11,8 @@ import org.around.ieuri.tourism.domain.vo.DomainLocale
 interface NationwideMapCommandUseCase {
 
     /**
-     * 시군구를 방문으로 기록한다(R3). 이미 기록된 코드는 중복되지 않으며 오류도 아니다.
-     *
-     * 갱신된 칸을 돌려줘 클라이언트가 재조회 없이 지도를 고칠 수 있게 한다(계약 §7.1).
+     * 시군구를 방문으로 기록하고 갱신된 칸을 돌려준다(R3).
+     * - 이미 기록된 코드는 중복되지 않으며 오류도 아니다.
      */
     fun recordVisits(command: RecordVisitsCommand, locale: DomainLocale): RecordVisitsResult
 
@@ -24,7 +23,7 @@ interface NationwideMapCommandUseCase {
     fun createShareLink(memberId: Long): MapShareLinkView
 
     /**
-     * 공유 링크를 폐기한다(R14). 발급 때 받은 URL을 그대로 넘긴다 — 토큰 추출은 서버가 한다.
+     * 공유 링크를 폐기한다(R14). 발급 때 받은 URL을 그대로 넘긴다.
      *
      * @return 실제로 폐기했으면 true. 본인 것이 아니거나 이미 폐기됐으면 false다.
      */

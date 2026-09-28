@@ -8,12 +8,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
 
-/**
- * 축제 적재 입력의 조립 규칙(SPEC-0007 R-1).
- *
- * 이 커맨드가 **무엇을 담지 않는지**가 중요하다 — 제목·주소·좌표는 `spot`에 이미 있고, 축제 적재가
- * 그 값을 다시 쓰면 두 수집 경로가 같은 컬럼을 놓고 경합한다(AC-3).
- */
+/** 축제 적재 입력의 조립 규칙(SPEC-0007 R-1). 제목·주소·좌표는 `spot`의 몫이라 담지 않는다(AC-3). */
 class SyncFestivalCommandTest {
 
     private val period = FestivalPeriod(

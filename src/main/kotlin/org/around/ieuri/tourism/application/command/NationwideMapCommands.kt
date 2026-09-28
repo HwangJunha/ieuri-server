@@ -2,12 +2,7 @@ package org.around.ieuri.tourism.application.command
 
 import org.around.ieuri.tourism.application.query.MapCellView
 
-/**
- * 방문 등록 입력(SPEC-0030 R3).
- *
- * **칸 id가 아니라 시군구 코드다** — 클라이언트가 로컬 경계 데이터로 판정한 결과를 그대로
- * 넣는다. 칸으로 받으면 광역시 칸 하나가 25개 시군구 전체를 방문 처리해 버린다.
- */
+/** 방문 등록 입력(SPEC-0030 R3). 칸 id가 아니라 시군구 코드다. */
 data class RecordVisitsCommand(
     val memberId: Long,
     val districtCodes: List<String>,
@@ -15,9 +10,8 @@ data class RecordVisitsCommand(
 
 /**
  * 방문 등록 결과.
- *
- * [updatedCells]는 **이번 요청으로 방문 상태가 된 칸만** 담는다 — 이미 방문한 칸은 빠진다.
- * [unknownDistrictCodes]가 비어 있지 않으면 DISTRICT_NOT_FOUND userError가 된다.
+ * - [updatedCells]는 이번 요청으로 방문 상태가 된 칸만 담는다.
+ * - [unknownDistrictCodes]가 비어 있지 않으면 DISTRICT_NOT_FOUND userError가 된다.
  */
 data class RecordVisitsResult(
     val updatedCells: List<MapCellView>,

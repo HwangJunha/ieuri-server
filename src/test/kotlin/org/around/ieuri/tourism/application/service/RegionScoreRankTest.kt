@@ -17,13 +17,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * 항목별 순위(SPEC-0015 · 계약의 `RegionScore.rank`).
- *
- * 순위는 **상한을 적용하기 전의 후보 전체**에서 나오고 1이 가장 좋다. 반환된 목록 안에서
- * 다시 매기면 요청 개수에 따라 같은 지역의 순위가 달라져, 클라이언트가 "이 시도에서 몇 위"
- * 라고 말할 수 없게 된다.
- */
+/** 항목별 순위(SPEC-0015 `RegionScore.rank`). 상한 적용 전 후보 전체에서 매기며 1이 가장 좋다. */
 class RegionScoreRankTest {
 
     /** 관심사는 순위뿐이라 최소 항목 수·시도 규모 필터를 무력화한다. */
@@ -37,10 +31,7 @@ class RegionScoreRankTest {
         maxLimit = 50,
     )
 
-    /**
-     * origin의 시군구 코드는 픽스처에 없는 값이다 — 자기 지역 제외가 후보를 건드리지 않게 해
-     * 모수가 픽스처 전건임을 분명히 한다.
-     */
+    /** origin의 시군구 코드는 픽스처에 없는 값이라 모수가 픽스처 전건이다. */
     private fun service(
         fixtures: List<RegionFixture>,
         policy: RegionRecommendationPolicy = policy(),
@@ -49,9 +40,7 @@ class RegionScoreRankTest {
         policy,
     )
 
-    /**
-     * 모든 지역이 같은 좌표라 거리 점수가 동일해진다 — 순위 차이는 오직 지정한 지표에서 온다.
-     */
+    /** 모든 지역이 같은 좌표라 순위 차이는 지정한 지표에서만 온다. */
     private fun fixture(
         code: String,
         metrics: Map<RegionScoreFactor, Double>,
@@ -91,8 +80,7 @@ class RegionScoreRankTest {
 
     @Test
     fun `혼잡도 1위는 가장 덜 붐비는 지역이다 — 원본 값이 가장 낮은 쪽이다`() {
-        // 혼잡도는 정규화가 방향을 뒤집으므로, 값 내림차순 하나로 매겨도 원본 최솟값이 1위다.
-        // 뒤집기를 순위에서 한 번 더 하거나 빠뜨리면 여기가 잡는다.
+        // 혼잡도는 정규화가 방향을 뒤집는다.
         val service = service(
             listOf(
                 fixture("11110", mapOf(RegionScoreFactor.CONGESTION to 90.0)), // 가장 붐빔
@@ -110,9 +98,7 @@ class RegionScoreRankTest {
 
     @Test
     fun `순위는 잘리기 전 후보 전체에서 매긴다 — 반환된 3건에 4위 이상이 올 수 있다`() {
-        // 체류 강도는 코드 순서대로 낮아지고, 소비 강도는 그 반대다. 총점이 같아 정렬은
-        // 코드 오름차순이 되어 앞의 3건만 반환되는데, 그 3건의 소비 강도 순위는 6·5·4다.
-        // 순위를 반환 목록에서 다시 매기면 1·2·3이 나와 여기가 실패한다.
+        // 반환되는 앞의 3건의 소비 강도 순위는 6·5·4다.
         val service = service(
             (0 until 6).map { index ->
                 fixture(
@@ -194,8 +180,7 @@ class RegionScoreRankTest {
 
     @Test
     fun `거리도 순위를 받는다 — 가까울수록 1위다`() {
-        // 대표 좌표만 다르게 둔다. 거리는 적재된 지표가 아니라 요청 시점 계산이지만,
-        // 값이 있는 이상 다른 항목과 같은 규칙으로 순위가 붙는다.
+        // 대표 좌표만 다르게 둔다.
         fun at(code: String, latitude: Double) = RegionFixture(
             region = RegionRow(
                 code = code,
@@ -219,8 +204,7 @@ class RegionScoreRankTest {
 
     @Test
     fun `근거가 얕아 제외된 지역은 모수에서 빠진다 — 순위는 남은 후보에서 매긴다`() {
-        // 최소 항목 수 2에 걸려 탈락하는 지역(지표 없음 = 거리 1항목뿐)이 값은 가장 높다.
-        // 탈락 전 집합에서 순위를 매기면 남은 지역들이 한 칸씩 밀려 2·3위가 된다.
+        // 최소 항목 수 2에 걸려 탈락하는 지역(거리 1항목뿐)이 값은 가장 높다.
         val service = service(
             listOf(
                 fixture("11110", mapOf(RegionScoreFactor.STAY_INTENSITY to 50.0)),

@@ -8,11 +8,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
-/**
- * 신선도 감쇠(SPEC-0015). 낡은 지표가 최신 지표와 같은 무게로 추천되지 않게 하는 계수다.
- *
- * 기본값 유예 7일 · 반감기 23일은 **7일에 1.0, 30일에 0.5**를 만들기 위해 고른 조합이다.
- */
+/** 신선도 감쇠(SPEC-0015). 유예 7일 · 반감기 23일은 7일에 1.0, 30일에 0.5를 만든다. */
 class FreshnessDecayTest {
 
     private val decay = FreshnessDecay(plateauDays = 7, halfLifeDays = 23.0)
@@ -21,7 +17,7 @@ class FreshnessDecayTest {
     fun `유예 기간 안에서는 감쇠하지 않는다`() {
         assertEquals(1.0, decay.factor(0))
         assertEquals(1.0, decay.factor(3))
-        // 경계값(정확히 7일)은 유예에 포함된다 — 여기서 깎이면 정상 주기가 벌을 받는다.
+        // 경계값(정확히 7일)은 유예에 포함된다.
         assertEquals(1.0, decay.factor(7))
     }
 
@@ -51,7 +47,7 @@ class FreshnessDecayTest {
 
     @Test
     fun `미래 기준일도 감쇠하지 않는다`() {
-        // 업스트림이 앞선 날짜를 주더라도 계수가 1을 넘어 점수를 부풀리면 안 된다.
+        // 미래 날짜여도 계수가 1을 넘지 않는다.
         assertEquals(1.0, decay.factor(-5))
     }
 

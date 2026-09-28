@@ -43,12 +43,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * MapQueryService — SPEC-0014 R3·R5·R6·R9·R11·R13·R14.
- *
- * 포트를 전부 스텁해 **서비스가 무엇을 호출하고 결과를 어떻게 조립하는지**만 본다. PostGIS
- * 공간 질의의 실제 결과, Valkey 직렬화 왕복, 실제 HTTP는 인프라 영역이라 다루지 않는다.
- */
+/** MapQueryService — SPEC-0014 R3·R5·R6·R9·R11·R13·R14. 무엇을 호출하고 어떻게 조립하는지만 본다. */
 class MapQueryServiceTest {
 
     private val mapQueryPort = mockk<MapQueryPort>()
@@ -112,8 +107,6 @@ class MapQueryServiceTest {
 
     @Test
     fun `줌과 무관하게 개별 마커를 돌려준다`() {
-        // 클러스터링을 걷어냈다 — 저줌에서도 같은 조회를 하고 같은 모양으로 돌려준다.
-        // 저줌 화면에서 마커가 빽빽한 것은 클라이언트가 판단할 문제다(2026-08-10 결정).
         every { congestionAreaQueryPort.findAreaCodesWithin(seoulBounds) } returns emptyList()
         every { mapQueryPort.findSpotsWithin(any()) } returns listOf(spot(1), spot(2))
 
@@ -146,7 +139,7 @@ class MapQueryServiceTest {
 
     @Test
     fun `상한을 넘겨 조회해 잘림을 판정한다`() {
-        // AC R3. COUNT(*)를 따로 세지 않고 상한 + 1로 판정한다는 것이 계약이다.
+        // AC R3. COUNT(*) 없이 상한 + 1로 판정한다.
         every { congestionAreaQueryPort.findAreaCodesWithin(seoulBounds) } returns emptyList()
         val search = slot<MapViewportSearch>()
         every { mapQueryPort.findSpotsWithin(capture(search)) } returns emptyList()
@@ -172,7 +165,7 @@ class MapQueryServiceTest {
 
     @Test
     fun `면적 상한을 초과하면 거절된다`() {
-        // AC R5. 전 지구 bbox 한 번으로 전체를 긁어가는 것을 막는다.
+        // AC R5.
         val huge = MapBounds(minLat = 0.0, minLng = 0.0, maxLat = 80.0, maxLng = 170.0)
 
         assertFailsWith<BboxTooLargeException> {
@@ -182,7 +175,7 @@ class MapQueryServiceTest {
 
     @Test
     fun `문화행사는 캐시에서만 모으고 업스트림을 부르지 않는다`() {
-        // AC R12. 지도를 움직일 때마다 행사 때문에 쿼터를 태우면 혼잡도를 볼 호출이 남지 않는다.
+        // AC R12.
         val event = CulturalEventView("e1", "축제", "광장", "2026-08-01~2026-08-10", 127.0, 37.5, null)
         every { congestionAreaQueryPort.findAreaCodesWithin(seoulBounds) } returns listOf("POI009")
         every { cachePort.get("POI009") } returns CachedSeoulOpenData(
@@ -204,7 +197,7 @@ class MapQueryServiceTest {
 
     @Test
     fun `구역 지정이 없으면 거절된다`() {
-        // AC R6. 범위 없는 전체 조회는 일일 쿼터를 한 번에 소진시킨다.
+        // AC R6.
         assertFailsWith<AreaFilterRequiredException> {
             service.seoulCongestion(areaIds = null, bounds = null, locale = DomainLocale.KO)
         }
@@ -222,7 +215,7 @@ class MapQueryServiceTest {
 
     @Test
     fun `구역 id 개수가 상한을 넘으면 거절된다`() {
-        // AC R6. 구역 수가 곧 호출 수라 클램프가 아니라 거절이다.
+        // AC R6. 클램프가 아니라 거절이다.
         assertFailsWith<TooManyAreaIdsException> {
             service.seoulCongestion(
                 areaIds = listOf("POI001", "POI002", "POI003", "POI004"),
@@ -265,8 +258,7 @@ class MapQueryServiceTest {
 
     @Test
     fun `캐시가 신선하면 업스트림을 부르지 않는다`() {
-        // AC R13. 저장 시각 기준으로 판정한다 — 데이터가 30분 지연 도착하므로 5분 경계 TTL은
-        // 같은 데이터를 반복 호출한다.
+        // AC R13. 저장 시각 기준으로 판정한다.
         stubArea("POI009")
         every { cachePort.get("POI009") } returns CachedSeoulOpenData(
             snapshot("POI009", LocalDateTime.parse("2026-08-10T05:45")),
@@ -317,7 +309,7 @@ class MapQueryServiceTest {
 
     @Test
     fun `업스트림이 실패하고 캐시도 없으면 그 구역은 빠진다`() {
-        // AC R11. 예외로 던지지 않는다 — 지도 전체가 실패한 것처럼 다뤄지지 않게.
+        // AC R11. 예외로 던지지 않는다.
         stubArea("POI009")
         every { cachePort.get("POI009") } returns null
         every { seoulOpenDataPort.fetch("POI009", "광화문") } returns null

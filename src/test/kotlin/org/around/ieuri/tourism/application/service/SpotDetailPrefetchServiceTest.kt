@@ -24,11 +24,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 /**
- * 상세 사전 수집의 판단을 고정한다(SPEC-0037). 검증 대상은 **부재와 실패의 구분**, **실패해도
- * 다시 묻지 않는 것**, **일일 한도가 어떻게 나가는지** 셋이다.
- *
- * 동시 실행과 유량 제어 자체는 검증하지 않는다 — 코루틴과 RateLimiter의 몫이고, 여기서 확인할
- * 것은 어떤 I/O가 일어나고 무엇이 적재되는가다. `callsPerSecond`를 크게 두어 대기를 없앤다.
+ * 상세 사전 수집(SPEC-0037) — 부재와 실패의 구분, 실패 시 재시도 없음, 일일 한도 전파를 본다.
+ * - `callsPerSecond`를 크게 두어 유량 제어 대기를 없앤다.
  */
 class SpotDetailPrefetchServiceTest {
 
@@ -53,7 +50,7 @@ class SpotDetailPrefetchServiceTest {
 
         val result = service.prefetchNext(SpotDetailPart.BODY, afterSpotId = 7L, limit = 10)
 
-        // processed가 0이어야 Tasklet이 FINISHED로 끝낸다. 커서를 옮기면 재개 지점이 어긋난다.
+        // processed가 0이어야 호출자가 소진으로 판정한다.
         assertEquals(0, result.processed)
         assertEquals(7L, result.lastSpotId)
     }
@@ -65,7 +62,7 @@ class SpotDetailPrefetchServiceTest {
 
         val result = service.prefetchNext(SpotDetailPart.BODY, 0L, 10)
 
-        // 부재를 적재해야 미확보와 구분되고 조회가 다시 묻지 않는다. NOT NULL 컬럼은 spot 값으로 찬다.
+        // NOT NULL 컬럼은 spot 값으로 찬다.
         verify(exactly = 1) {
             upsertPort.saveDetailAbsence(
                 1L,
@@ -83,7 +80,6 @@ class SpotDetailPrefetchServiceTest {
 
         val result = service.prefetchNext(SpotDetailPart.BODY, 0L, 10)
 
-        // 답을 듣지 못한 것을 "없다"로 적으면 원본에 내용이 있어도 다음 주기까지 비어 있게 된다.
         verify(exactly = 0) { upsertPort.saveDetailAbsence(any(), any()) }
         verify(exactly = 0) { upsertPort.saveDetail(any(), any()) }
         assertEquals(1, result.failed)
@@ -97,8 +93,6 @@ class SpotDetailPrefetchServiceTest {
 
         service.prefetchNext(SpotDetailPart.BODY, 0L, 10)
 
-        // 실패는 확보 기록을 남기지 않아 다음 차례에 자연히 다시 대상이 된다(AC-012) — 그 자리에서
-        // 다시 묻는 것은 같은 쿼터를 여러 번 태울 뿐이다.
         verify(exactly = 1) { tourInfoPort.findDetail(any()) }
     }
 
@@ -107,7 +101,6 @@ class SpotDetailPrefetchServiceTest {
         givenTargets(SpotDetailPart.BODY, listOf(target(1L)))
         every { tourInfoPort.findDetail(any()) } throws UpstreamRateLimitedException()
 
-        // 그날 쿼터가 끝났다는 뜻이라 이 장소만의 문제가 아니다 — 호출자가 그 갈래를 멈춰야 한다.
         assertFailsWith<UpstreamRateLimitedException> { service.prefetchNext(SpotDetailPart.BODY, 0L, 10) }
     }
 
@@ -118,7 +111,6 @@ class SpotDetailPrefetchServiceTest {
 
         assertFailsWith<UpstreamRateLimitedException> { service.prefetchNext(SpotDetailPart.BODY, 0L, 10) }
 
-        // 이미 확보된 기존 행을 지우지는 않는다(BR-001). 이 묶음의 장소들은 다음 실행이 다시 집는다.
         verify(exactly = 0) { upsertPort.saveDetailAbsence(any(), any()) }
     }
 
@@ -141,7 +133,6 @@ class SpotDetailPrefetchServiceTest {
 
         service.prefetchNext(SpotDetailPart.GALLERY, 0L, 10)
 
-        // 한 갈래가 다른 갈래를 끌고 오면 호출량이 갈래 수만큼 늘고 FR-003의 독립성이 깨진다.
         verify(exactly = 1) { tourInfoPort.findGallery(any()) }
         verify(exactly = 0) { tourInfoPort.findDetail(any()) }
         verify(exactly = 1) { upsertPort.saveGallery(1L, any()) }
@@ -154,7 +145,7 @@ class SpotDetailPrefetchServiceTest {
 
         service.prefetchNext(SpotDetailPart.INTRO, 0L, 10)
 
-        // null을 그대로 넘겨야 어댑터가 전 컬럼 null 행을 남긴다 — 미적재와 구분되는 유일한 수단이다.
+        // null을 그대로 넘겨야 어댑터가 전 컬럼 null 행을 남긴다.
         verify(exactly = 1) { upsertPort.saveIntro(1L, CATEGORY, null) }
     }
 
@@ -165,7 +156,7 @@ class SpotDetailPrefetchServiceTest {
 
         service.prefetchNext(SpotDetailPart.INFO, 0L, 10)
 
-        // 저장 키가 (spot_id, category, display_order)라 카테고리가 빠지면 다른 카테고리 행을 덮는다.
+        // 저장 키에 카테고리가 포함된다.
         verify(exactly = 1) { upsertPort.saveInfoItems(1L, CATEGORY, any()) }
     }
 

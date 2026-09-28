@@ -5,7 +5,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** 공유 토큰(SPEC-0030 R12). 추측 가능하면 남의 지도가 열린다. */
+/** 공유 토큰(SPEC-0030). */
 class ShareTokenTest {
 
     @Test

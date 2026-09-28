@@ -41,9 +41,7 @@ import kotlin.test.assertTrue
 
 /**
  * SpotDiscoveryService — SPEC-0013 R1-R9(검색·자동완성), R17(진행 중 축제), R18(인기).
- *
- * 검색 포트와 시계를 스텁한다. BM25 점수의 실제 값·토크나이저의 형태소 분해는 인프라 영역이라
- * 여기서 다루지 않으며, 서비스가 무엇을 포트에 넘기고 결과를 어떻게 페이지로 만드는지만 본다.
+ * 서비스가 포트에 넘기는 조건과 페이지 구성만 본다.
  */
 class SpotDiscoveryServiceTest {
 
@@ -131,10 +129,7 @@ class SpotDiscoveryServiceTest {
         assertEquals("경복궁 야간개장", captured.captured.text)
     }
 
-    /**
-     * AC-2.2·AC-2.3 — 요청 언어가 포트로 전달된다. 토크나이저 선택과 코퍼스 격리는 이 언어값에
-     * 달려 있다(어댑터가 언어별 부분 인덱스를 고른다).
-     */
+    /** AC-2.2·AC-2.3 — 요청 언어가 포트로 전달된다. */
     @Test
     fun `요청 언어가 포트로 전달된다`() {
         val captured = slot<SpotSearchQuery>()
@@ -218,12 +213,7 @@ class SpotDiscoveryServiceTest {
         assertFalse(result.hasNext)
     }
 
-    /**
-     * AC-7.3 — 전체 건수가 남아 있으면 다음 페이지가 있다.
-     *
-     * **hasNext는 totalCount에서 도출된다** — 한 건 더 읽어 판정하지 않는다. 같은 사실을 두
-     * 경로로 구하면 hasNext=false인데 totalCount는 더 있다고 말하는 상태가 생긴다.
-     */
+    /** AC-7.3 — 전체 건수가 남아 있으면 다음 페이지가 있다. hasNext는 totalCount에서 도출된다. */
     @Test
     fun `전체 건수가 남아 있으면 hasNext가 true다`() {
         every { spotSearchPort.search(any()) } returns (1..2L).map { hit(spotId = it) }
@@ -300,7 +290,7 @@ class SpotDiscoveryServiceTest {
         verify(exactly = 1) { spotSearchPort.search(any()) }
     }
 
-    /** 길이는 트림 후를 센다 — 앞뒤 공백으로 상한을 넘기는 것은 사용자의 의도가 아니다. */
+    /** 길이는 트림 후를 센다. */
     @Test
     fun `길이 상한은 트림 후 기준이다`() {
         val padded = "  " + "가".repeat(100) + "  "
@@ -487,10 +477,7 @@ class SpotDiscoveryServiceTest {
 
     // ── 네 진입점 공통 규약 ─────────────────────────────────────────────────
 
-    /**
-     * 네 조회가 **모두** 같은 좌표·반경 검증을 거친다. 하나만 검증하면 나중에 리팩터링이
-     * 다른 셋에서 조용히 검증을 떨어뜨려도 아무도 모른다.
-     */
+    /** 네 조회가 모두 같은 좌표·반경 검증을 거친다. */
     @Test
     fun `네 조회 모두 반경 상한을 넘으면 거절한다`() {
         assertFailsWith<RadiusTooLargeException> {

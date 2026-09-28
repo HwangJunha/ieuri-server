@@ -142,8 +142,7 @@ class MapRelationServiceTest {
 
     @Test
     fun `탈퇴자가 섞여도 다음 페이지 존재 판정이 흔들리지 않는다`() {
-        // 페이지 경계를 거른 뒤의 개수로 정하면, 한 명만 빠져도 first+1이 first가 되어
-        // "다음 페이지 없음"으로 나가고 그 뒤 관계를 영영 볼 수 없게 된다.
+        // hasNext는 거르기 전의 개수로 정한다.
         every { relationQueryPort.findRelations(10L, 3, null) } returns listOf(
             overlap(counterpartId = 20L, cells = listOf(1L), theirTotal = 1),
             overlap(counterpartId = 30L, cells = listOf(2L), theirTotal = 1),

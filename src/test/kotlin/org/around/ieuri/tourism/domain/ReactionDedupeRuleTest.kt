@@ -7,12 +7,7 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import java.time.Instant
 
-/**
- * 좋아요 dedupe 규칙(SPEC-0019 R-10).
- *
- * **결정적이어야 한다** — 배치를 중단했다 재실행해도 같은 행이 남아야 한다.
- * 비결정적 규칙은 재실행 시 다른 행이 남아 좋아요가 뒤바뀐다.
- */
+/** 좋아요 dedupe 규칙(SPEC-0019 R-10). 결정적이어야 한다 — 재실행해도 같은 행이 남는다. */
 class ReactionDedupeRuleTest {
 
     private val earlier = Instant.parse("2026-08-13T00:00:00Z")

@@ -24,7 +24,6 @@ class SearchCursorsTest {
 
     @Test
     fun `커서는 내용을 그대로 드러내지 않는다`() {
-        // 불투명성의 요지는 값을 숨기는 것이 아니라 클라이언트가 조립하지 못하게 막는 것이다.
         val encoded = LikeCountCursor(likeCount = 42L, spotId = 77L).encode()
         assertEquals(false, encoded.contains("42"))
         assertEquals(false, encoded.contains("77"))
@@ -32,7 +31,6 @@ class SearchCursorsTest {
 
     @Test
     fun `다른 종류의 커서는 거부된다`() {
-        // 정렬 순서가 다른 커넥션에 커서를 넘기면 조용히 엉뚱한 위치로 뛰는 대신 실패해야 한다.
         val distance = DistanceCursor(distanceMeters = 100.0, spotId = 1L).encode()
         assertFailsWith<IllegalArgumentException> { LikeCountCursor.decode(distance) }
         val like = LikeCountCursor(likeCount = 1L, spotId = 1L).encode()

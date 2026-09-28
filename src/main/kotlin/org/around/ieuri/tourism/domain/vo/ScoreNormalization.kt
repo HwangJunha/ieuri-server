@@ -1,10 +1,6 @@
 package org.around.ieuri.tourism.domain.vo
 
-/**
- * 한 항목의 정규화 기준 구간(SPEC-0015 R11).
- *
- * 구간을 어느 모집단에서 뽑을지는 이 타입이 정하지 않는다 — 받은 [min]~[max]만 쓴다.
- */
+/** 한 항목의 정규화 기준 구간(SPEC-0015 R11). 모집단 선택은 호출자가 한다. */
 data class ScoreNormalization(
     val min: Double,
     val max: Double,
@@ -18,9 +14,7 @@ data class ScoreNormalization(
 
     /**
      * 원본 값을 0~100으로 정규화한다. 구간 밖의 값은 잘라낸다(clamp).
-     *
-     * [RegionScoreFactor.inverted]인 항목은 **방향이 뒤집혀** 원본 최댓값이 0점이 된다 —
-     * "덜 붐빌수록 높은 점수"가 여기에만 있다. 그 외는 원본 최댓값이 100점이다(R11).
+     * - [RegionScoreFactor.inverted]인 항목은 원본 최댓값이 0점, 그 외는 100점이다(R11).
      */
     fun normalize(factor: RegionScoreFactor, rawValue: Double): RegionScore {
         val ratio = if (isDegenerate) DEGENERATE_RATIO else ((rawValue - min) / (max - min)).coerceIn(0.0, 1.0)

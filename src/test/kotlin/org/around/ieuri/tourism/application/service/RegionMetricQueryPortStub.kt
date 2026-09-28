@@ -8,19 +8,10 @@ import org.around.ieuri.tourism.domain.vo.Coordinates
 import org.around.ieuri.tourism.domain.vo.RegionScoreFactor
 
 /**
- * 지표 질의 포트 스텁 — 지역 1건과 그 지역의 항목들을 함께 적어 두고 5개 질의로 흩뿌린다.
- *
- * 포트가 지표별로 나뉘어 있어 테스트마다 맵 4개를 손으로 짜면 지역 코드가 어긋나기 쉽다.
- * 여기서 **코드를 키로 뒤집어** 결합 규칙(코드가 맞는 것만 붙는다)이 실제로 걸리게 한다.
- *
- * **다섯 질의가 전부 시도로 거른다** — 실제 SQL의 `province_code = ?`를 여기서도 재현해야
- * 시도 필터가 서비스에서 사라진 것이 테스트에 잡힌다.
- *
- * [originDistrict]는 PostGIS 경계 판정을 대신한다. 기본 null이라 좌표를 줘도 어느 시군구에도
- * 걸리지 않는 상태(바다·해외)가 기본값이다.
- *
- * [askedProvinceCodes]는 실제로 좁혀 읽었는지 확인하는 데 쓴다 — 전국을 읽고 나중에 버리는
- * 형태로 되돌아가면 여기에 드러난다.
+ * 지표 질의 포트 스텁 — 지역 1건과 그 지역의 항목들을 함께 적어 두고 질의별로 흩뿌린다.
+ * - 모든 질의가 실제 SQL처럼 시도로 거른다.
+ * - [originDistrict]는 경계 판정을 대신하며 기본 null(어느 시군구에도 걸리지 않음)이다.
+ * - [askedProvinceCodes]로 실제로 좁혀 읽었는지 확인한다.
  */
 class RegionMetricQueryPortStub(
     private val fixtures: List<RegionFixture>,

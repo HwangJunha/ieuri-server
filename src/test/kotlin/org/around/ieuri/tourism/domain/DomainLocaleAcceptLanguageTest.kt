@@ -4,16 +4,10 @@ import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
-/**
- * `Accept-Language` 파싱(SPEC-0005 AC-11).
- *
- * **이 파싱이 도메인으로 들어왔다** — 이전에는 서블릿 필터가 문자열을 자른 뒤 요청 스코프 빈에
- * 담았다. 그 빈이 ThreadLocal 기반이라 가상 스레드에서 사라지는 문제가 있어 걷어냈고, 헤더
- * 형식을 다루는 자리는 여기 하나로 모았다.
- */
+/** `Accept-Language` 파싱(SPEC-0005 AC-11). */
 class DomainLocaleAcceptLanguageTest {
 
-    /** 세밀한 q-값 협상 대신 **첫 항목만** 본다 — 그 규약을 여기서 못박는다. */
+    /** q-값 협상 대신 첫 항목만 본다. */
     @Test
     fun `헤더의 첫 언어를 쓴다`() {
         assertEquals(DomainLocale.KO, DomainLocale.fromAcceptLanguage("ko-KR,ko;q=0.9,en;q=0.8"))
