@@ -23,10 +23,6 @@ data class CreatePostCommand(
     val photoKeys: List<String>,
 )
 
-/*
- * 글 수정 입력. 제목·본문만 바꾼다 — 사진·주제·대상은 불변이다.
- */
-
 /**
  * 글 수정. **null은 "건드리지 않는다"는 뜻이고 빈 값과 다르다** — 예컨대 photoKeys가 null이면
  * 사진을 그대로 두고, 빈 배열이면 전부 뗀다.

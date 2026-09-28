@@ -20,19 +20,15 @@ interface ConversationQueryPort {
     /** 대화 단건. 존재·참여자 판정에 쓴다. 없으면 null. */
     fun findConversation(conversationId: Long, memberId: Long): ConversationView?
 
-    /*
+    /**
      * 메시지 단건. 새 메시지 구독이 이벤트의 id로 **DB에서 다시 읽을 때** 쓴다 —
      * 본문을 브로커에 싣지 않으므로(POL-013) 값의 원본은 항상 DB다.
-     *
-     * [memberId]는 ownedByViewer 판정에 쓴다. 참여자 검사는 구독 시작 시점에 이미 끝났다.
-     */
-
-    /**
-     * 구독 스트림이 이벤트의 id로 메시지를 다시 읽는다.
      *
      * **대화 id로도 범위를 좁힌다** — 이벤트는 브로커에서 오는데 Valkey는 신뢰 경계가 아니다.
      * 채널 이름만 믿으면, 그 채널에 발행할 수 있는 무엇이든 임의의 메시지 id를 실어 남의 대화를
      * 복호화해 내려보내게 만들 수 있다.
+     *
+     * [memberId]는 ownedByViewer 판정에 쓴다. 참여자 검사는 구독 시작 시점에 이미 끝났다.
      */
     fun findMessage(conversationId: Long, messageId: Long, memberId: Long): MessageView?
 

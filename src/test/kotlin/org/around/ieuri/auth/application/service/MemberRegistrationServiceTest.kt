@@ -536,14 +536,6 @@ class MemberRegistrationServiceTest {
         verify(exactly = 0) { eventPublisher.publish(any<PasswordResetRequested>()) }
     }
 
-    /*
-     * **비밀번호가 없는 계정에는 코드를 발급하지도 메일을 보내지도 않는다.**
-     *
-     * 재설정할 비밀번호가 없어 성립하지 않는 요청이고, 보냈다면 주소를 아는 제3자가 메일
-     * 발송을 반복 유발할 수 있다. 응답은 계정 열거 방지를 위해 그대로 성공이다 —
-     * 막는 것은 발송이지 응답이 아니다.
-     */
-
     /** SNS 계정은 재설정할 비밀번호가 없어 성립하지 않는다. 발송하지 않고 코드로 알린다. */
     @Test
     fun `재설정 요청은 SNS 계정이면 NOT_EMAIL_MEMBER로 거부한다`() {

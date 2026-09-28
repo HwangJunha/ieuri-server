@@ -73,13 +73,6 @@ class CommunityQueryAdapter(
     private val block = QBlockEntity.blockEntity
     private val postHide = QPostHideEntity.postHideEntity
 
-    /*
-     * 글 피드. 대상 범위만 다르고 정렬·페이징·모더레이션 필터는 세 경우가 같다.
-     *
-     * [PostsSearch.targets]가 null이면 대상으로 좁히지 않고, 빈 목록이면 결과도 비어 있다 —
-     * 빈 `IN` 절은 SQL에서 유효하지 않으므로 조기 반환한다.
-     */
-
     /**
      * 최신순 피드.
      *

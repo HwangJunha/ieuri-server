@@ -23,13 +23,9 @@ import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.
  * 엔티티↔도메인 변환. 형태만 옮기며 업무 규칙도 I/O도 없다.
  */
 
-/*
+/**
  * 글 엔티티를 도메인으로.
  *
- * 파싱되지 않는 사진 키는 **조용히 버리지 않고 실패시킨다**. 적재 시점에 형식을 통과한
- * 값이므로 파싱 실패는 데이터 손상이며, 그냥 넘기면 글에서 사진 한 장이 이유 없이 사라진다.
- */
-/**
  * 카테고리·장소는 별도 테이블이라 **호출자가 읽어 넘긴다** — 엔티티에 연관으로 두면
  * nullable @OneToOne이 lazy가 되지 않아 조회마다 N+1이 붙는다(PostEntity 주석 참고).
  */
@@ -81,6 +77,10 @@ fun Post.toPhotoEntities(postId: Long): List<PostPhotoEntity> = photoKeys.mapInd
 
 fun Post.toTagEntities(postId: Long): List<PostTagEntity> = tags.map { PostTagEntity(postId = postId, name = it.name, normalized = it.normalized) }
 
+/**
+ * 파싱되지 않는 사진 키는 **조용히 버리지 않고 실패시킨다**. 적재 시점에 형식을 통과한
+ * 값이므로 파싱 실패는 데이터 손상이며, 그냥 넘기면 글에서 사진 한 장이 이유 없이 사라진다.
+ */
 fun PostPhotoEntity.toPhotoKey(): PhotoObjectKey = requireNotNull(PhotoObjectKey.parse(objectKey)) {
     "적재된 사진 키($objectKey)의 형식이 올바르지 않다."
 }
