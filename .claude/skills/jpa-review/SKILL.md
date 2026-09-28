@@ -61,8 +61,10 @@ than one abstracted builder that neither reader can follow.
 ## 4. Migrations
 
 - Schema is Flyway's, never Hibernate's — `ddl-auto: validate` only.
-- `V{n}__{snake_case}.sql`; **applied migrations are immutable** (Flyway checksums them). Determine
-  the next `n` from history; never reuse or edit.
+- `V{n}__{snake_case}.sql`. **A migration from a finished slice is immutable** (Flyway checksums the
+  whole file) — the fix is a new `V{n+1}`, with `n` taken from history, never reused. One written in
+  *this* unmerged slice is still editable; flag a new `V{n+1}` that only corrects it. See `CLAUDE.md`,
+  Persistence & migrations, for the local repair that edit needs.
 - One logical change per migration. NOT NULL and constraints should encode real invariants.
 - **A value the client always sends is NOT NULL in the DB too** — see the required-value rule in
   `CLAUDE.md`. A nullable column is a path that returns wrong data later.

@@ -30,7 +30,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-`ieuri` is a Spring Boot 4 application written in Kotlin, exposing a GraphQL API via Netflix DGS backed by PostgreSQL through Spring Data JPA (with QueryDSL for reads), and Spring Security on the request path. Two bounded contexts are implemented today — `auth` (members, tokens, RBAC) and `tourism` (spots, details, reactions, festival sync) — plus a Spring Batch job that syncs TourAPI data.
+`ieuri` is a Spring Boot 4 application written in Kotlin, exposing a GraphQL API via Netflix DGS backed by PostgreSQL through Spring Data JPA (with QueryDSL for reads), and Spring Security on the request path. Four bounded contexts are implemented — `auth` (members, tokens, RBAC), `tourism` (spots, details, reactions, festival sync), `community`, and `alarm` — plus a Spring Batch job that syncs TourAPI data.
 
 `ieuri` runs as a single server, and its design is centered on Domain-Driven Design (DDD) and hexagonal architecture. Every domain currently lives inside this one application, but because the application may need to be split as it grows in scale, the design deliberately leads with domain boundaries — so that individual domains can later be extracted into their own separate applications naturally, with minimal friction.
 
@@ -41,8 +41,8 @@ Uses the Gradle wrapper (`./gradlew`); Gradle 9.5.1, Java toolchain 25.
 - Build: `./gradlew build`
 - Run the app: `./gradlew bootRun` (local profile serves on port **8888**; deployed environments use 8080)
 - Run all tests: `./gradlew test`
-- Run a single test class: `./gradlew test --tests "org.around.ieuri.IeuriApplicationTests"`
-- Run a single test method: `./gradlew test --tests "org.around.ieuri.IeuriApplicationTests.contextLoads"`
+- Run a single test class: `./gradlew test --tests "org.around.ieuri.architecture.LayeredArchitectureTest"`
+- Run a single test method: `./gradlew test --tests "<fully.qualified.ClassName>.<methodName>"`
 - Package a runnable jar: `./gradlew bootJar`
 
 ## Architecture & conventions
@@ -83,20 +83,11 @@ Uses the Gradle wrapper (`./gradlew`); Gradle 9.5.1, Java toolchain 25.
   written early get rewritten every time a requirement moves, and that cost exceeds the feedback
   gained.
 
-  **Structure sensors are the exception — run them as you finish each piece, not once at the end.**
+  **While writing code, keep it compiling and run no tests — the architecture tests included.**
 
   ```
-  ./gradlew compileKotlin compileTestKotlin test --tests "org.around.ieuri.architecture.*"
+  ./gradlew compileKotlin compileTestKotlin
   ```
-
-  Run it when a piece of the slice stands on its own — a resolver wired up, a mapper written, a
-  migration added — not after every edit. The point is that a violation surfaces while you still
-  remember why you wrote it that way; a check saved for just before the PR arrives when the fix is
-  a rewrite. It takes well under a minute, so the cost of running it a few times per slice is
-  nothing against finding out late.
-
-  This does not conflict with the rule above: what that rule prevents is **tests that move with the
-  requirements**, and structure rules do not move.
 
   **Immediately before opening the PR**, write the tests for the domain and application logic this
   slice added, and make `./gradlew test` pass. The `test-strategy` skill has the required shape.
@@ -139,7 +130,7 @@ Uses the Gradle wrapper (`./gradlew`); Gradle 9.5.1, Java toolchain 25.
 
 - **JPA relations follow the textbook — no `@OneToMany`; a child-side `@ManyToOne` only, when one is needed at all.** Unless a service requirement genuinely demands otherwise, follow the well-proven default. `@OneToMany` fires a query the moment a mapper touches the collection — even when reading a single row — and its size cannot be bounded. A unidirectional child→parent `@ManyToOne` is better on both performance and longevity. Reads are the job of the repositories and QueryDSL projections.
 
-  But **across aggregates, not even `@ManyToOne`** — references between aggregates are id columns (see "Reference across aggregates by id" above). A relation is only ever a candidate *within* one aggregate. That is why the codebase currently has no relations at all, only id references, and that is correct.
+  But **across aggregates, not even `@ManyToOne`** — references between aggregates are id columns (see "Reference across aggregates by id" under Persistence & migrations). A relation is only ever a candidate *within* one aggregate. That is why the codebase currently has no relations at all, only id references, and that is correct.
 
 - **JPA entities need the Kotlin all-open treatment, which is already configured.** The `kotlin("plugin.jpa")` and `allOpen` block in `build.gradle.kts` automatically open classes annotated with `@Entity`, `@MappedSuperclass`, and `@Embeddable` (JPA/Hibernate require non-final classes). Do not manually mark entities `open`. These constraints are exactly why entities stay out of `domain/`.
 
@@ -150,6 +141,10 @@ Uses the Gradle wrapper (`./gradlew`); Gradle 9.5.1, Java toolchain 25.
 - **Queries are QueryDSL or derived queries — raw SQL is the exception, and exceptions get their own adapter.** The whole point of JPA + QueryDSL is not being pinned to one database; a `JdbcTemplate` string throws that away silently. Order of preference: Spring Data **derived query** → **QueryDSL** → raw SQL. Do not use `@Query` at all — an annotation string splits the query definition across two places and is neither type-checked nor refactorable.
     - Only two things justify raw SQL today: **PostGIS spatial functions** (`ST_DWithin`, `ST_Distance` — QueryDSL cannot express them) and **`INSERT ... ON CONFLICT` upsert** (JPA has no portable upsert; `merge` semantics would introduce a select-then-insert race).
     - When you need one, **isolate it in a dedicated adapter** whose name says so (`SpotSpatialQueryAdapter`, `SpotUpsertJdbcAdapter`). The invariant to preserve: `JdbcTemplate` appears *only* in those adapters. Give that adapter its **own outbound port** so the application depends on the port, not on another adapter — `infrastructure → infrastructure` injection hides the split in the wrong layer.
+    - **A column whose type JPA cannot express (PostGIS `geography`, …) is not mapped on the entity at all.** Mapping it — even as `String` to sneak it past the compiler — fails `ddl-auto: validate` at startup. An unmapped column is also invisible to HQL, so **any query touching it belongs in the raw-SQL adapter above.** Deriving the value from mapped columns instead (`ST_MakePoint(map_x, map_y)`) compiles but skips the index; measure before choosing it.
+    - **JPQL has no row-value constructor.** Keyset paging written as `(a, b) < (?, ?)` in SQL becomes `a < ? OR (a = ? AND b < ?)` in QueryDSL. Equivalent result and ordering; verify the index is still used if the table is large.
+    - Bulk `update()`/`delete()` bypass the persistence context. That is fine when nothing re-reads those entities in the same transaction — **check the callers before converting**, and note that DB-level `ON DELETE CASCADE` still fires (it is not a JPA cascade).
+    - Never self-invoke a `@Transactional` method from another method of the same class — the proxy is bypassed and the annotation silently does nothing. Extract the shared body into a private helper and have both call it.
 
 - **An outbound adapter never injects another adapter — including through a port whose only implementation is one.** The wrapper reads as "the application doesn't need to know about the split", but that is exactly the cost: which writes take raw SQL, and in what order two stores are touched, stop being visible where those decisions are made. **The application service injects both ports** and sequences them itself. A one-line `override` that forwards to another adapter is the tell.
 
@@ -158,12 +153,8 @@ Uses the Gradle wrapper (`./gradlew`); Gradle 9.5.1, Java toolchain 25.
   Two exceptions stand today, both because hoisting makes it worse:
     - **`TourApiClient`/`TourApiSyncClient` → `CategoryExternalMappingPort`.** The mapping resolves a domain category into TourAPI's `contentTypeId` *while building the request*. The service cannot sequence it without learning TourAPI's wire format.
     - **`out/event` listeners injecting an outbound port** (`SpotDetailWriteBehindListener`, `VerificationEmailListener`, `NewMessageBroadcastListener`, `PostViewCountListener`). These are one-line event→port bridges with no service between them. The honest fix is to move them to `adapter/in/event/` — where the other domains' listeners already live — not to invent a forwarding use case. Left as a structural decision, not a wiring one.
-    - **A column whose type JPA cannot express (PostGIS `geography`, …) is not mapped on the entity at all.** Mapping it — even as `String` to sneak it past the compiler — fails `ddl-auto: validate` at startup. An unmapped column is also invisible to HQL, so **any query touching it belongs in the raw-SQL adapter above.** Deriving the value from mapped columns instead (`ST_MakePoint(map_x, map_y)`) compiles but skips the index; measure before choosing it.
-    - **JPQL has no row-value constructor.** Keyset paging written as `(a, b) < (?, ?)` in SQL becomes `a < ? OR (a = ? AND b < ?)` in QueryDSL. Equivalent result and ordering; verify the index is still used if the table is large.
-    - Bulk `update()`/`delete()` bypass the persistence context. That is fine when nothing re-reads those entities in the same transaction — **check the callers before converting**, and note that DB-level `ON DELETE CASCADE` still fires (it is not a JPA cascade).
-    - Never self-invoke a `@Transactional` method from another method of the same class — the proxy is bypassed and the annotation silently does nothing. Extract the shared body into a private helper and have both call it.
 
-- **Security is on the classpath.** `spring-boot-starter-security` is included, so once beans exist, endpoints are locked down by default. Add a security configuration to open up GraphQL / introspection as needed.
+- **Security is on the request path.** `spring-boot-starter-security` locks endpoints down by default; `auth/infrastructure/config/SecurityConfig.kt` opens GraphQL, and introspection is toggled per profile (`local` only). Per-field authorization is still ours to write.
 
 - **`ZH` is always Traditional Chinese (번체/正體) — never Simplified.** This applies everywhere `ZH` appears: DB name columns, seed data, GraphQL responses, and any content we author or generate.
 
@@ -474,8 +465,8 @@ Requirements do not originate in this repository. They come from the planner har
 **`Specs/SPEC-XXXX/spec.md`** (vault) is the authority on *what must be true* — requirements and
 acceptance criteria. It is the one document in this workflow that this repo does not author.
 
-**`Specs/policies.md`** (vault) holds the 59 numbered platform policies. It no longer appears as an
-"적용 정책" section inside `spec.md`, so **checking it is this repo's job** — see
+**`Specs/policies.md`** (vault) holds the 59 numbered platform policies. `spec.md` does not say
+which of them apply, so **checking it is this repo's job** — see
 [Policies are recorder-owned](#policies-are-recorder-owned--never-edited-here). A policy violation
 compiles and passes the suite; nothing else catches it.
 
@@ -624,9 +615,8 @@ a spec is the same failure as quietly implementing something different from it.
 `Specs/policies.md` is **a document several specs depend on at once.** If one implementer edits it,
 the premises of other specs collapse silently, so do not edit it directly.
 
-**Read it before deciding, every slice.** The planner's `spec.md` used to carry an "적용 정책"
-section naming the ones that applied; it no longer does, and nothing replaced it — so a policy now
-binds this repo only if someone here opens the catalogue. Read the sections your slice touches (it
+**Read it before deciding, every slice.** A policy binds this repo only if someone here opens the
+catalogue. Read the sections your slice touches (it
 is organised into six sections — auth, personal data, API contract, i18n, legal/platform, and
 operations), cite the ids in the rationale column of `problem/SPEC-XXXX-server.md`, and treat a
 requirement that contradicts a policy as a gap rather than a decision you may make.
@@ -649,11 +639,9 @@ The schema is written here, from the requirements and the decisions in
 `problem/SPEC-XXXX-server.md`. Grow it to what the current slice needs and no further — a field no
 acceptance criterion requires does not belong in `.graphqls` yet.
 
-**The client builds against this schema, and this repo is what publishes it.** The planner used to
-hand down a draft `contract.graphql`; it no longer does, because a draft written before
-implementation drifted from what the server actually served, and the planner could not change code
-to close the gap — so the answer was always "ignore the draft, look at the live one." Whoever holds
-the schema has to be the one who publishes it.
+**The client builds against this schema, and this repo is what publishes it.** A schema drafted
+outside this repo drifts from what the server actually serves, and its author cannot change code to
+close the gap — so whoever holds the schema publishes it.
 
 **Implementation takes far longer than settling the schema.** If the client waits for it, they idle
 through the whole slice. So the moment the schema is settled — **before implementing it** — hand

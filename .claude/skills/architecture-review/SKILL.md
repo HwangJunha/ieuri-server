@@ -54,7 +54,7 @@ Frameworks change; domains outlive them. Spring/JPA/DGS annotations and imports 
 
 ## 4. Domain independence
 
-The three domains (`auth`, `tourism`, `community`) must each be liftable into their own application.
+Each domain (`auth`, `tourism`, `community`, `alarm`) must be liftable into its own application.
 
 - Cross-domain calls go through the other domain's `port/in` or a **published domain event** —
   never its internals (ArchUnit catches the import; it does not catch a *design* that assumes
