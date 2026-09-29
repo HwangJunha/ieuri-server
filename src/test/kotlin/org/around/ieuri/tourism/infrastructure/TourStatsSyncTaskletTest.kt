@@ -21,13 +21,7 @@ import java.time.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * KTO 빅데이터 Step의 순회·페이지 루프와 관측값(SPEC-0015 R4~R6 · R8 · R9).
- *
- * `FestivalSyncTaskletTest`와 같은 방식이다 — Spring 컨텍스트를 띄우지 않고 StepExecution만
- * 직접 만든다. 검증 대상이 프레임워크 배선이 아니라 **어떤 순서로 무엇을 호출하고 어디서
- * 재개하는가**이기 때문이다.
- */
+/** KTO 빅데이터 Step의 순회·페이지 루프와 관측값(SPEC-0015 R4~R6 · R8 · R9). StepExecution만 직접 만든다. */
 class TourStatsSyncTaskletTest {
 
     private val runDate = LocalDate.of(2026, 8, 11)
@@ -57,7 +51,7 @@ class TourStatsSyncTaskletTest {
 
     private fun <R : Any> run(tasklet: TourStatsSyncTasklet<Row, R>, execution: StepExecution): RepeatStatus? = tasklet.execute(StepContribution(execution), ChunkContext(StepContext(execution)))
 
-    /** 끝날 때까지 돌린다 — 순회가 여러 번의 execute로 나뉘므로 루프가 필요하다. */
+    /** 끝날 때까지 돌린다 — 순회가 여러 번의 execute로 나뉜다. */
     private fun <R : Any> runToCompletion(tasklet: TourStatsSyncTasklet<Row, R>, execution: StepExecution): Int {
         var calls = 0
         while (run(tasklet, execution) == RepeatStatus.CONTINUABLE) {
@@ -86,8 +80,7 @@ class TourStatsSyncTaskletTest {
 
     @Test
     fun `집중률은 지역마다 시도 코드와 시군구 코드를 함께 넘겨 호출한다`() {
-        // 실측(2026-08-11): 집중률만 signguCd가 필수라 하나만 보내면 업스트림이
-        // NO_MANDATORY_REQUEST_PARAMETERS_ERROR1(signguCd)을 준다.
+        // 집중률만 signguCd가 필수다.
         every { districtCodePort.findAllCodes() } returns regions.map { it.code }.toSet()
         val seen = mutableListOf<Pair<String, String>>()
 
@@ -103,8 +96,7 @@ class TourStatsSyncTaskletTest {
 
     @Test
     fun `강도는 시도 코드만 순회해 시군구 수보다 적게 호출한다`() {
-        // 실측(2026-08-11): areaCd만 주면 그 시도의 시군구 전체가 한 응답에 온다.
-        // 252 시군구가 아니라 17 시도만 돈다 — 여기서는 3 시군구 → 2 시도.
+        // areaCd만 주면 그 시도의 시군구 전체가 온다 — 17 시도만 돈다(여기서는 3 시군구 → 2 시도).
         every { districtCodePort.findAllCodes() } returns regions.map { it.code }.toSet()
         val provinces = listOf("11", "26")
         val seen = mutableListOf<String>()
@@ -132,8 +124,7 @@ class TourStatsSyncTaskletTest {
 
     @Test
     fun `시도 응답에 섞인 시도 집계 행은 R9 필터가 걸러낸다`() {
-        // 서울이 25개 구인데 26행이 온다 — 시도 단위 집계 행으로 보인다. 2자리 시도 코드는
-        // 5자리 시군구 코드 집합에 결코 없으므로 별도 분기 없이 R9 필터에 걸린다.
+        // 시도 집계 행(2자리 코드)은 별도 분기 없이 R9 필터에 걸린다.
         every { districtCodePort.findAllCodes() } returns setOf("11110", "11140")
         val upserted = mutableListOf<List<Row>>()
 
@@ -276,7 +267,7 @@ class TourStatsSyncTaskletTest {
 
     @Test
     fun `한 지역이 빈 응답이어도 예외 없이 다음 지역으로 넘어간다`() {
-        // 부재는 장애가 아니다 — 데이터가 없는 지역·월이 실제로 존재한다.
+        // 부재는 장애가 아니다.
         every { districtCodePort.findAllCodes() } returns regions.map { it.code }.toSet()
         val seen = mutableListOf<String>()
 
@@ -296,7 +287,7 @@ class TourStatsSyncTaskletTest {
 
     @Test
     fun `미등록 시군구 코드 행은 건너뛰고 건수를 누적한다`() {
-        // R9. 예외를 던지지 않는다 — KTO가 코드를 추가해도 정상 데이터는 쌓여야 한다.
+        // R9. 예외를 던지지 않는다 — 미등록 코드가 있어도 정상 데이터는 쌓인다.
         every { districtCodePort.findAllCodes() } returns setOf("11110")
         val upserted = mutableListOf<List<Row>>()
 
@@ -322,7 +313,7 @@ class TourStatsSyncTaskletTest {
 
     @Test
     fun `등록 코드 집합은 실행당 한 번만 조회한다`() {
-        // 지역·페이지마다 252행을 다시 읽으면 순회 횟수만큼 반복된다.
+        // 코드 집합은 Step 시작 시 한 번만 읽는다.
         every { districtCodePort.findAllCodes() } returns regions.map { it.code }.toSet()
 
         val tasklet = tasklet(fetchPage = { _, region, _ ->

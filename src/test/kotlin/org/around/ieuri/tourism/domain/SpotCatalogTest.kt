@@ -16,12 +16,7 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import java.time.LocalDate
 
-/**
- * 카탈로그 애그리거트(SPEC-0019).
- *
- * 이 스펙의 핵심은 **카탈로그가 이름을 갖지 않는다**는 것이다 — 이름은 언어에 종속되므로
- * 번역에만 있고, 그래야 "한국어 이름이 없는 장소"를 표현할 수 있다.
- */
+/** 카탈로그 애그리거트(SPEC-0019). 카탈로그는 이름을 갖지 않고 번역에만 둔다. */
 class SpotCatalogTest {
 
     private fun standard(
@@ -53,8 +48,7 @@ class SpotCatalogTest {
     @Test
     @DisplayName("외국어 전용 장소는 한국어 번역 없이 존재한다")
     fun `foreign only spot has no korean translation`() {
-        // **이 스펙의 핵심 판단이다.** 원본에 KO가 없는 장소에 한국어명을 지어내면 정합성이
-        // 깨진다. 그 장소는 자기 언어 사용자에게만 보이면 된다.
+        // 원본에 KO가 없는 장소에 한국어명을 지어내지 않는다.
         val catalog = SpotCatalog.from(
             language = DomainLocale.EN,
             title = "SM Entertainment",
@@ -77,8 +71,7 @@ class SpotCatalogTest {
     @Test
     @DisplayName("원본이 없는 언어 슬롯은 비어 있는 채로 남는다")
     fun `missing language slot stays empty`() {
-        // SPEC-0029 R-6·AC-6.1. 기계번역으로 채우던 동작을 걷어냈으므로, 원본이 없는 언어는
-        // 비어 있는 것이 올바른 상태다.
+        // SPEC-0029 R-6·AC-6.1. 원본이 없는 언어는 비어 있다.
         val catalog = SpotCatalog.from(DomainLocale.KO, "마린시티", null, standard())
 
         assertEquals("마린시티", catalog.translations[DomainLocale.KO]?.title)
@@ -90,8 +83,7 @@ class SpotCatalogTest {
     @Test
     @DisplayName("번역을 채울 수단이 존재하지 않는다")
     fun `no operation fills a translation`() {
-        // AC-6.2. 호출부만 지우면 다음 사람이 다시 부르므로 **연산 자체가 없어야 한다.**
-        // 이 테스트는 리플렉션으로 그 부재를 고정한다 — 다시 추가되면 여기서 깨진다.
+        // AC-6.2. 연산 자체가 없음을 리플렉션으로 고정한다.
         val operations = SpotCatalog::class.java.methods.map { it.name }
 
         assertFalse(operations.any { it == "fillTranslation" })
@@ -143,7 +135,7 @@ class SpotCatalogTest {
     @Test
     @DisplayName("한국 밖 좌표로는 표준값을 만들 수 없다")
     fun `coordinates outside korea are rejected`() {
-        // 좌표가 (0,0)이거나 한국 밖인 원본은 위치를 모르는 장소가 아니라 깨진 행이다.
+        // 좌표가 (0,0)이거나 한국 밖인 원본은 깨진 행이다.
         assertThrows(IllegalArgumentException::class.java) { standard(mapX = 0.0, mapY = 0.0) }
         assertThrows(IllegalArgumentException::class.java) { standard(mapX = 139.7, mapY = 35.7) }
     }

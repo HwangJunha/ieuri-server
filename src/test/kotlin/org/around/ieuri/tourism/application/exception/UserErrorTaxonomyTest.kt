@@ -18,17 +18,8 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * 예외 taxonomy 불변식(SPEC-0005 AC-42) — **인증 실패는 userErrors[]로 변환되지 않는다.**
- *
- * 클라이언트의 자동 토큰 갱신은 최상위 errors[]를 보는 링크 계층에서 일어나므로, 인증 실패가 payload의
- * userErrors[]에 담기면 갱신이 아예 트리거되지 않는다(k-trip-spot#22 실기기 재현).
- *
- * 이 규약을 강제할 스키마 수단이 없다(userErrors의 code는 SDL상 String!). 따라서 다음 뮤테이션이 같은
- * 실수를 반복하는 것을 막는 **유일한 자동 장치가 이 테스트**다 — 회귀 방지 장치이지 특정 변경의 확인
- * 절차가 아니다. 새 예외가 인증 실패를 userErrors에 담으면 여기서 깨져야 한다.
- *
- * 검증 대상 toReactionUserErrorOrNull/toUserErrorOrNull은 Throwable → UserError?의 순수 함수로,
- * 프레임워크도 컨텍스트도 요구하지 않는다.
+ * 예외 taxonomy 불변식(SPEC-0005 AC-42) — 인증 실패는 userErrors[]로 변환되지 않는다.
+ * - 클라이언트의 자동 토큰 갱신은 최상위 errors[]에서만 트리거된다. 이 규약을 강제하는 장치는 이 테스트뿐이다.
  */
 class UserErrorTaxonomyTest {
 
@@ -75,10 +66,7 @@ class UserErrorTaxonomyTest {
         }
     }
 
-    /**
-     * 인증 실패 예외 자체가 두 변환기 어디에도 걸리지 않아야 한다(null → 호출부가 재던져 최상위 errors[]로).
-     * reactToSpot이 requireMemberId()로 던지는 것이 바로 이 예외다.
-     */
+    /** 인증 실패 예외는 두 변환기 어디에도 걸리지 않아야 한다 — null이면 호출부가 최상위 errors[]로 재던진다. */
     @Test
     fun `UnauthorizedException은 어느 경로에서도 UserError로 변환되지 않는다`() {
         val e = UnauthorizedException("인증이 필요합니다.")

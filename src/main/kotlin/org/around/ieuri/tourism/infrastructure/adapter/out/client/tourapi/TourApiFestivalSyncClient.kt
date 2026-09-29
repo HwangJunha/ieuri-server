@@ -13,19 +13,9 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 /**
- * 축제 수집용 TourAPI 어댑터(searchFestival2). [TourApiSyncClient]와 같은 규율을 따른다 —
- * TourAPI 필드명·날짜 형식을 여기 가두고 밖으로는 도메인 언어([FestivalPeriod])로만 내보낸다.
- *
- * **기록된 함정 두 가지를 코드로 지킨다**(스펙 §기록된 함정):
- *  - 구필드(`areaCode`·`districtCode`·`cat1~3`)를 요청 필터로 쓰면 **에러 없이 0건**을 반환한다.
- *    그래서 지역·카테고리 필터를 아예 보내지 않는다.
- *  - `arrange`는 `spot` 적재와 **같은 값**을 쓴다. 대표이미지 필수 조건이 어긋나면 부모 `spot` 행이
- *    없는 축제만 잔뜩 나와 전부 건너뛰어진다(R-2).
- *
- * **`showflag`를 보내지 않는다.** `areaBasedSyncList2`에는 있는 파라미터지만 이 오퍼레이션에는
- * 없고, 위의 구필드와 똑같이 **에러 없이 0건**을 돌려준다(실측: 4개 언어 전부 0건 적재).
- * 표출 중단 항목을 거를 필요도 없다 — 부모 `spot` 행이 이미 `showflag=1`로 걸러졌고
- * `spot_festival`이 FK로 매달리므로, 부모 없는 축제는 애초에 적재되지 않는다.
+ * 축제 수집용 TourAPI 어댑터(searchFestival2). TourAPI 필드명·날짜 형식을 여기 가둔다.
+ * - 구필드(`areaCode`·`cat1~3` 등) 필터와 `showflag`를 보내지 않는다 — 에러 없이 0건이 온다.
+ * - `arrange`는 `spot` 적재와 같은 값이어야 한다 — 어긋나면 부모 `spot`이 없는 축제만 나온다(R-2).
  */
 @Component
 class TourApiFestivalSyncClient(
@@ -48,8 +38,7 @@ class TourApiFestivalSyncClient(
             .queryParam("numOfRows", numOfRows)
             .queryParam("pageNo", pageNo)
             .queryParam("arrange", properties.arrange)
-            // 필수 파라미터. "그 날짜에 시작하는 행사"가 아니라 **"그 날짜 기준 유효한 행사"** 를
-            // 뜻하므로, 실행일을 넣는 것만으로 별도의 기간 윈도우 설계가 필요 없다(AC-8).
+            // 필수 파라미터. "그 날짜 기준 유효한 행사"를 뜻한다(AC-8).
             .queryParam("eventStartDate", eventStartDate.format(YYYYMMDD))
             .build(true)
             .toUri()
@@ -59,12 +48,8 @@ class TourApiFestivalSyncClient(
     }
 
     /**
-     * 응답 → 적재 레코드. HTTP·역직렬화와 분리해 단위 테스트 가능하게 둔다
-     * ([TourApiSyncClient.mapPage]와 같은 관례).
-     *
-     * [asOf]는 종료 판정 기준일이다. 업스트림이 유효한 것만 준다는 보장에만 기대지 않고 여기서도
-     * 한 번 더 거른다(AC-9) — `eventStartDate` 파라미터의 의미가 문서와 실제로 어긋나면 끝난 행사가
-     * 적재되고, 그것을 같은 실행의 정리 단계가 다시 지우는 왕복이 생긴다.
+     * 응답 → 적재 레코드. HTTP·역직렬화와 분리해 단위 테스트 가능하게 둔다.
+     * - [asOf] 기준 종료된 행사는 업스트림과 별개로 여기서도 거른다(AC-9).
      */
     fun mapPage(
         response: TourApiFestivalResponse,
@@ -77,8 +62,7 @@ class TourApiFestivalSyncClient(
         return FestivalSyncPage(
             records = records,
             totalCount = body.totalCount,
-            // 날짜 해석 실패로 드랍된 건수를 적재 건수와 구분해 남긴다(AC-41). [TBD-2]는 이 값으로만
-            // 해소된다 — 드랍이 유의미한 규모면 R-4의 정책 자체를 재검토해야 한다.
+            // 날짜 해석 실패로 드랍된 건수(AC-41).
             droppedCount = body.items.item.size - records.size,
         )
     }

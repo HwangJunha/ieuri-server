@@ -11,11 +11,8 @@ import kotlin.test.Test
 import kotlin.test.assertFailsWith
 
 /**
- * 개별 글 숨김.
- *
- * **자기 화면에서만 감춘다** — 글은 그대로이고 다른 사람에게는 계속 보인다. 신고 누적으로
- * 모두에게 감춰지는 `Post.hidden`과 다른 개념이며, 소유권도 보지 않는다(조치가 아니라
- * 개인 화면 설정이다).
+ * 개별 글 숨김. 자기 화면에서만 감추며 `Post.hidden`(신고 누적)과 다르다.
+ * - 소유권을 보지 않는다.
  */
 class PostHideCommandServiceTest {
 
@@ -40,7 +37,7 @@ class PostHideCommandServiceTest {
     fun `남의 글도 숨길 수 있다 - 소유권을 보지 않는다`() {
         every { moderationPort.exists(postId) } returns true
 
-        // 조치가 아니라 개인 화면 설정이라 작성자 여부를 판정하지 않는다.
+        // 작성자 여부를 판정하지 않는다.
         service.hide(HidePostCommand(postId), memberId + 999)
 
         verify(exactly = 1) { hideRepository.save(memberId + 999, postId) }

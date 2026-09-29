@@ -5,14 +5,8 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
- * `member`를 참조하는 FK 자식이 전부 `deleteMember`에서 정리되는지 마이그레이션과 대조한다.
- *
- * **하나라도 빠지면 그 테이블에 행을 만든 회원만 탈퇴가 영구히 막힌다.** 실제로
- * `password_reset`이 빠져 있었고, 비밀번호 재설정을 요청한 적 없는 계정은 정상 탈퇴돼
- * 오래 드러나지 않았다. 탈퇴는 사용자가 자기 데이터를 지울 수 있는 유일한 경로이고
- * SPEC-0024에서는 인증 화면의 탈출구이기도 하므로, 막히면 앱에서 빠져나갈 수 없다.
- *
- * DB를 띄우지 않는다 — 마이그레이션 SQL을 읽어 FK 선언을 세는 정적 검사다.
+ * `member`를 참조하는 FK 자식이 전부 `deleteMember`에서 정리되는지 마이그레이션과 대조한다(DB 없이 SQL 정적 검사).
+ * - 하나라도 빠지면 그 테이블에 행을 만든 회원만 탈퇴가 영구히 막혀 평소에 드러나지 않는다.
  */
 class MemberDeletionCoverageTest {
 
@@ -42,9 +36,7 @@ class MemberDeletionCoverageTest {
                 }
             }
             // ALTER TABLE [ONLY] <t> ADD CONSTRAINT ... REFERENCES member(id)
-            //
-            // **`ONLY`를 건너뛰어야 한다** — pg_dump가 항상 붙이며(V1 베이스라인이 그 산출물이다),
-            // 없으면 `only`가 테이블 이름으로 잡혀 참조 목록이 통째로 어긋난다.
+            // `ONLY`를 건너뛰어야 한다(pg_dump가 붙인다). 없으면 `only`가 테이블 이름으로 잡힌다.
             Regex(
                 """ALTER\s+TABLE\s+(?:ONLY\s+)?(?:auth\.)?(\w+)[^;]*?REFERENCES\s+(?:auth\.)?member\s*\(""",
                 setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
@@ -62,9 +54,7 @@ class MemberDeletionCoverageTest {
         val source = adapterSource.readText()
         val deleteBody = source.substringAfter("override fun deleteMember(").substringBefore("\n    }")
 
-        // 삭제 본문이 부르는 저장소 필드 → 그 필드의 선언 타입(=JPA 리포지토리 이름)을 찾는다.
-        // 이름 규칙(agreementRepository ↔ member_terms_agreement)이 일정하지 않아 필드명이 아니라
-        // **타입**으로 대조한다 — 타입은 엔티티를 따라가므로 테이블과 어긋나지 않는다.
+        // 삭제 본문이 부르는 저장소 필드의 선언 타입(JPA 리포지토리)으로 테이블과 대조한다. 필드명 규칙은 일정하지 않다.
         val calledTypes = Regex("""(\w+)\.delete(?:ByMemberId|ById)\(""")
             .findAll(deleteBody)
             .mapNotNull { call ->

@@ -5,11 +5,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * 요청 언어 정규화. 상단 칩 구성이 언어마다 다르므로 이 판정이 틀리면 엉뚱한 칩이 뜬다
- * (여행코스는 국문 전용, 교통은 외국어 전용).
- *
- * **어떤 입력에도 예외를 던지지 않는다** — Accept-Language는 클라이언트가 보내는 값이라
- * 무엇이 올지 통제할 수 없고, 헤더 하나 때문에 조회가 실패하면 안 된다.
+ * 요청 언어 정규화.
+ * - 어떤 입력에도 예외를 던지지 않는다.
  */
 class ContentLanguageTest {
 
@@ -23,7 +20,7 @@ class ContentLanguageTest {
 
     @Test
     fun `지역 서브태그는 떼고 본다`() {
-        // 실제로 오는 값은 "ko-KR" 같은 형태다. 이걸 못 잘라 내면 전부 폴백이 된다.
+        // 실제로 오는 값은 "ko-KR" 같은 형태다.
         assertEquals(ContentLanguage.KO, ContentLanguage.fromLanguageTag("ko-KR"))
         assertEquals(ContentLanguage.ZH, ContentLanguage.fromLanguageTag("zh-Hant"))
         assertEquals(ContentLanguage.EN, ContentLanguage.fromLanguageTag("en-US"))
@@ -54,10 +51,7 @@ class ContentLanguageTest {
         assertEquals(ContentLanguage.EN, ContentLanguage.FALLBACK)
     }
 
-    /**
-     * **`Accept-Language` 파싱이 도메인으로 들어왔다** — 이전에는 서블릿 필터 두 곳이 각자
-     * 같은 문자열을 잘랐다. 헤더 형식(q-값·다중 항목)을 여기서 한 번만 다룬다.
-     */
+    /** `Accept-Language` 헤더(q-값·다중 항목)는 첫 항목만 본다. */
     @Test
     fun `Accept-Language 헤더의 첫 언어를 쓴다`() {
         assertEquals(ContentLanguage.KO, ContentLanguage.fromAcceptLanguage("ko-KR,ko;q=0.9,en;q=0.8"))
@@ -65,7 +59,7 @@ class ContentLanguageTest {
         assertEquals(ContentLanguage.ZH, ContentLanguage.fromAcceptLanguage("zh-Hant;q=1.0"))
     }
 
-    /** 헤더가 없거나 지원하지 않는 언어면 폴백이다 — 오류가 아니다. */
+    /** 헤더가 없거나 지원하지 않는 언어면 오류가 아니라 폴백이다. */
     @Test
     fun `헤더가 없거나 미지원이면 폴백이다`() {
         assertEquals(ContentLanguage.FALLBACK, ContentLanguage.fromAcceptLanguage(null))

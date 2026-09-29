@@ -8,10 +8,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
-/**
- * tourism 카테고리 구성 → 커뮤니티 칩(SPEC-0020). tourism의 카테고리는 열린 문자열이고
- * 커뮤니티는 닫힌 enum이라, 이름으로 옮기되 모르는 값은 칩에서 빠진다.
- */
+/** tourism 카테고리 구성 → 커뮤니티 칩(SPEC-0020). 이름으로 옮기고 모르는 값은 빠진다. */
 class AppCategoryChipMapperTest {
 
     @Test
@@ -27,7 +24,7 @@ class AppCategoryChipMapperTest {
         assertEquals(TargetCategory.FESTIVAL_EVENT, chip.category)
     }
 
-    /** 커뮤니티가 아는 값은 모두 옮겨져야 한다 — 하나라도 빠지면 그 칩만 조용히 사라진다. */
+    /** 커뮤니티가 아는 값은 모두 옮겨진다. */
     @Test
     fun `커뮤니티가 아는 모든 카테고리가 대응된다`() {
         TargetCategory.entries.forEach { category ->
@@ -44,7 +41,7 @@ class AppCategoryChipMapperTest {
         assertNull(source("BRAND_NEW_CATEGORY").toChipViewOrNull())
     }
 
-    /** 라벨·아이콘은 칩이 쓰지 않는다 — 비어 있어도 카테고리만 옮겨지면 된다. */
+    /** 라벨·아이콘이 비어 있어도 카테고리는 옮겨진다. */
     @Test
     fun `아이콘이 없어도 칩으로 옮겨진다`() {
         val source = AppCategoryCode(category = "LODGING", label = "숙박", iconUrl = null)

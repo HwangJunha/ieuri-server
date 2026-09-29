@@ -11,12 +11,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * 위치 조회 감사 기록(SPEC-0032 R19·R20, POL-057).
- *
- * 고정하는 계약은 둘이다 — **좌표를 어떤 형태로도 남기지 않고**(POL-045),
- * **기록 실패가 요청을 실패시키지 않는다**.
- */
+/** 위치 조회 감사 기록(SPEC-0032 R19·R20, POL-057). 좌표를 어떤 형태로도 남기지 않고, 기록 실패가 요청을 실패시키지 않는다. */
 class LocationAccessAuditListenerTest {
 
     private val memberId = 7L
@@ -34,13 +29,7 @@ class LocationAccessAuditListenerTest {
         assertEquals("spots", payload.captured["operation"])
     }
 
-    /**
-     * **이 테스트가 POL-045의 집행 장치다.** payload가 jsonb라 스키마가 막아 주지 않으므로,
-     * 좌표를 뜻하는 어떤 키도 실리지 않는다는 것을 여기서 고정한다.
-     *
-     * 위도·경도는 물론 시군구·행정구역 어느 단위도 대상이다 — 위치의 *내용*이 빠져야
-     * 이동 경로가 재구성되지 않는다.
-     */
+    /** POL-045의 집행 장치다. payload가 jsonb라 스키마가 막지 않으므로 좌표를 뜻하는 키(위경도·시군구·행정구역)가 없음을 고정한다. */
     @Test
     fun `기록에 좌표를 뜻하는 어떤 항목도 담기지 않는다`() {
         val payload = slot<Map<String, Any?>>()

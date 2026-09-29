@@ -1,13 +1,11 @@
 package org.around.ieuri.tourism.domain.vo
 
 /**
- * 공공누리 저작권 유형. 클라이언트가 유형별 렌더링을 분기(TYPE3/UNSPECIFIED는 크롭 회피)하므로 서버가
- * 값을 감추거나 기본값으로 뭉개지 않는다. 빈 값은 UNSPECIFIED로 두되 보수적으로 변경금지에 준해 취급한다.
- *
- * cpyrhtDivCd 코드 문자열(Type1/Type3)→값 매핑과 최소 출처 문구를 이 enum이 소유한다(호출부에 수동 when 금지).
+ * 공공누리 저작권 유형과 최소 출처 문구. 클라이언트가 유형별로 렌더링을 분기한다.
+ * - UNSPECIFIED는 변경금지에 준해 취급한다.
  */
 enum class CopyrightType(
-    /** 최소 출처 문구(AC-15). 빈 값이어도 placeholder가 아니라 실제 출처를 담는다. */
+    /** 최소 출처 문구. 항상 실제 출처를 담는다. */
     val attributionText: String,
 ) {
     /** 공공누리 제1유형 — 출처표시. 상업·변형 가능. */

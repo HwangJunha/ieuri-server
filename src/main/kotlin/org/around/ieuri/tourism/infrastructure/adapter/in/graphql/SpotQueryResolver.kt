@@ -40,9 +40,8 @@ import org.around.ieuri.common.graphql.generated.types.SpotIntro as GqlSpotIntro
 import org.around.ieuri.common.graphql.generated.types.SpotPage as GqlSpotPage
 
 /**
- * 관광지 조회 GraphQL 쿼리 리졸버(인바운드 어댑터, CQRS 읽기). 언어는 Accept-Language 헤더를
- * 실행 컨텍스트에서 읽어 유스케이스에 넘긴다(GraphQL 인자 아님). read DTO를 GraphQL 응답 타입으로 매핑한다.
- * 쿼리 도메인 오류는 TourismQueryExceptionHandler가 최상위 errors[]로 분류한다(payload 컨벤션 없음).
+ * 관광지 조회 GraphQL 리졸버(CQRS 읽기). 언어는 Accept-Language 헤더에서 읽는다(GraphQL 인자 아님).
+ * - 쿼리 도메인 오류는 TourismQueryExceptionHandler가 최상위 errors[]로 분류한다.
  */
 @DgsComponent
 class SpotQueryResolver(
@@ -60,10 +59,9 @@ class SpotQueryResolver(
         @InputArgument page: Int?,
         @InputArgument size: Int?,
     ): GqlSpotPage {
-        // 만료 토큰을 비로그인으로 강등하지 않는다(R1) — 이미 반응한 항목이 조용히 되살아난다.
+        // 만료 토큰은 비로그인으로 강등하지 않고 오류다(R1).
         val memberId = dfe.viewerMemberId()
-        // 좌표를 받는 연산이므로 조회 사실을 남긴다(R19). **좌표는 넘기지 않는다.**
-        // 비로그인은 남길 "누구"가 없어 발행하지 않는다.
+        // 좌표 조회 사실을 남긴다(R19). 좌표는 넘기지 않고, 비로그인은 발행하지 않는다.
         memberId?.let { eventPublisher.publish(LocationAccessed(it, "spots")) }
         val result = spotQueryUseCase.spots(
             SpotsQuery(
@@ -75,21 +73,15 @@ class SpotQueryResolver(
                 size = size ?: DEFAULT_SIZE,
             ),
             locale = dfe.domainLocale(),
-            // 비로그인 허용 쿼리 — memberId가 있으면 이미 반응한 항목을 제외한다(requireMemberId 아님).
+            // 비로그인 허용 — memberId가 있으면 이미 반응한 항목을 제외한다.
             memberId = memberId,
         )
         return result.toGql()
     }
 
     /**
-     * **순서를 정하지 않는다**(V59) — 서버는 무엇을 보일지만 정하고 배열 순서는 클라이언트가 정한다.
-     *
-     * **구성 조회가 담아 온 라벨·아이콘을 로더에 미리 채운다.** 등록된 필드 리졸버는 소스 객체에
-     * 값이 이미 있어도 언제나 실행되므로(graphql-java는 명시적 페처가 있으면 프로퍼티로
-     * 폴백하지 않는다), 채우지 않으면 여기서 읽은 값을 버리고 칩 목록을 한 번 더 조회한다.
-     *
-     * `app_category`로 걸러 읽은 **이 앱의** 값이 권위를 갖게 하는 것도 겸한다 —
-     * 로더의 조회는 앱 범위가 아니다.
+     * 칩 목록. 배열 순서는 보장하지 않는다(클라이언트가 정한다, V59).
+     * - 읽어 온 라벨·아이콘을 로더에 미리 채운다 — 안 채우면 필드 리졸버가 한 번 더 조회한다.
      */
     @DgsQuery
     fun availableSpotCategories(dfe: DgsDataFetchingEnvironment): List<GqlSpotCategory> {
@@ -105,11 +97,8 @@ class SpotQueryResolver(
     }
 
     /**
-     * 상세 본문(detailCommon2 1콜). gallery·intro·infoItems·likeCount는 **요청된 경우에만** 아래 @DgsData
-     * 필드 리졸버가 각자 조회한다 — `{ id title overview }`만 물으면 upstream 콜은 1회다.
-     *
-     * 생성 타입(GqlSpotDetail)이 아니라 read DTO를 반환한다: 생성 타입은 non-null 필드를 생성자 필수 인자로
-     * 요구해서 지연 필드를 비워 둘 수 없다. 지연 필드의 소스로는 read DTO가 맞다(각 필드 리졸버가 여기서 id를 읽는다).
+     * 상세 본문(upstream 1콜). gallery·intro·infoItems·likeCount는 선택된 경우에만 필드 리졸버가 조회한다.
+     * - 생성 타입이 아니라 read DTO를 반환한다 — 필드 리졸버가 여기서 id를 읽는다.
      */
     @DgsQuery
     fun spotDetail(
@@ -118,13 +107,8 @@ class SpotQueryResolver(
     ): SpotDetailView = spotQueryUseCase.spotDetail(catalogId = id, locale = dfe.domainLocale())
 
     /**
-     * 갤러리(SPEC-0008 R-5). **nullable이다** — 이 필드의 조회가 실패하면 DGS가 실패를 이 필드에
-     * 가두고 null로 채운 뒤 최상위 `errors[]`에 path와 함께 싣는다. 본문은 이미 부모 리졸버가
-     * 반환했으므로 그대로 살아남는다(AC-17).
-     *
-     * 여기서 예외를 삼켜 null을 돌려주지 않는다 — 그러면 `errors[]` 항목이 사라져 클라이언트가
-     * "실패"와 "이미지 없음"을 구분할 근거를 잃는다. 실패는 그대로 던지고, 이미지가 없는 정상
-     * 경우만 빈 배열이 된다(AC-19).
+     * 갤러리(SPEC-0008 R-5). nullable — 조회 실패는 이 필드만 null로 두고 `errors[]`에 싣는다(AC-17).
+     * - 예외를 삼키지 않는다. 이미지가 없는 정상 경우만 빈 배열이다(AC-19).
      */
     @DgsData(parentType = "SpotDetail", field = "gallery")
     fun gallery(dfe: DgsDataFetchingEnvironment): List<GqlSpotImage>? = spotQueryUseCase.spotGallery(dfe.catalogId(), dfe.domainLocale())
@@ -156,32 +140,22 @@ class SpotQueryResolver(
         spotQueryUseCase.spotLikeCount(dfe.catalogId(), dfe.domainLocale()).toInt()
 
     /**
-     * 호출자가 이 장소에 남긴 최신 반응. **비로그인이면 null이다** — 공개 조회라
-     * `requireMemberId`가 아니라 `currentMemberId`를 쓴다(`spots`의 선례).
-     *
-     * 클라이언트가 질문/답변 작성 진입점을 그릴 때 참고하는 값이며(SPEC-0026 AC-3.6),
-     * **서버 판정을 대체하지 않는다** — 실제 자격은 뮤테이션 시점에 다시 본다(R5).
+     * 호출자가 이 장소에 남긴 반응. 비로그인이면 null이다.
+     * - 작성 진입점 표시용이며 서버 판정을 대체하지 않는다(SPEC-0026 AC-3.6, R5).
      */
     @DgsData(parentType = "SpotDetail", field = "viewerReaction")
     fun viewerReaction(dfe: DgsDataFetchingEnvironment): String? {
-        // 만료 토큰이면 null(=반응 없음)이 아니라 오류다 — 그래야 클라이언트가 갱신한다(R1).
+        // 만료 토큰이면 null이 아니라 오류다(R1).
         val memberId = dfe.viewerMemberId() ?: return null
         return spotQueryUseCase.spotViewerReaction(dfe.catalogId(), memberId, dfe.domainLocale())
     }
 
-    /**
-     * 뷰어 신원. **비로그인은 null이지만 만료 토큰은 오류다**(SPEC-0032 R1) — 공개 조회라
-     * 비로그인을 허용하되, 만료를 비로그인으로 다루면 이미 누른 반응이 조용히 되살아난다.
-     */
+    /** 뷰어 신원. 비로그인은 null, 만료 토큰은 오류다(SPEC-0032 R1). */
     private fun DgsDataFetchingEnvironment.viewerMemberId(): Long? = currentMemberProvider.optionalMemberId(tokenPresentation())
 
     /**
-     * 인증된 회원이 좋아요한 spot 커넥션. 미인증이면 빈 목록이 아니라 UNAUTHENTICATED 오류다.
-     *
-     * **read DTO(`CursorPage`)를 그대로 반환하면 안 된다.** Spring for GraphQL의
-     * `ConnectionFieldTypeVisitor`가 `edges`·`pageInfo`를 가진 필드를 Relay 커넥션으로 인식해 감싸려
-     * 하는데, 이 저장소엔 `ConnectionAdapter`가 없어 **클래스 이름이 `Connection`으로 끝나는** 타입만
-     * 통과한다. `CursorPage`를 돌려주면 `No ConnectionAdapter for: ...CursorPage`로 실패한다.
+     * 인증된 회원이 좋아요한 spot 커넥션. 미인증이면 UNAUTHENTICATED 오류다.
+     * - `CursorPage`를 그대로 반환하면 안 된다 — 이름이 `Connection`으로 끝나지 않으면 `No ConnectionAdapter`로 실패한다.
      */
     @DgsQuery
     fun likedSpots(
@@ -203,10 +177,9 @@ class SpotQueryResolver(
     }
 
     /**
-     * 좋아요 목록 내 검색(SPEC-0033). **[likedSpots]와 조회처가 다르다** — 검색 노드를 보므로
-     * 방금 누른 좋아요가 잠시 잡히지 않을 수 있다. 응답 타입·정렬·커서 규약은 같다.
-     *
-     * 검색어가 비어 있으면 이 필드가 아니라 [likedSpots]를 쓴다 — 빈 검색어는 오류다.
+     * 좋아요 목록 내 검색(SPEC-0033). 응답·정렬·커서 규약은 [likedSpots]와 같다.
+     * - 검색 노드를 보므로 방금 누른 좋아요가 잠시 잡히지 않을 수 있다.
+     * - 빈 검색어는 오류다.
      */
     @DgsQuery
     fun searchLikedSpots(
@@ -230,14 +203,13 @@ class SpotQueryResolver(
         ).toGql()
     }
 
-    /** 좋아요 커넥션 변환. 두 필드가 같은 응답 규약을 쓰므로 한 곳에서 만든다. */
+    /** 좋아요 커넥션 변환. */
     private fun CursorPage<LikedSpotView>.toGql() = GqlLikedSpotConnection(
         edges = edges.map {
             GqlLikedSpotEdge(
                 cursor = it.cursor,
                 node = it.node.toGql(),
-                // likedAt은 노드가 아니라 엣지의 값이다 — 회원과 spot의 *관계* 속성이라
-                // 같은 spot이라도 회원마다 다르다.
+                // likedAt은 노드가 아니라 엣지(회원-spot 관계)의 값이다.
                 likedAt = it.node.likedAt.toString(),
             )
         },
@@ -302,17 +274,11 @@ class SpotQueryResolver(
         const val DEFAULT_PAGE = 1
         const val DEFAULT_SIZE = 100
 
-        /** 좋아요 목록 기본 페이지 크기. `members`의 선례를 따랐다(SPEC-0008 [TBD-2]). */
+        /** 좋아요 목록 기본 페이지 크기. */
         const val DEFAULT_LIKED_PAGE_SIZE = 20
     }
 
-    /**
-     * 부모 `spotDetail`이 돌려준 read DTO에서 카탈로그 id를 꺼낸다(`SpotDetailView.id`는 카탈로그 id다).
-     *
-     * `!!` 대신 명시적으로 실패시킨다 — 부모 리졸버가 반환한 값이라 실제로 null이 될 수 없지만,
-     * 그 보장은 DGS의 실행 순서에 달려 있어 타입이 증명하지 못한다. 단언 연산자는 그 사실을
-     * 숨기는 반면 이 쪽은 왜 안전한지를 남긴다.
-     */
+    /** 부모 `spotDetail`의 read DTO에서 카탈로그 id를 꺼낸다. 없으면 명시적으로 실패한다. */
     private fun DgsDataFetchingEnvironment.catalogId(): Long = getSource<SpotDetailView>()?.id
         ?: error("SpotDetail 필드 리졸버는 부모가 반환한 SpotDetailView를 소스로 받아야 한다.")
 }

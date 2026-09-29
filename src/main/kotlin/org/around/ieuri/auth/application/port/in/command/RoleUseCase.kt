@@ -3,10 +3,7 @@ package org.around.ieuri.auth.application.port.`in`.command
 import org.around.ieuri.auth.application.command.AssignRoleCommand
 import org.around.ieuri.auth.application.command.RevokeRoleCommand
 
-/**
- * 역할 변경 유스케이스(관리자). 부여/회수를 하나로 묶는다.
- * 인가는 인바운드 리졸버에서 판정한다: 부여는 role:assign, 회수는 role:revoke 권한.
- */
+/** 역할 부여/회수 유스케이스(관리자). 인가는 리졸버가 판정한다(role:assign / role:revoke). */
 interface RoleUseCase {
     fun assign(command: AssignRoleCommand): RoleChangeResult
 

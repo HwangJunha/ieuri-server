@@ -15,17 +15,9 @@ import org.springframework.transaction.annotation.Transactional
 import java.sql.Timestamp
 
 /**
- * 거리순 피드 전용 어댑터. **이 클래스에만 생 SQL이 있다**(tourism의 `SpotSpatialQueryAdapter`와
- * 같은 관례이며, `JdbcTemplate`이 전용 어댑터 밖으로 새지 않게 한다).
- *
- * PostGIS 함수는 QueryDSL로 표현되지 않고, `location`(geography)은 대응하는 Kotlin 타입이 없어
- * 엔티티에 매핑조차 할 수 없다 — 매핑하면 `ddl-auto=validate`가 기동을 막고, 매핑하지 않으면
- * HQL이 그 컬럼을 해석하지 못한다. map_x/map_y로 매번 점을 만들어 우회하면 표현은 되지만
- * GiST 인덱스를 타지 못한다(실측: Seq Scan 389ms 대 Index Scan 0.3ms).
- *
- * **모더레이션·카테고리·태그 조건을 이 SQL이 전부 담는다.** 일부만 담고 나머지를 뒤에서 거르면
- * 요청한 개수를 채우려고 넉넉히 읽어야 하고, 그때 몇 배를 읽을지가 근거 없는 상수가 된다.
- * 한 번에 거르면 LIMIT이 곧 정확한 페이지 크기다.
+ * 거리순 피드 전용 raw SQL 어댑터(PostGIS). `location`(geography)은 엔티티에 매핑되지 않는다.
+ * - 모더레이션·카테고리·태그·언어 조건을 이 SQL이 전부 담는다 — 뒤에서 거르면 페이지 크기가 깨진다.
+ * - 장소 없는 글은 오지 않는다(community_post_spot INNER JOIN).
  */
 @Component
 class PostSpatialQueryAdapter(
@@ -53,11 +45,11 @@ class PostSpatialQueryAdapter(
         params += area.radiusMeters.toDouble()
 
         conditions += "p.deleted_at IS NULL"
-        // 숨김 제외 — 작성자 본인에게는 남는다(최신순 피드·단건과 같은 규칙).
+        // 숨김 제외 — 작성자 본인에게는 남는다.
         conditions += "(p.hidden = FALSE OR p.author_id = ?)"
         params += search.viewer.memberId
 
-        // 개별 숨김. hiddenByViewer면 뒤집어 숨긴 글만 남긴다 — 그러지 않으면 해제할 방법이 없다.
+        // 개별 숨김. hiddenByViewer면 뒤집어 숨긴 글만 남긴다.
         val hiddenPostIds = search.viewer.hiddenPostIds
         when {
             search.hiddenByViewer && hiddenPostIds.isEmpty() -> conditions += "FALSE"
@@ -77,20 +69,18 @@ class PostSpatialQueryAdapter(
             conditions += "p.author_id NOT IN (${placeholders(search.viewer.blockedMemberIds.size)})"
             params.addAll(search.viewer.blockedMemberIds)
         }
-        // 장소 필터는 카탈로그로 건다(SPEC-0019 R-12) — spot_id로 걸면 언어별로 피드가 갈린다.
+        // 장소 필터는 spot_id가 아니라 카탈로그로 건다(SPEC-0019).
         search.catalogId?.let {
             conditions += "ps.catalog_id = ?"
             params += it
         }
-        // 활성 언어 필터(SPEC-0029 R-23). **최신순 피드와 달리 "장소 없는 글" 절이 없다** —
-        // 아래 FROM이 community_post_spot을 INNER JOIN하므로 거리순에는 장소 없는 글이 애초에
-        // 오지 않는다(AC-15.4의 예외가 도달할 수 없다). 조건은 EXISTS 하나로 끝난다.
+        // 활성 언어 필터(SPEC-0029).
         conditions += """
             EXISTS (SELECT 1 FROM community.community_spot_catalog_language l
                      WHERE l.catalog_id = ps.catalog_id AND l.language = ?)
         """.trimIndent()
         params += search.language.name
-        // 다중 선택은 OR이며 IN으로 표현한다(SPEC-0020). 비어 있으면 조건 자체를 걸지 않는다.
+        // 다중 선택은 OR(IN)이다. 비어 있으면 조건을 걸지 않는다.
         search.categories.takeIf { it.isNotEmpty() }?.let { categories ->
             val placeholders = categories.joinToString(",") { "?" }
             conditions +=
@@ -141,7 +131,7 @@ class PostSpatialQueryAdapter(
             return cursorPageOf(emptyList(), hasNextPage = false, hasPreviousPage = cursor != null)
         }
 
-        // 본문은 엔티티로 읽는다 — 생 SQL은 어느 글인지와 거리만 정하고 매핑은 기존 경로를 쓴다.
+        // 생 SQL은 id와 거리만 정하고, 본문은 엔티티로 읽는다.
         val entities = queryFactory
             .selectFrom(post)
             .where(post.id.`in`(pageRows.map { it.first }))

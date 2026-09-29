@@ -3,16 +3,9 @@ package org.around.ieuri.auth.domain.vo
 import java.util.UUID
 
 /**
- * 프로필 이미지 오브젝트 키. 서버가 형태를 정하고 클라이언트는 지정할 수 없다.
- *
- * 형태는 `{상태}/profile/{memberId}/{uuid}`다. 커뮤니티 사진과 **도메인 구간이 다르다** —
- * 회원 프로필을 커뮤니티와 별개로 보관·삭제할 수 있어야 하고, lifecycle rule도 따로 건다.
- * 구간이 다르므로 커뮤니티 키를 프로필에 붙이거나 그 반대도 파싱 단계에서 걸린다.
- *
- * 키에 memberId 구간을 넣는 것이 소유권 판정의 근거다 — 저장소를 왕복하지 않고 문자열만으로
- * 판정한다. 저장소를 먼저 물으면 타인의 키 존재 여부를 응답 시간으로 알아낼 수 있다.
- *
- * 글과 달리 프로필 이미지는 1장이라 순서·다중 발급 개념이 없다.
+ * 프로필 이미지 오브젝트 키 `{상태}/profile/{memberId}/{uuid}`. 서버가 형태를 정한다.
+ * - 커뮤니티 사진과 도메인 구간이 달라 서로의 키를 붙이면 파싱에서 걸린다.
+ * - 소유권은 memberId 구간으로 저장소 왕복 없이 문자열만으로 판정한다.
  */
 data class ProfileImageObjectKey(
     val value: String,
@@ -51,10 +44,7 @@ data class ProfileImageObjectKey(
             )
         }
 
-        /**
-         * 클라이언트가 되돌려준 키 문자열을 파싱한다. 형식이 어긋나거나 알 수 없는 접두어면
-         * null — 예외가 아니라 부재로 다룬다. 호출자는 이를 소유권 실패와 같은 코드로 응답한다.
-         */
+        /** 클라이언트가 되돌려준 키를 파싱한다. 형식이 어긋나면 예외가 아니라 null이며, 호출자는 소유권 실패와 같은 코드로 응답한다. */
         fun parse(raw: String): ProfileImageObjectKey? {
             val segments = raw.split('/')
             if (segments.size != 4) return null

@@ -4,11 +4,7 @@ import java.time.Instant
 
 /**
  * 글에 달린 댓글. 애그리게이트 루트.
- *
- * **깊이는 2단계까지다.** [parentCommentId]가 null이면 최상위 댓글, 있으면 대댓글이다.
- * 대댓글에 답글을 달아도 3단계가 되지 않는다 — [replyParentIdFor]가 부모의 부모(최상위)를
- * 실제 부모로 잡아 준다. 거부하지 않고 붙여 주는 쪽이 사용자에게 자연스럽고, 트리는
- * 2단계로 유지된다.
+ * - 깊이는 2단계까지다. 대댓글에 단 답글은 거부하지 않고 최상위 댓글 아래로 붙는다([replyParentIdFor]).
  */
 class Comment private constructor(
     val id: Long?,
@@ -42,7 +38,7 @@ class Comment private constructor(
 
     fun ownedBy(memberId: Long): Boolean = authorId == memberId
 
-    /** 대댓글인지. 최상위 댓글과 표시 방식이 달라 클라이언트가 이 값으로 들여쓰기를 정한다. */
+    /** 대댓글인지. */
     val isReply: Boolean get() = parentCommentId != null
 
     /** 숨겨진 댓글은 작성자 본인에게만 보인다. */
@@ -51,12 +47,7 @@ class Comment private constructor(
     companion object {
         const val BODY_MAX_LENGTH = 500
 
-        /**
-         * 답글이 실제로 붙을 부모의 id. **깊이를 2단계로 유지하는 규칙이 여기 하나에 있다.**
-         *
-         * 최상위 댓글에 답글을 달면 그 댓글이 부모이고, **대댓글에 답글을 달면 그 대댓글의
-         * 부모**(= 최상위)가 부모다. 3단계를 만들려는 시도를 거부하는 대신 2단계로 눕힌다.
-         */
+        /** 답글이 실제로 붙을 부모의 id. 대댓글에 답하면 그 대댓글의 부모(최상위)가 부모다. */
         fun replyParentIdFor(parent: Comment): Long = parent.parentCommentId
             ?: requireNotNull(parent.id) { "적재된 댓글에는 id가 있어야 한다." }
 

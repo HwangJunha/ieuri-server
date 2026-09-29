@@ -12,12 +12,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * searchFestival2 응답 → 적재 레코드 매핑(SPEC-0007 R-3·R-4·R-5).
- *
- * `mapPage`는 HTTP·역직렬화와 분리되어 있으므로 응답 객체를 직접 만들어 호출한다 — RestClient를
- * 띄우지 않는다(`TourApiSyncClientTest`와 같은 관례).
- */
+/** searchFestival2 응답 → 적재 레코드 매핑(SPEC-0007 R-3·R-4·R-5). 응답 객체를 직접 만들어 `mapPage`를 부른다. */
 class TourApiFestivalSyncClientTest {
 
     private val runDate = LocalDate.of(2026, 8, 3)
@@ -75,7 +70,7 @@ class TourApiFestivalSyncClientTest {
 
     @Test
     fun `종료일이 YYYYMMDD가 아닌 형식이면 드랍한다`() {
-        // AC-14. 관대하게 보정하면 잘못 해석된 종료일로 정리 판정이 조용히 틀린다.
+        // AC-14. 관대하게 보정하지 않는다.
         val page = map(item(end = "2026-08-10"))
 
         assertTrue(page.records.isEmpty())
@@ -84,7 +79,7 @@ class TourApiFestivalSyncClientTest {
 
     @Test
     fun `종료일이 시작일보다 이전이면 드랍한다`() {
-        // AC-15. 도메인이 던지는 예외를 항목 드랍으로 흡수한다 — 페이지 전체를 실패시키지 않는다.
+        // AC-15. 도메인 예외를 항목 드랍으로 흡수한다.
         val page = map(item(start = "20260810", end = "20260801"))
 
         assertTrue(page.records.isEmpty())
@@ -92,8 +87,7 @@ class TourApiFestivalSyncClientTest {
 
     @Test
     fun `연말연시 행사는 연도를 넘겨 정상 해석된다`() {
-        // AC-16. 실행일을 그 기간 안에 둔다 — 기간 밖이면 AC-9의 종료 판정에 먼저 걸려
-        // "연도를 넘겨 해석되는가"를 검증할 수 없다.
+        // AC-16. 실행일을 기간 안에 둬야 종료 판정(AC-9)에 먼저 걸리지 않는다.
         val page = client.mapPage(
             response(item(start = "20251219", end = "20260103")),
             DomainLocale.KO,
@@ -152,7 +146,7 @@ class TourApiFestivalSyncClientTest {
 
     @Test
     fun `축제형태가 빈 문자열이면 값 없는 상태로 적재한다`() {
-        // AC-18. 빈 문자열과 "값 없음"을 구분하지 않는다 — 둘 다 의미가 없다.
+        // AC-18. 빈 문자열과 "값 없음"을 구분하지 않는다.
         val page = map(item(festivalType = ""))
 
         assertNull(page.records.single().festivalType)
@@ -160,7 +154,7 @@ class TourApiFestivalSyncClientTest {
 
     @Test
     fun `알려지지 않은 임의의 값도 매핑에 실패하지 않고 보존된다`() {
-        // AC-19. 공식 코드표가 없으므로 어떤 값이 와도 해석하지 않는다([TBD-1]).
+        // AC-19. 어떤 값이 와도 해석하지 않는다.
         val page = map(item(progressType = "미확인신규코드"))
 
         assertEquals("미확인신규코드", page.records.single().progressType)
@@ -170,7 +164,7 @@ class TourApiFestivalSyncClientTest {
 
     @Test
     fun `드랍 건수를 적재 건수와 구분해 남긴다`() {
-        // AC-41. [TBD-2]는 이 값으로만 해소된다.
+        // AC-41.
         val page = map(
             item(contentId = "1"),
             item(contentId = "2", start = ""),

@@ -5,15 +5,12 @@ import org.around.ieuri.community.domain.vo.ReportReason
 import org.around.ieuri.community.domain.vo.ReportTargetType
 import org.around.ieuri.community.domain.vo.TargetCategory
 
-/**
- * 커뮤니티 쓰기 입력. 형식 검증만 여기서 하고, 업무 불변식은 도메인이 판정한다.
- * 호출자(memberId)는 인자가 아니라 인증 컨텍스트에서 오므로 커맨드에 담지 않는다.
- */
+// 커뮤니티 쓰기 입력. 형식 검증만 하고 업무 불변식은 도메인이 판정한다. memberId는 담지 않는다.
 
 data class CreatePostCommand(
     /** 글의 카테고리. 필수 — 상단 칩이 이 값으로 거른다. */
     val category: TargetCategory,
-    /** 연결할 장소(카탈로그 id). **선택이다** — null이면 카테고리에만 속하는 글이다. */
+    /** 연결할 장소(카탈로그 id). null이면 카테고리에만 속하는 글이다. */
     val catalogId: Long?,
     /** 사용자가 입력한 태그. 최대 5개이며 중복은 하나로 합쳐진다. */
     val tags: List<String>,
@@ -24,11 +21,8 @@ data class CreatePostCommand(
 )
 
 /**
- * 글 수정. **null은 "건드리지 않는다"는 뜻이고 빈 값과 다르다** — 예컨대 photoKeys가 null이면
- * 사진을 그대로 두고, 빈 배열이면 전부 뗀다.
- *
- * [catalogId]만 예외다. 장소를 떼는 것과 그대로 두는 것을 null 하나로 구분할 수 없어
- * [changeSpot] 플래그로 의도를 받는다.
+ * 글 수정. null은 "건드리지 않는다"이고 빈 값과 다르다(photoKeys가 빈 배열이면 전부 뗀다).
+ * - [catalogId]만 예외로, [changeSpot] 플래그로 의도를 받는다.
  */
 data class EditPostCommand(
     val postId: Long,
@@ -38,10 +32,7 @@ data class EditPostCommand(
     val photoKeys: List<String>?,
     /** 바꿀 카테고리. null이면 그대로 둔다. */
     val category: TargetCategory? = null,
-    /**
-     * true면 [catalogId]로 장소를 바꾼다 — **catalogId가 null이면 장소를 뗀다.**
-     * false면 catalogId 값과 무관하게 장소를 건드리지 않는다.
-     */
+    /** true면 [catalogId]로 장소를 바꾸고 catalogId가 null이면 뗀다. false면 장소를 건드리지 않는다. */
     val changeSpot: Boolean = false,
     val catalogId: Long? = null,
     /** 태그 전체 목록으로 교체. null이면 태그를 건드리지 않는다. */
@@ -112,10 +103,7 @@ data class ReportContentCommand(
     }
 }
 
-/**
- * presigned URL 발급 입력. contentType·contentLength는 **서명에 포함되므로** 클라이언트가
- * 업로드 시 선언한 값과 정확히 일치해야 한다 — 선언과 다른 파일을 올리면 R2가 거부한다.
- */
+/** presigned URL 발급 입력. 서명에 포함되므로 업로드 시 이 값과 정확히 일치해야 한다. */
 data class PostImageUploadRequest(
     val contentType: String,
     val contentLength: Long,

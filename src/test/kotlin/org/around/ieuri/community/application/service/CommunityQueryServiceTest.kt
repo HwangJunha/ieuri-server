@@ -38,11 +38,8 @@ import kotlin.test.assertTrue
 
 /**
  * 커뮤니티 조회 서비스.
- *
- * 두 가지를 고정한다:
- *  1. **차단 컨텍스트를 세 경로가 모두 거친다**(피드·단건·댓글). 한 곳만 빠뜨려도 차단이
- *     무력화되며, 특히 단건은 딥링크 진입점이라 거기가 뚫리면 피드 필터가 소용없다.
- *  2. **피드 범위는 인자 조합이 정한다** — 대상 하나 / 좌표 반경 / 전체.
+ * - 차단 컨텍스트를 피드·단건·댓글 세 경로가 모두 거친다.
+ * - 피드 범위는 인자 조합(대상 하나 / 좌표 반경 / 전체)이 정한다.
  */
 class CommunityQueryServiceTest {
 
@@ -120,10 +117,7 @@ class CommunityQueryServiceTest {
 
     // ---------- 피드 범위 ----------
 
-    /**
-     * R-23 — 활성 언어가 조회 조건으로 내려가야 목록이 그 언어로 걸러진다. 조회 뒤에 걸러내면
-     * `first: 20`을 요청했는데 15건만 남는다.
-     */
+    /** R-23 — 활성 언어가 조회 조건으로 내려간다(조회 뒤에 거르지 않는다). */
     @Test
     fun `활성 언어를 조회 조건으로 내려보낸다`() {
         givenBlocked()
@@ -134,7 +128,7 @@ class CommunityQueryServiceTest {
         assertEquals(ContentLanguage.JA, search.captured.language)
     }
 
-    /** 언어가 바뀌면 조건도 함께 바뀐다 — 한 언어로 고정되어 있지 않다는 것을 고정한다. */
+    /** 언어가 바뀌면 조건도 함께 바뀐다. */
     @Test
     fun `언어가 바뀌면 조회 조건의 언어도 바뀐다`() {
         givenBlocked()
@@ -150,8 +144,7 @@ class CommunityQueryServiceTest {
         givenBlocked()
         val search = captureSearch()
 
-        // **클라이언트가 카탈로그 id를 그대로 보낸다**(SPEC-0019 R-12) — 목록·상세가 이미 그
-        // 축으로 id를 내려주므로 서버가 spot.id를 다시 해석할 것이 없다.
+        // 클라이언트가 보낸 카탈로그 id를 그대로 쓴다(SPEC-0019 R-12).
         service.posts(query(catalogId = 420L), memberId, language)
 
         assertEquals(420L, search.captured.catalogId)
@@ -176,8 +169,6 @@ class CommunityQueryServiceTest {
 
         service.posts(query(latitude = 37.5, longitude = 127.0, radiusMeters = 5_000), memberId, language)
 
-        // 이전에는 tourism에 spot id 목록을 물어 IN 절에 넣었고, 그 목록의 상한(2000)이
-        // 곧 피드의 한계였다. 이제 반경 조건이 글 조회로 직접 간다.
         assertEquals(127.0, search.captured.area?.longitude)
         assertEquals(37.5, search.captured.area?.latitude)
         assertEquals(5_000, search.captured.area?.radiusMeters)
@@ -219,8 +210,7 @@ class CommunityQueryServiceTest {
 
     @Test
     fun `상단 추천 칩은 조회 조건으로 그대로 넘어간다`() {
-        // 카테고리는 이제 **글이 직접 들고 있다** — spot에서 유도하지 않으므로
-        // 장소 없는 글도 칩에 걸린다.
+        // 카테고리는 글이 직접 들고 있어 장소 없는 글도 칩에 걸린다.
         givenBlocked()
         val search = captureSearch()
 
@@ -275,14 +265,7 @@ class CommunityQueryServiceTest {
         assertEquals(setOf(11L), search.captured.viewer.blockedMemberIds)
     }
 
-    /**
-     * 지워진 글의 댓글은 읽히지 않는다.
-     *
-     * **댓글은 자기 `deleted_at`만 본다** — 부모 글이 지워져도 댓글 행은 그대로 남으므로,
-     * 이 검사가 없으면 `post(id:)`는 null인데 `comments(postId:)`는 목록을 주는 상태가 된다.
-     * 글 id는 순번이라 추측도 쉽다. 예전에는 글을 물리 삭제해 FK CASCADE가 댓글까지 지웠기
-     * 때문에 이 구멍이 드러나지 않았다(탈퇴 소프트 삭제 전환).
-     */
+    /** 지워진 글의 댓글은 읽히지 않는다(부모 글이 지워져도 댓글 행은 남는다). */
     @Test
     fun `못 보는 글의 댓글은 조회하지 않는다`() {
         givenBlocked()
@@ -353,7 +336,7 @@ class CommunityQueryServiceTest {
 
     @Test
     fun `내가 쓴 글은 차단 숨김 집합을 읽지 않는다`() {
-        // 자기 글은 자기가 숨겼더라도 마이페이지에 보여야 한다 — 필터를 위한 조회 자체가 없다.
+        // 자기 글은 숨겼더라도 마이페이지에 보인다 — 숨김 필터 조회가 없다.
         every { queryPort.findMyPosts(any()) } returns emptyPage()
 
         service.myPosts(MyPostsQuery(20, null), memberId)
@@ -452,8 +435,6 @@ class CommunityQueryServiceTest {
 
         service.posts(query(latitude = 37.5, longitude = 127.0, categories = setOf(TargetCategory.RESTAURANT)), memberId, language)
 
-        // 목록을 경유하면 그 상한(2000)이 곧 피드의 한계가 된다 — 실측하면 기본 반경 20km에
-        // spot이 12,000개가 넘어 대부분이 조용히 잘렸다. 이제 그 포트 자체가 없다.
         assertEquals(setOf(TargetCategory.RESTAURANT), search.captured.categories)
         assertEquals(127.0, search.captured.area?.longitude)
     }
@@ -465,7 +446,7 @@ class CommunityQueryServiceTest {
 
         service.posts(query(sort = PostSortOrder.DISTANCE), memberId, language)
 
-        // 거리를 잴 기준이 없다. 오류 대신 정렬만 바꿔 화면은 뜨게 한다.
+        // 좌표가 없으면 오류 대신 최신순으로 바꾼다.
         assertEquals(PostSortOrder.LATEST, search.captured.sort)
     }
 
@@ -563,8 +544,7 @@ class CommunityQueryServiceTest {
 
         service.posts(query(), memberId, language)
 
-        // 카드가 스쳐 지나가는 것은 조회가 아니다. 세면 스크롤 한 번에 수십이 올라
-        // 숫자가 의미를 잃는다.
+        // 목록 카드 노출은 조회로 세지 않는다.
         verify(exactly = 0) { eventPublisher.publish(any()) }
     }
 
@@ -581,10 +561,7 @@ class CommunityQueryServiceTest {
     }
 
     // ---------- 지연 필드 ----------
-    //
-    // 태그·사진·카테고리·장소·좋아요는 각각 다른 테이블에 있어 **글 목록과 함께 읽지
-    // 않는다.** 클라이언트가 그 필드를 고른 경우에만 DataLoader가 조회를 부른다.
-    // 여기를 놓치면 `{ id title }`만 물어도 조회가 다섯 번 붙어 지연 필드가 무의미해진다.
+    // 글 목록 조회는 태그·사진·카테고리·장소·좋아요를 읽지 않는다 — 선택 시 DataLoader가 부른다.
 
     @Test
     fun `피드 조회 자체는 지연 필드를 하나도 읽지 않는다`() {

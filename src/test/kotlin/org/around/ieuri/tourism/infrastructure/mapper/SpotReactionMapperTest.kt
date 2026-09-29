@@ -12,11 +12,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /**
- * SpotReactionMapper 필드별 매핑 검증 — 순수 단위테스트(Spring/DB 없음).
- *
- * `memberId`·`catalogId`가 **둘 다 Long이라 서로 뒤바뀌어도 컴파일된다**(SPEC-0019 R-10).
- * 그래서 필드마다 다른 값을 준다. `language`도 자연키의 일부이므로 양방향 모두 옮겨져야
- * 한다(SPEC-0029 R-13) — 빠지면 반응이 엉뚱한 언어에 붙는다.
+ * SpotReactionMapper 필드별 매핑 검증. `memberId`·`catalogId`는 둘 다 Long이라 필드마다 다른 값을 준다.
+ * - `language`도 자연키의 일부라 양방향 모두 옮겨져야 한다(SPEC-0029 R-13).
  */
 class SpotReactionMapperTest {
 
@@ -45,7 +42,7 @@ class SpotReactionMapperTest {
 
     @Test
     fun `nullable 필드가 모두 null이어도 예외 없이 옮긴다`() {
-        // id·createdAt은 도메인 SpotReaction이 갖지 않으므로 null이어도 매핑에 영향이 없다.
+        // id·createdAt은 도메인이 갖지 않으므로 null이어도 매핑에 영향이 없다.
         val domain = entity(id = null, createdAt = null).toDomain()
 
         assertEquals(41L, domain.memberId)

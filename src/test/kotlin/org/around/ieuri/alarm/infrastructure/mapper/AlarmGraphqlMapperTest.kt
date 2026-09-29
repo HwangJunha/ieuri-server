@@ -15,11 +15,7 @@ import org.around.ieuri.common.graphql.generated.types.DevicePlatform as GqlDevi
 import org.around.ieuri.common.graphql.generated.types.Locale as GqlLocale
 import org.around.ieuri.common.graphql.generated.types.NotificationCategory as GqlNotificationCategory
 
-/**
- * GraphQL 입력 → Command, 읽기 모델 → 응답 변환(POL-033).
- *
- * `deviceId`와 `fcmToken`이 둘 다 String이라 뒤바뀌어도 컴파일이 통과한다 — 값을 다르게 준다.
- */
+/** GraphQL 입력 → Command, 읽기 모델 → 응답 변환(POL-033). 필드마다 다른 값을 준다. */
 class AlarmGraphqlMapperTest {
 
     @Test

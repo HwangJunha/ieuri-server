@@ -12,11 +12,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * GraphQL 입력 → Command 변환(SPEC-0026).
- *
- * **필드마다 다른 값을 쓴다** — id가 전부 Long이라 같은 값을 공유하면 뒤바뀌어도 통과한다.
- */
+/** GraphQL 입력 → Command 변환(SPEC-0026). 필드마다 다른 값을 쓴다. */
 class SpotQaInputMapperTest {
 
     @Test
@@ -55,7 +51,6 @@ class SpotQaInputMapperTest {
         assertEquals(true, command.resolved)
     }
 
-    /** 되돌리기가 true로 굳어 버리면 해제가 동작하지 않는다 — 값이 그대로 흘러야 한다. */
     @Test
     fun `되돌리기 입력의 resolved가 false로 옮겨진다`() {
         val command = ResolveSpotQuestionInput(questionId = 34L, resolved = false).toCommand()

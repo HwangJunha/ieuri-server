@@ -13,10 +13,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
-/**
- * TourApiDetailMapper의 필드별 매핑 검증 — 순수 단위테스트(HTTP/Spring 없음).
- * 갤러리 상한·intro 정규화 등 동작 규칙은 TourApiDetailMappingTest가 이미 덮으므로 여기선 다루지 않는다.
- */
+/** TourApiDetailMapper의 필드별 매핑 검증. 동작 규칙(갤러리 상한·intro 정규화)은 TourApiDetailMappingTest가 덮는다. */
 class TourApiDetailMapperTest {
 
     private fun commonItem(

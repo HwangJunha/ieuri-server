@@ -9,9 +9,7 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * 오브젝트 키의 소유권 판정(R24). 저장소를 묻지 않고 문자열만으로 답한다는 것이 요점이다.
- */
+/** 오브젝트 키의 소유권 판정(R24). 저장소를 묻지 않고 문자열만으로 답한다. */
 class PhotoObjectKeyTest {
 
     private val memberId = 11L
@@ -83,7 +81,6 @@ class PhotoObjectKeyTest {
 
     @Test
     fun `다른 도메인의 키는 거부된다`() {
-        // 한 버킷을 여러 도메인이 나눠 쓸 때 남의 오브젝트를 커뮤니티 글에 붙이지 못하게 한다.
         assertNull(PhotoObjectKey.parse("images/commerce/11/${UUID.randomUUID()}"))
         // 도메인 구간이 아예 빠진 옛 형식도 거부된다.
         assertNull(PhotoObjectKey.parse("images/11/${UUID.randomUUID()}"))

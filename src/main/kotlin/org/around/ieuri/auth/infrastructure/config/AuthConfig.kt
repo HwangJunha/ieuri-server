@@ -10,12 +10,7 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory
 import org.springframework.web.client.RestClient
 import java.time.Duration
 
-/**
- * auth 도메인 인프라 빈 구성. 설정값(VerificationProperties)을 애플리케이션 정책 타입(VerificationPolicy)으로
- * 변환해 핸들러에 주입한다.
- *
- * Clock 빈은 여기 없다 — 여러 도메인이 쓰므로 `common/time/ClockConfig`로 옮겼다.
- */
+/** auth 도메인 인프라 빈 구성. 설정값을 애플리케이션 정책 타입으로 변환해 주입한다. */
 @Configuration
 @EnableConfigurationProperties(
     EncryptionProperties::class,
@@ -30,10 +25,7 @@ import java.time.Duration
 )
 class AuthConfig {
 
-    /**
-     * provider 토큰 교환·연결 해제 호출용 RestClient. 타임아웃이 곧 R11의 대기 상한이다 —
-     * 이 호출은 탈퇴 트랜잭션 안에서 일어나므로 상한이 없으면 트랜잭션이 무한정 길어진다.
-     */
+    /** provider 토큰 교환·연결 해제용 RestClient. 탈퇴 트랜잭션 안에서 호출되므로 타임아웃이 곧 대기 상한이다(R11). */
     @Bean
     fun snsRevokeRestClient(builder: RestClient.Builder, properties: SnsRevokeProperties): RestClient {
         val requestFactory = SimpleClientHttpRequestFactory().apply {

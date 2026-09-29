@@ -1,23 +1,13 @@
-# 배치 전용 설정. **batch 프로파일에서만 로드된다.**
-#
-# 배치는 API 서버와 다른 프로세스로 뜨고, 부팅하면 1회 실행 후 종료한다. 언제 띄울지는
-# k8s CronJob이 소유한다 — 앱에 스케줄러를 두면 트리거가 둘이 되어 두 번 돈다.
-#
-# 실행:
+# 배치 전용 설정. batch 프로파일에서만 로드된다.
+# 부팅하면 1회 실행 후 종료한다. 언제 띄울지는 k8s CronJob이 소유한다(앱에 스케줄러를 두면 두 번 돈다).
 #   로컬  ./gradlew bootRun --args='--spring.profiles.active=local,batch'
 #   k3s   CronJob에서 --spring.profiles.active=prod,batch
-#
-# 공통 설정은 application.yaml에서 상속받고, 여기에는 배치일 때만 달라지는 값만 둔다.
 
 spring:
   datasource:
     hikari:
-      # **공통값 20을 상속하지 않는다**(PERF-20260921). 배치 파드는 API 파드가 떠 있는 채로
-      # CronJob이 따로 띄우므로, 커넥션 예산에서 API와 **더해지는** 몫이다. 20을 물려받으면
-      # 앱 메인 40 + search 20 + 나머지 ~14에 20이 더해져 `max_connections` 100에 6만 남는다.
-      #
-      # 8이면 충분하다 — 가장 넓게 쓰는 상세 수집 잡이 `SpotDetailPart` 4갈래를 병렬로 돌고
-      # (`SpotDetailPrefetchJobConfig`), 거기에 잡 리포지터리 몫을 더한 것이 상한이다.
+      # 공통값을 상속하지 않는다 — 배치 파드는 API 파드와 별도로 떠 커넥션 예산에 더해지는 몫이다.
+      # 상한은 상세 수집 잡의 병렬 4갈래 + 잡 리포지터리 몫이다.
       maximum-pool-size: 8
   batch:
     job:
@@ -31,13 +21,7 @@ ieuri:
   tourapi:
     sync:
       # 실행할 잡 이름. 런처가 등록된 Job 빈 중 이름이 맞는 것을 돌린다.
-      #
-      # **tourism 잡만 고르는 이름이 아니다** — 다른 도메인의 잡도 이 값으로 고른다.
-      # community의 DM 보관 삭제(SPEC-0017 R16)를 돌리려면:
-      #   IEURI_TOUR_SYNC_JOB=messageRetentionJob
-      # 프로퍼티 이름이 tourapi 밑에 있는 것은 런처가 거기서 시작했기 때문이며,
-      # 도메인 중립 이름(ieuri.batch.job)으로 옮기는 것은 기존 CronJob 설정을 함께
-      # 바꿔야 해 별도 작업으로 둔다.
+      # tourism 잡만 고르는 이름이 아니다 — 다른 도메인의 잡도 이 값으로 고른다(예: messageRetentionJob).
       job: ${IEURI_TOUR_SYNC_JOB:spotSyncJob}
       # 수집용 numOfRows. 조회 경로의 max-page-size(100)와 별개다. 업스트림이 거부하면 낮춘다.
       page-size: ${IEURI_TOUR_SYNC_PAGE_SIZE:1000}
@@ -48,21 +32,15 @@ ieuri:
       # 상한이 실측되지 않았다 — 업스트림이 거부하면 이 값만 낮춘다.
       page-size: ${IEURI_TOUR_FESTIVAL_PAGE_SIZE:1000}
 
-    # 관광지 상세 사전 전량 수집(SPEC-0037). `spotDetailPrefetchJob`이 읽는다.
-    # 값에 확정된 근거가 없어 전부 설정으로 뺐다(POL-044).
+    # 관광지 상세 사전 전량 수집(SPEC-0037, spotDetailPrefetchJob). 출발값이다(POL-044).
     detail-prefetch:
       # 한 번에 뽑는 대상 수. 이 단위가 트랜잭션·커서 전진의 경계다.
       batch-size: ${IEURI_TOUR_DETAIL_PREFETCH_BATCH_SIZE:200}
-      # 마지막 확보로부터 이 기간이 지나면 다시 확보한다(FR-007). 사용자가 정한 값이며
-      # TourAPI 실측이 아니다 — 근거는 spec.md의 각주에 있다.
+      # 마지막 확보로부터 이 기간이 지나면 다시 확보한다(FR-007).
       refresh-after: ${IEURI_TOUR_DETAIL_PREFETCH_REFRESH_AFTER:30d}
-      # 한 갈래가 초당 던지는 upstream 호출 수. **순차로는 FR-002(1일 이내)를 못 지킨다** —
-      # 건당 0.2초로 잡아도 18시간이다. 한도는 (언어 × 오퍼레이션) 조합마다 초당 50으로
-      # 실측됐고(공식 고지값 아님), 통신 순단 뒤 재시도가 몰릴 여지를 두어 40으로 잡는다.
+      # 한 갈래가 초당 던지는 upstream 호출 수. 한도는 (언어 × 오퍼레이션)마다 초당 50이다.
       calls-per-second: ${IEURI_TOUR_DETAIL_PREFETCH_CALLS_PER_SECOND:40}
-      # 한 갈래가 하루에 처리할 장소 수. 장소 하나가 호출 하나이므로 곧 호출 수다.
-      # 오퍼레이션당 쿼터가 10만이라 1만 건을 사용자 조회 시점 확보(FR-010) 몫으로
-      # 남긴다 — 배치가 쿼터를 다 쓰면 그날 조회가 upstream에 닿지 못한다.
+      # 한 갈래가 하루에 처리할 장소 수(= 호출 수). 쿼터 10만 중 1만을 사용자 조회(FR-010) 몫으로 남긴다.
       daily-limit: ${IEURI_TOUR_DETAIL_PREFETCH_DAILY_LIMIT:90000}
 
   # 한국관광공사 관광통계 4종(SPEC-0015). 갱신 주기가 갈려 잡을 나눴다 — 묶으면 월 단위가 매일 헛돈다.
@@ -71,31 +49,17 @@ ieuri:
   tour-stats:
     sync:
       # 월 지표의 기준월 탐색 창(개월). 이번 달부터 거슬러 올라가며 데이터가 있는 첫 달을 쓴다.
-      #
-      # **고정 소급월을 쓰지 않는 이유: 가용한 최신 월이 고정되어 있지 않다**(실측 2026-08-11 —
-      # 202608·202607은 0행이고 202606에 데이터가 있어 지연이 2개월이었다). 지연 폭은 흔들리며
-      # 데이터셋마다 다를 수 있다. 창 안에 데이터가 없으면 0건 적재로 정상 종료한다.
-      #
-      # 월은 실행당 한 번만 정해 나머지 시도는 탐색 없이 그 달로 부른다.
+      # 창 안에 데이터가 없으면 0건 적재로 정상 종료한다. 월은 실행당 한 번만 정한다.
       monthly-lookback-months: 6
-      # 매번 최근 구간을 통째로 다시 받는다 — 하루치만 받으면 배치가 실패한 날이 영구히 빈다.
-      # upsert라 중복이 생기지 않는다.
-      #
-      # **90일인 이유: 방문자수가 약 30일 지연 공개된다**(실측 2026-08-11 — 8/11 기준 7/12까지만
-      # 존재). 30일 창으로 오늘까지 요청하면 totalCount가 0이다. 지연이 흔들려도 데이터 구간을
-      # 덮도록 넉넉히 잡았다. 스펙 §4.6의 "4일 지연"은 실측과 다르다.
+      # 매번 최근 구간을 통째로 다시 받는다(upsert). 방문자수는 약 30일 지연 공개되므로 넉넉히 잡는다.
       visitor-backfill-days: 90
 
-  # 시군구 대표 위치 선정(SPEC-0015 · V46). 잡 이름은 districtRepresentativeLocationJob.
-  #
-  # **spot 동기화 이후에 스케줄해야 한다** — spot 테이블을 읽어 산출하므로 순서가 뒤집히면
-  # 전날 데이터로 계산한다. 예: spot 04:00 → 이 잡 06:00.
+  # 시군구 대표 위치 선정(SPEC-0015, districtRepresentativeLocationJob).
+  # spot 동기화 이후에 스케줄해야 한다 — 순서가 뒤집히면 전날 데이터로 계산한다.
   district-representative:
     # 밀집 격자 한 칸(도). 0.02 ≈ 2km — 도보권 "한 동네" 단위.
     cell-size-degrees: 0.02
-    # 가장 밀집한 격자의 최소 spot 수. 미달이면 NULL로 두어 추천에서 뺀다(갈 곳이 없는 지역).
-    # **KO 행 기준이다** — 전 언어를 세면 같은 장소가 최대 4번 잡혀 번역 많은 지역이 유리해진다.
-    # 실측: 이 값으로 252개 중 226개 선정.
+    # 가장 밀집한 격자의 최소 spot 수(KO 행 기준). 미달이면 NULL로 두어 추천에서 뺀다.
     min-spot-count: 10
 
 

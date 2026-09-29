@@ -7,7 +7,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
-/** 커서 인코딩·디코딩. 인덱스 효율은 데이터가 쌓인 뒤에 판단할 사안이라 여기서 다루지 않는다. */
+/** 커서 인코딩·디코딩. */
 class CommunityCursorTest {
 
     @Test
@@ -28,7 +28,7 @@ class CommunityCursorTest {
     @Test
     fun `커서는 정렬 키가 그대로 드러나지 않게 감싼다`() {
         val cursor = encodeCursor(Instant.parse("2026-08-05T00:00:00Z"), 42L)
-        // 클라이언트가 조립하지 못하게 하려는 것이므로 평문이 아니어야 한다.
+        // 커서는 평문이 아니다.
         assertEquals(false, cursor.contains("2026"))
         assertEquals(false, cursor.contains("|"))
     }

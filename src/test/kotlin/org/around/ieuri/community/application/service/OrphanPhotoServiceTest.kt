@@ -25,10 +25,7 @@ class OrphanPhotoServiceTest {
         assertEquals(listOf("images/community/1/a", "images/community/1/b"), deletable)
     }
 
-    /**
-     * AC6.2 — **커뮤니티 글이 같은 키를 쓰고 있으면 제외한다.** 업로드 확정 경로를 공유하므로
-     * 중복이 성립하고, 지우면 살아 있는 글의 사진이 깨진다.
-     */
+    /** AC6.2 — 커뮤니티 글이 같은 키를 쓰고 있으면 제외한다. */
     @Test
     fun `커뮤니티 글이 쓰는 키는 대상에서 빠진다`() {
         every { queryPort.findOrphanPhotoKeys() } returns
@@ -51,7 +48,7 @@ class OrphanPhotoServiceTest {
         verify(exactly = 0) { queryPort.findOrphanKeysStillUsedByPosts() }
     }
 
-    /** 전부 글이 쓰고 있으면 지울 것이 없다 — 빈 목록이지 실패가 아니다. */
+    /** 전부 글이 쓰고 있으면 실패가 아니라 빈 목록이다. */
     @Test
     fun `모든 키를 글이 쓰고 있으면 대상이 없다`() {
         every { queryPort.findOrphanPhotoKeys() } returns listOf("images/community/1/a")

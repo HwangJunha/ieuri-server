@@ -1,9 +1,8 @@
 package org.around.ieuri.auth.application.event
 
 /**
- * 비밀번호 재설정 코드 메일 발송 요청 애플리케이션 이벤트.
- * 평문 코드는 저장하지 않고 이 이벤트로만(메모리) 전달되어 AFTER_COMMIT 리스너가 발송한다.
- * 트랜잭션이 롤백되면 발송되지 않는다.
+ * 비밀번호 재설정 코드 메일 발송 요청 이벤트. 평문 코드는 이 이벤트로만 전달된다.
+ * - AFTER_COMMIT 리스너가 발송하므로 트랜잭션이 롤백되면 발송되지 않는다.
  */
 data class PasswordResetRequested(
     val toEmail: String,

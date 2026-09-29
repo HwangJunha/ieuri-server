@@ -9,12 +9,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/**
- * 감사 기록 보관 기간 판정(SPEC-0032 R22, POL-014).
- *
- * 고정하는 계약은 둘이다 — **경계는 배타적**(정확히 기간에 걸친 기록은 남는다)이고,
- * **기간을 인자로 받는다**(대상이 늘어도 판정 로직을 다시 쓰지 않는다).
- */
+/** 감사 기록 보관 기간 판정(SPEC-0032 R22, POL-014). 경계는 배타적이고 기간은 인자로 받는다. */
 class AuditRetentionTest {
 
     private val now = Instant.parse("2026-08-25T00:00:00Z")
@@ -44,31 +39,23 @@ class AuditRetentionTest {
         assertFalse(AuditRetention.isExpired(now, now, AuditRetention.MEMBER_AUDIT))
     }
 
-    /**
-     * 위치정보법 제16조 제2항의 6개월. **법정 기간이라 값이 바뀌면 고지 위반이 되므로 고정한다.**
-     */
+    /** 위치정보법 제16조 제2항의 6개월. 법정 기간이라 값을 고정한다. */
     @Test
     fun `위치 조회 기록 보관 기간은 6개월이다`() {
         assertEquals(Period.ofMonths(6), AuditRetention.LOCATION_ACCESS)
     }
 
-    /**
-     * **달의 길이를 따라야 한다.** 고정 일수(180일)로 세면 고지한 6개월보다 이르게 지운다 —
-     * 2월을 포함한 구간에서 특히 벌어진다.
-     */
+    /** 달의 길이를 따라야 한다. 고정 일수(180일)로 세면 고지한 6개월보다 이르게 지운다. */
     @Test
     fun `6개월 경계는 고정 일수가 아니라 달력으로 센다`() {
-        // 2026-08-25에서 6개월 전은 2026-02-25다. 180일 전(2026-02-26)보다 하루 이르므로,
-        // 180일로 셌다면 아직 남아 있어야 할 하루치를 더 지우게 된다.
+        // 2026-08-25의 6개월 전은 2026-02-25로, 180일 전(2026-02-26)보다 하루 이르다.
         val cutoff = AuditRetention.cutoff(now, AuditRetention.LOCATION_ACCESS)
 
         assertEquals(Instant.parse("2026-02-25T00:00:00Z"), cutoff)
         assertTrue(cutoff.isBefore(now.minus(Duration.ofDays(180))))
     }
 
-    /**
-     * 판정이 기간을 인자로 받으므로, 대상이 늘어도 이 로직을 다시 쓰지 않는다.
-     */
+    /** 판정이 기간을 인자로 받는다. */
     @Test
     fun `기간을 바꾸면 같은 기록의 판정도 바뀐다`() {
         val createdAt = now.minus(Duration.ofDays(100))

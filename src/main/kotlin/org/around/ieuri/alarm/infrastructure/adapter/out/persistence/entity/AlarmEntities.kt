@@ -17,13 +17,7 @@ import org.around.ieuri.alarm.domain.vo.NotificationType
 import org.around.ieuri.common.persistence.DbSchema
 import java.time.Instant
 
-/**
- * 기기 푸시 토큰(SPEC-0028 R1).
- *
- * 다른 도메인 엔티티와 같은 규약이다 — 연관(@ManyToOne·@OneToMany)을 두지 않고 plain
- * 컬럼으로 id만 든다. `member_id`는 스키마가 달라 FK도 아니며, 탈퇴 연쇄는 애플리케이션이
- * 이벤트를 받아 지운다.
- */
+/** 기기 푸시 토큰(SPEC-0028 R1). `member_id`는 FK가 아니며 탈퇴 연쇄는 이벤트로 지운다. */
 @Entity
 @Table(name = "device_token", schema = DbSchema.ALARM)
 class DeviceTokenEntity(
@@ -35,7 +29,7 @@ class DeviceTokenEntity(
     @Column(name = "device_id", nullable = false, length = 255)
     var deviceId: String,
 
-    /** 재등록으로 바뀔 수 있다 — 기기를 다른 회원이 쓰기 시작하는 경우다(AC1.4). */
+    /** 다른 회원이 같은 기기로 재등록하면 바뀐다(AC1.4). */
     @Column(name = "member_id", nullable = false)
     var memberId: Long,
 
@@ -69,12 +63,7 @@ class DeviceTokenEntity(
     }
 }
 
-/**
- * 알림 제목 문구(SPEC-0028 R13).
- *
- * **읽기 전용으로 쓴다** — 값은 마이그레이션이 넣고 운영자가 DB에서 고친다. 앱에는 쓰기
- * 경로가 없다.
- */
+/** 알림 문구(SPEC-0028 R13). 읽기 전용이며 값은 마이그레이션·운영자가 넣는다. */
 @Entity
 @Table(name = "notification_message", schema = DbSchema.ALARM)
 class NotificationMessageEntity(
@@ -93,7 +82,7 @@ class NotificationMessageEntity(
     @Column(name = "title", nullable = false, length = 200)
     var title: String,
 
-    /** 서버가 정한 안내 문구. 사용자 본문이 아니다 — iOS 표시 요건이라 비울 수 없다. */
+    /** 서버가 정한 안내 문구. 비우면 iOS가 알림을 표시하지 않는다. */
     @Column(name = "body", nullable = false, length = 200)
     var body: String,
 
@@ -116,11 +105,7 @@ class NotificationMessageEntity(
     }
 }
 
-/**
- * 카테고리별 수신 설정(SPEC-0028 R19).
- *
- * **행이 없는 것이 정상이며 켜짐을 뜻한다**(AC10.3) — 사용자가 토글을 처음 건드릴 때만 생긴다.
- */
+/** 카테고리별 수신 설정(SPEC-0028 R19). 행이 없으면 켜짐이다(AC10.3). */
 @Entity
 @Table(name = "notification_preference", schema = DbSchema.ALARM)
 class NotificationPreferenceEntity(

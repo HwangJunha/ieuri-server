@@ -10,7 +10,7 @@ class TasteNormalizationTest {
 
     @Test
     fun `최소는 0 최대는 1이 되고 사이는 선형이다`() {
-        // 실측에서 관찰된 압축 구간(0.468~0.548)을 그대로 쓴다.
+        // 압축된 구간(0.468~0.548).
         val result = TasteNormalization.normalize(
             mapOf(1L to 0.468, 2L to 0.508, 3L to 0.548),
         )
@@ -43,7 +43,7 @@ class TasteNormalizationTest {
 
     @Test
     fun `값이 전부 같으면 중립값이다`() {
-        // 폭이 0이면 나눌 수 없다. 0이나 1을 주면 취향 있는 회원이 유불리를 얻으므로 가운데를 준다.
+        // 폭이 0이면 가운데 값을 준다.
         val result = TasteNormalization.normalize(mapOf(1L to 0.5, 2L to 0.5, 3L to 0.5))
 
         assertTrue(result.values.all { it == 0.5 })
@@ -62,8 +62,7 @@ class TasteNormalizationTest {
 
     @Test
     fun `폭이 좁아도 그대로 펼친다`() {
-        // 같은 건물 매장들처럼 사실상 균질한 집단(실측 폭 0.006)도 0~1로 늘어난다.
-        // 가드를 두지 않기로 한 결정이 여기서 보인다 — 미세한 차이가 순위를 가른다.
+        // 사실상 균질한 집단도 가드 없이 0~1로 늘어난다.
         val result = TasteNormalization.normalize(mapOf(1L to 0.4951, 2L to 0.5014))
 
         assertEquals(0.0, result.getValue(1L), 1e-9)

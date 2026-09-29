@@ -64,7 +64,7 @@ class MessageReportCommandServiceTest {
         every { conversationRepository.findById(conversationId) } returns conversation()
     }
 
-    /** AC15-1 — 3건이 **하나의 신고 건**으로 접수된다. 3번 신고한 것으로 집계되지 않는다. */
+    /** AC15-1 — 3건이 하나의 신고 건으로 접수된다. */
     @Test
     fun `여러 메시지가 한 건의 신고로 접수된다`() {
         every { messageRepository.findAllByIds(any()) } returns listOf(message(10L), message(11L), message(12L))
@@ -101,7 +101,7 @@ class MessageReportCommandServiceTest {
         verify(exactly = 0) { reportRepository.save(any()) }
     }
 
-    /** AC15-4 — **한 신고는 한 대화에 대한 것이다.** 섞이면 운영자의 열람 범위가 넓어진다. */
+    /** AC15-4 — 한 신고는 한 대화에 대한 것이다. */
     @Test
     fun `여러 대화의 메시지가 섞이면 INVALID_INPUT이다`() {
         every { messageRepository.findAllByIds(any()) } returns listOf(
@@ -139,7 +139,7 @@ class MessageReportCommandServiceTest {
         }
     }
 
-    /** AC15-6 — 이미 신고한 메시지가 포함되면 거부된다. 판정은 저장소의 유일 제약이 맡는다. */
+    /** AC15-6 — 이미 신고한 메시지가 포함되면 거부된다(저장소 유일 제약이 판정). */
     @Test
     fun `이미 신고한 메시지가 포함되면 ALREADY_REPORTED다`() {
         every { messageRepository.findAllByIds(any()) } returns listOf(message(10L))
@@ -151,7 +151,6 @@ class MessageReportCommandServiceTest {
         }
     }
 
-    /** 신고를 남의 대화를 들여다보는 통로로 쓸 수 없어야 한다. */
     @Test
     fun `참여자가 아닌 대화의 메시지는 신고할 수 없다`() {
         every { messageRepository.findAllByIds(any()) } returns listOf(message(10L))

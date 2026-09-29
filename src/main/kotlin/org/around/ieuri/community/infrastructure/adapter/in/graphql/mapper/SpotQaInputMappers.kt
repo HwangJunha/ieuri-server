@@ -16,12 +16,7 @@ import org.around.ieuri.community.application.command.DeleteSpotQuestionCommand
 import org.around.ieuri.community.application.command.ResolveSpotQuestionCommand
 
 /**
- * GraphQL 입력 → Command 변환(SPEC-0026, POL-033).
- *
- * 리졸버 안에 인라인으로 두지 않는 이유는 **혼자 호출할 수 없어 테스트가 불가능하기**
- * 때문이다. 여기 있으면 리졸버를 세우지 않고도 필드별로 검증할 수 있다.
- *
- * **memberId를 싣지 않는다** — 호출자 신원은 인증 컨텍스트에서 오며 입력이 정하지 않는다.
+ * 장소 질문/답변 GraphQL 입력 → Command 변환(SPEC-0026, POL-033). 호출자 id는 담지 않는다.
  */
 
 fun CreateSpotQuestionInput.toCommand(): CreateSpotQuestionCommand = CreateSpotQuestionCommand(

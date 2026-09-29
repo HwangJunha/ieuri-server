@@ -2,12 +2,7 @@ package org.around.ieuri.auth.application.port.out.persistence
 
 import org.around.ieuri.auth.domain.aggregate.Role
 
-/**
- * 역할/권한 쓰기·조회 포트(CQRS 쓰기 측). 회원의 역할 매핑을 갱신하고, 역할 애그리거트를 도메인 용어로 로드한다.
- * 토큰 발급 시 유효 권한 flatten, 역할 부여/회수, 자기 강등 방지 판정에 쓰인다. JPA를 노출하지 않는다.
- *
- * (읽기 화면용 회원 조회는 CQRS 규약에 따라 별도 `port/out/query`로 분리한다 — 이 포트로 읽지 않는다.)
- */
+/** 역할/권한 쓰기 포트. 회원의 역할 매핑을 갱신하고 역할 애그리거트를 로드한다. 화면용 조회는 port/out/query가 맡는다. */
 interface RoleRepositoryPort {
     /** 코드로 역할(+권한)을 로드. 없으면 null. */
     fun findByCode(code: String): Role?

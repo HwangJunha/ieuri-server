@@ -8,15 +8,9 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 /**
- * 취향 유사도 조회 어댑터(SPEC-0035 S2). pgvector의 `avg(vector)`와 코사인 거리(`<=>`)를 QueryDSL로 표현할
- * 수 없어 이 어댑터에만 생 SQL이 있다. 회원의 좋아요·싫어요 장소 벡터 평균을 CTE로 만들고 후보와의
- * 코사인 유사도(`1 − 거리`)만 돌려준다 — 벡터는 DB 밖으로 나오지 않는다.
- *
- * 비어 있는 id 집합은 `WHERE false`로 바꾼다 — 평균은 행 하나(NULL)를 돌려주고 유사도가 NULL이 된다.
- *
- * **id 목록은 배열 한 개로 바인딩한다.** 플레이스홀더를 개수만큼 펼치면 SQL 본문이 입력 크기에
- * 비례해 자라고, 개수가 다를 때마다 다른 구문이 되어 계획 캐시가 재사용되지 않는다. 후보는
- * 지도 영역 추천에서 2,000건까지 올라온다(SPEC-0036).
+ * 취향 유사도 조회 어댑터(SPEC-0035). pgvector의 `avg(vector)`·`<=>` 때문에 생 SQL이다.
+ * - 회원 반응 장소 벡터 평균과 후보의 코사인 유사도만 돌려준다 — 벡터는 DB 밖으로 나오지 않는다.
+ * - 빈 id 집합이면 유사도가 NULL이다. id 목록은 배열 한 개로 바인딩한다.
  */
 @Component
 class TasteSimilarityQueryJdbcAdapter(

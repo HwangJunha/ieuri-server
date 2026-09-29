@@ -25,11 +25,8 @@ import kotlin.test.assertTrue
 
 /**
  * 사진 업로드 발급·확인·삭제.
- *
- * 여기서 지키는 계약은 세 가지다. **발급은 all-or-nothing**(부분 발급은 클라이언트가
- * 추적하기 어렵다), **확인은 장별로 성패가 갈리고**(한 장 실패로 나머지를 버리지 않는다),
- * **키의 소유권은 저장소를 묻기 전에 문자열만으로 판정한다**(타인 키의 존재 여부가 응답
- * 시간으로 새어 나가지 않게 한다).
+ * - 발급은 all-or-nothing, 확인은 장별로 성패가 갈린다.
+ * - 키의 소유권은 저장소를 묻기 전에 문자열만으로 판정한다.
  */
 class PostImageUploadServiceTest {
 
@@ -93,7 +90,7 @@ class PostImageUploadServiceTest {
             .single()
             .objectKey
 
-        // 키에 memberId가 들어가는 것이 나중에 소유권 판정의 근거가 된다.
+        // 키에 memberId가 들어간다.
         assertTrue(key.startsWith("pending/community/$memberId/"), "키가 pending/community/$memberId/로 시작하지 않는다: $key")
     }
 
@@ -128,7 +125,7 @@ class PostImageUploadServiceTest {
 
     @Test
     fun `한 장이라도 형식이 어긋나면 전부 발급하지 않는다`() {
-        // 부분 발급은 클라이언트가 어느 장이 실패했는지 추적해야 해서 복잡도가 이득보다 크다.
+        // 부분 발급하지 않는다.
         assertFailsWith<UnsupportedContentTypeException> {
             service.issueUploadUrls(
                 IssuePostImageUploadUrlsCommand(
@@ -180,7 +177,7 @@ class PostImageUploadServiceTest {
             memberId,
         )
 
-        // 서명에 들어가는 값이 정규화된 형태여야 업로드 시 Content-Type과 맞출 수 있다.
+        // 서명에는 정규화된 Content-Type이 들어간다.
         verify { storage.presignPut(any(), "image/jpeg", 100, any()) }
     }
 
@@ -216,7 +213,7 @@ class PostImageUploadServiceTest {
             memberId,
         )
 
-        // 전부 버리면 사용자가 성공한 장까지 다시 올려야 한다.
+        // 한 장 실패로 나머지를 버리지 않는다.
         assertContentEquals(listOf(good.replaceFirst("pending/", "images/")), result.confirmed)
         assertEquals(listOf(bad), result.failed.map { it.objectKey })
         verify(exactly = 0) { storage.move(bad, any()) }
@@ -255,7 +252,7 @@ class PostImageUploadServiceTest {
         val result = service.confirmUploads(ConfirmPostImageUploadsCommand(listOf(key)), memberId)
 
         assertEquals(listOf(key), result.failed.map { it.objectKey })
-        // 저장소를 먼저 물으면 타인의 키가 존재하는지 응답 시간으로 알아낼 수 있다.
+        // 타인의 키면 저장소를 묻지 않는다.
         verify(exactly = 0) { storage.findSize(any()) }
     }
 
@@ -272,8 +269,7 @@ class PostImageUploadServiceTest {
 
     @Test
     fun `이미 확정된 키를 다시 확인하면 실패한다`() {
-        // 원본이 pending에 없으므로 재확인은 성공할 수 없다. 조용히 통과시키면
-        // 클라이언트가 move가 두 번 일어났다고 착각한다.
+        // 원본이 pending에 없으므로 재확인은 실패한다.
         val key = "images/community/$memberId/${UUID.randomUUID()}"
 
         val result = service.confirmUploads(ConfirmPostImageUploadsCommand(listOf(key)), memberId)
@@ -300,7 +296,7 @@ class PostImageUploadServiceTest {
 
     @Test
     fun `실패 사유는 원인을 구분하지 않는다`() {
-        // 미업로드·타인 키·위조 키를 구분해 주면 키 존재 여부를 캐낼 수 있다.
+        // 미업로드·타인 키·위조 키는 같은 코드로 응답한다.
         val notUploaded = pendingKey()
         val someoneElses = pendingKey(otherMemberId)
         every { storage.findSize(notUploaded) } returns null

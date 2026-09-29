@@ -16,15 +16,7 @@ import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignReques
 import java.time.Duration
 import java.time.Instant
 
-/**
- * 프로필 이미지용 R2(S3 호환) 어댑터.
- *
- * **S3Client·S3Presigner 빈은 community와 공유하고 포트는 공유하지 않는다.** 그 둘은
- * AWS SDK 타입이라 도메인 경계와 무관하지만, 포트를 공유하면 auth가 community 패키지를
- * import하게 되어 나중에 auth를 떼어낼 수 없다.
- *
- * 서버는 이미지 바이트를 중계하지 않는다 — 업로드는 클라이언트가 presigned URL로 직접 PUT한다.
- */
+/** 프로필 이미지용 R2(S3 호환) 어댑터. S3Client·S3Presigner 빈은 community와 공유하되 포트는 공유하지 않는다. */
 @Component
 class R2ProfileImageStorageAdapter(
     private val s3Client: S3Client,
@@ -32,10 +24,7 @@ class R2ProfileImageStorageAdapter(
     private val properties: ProfileImageProperties,
 ) : ProfileImageStoragePort {
 
-    /**
-     * presigned PUT URL. **contentType·contentLength가 서명에 포함된다** — 선언과 다르게
-     * 올리면 R2가 거부하므로, 발급 시점의 선언이 업로드 시점에 강제된다.
-     */
+    /** presigned PUT URL. contentType·contentLength가 서명에 포함돼 선언과 다르게 올리면 R2가 거부한다. */
     override fun presignPut(
         objectKey: String,
         contentType: String,
@@ -67,8 +56,7 @@ class R2ProfileImageStorageAdapter(
     } catch (e: NoSuchKeyException) {
         null
     } catch (e: S3Exception) {
-        // R2의 HeadObject는 부재를 404로 돌려주며 NoSuchKeyException으로 매핑되지 않는
-        // 경우가 있다. 부재와 장애를 구분하되, 부재는 예외가 아니라 null이다.
+        // R2 HeadObject는 부재를 NoSuchKeyException이 아닌 404로 줄 때가 있다. 부재는 예외가 아니라 null이다.
         if (e.statusCode() == 404) null else throw e
     }
 
@@ -87,10 +75,7 @@ class R2ProfileImageStorageAdapter(
         if (e.statusCode() == 404) null else throw e
     }
 
-    /**
-     * 복사 후 원본 삭제. S3에는 이동이 없다. 복사 성공·삭제 실패면 `pending/`에 사본이
-     * 남는데 고아 오브젝트일 뿐이며 lifecycle rule이 정리한다. 반대 순서로 쓰면 원본을 잃는다.
-     */
+    /** 복사 후 원본 삭제(S3에는 이동이 없다). 삭제 실패로 남는 `pending/` 사본은 lifecycle rule이 정리한다. */
     override fun move(sourceKey: String, targetKey: String) {
         s3Client.copyObject(
             CopyObjectRequest.builder()

@@ -9,10 +9,8 @@ import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
 /**
- * 비밀번호 단방향 해시 구현: `bcrypt( HMAC-SHA256(rawPassword, pepper) )`.
- * - BCrypt: 솔트 내장의 표준 단방향 해시(work factor로 계산 비용 조절).
- * - pepper: 서버 비밀키. DB에 없으므로 DB 유출만으로는 크래킹이 어렵다(OWASP 권고).
- * HMAC로 선처리하므로 BCrypt의 72바이트 입력 제한 문제도 자연히 해소된다.
+ * 비밀번호 단방향 해시: `bcrypt( HMAC-SHA256(rawPassword, pepper) )`.
+ * - pepper는 DB 밖의 서버 비밀키다. HMAC 선처리로 BCrypt의 72바이트 입력 제한도 피한다.
  */
 @Component
 class PepperedBCryptPasswordEncoder(

@@ -17,11 +17,8 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 
 /**
- * 상세 사전 수집 대상 조회(SPEC-0037). 갈래마다 자식 표가 다를 뿐 조건 구조는 같다 —
- * **그 `spot_id`로 아직 확보하지 못했거나(행 없음) 오래된(`fetched_at` 경과) 장소**.
- *
- * `NOT EXISTS`로 쓴 이유는 갤러리·이용안내가 `spot_id`당 여러 행이라 조인하면 중복이 생기고
- * `limit`이 장소 수가 아닌 행 수를 세게 되기 때문이다. 본문은 1:1이지만 형태를 맞춘다.
+ * 상세 사전 수집 대상 조회(SPEC-0037) — 그 갈래 자식 표에 행이 없거나 `fetched_at`이 지난 장소.
+ * - `NOT EXISTS`다 — 조인하면 여러 행 자식 때문에 중복이 생기고 `limit`이 행 수를 센다.
  */
 @Component
 class SpotDetailPrefetchTargetQueryAdapter(
@@ -69,10 +66,7 @@ class SpotDetailPrefetchTargetQueryAdapter(
             )
         }
 
-    /**
-     * 아직 확보하지 못했거나 신선도가 지난 장소. **확보실패와 미확보를 구분하지 않는다** —
-     * 실패하면 행이 남지 않으므로 둘 다 "행 없음"이고, 다음 실행이 똑같이 집어 든다.
-     */
+    /** 아직 확보하지 못했거나 신선도가 지난 장소. 확보 실패와 미확보를 구분하지 않는다. */
     private fun needsFetch(part: SpotDetailPart, staleBefore: Instant): BooleanExpression {
         val fresh = when (part) {
             SpotDetailPart.BODY ->

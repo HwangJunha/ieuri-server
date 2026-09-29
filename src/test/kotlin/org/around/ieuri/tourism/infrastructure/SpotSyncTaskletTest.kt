@@ -30,12 +30,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
-/**
- * 동기화 Tasklet의 페이지 진행·재개 동작(SPEC-0004 R-3·R-4).
- *
- * Spring 컨텍스트를 띄우지 않고 StepExecution만 직접 만들어 검증한다 — 검증 대상이 프레임워크 배선이
- * 아니라 **페이지 루프와 ExecutionContext에 남는 재개 상태**이기 때문이다.
- */
+/** 동기화 Tasklet의 페이지 진행·재개 동작(SPEC-0004 R-3·R-4). StepExecution만 직접 만든다. */
 class SpotSyncTaskletTest {
 
     private val syncPort = mockk<SpotSyncPort>()
@@ -56,10 +51,7 @@ class SpotSyncTaskletTest {
 
     private fun page(records: List<SyncSpotCommand>, totalCount: Int) = SpotSyncPage(records = records, totalCount = totalCount, droppedCount = 0, categoryFallbackCount = 0)
 
-    /**
-     * 실제 StepExecution — ExecutionContext가 진짜로 유지되어야 재개 동작을 검증할 수 있다.
-     * `runDate` 잡 파라미터는 SPEC-0007의 종료 축제 제외 집합 조회 기준일이다.
-     */
+    /** 실제 StepExecution. `runDate`는 종료 축제 제외 집합 조회 기준일이다(SPEC-0007). */
     private fun stepExecution(): StepExecution {
         val parameters = JobParametersBuilder()
             .addString(RUN_DATE_PARAMETER, RUN_DATE.toString())
@@ -123,8 +115,7 @@ class SpotSyncTaskletTest {
 
     @Test
     fun `실행 시각은 첫 페이지에서 고정되어 이후 페이지에서 바뀌지 않는다`() {
-        // 페이지마다 now()를 쓰면 정리 단계(R-5)의 기준 시각이 페이지별로 어긋나
-        // "이번 실행이 건드린 행"의 경계가 흐려진다.
+        // 정리 단계(R-5)의 기준 시각이 페이지별로 어긋나면 안 된다.
         every { syncPort.fetchPage(DomainLocale.KO, any(), 1_000) } returns
             page(listOf(record("1")), totalCount = 3_000)
         val syncedAt = slot<Instant>()
@@ -246,8 +237,7 @@ class SpotSyncTaskletTest {
 
     @Test
     fun `종료된 축제는 적재 대상에서 제외한다`() {
-        // AC-31·AC-32. areaBasedSyncList2에는 contentTypeId 파라미터가 없어 축제도 이 경로로 온다.
-        // 제외하지 않으면 같은 잡의 축제 정리가 지운 행사를 이 Step이 되살린다.
+        // AC-31·AC-32. 축제도 이 경로로 오므로 제외하지 않으면 축제 정리가 지운 행사를 되살린다.
         every { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) } returns
             page(listOf(record("ended"), record("alive")), totalCount = 2)
         every { upsertPort.upsertAll(any(), any()) } returns 1
@@ -260,8 +250,7 @@ class SpotSyncTaskletTest {
 
     @Test
     fun `축제가 아닌 항목은 종료 판정의 영향을 받지 않는다`() {
-        // AC-33. 판정은 contentId 집합 멤버십뿐이다 — 카테고리·날짜를 여기서 다시 해석하지 않으므로
-        // 축제가 아닌 contentId는 애초에 제외 집합에 들어올 수 없다.
+        // AC-33. 판정은 contentId 집합 멤버십뿐이다.
         every { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) } returns
             page(listOf(record("spot-1"), record("spot-2")), totalCount = 2)
         every { upsertPort.upsertAll(any(), any()) } returns 2
@@ -274,8 +263,7 @@ class SpotSyncTaskletTest {
 
     @Test
     fun `제외된 항목도 수집 집합에는 포함되어 이중 삭제되지 않는다`() {
-        // AC-34. collectedIds는 deleteMissing의 생존 집합이다. 제외분이 빠지면 그것이 "사라진
-        // 항목"으로 삭제 대상에 들어가 삭제 건수가 이중으로 잡힌다.
+        // AC-34. 제외분도 생존 집합에 들어가야 "사라진 항목"으로 삭제되지 않는다.
         every { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) } returns
             page(listOf(record("ended"), record("alive")), totalCount = 2)
         every { upsertPort.upsertAll(any(), any()) } returns 1
@@ -290,8 +278,7 @@ class SpotSyncTaskletTest {
 
     @Test
     fun `제외 집합은 Step당 한 번만 조회한다`() {
-        // 페이지마다 다시 조회하면 페이지당 질의가 하나씩 늘고, 하루 1회 배치에서 그만큼의 신선도가
-        // 필요하지도 않다. 부팅 시점이 아니라 실행 시점에 잡는 것이 요점이다.
+        // 부팅 시점이 아니라 실행 시점에, 한 번만 조회한다.
         every { syncPort.fetchPage(DomainLocale.KO, any(), 1_000) } returns
             page(listOf(record("a")), totalCount = 3_000)
         every { upsertPort.upsertAll(any(), any()) } returns 1

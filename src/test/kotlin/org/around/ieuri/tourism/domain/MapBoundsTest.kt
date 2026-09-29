@@ -6,12 +6,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
-/**
- * 뷰포트 bbox의 유효성과 면적(SPEC-0014 R4·R5).
- *
- * 검증을 VO에 두는 이유가 여기 있다 — "뒤집힘"과 "범위 밖"의 경계가 리졸버와 SQL에 흩어지면
- * 두 곳이 어긋난다. 그 경계를 이 테스트가 고정한다.
- */
+/** 뷰포트 bbox의 유효성과 면적(SPEC-0014 R4·R5). */
 class MapBoundsTest {
 
     @Test
@@ -33,14 +28,13 @@ class MapBoundsTest {
 
     @Test
     fun `위도가 같으면 거절된다`() {
-        // 넓이 0의 선분이라 마커가 나올 수 없다. "뒤집힘"과 같이 다룬다.
+        // 넓이 0은 "뒤집힘"과 같이 다룬다.
         assertNull(MapBounds.ofOrNull(minLat = 37.5, minLng = 126.9, maxLat = 37.5, maxLng = 127.1))
     }
 
     @Test
     fun `경도가 뒤집힌 bbox는 거절된다`() {
-        // 날짜변경선을 넘는 bbox(minLng > maxLng)를 지원하지 않는다는 결정이 여기 걸린다 —
-        // 지원하면 질의가 둘로 쪼개진다.
+        // 날짜변경선을 넘는 bbox(minLng > maxLng)는 지원하지 않는다.
         assertNull(MapBounds.ofOrNull(minLat = 37.4, minLng = 127.1, maxLat = 37.6, maxLng = 126.9))
     }
 
@@ -63,13 +57,12 @@ class MapBoundsTest {
 
     @Test
     fun `극단값 자체는 유효하다`() {
-        // 90·180은 범위 밖이 아니다 — 경계를 배타로 처리하면 전 지구 bbox가 만들어지지 않는다.
+        // 90·180은 범위 밖이 아니다(경계 포함).
         assertNotNull(MapBounds.ofOrNull(minLat = -90.0, minLng = -180.0, maxLat = 90.0, maxLng = 180.0))
     }
 
     @Test
     fun `NaN이나 무한대는 거절된다`() {
-        // 비교 연산이 전부 false가 되어 검증을 그대로 통과해 버리므로 따로 막는다.
         assertNull(MapBounds.ofOrNull(minLat = Double.NaN, minLng = 126.9, maxLat = 37.6, maxLng = 127.1))
         assertNull(
             MapBounds.ofOrNull(
@@ -83,7 +76,7 @@ class MapBoundsTest {
 
     @Test
     fun `면적은 위경도 도 곱이다`() {
-        // AC R5의 상한 비교 기준. 제곱미터가 아니라 도 곱이라는 점이 계약이다.
+        // AC R5의 상한 비교 기준. 제곱미터가 아니라 도 곱이다.
         val bounds = MapBounds.ofOrNull(minLat = 37.0, minLng = 126.0, maxLat = 37.5, maxLng = 127.0)
 
         assertNotNull(bounds)
@@ -92,7 +85,7 @@ class MapBoundsTest {
 
     @Test
     fun `중심점은 위경도 평균이다`() {
-        // SPEC-0036의 거리 기준점. 네 변을 전부 다른 값으로 둬 위경도가 뒤바뀌면 깨지게 한다.
+        // 네 변을 전부 다른 값으로 둬 위경도가 뒤바뀌면 깨지게 한다.
         val bounds = MapBounds.ofOrNull(minLat = 37.0, minLng = 126.0, maxLat = 37.5, maxLng = 127.0)
 
         assertNotNull(bounds)
@@ -102,7 +95,7 @@ class MapBoundsTest {
 
     @Test
     fun `적도와 본초자오선을 걸치는 영역의 중심점도 평균이다`() {
-        // 음수 좌표에서 부호를 잃지 않는지 — 서비스 지역은 아니지만 계산 자체는 일반적이어야 한다.
+        // 음수 좌표에서 부호를 잃지 않는지.
         val bounds = MapBounds.ofOrNull(minLat = -1.0, minLng = -2.0, maxLat = 3.0, maxLng = 6.0)
 
         assertNotNull(bounds)

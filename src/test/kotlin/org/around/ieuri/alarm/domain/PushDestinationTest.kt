@@ -8,9 +8,7 @@ import kotlin.test.assertEquals
 
 /**
  * FCM 데이터 페이로드(SPEC-0028 R11).
- *
- * 값마다 서로 다른 수를 넣어 **두 식별자가 뒤바뀌면 반드시 깨지게** 한다 — spotId와
- * questionId가 같은 Long이라 swap이 컴파일을 통과한다.
+ * - 값마다 다른 수를 넣어 spotId·questionId가 뒤바뀌면 깨지게 한다.
  */
 class PushDestinationTest {
 
@@ -51,17 +49,14 @@ class PushDestinationTest {
         assertEquals(NotificationCategory.MESSAGE, PushDestination.Dm(1L).category)
     }
 
-    /** 답변과 답글은 한 카테고리로 묶인다 — 사용자에게 같은 성격이다. */
+    /** 답변과 답글은 한 카테고리로 묶인다. */
     @Test
     fun `답변과 답글은 SPOT_QA 카테고리다`() {
         assertEquals(NotificationCategory.SPOT_QA, PushDestination.SpotQaAnswer(1L, 2L).category)
         assertEquals(NotificationCategory.SPOT_QA, PushDestination.SpotQaReply(1L, 2L).category)
     }
 
-    /**
-     * **카테고리는 같아도 종류는 갈린다.** 문구를 이 값으로 찾으므로, 답변과 답글이 같은
-     * 종류가 되면 두 알림의 제목이 같아진다.
-     */
+    /** 카테고리는 같아도 종류(문구 조회 키)는 갈린다. */
     @Test
     fun `답변과 답글은 종류가 다르다`() {
         assertEquals(NotificationType.SPOT_QA_ANSWER, PushDestination.SpotQaAnswer(1L, 2L).type)
@@ -69,7 +64,7 @@ class PushDestinationTest {
         assertEquals(NotificationType.DM, PushDestination.Dm(1L).type)
     }
 
-    /** FCM 데이터의 `type` 값이 곧 종류의 이름이다 — 둘이 어긋나면 클라이언트가 라우팅에 실패한다. */
+    /** FCM 데이터의 `type` 값이 곧 종류의 이름이다. */
     @Test
     fun `데이터의 type이 종류 이름과 같다`() {
         listOf<PushDestination>(

@@ -10,11 +10,7 @@ import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.Sp
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.SpotDetailInfoEntity
 import org.around.ieuri.tourism.infrastructure.adapter.out.persistence.entity.SpotDetailIntroEntity
 
-/**
- * 적재된 본문을 도메인 [SpotDetail]로 옮긴다.
- *
- * `likeCount`는 적재 대상이 아니라 서비스가 실시간 집계로 얹으므로 여기서 채우지 않는다.
- */
+/** 적재된 본문 → 도메인 [SpotDetail]. `likeCount`는 서비스가 얹으므로 채우지 않는다. */
 fun SpotDetailEntity.toDomain(): SpotDetail = SpotDetail(
     title = title,
     category = SpotCategory(category),

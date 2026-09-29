@@ -3,19 +3,16 @@ package org.around.ieuri.tourism.infrastructure.config
 import org.springframework.boot.context.properties.ConfigurationProperties
 
 /**
- * 추천 설정(SPEC-0035 §9 · POL-044). 코드 기본값은 **출발값**이며 실측 후 확정한다.
- * 값은 `application.yaml`이 덮어쓴다.
+ * 추천 설정(SPEC-0035 §9 · POL-044). 코드 기본값은 출발값이며 `application.yaml`이 덮어쓴다.
  *
- * @param distanceHalfLifeMeters 거리 요인이 0.5가 되는 거리(m). SPEC-0013 실측 5km.
- * @param taxRefundMultiplier 면세 태그 장소의 점수 배율.
- * @param taxRefundTitlePatterns 면세 태그 판정 패턴. 언어별 표기가 다르다(실측: EN·JA·ZH·KO 네 가지).
+ * @param distanceHalfLifeMeters 거리 요인이 0.5가 되는 거리(m).
+ * @param taxRefundTitlePatterns 면세 태그 판정 패턴. 언어별 표기가 다르다.
  * @param categoryRepeatPenalty 같은 카테고리 n번째 장소에 깎는 `penalty × (n − 1)`. 0이면 순수 점수순.
  * @param candidateCap 후보 상한 N. 거리 가까운 순 N건만 대상이다.
  * @param tasteWeight 취향 요인 비중 w. 취향이 있으면 `(1 − w)·거리 + w·취향`.
  * @param tasteMinReactions 취향이 성립하는 최소 반응 수(좋아요 + 싫어요).
- * @param likedMultiplier 좋아요한 장소의 점수 배율(SPEC-0036 D-13). 1보다 크면 앞으로 당긴다.
- * @param dislikedMultiplier 싫어요한 장소의 점수 배율. 1보다 작으면 뒤로 민다 — **0이어도 결과에서
- *   빠지지는 않는다**. 지도는 화면 안의 것을 다 그린다.
+ * @param likedMultiplier 좋아요한 장소의 점수 배율(SPEC-0036). 1보다 크면 앞으로 당긴다.
+ * @param dislikedMultiplier 싫어요한 장소의 점수 배율. 0이어도 결과에서 빠지지는 않는다.
  */
 @ConfigurationProperties(prefix = "ieuri.tourism.recommendation")
 data class RecommendationProperties(
@@ -31,8 +28,8 @@ data class RecommendationProperties(
     val embedding: Embedding = Embedding(),
 ) {
     /**
-     * 임베딩(S2). [dimension]은 `spot_embedding.embedding vector(1024)`와 같아야 한다 — 바꾸면 마이그레이션이
-     * 따른다. [batchSize]는 Voyage 요청당 입력 상한(1,000건·320K 토큰) 안이어야 한다.
+     * 임베딩. [dimension]은 `spot_embedding.embedding vector(1024)`와 같아야 한다 — 바꾸면 마이그레이션이 따른다.
+     * - [batchSize]는 Voyage 요청당 입력 상한(1,000건·320K 토큰) 안이어야 한다.
      */
     data class Embedding(
         val model: String = "voyage-4",

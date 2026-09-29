@@ -14,7 +14,7 @@ class AlarmMemberDataEraseServiceTest {
 
     private val service = AlarmMemberDataEraseService(deviceTokenRepository, preferenceRepository)
 
-    /** 기기 토큰과 수신 설정이 **둘 다** 지워진다 — 하나만 지우면 탈퇴 후 설정이 남는다. */
+    /** 기기 토큰과 수신 설정이 둘 다 지워진다. */
     @Test
     fun `탈퇴하면 기기 토큰과 수신 설정이 지워진다`() {
         service.eraseMemberData(7L)

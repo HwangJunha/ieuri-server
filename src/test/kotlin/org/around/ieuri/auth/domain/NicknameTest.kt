@@ -5,10 +5,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
-/**
- * 닉네임 값 객체(SPEC-0011 R5). 길이·공백 규칙이 여기 있다 —
- * 고유성은 애그리거트 밖의 사실이라 값 객체가 판정하지 않는다.
- */
+/** 닉네임 값 객체(SPEC-0011 R5). 길이·공백 규칙을 판정하며 고유성은 판정하지 않는다. */
 class NicknameTest {
 
     @Test

@@ -4,27 +4,18 @@ import org.around.ieuri.auth.application.exception.PasswordPolicyViolationExcept
 import org.around.ieuri.auth.domain.vo.Provider
 import java.util.UUID
 
-/**
- * 회원가입 커맨드(쓰기 입력). GraphQL input에서 변환된다.
- * 형식/shape 검증만 여기서 수행하고, 업무 불변식은 도메인(Member.register)에서 강제한다.
- */
+/** 회원가입 커맨드. 형식 검증만 하고 업무 불변식은 Member.register가 강제한다. */
 data class RegisterMemberCommand(
     val provider: Provider,
     val idToken: String,
-    /** 폼 제출 이메일(필수). provider 값이 기본 채워지되 사용자가 수정 가능. */
+    /** 폼 제출 이메일(필수). */
     val submittedEmail: String,
     /** 만 14세 이상 확인 체크값. */
     val ageVerified: Boolean,
     val agreements: List<AgreementInput>,
     /** 탈퇴 시 연결 해제용 토큰을 확보하기 위한 provider authorization code. 확보 실패해도 가입은 성공한다. */
     val authorizationCode: String? = null,
-    /**
-     * 클라이언트가 provider에서 받아 넘긴 닉네임(SPEC-0032 R29).
-     *
-     * **형식을 여기서 검사하지 않는다** — provider가 주는 값이라 클라이언트가 고칠 수 없고,
-     * 규칙을 벗어나면 서버가 조용히 자동 생성으로 대체한다. `require`로 막으면 가입이
-     * 실패하는데, 그것은 사용자가 손쓸 수 없는 이유로 막는 것이다.
-     */
+    /** provider가 준 닉네임(SPEC-0032 R29). 형식을 검사하지 않는다 — 규칙을 벗어나면 서버가 자동 생성으로 대체한다. */
     val nickname: String? = null,
 ) {
     init {
@@ -33,10 +24,7 @@ data class RegisterMemberCommand(
     }
 }
 
-/**
- * 자체(EMAIL) 회원가입 커맨드. 이메일+비밀번호로 가입하고 이메일 인증으로 활성화한다.
- * 비밀번호 정책(개인정보보호법 안전성 확보조치 기준: 3종 조합 8자 이상)은 여기서 형식 검증한다.
- */
+/** 자체(EMAIL) 회원가입 커맨드. 비밀번호 정책은 여기서 형식 검증한다. */
 data class RegisterEmailMemberCommand(
     val email: String,
     val password: String,
@@ -59,13 +47,8 @@ data class AgreementInput(
     }
 }
 
-/**
- * 비밀번호 정책 검증(형식). 영문·숫자·특수문자 3종을 모두 포함하고 8자 이상이어야 한다.
- * (개인정보보호법 「개인정보의 안전성 확보조치 기준」: 3종 조합 시 8자 이상 충족.)
- */
+/** 비밀번호 정책 검증: 8~100자, 영문·숫자·특수문자 모두 포함. 위반 시 INVALID_INPUT이 아니라 [PasswordPolicyViolationException]. */
 fun validatePasswordPolicy(password: String) {
-    // 전용 코드로 던진다 — INVALID_INPUT으로 뭉뚱그리면 클라이언트가 어느 입력이 문제인지
-    // 알 수 없고, 서버 message에 의존해야 해 다국어 대응이 불가능하다(POL-022).
     fun requirePolicy(satisfied: Boolean, message: String) {
         if (!satisfied) throw PasswordPolicyViolationException(message)
     }
@@ -78,7 +61,7 @@ fun validatePasswordPolicy(password: String) {
     )
 }
 
-/** 비밀번호 재설정 요청 커맨드(이메일로 코드 발송). 계정 유무는 응답으로 드러내지 않는다. */
+/** 비밀번호 재설정 요청 커맨드(이메일로 코드 발송). */
 data class RequestPasswordResetCommand(
     val email: String,
 ) {
@@ -115,13 +98,7 @@ data class ResendVerificationCommand(
     val verificationPublicId: UUID,
 )
 
-/**
- * 인증 주소 재입력 커맨드(SPEC-0024 R7).
- *
- * 검증 핸들이 아니라 **[memberId]로 대상을 정한다** — 발급된 핸들을 잃은 회원도 주소를
- * 고칠 수 있어야 하고, 이 오퍼레이션은 인증된 호출자만 쓰기 때문이다.
- * 주소 형식은 도메인 `Email`이 판정한다.
- */
+/** 인증 주소 재입력 커맨드(SPEC-0024 R7). 검증 핸들이 아니라 인증된 [memberId]로 대상을 정한다. */
 data class RetargetEmailVerificationCommand(
     val memberId: Long,
     val newEmail: String,

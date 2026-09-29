@@ -14,11 +14,8 @@ import kotlin.test.assertFailsWith
 
 /**
  * 탈퇴 회원의 커뮤니티 데이터 정리(SPEC-0011 R17).
- *
- * 고정하는 계약은 둘이다.
- * - **남에게도 보이는 것은 소프트 삭제한다** — 글·댓글·질문·답변·답글·DM. 지우면 남의
- *   스레드에 구멍이 나고 대화 상대는 독백을 보게 된다. 행은 남기고 표시에서만 지운다.
- * - **본인만의 데이터는 물리 삭제한다** — 좋아요·숨김·차단은 남길 이유가 없다.
+ * - 남에게도 보이는 콘텐츠(글·댓글·질문·답변·답글·DM)는 소프트 삭제한다.
+ * - 본인만의 데이터(좋아요·숨김·차단)는 물리 삭제한다.
  */
 class MemberDataEraseServiceTest {
 
@@ -54,21 +51,18 @@ class MemberDataEraseServiceTest {
         verify { softDeletePort.softDeleteSpotAnswerRepliesByAuthor(memberId, now) }
     }
 
-    /**
-     * **행을 지우지 않는다.** 물리 삭제하면 그 글에 달린 남의 댓글·좋아요가 CASCADE로 함께
-     * 사라지고, 질문을 지우면 남이 쓴 답변이 통째로 없어진다 — 이 슬라이스가 고친 것이다.
-     */
+    /** 콘텐츠 행은 물리 삭제하지 않는다. */
     @Test
     fun `콘텐츠를 물리 삭제하지 않는다`() {
         service.eraseMemberData(memberId)
 
-        // 콘텐츠 삭제 메서드는 포트에서 사라졌고, 남은 물리 삭제는 본인 데이터뿐이다.
+        // 물리 삭제는 본인 데이터뿐이다.
         verify(exactly = 1) { erasePort.deleteLikesByMember(memberId) }
         verify(exactly = 1) { erasePort.deleteHidesByMember(memberId) }
         verify(exactly = 1) { erasePort.deleteBlocksInvolving(memberId) }
     }
 
-    /** 한 번의 탈퇴가 남기는 시각은 하나여야 한다 — 표마다 갈리면 한 값으로 읽을 수 없다. */
+    /** 한 번의 탈퇴는 모든 표에 같은 시각을 남긴다. */
     @Test
     fun `모든 콘텐츠가 같은 삭제 시각을 받는다`() {
         service.eraseMemberData(memberId)
@@ -92,12 +86,7 @@ class MemberDataEraseServiceTest {
         verify { erasePort.deleteBlocksInvolving(memberId) }
     }
 
-    /**
-     * SPEC-0017 AC17-1·AC17-2 — 탈퇴하면 그가 보낸 DM이 상대 화면에서 사라진다.
-     *
-     * **행을 지우지 않는다.** 지우면 상대는 자기 말만 남은 독백을 보게 된다 — 대화를 남기는
-     * 것(AC17-2)의 취지가 메시지를 지우면 반만 지켜진다.
-     */
+    /** SPEC-0017 AC17-1·AC17-2 — 탈퇴자가 보낸 DM은 상대 화면에서 사라지되 행은 남는다. */
     @Test
     fun `탈퇴하면 보낸 메시지를 소프트 삭제한다`() {
         service.eraseMemberData(memberId)
@@ -105,10 +94,7 @@ class MemberDataEraseServiceTest {
         verify { softDeletePort.softDeleteMessagesBySender(memberId, now) }
     }
 
-    /**
-     * AC17-3 — 메시지 처리는 **탈퇴 경로에서만** 일어난다. 정지는 해제될 수 있으므로 이
-     * 유스케이스는 `MemberWithdrawn`에만 연결되어 있다.
-     */
+    /** AC17-3 — 메시지 처리는 탈퇴(`MemberWithdrawn`) 경로에서만 일어난다. */
     @Test
     fun `메시지 소프트 삭제는 한 번만 일어난다`() {
         service.eraseMemberData(memberId)
@@ -119,9 +105,8 @@ class MemberDataEraseServiceTest {
     // ── answerCount ──
 
     /**
-     * 답변을 지운 만큼 남는 질문의 `answerCount`를 내린다(SPEC-0026 R17).
-     *
-     * **세는 것이 칠하는 것보다 먼저다** — 칠하고 나면 어느 질문의 수를 내려야 하는지 알 수 없다.
+     * 지운 답변 수만큼 질문의 `answerCount`를 내린다(SPEC-0026 R17).
+     * - 세는 것이 삭제 표시보다 먼저다.
      */
     @Test
     fun `답변을 칠하기 전에 대상 질문을 먼저 센다`() {
@@ -141,12 +126,12 @@ class MemberDataEraseServiceTest {
 
         service.eraseMemberData(memberId)
 
-        // 같은 질문에 두 건이면 두 번 내린다 — 중복을 접으면 수가 실제보다 크게 남는다.
+        // 같은 질문에 두 건이면 두 번 내린다.
         verify(exactly = 2) { counterPort.decreaseAnswerCount(11L) }
         verify(exactly = 1) { counterPort.decreaseAnswerCount(22L) }
     }
 
-    /** 대상이 없으면 감소도 없다 — 숨겨진 답변은 애초에 수에 들어 있지 않다. */
+    /** 대상이 없으면 감소도 없다. */
     @Test
     fun `내릴 질문이 없으면 답변 수를 건드리지 않는다`() {
         every { softDeletePort.findQuestionIdsToDecrease(memberId) } returns emptyList()
@@ -156,7 +141,7 @@ class MemberDataEraseServiceTest {
         verify(exactly = 0) { counterPort.decreaseAnswerCount(any()) }
     }
 
-    /** 칠하기가 실패하면 수를 내리지 않는다 — 먼저 내리면 수만 줄어든 상태가 남는다. */
+    /** 삭제 표시가 실패하면 수를 내리지 않는다. */
     @Test
     fun `답변 소프트 삭제가 실패하면 답변 수를 내리지 않는다`() {
         every { softDeletePort.findQuestionIdsToDecrease(memberId) } returns listOf(11L)

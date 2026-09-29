@@ -10,10 +10,7 @@ import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.P
 import org.springframework.stereotype.Component
 import java.time.Instant
 
-/**
- * 비밀번호 재설정 챌린지 쓰기 포트 구현.
- * update()는 managed 엔티티를 로드해 attempts/consumed를 반영하고 dirty-check에 맡긴다.
- */
+/** 비밀번호 재설정 챌린지 쓰기 포트 구현. update()는 managed 엔티티를 고쳐 dirty-check에 맡긴다. */
 @Component
 class PasswordResetPersistenceAdapter(
     private val repository: PasswordResetJpaRepository,

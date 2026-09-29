@@ -2,10 +2,7 @@ package org.around.ieuri.auth.infrastructure.adapter.out.client
 
 import org.springframework.mail.MailAuthenticationException
 
-/**
- * 발송 실패 원인. 로그에서 "자격증명이 틀렸다"와 "레이트 리밋에 걸렸다"를 구별하기 위한
- * 분류일 뿐이며, 재시도 같은 동작 분기에는 쓰지 않는다(SPEC-0016 R7).
- */
+/** 발송 실패 원인. 로그 구별용 분류이며 재시도 같은 동작 분기에는 쓰지 않는다(SPEC-0016 R7). */
 enum class MailSendFailure {
     /** 인증 실패(SMTP 535). 자격증명·환경변수를 점검해야 한다. */
     AUTH,
@@ -20,12 +17,8 @@ enum class MailSendFailure {
 private val RATE_LIMIT_HINTS = listOf("throttl", "rate limit", "too many", "try again later")
 
 /**
- * 예외를 발송 실패 원인으로 분류한다. Spring이 535를 [MailAuthenticationException]으로 이미
- * 갈라 주므로 인증은 타입으로 판정하고, 스로틀링은 SMTP 4xx 응답 코드와 메시지 문구로 판정한다.
- *
- * 원인 체인 전체를 훑는다 — JavaMail 예외는 `MailSendException`에 중첩되어 올라온다.
- * 어디에도 걸리지 않으면 [MailSendFailure.OTHER]다. 분류가 발송 경로를 깨뜨려선 안 되므로
- * 예외를 던지지 않는다.
+ * 예외를 발송 실패 원인으로 분류한다. 인증은 [MailAuthenticationException] 타입으로, 스로틀링은 SMTP 4xx로 판정한다.
+ * - 원인 체인 전체를 훑고, 걸리지 않으면 [MailSendFailure.OTHER]다. 예외를 던지지 않는다.
  */
 fun classifySendFailure(ex: Throwable): MailSendFailure {
     val chain = generateSequence(ex) { it.cause?.takeIf { cause -> cause !== it } }.take(10).toList()

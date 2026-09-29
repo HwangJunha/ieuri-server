@@ -13,13 +13,8 @@ import org.springframework.context.annotation.Profile
 import org.springframework.transaction.PlatformTransactionManager
 
 /**
- * 시군구 대표 위치 선정 잡 구성(SPEC-0015 · V46). Step 하나짜리 잡이다 — 선정 전체가 DB 안의
- * UPDATE 두 문장이라 페이지네이션도 언어별 분기도 없다.
- *
- * **반드시 spot 동기화(`spotSyncJob`) 이후에 실행해야 한다.** `spot` 테이블을 읽어 산출하므로
- * 순서가 뒤집히면 전날 데이터로 계산한다. 그럼에도 `spotSyncJob`에 Step으로 붙이지 않는다 —
- * 런처가 이름으로 잡 하나를 골라 실행하는 구조이고 둘은 별도 CronJob으로 트리거된다.
- * **순서 보장은 CronJob 스케줄의 책임이다**(예: spot 04:00 → 이 잡 06:00).
+ * 시군구 대표 위치 선정 잡 구성(SPEC-0015 · V46). UPDATE 두 문장짜리 단일 Step이다.
+ * - `spotSyncJob` 이후에 실행해야 한다 — 순서는 CronJob 스케줄이 보장한다(예: spot 04:00 → 이 잡 06:00).
  *
  * 실행: `--ieuri.tourapi.sync.job=districtRepresentativeLocationJob`
  */

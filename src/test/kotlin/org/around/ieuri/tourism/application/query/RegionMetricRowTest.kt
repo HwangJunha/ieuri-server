@@ -8,11 +8,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * 지표 행의 항목 추출(SPEC-0015 R14 · POL-043).
- *
- * 값이 있는 항목만 [RegionMetricRow.metrics]에 들어가고, 결측은 0으로 채우지 않고 빠진다.
- */
+/** 지표 행의 항목 추출(SPEC-0015 · POL-043). 결측은 0으로 채우지 않고 빠진다. */
 class RegionMetricRowTest {
 
     private val region = RegionRow(
@@ -31,7 +27,7 @@ class RegionMetricRowTest {
         spendingIntensity: Double? = null,
     ) = RegionMetricRow(
         region = region,
-        // 결측 지표는 맵에 키 자체가 없다 — 질의가 그 지역을 돌려주지 않은 상태다.
+        // 결측 지표는 맵에 키 자체가 없다.
         metrics = buildMap {
             concentrationRate?.let {
                 put(RegionScoreFactor.CONGESTION, RegionMetric(it))
@@ -103,7 +99,7 @@ class RegionMetricRowTest {
 
     @Test
     fun `지역 정보는 결합된 지역 행에서 그대로 읽힌다`() {
-        // 결합 결과가 어느 지역의 것인지 잃지 않는다 — 코드가 어긋나면 점수가 남의 지역에 실린다.
+        // 결합 결과가 어느 지역의 것인지 잃지 않는다.
         val row = row(concentrationRate = 67.4)
 
         assertEquals("11680", row.code)

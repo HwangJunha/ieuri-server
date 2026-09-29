@@ -23,9 +23,7 @@ import org.springframework.transaction.annotation.Transactional
 
 /**
  * 전국 지도 쓰기 유스케이스 구현(SPEC-0030 R3·R4·R12·R14).
- *
- * **저장하는 것은 시군구 코드뿐이다** — 좌표도, 기록 시각도, 판정 출처도 저장하지 않는다
- * (R5, POL-045). 저장 포트의 시그니처가 그것을 타입으로 강제한다.
+ * - 저장하는 것은 시군구 코드뿐이다 — 좌표·기록 시각·판정 출처는 저장하지 않는다(R5, POL-045).
  */
 @Service
 class NationwideMapCommandService(
@@ -46,16 +44,13 @@ class NationwideMapCommandService(
             return RecordVisitsResult(updatedCells = emptyList(), unknownDistrictCodes = emptyList())
         }
 
-        // 없는 코드를 조용히 버리지 않는다 — 클라이언트가 DISTRICT_NOT_FOUND를 받을 근거다.
+        // 없는 코드는 버리지 않고 DISTRICT_NOT_FOUND의 근거로 돌려준다.
         val existing = districtVisitQueryPort.filterExistingDistrictCodes(requested)
         val unknown = requested.filterNot { it in existing }
 
         val added = districtVisitUpsertPort.record(command.memberId, existing)
 
-        // **이번 요청으로 방문이 된 칸만** 돌려준다. 이미 방문한 칸은 상태가 바뀌지 않았다.
-        //
-        // 칸마다 mapCell을 부르지 않는다 — 사진 동기화가 한 번에 수십 칸을 방문으로 바꾸면
-        // 그 수만큼 질의가 두 배로 나간다. 시군구를 한 번에 읽고 도메인이 접는다.
+        // 이번 요청으로 방문이 된 칸만 돌려준다. 시군구를 한 번에 읽고 도메인이 접는다.
         val updatedCellIds = mapCellDistrictQueryPort.findCellIdsByDistrictCodes(added)
         val visited = districtVisitQueryPort.findVisitedDistrictCodes(command.memberId)
         val updatedCells = MapCellGrouping.fold(mapCellQueryPort.findCellDistrictsIn(updatedCellIds))
@@ -66,13 +61,13 @@ class NationwideMapCommandService(
 
     @Transactional
     override fun removeVisit(command: RemoveVisitCommand, locale: DomainLocale): RemoveVisitResult {
-        // 칸에 속한 시군구 전부를 지운다(R4) — 광역시 칸이면 25개가 한 번에 지워진다.
+        // 칸에 속한 시군구 전부를 지운다(R4).
         val rows = mapCellQueryPort.findCellDistricts(command.cellId)
         if (rows.isEmpty()) return RemoveVisitResult(updatedCell = null)
 
         districtVisitStorePort.remove(command.memberId, rows.map { it.districtCode })
 
-        // 이미 읽은 rows로 접는다 — 조회 유스케이스를 다시 부르면 같은 시군구를 두 번 읽는다.
+        // 이미 읽은 rows로 접는다.
         val visited = districtVisitQueryPort.findVisitedDistrictCodes(command.memberId)
         return RemoveVisitResult(
             updatedCell = MapCellGrouping.fold(rows).single().toView(locale, visited),
@@ -91,9 +86,7 @@ class NationwideMapCommandService(
 
     /**
      * 발급 때 내보낸 URL을 그대로 받아 토큰을 꺼낸다.
-     *
-     * **URL 형태를 검사하지 않는다** — 스킴이 바뀌어도(딥링크 → 웹) 마지막 경로 조각은 같고,
-     * 엉뚱한 값이면 폐기 대상을 못 찾아 false가 된다. 그것으로 충분하다.
+     * - URL 형태를 검사하지 않는다 — 엉뚱한 값이면 폐기 대상을 못 찾아 false다.
      */
     @Transactional
     override fun revokeShareLink(memberId: Long, shareUrl: String): Boolean = mapShareLinkPort.revoke(memberId, ShareToken.extractFrom(shareUrl))

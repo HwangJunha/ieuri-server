@@ -31,16 +31,9 @@ import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
 /**
- * 이메일 변경(SPEC-0011 R7·R8).
- *
- * 가입 검증과 **같은 챌린지 구조를 공유한다** — `EmailVerification` 애그리거트와
- * `VerificationPolicy`(만료 10분·시도 5회·쿨다운 60초)를 그대로 쓴다. 코드 발급·검증 규칙을
- * 두 번 구현하지 않기 위해서다. 갈리는 것은 두 가지뿐이다:
- *
- *  1. 코드를 **새 주소로** 보낸다. 아직 회원의 것이 아니므로 챌린지가 대상을 들고 있어야 한다.
- *  2. 통과하면 이메일을 교체한다. `Provider.EMAIL` 회원은 **로그인 식별자도 함께** 바꾼다(R8).
- *
- * 대상 주소는 검증 통과 전에도 개인정보라 암호문으로만 저장한다(POL-012).
+ * 이메일 변경(SPEC-0011 R7·R8). 가입 검증의 `EmailVerification`·`VerificationPolicy`를 공유한다.
+ * - 코드는 새 주소로 보내고, 통과하면 이메일을 교체한다. EMAIL 회원은 로그인 식별자도 함께 바꾼다(R8).
+ * - 대상 주소는 검증 전에도 암호문으로만 저장한다(POL-012).
  */
 @Service
 class EmailChangeService(
@@ -58,9 +51,7 @@ class EmailChangeService(
 
     /**
      * 변경 요청. 형식 → 동일 주소 → 중복 순으로 보고, 통과하면 새 주소로 코드를 보낸다.
-     *
-     * **회원의 이메일은 아직 바뀌지 않는다** — 확인을 통과해야 교체된다.
-     * 진행 중이던 이메일 변경 챌린지는 폐기한다(주소를 바꿔 다시 요청하는 경우).
+     * - 회원의 이메일은 확인을 통과해야 바뀐다. 진행 중이던 이메일 변경 챌린지는 폐기한다.
      */
     @Transactional
     override fun changeEmail(command: ChangeEmailCommand): EmailChangeRequested {
@@ -69,10 +60,7 @@ class EmailChangeService(
 
         val member = memberRepository.load(command.memberId)
             ?: throw MemberNotFoundException("회원을 찾을 수 없습니다.")
-        // 변경 가능 여부는 도메인에 묻는다(SPEC-0024 R6) — provider 판정은 불변식이지
-        // 이 서비스의 분기가 아니다. `confirmEmailChange`·`resendEmailChange`에는 같은
-        // 판정을 두지 않는다. 여기서 막히면 도달할 수 없는 경로이고, 세 곳에 복제하면
-        // 어긋날 여지만 생긴다.
+        // 변경 가능 여부는 도메인이 판정한다(SPEC-0024 R6). confirm·resend는 여기를 거쳐야 도달하므로 다시 보지 않는다.
         if (!member.canChangeEmail()) {
             throw NotEmailMemberException("SNS 계정은 이메일을 변경할 수 없습니다.")
         }
@@ -93,9 +81,7 @@ class EmailChangeService(
 
     /**
      * 코드 확인. 성패와 무관하게 attempts·consumed를 반영한다(무차별 대입 방지).
-     *
-     * **핸들이 호출자의 것인지 확인한다** — 남의 핸들로 자기 이메일을 바꾸거나 그 반대를
-     * 막는다. 존재하지 않는 것과 같은 오류로 응답해 핸들의 존재 여부가 새지 않게 한다.
+     * - 남의 핸들이면 존재하지 않는 것과 같은 오류로 응답한다.
      */
     @Transactional
     override fun confirmEmailChange(command: ConfirmEmailChangeCommand): ConfirmEmailChangeResult {
@@ -142,12 +128,7 @@ class EmailChangeService(
         return ConfirmEmailChangeResult(changed = true, email = newEmail.value, failureReason = null)
     }
 
-    /**
-     * 재발송. 쿨다운은 **이메일 변경 용도로만** 센다 — 가입 검증과 창을 공유하면
-     * 한쪽을 보낸 직후 다른 쪽이 막힌다.
-     *
-     * 이전 챌린지의 대상 주소를 그대로 이어받는다. 주소를 바꾸려면 changeEmail을 다시 부른다.
-     */
+    /** 재발송. 쿨다운은 이메일 변경 용도로만 센다. 대상 주소는 이전 챌린지에서 이어받는다. */
     @Transactional
     override fun resendEmailChange(command: ResendEmailChangeCommand): EmailChangeRequested {
         val existing = loadOwnedChallenge(command.verificationPublicId, command.memberId)
@@ -174,10 +155,7 @@ class EmailChangeService(
         return issueChallenge(command.memberId, targetEmail, now)
     }
 
-    /**
-     * 새 챌린지를 만들고 **새 주소로** 코드를 보낸다. 평문 코드는 저장하지 않고 이벤트로만
-     * 전달되어 AFTER_COMMIT에 발송된다 — 트랜잭션이 롤백되면 메일도 나가지 않는다.
-     */
+    /** 새 챌린지를 만들고 새 주소로 코드를 보낸다. 평문 코드는 이벤트로만 전달되어 AFTER_COMMIT에 발송된다. */
     private fun issueChallenge(memberId: Long, targetEmail: Email, now: java.time.Instant): EmailChangeRequested {
         val plainCode = codeGenerator.generate()
         val verification = EmailVerification.issue(
@@ -196,10 +174,7 @@ class EmailChangeService(
         return EmailChangeRequested(verification.publicId, verification.expiresAt)
     }
 
-    /**
-     * 핸들을 호출자 소유의 **이메일 변경** 챌린지로만 해석한다. 남의 핸들이거나 가입 검증
-     * 핸들이면 없는 것과 같이 응답한다 — 사유를 구분해 알려 주면 남의 핸들 존재가 새어 나간다.
-     */
+    /** 핸들을 호출자 소유의 이메일 변경 챌린지로만 해석한다. 아니면 없는 것과 같이 응답한다(핸들 존재 비노출). */
     private fun loadOwnedChallenge(publicId: UUID, memberId: Long): EmailVerification {
         val verification = verificationRepository.findByPublicId(publicId)
         if (verification == null ||

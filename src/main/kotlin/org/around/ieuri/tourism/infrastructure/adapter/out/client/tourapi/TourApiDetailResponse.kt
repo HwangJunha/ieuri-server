@@ -8,11 +8,8 @@ import tools.jackson.databind.ValueDeserializer
 import tools.jackson.databind.annotation.JsonDeserialize
 
 /**
- * TourAPI detailCommon2 응답 DTO. **어댑터 내부 전용** — TourAPI 필드명을 그대로 담으며 어댑터 밖으로 나가지 않는다.
- *
- * items 함정 2종을 [ItemsDeserializer]가 흡수한다:
- *  - 결과 없음 → `"items": ""`(빈 문자열) → item 빈 리스트.
- *  - 단건 → `"items": { "item": { ... } }`(객체) → 1개 리스트로 정규화(AC-10 계열).
+ * TourAPI detailCommon2 응답 DTO(어댑터 내부 전용).
+ * - 결과 없음(`"items": ""`)은 빈 리스트, 단건 객체는 1개 리스트로 정규화한다([ItemsDeserializer]).
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class TourApiDetailCommonResponse(
@@ -45,9 +42,7 @@ data class TourApiDetailCommonResponse(
     )
 }
 
-/**
- * TourAPI detailImage2 응답 DTO. 이미지별 cpyrhtDivCd(저작권 유형)를 담는다.
- */
+/** TourAPI detailImage2 응답 DTO. 이미지별 cpyrhtDivCd(저작권 유형)를 담는다. */
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class TourApiDetailImageResponse(
     val response: Response = Response(),
@@ -74,11 +69,8 @@ data class TourApiDetailImageResponse(
 }
 
 /**
- * TourAPI detailIntro2 응답 DTO. **카테고리(contentTypeId)마다 필드가 완전히 다르다** — 관광지는 `usetime`,
- * 음식점은 `opentimefood`, 문화시설은 `usetimeculture` … 그래서 한 Item에 카테고리별 변형을 모두 nullable로
- * 담고, 어댑터가 의미가 같은 것끼리 공통 도메인 필드로 정규화한다(응답은 그중 자기 카테고리 필드만 채워 준다).
- *
- * 여기 없는 필드는 무시된다(@JsonIgnoreProperties) — 카테고리 고유 필드까지 전부 담지는 않는다.
+ * TourAPI detailIntro2 응답 DTO. 카테고리(contentTypeId)마다 필드가 달라 변형을 모두 nullable로 담는다.
+ * - 어댑터가 의미가 같은 것끼리 공통 도메인 필드로 정규화한다.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class TourApiDetailIntroResponse(
@@ -144,9 +136,8 @@ data class TourApiDetailIntroResponse(
 }
 
 /**
- * TourAPI detailInfo2 응답 DTO. 반복 항목(0..N)이며 기본 형태는 `infoname`/`infotext` 쌍이다.
- * 여행코스(25)·숙박(32)은 형태가 전혀 다르지만(코스 일정·객실 정보) 이번 범위는 공통 형태만 다룬다 —
- * 그 경우 infoname/infotext가 없어 빈 목록이 된다.
+ * TourAPI detailInfo2 응답 DTO. `infoname`/`infotext` 쌍의 반복 항목이다.
+ * - 여행코스(25)·숙박(32)은 형태가 달라 빈 목록이 된다.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class TourApiDetailInfoResponse(
@@ -172,11 +163,7 @@ data class TourApiDetailInfoResponse(
     )
 }
 
-/**
- * TourAPI `items` 필드 함정을 흡수하는 공통 역직렬화 로직.
- *  - 문자열(빈 문자열 등) → 빈 리스트.
- *  - `item`이 배열이면 그대로, 객체 단건이면 1개 리스트로.
- */
+/** TourAPI `items` 필드 정규화 — 문자열(빈 문자열 등)은 빈 리스트, 객체 단건은 1개 리스트. */
 private inline fun <reified T> readItems(parser: JsonParser, context: DeserializationContext): List<T> {
     val node: JsonNode = parser.readValueAsTree()
     // 결과 없음: TourAPI가 items를 빈 문자열로 준다.

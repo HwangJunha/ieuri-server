@@ -6,14 +6,8 @@ import org.around.ieuri.tourism.domain.vo.DomainLocale
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 
 /**
- * 관광지 1건의 적재 입력. 수집 포트(`SpotSyncPort`)가 만들고 적재 포트(`SpotStorePort`)가 소비하므로,
- * 두 포트 중 어느 쪽도 소유하지 않도록 여기(application/command)에 둔다.
- *
- * 도메인 `Spot`은 `distance`(요청 좌표 종속)와 `attributionText`(copyright 파생)를 필수로 요구해
- * 적재 시점에는 조립할 수 없으므로, 그것을 재사용하지 않는다.
- *
- * [contentTypeId]는 해석 이전의 TourAPI 원본 코드로 **적재 전용**이며 카테고리 폴백 감지·교정에만
- * 쓴다(응답·로그 노출 금지). 값이 없는 항목은 어댑터가 드랍하고 DB의 NOT NULL이 한 번 더 막는다.
+ * 관광지 1건의 적재 입력.
+ * - [contentTypeId]는 TourAPI 원본 코드로 적재 전용이다. 응답·로그에 노출하지 않는다.
  */
 data class SyncSpotCommand(
     val contentId: String,
@@ -29,8 +23,7 @@ data class SyncSpotCommand(
     init {
         require(contentId.isNotBlank()) { "contentId는 필수입니다." }
         require(title.isNotBlank()) { "title은 필수입니다." }
-        // 대표이미지 없는 항목은 적재 자체를 하지 않는다 — 도메인 Spot.init의 같은 규칙과 짝을
-        // 이룬다(적재 시점에 막고, 조립 시점에 다시 확인).
+        // 대표이미지 없는 항목은 적재하지 않는다.
         require(thumbnailImageUrl.startsWith("https://")) { "thumbnailImageUrl은 https여야 합니다." }
     }
 }

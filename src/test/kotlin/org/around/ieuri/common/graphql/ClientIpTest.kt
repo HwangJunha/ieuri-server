@@ -12,19 +12,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /**
- * 접속지 정보 판정(「개인정보의 안전성 확보조치 기준」 제8조).
- *
- * 고정하는 계약은 셋이다 — **Cloudflare 헤더가 우선**, **X-Forwarded-For는 맨 앞**,
- * 그리고 **무슨 값이 오든 던지지 않는다**. 접속기록은 부수 효과라 판정이 예외를 내면
- * 로그인 자체가 실패한다.
+ * 접속지 정보 판정: Cloudflare 헤더가 우선, X-Forwarded-For는 맨 앞, 무슨 값이 오든 던지지 않는다.
  */
 class ClientIpTest {
 
     private fun dfe(vararg headerPairs: Pair<String, String>): DataFetchingEnvironment {
         val headers = HttpHeaders().apply { headerPairs.forEach { (k, v) -> add(k, v) } }
         val requestData = mockk<DgsRequestData> { every { this@mockk.headers } returns headers }
-        // DgsContext가 Consumer<GraphQLContext.Builder>로서 자기 키를 직접 심는다 —
-        // 키 상수를 테스트가 알 필요가 없다.
+        // DgsContext가 Consumer<GraphQLContext.Builder>로서 자기 키를 직접 심는다.
         val context = GraphQLContext.newContext()
             .also { DgsContext(null, requestData).accept(it) }
             .build()
@@ -42,10 +37,7 @@ class ClientIpTest {
         assertEquals("203.0.113.7", dfe("CF-Connecting-IP" to "203.0.113.7").clientIp())
     }
 
-    /**
-     * 모든 요청이 Cloudflare Tunnel로만 들어오므로 엣지가 덮어쓴 값이 더 믿을 만하다 —
-     * 클라이언트가 X-Forwarded-For를 위조해 보내도 이 값이 이긴다.
-     */
+    /** 클라이언트가 X-Forwarded-For를 위조해 보내도 Cloudflare 헤더가 이긴다. */
     @Test
     fun `두 헤더가 모두 있으면 Cloudflare 헤더가 이긴다`() {
         val ip = dfe(
@@ -87,10 +79,7 @@ class ClientIpTest {
         assertNull(dfe("CF-Connecting-IP" to "   ").clientIp())
     }
 
-    /**
-     * **값의 형식을 검증하지 않는다.** 프록시가 넣어 주는 값이라 형식 검사로 걸러 봐야
-     * 얻을 것이 없고, 검사에서 던지면 로그인이 실패한다. 컬럼 길이만 지킨다.
-     */
+    /** 값의 형식을 검증하지 않는다. 컬럼 길이만 지킨다. */
     @Test
     fun `IP 형식이 아니어도 던지지 않고 컬럼 길이만 지킨다`() {
         val garbage = "not-an-ip-" + "x".repeat(100)

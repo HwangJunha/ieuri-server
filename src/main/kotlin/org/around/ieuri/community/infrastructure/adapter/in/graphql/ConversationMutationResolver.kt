@@ -24,12 +24,8 @@ import org.around.ieuri.community.infrastructure.locale.contentLanguage
 import org.springframework.stereotype.Component
 
 /**
- * DM 쓰기 리졸버(SPEC-0017·SPEC-0021). 전부 인증이 필요하며, 비로그인은 UnauthorizedException이
- * withCommunityUserErrors에 붙잡히지 않고 최상위 errors[]로 전파된다.
- *
- * 리졸버는 얇게 둔다 — 입력을 커맨드로 옮기고 결과를 payload로 옮길 뿐 판단하지 않는다.
- * 입력→커맨드 변환은 필드가 많은 것만 확장 함수로 뺐다(POL-033) — 나머지는 인자 하나라
- * 뒤바뀔 여지가 없다.
+ * DM 쓰기 리졸버(SPEC-0017·SPEC-0021). 전부 인증이 필요하다.
+ * - 비로그인의 UnauthorizedException은 userErrors가 아니라 최상위 errors[]로 전파된다.
  */
 @DgsComponent
 @Component
@@ -76,7 +72,7 @@ class ConversationMutationResolver(
         SendMessagePayload(success = true, userErrors = emptyList(), messageId = messageId)
     }
 
-    /** 수신자가 없어도 성공한다(AC10-2) — 받을 사람이 없는 것은 실패가 아니다. */
+    /** 수신자가 없어도 성공한다(AC10-2). */
     @DgsMutation
     fun notifyTyping(@InputArgument input: NotifyTypingInput): NotifyTypingPayload = withCommunityUserErrors(
         onError = { NotifyTypingPayload(success = false, userErrors = it) },
@@ -89,10 +85,7 @@ class ConversationMutationResolver(
         NotifyTypingPayload(success = true, userErrors = emptyList())
     }
 
-    /**
-     * 읽음 처리. **조회가 아니라 명시적 호출로만 읽음이 된다** — 목록 미리보기나 알림에서
-     * 스쳐 본 것이 읽음으로 처리되면 사용자가 메시지를 놓친다.
-     */
+    /** 읽음 처리. 조회로는 읽음이 되지 않고 이 명시적 호출로만 된다. */
     @DgsMutation
     fun markConversationRead(
         @InputArgument input: MarkConversationReadInput,

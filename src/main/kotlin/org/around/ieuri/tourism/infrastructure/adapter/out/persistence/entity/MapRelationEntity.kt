@@ -11,14 +11,9 @@ import org.around.ieuri.common.persistence.DbSchema
 import java.time.Instant
 
 /**
- * 지도 관계 JPA 엔티티(SPEC-0030 확장).
- *
- * **방향이 있다.** `ownerId`가 이 행을 자기 목록에서 보는 사람이고 `counterpartId`가 거기
- * 나타나는 상대다. 등록 한 번에 두 행이 생기며, 삭제는 자기 행만 지운다 — 상대 목록은
- * 건드리지 않는다.
- *
- * **겹친 칸을 담지 않는다.** 조회 시점에 재계산하는 값이라 저장하면 서로 여행을 더 다녀도
- * 숫자가 그대로가 된다.
+ * 지도 관계 JPA 엔티티(SPEC-0030 확장). 방향이 있다 — `ownerId`의 목록에 `counterpartId`가 나타난다.
+ * - 등록은 두 행을 만들고, 삭제는 자기 행만 지운다.
+ * - 겹친 칸은 조회 시점에 재계산하므로 담지 않는다.
  */
 @Entity
 @Table(name = "map_relation", schema = DbSchema.TOUR)

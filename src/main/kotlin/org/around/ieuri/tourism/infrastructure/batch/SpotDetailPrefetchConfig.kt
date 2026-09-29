@@ -11,10 +11,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Profile
 
-/**
- * 상세 사전 수집의 빈 조립(SPEC-0037). **batch 프로파일에서만 로드된다** — API 서버는 이 잡을
- * 갖지 않는다.
- */
+/** 상세 사전 수집의 빈 조립(SPEC-0037). batch 프로파일에서만 로드된다. */
 @Configuration
 @Profile(BATCH_PROFILE)
 @EnableConfigurationProperties(SpotDetailPrefetchProperties::class)

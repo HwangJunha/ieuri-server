@@ -5,12 +5,8 @@ import org.around.ieuri.alarm.domain.vo.DevicePlatform
 import java.time.Instant
 
 /**
- * 한 기기의 푸시 토큰(SPEC-0028 R1).
- *
- * **[deviceId]가 동일성 기준이고 [fcmToken]은 갱신 대상이다.** FCM 토큰은 로테이션되므로
- * 키로 삼으면 로테이션마다 행이 쌓이고 죽은 토큰으로 계속 발송하게 된다.
- *
- * 기간 만료를 두지 않는다 — 삭제는 로그아웃(R2)·탈퇴(R3)·발송 실패 응답(R4) 셋뿐이다.
+ * 한 기기의 푸시 토큰(SPEC-0028 R1). [deviceId]가 동일성 기준이고 [fcmToken]은 갱신 대상이다.
+ * - 기간 만료가 없다. 삭제는 로그아웃(R2)·탈퇴(R3)·발송 실패 응답(R4)뿐이다.
  */
 class DeviceToken private constructor(
     val id: Long?,
@@ -21,7 +17,7 @@ class DeviceToken private constructor(
     platform: DevicePlatform,
     val createdAt: Instant?,
 ) {
-    /** 재등록으로 소유가 바뀔 수 있다(AC1.4) — 기기를 다른 회원이 쓰기 시작하는 경우다. */
+    /** 다른 회원이 같은 기기로 재등록하면 바뀐다(AC1.4). */
     var memberId: Long = memberId
         private set
 
@@ -34,12 +30,7 @@ class DeviceToken private constructor(
     var platform: DevicePlatform = platform
         private set
 
-    /**
-     * 같은 기기의 재등록을 반영한다(R1·R20·AC1.4).
-     *
-     * 토큰·언어·플랫폼은 물론 **소유 회원까지 덮어쓴다.** 한 기기를 다른 사람이 쓰기
-     * 시작했을 때 이전 회원 귀속이 남으면 그 사람에게 발송된다.
-     */
+    /** 같은 기기의 재등록을 반영한다(R1·R20·AC1.4). 소유 회원까지 덮어쓴다. */
     fun reregister(
         memberId: Long,
         fcmToken: String,

@@ -5,10 +5,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-/**
- * 두 좌표 사이의 직선거리(미터). Haversine 공식으로 계산하는 순수 도메인 값(TourAPI 무관, AC-2).
- * API가 dist를 주지 않아도 서버가 항상 채운다.
- */
+/** 두 좌표 사이의 직선거리(미터). Haversine 공식으로 계산한다(AC-2). */
 @JvmInline
 value class Distance private constructor(val meters: Double) : Comparable<Distance> {
 

@@ -12,27 +12,19 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 /**
- * 지도 bbox 조회 전용 어댑터(SPEC-0014 R1·R3). PostGIS 연산자·함수(`&&`·`ST_MakeEnvelope`)를
- * QueryDSL로 표현할 수 없어 이 어댑터에만 생 SQL이 남는다 — `SpotSpatialQueryAdapter`와 같은 선례다.
- *
- * bbox 판정은 `&&`(바운딩박스 겹침)이며 **경계선에 걸친 점을 포함한다**(R1).
- * 캐스팅 방향이 성능을 가르는 지점이라 [BBOX_PREDICATE]의 주석을 함께 읽어야 한다.
- *
- * **`spot`을 읽지 않는다**(SPEC-0019). 카탈로그와 번역만 보므로 그 언어의 spot 행이 없어도
- * 번역이 있으면 지도에 나타나며, 마커 id는 `spot_catalog.id`다.
+ * 지도 bbox 조회 어댑터(SPEC-0014 R1·R3). PostGIS 연산자·함수 때문에 생 SQL이다.
+ * - bbox 판정은 경계선에 걸친 점을 포함한다(R1). 캐스팅 방향은 [BBOX_PREDICATE] 참조.
+ * - `spot`을 읽지 않는다(SPEC-0019). 마커 id는 `spot_catalog.id`다.
  */
 @Component
 class MapSpatialQueryAdapter(
     private val jdbcTemplate: JdbcTemplate,
 ) : MapQueryPort {
 
-    /**
-     * bbox 안의 개별 마커. 정렬은 id 오름차순이다 — 지도에는 순서 개념이 없지만(POL-019
-     * 해당 없음), 상한에 걸려 잘릴 때 매 요청 같은 집합이 나오도록 고정한다.
-     */
+    /** bbox 안의 개별 마커. id 오름차순 — 상한에 걸려 잘릴 때 매 요청 같은 집합이 나온다. */
     @Transactional(readOnly = true)
     override fun findSpotsWithin(query: MapViewportSearch): List<MapSpotView> {
-        // 다중 선택은 OR이며 IN으로 표현한다(SPEC-0020). 비어 있으면 조건 자체를 걸지 않는다.
+        // 다중 선택은 OR(SPEC-0020). 비어 있으면 조건을 걸지 않는다.
         val categoryCodes = query.categories.codes()
         val categoryCondition =
             if (query.categories.isUnfiltered) {
@@ -41,7 +33,7 @@ class MapSpatialQueryAdapter(
                 "AND cat.category IN (${categoryCodes.joinToString(",") { "?" }})"
             }
 
-        // **파라미터 순서는 SQL 문자열의 ? 등장 순서다.** 언어가 JOIN 조건에 있어 bbox보다 앞선다.
+        // 파라미터 순서는 `?` 등장 순서다 — 언어가 JOIN 조건에 있어 bbox보다 앞선다.
         val params = buildList<Any> {
             add(query.language.name)
             addAll(envelopeParams(query.bounds))
@@ -78,19 +70,9 @@ class MapSpatialQueryAdapter(
     }
 
     /**
-     * bbox 안의 추천 후보(SPEC-0036). 중심점에서 가까운 순 상한 N건이며, 최종 순서는 점수가
-     * 정한다(호출자가 재배열한다).
-     *
-     * **정렬은 `<->`이고 표시용 거리는 `ST_Distance`로 따로 계산한다. 인덱스 때문이 아니다** —
-     * 우변이 CTE에서 와도 상수로 접히지만, bbox 필터가 이미 인덱스를 쓰고 있어 플래너는
-     * KNN 스캔이 아니라 `Sort`를 고른다(실측 확인). 이득은 정렬 방식과 함수 비용에서 온다:
-     * `<->`는 `top-N heapsort`로 상한만큼만 유지하는 반면 `ST_Distance`는 측지 계산이라
-     * 행마다 비싸고 전체 정렬로 간다. dev 실측(명동 20km 폭 · 후보 2,000건 · 캐시 워밍):
-     * `<->` 28ms · `ST_Distance` 488ms. 좁은 bbox(448건)에서는 둘 다 10ms 아래로 차이가 없다.
-     *
-     * **제외 id는 배열 한 개로 바인딩한다.** 제외 목록은 세션 내내 커져 상한이 없으므로,
-     * `NOT IN (?, ?, …)`처럼 플레이스홀더를 개수만큼 펼치면 SQL이 입력 크기에 비례해 자란다.
-     * 배열은 InitPlan에서 한 번만 평가된다(제외 500건 + 후보 2,000건 실측 114ms).
+     * bbox 안의 추천 후보(SPEC-0036). 중심점에서 가까운 순 상한 N건이며 최종 순서는 호출자가 점수로 정한다.
+     * - 정렬은 `<->`(top-N heapsort), 표시용 거리는 `ST_Distance`로 따로 계산한다.
+     * - 제외 id는 배열 한 개로 바인딩한다.
      */
     @Transactional(readOnly = true)
     override fun findRecommendationCandidatesWithin(query: MapCandidateSearch): List<MapCandidateView> {
@@ -101,7 +83,7 @@ class MapSpatialQueryAdapter(
             } else {
                 "AND cat.category IN (${categoryCodes.joinToString(",") { "?" }})"
             }
-        // 빈 배열에도 조건을 그대로 걸 수 있지만(전부 참) 불필요한 스캔 조건이라 비면 뺀다.
+        // 제외 목록이 비면 조건을 뺀다.
         val exclusionCondition =
             if (query.excludedSpotIds.isEmpty()) {
                 ""
@@ -110,8 +92,7 @@ class MapSpatialQueryAdapter(
             }
 
         val center = query.bounds.center
-        // **파라미터 순서는 SQL 문자열의 ? 등장 순서다.** 중심점이 SELECT·ORDER BY 두 곳에
-        // 나오므로 CTE로 한 번만 바인딩한다 — 반복하면 위치 파라미터가 4개로 늘어난다.
+        // 파라미터 순서는 `?` 등장 순서다. 중심점은 CTE로 한 번만 바인딩한다.
         val params = buildList<Any> {
             add(center.longitude)
             add(center.latitude)
@@ -161,26 +142,14 @@ class MapSpatialQueryAdapter(
 
     private companion object {
         /**
-         * bbox 교차 판정. `ST_MakeEnvelope`은 **(minLng, minLat, maxLng, maxLat)** 순서이며
-         * 경도가 먼저다 — 위경도 순으로 넣으면 조용히 틀린다.
-         *
-         * **`&&`를 쓰고 envelope을 geography로 캐스팅한다.** `idx_spot_catalog_location`이
-         * geography GiST 인덱스라, `ST_Intersects(location::geometry, ...)`로 쓰면 컬럼 쪽
-         * 캐스팅이 인덱스를 무력화해 전 행 필터가 된다(실측 비용 291,650 → 1,112). 캐스팅
-         * 방향이 성능을 가르는 지점이다.
-         *
-         * `&&`는 바운딩박스 겹침이라 경계선에 걸친 점을 포함한다(R1). 점 데이터에서는
-         * `ST_Intersects`와 결과가 같다 — 점의 바운딩박스가 점 자신이기 때문이다.
-         *
-         * 좌표가 없는 카탈로그(location null)는 이 조건에서 자연히 빠진다.
+         * bbox 교차 판정. `ST_MakeEnvelope`은 (minLng, minLat, maxLng, maxLat) 순서다 — 위경도 순이면 조용히 틀린다.
+         * - envelope을 geography로 캐스팅해야 GiST 인덱스를 탄다. 컬럼을 geometry로 캐스팅하면 전 행 필터가 된다.
+         * - 경계선에 걸친 점을 포함한다(R1). 좌표가 없는 카탈로그는 빠진다.
          */
         const val BBOX_PREDICATE =
             "cat.location && ST_MakeEnvelope(?, ?, ?, ?, 4326)::geography"
 
-        /**
-         * 뷰포트 중심점을 geography 점으로(SPEC-0036). ST_MakePoint는 **(경도, 위도)** 순서다 —
-         * 뒤집으면 조용히 틀린다.
-         */
+        /** 뷰포트 중심점(SPEC-0036). ST_MakePoint는 (경도, 위도) 순서다 — 뒤집으면 조용히 틀린다. */
         const val CENTER = "ST_MakePoint(?, ?)::geography"
     }
 }

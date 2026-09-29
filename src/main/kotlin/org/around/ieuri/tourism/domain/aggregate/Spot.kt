@@ -6,11 +6,8 @@ import org.around.ieuri.tourism.domain.vo.Distance
 import org.around.ieuri.tourism.domain.vo.SpotCategory
 
 /**
- * 관광지 도메인 모델. TourAPI 응답이 아니라 **어댑터가 이미 필터·정규화·매핑을 끝낸** 순수 도메인 표현이다.
- * 도메인은 TourAPI 필드명(contentid/firstimage/mapx…)·코드 체계를 알지 않는다 — 어댑터가 이 모델로 번역한다.
- * DB에 적재하지 않는 읽기 전용 값(관광 데이터는 저장하지 않음). JPA 엔티티가 아니다.
- *
- * [distance]는 application이 사용자 좌표 기준으로 채운다(도메인 [Distance.between] 사용). 서버 정렬 기준.
+ * 관광지 도메인 모델. 어댑터가 필터·정규화·매핑을 끝낸 값이다.
+ * - [distance]는 application이 사용자 좌표 기준으로 채운다([Distance.between]).
  */
 data class Spot(
     /** TourAPI contentId. 같은 장소라도 언어별로 다르다 — 요청 언어 내에서만 안정적. */

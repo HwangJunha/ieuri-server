@@ -24,9 +24,7 @@ import kotlin.test.assertFailsWith
 
 /**
  * 질문 작성·삭제·해결(SPEC-0026 R3, R8, R10).
- *
- * **자격 게이팅이 없다** — 로그인 회원이면 그 장소에 어떤 반응을 남겼든(무반응 포함)
- * 질문할 수 있다. 남는 확인은 장소 존재와 입력 검증뿐이다.
+ * - 자격 게이팅이 없다. 확인하는 것은 장소 존재와 입력 검증뿐이다.
  */
 class SpotQuestionCommandServiceTest {
 
@@ -91,10 +89,7 @@ class SpotQuestionCommandServiceTest {
         assertEquals(questionId, service.createQuestion(command(), memberId, language))
     }
 
-    /**
-     * 좋아요 게이팅이 사라졌다는 것을 **포트 부재로** 고정한다 — 서비스가 반응을 물을 방법
-     * 자체가 없으므로, 게이팅을 되살리려면 생성자가 바뀌어 이 테스트가 컴파일되지 않는다.
-     */
+    /** 좋아요 게이팅이 없음을 반응 조회 포트의 부재로 고정한다. */
     @Test
     fun `장소 조회 외에는 어떤 외부 조회도 하지 않는다`() {
         givenSpotExists()
@@ -102,7 +97,7 @@ class SpotQuestionCommandServiceTest {
 
         service.createQuestion(command(), memberId, language)
 
-        // 장소에 묻는 것은 존재 검사 하나뿐이다. 반응을 묻는 경로는 여전히 없다.
+        // 장소에 묻는 것은 존재 검사 하나뿐이다.
         verify(exactly = 1) { spotLookupPort.findSummary(catalogId, language) }
         confirmVerified(spotLookupPort)
     }
@@ -152,7 +147,7 @@ class SpotQuestionCommandServiceTest {
         verify { questionRepository.save(match { it.resolved }) }
     }
 
-    /** R8 — 되돌리기. 저장되는 애그리거트의 resolved가 실제로 false여야 한다. */
+    /** R8 — 되돌리기. 저장되는 애그리거트의 resolved가 false다. */
     @Test
     fun `작성자는 해결을 미해결로 되돌리고 저장한다`() {
         every { questionRepository.findById(questionId) } returns question(resolved = true)

@@ -31,12 +31,7 @@ import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
-/**
- * 장소 질문/답변 읽기(SPEC-0026). 애그리게이트를 우회해 필요한 값만 프로젝션한다.
- *
- * 차단·숨김 필터는 커뮤니티 글과 **같은 모양**이다 — 차단은 사람 단위라 어느 표면에서
- * 만나든 같아야 한다.
- */
+/** 장소 질문/답변 읽기(SPEC-0026). 차단·숨김 필터는 커뮤니티 글과 같은 모양이다. */
 @Component
 class SpotQaQueryAdapter(
     private val queryFactory: JPAQueryFactory,
@@ -48,12 +43,7 @@ class SpotQaQueryAdapter(
     private val photo = QSpotQaPhotoEntity.spotQaPhotoEntity
     private val catalogLanguage = QSpotCatalogLanguageEntity.spotCatalogLanguageEntity
 
-    /**
-     * 질문 목록. 정렬은 **미해결 우선, 그 안에서 최신순**이다(R2) — 인자로 바꿀 수 없다.
-     *
-     * `resolved ASC`가 먼저인 이유는 미해결 질문이 답을 기다리는 쪽이기 때문이다.
-     * Postgres에서 boolean은 false < true라 오름차순이 곧 미해결 우선이다.
-     */
+    /** 질문 목록. 정렬은 미해결 우선, 그 안에서 최신순으로 고정이다(`resolved ASC` = false 먼저). */
     @Transactional(readOnly = true)
     override fun findQuestions(search: SpotQuestionsSearch): CursorPage<SpotQuestionView> {
         val cursor = search.after?.let { decodeSpotQuestionCursor(it) }
@@ -61,7 +51,6 @@ class SpotQaQueryAdapter(
         val rows = queryFactory
             .selectFrom(question)
             .where(
-                // 셋 다 선택이며 함께 걸린다. null인 where 인자는 QueryDSL이 버린다.
                 search.catalogId?.let { question.catalogId.eq(it) },
                 search.authorId?.let { question.authorId.eq(it) },
                 idsCondition(search.ids),
@@ -98,9 +87,8 @@ class SpotQaQueryAdapter(
         .where(
             question.id.eq(questionId),
             question.deletedAt.isNull,
-            // 차단은 언제나 건다 — 우회하면 답변 목록이 차단을 뚫는 통로가 된다.
+            // 차단은 언제나 건다. 숨김만 선택적으로 우회한다(R11 종속 판정용).
             blockExclusion(viewer, question.authorId),
-            // 숨김만 선택적으로 우회한다(R11 종속 판정용).
             if (includeHidden) null else hiddenExclusion(viewer, question.hidden, question.authorId),
         )
         .fetchOne()
@@ -108,10 +96,7 @@ class SpotQaQueryAdapter(
 
     /**
      * 답변 목록. 최신순.
-     *
-     * **질문의 숨김 종속(R11)은 여기서 보지 않는다** — 호출자(SpotQaQueryService)가 질문을
-     * 먼저 조회해 판정한 뒤 부른다. 그래야 답변 레코드의 hidden을 덮어쓰지 않고도 종속이
-     * 성립하고, 질문이 복구되면 답변이 원래 상태 그대로 돌아온다.
+     * - 질문의 숨김 종속(R11)은 여기서 보지 않는다 — 호출자가 질문을 먼저 판정한 뒤 부른다.
      */
     @Transactional(readOnly = true)
     override fun findAnswers(search: SpotAnswersSearch): CursorPage<SpotAnswerView> {
@@ -142,11 +127,8 @@ class SpotQaQueryAdapter(
     }
 
     /**
-     * 여러 답변의 답글을 **한 번에** 읽는다. 답변마다 물으면 목록 한 페이지에 쿼리가 그
-     * 수만큼 붙는다(N+1) — DataLoader가 답변 id를 모아 이 메서드를 한 번 부른다.
-     *
-     * 답글은 **오래된 순**이다(AC-7.4) — 대화의 흐름이라 뒤집으면 문맥이 끊긴다. 페이지네이션이
-     * 없는 것은 댓글의 대댓글과 같은 근거다(깊이 2단계라 화면을 넘길 만큼 커지지 않는다).
+     * 여러 답변의 답글을 한 번에 읽는다(DataLoader용).
+     * - 답글은 오래된 순이며 페이지네이션이 없다.
      */
     @Transactional(readOnly = true)
     override fun findRepliesOf(
@@ -178,11 +160,8 @@ class SpotQaQueryAdapter(
     override fun findReplyPhotoKeys(replyIds: List<Long>): Map<Long, List<String>> = findPhotoKeys(SpotQaPhotoOwnerType.REPLY, replyIds)
 
     /**
-     * 출처 스냅샷의 재료. 답변과 질문을 **한 번의 조인으로** 읽는다.
-     *
-     * 삭제된 답변이거나 질문이 이미 사라졌으면 null이다 — 조인이 비는 것이 곧 그 판정이다.
-     * 숨김 여부는 보지 않는다: 출처는 이미 읽은 답변에서 대화를 여는 것이라, 숨겨진 뒤에도
-     * 그 시점의 맥락을 남기는 것이 맞다.
+     * 출처 스냅샷의 재료. 답변과 질문을 한 번의 조인으로 읽는다.
+     * - 답변이나 질문이 삭제됐으면 null. 숨김 여부는 보지 않는다.
      */
     @Transactional(readOnly = true)
     override fun findAnswerOriginSource(answerId: Long): SpotQaOriginSource? = queryFactory
@@ -209,7 +188,7 @@ class SpotQaQueryAdapter(
             )
         }
 
-    /** 첨부 순서대로. 셋이 한 표를 쓰므로 소유자 종류로 갈라 읽는다. */
+    /** 소유자 종류별 사진 키. 첨부 순서대로. */
     private fun findPhotoKeys(
         ownerType: SpotQaPhotoOwnerType,
         ownerIds: List<Long>,
@@ -225,12 +204,7 @@ class SpotQaQueryAdapter(
             .groupBy({ it.get(photo.ownerId)!! }, { it.get(photo.objectKey)!! })
     }
 
-    /**
-     * 삭제되지 않았고, 차단 관계가 아니며, 숨겨졌다면 작성자 본인인 질문.
-     *
-     * **차단이 숨김보다 먼저 적용된다**(AC-11.6) — 두 조건이 AND로 묶여 있어, 차단 상대의
-     * 질문은 그것이 자동 숨김되었는지와 무관하게 빠진다.
-     */
+    /** 삭제되지 않았고, 차단 관계가 아니며, 숨겨졌다면 작성자 본인인 질문(AC-11.6). */
     private fun visibleToViewer(viewer: ViewerContext): BooleanExpression {
         var condition = question.deletedAt.isNull
         blockExclusion(viewer, question.authorId)?.let { condition = condition.and(it) }
@@ -238,32 +212,20 @@ class SpotQaQueryAdapter(
         return condition
     }
 
-    /**
-     * id 목록 필터. **null과 빈 목록의 뜻이 다르다** — null은 "id로 좁히지 않음"이고
-     * 빈 목록은 "결과 없음"이다. 빈 목록을 그냥 `in`에 넣으면 DB마다 해석이 갈리므로
-     * 명시적으로 거짓 조건을 만든다.
-     */
+    /** id 목록 필터. null은 "좁히지 않음", 빈 목록은 "결과 없음"이다. */
     private fun idsCondition(ids: List<Long>?): BooleanExpression? = when {
         ids == null -> null
         ids.isEmpty() -> Expressions.FALSE.isTrue
         else -> question.id.`in`(ids)
     }
 
-    /**
-     * 활성 언어 필터(SPEC-0029 R-23). 장소가 이 언어에서 해소되지 않는 질문을 뺀다 —
-     * **오류가 아니라 부재다.**
-     *
-     * **무조건 걸린다.** 질문은 `catalog_id`가 NOT NULL이라 장소 없는 질문이 없고, 그래서
-     * 글 목록과 달리 "장소 없는 항목은 남긴다"는 예외 절이 필요 없다(AC-15.4는 글에만 해당).
-     *
-     * 언어 사본은 커뮤니티가 들고 있어 tour 스키마를 조인하지 않는다.
-     */
+    /** 활성 언어 필터(SPEC-0029). 장소가 이 언어에서 해소되지 않는 질문을 뺀다(오류 아님). */
     private fun languageCondition(language: ContentLanguage): BooleanExpression = question.catalogId.`in`(
         JPAExpressions.select(catalogLanguage.catalogId).from(catalogLanguage)
             .where(catalogLanguage.language.eq(language)),
     )
 
-    /** 차단 집합이 비면 조건을 붙이지 않는다 — QueryDSL은 null인 where 인자를 버린다. */
+    /** 차단 제외. 차단 집합이 비면 null(조건 없음). */
     private fun blockExclusion(
         viewer: ViewerContext,
         authorIdPath: NumberPath<Long>,
@@ -279,12 +241,7 @@ class SpotQaQueryAdapter(
         authorIdPath: NumberPath<Long>,
     ): BooleanExpression = hiddenPath.isFalse.or(authorIdPath.eq(viewer.memberId))
 
-    /**
-     * 정렬 `(resolved ASC, createdAt DESC, id DESC)`의 keyset 조건.
-     *
-     * JPQL에는 행 값 생성자가 없어 `(a, b, c) > (?, ?, ?)`를 쓸 수 없다 — 사전식 비교를
-     * OR로 펼친다. 첫 키만 방향이 반대(ASC)라는 점에 주의한다.
-     */
+    /** `(resolved ASC, createdAt DESC, id DESC)` keyset 조건. 첫 키만 방향이 반대(ASC)다. */
     private fun questionKeysetCondition(cursor: SpotQuestionCursor): BooleanExpression {
         val sameGroup = question.resolved.eq(cursor.resolved)
         val laterGroup = question.resolved.gt(cursor.resolved)
@@ -293,7 +250,7 @@ class SpotQaQueryAdapter(
         return laterGroup.or(sameGroup.and(withinGroup))
     }
 
-    /** 정렬 `(createdAt DESC, id DESC)`의 keyset 조건. 답변·답글이 쓴다. */
+    /** `(createdAt DESC, id DESC)` keyset 조건. */
     private fun keysetCondition(
         createdAtPath: DateTimePath<java.time.Instant>,
         idPath: NumberPath<Long>,
@@ -301,10 +258,7 @@ class SpotQaQueryAdapter(
     ): BooleanExpression = createdAtPath.lt(cursor.createdAt)
         .or(createdAtPath.eq(cursor.createdAt).and(idPath.lt(cursor.id)))
 
-    /**
-     * 엔티티를 read DTO로. 사진·작성자는 다른 표라 지연 필드가 채운다 — 여기서 읽으면
-     * `{ id body }`만 물어도 조회가 여러 번 붙는다.
-     */
+    /** 엔티티를 read DTO로. 사진·작성자는 지연 필드가 채운다. */
     private fun SpotQuestionEntity.toQuestionView(viewer: ViewerContext) = SpotQuestionView(
         id = requireNotNull(id),
         catalogId = catalogId,

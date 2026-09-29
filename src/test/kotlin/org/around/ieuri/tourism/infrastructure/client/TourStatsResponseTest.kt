@@ -10,13 +10,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * 관광통계 응답 역직렬화(SPEC-0015 R8).
- *
- * **결과가 없을 때 업스트림은 `"items": ""`(빈 문자열)를 준다.** 객체를 기대하는 자리에 문자열이
- * 오므로, 이 경우를 흡수하지 못하면 역직렬화가 깨져 `UPSTREAM_UNAVAILABLE`이 된다 — 부재가
- * 장애로 둔갑하는 것이며 수용 기준이 금지한다.
- */
+/** 관광통계 응답 역직렬화(SPEC-0015 R8). 결과 없음의 `"items": ""`를 흡수해야 부재가 장애로 둔갑하지 않는다. */
 class TourStatsResponseTest {
 
     // TourismConfig.ktoBigDataRestClient와 같은 설정이어야 의미가 있다.
@@ -29,7 +23,7 @@ class TourStatsResponseTest {
 
     @Test
     fun `결과가 없으면 items가 빈 문자열로 오며 빈 목록으로 흡수된다`() {
-        // 실측(2026-08-11): 적재 범위 밖 날짜를 요청하면 이 형태로 온다.
+        // 결과 없는 날짜를 요청하면 이 형태로 온다.
         val json = """
             {"response":{"header":{"resultCode":"0000","resultMsg":"OK"},
              "body":{"items":"","numOfRows":0,"pageNo":1,"totalCount":0}}}

@@ -4,14 +4,8 @@ import org.around.ieuri.auth.domain.vo.Nickname
 import kotlin.random.Random
 
 /**
- * 가입 시 닉네임 자동 생성(SPEC-0011 R20). 형용사 + 명사 + 4자리 숫자를 이어 붙인다.
- *
- * 목록을 키우는 대신 숫자로 충돌을 흡수한다 — 단어를 늘리면 검수할 어휘가 함께 늘지만
- * 숫자 구간은 공짜다. [COMBINATIONS]가 요구치(100만)를 넘는지는 단위 테스트가 고정한다.
- *
- * **고유성을 보장하지 않는다**(SPEC-0032 R31) — 닉네임 중복이 허용되므로 재시도할 이유가
- * 없다. 그럼에도 조합 수를 유지하는 이유는 같은 이름이 우연히 쏟아지는 것이 여전히 나쁘기
- * 때문이다. 고유성이 아니라 다양성이 근거다.
+ * 가입 시 닉네임 자동 생성(SPEC-0011 R20): 형용사 + 명사 + 4자리 숫자.
+ * - 고유성을 보장하지 않는다(SPEC-0032 R31). [COMBINATIONS]가 100만 이상인지는 단위 테스트가 고정한다.
  */
 class NicknameGenerator(private val random: Random = Random.Default) {
 
@@ -32,10 +26,7 @@ class NicknameGenerator(private val random: Random = Random.Default) {
         val COMBINATIONS: Long
             get() = ADJECTIVES.size.toLong() * NOUNS.size.toLong() * NUMBER_BOUND
 
-        /**
-         * 형용사 200개. 명사와 이어 붙였을 때 [Nickname.MAX_LENGTH]를 넘지 않도록
-         * 짧은 낱말만 쓴다(형용사 ≤ 4자, 명사 ≤ 4자, 숫자 4자).
-         */
+        /** 형용사 200개. [Nickname.MAX_LENGTH]를 넘지 않도록 짧은 낱말만 쓴다(형용사 ≤ 4자, 명사 ≤ 4자, 숫자 4자). */
         val ADJECTIVES: List<String> = listOf(
             "귀여운", "용감한", "날쌘", "따뜻한", "차분한", "밝은", "씩씩한", "다정한",
             "성실한", "슬기로운", "지혜로운", "명랑한", "쾌활한", "느긋한", "부지런한", "든든한",

@@ -10,15 +10,7 @@ import org.springframework.stereotype.Component
 import java.time.Clock
 import java.time.Instant
 
-/**
- * 구독 인가의 auth 쪽 구현(SPEC-0032 R7).
- *
- * 두 가지를 본다 — **연결이 액세스 TTL을 넘겼는지**, 그리고 **그 회원의 토큰이 전부
- * 폐기됐는지**. 폐기는 탈퇴·정지·재사용 감지가 이미 `revokeAllByMember`를 부르므로
- * 저장소를 읽으면 알 수 있다.
- *
- * 판정 자체는 순수 함수([SubscriptionIdentity])에 두고 여기서는 값을 모아 넘긴다.
- */
+/** 구독 인가의 auth 쪽 구현(SPEC-0032 R7). 연결 시각과 토큰 폐기 여부를 모아 [SubscriptionIdentity]에 넘긴다. */
 @Component
 class TokenBackedSubscriptionAuthorizer(
     private val refreshTokenStore: RefreshTokenStorePort,

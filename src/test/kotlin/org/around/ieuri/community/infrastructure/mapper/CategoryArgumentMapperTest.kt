@@ -9,10 +9,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import org.around.ieuri.common.graphql.generated.types.TargetCategory as GqlTargetCategory
 
-/**
- * 커뮤니티 카테고리 인자 변환(SPEC-0020). **관광지 쪽과 같은 규칙을 지킨다** —
- * 같은 개념을 두 도메인이 다르게 해석하면 클라이언트가 화면마다 다른 규칙을 외워야 한다.
- */
+/** 커뮤니티 카테고리 인자 변환(SPEC-0020). 관광지 쪽과 같은 규칙을 지킨다. */
 class CategoryArgumentMapperTest {
 
     @Test
@@ -43,7 +40,7 @@ class CategoryArgumentMapperTest {
         assertEquals(setOf(TargetCategory.RESTAURANT), categories)
     }
 
-    /** 빈 배열 규칙이 관광지 쪽과 같은 코드로 거절되어야 클라이언트가 한 번만 분기한다. */
+    /** 빈 배열은 관광지 쪽과 같은 코드로 거절된다. */
     @Test
     fun `빈 배열은 EMPTY_CATEGORY_SET으로 거절된다`() {
         val thrown = assertFailsWith<EmptyCategorySetException> { toTargetCategories(emptyList()) }

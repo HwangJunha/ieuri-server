@@ -27,11 +27,8 @@ class SpotCatalogQueryAdapter(
     private val translation = QSpotCatalogTranslationEntity.spotCatalogTranslationEntity
 
     /**
-     * 배정 대상 — `catalog_id`가 null이고 좌표가 유효한 행. 배정된 행은 다시 판정하지 않으므로
-     * **미배정 조건 하나가 곧 증분 처리다**(설계 문서 §3.3).
-     *
-     * **좌표 필터가 여기 있다.** (0,0)이거나 한국 밖인 행은 깨진 데이터이며(실측 317건)
-     * 카탈로그를 내주면 지도·반경 조회에서 빠지는 "존재하지만 안 보이는" 데이터가 된다.
+     * 배정 대상 — `catalog_id`가 null이고 좌표가 유효한 행. 미배정 조건이 곧 증분 처리다.
+     * - (0,0)이거나 한국 밖인 좌표는 배정하지 않는다.
      */
     @Transactional(readOnly = true)
     override fun findUnassigned(language: DomainLocale, afterSpotId: Long, limit: Int): List<UnassignedSpot> = queryFactory
@@ -73,12 +70,7 @@ class SpotCatalogQueryAdapter(
 
     /**
      * KO 카탈로그의 제목 키 → 후보 맵. 배정 회차마다 한 번 읽어 메모리에서 대조한다.
-     *
-     * **정규화를 SQL로 하지 않는다** — 규칙은 도메인([SpotTitleNormalizer])이 소유하며, DB
-     * 함수로 옮기면 규칙이 두 곳에 생겨 반드시 어긋난다. 제목을 그대로 읽어 와 여기서 키를
-     * 만들기 때문에 저장 컬럼도 인덱스도 필요 없다.
-     *
-     * KO 카탈로그 수만큼(실측 56,413) 메모리를 쓴다 — 키가 평균 수십 바이트라 수 MB 수준이다.
+     * - 정규화는 SQL이 아니라 도메인([SpotTitleNormalizer])이 한다.
      */
     @Transactional(readOnly = true)
     override fun loadKoreanTitleIndex(): Map<String, List<CatalogCandidate>> = queryFactory
@@ -88,7 +80,7 @@ class SpotCatalogQueryAdapter(
         .where(translation.language.eq(DomainLocale.KO))
         .fetch()
         .mapNotNull { row ->
-            // **배정 쪽과 같은 함수여야 한다** — 규칙이 갈리면 맵의 키와 조회 키가 어긋난다.
+            // 배정 쪽과 같은 함수여야 한다 — 갈리면 맵의 키와 조회 키가 어긋난다.
             val key = SpotTitleNormalizer.lookupKey(requireNotNull(row.get(translation.title)))
                 ?: return@mapNotNull null
             key to CatalogCandidate(
@@ -100,12 +92,7 @@ class SpotCatalogQueryAdapter(
         }
         .groupBy({ it.first }) { it.second }
 
-    /**
-     * 썸네일 URL → KO 카탈로그 id. **KO spot이 정확히 하나인 URL만 담는다.**
-     *
-     * `HAVING count = 1`이 이 조회의 전부다 — 여럿이 공유하는 URL은 같은 장소라는 근거가
-     * 되지 못하므로 애초에 후보에서 뺀다.
-     */
+    /** 썸네일 URL → KO 카탈로그 id. KO spot이 정확히 하나인 URL만 담는다(`HAVING count = 1`). */
     @Transactional(readOnly = true)
     override fun loadKoreanThumbnailIndex(): Map<String, Long> = queryFactory
         .select(spot.thumbnailImageUrl, spot.catalogId.min())

@@ -1,15 +1,10 @@
 name: build
 
 on:
-  # 머지될 때만 돈다. dev/master로의 직접 푸시는 브랜치 보호 규칙으로 막으므로(저장소 설정,
-  # 이 파일 밖) 여기 걸리는 건 사실상 머지뿐이다.
-  #
-  # PR에서는 이 워크플로를 돌리지 않는다 — 같은 코드를 PR과 머지에서 두 번 빌드하는 낭비다.
-  # master로 향하는 PR의 사전 검증은 test.yml이 check(테스트·스타일)를 돌려 맡는다.
+  # 머지(dev/master 푸시)될 때만 돈다. PR 검증은 test.yml·lint.yml이 맡는다.
   push:
     branches: [dev, master]
-  # 재배포·복구용 수동 실행. 브랜치를 오지선택으로 제한해 feature 브랜치가 실수로
-  # 레지스트리에 올라가지 않게 한다.
+  # 재배포·복구용 수동 실행. feature 브랜치가 레지스트리에 올라가지 않게 브랜치를 선택지로 제한한다.
   workflow_dispatch:
     inputs:
       branch:
@@ -33,16 +28,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          # 수동 실행에서는 드롭다운으로 고른 브랜치를 받는다. 지정하지 않으면 워크플로 파일을
-          # 고른 브랜치가 아니라 이벤트의 기본 ref가 체크아웃된다.
+          # 수동 실행에서는 드롭다운으로 고른 브랜치를 체크아웃한다.
           ref: ${{ inputs.branch || github.ref }}
 
-      # 실제로 체크아웃된 커밋을 읽어 태그에 쓴다. 수동 실행에서 github.sha는 워크플로 파일을
-      # 고른 브랜치의 커밋이라 빌드한 코드와 다를 수 있고, 그러면 sha- 태그가 거짓말을 한다.
-      #
-      # **환경 접두사를 함께 낸다.** 태그가 어느 환경 것인지 스스로 말하지 않으면 Image
-      # Updater가 가릴 수 없다 — 커밋 해시만으로는 dev에서 나온 이미지와 master에서 나온
-      # 이미지가 구분되지 않아, 개발에 머지한 코드가 운영의 "가장 최근 빌드"로 뽑힌다.
+      # 실제로 체크아웃된 커밋으로 태그를 만든다(수동 실행에서 github.sha는 빌드한 코드와 다를 수 있다).
+      # 환경 접두사를 함께 낸다 — 없으면 Image Updater가 dev 이미지와 prod 이미지를 가리지 못한다.
       - id: rev
         run: |
           echo "sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
@@ -67,12 +57,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
 
       - name: Check and build jar
-        # **--no-daemon을 쓰지 않는다.** CI는 일회성이니 데몬이 무의미하다는 것이 오래된
-        # 관행이었으나, 지금은 손해다 — 데몬이 없으면 Kotlin 컴파일러가 매번 별도 JVM을
-        # 띄우고(gradle.properties의 in-process 전략이 무력화된다) 설정 캐시도 쓰지 못한다.
-        #
-        # 빌드 시간의 대부분은 QueryDSL kapt와 Kotlin 컴파일이다.
-        # 그 둘이 데몬 안에서 큰 힙을 쓰며 도는 편이 훨씬 빠르다.
+        # --no-daemon을 쓰지 않는다 — 데몬이 없으면 in-process 컴파일 전략과 설정 캐시가 무력화된다.
         run: ./gradlew check bootJar --build-cache
 
       # JAR은 아키텍처 독립이라 빌드는 x86 네이티브로 돌리고 이미지 조립만 arm64로 한다.
@@ -92,36 +77,16 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ghcr.io/hwangjunha/ieuri-server
-          # **환경 접두사를 붙인다**(dev-sha-… / prod-sha-…). Image Updater가 두 환경에서
-          # 모두 도는데, 접두사가 없으면 `newest-build`가 브랜치를 가리지 못해 dev에 머지한
-          # 커밋이 운영의 최신 빌드로 뽑힌다. 접두사가 곧 필터의 근거다
-          # (매니페스트의 server.allow-tags 정규식과 짝을 이룬다).
-          #
-          # sha- 부분은 그대로 불변이라 롤백 대상을 정확히 가리킨다. 브랜치 태그는 그 브랜치의
-          # 최신을 가리키며, 사람이 `docker pull ieuri-server:dev`로 쓰라고 남긴다 —
-          # Image Updater는 이 태그를 보지 않는다(정규식이 sha 형태만 받는다).
-          #
-          # 브랜치명을 직접 지정한다 — 수동 실행에서 github.ref는 워크플로 파일을 고른 브랜치라
-          # inputs.branch로 체크아웃한 브랜치와 어긋날 수 있다.
+          # 환경 접두사(dev-sha-… / prod-sha-…)가 Image Updater 필터의 근거다(매니페스트 server.allow-tags와 짝).
+          # 브랜치 태그는 사람용이며 Image Updater는 보지 않는다.
+          # 브랜치명은 inputs.branch로 직접 지정한다 — 수동 실행에서 github.ref와 어긋날 수 있다.
           tags: |
             type=raw,value=${{ steps.rev.outputs.env }}-sha-${{ steps.rev.outputs.sha }}
             type=raw,value=${{ inputs.branch || github.ref_name }}
 
       - uses: docker/build-push-action@v7
-        # **SOURCE_DATE_EPOCH를 커밋 시각으로 못 박는다**(2026-09-21).
-        #
-        # 없으면 이미지 config의 `created`가 **캐시된 레이어의 값을 그대로 물려받는다.**
-        # 실제로 그렇게 됐다: Dockerfile의 ENTRYPOINT 한 줄만 바꾼 빌드(13b85d4)가
-        # 레이어를 전부 캐시에서 꺼내는 바람에, 38분 전 빌드(ffdbd51)와 `created`가
-        # 나노초까지 같아졌다(둘 다 2026-09-20T19:16:15.612685281Z).
-        #
-        # 그러면 **Image Updater가 멈춘다.** `updateStrategy: newest-build`는 이 필드로
-        # 최신을 가리는데 값이 동률이면 "더 새로운 것이 없다"로 판정한다 — errors=0,
-        # images_updated=1이라는 성공 로그를 남기면서 제자리를 돈다. 세 사이클과 파드
-        # 재시작에도 같았고, 사람이 values-dev.yaml을 직접 고쳐도 다음 사이클에 되돌렸다.
-        #
-        # GHCR의 Published 시각은 정상적으로 달랐다. 레지스트리도 이미지도 멀쩡하고,
-        # Updater가 보는 필드 하나만 같았던 것이다 — 조용히 멈추는 종류의 고장이다.
+        # SOURCE_DATE_EPOCH를 커밋 시각으로 못 박는다 — 없으면 캐시된 레이어의 `created`를 물려받아
+        # 값이 동률이 되고, Image Updater(newest-build)가 성공 로그를 남기며 조용히 멈춘다.
         env:
           SOURCE_DATE_EPOCH: ${{ steps.rev.outputs.epoch }}
         with:

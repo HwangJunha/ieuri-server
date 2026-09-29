@@ -23,13 +23,7 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.util.UUID
 
-/**
- * 프로필 수정(SPEC-0011 R5·R6). 닉네임과 프로필 이미지를 한 서비스로 묶는다 —
- * 둘 다 member_profile 한 행을 고치는 같은 결의 유스케이스다.
- *
- * 이미지 흐름은 커뮤니티 사진과 같은 3단계(발급 → 클라이언트 직접 PUT → 확인)지만
- * **1장이라 다중 발급·부분 성공 개념이 없다.** 키 네임스페이스도 `profile` 구간으로 갈린다.
- */
+/** 프로필 수정(SPEC-0011 R5·R6): 닉네임과 프로필 이미지(발급 → 클라이언트 직접 PUT → 확인). */
 @Service
 class MemberProfileService(
     private val profileRepository: MemberProfileRepositoryPort,
@@ -38,12 +32,7 @@ class MemberProfileService(
     private val clock: Clock,
 ) : MemberProfileUseCase {
 
-    /**
-     * 닉네임 변경. 형식 검사 후 저장한다.
-     *
-     * **중복을 보지 않는다**(SPEC-0032 R31) — 닉네임은 어디서도 조회 키가 아니라 전부
-     * 표시용 투영이므로, 고유성을 강제할 이유가 없다. 형식 규칙은 그대로 남는다.
-     */
+    /** 닉네임 변경. 형식만 보고 중복은 보지 않는다(SPEC-0032 R31). */
     @Transactional
     override fun changeNickname(command: ChangeNicknameCommand): String {
         val nickname = runCatching { Nickname(command.nickname) }
@@ -53,10 +42,7 @@ class MemberProfileService(
         return nickname.value
     }
 
-    /**
-     * 업로드 URL 발급. 형식·크기를 먼저 보고, 어긋나면 **키를 발급하지 않는다** —
-     * 발급해 두면 쓰이지 않는 임시 오브젝트 자리가 남는다.
-     */
+    /** 업로드 URL 발급. 형식·크기가 어긋나면 키를 발급하지 않는다. */
     override fun issueProfileImageUploadUrl(
         command: IssueProfileImageUploadUrlCommand,
     ): ProfileImageUploadUrlView {
@@ -81,10 +67,8 @@ class MemberProfileService(
 
     /**
      * 업로드 확인 후 회원에 반영. 판정 순서는 소유권 → 존재 → 크기 → 매직바이트다.
-     * 소유권을 먼저 보는 이유는 저장소를 왕복할 필요가 없고, 저장소를 먼저 물으면 타인의
-     * 키 존재 여부를 응답 시간으로 알아낼 수 있기 때문이다.
-     *
-     * **교체 시 이전 오브젝트를 정리하되, 정리 실패가 프로필 반영을 막지 않는다.**
+     * - 소유권을 먼저 본다. 저장소를 먼저 물으면 타인 키의 존재가 응답 시간으로 샌다.
+     * - 교체 시 이전 오브젝트 정리 실패는 반영을 막지 않는다.
      */
     @Transactional
     override fun confirmProfileImageUpload(command: ConfirmProfileImageUploadCommand): String {
@@ -124,11 +108,7 @@ class MemberProfileService(
         deleteQuietly(previousKey, null)
     }
 
-    /**
-     * 이전 오브젝트 정리. **실패해도 삼킨다** — 프로필은 이미 새 값으로 바뀌었고,
-     * 남은 오브젝트는 스토리지 lifecycle rule이 걷어 간다. 여기서 예외를 올리면
-     * 반영된 변경이 롤백되어 사용자에게는 "실패했는데 바뀐" 상태로 보인다.
-     */
+    /** 이전 오브젝트 정리. 실패해도 삼킨다 — 남은 오브젝트는 스토리지 lifecycle rule이 걷어 간다. */
     private fun deleteQuietly(previousKey: String?, newKey: String?) {
         if (previousKey == null || previousKey == newKey) return
         runCatching { storage.delete(previousKey) }

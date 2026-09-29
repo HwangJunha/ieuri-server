@@ -13,14 +13,8 @@ import java.sql.ResultSet
 
 /**
  * 시군구 추천 지표 조회 어댑터(SPEC-0015 R14·R21).
- *
- * `district`의 geography 컬럼이 **JPA 엔티티에 매핑되어 있지 않아** 생 SQL로 남는다 —
- * 매핑하면 `ddl-auto: validate`가 기동 시 실패한다.
- *
- * **지표마다 질의를 나눈다** — 집계 단위가 서로 다르다. 지역과 지표의 결합은 서비스가 한다.
- *
- * KTO 테이블에는 시도 코드가 없어 `district`와 조인해 거른다 — 시군구 코드 앞 2자리로
- * `LIKE`를 걸지 않는다.
+ * - `district`의 geography 컬럼이 JPA에 매핑되지 않아 생 SQL이다.
+ * - 지표마다 질의를 나누고, 지역과 지표의 결합은 서비스가 한다.
  */
 @Component
 class RegionMetricQueryAdapter(
@@ -28,11 +22,9 @@ class RegionMetricQueryAdapter(
 ) : RegionMetricQueryPort {
 
     /**
-     * origin 좌표를 품은 시군구 1건. 경계 안에 없으면 null이다(바다·해외).
-     *
-     * **`ST_MakePoint`는 (경도, 위도) 순서다** — 뒤집으면 예외 없이 조용히 0건이 된다.
-     * geography로 캐스팅해야 `idx_district_boundary`를 탄다. 경계선에 정확히 걸린 좌표가
-     * 2건을 낼 수 있어 `LIMIT 1`을 둔다.
+     * origin 좌표를 품은 시군구 1건. 경계 안에 없으면(바다·해외) null이다.
+     * - `ST_MakePoint`는 (경도, 위도) 순서다 — 뒤집으면 조용히 0건이 된다.
+     * - 경계선 위 좌표는 2건을 낼 수 있어 `LIMIT 1`이 필요하다. geography 캐스팅을 빼면 공간 인덱스를 타지 않는다.
      */
     @Transactional(readOnly = true)
     override fun findDistrictAt(origin: Coordinates): OriginDistrict? = jdbcTemplate.query(
@@ -53,13 +45,8 @@ class RegionMetricQueryAdapter(
     ).firstOrNull()
 
     /**
-     * 한 시도의 추천 후보 시군구 전건.
-     *
-     * **좌표는 `center`가 아니라 `representative_location`이다** — `center`는 기하학적
-     * 중심이라 spot이 없는 곳일 수 있다.
-     *
-     * **`ST_X`가 경도, `ST_Y`가 위도다** — 뒤집으면 조용히 틀린다. 둘 다 geometry만 받아
-     * `::geometry` 캐스팅이 필요하다.
+     * 한 시도의 추천 후보 시군구 전건. 좌표는 `center`가 아니라 `representative_location`이다.
+     * - `ST_X`가 경도, `ST_Y`가 위도다 — 뒤집으면 조용히 틀린다.
      */
     @Transactional(readOnly = true)
     override fun findRegions(provinceCode: String): List<RegionRow> = jdbcTemplate.query(
@@ -94,12 +81,8 @@ class RegionMetricQueryAdapter(
     )
 
     /**
-     * 그 시도 시군구별 **오늘 예측** 집중률의 평균.
-     *
-     * 집중률은 향후 30일치가 함께 오지만 오늘 행만 쓴다. **오늘 행이 없으면 미래로 밀지 않고
-     * 결측이다**(R14) — 다른 날의 예측을 오늘의 혼잡도로 내놓으면 조용히 틀린 값이 된다.
-     *
-     * 값이 관광지 단위로 오므로 시군구 점수로 쓰려면 평균으로 묶는다.
+     * 그 시도 시군구별 오늘 예측 집중률의 평균.
+     * - 오늘 행이 없으면 다른 날로 밀지 않고 결측이다(R14).
      */
     @Transactional(readOnly = true)
     override fun findConcentrationRates(provinceCode: String): Map<String, RegionMetric> = jdbcTemplate.query(
@@ -116,14 +99,8 @@ class RegionMetricQueryAdapter(
     ).toMap()
 
     /**
-     * 그 시도 시군구별 **최근 7일 평균 방문자수(외지인+외국인)**.
-     *
-     * 하루에 방문객 구분별로 3행이 있다 — 현지인(`1`)은 주민의 일상 이동이라 관광 수요가
-     * 아니어서 뺀다. 요일 변동이 커 하루가 아니라 7일을 평균하며, 최신 기준일이 지역마다
-     * 달라 **지역별 최댓값**에서 되짚는다.
-     *
-     * 나이(일)는 **DB가 한국 날짜로 계산한다** — 앱 시계로 재면 DB가 UTC라 한국 00~09시
-     * 구간에서 하루가 어긋난다.
+     * 그 시도 시군구별 최근 7일 평균 방문자수(외지인+외국인, 현지인 제외).
+     * - 7일은 지역별 최신 기준일에서 되짚는다. 나이(일)는 DB가 한국 날짜로 계산한다.
      */
     @Transactional(readOnly = true)
     override fun findVisitorCounts(provinceCode: String): Map<String, RegionMetric> = jdbcTemplate.query(
@@ -151,19 +128,17 @@ class RegionMetricQueryAdapter(
         provinceCode,
     ).toMap()
 
-    /** 그 시도 시군구별 **최신 월** 체류 강도. 월 단위라 수십 일 지난 값이 정상이다. */
+    /** 그 시도 시군구별 최신 월 체류 강도. 월 단위라 수십 일 지난 값이 정상이다. */
     @Transactional(readOnly = true)
     override fun findStayIntensities(provinceCode: String): Map<String, RegionMetric> = findLatestMonthly("kto_stay_intensity", provinceCode)
 
-    /** 그 시도 시군구별 **최신 월** 소비 강도. 외지인 소비 기준이며 외국인 소비는 포함하지 않는다. */
+    /** 그 시도 시군구별 최신 월 소비 강도. 외지인 소비 기준이며 외국인 소비는 포함하지 않는다. */
     @Transactional(readOnly = true)
     override fun findSpendingIntensities(provinceCode: String): Map<String, RegionMetric> = findLatestMonthly("kto_spending_intensity", provinceCode)
 
     /**
      * 월 지표 공통 형태 — 그 시도의 지역마다 자기 최신 월 1행.
-     *
-     * **[table]에 외부 입력을 넘기면 안 된다** — 문자열 결합이라 호출부 상수만 온다.
-     * [provinceCode]는 사용자 입력에서 파생되므로 반드시 바인딩한다.
+     * - [table]은 문자열 결합이라 호출부 상수만 넘긴다. [provinceCode]는 바인딩한다.
      */
     private fun findLatestMonthly(table: String, provinceCode: String): Map<String, RegionMetric> = jdbcTemplate.query(
         """

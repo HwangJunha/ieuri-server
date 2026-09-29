@@ -4,12 +4,8 @@ import org.around.ieuri.common.graphql.generated.types.ErrorCode
 import org.around.ieuri.common.graphql.generated.types.UserError
 
 /**
- * alarm 뮤테이션의 오류 규약(POL-015·POL-016).
- *
- * **`INVALID_INPUT` 하나뿐이다** — 이 도메인의 실패 모드는 빈 `deviceId`·`fcmToken`이 전부이고,
- * 삭제와 설정 변경은 멱등이라 도메인 실패가 성립하지 않는다. 새 오류 코드를 만들지 않는다.
- *
- * 인증 실패는 여기서 잡지 않고 최상위 `errors[]`로 나간다(POL-016).
+ * alarm 뮤테이션의 오류 규약(POL-015·POL-016). 사용자 오류는 `INVALID_INPUT` 하나뿐이다.
+ * - 인증 실패는 여기서 잡지 않고 최상위 `errors[]`로 나간다.
  */
 inline fun <T> withAlarmUserErrors(onError: (List<UserError>) -> T, block: () -> T): T = try {
     block()

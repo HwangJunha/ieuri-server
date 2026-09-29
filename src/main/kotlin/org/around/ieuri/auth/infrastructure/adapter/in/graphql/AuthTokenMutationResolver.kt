@@ -20,10 +20,7 @@ import org.around.ieuri.common.graphql.generated.types.LogoutPayload
 import org.around.ieuri.common.graphql.generated.types.RefreshTokenInput
 import org.around.ieuri.common.graphql.generated.types.UserError
 
-/**
- * 로그인/토큰 GraphQL 뮤테이션 리졸버(인바운드 어댑터). 유스케이스에 위임하고 응답 페이로드로 매핑한다.
- * 입력/출력 타입은 auth.graphqls로부터 codegen으로 생성된다.
- */
+/** 로그인/토큰 뮤테이션 리졸버. 유스케이스에 위임하고 응답 페이로드로 매핑한다. */
 @DgsComponent
 class AuthTokenMutationResolver(
     private val authTokenUseCase: AuthTokenUseCase,

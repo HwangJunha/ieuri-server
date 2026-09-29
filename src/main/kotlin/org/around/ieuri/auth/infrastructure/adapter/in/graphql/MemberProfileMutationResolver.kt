@@ -17,12 +17,7 @@ import org.around.ieuri.common.graphql.generated.types.CreateProfileImageUploadU
 import org.around.ieuri.common.graphql.generated.types.RemoveProfileImagePayload
 import org.around.ieuri.common.security.CurrentMemberProvider
 
-/**
- * 프로필 수정 뮤테이션 리졸버(SPEC-0011 R5·R6). 전부 인증 주체(본인) 대상이라 권한 검사가 없다.
- *
- * 이미지 업로드는 3단계이며 **서버는 바이트를 중계하지 않는다** — 발급받은 presigned URL로
- * 클라이언트가 스토리지에 직접 PUT한 뒤 확인만 서버에 알린다.
- */
+/** 프로필 수정 뮤테이션 리졸버(SPEC-0011 R5·R6). 본인 대상이며 이미지 바이트는 서버를 거치지 않는다. */
 @DgsComponent
 class MemberProfileMutationResolver(
     private val memberProfileUseCase: MemberProfileUseCase,

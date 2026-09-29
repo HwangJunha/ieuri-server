@@ -29,8 +29,7 @@ class OriginProximityClusteringTest {
     @Test
     @DisplayName("미터 단위로 다른 좌표는 같은 장소다")
     fun `metre-scale differences stay in one cluster`() {
-        // 실측 회귀: `솔로몬로파크`의 KO 행과 외국어 행이 1.6m 차이다. 정확 일치로 묶으면
-        // 같은 장소가 갈라지고, 그러면 좋아요가 따로 쌓인다.
+        // 언어별 좌표가 1.6m 다른 같은 장소는 한 군집이다.
         val koRow = 126.93131322530203 to 35.18953087389348
         val foreignRow = 126.9313275748 to 35.189570284
 
@@ -58,7 +57,6 @@ class OriginProximityClusteringTest {
     @Test
     @DisplayName("군집은 첫 원소가 나온 입력 순서를 지킨다")
     fun `clusters preserve input order`() {
-        // 순서가 흔들리면 "가장 큰 군집"이 동수일 때 남는 카탈로그가 실행마다 달라진다.
         val clusters = cluster(gwangju, incheon)
 
         assertEquals(listOf(gwangju), clusters[0])
@@ -87,7 +85,7 @@ class OriginProximityClusteringTest {
     @Test
     @DisplayName("거리는 경도·위도 순으로 받는다")
     fun `distance takes longitude first`() {
-        // 인천과 광주는 실측 247km다. 인자를 뒤집으면 전혀 다른 값이 나오므로 순서가 고정된다.
+        // 인천과 광주는 약 247km다.
         val (incheonLon, incheonLat) = incheon
         val (gwangjuLon, gwangjuLat) = gwangju
 

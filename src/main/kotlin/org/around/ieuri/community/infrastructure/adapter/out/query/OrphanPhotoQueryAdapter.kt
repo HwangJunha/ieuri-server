@@ -6,9 +6,7 @@ import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostPhotoEntity
 import org.springframework.stereotype.Component
 
-/**
- * 주인 잃은 사진 키 조회 어댑터(SPEC-0021 R6). 판정은 애플리케이션이 하고 여기서는 읽기만 한다.
- */
+/** 주인 잃은 사진 키 조회(SPEC-0021 R6). 판정은 애플리케이션이 한다. */
 @Component
 class OrphanPhotoQueryAdapter(
     private val queryFactory: JPAQueryFactory,
@@ -22,7 +20,7 @@ class OrphanPhotoQueryAdapter(
         .from(orphan)
         .fetch()
 
-    /** 두 표를 조인한다 — 보존 목록을 끌어와 `IN`으로 되물으면 키 개수만큼 SQL이 길어진다. */
+    /** 고아 목록 중 아직 글 사진으로 쓰이는 키. */
     override fun findOrphanKeysStillUsedByPosts(): Set<String> = queryFactory
         .select(orphan.objectKey)
         .from(orphan)

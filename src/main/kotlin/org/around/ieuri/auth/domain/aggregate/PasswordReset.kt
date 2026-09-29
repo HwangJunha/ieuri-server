@@ -5,10 +5,8 @@ import java.time.Instant
 import java.util.UUID
 
 /**
- * 비밀번호 재설정 챌린지 애그리거트. 이메일 검증과 목적은 다르지만(성공 시 비밀번호 변경) 코드 챌린지의
- * 보안 규칙은 동일하다: ① 짧은 만료 ② 시도 횟수 제한 ③ 단회용(consumed).
- * 실패 사유/결과는 [VerificationResult]를 재사용한다(코드 챌린지 공통 개념).
- * 코드는 평문이 아닌 해시(codeHash)로만 다룬다.
+ * 비밀번호 재설정 챌린지 애그리거트. 보안 규칙은 이메일 검증과 같다(짧은 만료·시도 제한·단회용).
+ * - 결과는 [VerificationResult]를 재사용하고, 코드는 해시(codeHash)로만 다룬다.
  */
 class PasswordReset private constructor(
     val id: Long?,

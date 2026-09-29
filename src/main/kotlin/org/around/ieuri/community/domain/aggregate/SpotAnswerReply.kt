@@ -5,18 +5,12 @@ import java.time.Instant
 
 /**
  * 답변에 달린 답글. 애그리게이트 루트.
- *
- * **답글에는 답글을 달 수 없다.** 부모 답글 id 필드가 없는 것이 그 표현이며, 3단계 상태를
- * 도메인에서 표현할 수 없게 만든다. 댓글([Comment])이 3단계 시도를 2단계로 눕히는 것과
- * 다른 선택이다 — 여기서는 계약이 거부를 요구한다(REPLY_TO_REPLY_NOT_ALLOWED).
- *
- * 답변과 별도 루트인 이유는 답글이 독립적으로 신고·숨김·삭제되기 때문이다. 내부 엔티티라면
- * 답글 하나를 지우는 데 답변 애그리게이트 전체를 적재해야 한다.
+ * - 답글에는 답글을 달 수 없다(REPLY_TO_REPLY_NOT_ALLOWED). 댓글([Comment])과 달리 거부한다.
  */
 class SpotAnswerReply private constructor(
     val id: Long?,
     val answerId: Long,
-    /** 자격 판정이 장소 단위라 답변에서 복사해 들고 있다. */
+    /** 답변에서 복사한 장소 id. */
     val catalogId: Long,
     val authorId: Long,
     val body: String,

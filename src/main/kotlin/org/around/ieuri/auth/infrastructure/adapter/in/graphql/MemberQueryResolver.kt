@@ -22,24 +22,15 @@ import org.around.ieuri.common.graphql.generated.types.MemberStatus as GqlMember
 import org.around.ieuri.common.graphql.generated.types.MemberSummary as GqlMemberSummary
 import org.around.ieuri.common.graphql.generated.types.PageInfo as GqlPageInfo
 
-/**
- * 회원 조회 GraphQL 쿼리 리졸버(인바운드 어댑터, CQRS 읽기 측).
- * `me`는 인증만, `member`/`members`는 member:read 권한을 요구한다. read DTO를 GraphQL 응답 타입으로 매핑한다.
- */
+/** 회원 조회 쿼리 리졸버. `me`는 인증만, `member`/`members`는 member:read 권한을 요구한다. */
 @DgsComponent
 class MemberQueryResolver(
     private val memberQueryUseCase: MemberQueryUseCase,
     private val currentMemberProvider: CurrentMemberProvider,
 ) {
     /**
-     * 본인 정보.
-     *
-     * **생성 타입이 아니라 read DTO를 돌려준다.** `Me.notificationPreferences`가 선택했을
-     * 때만 조회가 붙는 지연 필드라(SPEC-0028) 필드 리졸버가 이 값을 `getSource`로 받는다 —
-     * 생성 타입은 non-null 필드를 생성자에서 요구해 지연 필드를 비운 채로 만들 수 없다.
-     *
-     * 나머지 필드는 이름이 같아 DGS가 프로퍼티로 바로 해석하고, 어긋나는 셋(`id`·`status`·
-     * `createdAt`)만 아래에서 옮긴다.
+     * 본인 정보. 생성 타입이 아니라 read DTO를 돌려준다 — 지연 필드(`notificationPreferences`)가 `getSource`로 받는다.
+     * - 이름이 어긋나는 `id`·`status`·`createdAt`만 아래에서 옮긴다.
      */
     @DgsQuery
     fun me(): MeView {

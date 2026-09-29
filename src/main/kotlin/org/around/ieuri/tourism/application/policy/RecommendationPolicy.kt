@@ -22,10 +22,7 @@ data class RecommendationPolicy(
     }
 }
 
-/**
- * 임베딩 사양. [model]·[dimension]이 저장된 벡터와 다르면 그 벡터는 없는 것으로 본다 —
- * 모델 교체가 곧 재적재 대상 판정이다.
- */
+/** 임베딩 사양. [model]·[dimension]이 저장된 벡터와 다르면 그 벡터는 없는 것으로 본다(재적재 대상). */
 data class EmbeddingSpec(
     val model: String,
     val dimension: Int,

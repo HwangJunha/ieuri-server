@@ -26,13 +26,9 @@ import org.around.ieuri.common.graphql.generated.types.RegionScore as GqlRegionS
 import org.around.ieuri.common.graphql.generated.types.RegionScoreFactor as GqlRegionScoreFactor
 
 /**
- * 지역 추천 GraphQL 리졸버(인바운드 어댑터, CQRS 읽기, SPEC-0015). 언어는 GraphQL 인자가
- * 아니라 Accept-Language 헤더에서 온다.
- *
- * **지연 필드(@DgsData)를 두지 않는다.** 응답의 모든 필드가 한 번의 지표 조회와 그 위의 단일
- * 점수 산출 패스에서 나와, 필드를 나눠도 줄어드는 I/O가 없다.
- *
- * **origin은 로깅하지 않는다**(POL-013 · POL-045) — 사용자 본인의 위치다.
+ * 지역 추천 GraphQL 리졸버(CQRS 읽기, SPEC-0015). 언어는 Accept-Language 헤더에서 온다.
+ * - 모든 필드가 한 번의 조회에서 나와 지연 필드가 없다.
+ * - origin은 로깅하지 않는다(POL-013 · POL-045).
  */
 @DgsComponent
 class RegionRecommendationResolver(
@@ -42,21 +38,15 @@ class RegionRecommendationResolver(
     private val eventPublisher: TourismEventPublisherPort,
 ) {
 
-    /**
-     * 추천 시군구 목록. 입력 검증(형식·범위)은 인바운드 어댑터의 몫이다 — 도메인은 GraphQL
-     * 오류 코드를 모른다.
-     */
+    /** 추천 시군구 목록. 입력 검증(형식·범위)은 이 어댑터가 한다. */
     @DgsQuery
     fun recommendedRegions(
         dfe: DgsDataFetchingEnvironment,
         @InputArgument origin: GqlCoordinatesInput,
         @InputArgument limit: Int?,
     ): GqlRecommendedRegionResult {
-        // 좌표를 받는 연산이므로 조회 사실을 남긴다(SPEC-0032 R19). **origin은 넘기지 않는다.**
-        //
-        // **거절된 토큰을 비로그인으로 흘리지 않는다** — 만료를 비로그인으로 다루면 로그인한
-        // 회원의 위치 조회가 기록 없이 지나가고, 그 구멍이 액세스 TTL마다 열린다.
-        // 비로그인은 남길 "누구"가 없어 발행하지 않는다.
+        // 좌표 조회 사실을 남긴다(SPEC-0032 R19). origin은 넘기지 않는다.
+        // 만료 토큰은 비로그인으로 흘리지 않고 오류다. 비로그인은 발행하지 않는다.
         currentMemberProvider.optionalMemberId(dfe.tokenPresentation())
             ?.let { eventPublisher.publish(LocationAccessed(it, "recommendedRegions")) }
         return regionRecommendationUseCase.recommendedRegions(
@@ -68,10 +58,7 @@ class RegionRecommendationResolver(
         ).toGql()
     }
 
-    /**
-     * 개수 검증(R29 · POL-018). **0 이하는 거절, 상한 초과는 클램프**다 — 두 방향의 처리가
-     * 다르다. 0건 요청은 의도로 성립하지 않아 조용히 기본값으로 바꾸지 않는다.
-     */
+    /** 개수 검증(R29 · POL-018). 0 이하는 거절, 상한 초과는 클램프다. */
     private fun resolveLimit(requested: Int?): Int {
         if (requested != null && requested <= 0) {
             throw InvalidLimitException("요청 개수는 1 이상이어야 합니다.")

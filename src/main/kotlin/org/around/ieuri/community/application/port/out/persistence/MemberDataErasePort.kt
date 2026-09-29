@@ -1,11 +1,8 @@
 package org.around.ieuri.community.application.port.out.persistence
 
 /**
- * 탈퇴 회원의 커뮤니티 데이터 **물리 삭제**(SPEC-0011 R17).
- *
- * **여기 남은 것은 본인만의 데이터다** — 좋아요·숨김·차단. 남에게도 보이는 것
- * (글·댓글·질문·답변·답글·DM)은 지우면 남의 화면이 깨지므로 소프트 삭제로 옮겼다
- * ([MemberContentSoftDeletePort]).
+ * 탈퇴 회원의 본인만의 데이터(좋아요·숨김·차단) 물리 삭제(SPEC-0011 R17).
+ * - 남에게 보이는 콘텐츠는 [MemberContentSoftDeletePort]가 소프트 삭제한다.
  */
 interface MemberDataErasePort {
     /** 회원이 누른 좋아요. */

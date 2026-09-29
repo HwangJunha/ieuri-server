@@ -251,7 +251,6 @@ class PostTest {
     fun `장소와 좌표는 함께 있거나 함께 없어야 한다`() {
         val post = create()
 
-        // 좌표 없이 장소만 바꾸면 그 글이 지역 피드의 거리순에서 조용히 사라진다.
         assertFailsWith<IllegalArgumentException> { post.changeSpot(990L, null) }
         assertFailsWith<IllegalArgumentException> { post.changeSpot(null, SpotPoint(127.0, 37.5)) }
     }
@@ -268,7 +267,7 @@ class PostTest {
             ),
         )
 
-        // 유저가 "서울"과 "#서울"을 함께 칠 수 있다.
+        // "서울"과 "#서울"은 같은 태그다.
         assertEquals(2, post.tags.size)
         assertEquals(listOf("Seoul", "야경"), post.tags.map { it.name })
     }

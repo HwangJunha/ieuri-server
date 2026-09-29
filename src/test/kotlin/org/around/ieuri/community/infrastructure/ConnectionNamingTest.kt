@@ -8,17 +8,8 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
- * 커넥션 반환 타입의 **이름**을 고정한다.
- *
- * Spring for GraphQL의 `ConnectionFieldTypeVisitor`는 스키마가 Relay 커넥션으로 선언한 필드의
- * 반환값을 감싼다. 등록된 `ConnectionAdapter`(Spring Data의 Window/Slice 전용)가 지원하지 않는
- * 타입이면 `getClass().getName().endsWith("Connection")`으로 통과 여부를 판정하고, 실패하면
- * 런타임에 `No ConnectionAdapter for: ...`로 조회가 통째로 깨진다.
- *
- * **컴파일로는 잡히지 않는다.** 실제로 `PostConnectionResponse`라는 이름으로 배포됐다가
- * 첫 조회에서 500이 났고, 그래서 이 테스트를 둔다. 이름 규칙이 계약의 일부라는 뜻이다.
- *
- * DGS·Spring 컨텍스트를 띄우지 않는다 — 리플렉션으로 반환 타입 이름만 본다.
+ * 커넥션 반환 타입의 이름이 `Connection`으로 끝나는지 고정한다.
+ * - 아니면 Spring for GraphQL이 런타임에 `No ConnectionAdapter for: ...`로 조회를 깬다.
  */
 class ConnectionNamingTest {
 
@@ -29,7 +20,7 @@ class ConnectionNamingTest {
         "blockedUsers",
     )
 
-    /** DM 커넥션(SPEC-0017). 리졸버가 달라 목록을 나눠 둔다. */
+    /** DM 커넥션(SPEC-0017). */
     private val conversationConnectionReturningFields = setOf(
         "conversations",
         "conversationMessages",
@@ -50,7 +41,7 @@ class ConnectionNamingTest {
             .filter { it.name in fields }
             .filter { it.isAnnotationPresent(DgsQuery::class.java) || it.isAnnotationPresent(DgsData::class.java) }
 
-        // 메서드 이름이 바뀌었는데 위 목록만 남으면 아무것도 검사하지 않는 테스트가 된다.
+        // 목록의 메서드가 실제로 있는지 확인한다.
         assertTrue(
             checked.size == fields.size,
             "${resolver.simpleName}에서 커넥션 반환 리졸버를 ${fields.size}개 기대했으나 ${checked.size}개를 찾았다. " +

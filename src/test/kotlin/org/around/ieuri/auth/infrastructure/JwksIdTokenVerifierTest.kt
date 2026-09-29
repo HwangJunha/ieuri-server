@@ -19,10 +19,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
-/**
- * [JwksIdTokenVerifier] 단위 테스트. 테스트용 RSA 키페어로 JWKS 소스를 만들고 토큰을 서명해,
- * 서명·iss·aud·exp 검증이 올바르게 통과/거부되는지 확인한다. 외부 provider 엔드포인트는 호출하지 않는다.
- */
+/** [JwksIdTokenVerifier] 단위 테스트. 테스트용 RSA 키로 JWKS를 만들어 서명·iss·aud·exp 판정을 본다. */
 class JwksIdTokenVerifierTest {
 
     private val issuer = "https://accounts.google.com"

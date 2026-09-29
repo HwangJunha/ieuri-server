@@ -2,9 +2,7 @@ package org.around.ieuri.tourism.domain.vo
 
 /**
  * 항목별 가중치(SPEC-0015 R12).
- *
- * **누락된 항목의 가중치는 0이 아니라 [DEFAULT_WEIGHT]다** — 설정이 덜 채워진 것을 항목을
- * 죽이는 것으로 해석하지 않는다.
+ * - 누락된 항목의 가중치는 0이 아니라 [DEFAULT_WEIGHT]다.
  */
 data class RegionScoreWeights(
     private val weights: Map<RegionScoreFactor, Double>,

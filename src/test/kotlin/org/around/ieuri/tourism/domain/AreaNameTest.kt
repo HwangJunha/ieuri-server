@@ -5,12 +5,7 @@ import org.around.ieuri.tourism.domain.vo.DomainLocale
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * 구역명 언어 선택과 폴백(SPEC-0014 R31).
- *
- * 폴백 순서는 **활성 언어 → EN → KO**다. 이름이 비어 마커가 사라지는 것보다 다른 언어로라도
- * 보이는 편이 낫다는 판단이며, 그 순서를 이 테스트가 고정한다.
- */
+/** 구역명 언어 선택과 폴백(SPEC-0014 R31). 폴백 순서는 활성 언어 → EN → KO다. */
 class AreaNameTest {
 
     private val full = AreaName(ko = "강남역", en = "Gangnam station", ja = "江南駅", zh = "江南站")
@@ -44,7 +39,7 @@ class AreaNameTest {
 
     @Test
     fun `공백뿐인 이름은 부재로 본다`() {
-        // 적재 사고로 빈 문자열이 들어오면 마커에 이름이 사라진다 — 폴백이 걸려야 한다.
+        // 빈 문자열도 폴백한다.
         val blankJa = full.copy(ja = "   ")
 
         assertEquals("Gangnam station", blankJa.resolve(DomainLocale.JA))

@@ -27,17 +27,8 @@ import java.time.Instant
 
 /**
  * 상세 사전 수집(SPEC-0037). 대상 → 조회 → 적재를 한 묶음씩 처리한다.
- *
- * **실패를 그 자리에서 다시 시도하지 않는다**(FR-008). 실패하면 확보 기록이 남지 않아 다음 확보
- * 차례에 대상 쿼리가 다시 집고, 그 사이 사용자가 조회하면 그 시점에 채워진다(FR-010). 실시간
- * 데이터가 아니라 하루 늦어지는 비용이 없고, 재시도는 한 장소에 쿼터를 여러 번 태운다.
- *
- * **조회 경로의 write-behind를 재사용하지 않는다.** 그쪽 리스너는 예외를 삼키고 전용 executor는
- * 큐가 차면 작업을 버린다 — "캐시 충전은 버려도 된다"는 전제 위에 서 있어서다. 여기서는 결과가
- * 곧 데이터이므로 적재를 기다리고 실패를 센다.
- *
- * **빈 등록은 `SpotDetailPrefetchConfig`가 한다**(batch 프로파일 전용). 이 클래스에 `@Service`를
- * 붙이면 API 서버도 생성하려 들지만 정책 빈이 그쪽에 없다.
+ * - 실패를 그 자리에서 다시 시도하지 않는다(FR-008) — 다음 확보 차례에 대상 쿼리가 다시 집는다.
+ * - 빈 등록은 `SpotDetailPrefetchConfig`가 한다(batch 프로파일 전용). `@Service`를 붙이지 않는다.
  */
 class SpotDetailPrefetchService(
     private val targetQueryPort: SpotDetailPrefetchTargetQueryPort,
@@ -48,10 +39,7 @@ class SpotDetailPrefetchService(
 
     private val log = LoggerFactory.getLogger(SpotDetailPrefetchService::class.java)
 
-    /**
-     * **갈래마다 따로 둔다** — upstream 한도가 (언어 × 오퍼레이션) 조합마다 초당 50이라
-     * 하나를 공유하면 네 갈래가 한 갈래 몫을 나눠 쓰게 된다. 갈래가 곧 오퍼레이션이다.
-     */
+    /** 갈래(= 오퍼레이션)마다 따로 둔다 — upstream 한도가 오퍼레이션별이다. */
     private val limiters: Map<SpotDetailPart, RateLimiter> =
         SpotDetailPart.entries.associateWith { part ->
             RateLimiter.of(
@@ -59,7 +47,6 @@ class SpotDetailPrefetchService(
                 RateLimiterConfig.custom()
                     .limitForPeriod(policy.callsPerSecond)
                     .limitRefreshPeriod(Duration.ofSeconds(1))
-                    // 한도를 기다리는 것은 정상 동작이다 — 묶음 전체가 창을 나눠 쓰므로
                     // 마지막 호출은 (묶음 크기 / 초당 한도)초까지 기다릴 수 있다.
                     .timeoutDuration(Duration.ofMinutes(1))
                     .build(),
@@ -82,22 +69,15 @@ class SpotDetailPrefetchService(
     }
 
     /**
-     * 묶음 전체를 동시에 받아 온다. **순차로는 FR-002(1일 이내)를 지킬 수 없다** — 건당 0.2초로
-     * 잡아도 18시간이다.
-     *
-     * 속도는 [RateLimiter]가 잡는다. **동시 실행 수를 묶는 것으로는 부족하다** — 응답이 빠르면
-     * 같은 동시성으로도 초당 호출이 얼마든 늘어나고, 실제로 동시 20으로 1000건이 2초에 나가
-     * 대부분이 한도에 걸렸다. 제한해야 하는 것은 초당 호출 수다.
-     *
-     * 한 장소가 [UpstreamRateLimitedException]을 던지면 스코프가 나머지를 취소하고 그 예외를
-     * 그대로 올린다 — 그날 쿼터가 끝났으므로 남은 호출은 낭비다(AC-018).
+     * 묶음 전체를 동시에 받아 온다. 초당 호출 수는 [RateLimiter]가 잡는다.
+     * - 한 장소가 [UpstreamRateLimitedException]을 던지면 나머지를 취소하고 그 예외를 올린다(AC-018).
      */
     private suspend fun fetchAll(part: SpotDetailPart, targets: List<PrefetchTarget>): List<Detail?> = coroutineScope {
         val limiter = limiters.getValue(part)
         targets
             .map { target ->
                 async(Dispatchers.IO) {
-                    // 창이 열릴 때까지 대기한다. 대기는 스레드를 잡지만 Dispatchers.IO의 몫이다.
+                    // 창이 열릴 때까지 대기한다(스레드를 잡는다).
                     limiter.acquirePermission()
                     fetch(part, target)
                 }
@@ -106,11 +86,8 @@ class SpotDetailPrefetchService(
     }
 
     /**
-     * 한 장소의 한 갈래를 원본에서 받아 온다. 실패하면 null이며 **적재하지 않는다** — 답을 듣지
-     * 못한 것을 "없다"로 적으면 원본에 내용이 있어도 다음 주기까지 비어 있게 된다(FR-012).
-     *
-     * **일일 한도는 잡지 않는다.** 그날 쿼터가 끝났다는 뜻이라 이 장소만의 문제가 아니고, 그대로
-     * 올라가 호출자가 그 갈래를 멈춘다(AC-018).
+     * 한 장소의 한 갈래를 원본에서 받아 온다. 실패하면 null이며 적재하지 않는다(FR-012).
+     * - 일일 한도 예외는 잡지 않고 올려 호출자가 그 갈래를 멈춘다(AC-018).
      */
     private fun fetch(part: SpotDetailPart, target: PrefetchTarget): Detail? = try {
         read(part, target)

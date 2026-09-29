@@ -4,7 +4,6 @@ import org.around.ieuri.tourism.domain.specification.TaxRefundTitleRule
 
 /**
  * 추천 점수(SPEC-0035). 가까울수록 높고, 취향이 있으면 섞이고, 면세 태그 장소는 배율만큼 깎인다.
- * 순수 함수이며 계수는 주입된다.
  *
  * - `거리 요인 = 1 / (1 + 거리 ÷ 반감거리)` — 거리 0이면 1, 반감 거리에서 0.5.
  * - `취향 요인 = ((cos좋아요 − cos싫어요) + 1) ÷ 2` — 싫어요 평균이 없으면 cos싫어요 = 0.
@@ -18,12 +17,7 @@ class RecommendationScore(
     private val taxRefundTitleRule: TaxRefundTitleRule,
     /** 취향 요인의 비중 w(0~1). 취향이 없는 회원·후보에는 쓰이지 않는다. */
     private val tasteWeight: Double,
-    /**
-     * 좋아요한 장소의 점수 배율. 1보다 크면 앞으로 당긴다.
-     *
-     * 기본값 1은 **반응을 제외로 처리하는 호출자**(발견 탭 `recommendedSpots`)를 위한 것이다 —
-     * 그쪽은 반응한 장소가 후보에 아예 없어 배율이 쓰일 자리가 없다.
-     */
+    /** 좋아요한 장소의 점수 배율. 1보다 크면 앞으로 당긴다. */
     private val likedMultiplier: Double = 1.0,
     /** 싫어요한 장소의 점수 배율. 1보다 작으면 뒤로 민다. 0이어도 결과에서 빠지지는 않는다. */
     private val dislikedMultiplier: Double = 1.0,

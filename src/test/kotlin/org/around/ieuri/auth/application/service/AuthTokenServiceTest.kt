@@ -260,10 +260,7 @@ class AuthTokenServiceTest {
         assertFailsWith<InvalidCredentialsException> { service.loginByEmail(emailLoginCommand) }
     }
 
-    /**
-     * 미인증은 로그인을 막지 않는다(SPEC-0024 R8) — 토큰은 정상 발급되고, 인증이 필요한
-     * 오퍼레이션만 별도 게이트에서 걸린다(R9).
-     */
+    /** 미인증은 로그인을 막지 않는다(SPEC-0024 R8). 차단은 오퍼레이션 게이트가 맡는다(R9). */
     @Test
     fun `이메일 미인증 회원도 로그인에 성공한다`() {
         every { memberRepository.findEmailAuthentication(any()) } returns emailAuth(emailVerified = false)

@@ -16,10 +16,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * TourApiClient 상세 매핑(SPEC-0003) — 2콜 병합·https 정규화(AC-7)·10장 캡(AC-8)·빈 갤러리(AC-9)·
- * 이미지별 저작권 매핑, items 단건 객체화/빈문자열 함정 역직렬화(AC-10). HTTP는 배제하고 순수 매핑만 검증한다.
- */
+/** TourApiClient 상세 매핑(SPEC-0003) — https 정규화(AC-7)·10장 캡(AC-8)·빈 갤러리(AC-9)·저작권·items 역직렬화(AC-10). */
 class TourApiDetailMappingTest {
 
     private val properties = TourApiProperties(
@@ -52,15 +49,14 @@ class TourApiDetailMappingTest {
     @Test
     fun `AC-1 - detailCommon2 item을 SpotDetail 본문으로 매핑한다`() {
         val detail = client.mapDetail(commonItem(), DomainLocale.KO)
-        // 식별자는 이 모델에 없다(V20) — TourAPI는 자기 contentId만 알 뿐 우리 spot.id를
-        // 모르므로, 응답 식별자는 읽기 DTO가 요청받은 값으로 채운다.
+        // 식별자는 이 모델에 없다(V20) — 읽기 DTO가 요청받은 값으로 채운다.
         assertEquals("경복궁", detail.title)
         assertEquals("조선의 법궁", detail.overview)
         assertEquals("http://royal.go.kr", detail.homepage)
         assertEquals("서울 종로구", detail.address)
         assertEquals(SpotCategory.TOURIST_SPOT, detail.category)
         assertEquals(CopyrightType.TYPE1, detail.copyright)
-        assertEquals(0, detail.likeCount) // 어댑터는 likeCount를 채우지 않는다(§4 경계)
+        assertEquals(0, detail.likeCount) // 어댑터는 likeCount를 채우지 않는다
     }
 
     @Test
@@ -121,7 +117,7 @@ class TourApiDetailMappingTest {
 
     @Test
     fun `음식점 intro 필드도 같은 공통 이름으로 정규화된다`() {
-        // 음식점은 opentimefood/restdatefood/parkingfood… 로 필드명이 완전히 다르다.
+        // 음식점은 필드명이 다르다(opentimefood/restdatefood/parkingfood…).
         val intro = client.mapIntro(
             TourApiDetailIntroResponse.Item(
                 opentimefood = "11:00~22:00",
@@ -180,13 +176,7 @@ class TourApiDetailMappingTest {
         assertTrue(client.mapInfoItems(emptyList()).isEmpty())
     }
 
-    /**
-     * SPEC-0008 R-1의 입력 조건. upstream이 본문을 갖고 있지 않으면 `items`가 빈 문자열로 오고
-     * 빈 리스트가 된다 — `findDetail`은 이때 예외가 아니라 null을 돌려줘야 한다.
-     *
-     * 이전 구현은 `items.first()`를 호출해 NoSuchElementException을 던졌고, **부재가 장애로
-     * 둔갑했다.** 재시도가 무의미한 사실이 재시도 가능한 실패로 표면화되던 지점이다.
-     */
+    /** 본문이 없으면 `items`가 빈 문자열로 와서 빈 리스트가 된다 — `findDetail`은 null을 돌려준다(SPEC-0008 R-1). */
     @Test
     fun `본문이 없으면 common items가 빈 목록으로 역직렬화된다(SPEC-0008 R-1)`() {
         val json = """
@@ -195,7 +185,7 @@ class TourApiDetailMappingTest {
         val parsed = mapper.readValue(json, TourApiDetailCommonResponse::class.java)
 
         assertTrue(parsed.response.body.items.isEmpty())
-        // 어댑터는 이 빈 목록을 firstOrNull()로 받아 null을 돌려준다(예외 아님).
+        // 어댑터는 firstOrNull()로 받아 null을 돌려준다.
         assertNull(parsed.response.body.items.firstOrNull())
     }
 

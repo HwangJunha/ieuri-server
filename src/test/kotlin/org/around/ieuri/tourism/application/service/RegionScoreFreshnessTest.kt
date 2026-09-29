@@ -18,12 +18,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * 신선도 감쇠(SPEC-0015).
- *
- * 감쇠는 **방문자수에만** 걸린다 — 다른 항목에 같은 감쇠를 걸면 월 지표가 정상 주기만으로
- * 반값이 된다.
- */
+/** 신선도 감쇠(SPEC-0015). 감쇠는 방문자수에만 걸린다. */
 class RegionScoreFreshnessTest {
 
     private val policy = RegionRecommendationPolicy(
@@ -31,17 +26,13 @@ class RegionScoreFreshnessTest {
         distanceScoring = DistanceScoring(30_000.0),
         freshnessDecay = FreshnessDecay(plateauDays = 7, halfLifeDays = 23.0),
         minFactorCount = 2,
-        // 관심사는 감쇠지 후보 선별이 아니다 — 시도 규모 필터를 무력화한다
-        // (선별은 RegionCandidateSelectionTest가 본다).
+        // 시도 규모 필터를 무력화한다(선별은 RegionCandidateSelectionTest가 본다).
         minDistrictsPerProvince = 1,
         defaultLimit = 10,
         maxLimit = 50,
     )
 
-    /**
-     * 경계 판정 결과를 서울(11)로 고정하되 그 시군구 코드는 픽스처에 없는 값으로 둬
-     * 자기 지역 제외가 픽스처를 건드리지 않게 한다.
-     */
+    /** 출발 시군구를 픽스처에 없는 서울 코드로 둬 자기 지역 제외가 픽스처를 건드리지 않게 한다. */
     private fun service(vararg fixtures: RegionFixture) = RegionRecommendationService(
         RegionMetricQueryPortStub(
             fixtures.toList(),
@@ -77,18 +68,14 @@ class RegionScoreFreshnessTest {
         },
     )
 
-    /**
-     * 기본 좌표는 픽스처의 대표 좌표와 같다 — 지역이 전부 같은 좌표라 거리 점수가 동일해지고,
-     * 총점 비교에 남는 차이는 오직 감쇠에서 온다.
-     */
+    /** 기본 좌표는 픽스처의 대표 좌표와 같다 — 거리 점수가 동일해 차이는 감쇠에서만 온다. */
     private fun query(origin: Coordinates = Coordinates(latitude = 37.5, longitude = 127.05)) = RecommendedRegionQuery(origin = origin, limit = 10)
 
     private fun RecommendedRegionItemView.score(factor: RegionScoreFactor) = scores.single { it.score.factor == factor }
 
     @Test
     fun `30일 지난 방문자수는 점수가 절반이 된다`() {
-        // 두 지역의 원본 방문자수가 같고 나이만 다르다 — 정규화 후 점수는 둘 다 만점이므로
-        // 차이는 오직 감쇠에서 온다.
+        // 원본 방문자수가 같고 나이만 다르다.
         val service = service(
             fixture(code = "11680", visitorCount = 600_000.0, visitorAgeDays = 0),
             fixture(code = "11710", visitorCount = 600_000.0, visitorAgeDays = 30),
@@ -161,8 +148,7 @@ class RegionScoreFreshnessTest {
 
     @Test
     fun `낡은 방문자수는 총점 순위를 실제로 내린다`() {
-        // 감쇠를 가중치가 아니라 점수에 곱하는 이유다. 가중치를 깎으면 분모도 함께 줄어
-        // 총점이 거의 그대로다. 총점은 계약에 없으므로 목록 순서와 항목 순위로 확인한다.
+        // 총점은 계약에 없으므로 목록 순서와 항목 순위로 확인한다.
         val service = service(
             fixture(code = "11680", visitorCount = 600_000.0, visitorAgeDays = 60),
             fixture(code = "11710", visitorCount = 600_000.0, visitorAgeDays = 0),
@@ -177,9 +163,7 @@ class RegionScoreFreshnessTest {
 
     @Test
     fun `나이가 실려 와도 방문자수가 아닌 항목은 감쇠하지 않는다`() {
-        // 어댑터가 방문자수에만 나이를 싣지만, 그 규율이 느슨해져도 감쇠 대상은 코드가 정한다.
-        // 지역이 둘이어야 정규화 구간이 생겨 상위 지역이 만점이 된다 — 한 지역만 두면 구간
-        // 폭이 0이라 모든 항목이 중립 50점이 되어 감쇠 여부를 구분할 수 없다.
+        // 지역이 둘이어야 정규화 구간이 생긴다 — 하나면 모든 항목이 중립 50점이다.
         fun staleFixture(code: String, stay: Double) = RegionFixture(
             region = RegionRow(
                 code = code,
@@ -204,7 +188,6 @@ class RegionScoreFreshnessTest {
 
     @Test
     fun `지표는 코드가 맞는 지역에만 붙는다`() {
-        // 질의가 나뉘면서 결합이 코드로 이뤄진다 — 어긋나면 남의 지역 점수가 실린다.
         val service = service(
             fixture(code = "11680", visitorCount = 600_000.0, visitorAgeDays = 0),
             fixture(code = "11710", visitorCount = 300_000.0, visitorAgeDays = 0),

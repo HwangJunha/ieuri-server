@@ -30,10 +30,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * 엔티티↔도메인 변환. **필드마다 서로 다른 값**을 넣어 매핑이 뒤바뀌면 실패하게 한다 —
- * 통째로 비교하면 어느 필드가 틀렸는지 알 수 없다.
- */
+/** 엔티티↔도메인 변환. 필드마다 서로 다른 값을 넣어 뒤바뀐 매핑을 잡는다. */
 class CommunityMapperTest {
 
     private val createdAt = Instant.parse("2026-08-05T01:02:03Z")
@@ -56,8 +53,7 @@ class CommunityMapperTest {
         val key = PhotoObjectKey.issue(3L, UUID.randomUUID()).toConfirmed()
         val tag = PostTag.restore("야경", "야경")
 
-        // 태그·사진은 별도 테이블이라 **호출자가 읽어 넘긴다** — 엔티티에 컬렉션을 두면
-        // 글을 읽을 때마다 자식 조회가 따라붙는다.
+        // 태그·사진은 별도 테이블이라 호출자가 읽어 넘긴다.
         val domain = entity.toDomain(
             category = TargetCategory.TOURIST_SPOT,
             catalogId = 90L,

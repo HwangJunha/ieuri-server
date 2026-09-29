@@ -3,19 +3,11 @@ package org.around.ieuri.community.domain.aggregate
 import org.around.ieuri.community.domain.vo.PhotoObjectKey
 import java.time.Instant
 
-/**
- * 질문에 달린 답변. 애그리게이트 루트.
- *
- * 질문과 별도 루트인 이유는 답변이 독립적으로 생성·삭제·숨김되고 한 질문에 무제한으로
- * 붙을 수 있기 때문이다.
- *
- * 답변은 질문의 [catalogId]를 복사해 들고 있다. 자격 판정과 목록 조회가 장소 단위이고,
- * 그때마다 질문을 되읽지 않기 위해서다.
- */
+/** 질문에 달린 답변. 애그리게이트 루트. */
 class SpotAnswer private constructor(
     val id: Long?,
     val questionId: Long,
-    /** 질문이 달린 장소. 질문에서 복사한 값이며 질문이 옮겨 다니지 않으므로 갱신되지 않는다. */
+    /** 질문에서 복사한 장소 id. 갱신되지 않는다. */
     val catalogId: Long,
     val authorId: Long,
     val body: String,

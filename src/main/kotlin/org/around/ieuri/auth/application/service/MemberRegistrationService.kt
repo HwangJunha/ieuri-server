@@ -59,10 +59,7 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.util.UUID
 
-/**
- * 회원가입 계열 서비스. SNS 가입·이메일 검증·검증 재발송을 한 서비스로 묶어 관리한다.
- * 가입은 이메일 검증 완료를 기다리지 않고 성공 처리하며, 검증 코드는 이벤트로만 평문 전달한다(AFTER_COMMIT).
- */
+/** 회원가입 서비스: 가입·이메일 검증·재발송·인증 주소 재입력·비밀번호 재설정. 검증 코드는 이벤트로만 평문 전달한다(AFTER_COMMIT). */
 @Service
 class MemberRegistrationService(
     private val snsVerifier: SnsIdentityVerifierPort,
@@ -85,28 +82,16 @@ class MemberRegistrationService(
     private val clock: Clock,
 ) : MemberRegistrationUseCase {
 
-    /**
-     * 가입 시 닉네임 자동 생성(SPEC-0011 R20). 중복이 허용되므로 저장소를 묻지 않는다(R31).
-     */
+    /** 가입 시 닉네임 자동 생성(SPEC-0011 R20). 중복이 허용되므로 저장소를 묻지 않는다(R31). */
     private fun generateNickname(): Nickname = nicknameGenerator.generate()
 
     /**
-     * provider가 준 닉네임을 쓰되, 쓸 수 없으면 생성기로 물러난다(SPEC-0032 R29·R30).
-     *
-     * 이전에는 이 값을 버렸다. 버린 이유 두 가지 중 **고유성 훼손은 R31이 없앴고**, 실명
-     * 노출은 사용자가 카카오 동의 항목을 닉네임으로 설정한 결과이므로 사용자가 준 값을 쓰는
-     * 것이 의도다.
-     *
-     * **잘라내지 않는다** — 잘린 이름은 사용자가 의도하지 않은 값이고, 생성 닉네임은 언제든
-     * 바꿀 수 있다. 길이 규칙(2~20자)을 벗어나면 통째로 생성기로 물러난다.
-     *
-     * 클레임에 닉네임이 실릴지는 provider 동의 항목 설정에 달려 있어 서버가 통제하지 못한다 —
-     * 실리지 않아도 이 폴백으로 가입은 성공한다.
+     * 후보 중 처음으로 형식에 맞는 닉네임을 쓰고, 없으면 생성기로 물러난다(SPEC-0032 R29·R30).
+     * - 잘라내지 않는다. 길이 규칙(2~20자)을 벗어나면 통째로 다음 후보로 넘어간다.
      */
     private fun nicknameFrom(vararg candidates: String?): Nickname = candidates.asSequence()
         .filterNotNull()
-        // **형식을 벗어나면 조용히 다음 후보로 넘어간다.** provider가 주는 값이라
-        // 사용자가 고칠 수 없고, 가입을 막을 이유가 없다(SPEC-0032 R30).
+        // 형식을 벗어나면 오류 없이 다음 후보로 넘어간다(SPEC-0032 R30).
         .mapNotNull { runCatching { Nickname(it) }.getOrNull() }
         .firstOrNull()
         ?: generateNickname()
@@ -124,11 +109,7 @@ class MemberRegistrationService(
 
         val submittedEmail = Email(command.submittedEmail)
         val providerEmail = identity.email?.let { Email(it) }
-        // provider가 준 값을 먼저 본다(SPEC-0032 R29) — 쓸 수 없으면 생성기로 물러난다.
-        //
-        // **클라이언트가 넘긴 값이 클레임보다 앞선다.** 카카오는 `/v2/user/me`에서만 주는
-        // 닉네임이 있어 클라이언트 쪽이 더 정확할 수 있고, 없으면 클레임이 받는다.
-        // 임의 값을 넣어도 표시용 닉네임이라 다른 회원에게 해가 없다(중복도 허용된다).
+        // 클라이언트가 넘긴 값이 클레임보다 앞선다(SPEC-0032 R29).
         val nickname = nicknameFrom(command.nickname, identity.nickname)
 
         val (agreements, requiredCodes) = buildAgreements(command.agreements, now)
@@ -146,12 +127,10 @@ class MemberRegistrationService(
             now = now,
         )
 
-        // 저장 이메일이 확정된 뒤에 판정한다(R5) — provider가 준 값을 쓰는 경우
-        // 제출값으로 조회하면 실제로 저장될 주소와 다른 주소를 검사하게 된다.
+        // 저장될 이메일(member.email)로 판정한다(R5). 제출값으로 보면 다른 주소를 검사하게 된다.
         emailUniqueness.ensureAvailable(command.provider, member.email)
 
-        // 클라이언트가 R1(읽기 전용 표시)을 어긴 흔적. 가입을 막지는 않는다 — R12가 제출값을
-        // 이미 버렸으므로 저장값은 안전하고, 여기서 거부하면 클라이언트 버그가 가입 장애가 된다.
+        // 클라이언트가 R1(읽기 전용 표시)을 어긴 흔적. 저장값은 provider 값이므로 가입은 막지 않는다(R12).
         if (providerEmail != null && providerEmail != submittedEmail) {
             log.warn(
                 "SNS 가입: 제출 이메일이 provider 값과 다르다. provider={} submitted={} stored={}",
@@ -182,8 +161,7 @@ class MemberRegistrationService(
             )
             verificationRepository.save(verification)
             verificationPublicId = verification.publicId
-            // 평문 코드는 저장하지 않고 이벤트로만 전달 → AFTER_COMMIT 발송.
-            // 제출값이 아니라 **저장된 주소**로 보낸다 — 둘은 R12에 의해 다를 수 있다.
+            // 평문 코드는 이벤트로만 전달(AFTER_COMMIT 발송). 제출값이 아니라 저장된 주소로 보낸다(R12).
             eventPublisher.publish(VerificationEmailRequested(member.email.value, plainCode))
         }
 
@@ -265,9 +243,7 @@ class MemberRegistrationService(
 
         return when (result) {
             is VerificationResult.Success -> {
-                // 주소를 정정한 챌린지면 여기서 회원의 이메일이 확정된다(R7-5).
-                // 정정 시점이 아니라 이 시점인 이유는 소유를 증명하기 전에는 유니크를
-                // 선점시키지 않기 위해서다.
+                // 주소를 정정한 챌린지면 소유가 증명된 지금 회원의 이메일을 확정한다(R7-5).
                 verification.targetEmailEncrypted?.let { applyRetargetedEmail(verification.memberId, it) }
                 memberRepository.markEmailVerified(verification.memberId, now)
                 auditLog.record(
@@ -293,16 +269,14 @@ class MemberRegistrationService(
             throw VerificationRateLimitedException("잠시 후 다시 시도해 주세요.")
         }
 
-        // **정정한 주소를 이어받는다.** 주소를 고친 뒤 재발송을 누르면 대기 주소가 살아 있어야
-        // 한다 — 회원 행의 이메일을 읽으면 정정 이전 주소로 되돌아가고, 정정이 조용히 취소된다.
+        // 정정한 대기 주소를 이어받는다. 회원 행의 이메일을 읽으면 정정이 조용히 취소된다.
         val targetEmailEncrypted = existing.targetEmailEncrypted
         val toEmail = targetEmailEncrypted
             ?.let { Email(emailEncryptor.decrypt(it)) }
             ?: memberRepository.findEmailByMemberId(memberId)
             ?: throw VerificationNotFoundException("회원 정보를 찾을 수 없습니다.")
 
-        // 이전 활성 챌린지 폐기 후 새 코드 발급. **가입 인증 목적만** 폐기한다 —
-        // 같은 회원이 이메일 변경 검증을 동시에 대기 중일 수 있다.
+        // 가입 인증 목적의 활성 챌린지만 폐기한다. 진행 중인 이메일 변경 검증은 건드리지 않는다.
         verificationRepository.consumeActiveByMemberIdAndPurpose(memberId, VerificationPurpose.REGISTRATION, now)
 
         val verification = issueRegistrationChallenge(memberId, toEmail, now, targetEmailEncrypted)
@@ -314,20 +288,10 @@ class MemberRegistrationService(
     }
 
     /**
-     * 인증 대기 주소를 정정한다(SPEC-0024 R7). 이메일 가입자와 provider가 이메일을 주지 않은
-     * SNS 가입자(R3)가 함께 쓴다.
-     *
-     * **`changeEmail`과 다른 유스케이스다** — 그쪽은 이미 인증된 주소를 바꾸는 것이라
-     * `Provider.EMAIL` 전용이고(R6), 이쪽은 아직 인증되지 않은 대기 주소를 고치는 것이라
-     * provider를 가리지 않는다. 인증을 마치면 이 경로는 닫힌다(R7-2).
-     *
-     * **회원의 이메일은 아직 바뀌지 않는다.** 새 주소는 챌린지가 암호문으로 들고 있다가
-     * 코드 검증을 통과할 때 반영된다(`verifyEmail`) — `changeEmail`과 같은 구조다.
-     * 즉시 반영하면 소유를 증명하지 않은 주소가 `(provider, email)` 유니크를 선점해, 그
-     * 주소의 진짜 주인이 가입하지 못한다. 정정을 반복하면 임의의 주소를 막을 수 있다.
-     *
-     * 쿨다운은 `resendVerification`과 **같은 창을 공유한다**(R7-3). 별도 창을 주면 주소를
-     * 바꿔가며 메일 발송을 무제한으로 유발할 수 있다.
+     * 인증 대기 주소를 정정한다(SPEC-0024 R7). provider를 가리지 않으며 인증을 마치면 닫힌다(R7-2).
+     * - 회원의 이메일은 아직 바뀌지 않는다. 새 주소는 챌린지가 암호문으로 들고 있다가 `verifyEmail` 통과 시 반영된다
+     *   — 즉시 반영하면 증명되지 않은 주소가 `(provider, email)` 유니크를 선점한다.
+     * - 쿨다운은 `resendVerification`과 같은 창을 공유한다(R7-3). 나누면 주소를 바꿔가며 메일을 무제한 유발할 수 있다.
      */
     @Transactional
     override fun retargetEmailVerification(command: RetargetEmailVerificationCommand): RetargetEmailVerificationResult {
@@ -337,17 +301,14 @@ class MemberRegistrationService(
         val member = memberRepository.load(command.memberId)
             ?: throw MemberNotFoundException("회원을 찾을 수 없습니다.")
 
-        // 인증 완료 회원의 호출은 도메인이 거부한다(R7-2). 도메인은 `require`로 판정하므로
-        // 그대로 두면 INVALID_INPUT이 되어 클라이언트가 형식 오류와 구분하지 못한다 —
-        // 화면 전환이 필요한 상태이므로 전용 코드로 옮긴다.
+        // 인증 완료 회원은 INVALID_INPUT이 아니라 전용 코드로 거부한다(R7-2).
         if (member.emailVerified) {
             throw AlreadyVerifiedException("이미 이메일 인증을 마쳤습니다.")
         }
         member.ensureCanRetargetPendingEmail()
 
         emailUniqueness.ensureAvailable(member.provider, newEmail, excludingMemberId = command.memberId)
-        // 계약이 이 오퍼레이션에 지정한 코드는 RESEND_COOLDOWN_ACTIVE다 —
-        // 재발송(VERIFICATION_RATE_LIMITED)과 창은 공유하되 클라이언트 화면이 달라 코드를 나눈다.
+        // 창은 재발송과 공유하지만 코드는 RESEND_COOLDOWN_ACTIVE다(계약).
         if (!isResendCooldownPassed(command.memberId, now)) {
             throw ResendCooldownActiveException("잠시 후 다시 시도해 주세요.")
         }
@@ -380,15 +341,8 @@ class MemberRegistrationService(
     }
 
     /**
-     * 가입 인증 재발송 쿨다운이 지났는지(R7-3). **`ensure*`가 아니라 `is*`인 이유**는
-     * 던지지 않고 판정만 돌려주기 때문이다 — 이 파일의 `ensure*`는 전부 위반 시 던지므로,
-     * 같은 이름을 쓰면 반환값을 버리는 호출이 쿨다운을 조용히 없앤다.
-     * `resendVerification`과 인증 주소 재입력이
-     * **한 창을 공유한다** — 창을 나누면 주소를 바꿔가며 메일 발송을 무제한으로 유발할 수 있다.
-     * 용도별로 세므로 진행 중인 이메일 변경 검증이 이 창을 막지는 않는다.
-     *
-     * 던지지 않고 판정만 돌려주는 이유는 두 호출부의 오류 코드가 다르기 때문이다 —
-     * 재발송은 `VERIFICATION_RATE_LIMITED`, 주소 재입력은 `RESEND_COOLDOWN_ACTIVE`(계약).
+     * 가입 인증 재발송 쿨다운이 지났는지(R7-3). 던지지 않고 판정만 돌려준다 — 호출부마다 오류 코드가 다르다.
+     * - 재발송과 인증 주소 재입력이 한 창을 공유한다. 이메일 변경 검증은 이 창을 막지 않는다.
      */
     private fun isResendCooldownPassed(memberId: Long, now: java.time.Instant): Boolean {
         val lastCreatedAt = verificationRepository.findLatestCreatedAtByMemberIdAndPurpose(
@@ -399,12 +353,8 @@ class MemberRegistrationService(
     }
 
     /**
-     * 핸들을 **가입 인증** 챌린지로만 해석한다. 이메일 변경 핸들이면 없는 것과 같이 응답한다 —
-     * 사유를 구분해 알려 주면 남의 핸들 존재가 새어 나간다(`EmailChangeService`와 대칭).
-     *
-     * **목적을 반드시 걸러야 한다.** 이 경로는 인증을 요구하지 않아 호출자가 핸들의 주인인지
-     * 확인하지 않는다. 예전에는 가입 챌린지에 대상 주소가 없다는 것이 사실상의 방어였으나,
-     * 주소 정정(R7)이 그 전제를 없앴다 — 거르지 않으면 이메일 변경이 이 경로로 확정된다.
+     * 핸들을 가입 인증 챌린지로만 해석한다. 이메일 변경 핸들이면 없는 것과 같이 응답한다.
+     * - 목적을 반드시 걸러야 한다. 이 경로는 인증이 없어, 거르지 않으면 남의 이메일 변경이 여기서 확정된다.
      */
     private fun loadRegistrationChallenge(publicId: UUID): EmailVerification = verificationRepository.findByPublicId(publicId)
         ?.takeIf { it.purpose == VerificationPurpose.REGISTRATION }
@@ -412,12 +362,8 @@ class MemberRegistrationService(
 
     /**
      * 가입 인증 코드를 발급하고 평문 코드를 이벤트로만 전달한다(AFTER_COMMIT 발송).
-     *
-     * [targetEmailEncrypted]는 주소 정정(R7)에서만 채워진다 — 통과 시 회원의 이메일로 확정될
-     * 대기 주소다. 최초 가입·단순 재발송은 회원이 이미 그 주소를 갖고 있어 null이다.
-     *
-     * **호출자는 먼저 같은 목적의 활성 챌린지를 폐기해야 한다.** `verifyEmail`이 대상 주소를
-     * 그대로 확정하므로, 살아 있는 가입 챌린지가 둘이면 어느 주소로 확정될지 정해지지 않는다.
+     * - [targetEmailEncrypted]는 주소 정정(R7)에서만 채워지고, 최초 가입·단순 재발송은 null이다.
+     * - 호출자는 먼저 같은 목적의 활성 챌린지를 폐기해야 한다. 둘이 살아 있으면 확정될 주소가 정해지지 않는다.
      */
     private fun issueRegistrationChallenge(
         memberId: Long,
@@ -440,11 +386,7 @@ class MemberRegistrationService(
         return verification
     }
 
-    /**
-     * 정정된 주소를 회원에게 확정한다(R7-5). `Provider.EMAIL` 회원은 provider_user_id가 곧
-     * 이메일의 HMAC이라 함께 바뀌어야 다음 로그인이 성립한다(SPEC-0011 R7·R8).
-     * SNS는 provider가 준 값이라 건드리지 않는다.
-     */
+    /** 정정된 주소를 회원에게 확정한다(R7-5). EMAIL 회원은 로그인 식별자도 함께 바꾸고, SNS는 건드리지 않는다. */
     private fun applyRetargetedEmail(memberId: Long, targetEmailEncrypted: String) {
         val member = memberRepository.load(memberId)
             ?: throw MemberNotFoundException("회원을 찾을 수 없습니다.")
@@ -462,17 +404,7 @@ class MemberRegistrationService(
         )
     }
 
-    /**
-     * 비밀번호 재설정 요청.
-     *
-     * **가입되지 않은 주소·SNS 계정은 코드로 거부한다.** 예전에는 계정 열거를 막으려고
-     * 조용히 성공으로 끝냈으나, 그 침묵은 값을 하지 못하면서 사용자만 오지 않을 메일을
-     * 기다리게 했다 — 2단계(`resetPassword`)의 실패 사유가 계정 유무에 따라 갈려
-     * 두 번의 호출로 이미 열거가 가능했기 때문이다. 그 누수는 함께 막고(사유 통일),
-     * 이 단계는 사용자가 바로 알 수 있게 코드를 준다.
-     *
-     * 재설정할 비밀번호가 없는 SNS 계정에 코드를 보내는 것은 애초에 성립하지 않는다.
-     */
+    /** 비밀번호 재설정 요청. 가입되지 않은 주소는 MEMBER_NOT_FOUND, SNS 계정은 NOT_EMAIL_MEMBER로 거부한다. */
     @Transactional
     override fun requestPasswordReset(command: RequestPasswordResetCommand) {
         val now = clock.instant()
@@ -531,10 +463,7 @@ class MemberRegistrationService(
         }
     }
 
-    /**
-     * 활성 약관 전체에 대해 동의/비동의 이력(append-only)을 만들고 필수 약관 코드 집합을 함께 반환한다.
-     * SNS·EMAIL 가입이 공유한다.
-     */
+    /** 활성 약관 전체의 동의/비동의 목록과 필수 약관 코드 집합을 만든다. SNS·EMAIL 가입이 공유한다. */
     private fun buildAgreements(inputs: List<AgreementInput>, now: java.time.Instant): AgreementBuild {
         val activeTerms = termsRepository.findActiveTerms(now)
         val requiredCodes = activeTerms.filter { it.required }.map { it.code }.toSet()
@@ -555,18 +484,8 @@ class MemberRegistrationService(
 
     private companion object {
         /**
-         * 계정이 없든, SNS 계정이든, 챌린지가 없든, 코드가 틀렸든 **모두 같은 값을 낸다.**
-         *
-         * 예전에는 앞의 세 경우를 `INVALID_OR_EXPIRED`로 내보내 코드 오타(`CODE_MISMATCH`)와
-         * 갈렸다. 아무 코드나 넣고 사유만 읽으면 그 주소에 이메일 계정이 있는지 알 수 있어,
-         * **인증 없이 회원 목록을 캐낼 수 있는 통로**였다.
-         *
-         * 1단계는 사용자 편의를 위해 계정 유무를 알려 주지만, 그것은 **주소의 주인이 스스로
-         * 물어보는 화면**이다. 이 단계까지 열어 두면 코드를 모르는 제3자가 반복 호출로
-         * 열거할 수 있으므로 여기서는 통일한다.
-         *
-         * 만료·소진은 실제 챌린지가 있을 때만 나오므로 그대로 둔다. 그 값이 나온다는 것은
-         * 이미 코드를 받은 본인이라는 뜻이라 새로 드러나는 사실이 없다.
+         * 계정 없음·SNS 계정·챌린지 없음·코드 불일치가 모두 이 값을 낸다. 사유가 갈리면 인증 없이 계정을 열거할 수 있다.
+         * - 만료·소진은 실제 챌린지가 있을 때만 나오므로 그대로 둔다.
          */
         const val CODE_MISMATCH = "CODE_MISMATCH"
 

@@ -73,14 +73,10 @@ class MemberTest {
         assertTrue(register(providerEmail = "same@example.com").emailVerified)
     }
 
-    /**
-     * **이 슬라이스 변경의 핵심이다**(R2-2). 이전에는 provider의 검증 플래그가 거짓이면
-     * 미검증으로 시작했다. 이제 플래그를 보지 않으므로 참이 된다 — provider의 서명을 검증해
-     * 신원을 위임하는 이상(POL-030) 같은 provider가 준 이메일을 따로 의심할 근거가 없다.
-     */
+    /** R2-2. provider의 검증 플래그를 보지 않는다 — provider 이메일이 있으면 인증이 면제된다(POL-030). */
     @Test
     fun `provider의 검증 플래그와 무관하게 이메일만 주면 email_verified가 true다`() {
-        // 판정에 플래그가 아예 쓰이지 않으므로 파라미터 자체가 사라졌다.
+        // 판정에 플래그가 쓰이지 않으므로 파라미터가 없다.
         assertTrue(register(providerEmail = "unverified-by-provider@example.com").emailVerified)
     }
 

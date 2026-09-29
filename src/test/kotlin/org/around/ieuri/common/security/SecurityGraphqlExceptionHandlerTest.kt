@@ -14,22 +14,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * 인증·권한 실패가 **코드와 함께** 최상위 errors[]로 나가는지(POL-016).
- *
- * 핵심은 **감싸인 예외를 푼다**는 것이다. DGS는 리졸버를 리플렉션으로 호출하므로 리졸버가
- * 던진 예외가 `InvocationTargetException`에 담겨 도착한다. 껍데기를 벗기지 않으면 `is`
- * 검사가 빗나가 정제 핸들러까지 흘러가고, 클라이언트는 코드 없는 `INTERNAL_ERROR`를 받는다 —
- * 자동 토큰 갱신은 `UNAUTHENTICATED`를 보고 돌기 때문에 그때 갱신도 재로그인도 되지 않는다.
- * (실측: conversations 조회가 미인증 상태에서 INTERNAL_ERROR로 나갔다.)
+ * 인증·권한 실패가 코드와 함께 최상위 errors[]로 나가는지(POL-016).
+ * 핵심은 감싸인 예외(InvocationTargetException·CompletionException)를 푸는 것이다.
  */
 class SecurityGraphqlExceptionHandlerTest {
 
     private val handler = SecurityGraphqlExceptionHandler()
 
-    /**
-     * `build()`가 환경에서 path·location을 읽으므로 최소 스텁이 필요하다. 핸들러의 분기는
-     * 예외 타입만 보므로 이 둘의 값 자체는 판정에 영향을 주지 않는다.
-     */
+    /** `build()`가 환경에서 path·location을 읽으므로 최소 스텁이 필요하다. 값은 판정에 영향이 없다. */
     private fun codeOf(exception: Throwable): String {
         val environment = mockk<DataFetchingEnvironment>(relaxed = true) {
             every { executionStepInfo } returns
@@ -59,7 +51,7 @@ class SecurityGraphqlExceptionHandlerTest {
         assertEquals("FORBIDDEN", codeOf(ForbiddenException("권한이 없습니다.")))
     }
 
-    /** 리플렉션 호출이 만드는 실제 형태다 — 이 테스트가 회귀를 막는다. */
+    /** 리플렉션 호출이 만드는 실제 형태다. */
     @Test
     fun `InvocationTargetException에 감싸여도 UNAUTHENTICATED로 나간다`() {
         val wrapped = InvocationTargetException(UnauthorizedException("인증이 필요합니다."))
@@ -85,10 +77,7 @@ class SecurityGraphqlExceptionHandlerTest {
         )
     }
 
-    /**
-     * 모르는 예외는 정제 핸들러로 넘어가 고정 메시지·고정 코드가 된다(POL-013) —
-     * 예외 FQCN이나 원문이 클라이언트로 새지 않아야 한다.
-     */
+    /** 모르는 예외는 정제 핸들러로 넘어가 고정 메시지·고정 코드가 된다(POL-013). */
     @Test
     fun `모르는 예외는 INTERNAL_ERROR로 정제된다`() {
         assertEquals("INTERNAL_ERROR", codeOf(IllegalStateException("테이블 제약 위반 상세")))

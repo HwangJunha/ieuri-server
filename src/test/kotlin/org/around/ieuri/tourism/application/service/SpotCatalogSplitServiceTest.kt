@@ -16,19 +16,10 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 
-/**
- * 잘못 접힌 카탈로그 분할(SPEC-0029).
- *
- * 이 테스트가 고정하는 것은 **언제 가르고 언제 가르지 않는가**, 그리고 **가를 때 무엇이
- * 어디로 가는가**이다. 후보 판정 자체(원본 수 · 거리)는 생 SQL이라 어댑터에 있고 여기서는
- * 스텁이 후보를 내준다 — 대신 서비스가 그 후보를 어떻게 군집으로 가르는지를 본다.
- *
- * 좌표는 실측에서 가져온다: 인천 `카페 림`과 광주 `카페 림`이 247km, 광주 `솔로몬로파크`의
- * KO와 외국어 행이 1.6m 차이다.
- */
+/** 잘못 접힌 카탈로그 분할(SPEC-0029). 후보 판정은 스텁이 내주고, 서비스가 후보를 군집으로 가르는 방식을 본다. */
 class SpotCatalogSplitServiceTest {
 
-    /** 실측 카탈로그의 카테고리. `SpotCategory`에 이름 상수가 없는 코드라 직접 만든다. */
+    /** `SpotCategory`에 이름 상수가 없는 코드라 직접 만든다. */
     private val restaurant = SpotCategory("RESTAURANT")
 
     // 실측 좌표. 두 지점은 247km 떨어져 있다.
@@ -57,7 +48,7 @@ class SpotCatalogSplitServiceTest {
         copyright = CopyrightType.TYPE3,
     )
 
-    /** 인천 4행(KO·EN·JA·ZH) + 광주 3행(EN·JA·ZH). 실측 카탈로그 295101의 모양이다. */
+    /** 인천 4행(KO·EN·JA·ZH) + 광주 3행(EN·JA·ZH). */
     private fun cafeLimOrigins() = listOf(
         origin(1, DomainLocale.KO),
         origin(2, DomainLocale.EN, title = "Cafe Rim (카페 림)"),
@@ -78,8 +69,7 @@ class SpotCatalogSplitServiceTest {
     @Test
     @DisplayName("원본이 4개를 넘고 10km 이상 떨어지면 군집대로 가른다")
     fun `folded catalog is split into its clusters`() {
-        // 실측 회귀: `카페 림`(인천)과 `카페 림`(광주)이 제목 키가 같아 한 카탈로그로 접혔다.
-        // 매칭 키가 한글만 남기고, 비한국어 배정은 후보가 유일하면 좌표를 묻지 않는다.
+        // `카페 림`(인천)과 `카페 림`(광주)이 제목 키가 같아 한 카탈로그로 접힌 경우.
         val spatial = StubSpatialQueryPort(candidates = listOf(295101L), origins = cafeLimOrigins())
         val store = RecordingStorePort()
         val split = RecordingSplitPort()
@@ -98,11 +88,7 @@ class SpotCatalogSplitServiceTest {
     @Test
     @DisplayName("원본이 4개를 넘어도 10km 안이면 가르지 않는다")
     fun `nearby origins are the same place and never split`() {
-        // 실측: 원본이 5~7개인데 300m 안에 모인 카탈로그가 6건 있다 — 상류가 같은 장소를
-        // 중복 등록한 것이므로 가르면 오히려 한 장소가 둘로 쪼개진다.
-        //
-        // **후보 판정은 어댑터가 하지만 서비스도 다시 군집으로 확인한다** — 판정이 최대 거리로
-        // 하는데 세 점이 사슬처럼 이어지면 최대 거리가 멀어도 한 군집이다.
+        // 후보로 들어와도 서비스가 다시 군집으로 확인한다 — 사슬처럼 이어진 점들은 한 군집이다.
         val nearby = (1L..6L).map { origin(it, DomainLocale.entries[(it % 4).toInt()], mapX = incheonX + it * 0.0001) }
         val spatial = StubSpatialQueryPort(candidates = listOf(300251L), origins = nearby)
         val store = RecordingStorePort()
@@ -119,10 +105,7 @@ class SpotCatalogSplitServiceTest {
     @Test
     @DisplayName("원본이 4개 이하면 아무리 멀어도 후보가 아니다")
     fun `four or fewer origins are never candidates`() {
-        // 언어가 4개뿐이라 4개 이하는 아직 아무것도 접히지 않은 상태다. 거리만으로 판정하면
-        // 한라산처럼 정당하게 넓은 장소가 걸린다(실측 32건).
-        //
-        // 이 조건은 어댑터의 SQL이 강제하므로, 서비스는 **후보를 받지 못하는 것**으로 표현된다.
+        // 이 조건은 어댑터의 SQL이 강제하므로, 서비스에서는 후보를 받지 못하는 것으로 표현된다.
         val spatial = StubSpatialQueryPort(candidates = emptyList(), origins = cafeLimOrigins())
         val store = RecordingStorePort()
         val split = RecordingSplitPort()
@@ -137,7 +120,6 @@ class SpotCatalogSplitServiceTest {
     @Test
     @DisplayName("가장 큰 군집이 기존 카탈로그 id를 지킨다")
     fun `largest cluster keeps the original catalog id`() {
-        // **좋아요·글 연결이 기존 id에 매달려 있다.** 큰 쪽을 남겨야 옮기는 행이 적고 영향이 작다.
         val spatial = StubSpatialQueryPort(candidates = listOf(295101L), origins = cafeLimOrigins())
         val store = RecordingStorePort()
         val split = RecordingSplitPort()
@@ -153,10 +135,7 @@ class SpotCatalogSplitServiceTest {
     @Test
     @DisplayName("KO가 없는 군집은 언어 순서상 첫 행에서 표준값을 가져온다")
     fun `cluster without a korean row takes standard values from the first by language order`() {
-        // 갈라져 나온 광주 군집은 EN·JA·ZH뿐이다(실측). KO가 없으면 EN이 대표가 된다 —
-        // `SpotCatalog.from`이 최초 배정에서 따르는 규칙과 같다.
-        //
-        // mapX·mapY가 둘 다 Double이라 뒤바뀌어도 컴파일된다. 값을 다르게 주고 개별로 단언한다.
+        // 광주 군집은 EN·JA·ZH뿐이라 EN이 대표가 된다. mapX·mapY는 개별로 단언한다.
         val spatial = StubSpatialQueryPort(candidates = listOf(295101L), origins = cafeLimOrigins())
         val store = RecordingStorePort()
 
@@ -175,7 +154,7 @@ class SpotCatalogSplitServiceTest {
     @Test
     @DisplayName("대표가 아닌 언어의 번역은 새 카탈로그에 덧붙인다")
     fun `remaining languages are upserted onto the new catalog`() {
-        // 대표(EN)의 번역은 save가 이미 썼다. JA·ZH가 빠지면 그 언어 사용자에게 장소가 사라진다.
+        // 대표(EN)의 번역은 save가 이미 썼다.
         val spatial = StubSpatialQueryPort(candidates = listOf(295101L), origins = cafeLimOrigins())
         val upsert = RecordingUpsertPort()
 
@@ -193,10 +172,6 @@ class SpotCatalogSplitServiceTest {
     @Test
     @DisplayName("옮겨 간 언어의 번역 행은 옛 카탈로그에서 지운다")
     fun `translations of departed languages are deleted from the old catalog`() {
-        // **감춤이 아니라 삭제다.** 감춤은 "원본이 잠시 사라졌다"는 뜻이라 원본이 돌아오면
-        // 되살아나는데, 여기서 원본은 사라진 것이 아니라 다른 카탈로그로 갔다 — 되살릴 근거가
-        // 없어 노출 갱신이 정리하지 못한다.
-        //
         // 광주 군집은 EN·JA·ZH인데 인천에도 셋 다 있으므로, 옛 카탈로그가 잃는 언어는 없다.
         val spatial = StubSpatialQueryPort(candidates = listOf(295101L), origins = cafeLimOrigins())
         val split = RecordingSplitPort()
@@ -209,10 +184,6 @@ class SpotCatalogSplitServiceTest {
     @Test
     @DisplayName("남는 군집에 없는 언어만 옛 카탈로그에서 지운다")
     fun `only languages absent from the staying cluster are deleted`() {
-        // 실측 카탈로그 293567(`솔로몬로파크`)의 모양이다 — 광주 4행(KO·EN·JA·ZH)이 남고
-        // 대전 2행(EN·ZH)이 나간다. EN·ZH는 광주에도 있으므로 지울 것이 없다.
-        //
-        // 여기서는 대전에만 있는 언어(JA)를 만들어 그 경우를 고정한다.
         val origins = listOf(
             origin(1, DomainLocale.KO),
             origin(2, DomainLocale.EN, title = "Solomon (솔로몬)"),
@@ -232,8 +203,7 @@ class SpotCatalogSplitServiceTest {
     @Test
     @DisplayName("새 카탈로그에도 축제 기간을 심는다")
     fun `newly created catalog gets its festival period planted`() {
-        // 기간은 저장한 행이 아니라 spot_festival에서 온다. 빠뜨리면 갈라져 나온 축제는
-        // 기간을 영영 갖지 못한다 — 최초 배정과 같은 규칙이다.
+        // 기간은 저장한 행이 아니라 spot_festival에서 온다.
         val spatial = StubSpatialQueryPort(candidates = listOf(295101L), origins = cafeLimOrigins())
         val upsert = RecordingUpsertPort()
 

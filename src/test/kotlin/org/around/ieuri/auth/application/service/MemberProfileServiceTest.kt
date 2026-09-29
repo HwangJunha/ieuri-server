@@ -27,10 +27,8 @@ import kotlin.test.assertTrue
 
 /**
  * 프로필 수정(SPEC-0011 R5·R6).
- *
- * 고정하는 계약: 닉네임은 **중복을 허용하고 형식만 본다**(SPEC-0032 R31). 이미지는
- * **키 발급 전에 형식·크기를 보고**, 확인 단계는 **소유권 → 존재 → 크기 → 매직바이트**
- * 순으로 판정한다. 제거는 멱등이다.
+ * - 닉네임은 중복을 허용하고 형식만 본다(SPEC-0032 R31). 제거는 멱등이다.
+ * - 이미지는 발급 전에 형식·크기를, 확인 단계는 소유권 → 존재 → 크기 → 매직바이트 순으로 판정한다.
  */
 class MemberProfileServiceTest {
 
@@ -74,10 +72,7 @@ class MemberProfileServiceTest {
         verify { repository.updateNickname(memberId, "여행하는곰") }
     }
 
-    /**
-     * SPEC-0032 R31. 이전에는 두 번째 호출을 거절했다 — 그 동작이 사라진 것이 이 요구다.
-     * 고유성 판정이 없으므로 서로를 막지 않는다.
-     */
+    /** SPEC-0032 R31. 고유성 판정이 없으므로 같은 닉네임이 서로를 막지 않는다. */
     @Test
     fun `두 회원이 같은 닉네임을 가질 수 있다`() {
         service.changeNickname(ChangeNicknameCommand(memberId, "여행하는곰"))

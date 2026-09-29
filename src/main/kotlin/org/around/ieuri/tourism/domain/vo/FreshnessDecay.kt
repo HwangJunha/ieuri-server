@@ -3,13 +3,8 @@ package org.around.ieuri.tourism.domain.vo
 import kotlin.math.pow
 
 /**
- * 오래된 지표의 점수를 낮추는 신선도 감쇠(SPEC-0015).
- *
- * **가중치가 아니라 정규화된 점수에 곱한다** — 가중치를 깎으면 분모도 함께 줄어 총점이
- * 거의 그대로다.
- *
- * @param plateauDays 감쇠가 시작되지 않는 경과 일수. 이 값 이하는 계수 1.0이다.
- * @param halfLifeDays 반감기(일). [plateauDays] 이후 이 일수마다 계수가 절반이 된다.
+ * 오래된 지표의 점수를 낮추는 신선도 감쇠(SPEC-0015). 가중치가 아니라 정규화된 점수에 곱한다.
+ * - [plateauDays] 이하는 계수 1.0, 이후 [halfLifeDays]일마다 절반이 된다.
  */
 data class FreshnessDecay(
     val plateauDays: Long,

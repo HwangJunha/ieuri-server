@@ -27,10 +27,7 @@ fun DeviceToken.toNewEntity(): DeviceTokenEntity = DeviceTokenEntity(
     platform = platform,
 )
 
-/**
- * 알림 문구 엔티티를 도메인 모델로 옮긴다.
- * 반대 방향이 없는 것은 앱에 쓰기 경로가 없기 때문이다.
- */
+/** 알림 문구 엔티티를 도메인 모델로 옮긴다(읽기 전용이라 반대 방향은 없다). */
 fun NotificationMessageEntity.toDomain(): NotificationMessage = NotificationMessage.restore(
     id = requireNotNull(id) { "저장된 알림 문구에는 id가 있어야 한다." },
     type = notificationType,

@@ -26,12 +26,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
-/**
- * 축제 Step의 수집 루프·정리 게이트·관측값(SPEC-0007 R-3·R-6·R-8·R-10·R-11).
- *
- * `SpotSyncTaskletTest`와 같은 방식이다 — Spring 컨텍스트를 띄우지 않고 StepExecution만 직접 만든다.
- * 검증 대상이 프레임워크 배선이 아니라 **어떤 조건에서 무엇을 지우는가**이기 때문이다.
- */
+/** 축제 Step의 수집 루프·정리 게이트·관측값(SPEC-0007 R-3·R-6·R-8·R-10·R-11). StepExecution만 직접 만든다. */
 class FestivalSyncTaskletTest {
 
     private val runDate = LocalDate.of(2026, 8, 3)
@@ -75,8 +70,7 @@ class FestivalSyncTaskletTest {
 
     @Test
     fun `수집 호출의 행사 시작일 파라미터로 실행일을 넘긴다`() {
-        // AC-8. Step 안에서 now()를 부르지 않고 잡 파라미터의 runDate를 쓴다 —
-        // 그래야 수집 조건·종료 판정·재삽입 제외가 같은 날짜를 본다.
+        // AC-8. Step 안에서 now()를 부르지 않고 잡 파라미터의 runDate를 쓴다.
         every { syncPort.fetchPage(DomainLocale.KO, runDate, 1, 1_000) } returns
             page(listOf(record("1")), totalCount = 1)
         every { upsertPort.upsertAll(any(), any()) } returns 1
@@ -122,7 +116,7 @@ class FestivalSyncTaskletTest {
 
     @Test
     fun `수집 레코드를 그대로 저장 포트에 전달한다`() {
-        // AC-1·AC-23~25. upsert의 멱등성은 저장 포트의 계약이며, Step은 명령의 모양만 책임진다.
+        // AC-1·AC-23~25. Step은 명령의 모양만 책임진다.
         val records = listOf(record("a"), record("b"))
         every { syncPort.fetchPage(DomainLocale.KO, runDate, 1, 1_000) } returns page(records, totalCount = 2)
         every { upsertPort.upsertAll(any(), any()) } returns 2
@@ -193,12 +187,7 @@ class FestivalSyncTaskletTest {
 
     @Test
     fun `기존 100건에 이번 수집이 10건이어도 정리를 수행한다`() {
-        // AC-36. **관광지와 다른 점이다** — 축제는 계절에 따라 절반 이하로 흔들리는 것이 정상이라
-        // 비율 게이트를 걸면 정리가 영구히 막힌다(R-10).
-        //
-        // 이 테스트가 실제로 고정하는 것은 "급감 게이트가 존재하지 않는다"이다. 게이트가 없으니
-        // 기존 건수를 **조회조차 하지 않는다** — 그래서 저장 포트에 count 메서드가 없고, 90건이
-        // 지워지는 것을 아무것도 막지 않는다.
+        // AC-36. 축제는 급감 게이트가 없다(R-10) — 기존 건수를 조회하지도 않는다.
         every { syncPort.fetchPage(DomainLocale.KO, runDate, 1, 1_000) } returns
             page(List(10) { record("f$it") }, totalCount = 10)
         every { upsertPort.upsertAll(any(), any()) } returns 10
@@ -246,7 +235,7 @@ class FestivalSyncTaskletTest {
 
     @Test
     fun `적재 건수와 드랍 건수를 페이지에 걸쳐 구분해 누적한다`() {
-        // AC-39·AC-41. 드랍이 적재에 섞이면 [TBD-2]를 판단할 근거가 사라진다.
+        // AC-39·AC-41. 드랍은 적재 건수와 따로 센다.
         every { syncPort.fetchPage(DomainLocale.KO, runDate, any(), 1_000) } returns
             page(listOf(record("1"), record("2")), totalCount = 3_000, dropped = 3)
         every { upsertPort.upsertAll(any(), any()) } returns 2

@@ -1,14 +1,8 @@
 package org.around.ieuri.community.domain.event
 
 /*
- * 알림 트리거 3종(SPEC-0028 R5~R7).
- *
- * **`application/event`가 아니라 여기 있는 이유는 구독자가 다른 도메인(alarm)이기 때문이다** —
- * 도메인 간 구독은 `domain/event` 타입으로만 허용된다(LayeredArchitectureTest).
- * community 내부에서만 소비되는 `NewMessageStored`는 계속 `application/event`에 남는다.
- *
- * **본문을 싣지 않는다.** 푸시가 제목만 보내고 사용자가 쓴 내용은 담지 않으므로(R13),
- * 알림 경로에 본문이 필요한 지점이 아예 없다. 다른 이벤트들과 같이 id만 싣는다(POL-013).
+ * 알림 트리거 3종(SPEC-0028 R5~R7). alarm 도메인이 구독한다.
+ * - 본문을 싣지 않고 id만 싣는다(R13, POL-013).
  */
 
 /** DM 새 메시지 도착(R5). */

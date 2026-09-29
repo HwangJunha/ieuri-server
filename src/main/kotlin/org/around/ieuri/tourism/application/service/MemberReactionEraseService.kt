@@ -23,10 +23,8 @@ class MemberReactionEraseService(
 ) : MemberReactionEraseUseCase {
 
     /**
-     * **REQUIRES_NEW여야 한다.** 이 유스케이스는 `AFTER_COMMIT` 리스너가 부르는데, 그 시점의
-     * 원본 트랜잭션은 이미 커밋됐으면서도 스레드에 **묶여 있다.** 기본 전파(REQUIRED)로 두면
-     * 커밋할 수 없는 그 트랜잭션에 조용히 합류해 삭제가 흘러가지 않는다 —
-     * 예외도 나지 않아 성공한 것처럼 보인다(실제로 탈퇴 후 글·댓글이 남았다).
+     * 탈퇴 회원의 좋아요/싫어요를 지운다.
+     * - REQUIRES_NEW여야 한다 — `AFTER_COMMIT` 리스너가 부르므로, REQUIRED면 커밋된 트랜잭션에 합류해 삭제가 조용히 사라진다.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     override fun eraseMemberReactions(memberId: Long) {
@@ -37,16 +35,13 @@ class MemberReactionEraseService(
 
     /**
      * 전국 지도 데이터 삭제(SPEC-0030 §9.1). 전파 규약은 위와 같다.
-     *
-     * **방문 기록을 먼저 지운다.** 순서가 결과를 바꾸지는 않지만, 둘 중 개인정보 성격이 짙은
-     * 쪽(어디를 다녔는가)을 먼저 없앤다 — 중간에 실패해도 남는 것이 링크 쪽이 되게 한다.
+     * - 개인정보 성격이 짙은 방문 기록을 먼저 지운다.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     override fun eraseMemberMapData(memberId: Long) {
         val visits = districtVisitStorePort.removeAll(memberId)
         val links = mapShareLinkPort.deleteAll(memberId)
-        // 관계는 양방향이라 상대 목록의 이 회원까지 지운다 — 남겨 두면 상대 화면에
-        // 닉네임을 얻을 수 없는 행이 생긴다.
+        // 관계는 양방향이라 상대 목록의 이 회원까지 지운다.
         val relations = mapRelationPort.deleteAllInvolving(memberId)
         // 개인정보를 담지 않는다(POL-013) — 식별자와 건수만 남긴다. 시군구 코드는 남기지 않는다.
         log.info(

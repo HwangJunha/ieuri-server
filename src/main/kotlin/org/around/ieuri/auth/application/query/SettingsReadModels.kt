@@ -2,10 +2,7 @@ package org.around.ieuri.auth.application.query
 
 import java.time.Instant
 
-/**
- * 약관 1건에 대한 회원의 동의 상태(SPEC-0011 R9). 시행 중인 버전 기준이며,
- * **새 버전이 시행되면 이전 버전의 동의는 이월되지 않아** agreed가 거짓이 된다.
- */
+/** 약관 1건의 동의 상태(SPEC-0011 R9). 새 버전이 시행되면 이전 버전 동의는 이월되지 않아 agreed가 거짓이 된다. */
 data class AgreementStatusView(
     val termsCode: String,
     val required: Boolean,

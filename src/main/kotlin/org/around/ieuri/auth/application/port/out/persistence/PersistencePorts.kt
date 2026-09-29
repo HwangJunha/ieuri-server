@@ -11,22 +11,14 @@ import org.around.ieuri.auth.domain.vo.VerificationPurpose
 import java.time.Instant
 import java.util.UUID
 
-/**
- * 회원 쓰기 포트. 도메인 용어로만 표현되며 JPA를 노출하지 않는다.
- * 이메일 암호화/복호화는 이 포트의 구현(persistence adapter)이 책임진다.
- */
+/** 회원 쓰기 포트. 이메일 암호화/복호화는 구현이 책임진다. */
 interface MemberRepositoryPort {
     fun existsByProviderAndProviderUserId(provider: Provider, providerUserId: ProviderUserId): Boolean
 
     /**
-     * `(provider, email)` 중복 여부(SPEC-0024 R5). 다른 provider에 같은 주소가 있는 것은
-     * 충돌이 아니다 — POL-002가 다계정을 허용해 `(KAKAO, a@b.com)`과 `(EMAIL, a@b.com)`은 공존한다.
-     *
-     * 인자는 평문이 아니라 **정규화된 이메일의 보호 식별자**다
-     * ([org.around.ieuri.auth.application.port.out.security.LoginIdentifierProtectorPort.protect] 결과).
-     * 저장된 이메일 암호문은 IV가 매번 달라 등호 조회가 불가능하기 때문이다.
-     *
-     * @param excludingMemberId 본인을 제외하고 판정할 회원 id. 가입처럼 본인이 없으면 null.
+     * 같은 provider에 같은 이메일이 있는지(SPEC-0024 R5). 다른 provider의 같은 주소는 충돌이 아니다(POL-002).
+     * - 인자는 평문이 아니라 정규화된 이메일의 보호 식별자다(LoginIdentifierProtectorPort.protect 결과).
+     * @param excludingMemberId 판정에서 제외할 본인. 가입처럼 본인이 없으면 null.
      */
     fun existsByProviderAndEmailIdentifier(
         provider: Provider,
@@ -51,31 +43,18 @@ interface MemberRepositoryPort {
 
     /**
      * 이메일 교체(SPEC-0011 R7·R8). managed 엔티티에 반영한다(dirty-check).
-     *
-     * **[protectedIdentifier]를 함께 받는 이유**: `Provider.EMAIL` 회원은 provider_user_id가
-     * 곧 로그인 식별자(이메일의 HMAC)라 이메일만 바꾸면 다음 로그인이 실패한다. 두 값이
-     * 반드시 같은 트랜잭션에서 함께 바뀌어야 하므로 한 메서드로 묶는다.
-     * SNS 회원은 provider가 준 불투명 식별자를 쓰므로 null을 준다(건드리지 않는다).
-     *
-     * **[emailIdentifier]는 provider와 무관하게 항상 갱신된다**(SPEC-0024 R5) — 유니크 판정용
-     * 파생 값이라 이메일과 어긋나면 제약이 엉뚱한 주소를 막는다. `provider_user_id`와 달리
-     * SNS 회원도 대상이다.
+     * - [protectedIdentifier]: EMAIL 회원의 로그인 식별자. 이메일과 같은 트랜잭션에서 바꾸지 않으면 다음 로그인이 실패한다. SNS는 null.
+     * - [emailIdentifier]는 provider와 무관하게 항상 갱신된다. 이메일과 어긋나면 유니크 제약이 엉뚱한 주소를 막는다.
      */
     fun updateEmail(memberId: Long, newEmail: Email, emailIdentifier: String, protectedIdentifier: String?)
 
     /** 로그인용 인증 정보 조회. (provider, provider_user_id)로 회원의 id·상태를 반환. 없으면 null. */
     fun findAuthentication(provider: Provider, providerUserId: ProviderUserId): MemberAuthentication?
 
-    /**
-     * 자체(EMAIL) 로그인용 인증 정보. 비밀번호 해시·검증 여부를 포함한다. 없으면 null.
-     * 인자는 평문 이메일이 아니라 보호된 로그인 식별자다(LoginIdentifierProtectorPort.protect 결과).
-     */
+    /** 자체(EMAIL) 로그인용 인증 정보. 인자는 평문이 아니라 보호된 로그인 식별자다. 없으면 null. */
     fun findEmailAuthentication(protectedIdentifier: String): EmailAuthentication?
 
-    /**
-     * provider 폐기용 refresh token을 저장한다(암호화는 구현이 책임진다. SPEC-0012 R6).
-     * 이미 값이 있으면 덮어쓴다 — 재로그인 시 provider가 새 토큰을 주기 때문이다.
-     */
+    /** provider 폐기용 refresh token을 저장한다(암호화는 구현 책임, SPEC-0012 R6). 이미 값이 있으면 덮어쓴다. */
     fun updateProviderRefreshToken(memberId: Long, refreshToken: String)
 
     /** 저장된 provider refresh token을 복호화해 반환한다. 없으면 null. */
@@ -132,9 +111,8 @@ interface EmailVerificationRepositoryPort {
     fun update(verification: EmailVerification)
 
     /**
-     * 용도별 가장 최근 발급 시각. **쿨다운을 용도로 나눠 센다**(SPEC-0011 R7) —
-     * 가입 검증과 이메일 변경이 한 창을 공유하면 한쪽을 보낸 직후 다른 쪽이 막힌다.
-     * 가입 검증 안에서는 재발송과 주소 정정이 한 창을 공유한다(SPEC-0024 R7-3).
+     * 용도별 가장 최근 발급 시각. 쿨다운은 용도별로 센다(SPEC-0011 R7).
+     * - 가입 검증 안에서는 재발송과 주소 정정이 한 창을 공유한다(SPEC-0024 R7-3).
      */
     fun findLatestCreatedAtByMemberIdAndPurpose(memberId: Long, purpose: VerificationPurpose): Instant?
 
@@ -147,12 +125,7 @@ interface AuditLogPort {
     fun record(memberId: Long, eventType: String, payload: Map<String, Any?>)
 }
 
-/**
- * 위치 조회 감사 기록 포트(SPEC-0032 R19·R20, POL-057).
- *
- * **[payload]에 좌표를 담지 않는다** — 위도·경도는 물론 시군구·행정구역 어느 단위로도
- * 남기지 않는다(POL-045). 담는 것은 연산의 맥락(연산명 등)뿐이다.
- */
+/** 위치 조회 감사 기록 포트(SPEC-0032 R19·R20, POL-057). [payload]에 좌표를 어떤 단위로도 담지 않는다(POL-045). */
 interface LocationAccessLogPort {
     fun record(memberId: Long, payload: Map<String, Any?>)
 }
@@ -163,12 +136,8 @@ interface AuditLogRetentionPort {
 }
 
 /**
- * 접속기록 기록 포트(「개인정보의 안전성 확보조치 기준」 제8조).
- *
- * 남기는 것은 기준이 요구하는 넷뿐이다 — 계정·접속일시·접속지 정보([ipAddress])·수행업무
- * ([operation]). **요청 본문이나 응답을 남기지 않는다**(POL-013).
- *
- * [ipAddress]는 프록시가 주지 않으면 null이다. 모르는 것을 채워 넣으면 기록이 거짓이 된다.
+ * 접속기록 기록 포트(안전성 확보조치 기준 제8조). 계정·접속일시·접속지·수행업무만 남긴다.
+ * - 요청 본문·응답을 남기지 않는다(POL-013). [ipAddress]는 프록시가 주지 않으면 null이다.
  */
 interface AccessLogPort {
     fun record(memberId: Long, operation: String, ipAddress: String?)
@@ -181,10 +150,7 @@ interface AccessLogRetentionPort {
 
 /**
  * 위치 조회 감사 기록의 보관 정리 포트(위치정보법 제16조 제2항의 6개월).
- *
- * **[AuditLogRetentionPort]와 규약이 같은데도 나눈 이유는 지우는 테이블이 다르기 때문이다** —
- * 한 인터페이스에 두 구현을 두면 주입 지점에서 어느 테이블을 어느 기간으로 지우는지가 타입으로
- * 드러나지 않는다. 둘이 뒤바뀌면 법정 기간(6개월)을 1년으로 지키게 되고, 그것은 고지 위반이다.
+ * - [AuditLogRetentionPort]와 합치지 않는다. 뒤바뀌면 법정 6개월을 1년으로 지키게 된다.
  */
 interface LocationAccessLogRetentionPort {
     fun deleteCreatedBefore(cutoff: Instant, limit: Int): Int
@@ -197,10 +163,7 @@ interface PasswordResetRepositoryPort {
     /** 회원의 활성(미소진·미만료 아님은 도메인 판정) 최신 챌린지. */
     fun findActiveByMemberId(memberId: Long): PasswordReset?
 
-    /**
-     * 가장 최근 발급 시각(쿨다운 판정용). 소진 여부를 가리지 않는다 —
-     * 발송을 제한하는 것이 목적이라 코드가 이미 쓰였는지는 무관하다.
-     */
+    /** 가장 최근 발급 시각(쿨다운 판정용). 소진 여부를 가리지 않는다. */
     fun findLatestCreatedAtByMemberId(memberId: Long): Instant?
 
     /** attempts/consumed 변경을 반영(dirty-check). */

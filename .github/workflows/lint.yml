@@ -1,8 +1,7 @@
 name: lint
 
 on:
-  # feature → dev PR에서 스타일(ktlint)만 본다. 테스트 전체(test.yml)는 비용이 커 걸지 않지만,
-  # 린트가 여기서 빠지면 위반이 dev에 머지된 뒤 build.yml의 check에서 드러나 배포를 막는다.
+  # feature → dev PR에서 스타일(ktlint)만 본다. 빠지면 위반이 머지 후 build.yml의 check에서 배포를 막는다.
   pull_request:
     branches: [dev]
 
@@ -26,6 +25,6 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
 
-      # 컴파일이 필요 없는 소스 검사라 kapt·Kotlin 컴파일이 돌지 않는다(로컬 실측 5초).
+      # 컴파일이 필요 없는 소스 검사다.
       - name: Lint
         run: ./gradlew lintKotlin --build-cache

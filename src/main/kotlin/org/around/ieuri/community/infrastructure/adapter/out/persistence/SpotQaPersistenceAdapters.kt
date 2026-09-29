@@ -25,11 +25,8 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 /**
- * 질문 적재(SPEC-0026). 갱신은 **관리 엔티티에 도메인 변경을 얹어** dirty-checking으로
- * UPDATE를 낸다 — 새 엔티티를 만들어 save하면 dirty-checking이 무의미해진다.
- *
- * 사진은 생성 시에만 적재한다 — 질문 수정 기능이 없어(범위 밖: 삭제 후 재작성) 구성이
- * 나중에 바뀌지 않는다.
+ * 질문 적재(SPEC-0026). 갱신은 관리 엔티티에 얹어 dirty-checking으로 UPDATE를 낸다.
+ * - 사진은 생성 시에만 적재한다(질문 수정 없음).
  */
 @Component
 class SpotQuestionPersistenceAdapter(
@@ -53,9 +50,7 @@ class SpotQuestionPersistenceAdapter(
             IllegalStateException("갱신하려는 질문($id)이 존재하지 않는다.")
         }
         entity.resolved = question.resolved
-        // **answerCount는 여기서 쓰지 않는다.** 적재와 flush 사이에 답변이 달리면 그 +1을
-        // 덮어써 수가 영구히 작아진다 — 증감은 SpotQuestionCounterAdapter의 원자적 UPDATE가
-        // 소유하며, 이 경로(해결 표시)는 그 값을 건드리지 않는다.
+        // answerCount는 쓰지 않는다 — 동시 +1을 덮어쓴다. 증감은 SpotQuestionCounterAdapter 소유.
         entity.hidden = question.hidden
         entity.deletedAt = question.deletedAt
         return question
@@ -72,13 +67,8 @@ class SpotQuestionPersistenceAdapter(
 
     /**
      * 질문·답변·답글의 물리 삭제(AC-10.3).
-     *
-     * **순서가 전부다.** 사진에는 FK가 없어 CASCADE가 닿지 않으므로, 질문을 지우기 **전에**
-     * 자식 id를 모아 사진을 먼저 지운다. 순서를 뒤집으면 답변·답글이 사라진 뒤라 그 id를
-     * 알 수 없고, 사진 행이 영구히 남는다.
-     *
-     * 소프트 삭제가 아닌 이유는 종속 삭제 때문이다 — 답변·답글까지 deleted_at을 칠하려면
-     * 자식을 전부 훑어야 하는데 그 수에 상한이 없다.
+     * - 순서 주의: 사진에는 FK가 없어 CASCADE가 닿지 않는다. 질문을 지우기 전에 자식 id를
+     *   모아 사진을 먼저 지운다 — 뒤집으면 사진 행이 영구히 남는다.
      */
     @Transactional
     override fun deleteWithDescendants(questionId: Long) {
@@ -197,10 +187,7 @@ class SpotAnswerReplyPersistenceAdapter(
     }
 }
 
-/**
- * 질문의 답변 수 증감. **읽고 고쳐 쓰지 않는다** — 동시 답변이 서로의 증가를 덮어써 계수가
- * 실제보다 작아지기 때문이다. [PostCounterAdapter]와 같은 규율이다.
- */
+/** 질문의 답변 수 증감. 원자적 UPDATE로 처리한다([PostCounterAdapter]와 같다). */
 @Component
 class SpotQuestionCounterAdapter(
     private val queryFactory: JPAQueryFactory,
@@ -217,10 +204,7 @@ class SpotQuestionCounterAdapter(
             .execute()
     }
 
-    /**
-     * **0 아래로 내려가지 않는다.** 조건절이 0인 행을 아예 건드리지 않으므로 CHECK 제약도
-     * 걸리지 않는다 — 음수를 쓰려다 예외가 나는 대신 조용히 0으로 머문다.
-     */
+    /** 0 아래로 내려가지 않는다 — 예외 없이 0에 머문다. */
     @Transactional
     override fun decreaseAnswerCount(questionId: Long) {
         queryFactory
@@ -235,10 +219,7 @@ class SpotQuestionCounterAdapter(
     }
 }
 
-/**
- * 존재 확인과 자동 숨김. 애그리게이트를 복원하지 않는다 — 신고의 대상 확인은 "있는가"만
- * 물으면 되는데 복원하면 사진까지 읽는다.
- */
+/** 질문·답변·답글의 존재 확인과 자동 숨김. 애그리게이트를 복원하지 않는다. */
 @Component
 class SpotQaModerationAdapter(
     private val queryFactory: JPAQueryFactory,
@@ -269,7 +250,7 @@ class SpotQaModerationAdapter(
         .where(reply.id.eq(replyId), reply.deletedAt.isNull)
         .fetchFirst() != null
 
-    /** 이미 숨겨져 있으면 조건절에서 걸러져 0건이 갱신되고 false다 — 중복 처리를 막는다. */
+    /** 이번 호출로 숨겨졌을 때만 true. 이미 숨겨져 있으면 false다. */
     @Transactional
     override fun hideQuestion(questionId: Long): Boolean = queryFactory
         .update(question)
@@ -278,11 +259,8 @@ class SpotQaModerationAdapter(
         .execute() > 0
 
     /**
-     * 답변을 숨기고 **그 답변이 달린 질문 id를 돌려준다** — 호출자가 answerCount를 줄여야
-     * 하기 때문이다. 갱신 전에 읽는 이유는 벌크 update가 갱신된 행을 돌려주지 않아서다.
-     *
-     * 이미 숨겨져 있었으면 0건이 갱신되고 null이라, 신고가 더 쌓여도 답변 수를 두 번
-     * 내리는 일이 없다.
+     * 답변을 숨기고 그 답변이 달린 질문 id를 돌려준다(호출자가 answerCount를 줄인다).
+     * - 이미 숨겨져 있었으면 null이다.
      */
     @Transactional
     override fun hideAnswer(answerId: Long): Long? {

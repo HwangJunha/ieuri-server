@@ -8,12 +8,8 @@ import org.springframework.batch.core.step.tasklet.Tasklet
 import org.springframework.batch.infrastructure.repeat.RepeatStatus
 
 /**
- * 시군구 대표 위치를 다시 고르는 Step 본체(SPEC-0015 · V46).
- *
- * 페이지 루프가 없다 — 선정 전체가 DB 안의 UPDATE 두 문장이라 한 번 호출하고 끝난다.
- *
- * **`cleared`가 0이 아니면 그 지역들이 추천에서 빠졌다는 뜻이다.** 값이 갑자기 커지면 spot
- * 동기화가 덜 끝난 상태에서 이 잡이 돌았을 가능성을 먼저 본다(실행 순서는 잡 구성 참조).
+ * 시군구 대표 위치를 다시 고르는 Step 본체(SPEC-0015 · V46). UPDATE 두 문장을 한 번 호출한다.
+ * - `cleared`가 갑자기 커지면 spot 동기화가 덜 끝난 상태에서 돌았는지 먼저 본다.
  */
 class DistrictRepresentativeLocationTasklet(
     private val updatePort: DistrictRepresentativeUpdatePort,

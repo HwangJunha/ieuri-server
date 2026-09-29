@@ -17,10 +17,7 @@ import java.util.Date
 import java.util.UUID
 import javax.crypto.SecretKey
 
-/**
- * jjwt 기반 JWT 토큰 제공자(HS256). accessToken은 stateless, refreshToken은 jti로 저장소에서 추적된다.
- * typ 클레임으로 access/refresh를 구분해 refresh 자리에 access를 넣는 오용을 막는다.
- */
+/** jjwt 기반 JWT 제공자(HS256). typ 클레임으로 access/refresh를 구분해 서로의 자리에 쓰지 못하게 한다. */
 @Component
 class JjwtTokenProvider(
     properties: JwtProperties,

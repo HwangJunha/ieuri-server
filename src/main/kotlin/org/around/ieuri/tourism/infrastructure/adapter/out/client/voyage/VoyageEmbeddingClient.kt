@@ -9,8 +9,8 @@ import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
 
 /**
- * Voyage 임베딩 클라이언트(SPEC-0035 S2). `POST /v1/embeddings`. 키는 환경변수로만 오고 로그·응답에
- * 노출하지 않는다(TourAPI 키와 같은 규칙). 전송·응답 실패는 그대로 예외로 올린다 — 재시도는 서비스가 한다.
+ * Voyage 임베딩 클라이언트(SPEC-0035). `POST /v1/embeddings`. 키는 환경변수로만 오고 로그·응답에 노출하지 않는다.
+ * - 전송·응답 실패는 그대로 예외로 올린다 — 재시도는 서비스가 한다.
  */
 @Component
 class VoyageEmbeddingClient(

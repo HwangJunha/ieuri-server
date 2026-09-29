@@ -20,10 +20,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 
-/**
- * 회원 생명주기 계열 서비스. 탈퇴(본인)·정지/복구(관리자)를 한 서비스로 묶어 관리한다.
- * 상태 전이 불변식은 도메인(Member.suspend/reactivate)에서 강제하고, 여기선 오케스트레이션만 담당한다.
- */
+/** 회원 생명주기 서비스: 탈퇴(본인)·정지/복구(관리자). 상태 전이 불변식은 도메인이 강제한다. */
 @Service
 class MemberLifecycleService(
     private val memberRepository: MemberRepositoryPort,
@@ -35,15 +32,9 @@ class MemberLifecycleService(
 ) : MemberLifecycleUseCase {
 
     /**
-     * 탈퇴(본인). 회원과 소유 데이터(프로필·동의이력·이메일검증)를 **행 삭제**한다(hard delete).
-     * provider 연결 해제 시도 → 삭제 → refresh 전량 폐기 → 감사 기록(비-PII)·이벤트.
-     *
-     * 해제는 회원 삭제 **앞**에서 한다 — 폐기용 토큰이 회원 행에 있어 삭제 후에는 읽을 수 없다.
-     * 해제 실패는 탈퇴를 막지 않는다(R11). 포트가 예외를 던지지 않으므로 트랜잭션도 롤백되지 않는다.
-     *
-     * [MemberWithdrawn]은 **커밋 후에** 다른 도메인으로 나간다(SPEC-0011 R17). 그래서 회원은
-     * 지워졌는데 글이 아직 남아 있는 창이 생기는데, 스펙이 이 창을 허용한다 — 한 도메인의
-     * 삭제 실패가 다른 도메인을 막지 않고, 실패해도 회원 삭제는 되돌아가지 않는다.
+     * 탈퇴(본인): provider 연결 해제 → 행 삭제(hard delete) → refresh 전량 폐기 → 감사 기록·이벤트.
+     * - 해제는 삭제보다 먼저다. 폐기용 토큰이 회원 행에 있어 삭제 후에는 읽을 수 없다.
+     * - 해제 실패는 탈퇴를 막지 않는다(R11). [MemberWithdrawn]은 커밋 후 다른 도메인으로 나간다(SPEC-0011 R17).
      */
     @Transactional
     override fun withdraw(command: WithdrawMemberCommand): LifecycleResult {
@@ -80,9 +71,7 @@ class MemberLifecycleService(
         return LifecycleResult(success = true)
     }
 
-    /**
-     * 정지(관리자). 상태만 SUSPENDED로 바꾸고 개인정보는 보존한다. refresh 전량 폐기 + 감사·이벤트.
-     */
+    /** 정지(관리자). 상태만 SUSPENDED로 바꾸고 개인정보는 보존한다. refresh 전량 폐기 + 감사·이벤트. */
     @Transactional
     override fun suspend(command: SuspendMemberCommand): LifecycleResult {
         val now = clock.instant()
@@ -102,9 +91,7 @@ class MemberLifecycleService(
         return LifecycleResult(success = true)
     }
 
-    /**
-     * 복구(관리자). SUSPENDED → ACTIVE(도메인 Member.reactivate가 상태를 강제). 감사·이벤트.
-     */
+    /** 복구(관리자). SUSPENDED → ACTIVE. 감사·이벤트. */
     @Transactional
     override fun reactivate(command: ReactivateMemberCommand): LifecycleResult {
         val now = clock.instant()

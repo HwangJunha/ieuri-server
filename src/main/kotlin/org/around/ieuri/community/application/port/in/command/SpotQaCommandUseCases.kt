@@ -9,19 +9,11 @@ import org.around.ieuri.community.application.command.DeleteSpotQuestionCommand
 import org.around.ieuri.community.application.command.ResolveSpotQuestionCommand
 import org.around.ieuri.community.domain.vo.ContentLanguage
 
-/**
- * 장소 질문 쓰기 유스케이스(SPEC-0026).
- *
- * **반응으로 게이팅하지 않는다**(R5) — 로그인한 회원이면 좋아요·싫어요·무반응과 무관하게
- * 쓸 수 있다. 남는 대상 검증은 장소가 실재하는가뿐이다.
- */
+/** 장소 질문 쓰기 유스케이스(SPEC-0026). 반응 여부로 게이팅하지 않는다(R5). */
 interface SpotQuestionCommandUseCase {
     /**
-     * 생성된 질문 id.
-     *
-     * [language]는 요청의 활성 언어이며 **장소 존재 검사의 기준이다**(SPEC-0029 R-16) —
-     * 카탈로그가 아예 없으면 SPOT_NOT_FOUND, 있으나 이 언어에 원본이 없으면
-     * SPOT_NOT_FOUND_IN_LOCALE이다.
+     * 생성된 질문 id. 장소는 [language] 기준으로 검사한다(SPEC-0029):
+     * 카탈로그가 없으면 SPOT_NOT_FOUND, 이 언어에 원본이 없으면 SPOT_NOT_FOUND_IN_LOCALE.
      */
     fun createQuestion(
         command: CreateSpotQuestionCommand,

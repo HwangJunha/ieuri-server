@@ -3,13 +3,9 @@ package org.around.ieuri.community.domain.aggregate
 import java.time.Instant
 
 /**
- * 1:1 대화. 애그리게이트 루트. 그룹 대화는 비범위다.
- *
- * **참여자를 정렬된 쌍으로 들고 있다** — `memberLow < memberHigh`가 불변식이며 (A,B)와
- * (B,A)가 같은 대화가 된다. 그래야 "이미 있는 대화"를 저장소의 유일 제약 하나로 판정할
- * 수 있고(AC7-2), 두 방향을 각각 조회하다 경합에서 중복 행이 생기는 일이 없다.
- *
- * 대화 시작과 첫 메시지 전송은 별개 연산이라 **빈 대화가 존재할 수 있다.**
+ * 1:1 대화. 애그리게이트 루트.
+ * - 참여자는 `memberLow < memberHigh`로 정렬된 쌍이다. (A,B)와 (B,A)는 같은 대화다(AC7-2).
+ * - 메시지가 없는 빈 대화가 존재할 수 있다.
  */
 class Conversation private constructor(
     val id: Long?,
@@ -24,13 +20,7 @@ class Conversation private constructor(
     var lastMessageAt: Instant = lastMessageAt
         private set
 
-    /**
-     * 각 참여자가 마지막으로 읽은 메시지 id. **null은 "아직 아무것도 읽지 않았다"이며 0이
-     * 아니다** — 0으로 두면 "id 0까지 읽었다"와 구분되지 않는다.
-     *
-     * 시각이 아니라 id를 쓰는 이유는 경계를 하나로 정하기 위해서다. 같은 밀리초에 도착한
-     * 메시지가 여럿이면 시각으로는 어디까지 읽은 것인지 정할 수 없다.
-     */
+    /** 각 참여자가 마지막으로 읽은 메시지 id. null은 "아직 아무것도 읽지 않았다"이다. */
     var lastReadMessageIdLow: Long? = lastReadMessageIdLow
         private set
 
@@ -50,13 +40,7 @@ class Conversation private constructor(
         return if (memberId == memberLow) lastReadMessageIdLow else lastReadMessageIdHigh
     }
 
-    /**
-     * [memberId]의 읽음 지점을 [messageId]까지 올린다.
-     *
-     * **뒤로 가지 않는다.** 클라이언트가 과거 메시지를 다시 열거나 요청이 순서를 바꿔
-     * 도착해도 이미 읽은 것이 안 읽음으로 되돌아가면 안 된다 — 사용자에게는 뱃지가
-     * 되살아나는 것으로 보인다.
-     */
+    /** [memberId]의 읽음 지점을 [messageId]까지 올린다. 더 작은 id로는 되돌아가지 않는다. */
     fun markRead(memberId: Long, messageId: Long) {
         require(hasParticipant(memberId)) { "대화의 참여자가 아닙니다." }
         val current = lastReadMessageIdOf(memberId)
@@ -69,10 +53,7 @@ class Conversation private constructor(
         }
     }
 
-    /**
-     * [memberId]의 상대방. **참여자가 아닌 id로 부르면 안 된다** — 호출 전에
-     * [hasParticipant]로 판정한다.
-     */
+    /** [memberId]의 상대방. 참여자가 아닌 id면 예외 — 호출 전에 [hasParticipant]로 판정한다. */
     fun counterpartOf(memberId: Long): Long {
         require(hasParticipant(memberId)) { "대화의 참여자가 아닙니다." }
         return if (memberId == memberLow) memberHigh else memberLow
@@ -80,10 +61,8 @@ class Conversation private constructor(
 
     companion object {
         /**
-         * 두 회원의 새 대화. 인자 순서와 무관하게 같은 쌍이면 같은 모양이 된다 —
-         * 여기서 정렬하는 것이 유일 제약이 성립하는 근거다.
-         *
-         * 자기 자신과의 대화는 만들지 않는다(AC7-4).
+         * 두 회원의 새 대화. 인자 순서와 무관하게 정렬된 쌍으로 만든다.
+         * - 자기 자신과의 대화는 거부한다(AC7-4).
          */
         fun create(
             memberId: Long,

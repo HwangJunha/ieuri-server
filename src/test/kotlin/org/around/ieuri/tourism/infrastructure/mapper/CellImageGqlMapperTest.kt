@@ -9,11 +9,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /**
- * 칸 대표 이미지 변환(POL-033).
- *
- * **같은 타입의 문자열이 두 쌍 있다** — `imageUrl`/`thumbnailUrl`과 `caption`/`attributionText`.
- * 뒤바뀌어도 컴파일이 통과하므로 **필드마다 다른 값**을 넣어 자리가 어긋나면 깨지게 한다.
- * 값을 공유하면 뒤바뀜이 그대로 통과한다.
+ * 칸 대표 이미지 변환(POL-033). 같은 타입 문자열 두 쌍(`imageUrl`/`thumbnailUrl`, `caption`/`attributionText`)이
+ * 뒤바뀌지 않도록 필드마다 다른 값을 넣는다.
  */
 class CellImageGqlMapperTest {
 

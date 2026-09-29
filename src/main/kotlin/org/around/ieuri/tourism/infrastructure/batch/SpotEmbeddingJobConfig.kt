@@ -13,11 +13,8 @@ import org.springframework.context.annotation.Profile
 import org.springframework.transaction.PlatformTransactionManager
 
 /**
- * 장소 임베딩 적재 잡(SPEC-0035 S2). `spotSyncJob`과 **별개의 잡**이다 — 외부 제공자(Voyage)에 기대는 단계라
- * 그 실패·지연이 spot 동기화를 붙들지 않게 하고, 필요할 때 따로 돌릴 수 있게 한다.
- *
- * spot 동기화가 끝난 뒤에 돌아야 한다(번역 행이 대상 단위). CronJob은 완료 순서를 보장하지 않으므로
- * 매니페스트가 시각으로 벌려 둔다(`spotDistrictAssignmentJob`과 같은 방식).
+ * 장소 임베딩 적재 잡(SPEC-0035). 외부 제공자(Voyage) 실패가 spot 동기화를 붙들지 않게 별개 잡이다.
+ * - spot 동기화 뒤에 돌아야 한다 — CronJob 시각으로 벌려 둔다.
  */
 @Configuration
 @Profile(BATCH_PROFILE)

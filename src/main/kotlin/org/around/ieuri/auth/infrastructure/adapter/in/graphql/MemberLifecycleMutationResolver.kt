@@ -21,10 +21,7 @@ import org.around.ieuri.common.graphql.generated.types.WithdrawMemberPayload
 import org.around.ieuri.common.security.CurrentMemberProvider
 import java.time.Instant
 
-/**
- * 회원 상태(탈퇴/정지/복구) GraphQL 뮤테이션 리졸버.
- * 탈퇴는 accessToken 인증 주체(본인)로 처리하고, 정지/복구는 권한(member:suspend/member:reactivate)으로 보호한다.
- */
+/** 회원 상태 뮤테이션 리졸버. 탈퇴는 본인 인증, 정지/복구는 member:suspend/member:reactivate 권한으로 보호한다. */
 @DgsComponent
 class MemberLifecycleMutationResolver(
     private val memberLifecycleUseCase: MemberLifecycleUseCase,

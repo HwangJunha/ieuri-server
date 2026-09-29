@@ -12,12 +12,8 @@ import java.time.Instant
 import java.util.Date
 
 /**
- * 애플 client secret 생성기. 애플은 client secret 문자열이 아니라 **ES256으로 서명한 JWT**를 요구한다.
- * (iss=teamId, sub=clientId, aud=https://appleid.apple.com, kid 헤더=keyId)
- *
- * 개인키(.p8)는 파일 경로로 받아 기동 시 한 번만 읽어 캐시한다 — 탈퇴마다 디스크를 읽을
- * 이유가 없고, 키가 없거나 형식이 깨졌으면 첫 탈퇴가 아니라 기동 시점에 드러나는 편이 낫다.
- * k8s/k3s는 Secret을 볼륨으로 마운트하고 그 경로를 준다.
+ * 애플 client secret 생성기. 애플은 ES256으로 서명한 JWT를 요구한다(iss=teamId, sub=clientId, kid=keyId).
+ * - 개인키(.p8)는 파일 경로로 받아 기동 시 한 번 읽는다. 키가 깨졌으면 기동 시점에 드러난다.
  */
 @Component
 class AppleClientSecretFactory(
@@ -45,12 +41,7 @@ class AppleClientSecretFactory(
             .compact()
     }
 
-    /**
-     * PEM(.p8)을 EC 개인키로 읽는다.
-     *
-     * nimbus의 `JWK.parseFromPEMEncodedObjects`는 쓸 수 없다 — .p8은 개인키만 담고 있는데
-     * 그 API는 JWK 조립에 공개키를 함께 요구한다("Missing PEM-encoded public key").
-     */
+    /** PEM(.p8)을 EC 개인키로 읽는다. nimbus `JWK.parseFromPEMEncodedObjects`는 공개키를 요구해 쓸 수 없다. */
     private fun parsePrivateKey(pem: String): PrivateKey {
         val keyInfo = PEMParser(StringReader(pem)).use { it.readObject() } as PrivateKeyInfo
         return JcaPEMKeyConverter().getPrivateKey(keyInfo)

@@ -6,10 +6,7 @@ import org.springframework.stereotype.Component
 import java.security.MessageDigest
 import java.security.SecureRandom
 
-/**
- * 6자리 검증 코드 생성/해시 구현. 코드는 평문 저장하지 않고 pepper를 섞은 SHA-256으로 해시해 저장한다.
- * 짧은 만료·시도 제한·단회용(도메인)과 함께 6자리 코드의 무차별 대입 위험을 낮춘다.
- */
+/** 6자리 검증 코드 생성/해시 구현. 코드는 pepper를 섞은 SHA-256 해시로만 저장한다. */
 @Component
 class Sha256VerificationCodeGenerator(
     properties: EncryptionProperties,

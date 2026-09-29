@@ -1,9 +1,6 @@
 package org.around.ieuri.auth.domain.vo
 
-/**
- * 권한(Permission) — 인가의 최소 단위. "무엇을 할 수 있는가"를 코드로 식별한다(예: `member:suspend`).
- * 인가는 역할명이 아니라 이 권한 코드로 판정한다(엔터프라이즈 관례).
- */
+/** 권한 — 인가의 최소 단위(예: `member:suspend`). 인가는 역할명이 아니라 이 코드로 판정한다. */
 @JvmInline
 value class Permission(val code: String) {
     init {
@@ -11,7 +8,7 @@ value class Permission(val code: String) {
     }
 
     companion object {
-        // 베이스라인 권한 코드. 시드(R__seed_rbac)와 일치한다. 인가 판정/자기 강등 방지에서 참조한다.
+        // 베이스라인 권한 코드. 시드(R__seed_rbac)와 일치해야 한다.
         const val MEMBER_SUSPEND = "member:suspend"
         const val MEMBER_REACTIVATE = "member:reactivate"
         const val ROLE_ASSIGN = "role:assign"

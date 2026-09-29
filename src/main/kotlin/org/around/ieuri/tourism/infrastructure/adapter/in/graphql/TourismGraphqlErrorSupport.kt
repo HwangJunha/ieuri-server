@@ -4,13 +4,8 @@ import org.around.ieuri.common.graphql.generated.types.UserError
 import org.around.ieuri.tourism.application.exception.ReactionUserException
 
 /**
- * tourism 뮤테이션(reactToSpot)의 공통 오류 규약(BaseResponse). 예상 실패(ReactionUserException: SPOT_NOT_FOUND)와
- * 입력 형식 오류(IllegalArgumentException)는 payload의 userErrors로, 그 외는 재던져 최상위 error로.
- *
- * 인증 실패(UnauthorizedException)는 ReactionUserException이 아니므로 여기서 붙잡히지 않고 최상위
- * errors[]로 전파된다(SPEC-0005 R15). userErrors[]는 세션 상태를 담지 않는다.
- *
- * 생성 UserError 타입은 스키마 codegen 산출물(common.graphql.generated)로 전역 공유된다.
+ * tourism 뮤테이션(reactToSpot)의 오류 규약(BaseResponse).
+ * - ReactionUserException·IllegalArgumentException은 payload의 userErrors로, 그 외(인증 실패 포함)는 최상위 errors[]로 나간다(SPEC-0005 R15).
  */
 fun toReactionUserErrorOrNull(e: Throwable): UserError? = when (e) {
     is ReactionUserException -> UserError(code = e.code, message = e.message ?: e.code, field = null)

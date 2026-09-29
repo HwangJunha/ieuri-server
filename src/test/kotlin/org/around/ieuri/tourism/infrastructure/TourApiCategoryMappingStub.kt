@@ -5,12 +5,8 @@ import org.around.ieuri.tourism.domain.vo.SpotCategory
 import org.around.ieuri.tourism.infrastructure.config.TourApiProperties
 
 /**
- * TourAPI contentTypeId 매핑의 테스트 대역(SPEC-0020, V59). 운영에서는 `category_external_mapping`
- * 테이블이 주지만, 클라이언트 매핑 테스트는 DB 없이 도는 게 규율이라 같은 표를 여기 고정한다.
- *
- * 표의 근거는 TourAPI 문서다 — 국문/외국어 서비스가 서로 다른 코드 체계를 쓰고, 양쪽에 모두
- * 있지는 않다(여행코스는 외국어에, 교통은 국문에 없다). 그 결손이 곧 "코드 없으면 호출 생략"
- * 동작의 근거이므로 표에서 빼지 말 것.
+ * TourAPI contentTypeId 매핑의 테스트 대역(SPEC-0020, V59). `category_external_mapping` 표를 DB 없이 고정한다.
+ * - 코드셋마다 빠진 칸(여행코스는 외국어, 교통은 국문)을 표에서 빼지 말 것 — "코드 없으면 호출 생략"의 근거다.
  */
 class TourApiCategoryMappingStub : CategoryExternalMappingPort {
 

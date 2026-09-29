@@ -11,12 +11,7 @@ import org.springframework.batch.infrastructure.repeat.RepeatStatus
 
 /**
  * 상세 사전 수집 단계(SPEC-0037). 한 갈래를 `spot.id` 키셋 커서로 돈다.
- *
- * **갈래마다 Step이 하나씩이다** — 갈래가 곧 TourAPI 오퍼레이션이고 쿼터 단위이므로, 한 갈래가
- * 한도에 걸려도 나머지는 자기 쿼터로 계속 돈다(AC-018).
- *
- * **하루에 처리할 건수를 [dailyLimit]으로 제한한다.** 장소 하나가 호출 하나이므로 처리 건수가 곧
- * 호출 수이고, 남은 몫이 사용자 조회 시점 확보(FR-010)에 쓰인다.
+ * - 하루 처리 건수(=호출 수)를 [dailyLimit]으로 제한한다.
  */
 class SpotDetailPrefetchTasklet(
     private val useCase: SpotDetailPrefetchUseCase,
@@ -39,13 +34,12 @@ class SpotDetailPrefetchTasklet(
         val result = try {
             useCase.prefetchNext(part, context.getLong(KEY_CURSOR, 0L), minOf(batchSize, remaining))
         } catch (e: UpstreamRateLimitedException) {
-            // 그날 쿼터가 끝났다. 남은 장소는 다음 실행의 대상 쿼리가 다시 집는다(AC-014·AC-015).
+            // 그날 쿼터가 끝났다. 남은 장소는 다음 실행이 다시 집는다(AC-014·AC-015).
             log.warn("{} 일일 한도 도달({}건 처리 후)", part, done)
             return RepeatStatus.FINISHED
         }
 
-        // **처리 건수로 소진을 판정한다** — 성공 건수로 보면 한 묶음이 전부 실패일 때 소진으로
-        // 오판해 그 갈래의 나머지를 통째로 건너뛴다.
+        // 성공 건수가 아니라 처리 건수로 소진을 판정한다.
         if (result.processed == 0) {
             log.info("{} 상세 수집 완료: 처리 {}건, 실패 {}건", part, done, context.getInt(KEY_FAILED, 0))
             return RepeatStatus.FINISHED

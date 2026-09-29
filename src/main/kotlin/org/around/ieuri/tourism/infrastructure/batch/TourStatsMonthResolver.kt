@@ -7,18 +7,10 @@ import org.springframework.batch.infrastructure.item.ExecutionContext
 import java.time.YearMonth
 
 /**
- * 월 지표(체류·소비 강도)에서 **실제로 데이터가 있는 최신 월**로 한 페이지를 가져온다.
- *
- * 고정 소급월을 쓰지 않는 이유: 가용한 최신 월이 고정되어 있지 않다(2026-08-11 실측 —
- * 202608·202607은 0행, 202606에 데이터). 지연 폭은 데이터셋마다 다를 수 있다.
- *
- * **월을 실행당 한 번만 정한다.** 시도마다 다시 탐색하면 17개 시도 × lookback만큼 호출이
- * 곱해진다. 확정 후에는 탐색 없이 그 달로 바로 부르며, 확정값이 ExecutionContext에 남아
- * 재시작 후에도 재탐색하지 않는다.
- *
- * **한 시도가 비었다고 포기하지 않는다** — 그 시도가 정말로 데이터가 없을 수 있으므로 월을
- * 확정하지 않고 다음 시도에서 다시 탐색한다. 창 안에 아무 데이터도 없으면 빈 페이지를 돌려
- * 0건 적재로 정상 종료한다(R8).
+ * 월 지표(체류·소비 강도)에서 실제로 데이터가 있는 최신 월로 한 페이지를 가져온다.
+ * - 월은 실행당 한 번만 정하고 ExecutionContext에 남긴다 — 재시작해도 재탐색하지 않는다.
+ * - 한 시도가 비었으면 월을 확정하지 않고 다음 시도에서 다시 탐색한다.
+ * - 창 안에 데이터가 없으면 빈 페이지를 돌려 0건으로 정상 종료한다(R8).
  */
 class TourStatsMonthResolver(
     private val datasetName: String,
@@ -28,11 +20,7 @@ class TourStatsMonthResolver(
 
     private val log = LoggerFactory.getLogger(javaClass)
 
-    /**
-     * [areaCd]의 한 페이지. 기준월이 아직 확정되지 않았다면 이번 달부터 거슬러 올라가며 첫
-     * 번째로 행이 오는 달을 찾고, **그 탐색 응답을 그대로 결과로 쓴다** — 찾자마자 같은 요청을
-     * 다시 보내지 않기 위해서다.
-     */
+    /** [areaCd]의 한 페이지. 미확정이면 이번 달부터 거슬러 올라가 행이 오는 첫 달을 찾고, 그 응답을 그대로 쓴다. */
     fun fetchPage(
         executionContext: ExecutionContext,
         runMonth: YearMonth,

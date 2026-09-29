@@ -9,14 +9,8 @@ import org.around.ieuri.auth.infrastructure.config.SnsProperties
 import org.springframework.stereotype.Component
 
 /**
- * SNS 신원 검증기. provider별 JWKS 검증기([JwksIdTokenVerifier])로 id_token의
- * 서명·iss·aud·exp를 검증하고, 검증된 클레임을 [SnsIdentity]로 매핑한다.
- * 모든 환경에서 실검증한다(별도 dev stub 없음 — 로컬에서 SNS를 테스트하려면 실제 provider
- * 로그인으로 발급받은 id_token이 필요하다).
- *
- * - Google: aud=웹 클라이언트 ID, iss=accounts.google.com(두 형태)
- * - Apple:  aud=Bundle ID(kr.ieuri.ktripspot), iss=appleid.apple.com. 이름/이메일은 최초 1회만.
- * - Kakao:  OIDC id_token, aud=REST API 키(앱 ID), iss=kauth.kakao.com
+ * SNS 신원 검증기. provider별 [JwksIdTokenVerifier]로 id_token을 검증하고 [SnsIdentity]로 매핑한다.
+ * - 모든 환경에서 실검증한다(dev stub 없음). Apple은 이름/이메일을 최초 1회만 준다.
  */
 @Component
 class CompositeSnsIdentityVerifier(

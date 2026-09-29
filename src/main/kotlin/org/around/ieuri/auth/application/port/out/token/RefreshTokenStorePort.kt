@@ -2,10 +2,7 @@ package org.around.ieuri.auth.application.port.out.token
 
 import java.time.Instant
 
-/**
- * refresh 토큰(jti) 저장소 포트. 회전·폐기·재사용 감지를 위해 살아있는 jti를 추적한다.
- * 지금은 In-memory 구현이며, 시그니처 변경 없이 Redis/Valkey 구현으로 교체할 수 있다.
- */
+/** refresh 토큰(jti) 저장소 포트. 회전·폐기·재사용 감지를 위해 살아있는 jti를 추적한다. */
 interface RefreshTokenStorePort {
     fun save(jti: String, memberId: Long, expiresAt: Instant)
 
@@ -19,10 +16,7 @@ interface RefreshTokenStorePort {
 
     /**
      * 이 회원에게 살아 있는 refresh가 하나라도 있는지(SPEC-0032 R7).
-     *
-     * false는 **탈퇴·정지·재사용 감지로 전부 폐기됐다**는 뜻이다 — 그 셋이 모두
-     * [revokeAllByMember]를 부르므로 이 값 하나로 세 경우를 함께 읽는다.
-     * 구독 인가가 이것으로 "연결은 살아 있지만 자격은 없는" 상태를 판정한다.
+     * - false는 탈퇴·정지·재사용 감지로 전부 폐기됐다는 뜻이다(셋 다 [revokeAllByMember]를 부른다).
      */
     fun hasActiveToken(memberId: Long): Boolean
 }

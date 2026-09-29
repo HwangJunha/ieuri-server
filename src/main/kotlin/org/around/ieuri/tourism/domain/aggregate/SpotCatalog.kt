@@ -6,14 +6,8 @@ import org.around.ieuri.tourism.domain.vo.SpotCategory
 import java.time.LocalDate
 
 /**
- * 장소 하나(SPEC-0019 R-1). 애그리거트 루트이며 **조회가 보는 유일한 모델이다.**
- *
- * `spot`은 원본(offer)으로 남고 카탈로그는 그것을 묶은 표준 상품에 해당한다 — 상품 카탈로그의
- * 구조와 같다. 그래서 카탈로그는 원본을 흡수하지 않고 **언어 무관 값만 확정해 갖는다.**
- *
- * **이름을 갖지 않는다.** 이름은 언어에 종속된 값이므로 [translations]에만 있고, KO도 그중
- * 하나의 언어일 뿐이다. 이 구분이 없으면 "한국어 이름이 없는 장소"(외국어에만 존재하는 spot)를
- * 표현할 수 없어, 결국 원본에 없는 한국어명을 지어내게 된다.
+ * 장소 하나(SPEC-0019 R-1). 애그리거트 루트이며 조회가 보는 유일한 모델이다.
+ * - 언어 무관 값만 갖는다. 이름은 [translations]에만 있고 KO도 그중 하나일 뿐이다.
  */
 class SpotCatalog private constructor(
     val id: Long?,
@@ -21,10 +15,7 @@ class SpotCatalog private constructor(
     translations: Map<DomainLocale, CatalogTranslation>,
     festivalPeriod: CatalogFestivalPeriod?,
 ) {
-    /**
-     * 원본이 존재하는 언어의 표시값. **채워 넣는 연산이 없다** — 여기 없는 언어는 그 언어에
-     * 원본이 없다는 뜻이고, 빈 채로 남는 것이 올바른 상태다(SPEC-0029 R-6).
-     */
+    /** 원본이 존재하는 언어의 표시값. 없는 언어는 그 언어에 원본이 없다는 뜻이다(SPEC-0029 R-6). */
     val translations: Map<DomainLocale, CatalogTranslation> = translations.toMap()
 
     /** 언어 무관 표준값. 조회가 카드에 쓰는 값이다. */
@@ -46,13 +37,7 @@ class SpotCatalog private constructor(
     }
 
     companion object {
-        /**
-         * spot 원본 한 행에서 카탈로그를 만든다.
-         *
-         * **어느 언어로도 만들 수 있다.** KO 원본이 있으면 KO로 만들어지고, 외국어에만 있는
-         * 장소는 그 언어로 만들어진다 — 후자는 한국어 번역 행이 없는 채로 존재하며, 그것이
-         * 올바른 상태다. 없는 한국어명을 만들어 채우지 않는다.
-         */
+        /** spot 원본 한 행에서 카탈로그를 만든다. 어느 언어로도 만들 수 있다. */
         fun from(
             language: DomainLocale,
             title: String,
@@ -81,10 +66,7 @@ class SpotCatalog private constructor(
 
 /**
  * 카탈로그의 언어 무관 표준값 — 조회가 카드에 쓰는 값이다.
- *
- * **전부 필수다.** 좌표가 없거나 (0,0)이거나 한국 밖인 원본은 위치를 모르는 장소가 아니라
- * 깨진 행이며(실측 317건), 배치가 적재 단계에서 제외한다. nullable로 열면 지도·반경 조회에서
- * 빠지는 "존재하지만 아무 데도 안 나오는" 카탈로그가 생긴다.
+ * - 전부 필수다. 한국 밖 좌표는 거절하며 배치가 적재 단계에서 제외한다.
  */
 data class CatalogStandardValues(
     val mapX: Double,
@@ -110,13 +92,8 @@ data class CatalogStandardValues(
 }
 
 /**
- * 카탈로그의 한 언어 표시값 — 제목과 주소.
- *
- * **이 행의 의미는 "이 언어에 원본이 존재한다는 증거"다**(SPEC-0029 R-6). 이전에는 "이 언어의
- * 표시값"이었고 비어 있으면 기계번역으로 채웠으나, 그 채움을 걷어냈다. 이제 여기 있는 값은
- * 전부 업스트림 원문이며, 없는 언어는 없는 채로 조회에서 빠진다.
- *
- * 원문에 주소가 없는 spot이 있어 [address]는 nullable이다.
+ * 카탈로그의 한 언어 표시값 — 제목과 주소. 이 언어에 원본이 존재한다는 증거다(SPEC-0029 R-6).
+ * - 값은 전부 업스트림 원문이다. [address]는 원문에 없으면 null이다.
  */
 data class CatalogTranslation(
     val title: String,
@@ -127,10 +104,7 @@ data class CatalogTranslation(
     }
 }
 
-/**
- * 축제 기간. **언어 무관한 장소 자체의 속성이다** — 실측상 다국어 축제 60개 중 기간이 다른
- * 것은 3개뿐이다.
- */
+/** 축제 기간. 언어 무관한 장소 자체의 속성이다. */
 data class CatalogFestivalPeriod(
     val startDate: LocalDate,
     val endDate: LocalDate,

@@ -18,18 +18,11 @@ interface MemberProfileRepositoryPort {
 }
 
 /**
- * 약관 동의 **현재 상태** 포트(R9~R12). 이력이 아니다 — 약관 하나에 한 행이며 재동의·철회는
- * 그 행의 갱신이다.
- *
- * **이력은 감사 로그(AuditLogPort)가 갖는다.** 이 테이블은 회원 삭제 시 FK 자식이라 함께
- * 지워지므로, 철회·탈퇴처럼 증빙이 가장 필요한 사건이 오히려 사라진다. 감사 로그는 FK가
- * 없어 남는다. 상태와 이력을 나눠 두는 이유이며, 상태 조회는 잦아서 전용 테이블이 필요하다.
+ * 약관 동의 현재 상태 포트(R9~R12). 약관 하나에 한 행이며 재동의·철회는 그 행의 갱신이다.
+ * - 이력은 감사 로그(AuditLogPort)가 갖는다. 이 테이블은 회원 삭제 시 함께 지워진다.
  */
 interface MemberAgreementRepositoryPort {
-    /**
-     * 회원의 (termsCode, termsVersion)별 현재 판단.
-     * 행이 없는 약관은 결과에 키가 없으며 그것이 미동의 판정이다.
-     */
+    /** 회원의 (termsCode, termsVersion)별 현재 판단. 행이 없는 약관은 키가 없으며 그것이 미동의다. */
     fun findCurrentAgreements(memberId: Long): Map<TermsKey, AgreementRecord>
 
     /** 동의/철회를 반영한다. 같은 약관의 기존 판단은 덮어쓴다. */

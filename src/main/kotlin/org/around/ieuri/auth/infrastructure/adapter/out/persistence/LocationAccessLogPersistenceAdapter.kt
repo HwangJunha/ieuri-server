@@ -16,12 +16,7 @@ import org.springframework.transaction.annotation.Transactional
 import tools.jackson.databind.ObjectMapper
 import java.time.Instant
 
-/**
- * 위치 조회 감사 기록 포트 구현(SPEC-0032 R19·R20).
- *
- * payload Map을 JSON 문자열로 직렬화해 jsonb 컬럼에 저장한다 — `AuditLogPersistenceAdapter`와
- * 같은 형태다. **좌표를 거르는 것은 이 어댑터의 책임이 아니다**(호출부가 애초에 담지 않는다).
- */
+/** 위치 조회 감사 기록 포트 구현(SPEC-0032 R19·R20). payload를 jsonb로 저장하며, 좌표 제외는 호출부 책임이다. */
 @Component
 class LocationAccessLogPersistenceAdapter(
     private val repository: MemberLocationAccessLogJpaRepository,
@@ -52,11 +47,7 @@ class AuditLogRetentionPersistenceAdapter(
     }
 }
 
-/**
- * 접속기록 포트 구현(「개인정보의 안전성 확보조치 기준」 제8조).
- *
- * 기준이 요구하는 넷을 컬럼으로 남긴다 — payload 직렬화가 없는 것이 위 둘과 다른 점이다.
- */
+/** 접속기록 포트 구현(안전성 확보조치 기준 제8조). 기준의 네 항목을 컬럼으로 남긴다. */
 @Component
 class AccessLogPersistenceAdapter(
     private val repository: MemberAccessLogJpaRepository,
@@ -87,12 +78,7 @@ class AccessLogRetentionPersistenceAdapter(
     }
 }
 
-/**
- * 위치 조회 감사 기록의 보관 정리(위치정보법 제16조 제2항). 규약은 위와 같다.
- *
- * **이 어댑터가 없어 기록이 무기한 쌓였다** — 그동안 개인정보처리방침과 위치기반서비스
- * 이용약관이 고지한 "6개월 보관 후 파기"가 집행되지 않았다.
- */
+/** 위치 조회 감사 기록의 보관 정리(위치정보법 제16조 제2항의 6개월). */
 @Component
 class LocationAccessLogRetentionPersistenceAdapter(
     private val repository: MemberLocationAccessLogJpaRepository,

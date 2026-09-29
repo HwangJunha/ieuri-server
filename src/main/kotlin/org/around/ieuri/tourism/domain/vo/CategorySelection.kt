@@ -2,15 +2,8 @@ package org.around.ieuri.tourism.domain.vo
 
 /**
  * 조회에 적용할 카테고리 선택(SPEC-0020). 비어 있으면 "필터 없음"이며 전 카테고리가 대상이다.
- *
- * 조회 5개 연산이 모두 이 값을 받는다. 빈 배열 거절 규칙을 연산마다 두면 다섯 번 어긋날
- * 기회가 생기므로 [of]에 한 번만 둔다.
- *
- * 선택된 값들은 **OR**로 결합된다.
- *
- * **알 수 없는 코드를 거절하지 않는다.** 그런 코드로 거른 결과는 비어 있을 뿐이며, 그것이
- * 서버가 아는 목록으로 요청을 막는 것보다 낫다 — 카테고리는 데이터로 늘어나는 축이라
- * (`category` 테이블), 코드가 유효 목록을 쥐면 새 카테고리마다 배포가 필요해진다.
+ * - 선택된 값들은 OR로 결합된다.
+ * - 알 수 없는 코드를 거절하지 않는다 — 결과가 비어 있을 뿐이다.
  */
 @JvmInline
 value class CategorySelection private constructor(val values: Set<SpotCategory>) {
@@ -26,8 +19,7 @@ value class CategorySelection private constructor(val values: Set<SpotCategory>)
         val UNFILTERED = CategorySelection(emptySet())
 
         /**
-         * 인자를 선택으로 정규화한다. 빈 배열은 여기서 [onEmpty]로 거절된다 — 실패를 경계에서
-         * 끝내고 조회 로직에 들여보내지 않기 위해서다.
+         * 인자를 선택으로 정규화한다.
          *
          * @param onEmpty `categories`가 빈 배열일 때 던질 예외를 만든다.
          */

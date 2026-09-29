@@ -27,10 +27,7 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 
-/**
- * 대화 적재. [saveIfAbsent]가 **경합을 흡수한다** — 유일 제약에 걸리면 새로 만드는 대신
- * 이미 만들어진 것을 돌려준다(AC7-2).
- */
+/** 대화 적재. [saveIfAbsent]는 경합으로 유일 제약에 걸리면 기존 대화를 돌려준다(AC7-2). */
 @Component
 class ConversationPersistenceAdapter(
     private val repository: ConversationJpaRepository,
@@ -46,7 +43,6 @@ class ConversationPersistenceAdapter(
         return try {
             repository.saveAndFlush(conversation.toNewEntity()).toDomain()
         } catch (e: DataIntegrityViolationException) {
-            // 조회와 저장 사이에 다른 요청이 먼저 만들었다. 새로 만들지 않고 그것을 쓴다.
             val existing = repository.findByMemberLowAndMemberHigh(
                 conversation.memberLow,
                 conversation.memberHigh,
@@ -55,16 +51,13 @@ class ConversationPersistenceAdapter(
         }
     }
 
-    /** 최근 활동 시각 갱신. 관리 엔티티에 얹어 dirty-checking으로 UPDATE를 낸다. */
+    /** 최근 활동 시각 갱신. */
     @Transactional
     override fun touch(conversationId: Long, at: Instant) {
         repository.findById(conversationId).orElse(null)?.lastMessageAt = at
     }
 
-    /**
-     * 읽음 지점 갱신. **관리 엔티티에 얹는다** — 도메인을 새 엔티티로 만들어 save()하면
-     * lastMessageAt 등 이 트랜잭션이 건드리지 않은 컬럼까지 덮어쓴다.
-     */
+    /** 읽음 지점 갱신. 읽음 컬럼만 관리 엔티티에 얹는다(다른 컬럼을 덮어쓰지 않게). */
     @Transactional
     override fun updateReadState(conversation: Conversation) {
         val id = requireNotNull(conversation.id) { "저장된 대화만 읽음 지점을 갱신할 수 있다." }
@@ -75,10 +68,8 @@ class ConversationPersistenceAdapter(
 }
 
 /**
- * 메시지 적재. **본문 암복호화를 여기서 한다**(R16) — 키를 아는 것은 어댑터이고, 매퍼는
- * 암호문·평문을 파라미터로 받는 순수 함수로 남는다(POL-033).
- *
- * 인용은 별도 표라 **메시지를 먼저 저장해 id를 받은 뒤** 붙인다(글의 사진과 같은 순서).
+ * 메시지 적재. 본문·인용 발췌의 암복호화를 여기서 한다(R16).
+ * - 인용은 메시지를 먼저 저장해 id를 받은 뒤 붙인다.
  */
 @Component
 class MessagePersistenceAdapter(
@@ -101,11 +92,10 @@ class MessagePersistenceAdapter(
                 ),
             )
         }
-        // 인자의 평문을 그대로 쓴다 — 방금 손에 쥔 값을 다시 복호화할 이유가 없다.
         return saved.toDomain(decryptedBody = message.body, spotQaOrigin = message.spotQaOrigin)
     }
 
-    /** 인용을 **한 번에** 읽는다 — 메시지마다 물으면 N+1이 된다. */
+    /** 지워지지 않은 메시지만 돌려준다. 인용은 한 번에 읽는다. */
     @Transactional(readOnly = true)
     override fun findAllByIds(messageIds: List<Long>): List<Message> {
         if (messageIds.isEmpty()) return emptyList()
@@ -154,21 +144,15 @@ class MessageReportPersistenceAdapter(
             itemRepository.flush()
             true
         } catch (e: DataIntegrityViolationException) {
-            // 확인과 저장 사이에 같은 신고자가 먼저 넣었다 — 중복이므로 접수하지 않는다.
+            // 동시에 같은 신고자가 먼저 넣었다 — 중복이므로 접수하지 않는다.
             false
         }
     }
 }
 
 /**
- * 만료 메시지의 **행 삭제만** 담당한다. **물리 삭제다**(R16).
- *
- * 선별과 삭제를 나누는 이유는 회차 상한을 실제로 지키기 위해서다 — 조건 하나로 지우면
- * 6개월치가 한 트랜잭션에 들어가 락과 WAL이 함께 커진다.
- *
- * **첨부 오브젝트는 여기서 지우지 않는다.** 회차당 최대 limit건의 R2 왕복이 이 트랜잭션 안에
- * 있으면 DB 커넥션 보유 시간이 원격 레이턴시에 묶여, 1000건이면 한 커넥션을 수십 초 잡는다.
- * 키만 돌려주고 스토리지 삭제는 호출자(`MessageRetentionService`)가 트랜잭션 밖에서 한다.
+ * 만료 메시지 행의 물리 삭제(R16). 회차당 최대 [limit]건.
+ * - 첨부 오브젝트는 지우지 않는다 — 키만 돌려주고 호출자가 트랜잭션 밖에서 지운다.
  */
 @Component
 class ExpiredMessageRowPurger(
@@ -180,7 +164,7 @@ class ExpiredMessageRowPurger(
         val targets = repository.findByCreatedAtBefore(cutoff, Limit.of(limit))
         if (targets.isEmpty()) return ExpiredMessagePurgeResult(deletedCount = 0, photoObjectKeys = emptyList())
 
-        // 키를 **삭제 전에** 모은다 — 행이 사라지고 나면 어느 오브젝트를 지워야 하는지 알 수 없다.
+        // 키는 행 삭제 전에 모아야 한다.
         val photoKeys = targets.mapNotNull { it.photoObjectKey }
         val deleted = repository.deleteByIdIn(targets.mapNotNull { it.id }).toInt()
         return ExpiredMessagePurgeResult(deletedCount = deleted, photoObjectKeys = photoKeys)

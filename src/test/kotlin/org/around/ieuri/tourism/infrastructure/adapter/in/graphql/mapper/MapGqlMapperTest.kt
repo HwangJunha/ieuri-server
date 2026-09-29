@@ -7,11 +7,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /**
- * 지도 응답 변환(POL-033). **필드마다 값을 다르게 둔다** — 같은 값을 공유하면 두 필드가
- * 뒤바뀌어도 통과한다. 좌표는 특히 위경도가 같은 Double이라 스왑이 컴파일로 잡히지 않는다.
- *
- * 입력 변환은 여기 없다 — bbox는 원시 좌표로 응용 계층에 넘어가고 도메인 VO 조립은 `boundsOf`가
- * 하므로, 그 검증은 `MapRecommendationServiceTest`가 덮는다.
+ * 지도 응답 변환(POL-033). 필드마다 값을 다르게 둔다 — 위경도는 같은 Double이라 스왑이 컴파일로 잡히지 않는다.
+ * - bbox 입력 변환은 응용 계층(`boundsOf`)이 하므로 `MapRecommendationServiceTest`가 덮는다.
  */
 class MapGqlMapperTest {
 
@@ -22,7 +19,7 @@ class MapGqlMapperTest {
             title = "명동 교자",
             thumbnailImageUrl = "https://img.example/mdk.jpg",
             category = SpotCategory("RESTAURANT"),
-            // 경도와 위도를 서로 다른 값으로 둔다 — 뒤바뀌면 아래 두 단언이 함께 깨진다.
+            // 경도와 위도를 서로 다른 값으로 둔다.
             lng = 126.9851,
             lat = 37.5636,
         )

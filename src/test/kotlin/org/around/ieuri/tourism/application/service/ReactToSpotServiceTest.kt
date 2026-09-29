@@ -21,10 +21,7 @@ import kotlin.test.assertFailsWith
 
 /**
  * ReactToSpotService — 언어별 저장과 재평가 덮어쓰기(SPEC-0029 R-13).
- *
- * **식별 단위는 `(memberId, catalogId, language)`다.** 클라이언트는 카탈로그 id만 보내고
- * 언어는 서버가 활성 언어로 정한다. 같은 장소라도 언어마다 별도의 기록이며, 재평가는 같은
- * 언어의 기록만 덮어쓴다.
+ * 식별 단위는 `(memberId, catalogId, language)`이며 언어는 서버가 활성 언어로 정한다.
  */
 class ReactToSpotServiceTest {
 
@@ -63,7 +60,7 @@ class ReactToSpotServiceTest {
 
     @Test
     fun `같은 카탈로그라도 언어가 다르면 다른 조회 키가 된다`() {
-        // 영어로 누른 기록은 일본어 조회에 걸리지 않는다 — 그것이 언어별 축의 정의다(AC-13.2).
+        // 영어로 누른 기록은 일본어 조회에 걸리지 않는다(AC-13.2).
         resolvedIn(DomainLocale.EN)
         every { port.find(1L, 777L, DomainLocale.EN) } returns null
 
@@ -126,8 +123,6 @@ class ReactToSpotServiceTest {
 
     @Test
     fun `유효하지 않은 catalogId 커맨드는 생성 시점에 거부된다`() {
-        // 문자열 blank 검사가 양수 검사로 바뀌었다 — 식별자가 Long이 되면서
-        // "비어 있음"이라는 상태 자체가 사라졌다.
         assertFailsWith<IllegalArgumentException> { ReactToSpotCommand(0L, ReactionType.LIKE) }
         assertFailsWith<IllegalArgumentException> { ReactToSpotCommand(-1L, ReactionType.LIKE) }
     }

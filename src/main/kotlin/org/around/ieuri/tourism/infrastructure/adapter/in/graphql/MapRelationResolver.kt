@@ -19,13 +19,8 @@ import org.around.ieuri.common.graphql.generated.types.RemoveMapRelationInput as
 import org.around.ieuri.common.graphql.generated.types.RemoveMapRelationPayload as GqlRemoveMapRelationPayload
 
 /**
- * 지도 관계 리졸버(SPEC-0030 확장).
- *
- * **셋 다 인증 필수다.** 목록은 본인 것만 보이고 등록·삭제도 본인 목록에만 작용한다 —
- * 대상 회원을 인자로 받지 않는다.
- *
- * 겹침은 목록 질의 한 번에 함께 계산되므로 지연 필드가 없다. 상대마다 방문 기록을 따로
- * 읽는 편이 오히려 왕복을 늘린다.
+ * 지도 관계 리졸버(SPEC-0030 확장). 셋 다 인증 필수이며 대상 회원을 인자로 받지 않는다.
+ * - 겹침은 목록 질의 한 번에 함께 계산되므로 지연 필드가 없다.
  */
 @DgsComponent
 class MapRelationResolver(
@@ -64,10 +59,7 @@ class MapRelationResolver(
         )
     }
 
-    /**
-     * 없던 관계를 지워도 성공이다 — 실패로 만들면 클라이언트가 목록을 다시 읽어 확인해야
-     * 하는데, 결과 상태(그 상대가 목록에 없음)는 어느 쪽이든 같다.
-     */
+    /** 없던 관계를 지워도 성공이다. */
     @DgsMutation
     fun removeMapRelation(
         @InputArgument input: GqlRemoveMapRelationInput,

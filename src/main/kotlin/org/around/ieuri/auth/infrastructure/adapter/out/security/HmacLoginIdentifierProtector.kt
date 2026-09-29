@@ -7,11 +7,9 @@ import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
 /**
- * 로그인 식별자 보호 구현. pepper를 키로 한 HMAC-SHA256의 소문자 hex(64자)를 낸다.
- *
- * 결정론적이라 등호 조회와 (provider, provider_user_id) 유니크 제약이 그대로 동작한다.
- * identifierPepper가 바뀌면 기존 EMAIL 회원이 로그인 불가가 되므로 값을 교체하지 않는다(재이전 필요).
- * 그래서 교체 가능해야 하는 검증 코드용 pepper와 값을 공유하지 않는다.
+ * 로그인 식별자 보호 구현: pepper를 키로 한 HMAC-SHA256의 소문자 hex(64자). 결정론적이다.
+ * - identifierPepper는 교체할 수 없다. 바뀌면 기존 EMAIL 회원 전원이 로그인 불가가 된다(재이전 필요).
+ * - 그래서 교체 가능한 검증 코드용 pepper와 값을 공유하지 않는다.
  */
 @Component
 class HmacLoginIdentifierProtector(

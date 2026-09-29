@@ -41,12 +41,7 @@ import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
-/**
- * 글 적재. 갱신은 **관리 엔티티에 도메인 변경을 얹어** dirty-checking으로 UPDATE를 낸다 —
- * 새 엔티티를 만들어 save하면 dirty-checking이 무의미해진다.
- *
- * 사진은 생성 시에만 적재한다 — 수정은 제목·본문만 바꾸므로 사진 구성은 나중에 바뀌지 않는다.
- */
+/** 글 적재. 갱신은 관리 엔티티에 도메인 변경을 얹어 dirty-checking으로 UPDATE를 낸다. */
 @Component
 class PostPersistenceAdapter(
     private val repository: PostJpaRepository,
@@ -57,14 +52,12 @@ class PostPersistenceAdapter(
 ) : PostRepositoryPort {
 
     /**
-     * **완전한 애그리게이트를 복원한다** — 그래서 조회가 다섯 번이다. 전체 상태가 필요한
-     * 연산(글 수정)만 이 포트를 써야 하는 이유이며, 카운터 증감이나 존재 확인은
-     * PostCounterPort·PostModerationPort로 간다.
+     * 완전한 애그리게이트를 복원한다(조회 5회). 카운터·존재 확인은
+     * PostCounterPort·PostModerationPort를 쓴다.
      */
     override fun findById(postId: Long): Post? {
         val entity = repository.findByIdAndDeletedAtIsNull(postId) ?: return null
-        // **좌표까지 함께 복원한다.** 빠뜨리면 장소를 바꾸지 않은 수정에서도 좌표가 null이 되어
-        // 연결 행이 지워지고, 그 글이 지역 피드에서 조용히 사라진다.
+        // 좌표까지 복원한다 — 빠뜨리면 수정 시 장소 연결 행이 지워진다.
         val spot = spotRepository.findById(postId).orElse(null)
         return entity.toDomain(
             category = requireNotNull(chipRepository.findById(postId).orElse(null)) {
@@ -98,10 +91,7 @@ class PostPersistenceAdapter(
         return post
     }
 
-    /**
-     * 글을 먼저 저장해 id를 받은 뒤 자식을 붙인다 — 자식이 전부 글의 id를 필요로 하므로
-     * 순서를 뒤집을 수 없다. 장소는 선택이라 없으면 행을 만들지 않는다.
-     */
+    /** 글을 먼저 저장해 id를 받은 뒤 자식을 붙인다(순서 고정). 장소가 없으면 행을 만들지 않는다. */
     private fun create(post: Post): Post {
         val saved = repository.save(post.toNewEntity())
         val postId = requireNotNull(saved.id) { "저장된 글에는 id가 있어야 한다." }
@@ -119,11 +109,8 @@ class PostPersistenceAdapter(
     }
 
     /**
-     * 사진은 **지우고 다시 넣는다.** 순서가 계약이라 부분 갱신으로는 position을 맞추기
-     * 어렵고, 최대 5장이라 전량 교체의 비용이 무시할 만하다.
-     *
-     * 삭제를 flush하지 않으면 같은 (post_id, position)으로 INSERT가 먼저 나가 유일 제약에
-     * 걸린다 — Hibernate는 INSERT를 DELETE보다 먼저 내보내기 때문이다.
+     * 사진은 지우고 다시 넣는다.
+     * - 삭제 flush를 빼면 Hibernate가 INSERT를 먼저 내보내 (post_id, position) 유일 제약에 걸린다.
      */
     private fun replacePhotos(postId: Long, post: Post) {
         photoRepository.deleteByPostId(postId)
@@ -131,17 +118,14 @@ class PostPersistenceAdapter(
         photoRepository.saveAll(post.toPhotoEntities(postId))
     }
 
-    /** 태그도 사진과 같은 이유로 전량 교체한다 — 최대 5개라 비용이 무시할 만하다. */
+    /** 태그도 사진처럼 flush 후 전량 교체한다. */
     private fun replaceTags(postId: Long, post: Post) {
         tagRepository.deleteByPostId(postId)
         tagRepository.flush()
         tagRepository.saveAll(post.toTagEntities(postId))
     }
 
-    /**
-     * 카테고리 연결. PK가 post_id라 **기존 행을 찾아 값만 바꾼다** — 지우고 다시 넣으면
-     * 같은 PK로 INSERT가 먼저 나가 충돌한다.
-     */
+    /** 카테고리 연결. PK가 post_id라 지우고 넣지 않고 기존 행의 값만 바꾼다(PK 충돌). */
     private fun replaceChip(postId: Long, post: Post) {
         val chip = chipRepository.findById(postId).orElse(null)
         if (chip == null) {
@@ -152,9 +136,8 @@ class PostPersistenceAdapter(
     }
 
     /**
-     * 장소 연결. **장소를 뗐으면 행을 지운다** — 남겨 두면 그 글이 지역 피드에 계속 뜬다.
-     *
-     * 좌표까지 함께 갱신한다. geography는 트리거가 map_x/map_y에서 파생시킨다.
+     * 장소 연결. 장소를 뗐으면 행을 지운다.
+     * - geography 컬럼은 트리거가 map_x/map_y에서 파생시킨다.
      */
     private fun replaceSpot(postId: Long, post: Post) {
         val existing = spotRepository.findById(postId).orElse(null)
@@ -167,8 +150,7 @@ class PostPersistenceAdapter(
             existing == null -> spotRepository.save(next)
 
             else -> {
-                // **catalogId를 빠뜨리면 장소를 바꿔도 글이 옛 장소의 피드에 남는다** —
-                // 조회 축이 이 컬럼이기 때문이다(SPEC-0019 R-12).
+                // catalogId를 빠뜨리면 글이 옛 장소의 피드에 남는다(조회 축, SPEC-0019).
                 existing.catalogId = next.catalogId
                 existing.mapX = next.mapX
                 existing.mapY = next.mapY
@@ -178,11 +160,8 @@ class PostPersistenceAdapter(
 }
 
 /**
- * 파생 계수 증감. **읽고 고쳐 쓰지 않는다** — 동시 요청이 서로의 증가를 덮어써 계수가
- * 실제보다 작아지기 때문이다. `count = count + 1` 한 문장을 DB가 원자적으로 처리한다.
- *
- * 벌크 update는 영속성 컨텍스트를 우회한다. 같은 트랜잭션에서 이 글을 **엔티티로** 다시 읽는
- * 곳이 없어야 한다는 뜻인데, 갱신값은 읽기 포트가 별도 쿼리로 가져오므로 문제가 없다.
+ * 파생 계수 증감. `count = count + 1` 원자적 UPDATE로 처리한다.
+ * - 벌크 update는 영속성 컨텍스트를 우회한다 — 같은 트랜잭션에서 이 글을 엔티티로 다시 읽지 말 것.
  */
 @Component
 class PostCounterAdapter(
@@ -215,10 +194,7 @@ class PostCounterAdapter(
             .execute()
     }
 
-    /**
-     * **0 아래로 내려가지 않는다.** 조건절이 0인 행을 아예 건드리지 않으므로 CHECK 제약도
-     * 걸리지 않는다 — 음수를 쓰려다 예외가 나는 대신 조용히 0으로 머문다.
-     */
+    /** 0 아래로 내려가지 않는다 — 예외 없이 0에 머문다. */
     private fun decrease(postId: Long, counter: NumberPath<Int>) {
         queryFactory
             .update(post)
@@ -228,10 +204,7 @@ class PostCounterAdapter(
     }
 }
 
-/**
- * 존재 확인과 상태 전환. 애그리게이트를 복원하지 않는다 — 신고의 대상 확인은 "있는가"만
- * 물으면 되는데 복원하면 태그·사진까지 읽는다.
- */
+/** 글 존재 확인과 숨김 전환. 애그리게이트를 복원하지 않는다. */
 @Component
 class PostModerationAdapter(
     private val queryFactory: JPAQueryFactory,
@@ -246,10 +219,7 @@ class PostModerationAdapter(
         .where(post.id.eq(postId), post.deletedAt.isNull)
         .fetchFirst() != null
 
-    /**
-     * 이미 숨겨진 글은 조건절에서 걸러져 0건이 갱신되고 false가 된다. 호출자가 그 값으로
-     * 중복 처리를 건너뛰므로, 신고가 더 쌓여도 댓글 수를 두 번 내리는 일이 없다.
-     */
+    /** 이번 호출로 숨겨졌을 때만 true. 이미 숨겨진 글이면 false다. */
     @Transactional
     override fun hide(postId: Long): Boolean = queryFactory
         .update(post)
@@ -277,12 +247,7 @@ class CommentPersistenceAdapter(
     }
 }
 
-/**
- * 좋아요 유일성. 멱등 판정을 저장소가 맡는다.
- *
- * exists 검사 뒤 insert 사이에 동시 요청이 끼어들 수 있어 유일 제약 위반도 함께 잡는다 —
- * 그 경우도 "이미 있었다"와 같은 결과이므로 오류가 아니다.
- */
+/** 좋아요 적재. 새로 생겼을 때만 true이며, 동시 insert의 유일 제약 위반도 false로 본다. */
 @Component
 class PostLikePersistenceAdapter(
     private val repository: PostLikeJpaRepository,
@@ -301,10 +266,7 @@ class PostLikePersistenceAdapter(
     override fun delete(postId: Long, memberId: Long): Boolean = repository.deleteByPostIdAndMemberId(postId, memberId) > 0
 }
 
-/**
- * 글 숨김. 좋아요·차단과 같은 형태다 — exists 검사 뒤 insert 사이에 동시 요청이 끼어들 수
- * 있어 유일 제약 위반도 함께 잡는다. 그 경우도 "이미 숨겨져 있었다"와 같은 결과다.
- */
+/** 개별 글 숨김 적재. 좋아요와 같은 형태다(동시 insert 충돌도 false). */
 @Component
 class PostHidePersistenceAdapter(
     private val repository: PostHideJpaRepository,

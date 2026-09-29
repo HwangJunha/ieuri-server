@@ -74,7 +74,7 @@ class PushDispatchStoreTest {
         verify { deviceTokenRepository.findByMemberId(memberId) }
     }
 
-    /** 언어로 바로 찾을 수 있게 맵으로 접는다 — 발송이 언어별로 갈리기 때문이다. */
+    /** 문구를 언어 키 맵으로 접는다. */
     @Test
     fun `문구를 언어별 맵으로 돌려준다`() {
         every { messageRepository.findByType(NotificationType.DM) } returns listOf(

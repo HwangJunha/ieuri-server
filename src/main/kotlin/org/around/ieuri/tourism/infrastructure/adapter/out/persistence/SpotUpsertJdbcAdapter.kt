@@ -11,10 +11,8 @@ import java.sql.Timestamp
 import java.time.Instant
 
 /**
- * 관광지 목록 upsert 전용 어댑터. JPA에 이식 가능한 upsert가 없어 이 어댑터에만 생 SQL이 남는다.
- *
- * 한 페이지를 한 번의 `executeBatch`로 보내 왕복 횟수를 줄인다. 충돌 시 전체 컬럼을 무조건
- * 덮어쓴다 — 해시 비교로 변경을 감지하면 낡은 저작권 분류가 무기한 남는다.
+ * 관광지 목록 upsert 전용 어댑터. JPA에 이식 가능한 upsert가 없어 생 SQL이다.
+ * - 한 페이지를 한 번의 배치로 보내고, 충돌 시 전체 컬럼을 덮어쓴다.
  */
 @Component
 class SpotUpsertJdbcAdapter(
@@ -39,16 +37,15 @@ class SpotUpsertJdbcAdapter(
             ps.setString(10, spot.copyright.name)
             ps.setTimestamp(11, syncedTimestamp)
         }
-        // batchUpdate(sql, batchArgs, batchSize, pss)는 청크별 결과를 배열의 배열로 돌려준다.
+        // 청크별 결과를 배열의 배열로 돌려준다.
         return jdbcTemplate.batchUpdate(UPSERT_SQL, spots, spots.size, setter)
             .sumOf { chunk -> chunk.count { it != 0 } }
     }
 
     private companion object {
         /**
-         * `updated_at`은 실제로 값이 바뀐 경우에만 올린다(CASE 절). 무조건 갱신하면 매일 전 행이
-         * 변경된 것처럼 보인다. `last_synced_at`은 반대로 항상 갱신해야 정리 단계가
-         * "이번 실행이 이 행을 봤다"를 판정할 수 있다.
+         * `updated_at`은 값이 바뀐 경우에만 올린다(CASE 절).
+         * - `last_synced_at`은 항상 갱신한다 — 정리 단계가 "이번 실행이 이 행을 봤다"를 판정한다.
          */
         val UPSERT_SQL = """
             INSERT INTO spot (

@@ -11,10 +11,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * TourApiClient 매핑 — 이미지 https 정규화(AC-3)·저작권 매핑(AC-15)·코드 역매핑·주소 병합.
- * HTTP·역직렬화는 라이브러리 책임이라 배제하고 mapResponse(DTO→결과)만 검증한다.
- */
+/** TourApiClient 매핑 — 이미지 https 정규화(AC-3)·저작권 매핑(AC-15)·코드 역매핑·주소 병합. mapResponse만 검증한다. */
 class TourApiClientTest {
 
     private val properties = TourApiProperties(

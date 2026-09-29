@@ -12,18 +12,13 @@ import org.springframework.stereotype.Component
 import java.util.concurrent.CompletableFuture
 
 /**
- * 쿼리(spots/availableSpotCategories) 도메인 오류를 최상위 errors[]로 내리되, DGS ErrorType으로 분류한다(spec §4.8).
- * 이 스키마엔 쿼리용 payload 컨벤션이 없어(뮤테이션만 BaseResponse) 쿼리 오류는 errors[]로 표면화한다.
- *
- * SpotQueryException이 아니면 다음 핸들러에 위임한다. 이 빈이 앱의 유일한 핸들러 빈이므로
- * (@ConditionalOnMissingBean 기본 빈을 대체한다) 체인 전체의 입구이기도 하다:
- * tourism → 인증·권한(SecurityGraphqlExceptionHandler) → 정제(InternalErrorSanitizingHandler).
- * extensions.classification에 BAD_REQUEST/FAILED_PRECONDITION/UNAVAILABLE을, code에 논리 코드 문자열을 담는다.
+ * tourism 쿼리 도메인 오류(SpotQueryException)를 최상위 errors[]로 내리며 DGS ErrorType으로 분류한다(spec §4.8).
+ * - 앱의 유일한 핸들러 빈이라 체인의 입구다: tourism → SecurityGraphqlExceptionHandler → InternalErrorSanitizingHandler.
+ * - extensions.classification에 ErrorType 이름을, code에 논리 코드 문자열을 담는다.
  */
 @Component
 class TourismQueryExceptionHandler(
-    // 인증·권한 실패를 코드와 함께 내리는 공용 핸들러를 먼저 태운다 — 없으면 DGS 기본
-    // 핸들러가 그 둘을 "Unknown GraphQL error"로 삼킨다(구독 디버깅이 불가능해진다).
+    // 인증·권한 실패를 코드와 함께 내리는 공용 핸들러 — 없으면 DGS 기본 핸들러가 "Unknown GraphQL error"로 삼킨다.
     private val delegate: DataFetcherExceptionHandler = SecurityGraphqlExceptionHandler(),
 ) : DataFetcherExceptionHandler {
 
@@ -48,10 +43,7 @@ class TourismQueryExceptionHandler(
     }
 }
 
-/**
- * SpotQueryException을 표현하는 GraphQLError. classification(ErrorType 이름)과 code를 extensions에 담는다.
- * DGS/graphql-java의 ErrorClassification 인터페이스를 직접 구현해 분류 문자열을 노출한다.
- */
+/** SpotQueryException을 표현하는 GraphQLError. classification과 code를 extensions에 담는다. */
 private class SpotQueryGraphQLError(
     private val message: String,
     private val path: ResultPath?,

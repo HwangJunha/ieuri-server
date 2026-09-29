@@ -19,11 +19,8 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 /**
- * ValkeyRefreshTokenStore — 외부 Valkey 없이 StringRedisTemplate을 대역으로 검증하는 순수 단위 테스트.
- * 실제 저장/TTL 축출은 Valkey 책임이므로 스코프에서 제외하고, 어댑터 자체 로직만 본다:
- *   - 만료 토큰 저장 스킵, 남은 TTL로 SET
- *   - 인프라 예외를 삼키지 않는다 → existsActive는 장애를 false로 만들지 않는다(fail-closed).
- *     예외는 AuthStoreUnavailableException으로 옮겨 올라간다(SPEC-0032 R6).
+ * ValkeyRefreshTokenStore — StringRedisTemplate 대역으로 어댑터 로직만 본다.
+ * - 만료 토큰 저장 스킵, 남은 TTL로 SET, 인프라 예외는 AuthStoreUnavailableException으로 올린다(fail-closed, SPEC-0032 R6).
  */
 class ValkeyRefreshTokenStoreTest {
 
@@ -61,11 +58,7 @@ class ValkeyRefreshTokenStoreTest {
         assertTrue(store.existsActive("jti-1"))
     }
 
-    /**
-     * fail-closed는 그대로다 — 장애를 false로 삼키면 재사용 감지가 무력화된다.
-     * 바뀐 것은 **예외의 종류**뿐이다(SPEC-0032 R6): 클라이언트가 "잠시 후 재시도"와
-     * "재로그인"을 구분할 수 있도록 코드를 실어 올린다.
-     */
+    /** fail-closed: 장애를 false로 삼키지 않고 코드를 실어 올린다(SPEC-0032 R6). */
     @Test
     fun `existsActive는 연결 장애를 false로 삼키지 않고 저장소 장애로 올린다`() {
         every { redis.hasKey(any()) } throws RedisConnectionFailureException("down")

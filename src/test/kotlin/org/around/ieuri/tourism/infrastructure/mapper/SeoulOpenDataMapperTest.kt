@@ -15,9 +15,7 @@ import kotlin.test.assertNull
 
 /**
  * 서울 실시간 도시데이터 응답 → 도메인 매핑(POL-033, SPEC-0014 R7·R9·R10·R12).
- *
- * 필드마다 다른 값을 넣어 **뒤바뀐 매핑이 드러나게** 한다 — 특히 `EVENT_X`(경도)와
- * `EVENT_Y`(위도)는 이름이 직관과 반대라 뒤집기 쉽다.
+ * - 필드마다 다른 값을 넣는다 — 특히 `EVENT_X`(경도)·`EVENT_Y`(위도)는 뒤집기 쉽다.
  */
 class SeoulOpenDataMapperTest {
 
@@ -69,7 +67,7 @@ class SeoulOpenDataMapperTest {
 
     @Test
     fun `인구 값이 깨져도 구역 전체를 버리지 않는다`() {
-        // 인구 범위 하나가 깨졌다고 구역을 버리는 것은 과하다 — 0으로 두고 나머지를 살린다.
+        // 인구 범위 하나가 깨져도 0으로 두고 나머지를 살린다.
         val population = SeoulOpenDataResponse.Population(
             congestionLevel = "여유",
             populationMin = "삼천",
@@ -206,7 +204,7 @@ class SeoulOpenDataMapperTest {
 
     @Test
     fun `문화행사가 필드별로 매핑되고 좌표가 뒤집히지 않는다`() {
-        // AC R12. EVENT_X가 경도, EVENT_Y가 위도다 — 이름이 직관과 반대라 여기서 바로잡는다.
+        // AC R12. EVENT_X가 경도, EVENT_Y가 위도다.
         val event = SeoulOpenDataResponse.Event(
             title = "청춘만발",
             period = "2026-08-10~2026-08-21",
@@ -244,7 +242,7 @@ class SeoulOpenDataMapperTest {
 
     @Test
     fun `선택 필드가 비면 빈 문자열과 null로 채워진다`() {
-        // 계약이 place·period를 non-null로 두므로 빈 문자열이 되고, url만 null이 된다.
+        // place·period는 non-null이라 빈 문자열이 되고, url만 null이 된다.
         val event = SeoulOpenDataResponse.Event(
             title = "축제",
             period = null,
@@ -264,7 +262,7 @@ class SeoulOpenDataMapperTest {
 
     @Test
     fun `같은 행사는 같은 id를 갖는다`() {
-        // 여러 구역 응답에 같은 행사가 걸쳐 나올 때 중복을 걸러내기 위한 것이다.
+        // 여러 구역 응답에 걸친 같은 행사의 중복을 거른다.
         val event = SeoulOpenDataResponse.Event(
             title = "축제",
             longitude = "126.9",

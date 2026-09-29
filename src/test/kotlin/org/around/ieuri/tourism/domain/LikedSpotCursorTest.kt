@@ -9,12 +9,7 @@ import java.nio.charset.StandardCharsets
 import java.time.Instant
 import java.util.Base64
 
-/**
- * 좋아요 목록 커서의 버전 접두사(SPEC-0019 §4.3).
- *
- * **구 커서는 형식이 새 커서와 같다** — `{updatedAt}|{id}`이고 두 번째 필드가 둘 다 Long이다.
- * 접두사가 없으면 파싱에 성공한 뒤 잘못된 keyset 조건으로 조용히 다른 페이지를 반환한다.
- */
+/** 좋아요 목록 커서의 버전 접두사(SPEC-0019). 구 커서는 형식이 같아 접두사로만 거를 수 있다. */
 class LikedSpotCursorTest {
 
     private val updatedAt = Instant.parse("2026-08-14T01:02:03.123456789Z")
@@ -42,8 +37,7 @@ class LikedSpotCursorTest {
     @Test
     @DisplayName("v2 접두사가 없는 구 커서는 값 해석 전에 거부된다")
     fun `rejects prefixless legacy cursor`() {
-        // 이관 이전 형식: {updatedAt}|{spotId}. 구조가 유효하고 각 필드 타입도 새 형식과 같다 —
-        // 그래서 접두사 검사가 없으면 파싱에 성공해 버린다.
+        // 이관 이전 형식: {updatedAt}|{spotId}. 필드 타입이 새 형식과 같다.
         val legacy = encodeRaw("$updatedAt|4321")
 
         assertThrows(IllegalArgumentException::class.java) { LikedSpotCursor.decode(legacy) }

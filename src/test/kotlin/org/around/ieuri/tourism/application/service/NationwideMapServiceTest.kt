@@ -109,7 +109,7 @@ class NationwideMapServiceTest {
 
         service.cellSpots(cellId = 1L, first = 999, locale = DomainLocale.KO)
 
-        // 상한 50으로 잘린다(POL-018) — 페이지네이션이 없으니 +1을 읽지 않는다.
+        // 상한 50으로 잘린다(POL-018).
         verify { mapCellQueryPort.findCellSpots(1L, DomainLocale.KO, 50) }
     }
 

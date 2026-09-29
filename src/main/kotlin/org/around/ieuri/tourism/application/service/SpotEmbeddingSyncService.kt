@@ -13,9 +13,9 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
 /**
- * 장소 임베딩 적재(SPEC-0035 S2). 대상 행 → 텍스트 → 제공자 → 저장. 제공자 실패는 설정 횟수까지 바로
- * 재시도하고(시간 대기 없음, POL-040) 그래도 실패하면 그 묶음을 건너뛰고 센다 — 다음 실행의 대상으로
- * 남는다. 차원이 설정과 다른 벡터는 저장하지 않는다.
+ * 장소 임베딩 적재(SPEC-0035). 대상 행 → 텍스트 → 제공자 → 저장.
+ * - 제공자 실패는 대기 없이 설정 횟수까지 재시도하고(POL-040), 그래도 실패한 묶음은 건너뛰고 센다.
+ * - 차원이 설정과 다른 벡터는 저장하지 않는다.
  */
 @Service
 class SpotEmbeddingSyncService(

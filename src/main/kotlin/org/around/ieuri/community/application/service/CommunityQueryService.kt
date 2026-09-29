@@ -32,14 +32,8 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 /**
- * 커뮤니티 조회. **애그리게이트를 우회한다** — 읽기 전용이므로 QueryDSL 프로젝션이 read DTO를
- * 직접 만든다.
- *
- * 이 서비스의 핵심은 [viewerContext]다. 피드·단건·댓글 **세 경로가 모두 이것을 거친다** —
- * 이 스펙에서 가장 흔한 구현 실수 지점이며, 한 곳만 빠뜨려도 차단이 무력화된다. 특히 단건
- * 조회는 딥링크의 진입점이라 여기가 뚫리면 피드 필터가 아무리 정확해도 소용이 없다.
- *
- * 필터를 각 쿼리에 흩어 두지 않고 여기 모아 네 경로가 같은 구현을 공유하게 한다.
+ * 커뮤니티 조회. 애그리게이트를 거치지 않고 read DTO를 받는다.
+ * - 피드·단건·댓글은 모두 [viewerContext]를 거친다 — 한 경로라도 빠지면 차단·숨김이 무력화된다.
  */
 @Service
 @Transactional(readOnly = true)
@@ -51,51 +45,37 @@ class CommunityQueryService(
     private val policy: CommunityPolicy,
 ) : CommunityQueryUseCase {
 
-    /**
-     * 글 피드. **인자 조합이 범위를 정한다** — 장소 하나, 좌표 반경, 카테고리, 또는 전체다.
-     * 정렬·페이징·모더레이션 필터는 모든 경우가 같다.
-     */
+    /** 글 피드. 인자 조합이 범위(장소 하나·좌표 반경·카테고리·전체)를 정한다. */
     override fun posts(query: PostsQuery, memberId: Long, language: ContentLanguage): CursorPage<PostView> {
         val search = PostsSearch(
             catalogId = query.catalogId,
             area = resolveArea(query),
             categories = query.categories,
-            // 태그는 정규화해 넘긴다 — 대소문자·선행 #을 가리지 않게 하려는 것이다.
+            // 대소문자·선행 #을 가리지 않도록 정규화한다.
             normalizedTag = query.tag?.let { PostTag.parseOrNull(it)?.normalized },
             sort = effectiveSort(query),
             hiddenByViewer = query.hiddenByViewer,
-            // 활성 언어에서 해소되지 않는 장소가 붙은 글을 뺀다(R-23). 조회 단계에서 걸어야
-            // `first`가 곧 정확한 페이지 크기다 — 뒤에서 거르면 요청 개수를 채우지 못한다.
+            // 활성 언어에서 해소되지 않는 장소가 붙은 글을 조회 조건으로 뺀다.
             language = language,
             first = clampPageSize(query.first),
             after = query.after,
             viewer = viewerContext(memberId),
         )
-        // **정렬에 따라 포트가 갈린다** — 거리순은 PostGIS라 구현 기술이 다르다.
+        // 거리순은 PostGIS 전용 포트로 간다.
         return when (search.sort) {
             PostSortOrder.LATEST -> communityQueryPort.findPosts(search)
             PostSortOrder.DISTANCE -> postSpatialQueryPort.findPostsByDistance(search)
         }
     }
 
-    /**
-     * 좌표가 없으면 거리를 잴 기준이 없어 **거리순 요청도 최신순으로 떨어진다.**
-     * 오류로 돌려주지 않는 이유는 클라이언트가 위치 권한을 못 받은 상태에서도 피드를
-     * 그려야 하기 때문이다 — 정렬만 바뀌고 화면은 뜬다.
-     */
+    /** 좌표가 없으면 거리순 요청도 오류 없이 최신순으로 떨어진다. */
     private fun effectiveSort(query: PostsQuery): PostSortOrder = if (query.sort == PostSortOrder.DISTANCE && !query.hasCoordinates) {
         PostSortOrder.LATEST
     } else {
         query.sort
     }
 
-    /**
-     * 좌표 반경. 좌표를 주지 않으면 null이고 반경으로 좁히지 않는다.
-     *
-     * **tourism에 spot 목록을 묻지 않는다.** 글이 자기 좌표를 들고 있어 반경 조건을 글
-     * 조회에 직접 걸 수 있기 때문이며, 덕분에 목록 상한(2000)이 피드의 한계가 되던 문제가
-     * 사라졌다 — 실측하면 기본 반경 20km 안에 spot이 12,000개가 넘는다.
-     */
+    /** 좌표 반경. 좌표가 없으면 null이고 반경으로 좁히지 않는다. 반경은 글 자신의 좌표에 건다. */
     private fun resolveArea(query: PostsQuery): PostsArea? {
         if (!query.hasCoordinates) return null
         return PostsArea(
@@ -107,10 +87,8 @@ class CommunityQueryService(
     }
 
     /**
-     * 글 단건. **여기서만 조회수가 오른다** — 피드 목록에서는 오르지 않는다.
-     *
-     * 증가는 이벤트로 넘겨 비동기로 처리하므로 응답이 UPDATE를 기다리지 않는다. 차단·숨김에
-     * 걸려 못 본 글은 세지 않는다 — 보지 못한 것을 조회로 셀 수는 없다.
+     * 글 단건. 조회수는 여기서만 오르며(피드 목록에서는 오르지 않음) 이벤트로 비동기 증가한다.
+     * - 차단·숨김으로 못 본 글은 세지 않는다.
      */
     override fun post(postId: Long, memberId: Long): PostView? {
         val view = communityQueryPort.findPost(postId, viewerContext(memberId)) ?: return null
@@ -119,18 +97,8 @@ class CommunityQueryService(
     }
 
     /**
-     * 글의 댓글 목록.
-     *
-     * **부모 글의 생존을 먼저 본다.** 댓글은 자기 `deleted_at`만 보므로, 이 검사가 없으면
-     * 지워진 글의 댓글이 `comments(postId:)`로 그대로 읽힌다 — `post(id:)`는 null을 주는데
-     * 댓글은 나오는 상태가 되고, 글 id는 순번이라 추측도 쉽다.
-     *
-     * 이전에는 글을 물리 삭제해 FK CASCADE가 댓글까지 지웠기 때문에 이 구멍이 드러나지
-     * 않았다. 소프트 삭제로 바꾸면서 검사가 필요해졌다(`spotAnswers`가 부모 질문을 먼저
-     * 읽는 것과 같은 규율이다).
-     *
-     * 못 보는 글이면 오류가 아니라 빈 페이지다 — 차단·숨김으로 걸린 경우와 구분되지 않아야
-     * 존재 여부가 새지 않는다.
+     * 글의 댓글 목록. 부모 글을 먼저 읽는다 — 댓글은 자기 `deleted_at`만 보므로 빼면 지운 글의 댓글이 읽힌다.
+     * - 못 보는 글(삭제·차단·숨김)이면 오류가 아니라 빈 페이지다.
      */
     override fun comments(query: PostCommentsQuery, memberId: Long): CursorPage<CommentView> {
         val viewer = viewerContext(memberId)
@@ -159,7 +127,6 @@ class CommunityQueryService(
         memberId: Long,
     ): Map<Long, List<CommentView>> = communityQueryPort.findRepliesOf(parentCommentIds, viewerContext(memberId))
 
-    // 지연 필드 다섯. 포트로 그대로 넘긴다 — 여기서 더할 규칙이 없다.
     override fun postTags(postIds: List<Long>): Map<Long, List<String>> = communityQueryPort.findTagsOf(postIds)
 
     override fun postPhotoKeys(postIds: List<Long>): Map<Long, List<String>> = communityQueryPort.findPhotoKeysOf(postIds)
@@ -178,16 +145,10 @@ class CommunityQueryService(
         ),
     )
 
-    /**
-     * 양방향 차단 판정(POL-041). 상대 목록을 한 번 읽어 포함 여부를 본다 —
-     * `ConversationCommandService.requireNotBlocked`와 같은 관용구다.
-     */
+    /** 양방향 차단 판정(POL-041). */
     override fun isBlockedBetween(memberId: Long, counterpartId: Long): Boolean = counterpartId in communityQueryPort.findBlockedMemberIds(memberId)
 
-    /**
-     * 내가 쓴 글. **[viewerContext]를 쓰지 않는다** — 차단·숨김 집합을 읽을 이유가 없고,
-     * 자기 글은 자기가 숨겼더라도 마이페이지에 보여야 한다(R3).
-     */
+    /** 내가 쓴 글. [viewerContext]를 쓰지 않는다 — 자기가 숨긴 자기 글도 보인다. */
     override fun myPosts(query: MyPostsQuery, memberId: Long): CursorPage<PostView> = communityQueryPort.findMyPosts(
         MyPostsSearch(
             memberId = memberId,
@@ -196,15 +157,10 @@ class CommunityQueryService(
         ),
     )
 
-    /** 구성은 tourism의 `app_category`가 소유한다(SPEC-0020) — 커뮤니티는 그 표를 읽을 뿐이다. */
+    /** 칩 구성은 tourism의 `app_category`가 소유한다(SPEC-0020). */
     override fun communityChips(appKey: AppKey, language: ContentLanguage): List<CommunityChipView> = categoryConfigPort.findCategories(appKey, language)
 
-    /**
-     * 호출자의 차단 관계를 **양방향으로** 읽어 담고, 개별로 숨긴 글 id도 함께 담는다.
-     *
-     * 둘 다 조회 시점에 한 번 읽는 이유는 필터가 쿼리 조건으로 들어가야 하기 때문이다 —
-     * 조회 후 걸러내면 `first: 20`을 요청했는데 15건만 남는다.
-     */
+    /** 호출자의 양방향 차단 회원과 숨긴 글 id. 조회 조건으로 들어간다. */
     private fun viewerContext(memberId: Long): ViewerContext = ViewerContext(
         memberId = memberId,
         blockedMemberIds = communityQueryPort.findBlockedMemberIds(memberId),

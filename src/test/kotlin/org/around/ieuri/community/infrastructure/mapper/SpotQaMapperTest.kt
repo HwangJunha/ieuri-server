@@ -23,9 +23,7 @@ import kotlin.test.assertTrue
 
 /**
  * 장소 질문/답변의 엔티티↔도메인 변환(SPEC-0026).
- *
- * **필드마다 다른 값을 쓴다** — 같은 값을 공유하면 두 필드가 뒤바뀌어도 통과한다.
- * id 계열(catalogId·questionId·answerId·authorId)이 전부 Long이라 특히 그렇다.
+ * - 필드마다 다른 값을 쓴다. 같은 값을 공유하면 뒤바뀐 매핑이 통과한다.
  */
 class SpotQaMapperTest {
 
@@ -227,7 +225,7 @@ class SpotQaMapperTest {
         assertTrue(photoKey.confirmed)
     }
 
-    /** 적재된 키가 파싱되지 않으면 데이터 손상이다 — 조용히 버리면 사진이 이유 없이 사라진다. */
+    /** 적재된 키가 파싱되지 않으면 조용히 버리지 않고 실패한다(데이터 손상). */
     @Test
     fun `형식이 깨진 사진 키는 실패시킨다`() {
         val entity = SpotQaPhotoEntity(

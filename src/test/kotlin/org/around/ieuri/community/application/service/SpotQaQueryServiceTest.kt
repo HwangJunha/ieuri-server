@@ -30,9 +30,7 @@ import kotlin.test.assertTrue
 
 /**
  * 질문·답변 조회(SPEC-0026 R1, R11, R12, R16).
- *
- * 핵심은 **질문의 숨김이 답변을 함께 가린다**는 종속 방향이다 — 답변 레코드의 hidden을
- * 건드리지 않고 조회 시점에 질문 상태로 판단한다.
+ * - 질문의 숨김이 조회 시점에 답변을 함께 가린다(답변 레코드는 건드리지 않는다).
  */
 class SpotQaQueryServiceTest {
 
@@ -122,13 +120,10 @@ class SpotQaQueryServiceTest {
         }
     }
 
-    /**
-     * R-23 — 활성 언어가 조회 조건으로 내려가야 목록이 그 언어로 걸러진다. 질문은 장소가
-     * 필수라 이 조건이 무조건 걸린다(글과 달리 "장소 없는 항목"이라는 예외가 없다).
-     */
+    /** R-23 — 활성 언어가 조회 조건으로 내려간다. 질문은 장소가 필수라 항상 걸린다. */
     @Test
     fun `활성 언어를 조회 조건으로 내려보낸다`() {
-        // 존재 검사도 그 언어로 간다 — 스텁을 JA로 둬야 통과한다는 것 자체가 R-16의 확인이다.
+        // 존재 검사도 그 언어로 간다(R-16).
         every { spotLookupPort.findSummary(catalogId, ContentLanguage.JA) } returns
             PostSpotView(
                 id = catalogId,
@@ -216,7 +211,7 @@ class SpotQaQueryServiceTest {
             language,
         )
 
-        // **호출자 자신이다.** 인자로 받은 남의 id가 들어갈 자리가 없다.
+        // 작성자 필터는 호출자 자신이다.
         assertEquals(memberId, search.captured.authorId)
         assertNull(search.captured.catalogId)
     }
@@ -272,7 +267,7 @@ class SpotQaQueryServiceTest {
         assertEquals(listOf(5L), search.captured.ids)
     }
 
-    /** 장소를 주지 않았으면 확인할 대상이 없다 — 없는 장소로 오인해 거부하면 안 된다. */
+    /** 장소를 주지 않았으면 존재 확인을 하지 않는다. */
     @Test
     fun `장소를 주지 않으면 장소 존재를 묻지 않는다`() {
         givenBlockedMembers()
@@ -298,7 +293,7 @@ class SpotQaQueryServiceTest {
         val page = service.spotAnswers(SpotAnswersQuery(questionId, first = 20, after = null), memberId)
 
         assertTrue(page.edges.isEmpty())
-        // 답변을 아예 읽지 않는다 — 가려진 것을 읽어 와 버리는 낭비를 하지 않는다.
+        // 답변을 아예 읽지 않는다.
         verify(exactly = 0) { spotQaQueryPort.findAnswers(any()) }
     }
 
@@ -329,8 +324,7 @@ class SpotQaQueryServiceTest {
     @Test
     fun `차단으로 가려진 질문의 답변은 QUESTION_NOT_FOUND다`() {
         givenBlockedMembers(setOf(99L))
-        // includeHidden은 **숨김만** 우회한다 — 차단은 그대로 걸려 null이 되고, 그래야
-        // 차단 상대의 질문에 달린 답변을 우회로 읽을 수 없다.
+        // includeHidden은 숨김만 우회한다 — 차단은 그대로 걸려 null이 된다.
         every { spotQaQueryPort.findQuestion(questionId, any(), includeHidden = true) } returns null
 
         assertFailsWith<QuestionNotFoundException> {
