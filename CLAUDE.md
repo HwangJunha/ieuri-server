@@ -307,7 +307,11 @@ Those rules are deleted in the final slice, not piecemeal.
   `Table` objects live in `adapter/persistence/table/` and mirror the DB exactly — the startup
   schema check fails on any drift except column type, which it cannot see. Transactions use Spring
   `@Transactional` on the Exposed transaction manager, never Exposed's `transaction {}` block.
-  PostGIS, CTEs and pgvector distance stay raw SQL.
+  PostGIS, CTEs and pgvector distance stay raw SQL, through a `JdbcTemplate` on `exposedDataSource` (it
+  joins the Exposed transaction). Declaring a table: identity id → `autoIncrement()`, read the generated
+  value with `insertReturning`; `DEFAULT now()` → `databaseGenerated()`; `timestamptz` →
+  `timestampWithTimeZone`; FKs → `onUpdate = NO_ACTION` and the DB's constraint name; CHECK, index and
+  UNIQUE names exactly as in the migration.
 - **Conversions live in each adapter's `mapper/` package as extension functions** —
   `adapter/graphql/mapper`, `adapter/persistence/mapper`, `adapter/client/mapper`. Resolvers and
   repositories contain no conversion code. The field-by-field test rule is unchanged.

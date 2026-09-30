@@ -29,9 +29,19 @@ repositories {
 extra["netflixDgsVersion"] = "12.1.0"
 // DGS 12가 strictly 3.0.0을 요구한다 — 아래 Boot BOM 재import가 2.10.0으로 내리지 않게 Boot 버전 속성으로 맞춘다.
 extra["json-path.version"] = "3.0.0"
+extra["exposedVersion"] = "1.5.0"
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    // 영속성 이전 대상(SPEC-0039 D-32). DSL만 쓴다 — DAO 모듈은 넣지 않는다.
+    // 스타터가 아니라 트랜잭션 모듈만 쓴다: 스타터의 자동구성이 트랜잭션 매니저를 만들면 JPA 매니저 자동구성이 물러난다.
+    implementation("org.jetbrains.exposed:exposed-core:${property("exposedVersion")}")
+    implementation("org.jetbrains.exposed:exposed-jdbc:${property("exposedVersion")}")
+    implementation("org.jetbrains.exposed:exposed-java-time:${property("exposedVersion")}")
+    implementation("org.jetbrains.exposed:spring7-transaction:${property("exposedVersion")}")
+    // 기동 시 스키마 검증(D-35).
+    implementation("org.jetbrains.exposed:exposed-migration-core:${property("exposedVersion")}")
+    implementation("org.jetbrains.exposed:exposed-migration-jdbc:${property("exposedVersion")}")
     // k8s 프로브용 health와 메트릭 노출. 노출 범위는 application.yaml의 management 블록이 정한다.
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     // 이 의존을 빼면 /actuator/prometheus가 404가 된다(management 설정과 무관하게).
