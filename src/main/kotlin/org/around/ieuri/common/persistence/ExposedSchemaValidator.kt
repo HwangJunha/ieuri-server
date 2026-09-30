@@ -2,6 +2,8 @@ package org.around.ieuri.common.persistence
 
 import org.jetbrains.exposed.v1.core.Table
 import org.jetbrains.exposed.v1.migration.jdbc.MigrationUtils
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.SmartInitializingSingleton
 import org.springframework.beans.factory.annotation.Qualifier
@@ -38,5 +40,10 @@ class ExposedSchemaValidator(
         check(drift.isEmpty()) {
             "Exposed 테이블 정의가 DB 스키마와 다르다 — Table 객체를 마이그레이션에 맞춘다:\n" + drift.joinToString(";\n")
         }
+        log.info("Exposed 스키마 검증 통과: 테이블 {}개", tables.size)
+    }
+
+    private companion object {
+        val log: Logger = LoggerFactory.getLogger(ExposedSchemaValidator::class.java)
     }
 }

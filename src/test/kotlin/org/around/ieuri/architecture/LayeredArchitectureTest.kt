@@ -22,7 +22,8 @@ class LayeredArchitectureTest {
             .consideringOnlyDependenciesInLayers()
             .layer("Domain").definedBy("..domain..")
             .layer("Application").definedBy("..application..")
-            .layer("Infrastructure").definedBy("..infrastructure..")
+            // `..adapter..`: Exposed로 옮긴 context의 새 구조(SPEC-0039 D-47). 옛 구조가 사라지면 `..infrastructure..`를 뺀다.
+            .layer("Infrastructure").definedBy("..infrastructure..", "..adapter..")
             .whereLayer("Infrastructure").mayNotBeAccessedByAnyLayer()
             .whereLayer("Application").mayOnlyBeAccessedByLayers("Infrastructure")
             .whereLayer("Domain").mayOnlyBeAccessedByLayers("Application", "Infrastructure")
@@ -105,6 +106,15 @@ class LayeredArchitectureTest {
             // 발행된 도메인 이벤트 구독은 인바운드 이벤트 어댑터에서만 허용한다.
             .ignoreDependency(
                 JavaClass.Predicates.resideInAPackage("..infrastructure.adapter.in.event.."),
+                JavaClass.Predicates.resideInAPackage("..domain.event.."),
+            )
+            // 새 구조(SPEC-0039 D-47): `adapter.client` → 상대의 `provided`(포트·DTO), `adapter.event` → 상대의 `domain.event`.
+            .ignoreDependency(
+                JavaClass.Predicates.resideInAPackage("..adapter.client.."),
+                JavaClass.Predicates.resideInAnyPackage("..application..provided..", "..application.port.in..", "..application.query.."),
+            )
+            .ignoreDependency(
+                JavaClass.Predicates.resideInAPackage("..adapter.event.."),
                 JavaClass.Predicates.resideInAPackage("..domain.event.."),
             )
             .because("도메인 간 상호작용은 상대 도메인의 port/in 또는 발행된 도메인 이벤트로만 한다")
