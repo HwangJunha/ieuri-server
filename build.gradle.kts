@@ -1,13 +1,13 @@
 plugins {
-    kotlin("jvm") version "2.3.0"
-    kotlin("plugin.spring") version "2.3.0"
-    id("org.springframework.boot") version "4.0.7"
+    kotlin("jvm") version "2.3.21"
+    kotlin("plugin.spring") version "2.3.21"
+    id("org.springframework.boot") version "4.1.1"
     id("io.spring.dependency-management") version "1.1.7"
-    kotlin("plugin.jpa") version "2.3.0"
+    kotlin("plugin.jpa") version "2.3.21"
     // QueryDSL Q클래스 생성을 위한 애노테이션 프로세싱(kapt).
-    kotlin("kapt") version "2.3.0"
+    kotlin("kapt") version "2.3.21"
     // 스키마 우선: schema/*.graphqls로부터 GraphQL input/output/enum 타입을 생성한다.
-    id("com.netflix.dgs.codegen") version "8.6.0"
+    id("com.netflix.dgs.codegen") version "8.7.0"
     // 스타일 센서(ktlint). `check`에 lintKotlin이 붙는다 — 규칙은 .editorconfig.
     id("org.jmailen.kotlinter") version "5.7.0"
 }
@@ -26,7 +26,9 @@ repositories {
     mavenCentral()
 }
 
-extra["netflixDgsVersion"] = "11.1.0"
+extra["netflixDgsVersion"] = "12.1.0"
+// DGS 12가 strictly 3.0.0을 요구한다 — 아래 Boot BOM 재import가 2.10.0으로 내리지 않게 Boot 버전 속성으로 맞춘다.
+extra["json-path.version"] = "3.0.0"
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
@@ -98,6 +100,8 @@ dependencies {
 dependencyManagement {
     imports {
         mavenBom("com.netflix.graphql.dgs:graphql-dgs-platform-dependencies:${property("netflixDgsVersion")}")
+        // Boot BOM을 뒤에 한 번 더 import한다 — 나중 import가 이긴다. 빼면 DGS BOM이 reactor-core 등을 Boot보다 낮게 덮어쓴다.
+        mavenBom(org.springframework.boot.gradle.plugin.SpringBootPlugin.BOM_COORDINATES)
     }
 }
 
