@@ -12,7 +12,7 @@
 - 회귀 보호: FR-016
 - 품질: QR-001
 - 단위 테스트 밖의 확인: VC-001 ~ VC-007
-- 제약: 스타일=ktlint·아키텍처=ArchUnit(사용자 결정), 기한 2026-10-02, 여러 브랜치 허용
+- 제약: 스타일=ktlint·아키텍처=ArchUnit(사용자 결정), 여러 브랜치 허용. 기한은 범위 확장(2026-09-30)으로 다시 정한다 — 부족한 정보 Q03
 
 ## 적용 정책
 
@@ -28,16 +28,19 @@
 | POL-035 | 검색어 트림 후 100자 — `maxSearchQueryLength` 판정 위치를 옮겨도 값·순서 동일(D-06) |
 | POL-044 | 설정으로 뺀 값은 설정으로 남는다(FR-007, D-07). 반대로 도메인 상수(`Post.TITLE_MAX_LENGTH` 등)를 이번에 설정으로 올리지 않는다 |
 | POL-053 | 관리 연산의 이중 방어가 이름 변경 뒤에도 남는지 VC-001 오류 사례(권한 없음)로 확인한다 |
-| POL-054 | 파기 판정은 값·의미·정렬·폴백·기본값 기준. VC-001의 비교 기준 그 자체다 |
+| POL-054 | 파기 판정은 값·의미·정렬·폴백·기본값 기준. VC-001의 비교 기준 그 자체다. D-38(다중 위반 우선순위)·D-43(결함 수정)은 의도한 차이로 VC-001 결과에 따로 적는다 |
+| POL-041 | 자동 숨김은 서로 다른 신고자 5명 — 카운터 원자화(D-40)가 신고 집계에도 적용되어야 한다 |
+| POL-049 · POL-050 | 신고된 메시지 열람 vs 6개월 파기가 충돌한다 — Q04 |
+| POL-056 | 풀을 나눌 때 매니페스트의 풀 크기·환경변수를 함께 바꾼다(D-33) |
 
 ## 결정
 
 | # | 슬라이스 | 결정 | 근거 | 탈락 대안과 이유 |
 |---|---|---|---|---|
-| D-01 | S3~S5 | **옮기는 것과 남기는 것을 규칙의 성격으로 가른다.** domain으로: 길이·개수 한도, 허용 값 범위, 상태 전이 가능 여부(FR-005가 열거한 셋). application에 남김: 존재 확인(`*NotFound`), 소유·참여·차단의 **예외 선택**(판정 자체는 이미 `ownedBy`·`hasParticipant`로 domain), 저장소가 필요한 유일성(`AlreadyReported`·`EmailAlreadyInUse`), 자격증명·토큰 재사용, `requireNotNull(saved.id)` 같은 기술적 불변, **설정값으로 조정되는 한도**(D-06) | 저장소·외부 호출 없이 참·거짓이 정해지는 것만 FR-005의 대상이다. 존재·유일성은 정의상 저장소를 봐야 한다. 서비스 52개 중 규칙 판정이 있는 32개(grep: throw·require·check 174줄)를 분류한 결과는 아래 설계 절의 표 | **전부 domain으로**: 존재 확인을 domain에 넣으려면 domain이 포트를 알아야 해 순수성(FR-005 자체)이 깨진다. **서비스에 그대로 두고 상수만 공유**: 지금 상태가 그것이며, 같은 규칙이 서비스 2곳 + domain 2곳에서 판정되는 것이 FR-006 위반의 원인이다 |
-| D-02 | S3~S4 | **판정 형태: domain이 규칙을 순수 판정 함수로 소유하고, 위반을 값(규칙별 위반 타입)으로 돌려준다. application은 지금과 같은 시점에 그 함수를 호출하고, 애그리게이트의 생성·변경 메서드도 같은 함수로 가드한다.** 한 필드 한도는 애그리게이트 쪽 판정, 여러 객체에 걸친 규칙은 `domain/specification`, 상태 전이는 애그리게이트 메서드의 결과로 표현 | **판정 순서가 응답을 정한다.** `createPost`는 제목·본문·사진 수를 장소 조회(`SPOT_NOT_FOUND_IN_LOCALE`)와 사진 업로드 확인보다 먼저 본다. 판정을 `Post.create()` 안으로만 옮기면 "긴 제목 + 없는 장소" 요청의 코드가 바뀐다(FR-003 파기). 판정 함수를 앞에서 호출하면 순서가 그대로이고 규칙은 한곳에 있다(FR-006). 선례: `tourism/application/validation/NearbySearchValidation.kt` | **domain이 예외를 던지고 서비스가 잡아 번역**: 판정 시점이 애그리게이트 호출 시점으로 밀려 순서가 깨지고, `IllegalArgumentException`을 넓게 잡으면 무관한 IAE까지 삼킨다. **필드마다 VO**: 애그리게이트 시그니처·엔티티 매퍼·기존 테스트가 함께 흔들리는데 얻는 동작이 없다. **Specification으로 통일**: 한 필드 길이 규칙까지 클래스로 만들면 판정이 애그리게이트와 멀어진다 |
-| D-03 | S3~S5 | **오류 응답 동일성은 번역 계층이 책임진다.** `application/validation`의 도메인별 번역 함수가 위반 값 → **기존 예외 클래스 그대로**(같은 `code`·같은 기본 메시지)로 옮긴다. 애그리게이트 가드가 던지는 `IllegalArgumentException`의 메시지는 **현재 문자열을 바이트 그대로 유지**한다. 한도를 문자열에 박아 둔 예외 메시지는 이번에 옮기는 규칙에 한해 domain 상수로 템플릿화한다 — 출력 바이트가 같을 때만 | 도메인 `require` 메시지는 **이미 응답에 나간다**: 세 도메인의 오류 지원(`toCommunityUserErrorOrNull`, auth `toUserErrorOrNull`, `withAlarmUserErrors`)이 IAE를 `INVALID_INPUT` + `e.message`로 바꾼다(FR-003·FR-004, POL-016). 템플릿화는 AC-005에서 메시지만 옛 숫자를 말하는 상태를 막는다 | **예외를 domain으로 옮겨 코드를 domain이 앎**: auth enum(POL-016)이 domain으로 새어 든다. **오류 코드 한곳 통합(enum화)**: 이번 범위 밖이고, 비대칭 유지가 POL-016의 명시 결정이다 |
-| D-04 | — | **애그리게이트 루트 구조를 새로 들이지 않는다.** 이미 있는 `domain/aggregate`(20개)에 규칙을 옮겨 담을 뿐, 공통 기반 클래스·애그리게이트 병합·애그리게이트 내 이벤트 수집은 하지 않는다 | spec은 도입을 요구도 금지도 하지 않는다. 현재 코드가 이미 애그리게이트 단위(`create`·`restore`·Boolean 결과 상태 변경)로 짜여 있어, 부족한 것은 구조가 아니라 **규칙이 서비스에 있다**는 점이다 | **splearn식(JPA 엔티티 = 도메인)**: apps.md·POL-033과 충돌. **애그리게이트 병합**: 로딩 단위·트랜잭션 모양이 바뀌어 조회 성능이 달라진다(SPEC-0038 목표 유지) — 동작 불변 리팩토링에서 가장 위험한 변경이다 |
+| D-01 | S3~S5 | **[D-38이 뒤집음 — 2026-09-30]** **옮기는 것과 남기는 것을 규칙의 성격으로 가른다.** domain으로: 길이·개수 한도, 허용 값 범위, 상태 전이 가능 여부(FR-005가 열거한 셋). application에 남김: 존재 확인(`*NotFound`), 소유·참여·차단의 **예외 선택**(판정 자체는 이미 `ownedBy`·`hasParticipant`로 domain), 저장소가 필요한 유일성(`AlreadyReported`·`EmailAlreadyInUse`), 자격증명·토큰 재사용, `requireNotNull(saved.id)` 같은 기술적 불변, **설정값으로 조정되는 한도**(D-06) | 저장소·외부 호출 없이 참·거짓이 정해지는 것만 FR-005의 대상이다. 존재·유일성은 정의상 저장소를 봐야 한다. 서비스 52개 중 규칙 판정이 있는 32개(grep: throw·require·check 174줄)를 분류한 결과는 아래 설계 절의 표 | **전부 domain으로**: 존재 확인을 domain에 넣으려면 domain이 포트를 알아야 해 순수성(FR-005 자체)이 깨진다. **서비스에 그대로 두고 상수만 공유**: 지금 상태가 그것이며, 같은 규칙이 서비스 2곳 + domain 2곳에서 판정되는 것이 FR-006 위반의 원인이다 |
+| D-02 | S3~S4 | **[D-38이 뒤집음 — 2026-09-30]** **판정 형태: domain이 규칙을 순수 판정 함수로 소유하고, 위반을 값(규칙별 위반 타입)으로 돌려준다. application은 지금과 같은 시점에 그 함수를 호출하고, 애그리게이트의 생성·변경 메서드도 같은 함수로 가드한다.** 한 필드 한도는 애그리게이트 쪽 판정, 여러 객체에 걸친 규칙은 `domain/specification`, 상태 전이는 애그리게이트 메서드의 결과로 표현 | **판정 순서가 응답을 정한다.** `createPost`는 제목·본문·사진 수를 장소 조회(`SPOT_NOT_FOUND_IN_LOCALE`)와 사진 업로드 확인보다 먼저 본다. 판정을 `Post.create()` 안으로만 옮기면 "긴 제목 + 없는 장소" 요청의 코드가 바뀐다(FR-003 파기). 판정 함수를 앞에서 호출하면 순서가 그대로이고 규칙은 한곳에 있다(FR-006). 선례: `tourism/application/validation/NearbySearchValidation.kt` | **domain이 예외를 던지고 서비스가 잡아 번역**: 판정 시점이 애그리게이트 호출 시점으로 밀려 순서가 깨지고, `IllegalArgumentException`을 넓게 잡으면 무관한 IAE까지 삼킨다. **필드마다 VO**: 애그리게이트 시그니처·엔티티 매퍼·기존 테스트가 함께 흔들리는데 얻는 동작이 없다. **Specification으로 통일**: 한 필드 길이 규칙까지 클래스로 만들면 판정이 애그리게이트와 멀어진다 |
+| D-03 | S3~S5 | **[D-38이 뒤집음 — 2026-09-30]** **오류 응답 동일성은 번역 계층이 책임진다.** `application/validation`의 도메인별 번역 함수가 위반 값 → **기존 예외 클래스 그대로**(같은 `code`·같은 기본 메시지)로 옮긴다. 애그리게이트 가드가 던지는 `IllegalArgumentException`의 메시지는 **현재 문자열을 바이트 그대로 유지**한다. 한도를 문자열에 박아 둔 예외 메시지는 이번에 옮기는 규칙에 한해 domain 상수로 템플릿화한다 — 출력 바이트가 같을 때만 | 도메인 `require` 메시지는 **이미 응답에 나간다**: 세 도메인의 오류 지원(`toCommunityUserErrorOrNull`, auth `toUserErrorOrNull`, `withAlarmUserErrors`)이 IAE를 `INVALID_INPUT` + `e.message`로 바꾼다(FR-003·FR-004, POL-016). 템플릿화는 AC-005에서 메시지만 옛 숫자를 말하는 상태를 막는다 | **예외를 domain으로 옮겨 코드를 domain이 앎**: auth enum(POL-016)이 domain으로 새어 든다. **오류 코드 한곳 통합(enum화)**: 이번 범위 밖이고, 비대칭 유지가 POL-016의 명시 결정이다 |
+| D-04 | — | **[D-40이 뒤집음 — 2026-09-30]** **애그리게이트 루트 구조를 새로 들이지 않는다.** 이미 있는 `domain/aggregate`(20개)에 규칙을 옮겨 담을 뿐, 공통 기반 클래스·애그리게이트 병합·애그리게이트 내 이벤트 수집은 하지 않는다 | spec은 도입을 요구도 금지도 하지 않는다. 현재 코드가 이미 애그리게이트 단위(`create`·`restore`·Boolean 결과 상태 변경)로 짜여 있어, 부족한 것은 구조가 아니라 **규칙이 서비스에 있다**는 점이다 | **splearn식(JPA 엔티티 = 도메인)**: apps.md·POL-033과 충돌. **애그리게이트 병합**: 로딩 단위·트랜잭션 모양이 바뀌어 조회 성능이 달라진다(SPEC-0038 목표 유지) — 동작 불변 리팩토링에서 가장 위험한 변경이다 |
 | D-05 | S3 | **`createPost`와 `editPost`의 태그 개수 초과 응답 비대칭을 유지한다.** 생성은 도메인 `require`가 `INVALID_INPUT`("태그는 최대 5개입니다."), 수정은 `TOO_MANY_TAGS`. 판정은 한 함수(D-02)로, **번역만 경로별로** 지금과 같게 둔다. AC-004는 "같은 도메인 판정이 같은 위반을 돌려준다"로 domain 단위에서 검증한다 | BR-001·FR-003을 함께 만족하는 길은 판정 일원화 + 번역 보존뿐이다. 결함은 별도 spec 대상으로 보고한다 | **둘 다 `TOO_MANY_TAGS`로 통일**: 생성 경로 응답 코드가 바뀐다(POL-054) |
 | D-06 | S5 | **`application/policy`의 숫자 한도는 "한도 값 + 판정"을 함께 가진 규칙 객체로 바꾼다**(예: 반경 상한 판정, 페이지 크기 절삭). 규칙 객체는 infrastructure config가 설정값으로 만들어 주입한다. 반경 3곳·좌표 번역 3곳·bbox 면적 2곳의 판정이 각각 한 객체로 모인다. 절삭/거절 방식과 오류 코드는 그대로(AC-007, D-03) | FR-006(한 규칙 한 곳) + FR-007(설정으로 조정). 값과 판정이 한 객체에 있으면 한 곳 판정이 구조로 보장된다. **초안 결정(application 판정 함수 + 숫자 봉투)을 뒤집는다(2026-09-28 사용자 결정)** — 초안이 탈락시킨 "한도를 domain에 인자로 넘김"의 사유(설정이 domain까지 흐른다)는 `RecommendationScore`가 이미 설정값을 받아 domain에 있는 선례로 약했다 | **숫자 봉투(Policy) + application 판정 함수**: 값과 판정이 떨어져 있어 판정이 다시 흩어질 수 있다. **인터페이스 + 구현 여럿(교과서 전략 패턴)**: 한도는 알고리즘 교체가 아니라 값 변경이고 두 번째 구현이 없다 — 교체할 일이 생기면 그때 인터페이스를 뽑는다 |
 | D-07 | S5 | **`application/policy` 묶음(10개)을 없앤다.** 알고리즘(`RecommendationScore`·`CategoryDiversity`·`RegionScoreCalculator`·`DistanceScoring`·`FreshnessDecay`)은 서비스가 직접 주입받고, 숫자 한도는 D-06의 규칙 객체로, 외부 호출 설정(임베딩 모델명·차원·재시도 등)은 해당 어댑터 설정으로 내린다(필드마다 S5에서 판정). `*Policy` 이름 센서는 두지 않는다 | 사용자 질문("Policy가 필요한가, 전략 패턴이어야 하지 않나", 2026-09-28)에 대한 조사: 10개 중 8개는 숫자 한도뿐이고 2개는 알고리즘 객체를 담아 서비스가 `policy.score.score(…)`로 꺼내 쓴다. 봉투가 알고리즘을 들고 다닐 이유가 없다. **초안(이름·위치 유지 + `*Policy` 센서)을 뒤집는다** | **유지**: 값·판정 분리와 봉투 경유가 남는다. **`*Settings` 개명**: 이름만 바뀌고 구조 문제가 남는다 |
@@ -45,11 +48,11 @@
 | D-09 | S6 | **변환 위치 규칙(FR-009)**: application·infrastructure에서 이름이 `to[A-Z]…`이거나 `from`인 메서드는 **`..mapper..` 패키지의 최상위 함수에만** 있다. 클래스·`object`·companion 멤버 변환 금지. `toString`은 제외. application 쪽 변환(도메인 → View 등)은 `application/mapper/`로 모은다. domain은 대상 아님 | 전수: infrastructure 멤버 변환 63건(리졸버 30 등) + mapper 밖 최상위 1, application 14건. 규칙을 "클래스 멤버인가"로 쓰는 것은 1차 조사(`HARNESS-server-sensors.md`)의 교훈. 패키지 패턴은 `..mapper..` | **생성 타입 생성자 호출 금지**: 186곳, payload 조립까지 걸린다(D-10). **Konsist로 작성**: 멤버 vs 최상위 함수는 바이트코드로 구별된다(`*Kt`) |
 | D-10 | S6 | **리졸버의 payload 조립은 리졸버에 남긴다.** 변환 규칙의 대상은 "경계 값 ↔ 도메인/View"로 한정 | 성공/실패 봉투를 채우는 것은 요청 흐름의 일부다 | **payload까지 mapper로**: D-09의 186곳 문제 |
 | D-11 | S6 | **리졸버가 도메인 VO를 조립하는 2곳**(`RegionRecommendationResolver`, `MapQueryResolver`)은 **오류 응답이 동일함을 확인할 수 있으면** `application/validation`으로 옮기고, 아니면 in/graphql `mapper`로만 옮긴다 | "인바운드 어댑터는 도메인 VO를 조립하지 않는다"는 합의. FR-003이 우선이다 | **무조건 application으로**: 실패 경로가 `errors[]` ↔ `userErrors[]`로 바뀔 위험 |
-| D-12 | S7 | **`port.in.command`는 `*CommandUseCase`, `port.in.query`는 `*QueryUseCase`.** 48개 중 25개 개명, 파일명도 맞춘다 | CLAUDE.md Layout이 이미 이 이름을 규정. 참고 프로젝트(splearn)의 역할 명사(`MemberRegister`·`MemberFinder`)와 비교 후 유지(사용자 동의 2026-09-28) — 접미사는 센서로 강제되지만(FR-011) 역할 명사의 적절성은 기계가 판정할 수 없다. 방향 없는 이름은 과거 이름 충돌을 낳았다 | **`*UseCase`로 통일**: 개명 수는 비슷하고 import만 보고 방향을 모른다 |
-| D-13 | S7 | **`application/service`의 최상위 클래스는 전부 `*Service`.** 5개 개명(`TokenIssuer`, `ProviderEmailUniqueness`, `ProviderTokenCollector`, `SpotQaPhotoKeyVerifier`, `PushDispatchStore`) | 한 패키지 한 규칙 | **협력 객체용 패키지 신설**: 규칙 없는 패키지가 하나 더 생길 뿐이다 |
-| D-14 | S7 | **`adapter.out.persistence`는 `*PersistenceAdapter`, `adapter.out.query`는 `*QueryAdapter`, `JdbcTemplate`·`NamedParameterJdbcTemplate`에 의존하는 클래스는 `*JdbcAdapter`**(역방향도). config의 DataSource 설정은 대상 밖. 20개 개명 | 현재 persistence 56개가 네 갈래, JdbcTemplate 어댑터 25개 중 `Jdbc` 표시 19 | **`Spatial`도 raw SQL 표시로 허용**: 같은 사실에 단어가 둘. **tourism의 `Store` 유지**: FR-011 위반 그 자체 |
-| D-15 | S7 | **`application/query`의 타입은 `*View` 또는 `*Query`로 끝난다.** 그 밖의 11개는 개명하거나 제자리로 옮긴다 | "읽기 모델"이라는 한 역할에 단어 하나 | **자유 명명 유지**: 센서가 검사할 것이 없다 |
-| D-16 | — | **`toNewEntity`는 유지한다.** 규칙 문서에 이유를 적는다 | 갱신은 관리 엔티티에 쓰고 더티체킹에 맡긴다. 새 엔티티를 만드는 변환은 생성 경로에서만 쓴다 — `New`가 그 구분을 이름으로 강제한다 | **`toEntity`로 개명**: 갱신 경로에서 새 엔티티를 만들어 `save()`하는 오용을 부른다 |
+| D-12 | S7 | **[D-39이 뒤집음 — 2026-09-30]** **`port.in.command`는 `*CommandUseCase`, `port.in.query`는 `*QueryUseCase`.** 48개 중 25개 개명, 파일명도 맞춘다 | CLAUDE.md Layout이 이미 이 이름을 규정. 참고 프로젝트(splearn)의 역할 명사(`MemberRegister`·`MemberFinder`)와 비교 후 유지(사용자 동의 2026-09-28) — 접미사는 센서로 강제되지만(FR-011) 역할 명사의 적절성은 기계가 판정할 수 없다. 방향 없는 이름은 과거 이름 충돌을 낳았다 | **`*UseCase`로 통일**: 개명 수는 비슷하고 import만 보고 방향을 모른다 |
+| D-13 | S7 | **[D-39이 뒤집음 — 2026-09-30]** **`application/service`의 최상위 클래스는 전부 `*Service`.** 5개 개명(`TokenIssuer`, `ProviderEmailUniqueness`, `ProviderTokenCollector`, `SpotQaPhotoKeyVerifier`, `PushDispatchStore`) | 한 패키지 한 규칙 | **협력 객체용 패키지 신설**: 규칙 없는 패키지가 하나 더 생길 뿐이다 |
+| D-14 | S7 | **[D-36이 뒤집음 — 2026-09-30]** **`adapter.out.persistence`는 `*PersistenceAdapter`, `adapter.out.query`는 `*QueryAdapter`, `JdbcTemplate`·`NamedParameterJdbcTemplate`에 의존하는 클래스는 `*JdbcAdapter`**(역방향도). config의 DataSource 설정은 대상 밖. 20개 개명 | 현재 persistence 56개가 네 갈래, JdbcTemplate 어댑터 25개 중 `Jdbc` 표시 19 | **`Spatial`도 raw SQL 표시로 허용**: 같은 사실에 단어가 둘. **tourism의 `Store` 유지**: FR-011 위반 그 자체 |
+| D-15 | S7 | **[D-36이 뒤집음 — 2026-09-30]** **`application/query`의 타입은 `*View` 또는 `*Query`로 끝난다.** 그 밖의 11개는 개명하거나 제자리로 옮긴다 | "읽기 모델"이라는 한 역할에 단어 하나 | **자유 명명 유지**: 센서가 검사할 것이 없다 |
+| D-16 | — | **[D-32이 뒤집음 — 2026-09-30]** **`toNewEntity`는 유지한다.** 규칙 문서에 이유를 적는다 | 갱신은 관리 엔티티에 쓰고 더티체킹에 맡긴다. 새 엔티티를 만드는 변환은 생성 경로에서만 쓴다 — `New`가 그 구분을 이름으로 강제한다 | **`toEntity`로 개명**: 갱신 경로에서 새 엔티티를 만들어 `save()`하는 오용을 부른다 |
 | D-17 | S2 | **`port.out`의 인터페이스 중 infrastructure가 구현하는 것은 `*Port`.** 116/116 | 비용 0으로 FR-011을 넓힌다. 대상을 "infrastructure가 구현하는"으로 두는 것은 포트의 정의 그대로다 — 같은 패키지의 결과 타입 `sealed interface SnsRevokeResult`가 첫 구현에서 거짓 양성으로 걸렸다 | **"연산을 선언한 인터페이스"**: 결과 타입에 프로퍼티가 생기면 getter가 메서드로 잡혀 다시 거짓 양성이 된다(리뷰 지적). **sealed 제외**: Kotlin sealed 여부는 바이트코드로 안정적으로 보이지 않는다 |
 | D-18 | S7 | **패키지·이름 규칙 문서(FR-011)는 CLAUDE.md Naming 절을 표로 확장해 둔다.** 1차 센서 KDoc의 "임시 규칙" 경고도 갱신 | CLAUDE.md가 규칙의 권위 문서다. 별도 문서는 드리프트한다 | **`docs/conventions.md` 신설**: 두 사본이 어긋난다 |
 | D-19 | — | **사용자 정의 스테레오타입 애노테이션은 들이지 않는다** | 사용자 결정(2026-09-28, splearn 비교 후). 패키지 + 접미사로 역할이 이미 결정되고, splearn의 `@ApplicationService`는 클래스 단위 `@Transactional`을 묶어 우리의 메서드별 `readOnly`·`REQUIRES_NEW`와 충돌한다 | **도입**: 같은 사실의 세 번째 표시가 된다 |
@@ -62,13 +65,29 @@
 | D-26 | S9 | **VC-002: `git diff 82fdd48..HEAD -- src/main/resources/schema/`가 0줄**임을 기록한다 | 스키마 우선 — 파일이 곧 스키마다. FR-002보다 엄격하다 | **인트로스펙션 비교**: 같은 것을 확인하는 데 서버 기동이 필요하다 |
 | D-27 | S0·S9 | **VC-007: 기준 커밋과 최종 커밋의 JUnit XML 테스트 목록을 대조해 `problem/SPEC-0039-vc/test-mapping.md`에 남긴다.** 사라지거나 이름이 바뀐 항목만 수작업으로 대응을 적는다 | 기계적으로 가능한 부분은 기계로 한다. 기준: 183 suite · 1664 테스트 | **수작업 전수**: 누락이 난다 |
 | D-28 | 전체 | **작업 중에는 컴파일만, 테스트는 각 브랜치 PR 직전에 `check` 전체.** 본문을 **그대로 옮긴** 변환은 필드별 변환 테스트를 새로 요구하지 않는다(VC-001 A/B가 보호). 옮기면서 **본문을 고친** 변환은 필드별 테스트를 쓴다 | CLAUDE.md "작성 중 테스트를 돌리지 않는다". 변환 테스트 규칙은 "슬라이스가 추가하거나 바꾼 것"에 걸리는데, 잘라 붙이기는 필드 대응을 바꾸지 않는다(사용자 승인 2026-09-28) | **옮긴 변환 77건 전부에 필드별 테스트**: 기한 안에 불가 |
-| D-29 | — | **브랜치 4개 순차 + 검증 1회.** ktlint 일괄 포맷은 맨 먼저 단독 브랜치로 머지. 각 센서는 **자기가 검사할 코드를 고친 커밋 뒤**에 켠다 | FR-014(도입 시점 0건). 포맷 diff(약 6.8k줄)와 리팩토링 diff가 섞이면 리뷰가 불가능하다 | **한 브랜치**: 포맷 diff 속에서 동작 변경을 찾아야 한다. **병렬 브랜치**: 같은 서비스 파일을 건드려 충돌한다 |
+| D-29 | — | **[D-44이 뒤집음 — 2026-09-30]** **브랜치 4개 순차 + 검증 1회.** ktlint 일괄 포맷은 맨 먼저 단독 브랜치로 머지. 각 센서는 **자기가 검사할 코드를 고친 커밋 뒤**에 켠다 | FR-014(도입 시점 0건). 포맷 diff(약 6.8k줄)와 리팩토링 diff가 섞이면 리뷰가 불가능하다 | **한 브랜치**: 포맷 diff 속에서 동작 변경을 찾아야 한다. **병렬 브랜치**: 같은 서비스 파일을 건드려 충돌한다 |
 | D-30 | C1 | **주석 전반을 CLAUDE.md POL-033 규칙으로 줄인다**: 무엇을 하는지 한두 줄, 운영 경고와 주석에만 있는 동작 사실(null vs 빈 목록, 절삭 vs 거절, 정렬 보장)은 한 줄로 압축해 남기고, 설계 근거·버린 대안·사고 이력은 지우고 SPEC id만 남긴다. 범위: main·test Kotlin, `build.gradle.kts`, `gradle.properties`, `application*.yaml`, 워크플로. **`.graphqls` 설명은 제외**. 동작 불변은 주석 제외 토큰 비교로 확인한다 | 사용자 요청("주석이 전반적으로 너무 길다", 2026-09-28). 실측: main 코드 27,838줄에 주석 13,637줄(49%), 10줄 이상 블록 305개·15줄 이상 62개. 스키마 설명은 클라이언트 계약이라 D-26·BR-001에 걸린다. B2·B3 전에 해야 옮기는 코드에 긴 주석이 딸려 가지 않는다 | **15줄 이상만 자름**: 요청(전반)을 해결하지 못한다. **근거를 `problem/`으로 옮김**: SPEC-0035 이전 코드는 결정 기록이 없어 옮길 자리를 새로 만드는 일이 된다. 대가: spec에 없는 옛 근거는 커밋 이력에만 남는다 |
 | D-31 | C2 | **주석 길이 센서: KDoc·블록 주석·연속된 `//` 묶음은 15줄 미만**(Konsist로 파일을 읽고 문자열 안의 주석 기호·자동 생성 코드는 제외). 연속 `//`까지 세는 것은 블록을 줄로 쪼개 규칙을 피하지 못하게 하려는 것이다. 코드 끝에 붙은 `//`도 연속된 줄이면 한 묶음으로 센다. 제외는 프로젝트 루트 기준 경로(`build/`·`.claude/`)로 판정한다 — 절대 경로에 `/build/`가 들어간 체크아웃에서 센서가 조용히 꺼지지 않게(리뷰 지적). 주석 정리 후 위반 0건일 때 켠다 | CLAUDE.md의 기존 규칙(KDoc 15줄 미만)을 기억이 아니라 빌드로 강제한다(FR-010 취지) | **센서 없이 리뷰에 맡김**: 정리 직후부터 다시 길어진다 |
+| D-32 | S11~S16 | **영속성을 JPA에서 Exposed 1.x DSL로 바꾼다.** domain은 계속 순수 Kotlin이다. 끝나면 JPA·QueryDSL·kapt를 걷어낸다(S16) | 사용자 결정(2026-09-30). 조사: JPA를 row mapper로만 쓴다 — 관계·cascade·lazy·`@Version` 0건, raw SQL 어댑터 25·`ON CONFLICT` 27. JPA 암묵 동작(자동 flush·1차 캐시·dirty-checking)이 lost update(글 좋아요·댓글 수, 질문 답변 수, 대화 읽음 지점)의 원인이다. 암묵 동작에 기대는 서비스 코드는 결함으로 보고 고친다(사용자 지시) | **JPA 유지**: 장점을 못 쓰고 암묵 동작의 위험만 진다. **JPA 엔티티 = 도메인(splearn)**: 위와 같은 암묵 동작이 도메인까지 온다. **Spring Data JDBC**: 권장안이었으나 사용자가 Exposed 선택 — 둘 다 암묵 동작이 없고, Exposed는 PostGIS·upsert·window 함수를 DSL로 더 많이 덮는다 |
+| D-33 | S11~S15 | **Exposed는 별도 DataSource(같은 DB, primary/replica 라우팅 동일)와 자기 트랜잭션 매니저를 쓰고, bounded context 단위로 community → tourism → auth → alarm 순서로 옮긴다.** 옮긴 context는 서비스 `@Transactional`이 Exposed 매니저를 지정하고, 그 context의 raw SQL도 Exposed DataSource를 쓴다. 두 풀의 합이 지금 풀 크기를 넘지 않게 나눈다 | 사용자 지시(2026-09-30). 확인: context 간 쓰기는 전부 `AFTER_COMMIT` 이벤트, 동기 호출은 조회 유스케이스 3개뿐이라 **한 트랜잭션이 두 매니저에 걸치는 곳이 없다**. tourism 배치 스텝은 tourism 이전 때 매니저를 바꾼다 | **한 번에 전부 교체**: 검증 단위가 서버 전체가 되어 회귀 위치를 좁힐 수 없다. **같은 DataSource 공유**: JPA와 Exposed 매니저가 같은 커넥션을 두고 경합한다 |
+| D-34 | S10 | **Spring Boot 4.1.1 · DGS 12.1.0 · codegen 8.7.0 · Kotlin 2.3.21로 올리고, DGS BOM 뒤에 Boot BOM을 다시 import해 Boot 관리 버전이 이기게 한다** | 조사: DGS 기동 검사는 메이저(4)만 본다, spring-graphql 2.0.x·graphql-java 25.0이 4.0과 같다, 실제 비호환 지점은 Boot 4.2(graphql-java 26). 실측: 현재 DGS 11.1.0 BOM이 `reactor-core 3.8.0 → 3.6.1`, `context-propagation 1.2.1 → 1.2.0`으로 내려 Spring 7 요구보다 낮다. DGS 12는 Jackson 3 기본 — 우리가 이미 Jackson 3 | **DGS 11.1.0 유지**: BOM 다운그레이드 문제가 남는다. **라이브러리별 버전 고정**: 고정값이 다음 업그레이드에서 다시 낡는다 |
+| D-35 | S11 | **스키마 검증: 기동 시 `MigrationUtils.statementsRequiredForDatabaseMigration`이 비어 있지 않으면 기동을 실패시킨다.** 오탐은 결과 문자열을 거르지 않고 `Table` 정의를 DB와 똑같이 맞춰 없앤다. **PostgreSQL 컬럼 타입 불일치는 잡지 못하는 한계로 받아들인다** | 조사(Exposed 1.5.0 소스): `ddl-auto=validate` 대응은 없다. 타입 비교는 H2에서만 동작하고 CHECK는 이름만, 인덱스는 종류·조건을 보지 않는다. 오탐 후보(`now()` 기본값, 이름 붙은 CHECK 56, identity 시퀀스 이름)는 S11에서 실측으로 확정한다 | **타입 비교기 직접 작성**: 선례도 Spring 관용도 없는 수제 인프라(CLAUDE.md). **검증 없음**: 엔티티와 스키마가 어긋나도 첫 쿼리까지 모른다 |
+| D-36 | S12~S15 | **패키지: context → 층 → 애그리거트.** `domain/<aggregate>/`(루트·소속 엔티티·VO·예외·이벤트), `domain/shared/`, `application/<aggregate>/{provided,required}/`, `adapter/<기술>/`(`graphql`·`event`·`persistence`·`client`·`storage`·`config`). `infrastructure/adapter/in|out/` 구분을 없앤다 | splearn 대조(2026-09-30). 현재 community 한 context에 디렉터리 40개, `domain/aggregate/`에 성격이 다른 애그리거트 11개가 섞여 있고 포트는 파일 하나에 여럿 묶였다. 애그리거트 패키지가 있어야 애그리거트 간 의존을 센서로 잡는다 | **splearn처럼 층을 최상위로**: 그 프로젝트는 context가 하나다 — 우리는 context 분리가 전제. **지금의 종류별(`aggregate/vo/event`)**: 관련 코드가 흩어진다. **in/out 유지**: 방향은 기술 이름이 이미 말한다 |
+| D-37 | S12~S15 | **도메인 모델은 불변 `data class`(전부 `val`, 컬렉션은 읽기 전용 `List`). 상태 변경 메서드는 검증 후 `copy`한 새 인스턴스를 돌려준다. 저장소 복원은 public 생성자로 한다(`restore` 없음). 도메인 밖에서 애그리거트 `copy` 호출을 금지하는 센서를 둔다.** `equals`는 기본값 — 애그리거트끼리 비교하는 곳이 나오면 그때 id 기준으로 바꾼다 | 사용자 결정(2026-09-30). 조사: 비JPA Kotlin의 다수 관행 — Spring Kotlin 튜토리얼(JDBC판) "immutable data classes", Spring Data 문서, Exposed 공식 샘플, JetBrains DDD 글. 지금 `Post`는 필드 목록을 생성자·`private set`·`restore`에 세 번 쓴다 | **private 생성자 + `@ConsistentCopyVisibility`**: 매퍼가 생성자를 못 불러 `restore`가 돌아온다. **가변 클래스 + `private set`(현재)**: 비JPA에서 권하는 출처를 찾지 못했고, Exposed는 저장이 어차피 명시적이다 |
+| D-38 | S12~S15 | **규칙 판정은 domain에만 둔다. domain은 위반마다 타입 있는 예외를 던지고, application은 선검증도 결과 해석(`Boolean`)도 하지 않는다.** 예외 → 오류 코드 번역은 어댑터의 오류 처리기가 기존 코드(`code`·`codeValue`) 그대로 한다(POL-016). **한 요청에 위반이 여럿일 때 어느 코드가 먼저 나가는지는 바뀔 수 있고, 이를 받아들인다** | 사용자 지시("비즈니스 로직도 고친다, 과한 설계를 뺀다", 2026-09-30). 실측: `Post` 제목·본문·사진 한도가 서비스 2곳 + domain 2곳에서 판정되고, `editBy`의 `false`를 서비스가 "숨겨진 글"로 해석한다. 원인은 domain의 이름 없는 `IllegalArgumentException`이다. **D-01~D-03을 뒤집는다** — D-02가 이 방식을 탈락시킨 사유(판정 순서)는 다중 위반 요청의 우선순위일 뿐이고, 그 대가로 규칙이 네 곳에 흩어졌다 | **D-02 판정 함수 + 위반 값**: 규칙 한 곳은 되지만 서비스가 판정 시점을 쥐어 로직이 계속 서비스에 남는다. **예외를 넓게 잡아 번역**: 무관한 IAE까지 삼킨다 |
+| D-39 | S12~S15 | **서비스는 애그리거트마다 `XxxModifyService`·`XxxQueryService` 둘로 모으고, 본문은 "찾는다 → 도메인 메서드 → 저장한다"로 쓴다.** 수정도 `save`를 명시한다. 다른 서비스·context의 조회는 `provided`의 `XxxFinder`로 한다. 들어오는 포트 파라미터는 `provided/dto`, 예외는 `provided/exception`에 둔다. 들어오는 포트 인터페이스 이름은 community 합의에서 정한다 | splearn·사용자 메모(서비스는 절차적으로 읽혀야 한다). 실측: community 서비스 19개(`PostCommandService`·`PostLikeCommandService`·`PostHideCommandService`…). **D-12·D-13을 뒤집는다** — 이름 규칙은 새 구조에서 다시 센서로 건다 | **현재 쪼개진 서비스 유지**: 한 애그리거트의 규칙을 보려면 서비스 여러 개를 읽어야 한다. **유스케이스당 클래스 하나**: 같은 문제가 더 커진다 |
+| D-40 | S12~S15 | **애그리거트 규칙: (1) 한 트랜잭션에서 애그리거트 하나만 load→변경→save. 다른 애그리거트 변경은 이벤트. (2) 카운터(좋아요·댓글·답변 수)는 애그리거트 상태가 아니라 저장소의 원자적 증감으로 같은 트랜잭션에서 올린다. (3) 동시에 수정될 수 있는 애그리거트는 `version` 컬럼(낙관적 락). 대상은 context 합의에서 정한다. (4) 애그리거트 밖은 id로만 참조. (5) 외부 I/O(HTTP·Valkey·R2)는 트랜잭션 밖. (6) 조회는 애그리거트를 거치지 않고 DSL로 조회 DTO를 바로 만든다** | 사용자 지시("경계도 바꿔야 한다", 2026-09-30). 조사: lost update 4건, 탈퇴 시 카운터 미감소, 반응 첫 insert 경합, auth의 트랜잭션 안 외부 호출·여러 애그리거트 동시 변경. Exposed는 행 전체를 UPDATE하므로 (3)이 없으면 lost update가 다시 생긴다. **D-04를 뒤집는다** | **카운터를 이벤트로 나중에 맞춤**: 방금 누른 좋아요가 숫자에 바로 반영되지 않는다(POL-041 숨김 임계는 신고 수라 해당 없음). **비관적 락**: 대화·글 수정 빈도에서 대기만 늘린다 |
+| D-41 | S12~S15 | **변환은 어댑터마다 `mapper` 패키지의 확장 함수로만 한다**(`adapter/graphql/mapper`·`adapter/persistence/mapper`·`adapter/client/mapper`). 리졸버와 저장소 구현에는 변환 코드가 없다. 필드별 변환 테스트는 POL-033 그대로. D-10(payload 조립은 리졸버)은 유지 | 사용자 지시(2026-09-30). 실측: `CommunityMutationResolver`가 입력 → Command 변환을 메서드 안에 인라인으로 가진다. D-09의 확장 | **context에 mapper 하나**: GraphQL 생성 타입과 Exposed 타입이 한 패키지에 섞여 어댑터 간 의존이 생긴다 |
+| D-42 | S11~S15 | **Exposed 사용 규칙: DSL만(DAO 금지). `Table` 객체는 `adapter/persistence/table/`에 DB와 똑같이 선언(D-35). 저장소는 `application/<agg>/required/XxxRepository` 인터페이스를 `adapter/persistence/ExposedXxxRepository`가 구현. 트랜잭션은 Spring `@Transactional`(Exposed의 `transaction {}` 블록 금지). `ON CONFLICT`는 가능한 곳을 `upsert`로.** PostGIS·CTE·pgvector 거리는 raw SQL로 남기고, raw SQL 도구(Exposed `exec` vs `JdbcTemplate`)는 S11 실측 후 이 행에 적는다 | DAO는 Active Record라 JPA 엔티티=도메인의 문제가 돌아온다. `@Transactional`이어야 `AFTER_COMMIT` 이벤트·`REQUIRES_NEW` 센서가 그대로 동작한다. PostGIS·CTE raw SQL은 사용자가 불가피하다고 확인(2026-09-30). Exposed CTE 미지원(EXPOSED-868) | **DAO**: 위 이유. **`transaction {}` 블록**: Spring 이벤트 단계와 따로 논다 |
+| D-43 | S12~S15 | **알려진 결함은 해당 context를 옮기면서 이 스펙 안에서 고친다**: 글 좋아요·댓글 수와 질문 답변 수 lost update, 대화 읽음 지점·`lastMessageAt` lost update, 탈퇴 시 카운터 미감소, 장소 반응 첫 insert 경합, 답글의 답글 id 공간 혼동, 비즈니스 예외가 `INTERNAL_ERROR`로 나가는 문제(tourism 조회·지도 변경·커서 디코드), `spotDetail.category.code` null. 보관 파기가 신고 증거를 지우는 문제는 Q04 답을 받아 고친다. **BR-001의 "동작을 바꿀 사유는 별도 스펙"을 이 목록에 한해 뒤집는다** | 사용자 지시(2026-09-30, "코드가 잘못된 것이니 코드를 바꾼다"). JPA에서 먼저 고치면 곧 다시 쓸 코드를 두 번 쓴다 | **JPA에서 먼저 핫픽스**: 이중 작업. **별도 스펙**: 이전 뒤에 같은 코드를 다시 연다 |
+| D-44 | 전체 | **남은 작업은 `feature/SPEC-0039-domain-rules` 한 브랜치에 슬라이스 커밋으로 쌓는다**(S10~S16, 이어서 S8·S9). B3·B4 브랜치는 만들지 않는다. **D-29를 뒤집는다** | 사용자 지시(2026-09-30, "해당 브랜치에 context가 들어가면 된다"). ktlint 일괄 포맷과 주석 정리는 이미 머지돼 D-29가 막으려던 diff 혼재는 없다 | **context마다 브랜치**: 리뷰 회차는 늘지만 커밋 단위로 이미 나뉜다 |
 
 ## 부족한 정보
 
-없음.
+| # | 질문 (서비스 사실) | 막는 것 |
+|---|---|---|
+| Q03 | SPEC-0039의 새 완료 기한은 언제이며, 그동안 기능 개발 동결을 유지하는가? | 없음(일정만) |
+| Q04 | 신고된 DM 메시지는 보관 기간(6개월, POL-050)이 지나도 신고 처리가 끝날 때까지 남아야 하는가? 남는다면 처리 후에는 언제 지우는가? POL-049(운영자는 신고된 메시지를 열람)와 POL-050(6개월 후 삭제)이 부딪히며, 지금 코드는 기간이 지나면 신고된 메시지도 함께 지운다 | S12의 메시지 보관 파기 수정 |
 
 **승인 대기 (spec의 `[TBD]`)**
 
@@ -102,11 +121,14 @@ grep으로 확인한 수(worktree `82fdd48`):
 | S0 | B1 | VC-001·VC-007 준비 | 이 문서, 기준 커밋 테스트 목록 추출 | 완료 |
 | S1 | B1 | FR-012 · FR-014 · VC-004(스타일) · VC-005 | ktlint 플러그인(D-20) → 일괄 포맷 커밋 → 수작업 수정 → 린트 활성화, CI `check` 전환 | 완료. VC-004(스타일) 탐침 확인 |
 | S2 | B1 | FR-008 · FR-010 · FR-015 | 이미 0건인 센서: 생성 타입·엔티티 누출 금지(D-08), `*Port`(D-17). 임포트 공유(D-24) | 완료. VC-003 탐침 확인. `*Policy`(D-07)는 보류 |
-| S3 | B2 | AC-001 · AC-002 · AC-004 · AC-005 | community 규칙을 domain 판정 + `application/validation` 번역으로(D-02·D-03·D-05) | |
-| S4 | B2 | AC-003 | 상태 전이 규칙을 애그리게이트 결과로 | |
-| S5 | B2 | AC-006 · AC-007 | 설정 한도 판정 한곳으로(D-06), 값 불변 확인 | |
-| S6 | B3 | FR-009 · FR-010 · FR-015 | 변환 77건 이동(D-09~D-11) → 변환 위치 센서 | |
-| S7 | B3 | FR-011 · FR-010 | 개명(D-12~D-15) + CLAUDE.md Naming 절(D-18) → 이름·패키지 센서 | |
+| S3~S7 | — | — | **S12~S15에 흡수(2026-09-30)** — 규칙 이동·설정 한도·변환 이동·개명을 context 이전과 함께 한다(D-36~D-41) | 폐기 |
+| S10 | B2 | QR-001 · FR-001 | Boot 4.1.1·DGS 12.1.0·codegen 8.7.0·Kotlin 2.3.21, BOM 순서 수정(D-34). 동작 불변 | |
+| S11 | B2 | FR-017 · FR-018 | Exposed 기반: 별도 DataSource·트랜잭션 매니저(D-33), 기동 시 스키마 검증(D-35), raw SQL 도구 실측(D-42) | |
+| S12 | B2 | FR-005~FR-009 · FR-019 · AC-001~AC-007 | community: 경계 합의 → 패키지(D-36) → 도메인 모델(D-37·D-38) → 서비스(D-39) → Exposed(D-40·D-42) → mapper(D-41) → 결함(D-43) | |
+| S13 | B2 | 같음 | tourism (배치 트랜잭션 매니저 포함) | |
+| S14 | B2 | 같음 | auth (트랜잭션 안 외부 I/O 분리) | |
+| S15 | B2 | 같음 | alarm | |
+| S16 | B2 | FR-010 · FR-011 | JPA·QueryDSL·kapt 제거, JPA 전제 센서·CLAUDE.md 규칙 정리, 새 구조 센서(애그리거트 순환·교차 호출·`copy` 제한) | |
 | C1 | B1.5 | D-30 | 주석 정리(컨텍스트별), 주석 제외 토큰 비교 | 완료. Kotlin 주석 16,248 → 7,376줄, 15줄 이상 블록 67 → 0. 771파일 주석 외 차이 0건, 마이그레이션·스키마 변경 0 |
 | C2 | B1.5 | D-31 · FR-010 | 주석 길이 센서 | 완료. 16줄 탐침으로 실패·제거 후 통과 확인, 문자열 안 주석 기호 오탐 없음 |
 | S8 | B4 | FR-013 · VC-004(한도) | detekt 2.0.0-alpha.6, 60/600/14(D-23), outlier 분할 | |
@@ -121,7 +143,11 @@ grep으로 확인한 수(worktree `82fdd48`):
 - 오류 코드 통합·auth `ErrorCode` enum 확장·tourism/community enum화(POL-016)
 - 리졸버 payload 조립을 mapper로 이동(D-10), 생성 타입 생성자 호출 금지 센서
 - 도메인 상수 한도를 설정값으로 승격
-- 애그리게이트 병합·공통 기반 클래스·애그리게이트 내 이벤트 수집(D-04), 필드별 VO 신설(D-02)
+- 애그리거트 공통 기반 클래스, 애그리거트 안의 이벤트 수집(경계 재설계 자체는 D-40으로 범위 안)
+- id의 `value class` 감싸기(`PostId` 등) — 필요해질 때 도입
+- Exposed 스키마 검증이 못 잡는 컬럼 타입 비교기(D-35)
+- Boot 4.2·graphql-java 26 업그레이드
+- 이전 기간의 CLAUDE.md JPA 규칙 삭제 — 마지막 context를 옮긴 뒤 S16에서 한 번에
 - 사용자 정의 스테레오타입 애노테이션(D-19)
 - 도메인모델·용어사전 문서 — 리팩토링 완료 후 마지막에 별도로 작성(사용자 결정 2026-09-28)
 - Instancio(무작위 테스트 데이터) — 리팩토링 완료 후 도입(사용자 결정 2026-09-28)
@@ -136,6 +162,8 @@ grep으로 확인한 수(worktree `82fdd48`):
 - ktlint 커스텀 룰
 
 ## 설계
+
+> **2026-09-30 범위 확장.** 아래 절(경계 불변·판정 분류·영속성 영향 없음)은 확장 전 설계다. 경계·영속성·서비스 모양은 D-32~D-44가 대체하며, context별 애그리거트 경계는 S12~S15 착수 시 합의해 이 문서에 추가한다.
 
 **도메인 / 애그리게이트 경계.** 경계는 바꾸지 않는다(D-04). 바뀌는 것은 규칙의 자리다. 대표 사례:
 
@@ -178,3 +206,4 @@ grep으로 확인한 수(worktree `82fdd48`):
 | 2026-09-28 | C1·C2 완료 기록, D-31에 연속 `//` 포함 | 구현 결과 |
 | 2026-09-28 | B1.5 리뷰 반영: 풀 증설 경고·LIMIT 1·FCM env 경고 복원, 의미가 바뀐 주석 2곳 수정, 센서 제외 판정을 루트 기준으로 | reviewer PASS-with-warnings |
 | 2026-09-29 | D-25 뒤집음: VC 실행 도구를 서버 레포에서 빼고 ieuri-QA 스위트로 | 사용자 지시(직접 만든 도구 금지, 검증은 코드와 분리) |
+| 2026-09-30 | 범위 확장: D-32~D-44 추가(Exposed 이전·Boot 4.1·패키지·불변 data class·domain 판정·서비스 모양·애그리거트 규칙·mapper·결함 수정·단일 브랜치). D-01~D-04·D-12~D-16·D-29 뒤집음. S3~S7을 S12~S15에 흡수, S10~S16 추가. Q03(기한)·Q04(신고된 DM 보관) 추가 | 사용자 결정 — splearn 대조와 재설계 합의 |

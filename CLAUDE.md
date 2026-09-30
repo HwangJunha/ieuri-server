@@ -278,6 +278,40 @@ This pass is **not another review**, and it is bounded so it cannot loop:
 A finding you deliberately did not fix is fine — say so in the PR with the reason. Silently leaving
 it is not.
 
+## Target shape — Exposed migration (SPEC-0039, in progress)
+
+Persistence is moving from JPA to **Exposed DSL**, one bounded context at a time: community →
+tourism → auth → alarm (decisions D-32~D-44 in `problem/SPEC-0039-server.md`). **A context that has
+been moved follows this section; one that has not still follows Layout and the JPA rules below.**
+Those rules are deleted in the final slice, not piecemeal.
+
+- **Packages: context → layer → aggregate.** `domain/<aggregate>/` holds the root with its own
+  entities, VOs, exceptions and events; `domain/shared/` holds VOs several aggregates use.
+  `application/<aggregate>/provided/` (inbound ports, `dto/`, `exception/`) and `required/`
+  (outbound ports). `adapter/<technology>/` — `graphql`, `event` (inbound listeners), `persistence`,
+  `client`, `storage`, `config`. No `infrastructure/adapter/in|out`.
+- **Domain model is an immutable `data class`.** Every field `val`, collections read-only `List`.
+  A state change validates and returns `copy(...)`. The persistence mapper rebuilds it through the
+  public constructor — there is no `restore`. **Only code inside `domain/` may call an aggregate's
+  `copy`**; that is how the invariants stay unbypassable.
+- **Rules are judged in the domain only.** The domain throws a typed exception per violation; the
+  application neither pre-validates nor interprets a `Boolean` result. Exception → error code happens
+  in the adapter's error handler, keeping the existing codes (POL-016).
+- **Services read as a procedure: find → domain method → save.** One `XxxModifyService` and one
+  `XxxQueryService` per aggregate. An update still calls `save` — Exposed has no dirty-checking.
+- **Aggregate rules.** One aggregate changed per transaction; others via events. Counters (likes,
+  comments, answers) are atomic increments in the repository, not aggregate state. An aggregate that
+  can be changed concurrently carries a `version` column. External I/O (HTTP, Valkey, R2) runs
+  outside the transaction. Reads skip the aggregate and project straight into read DTOs.
+- **Exposed: DSL only, never DAO** (DAO is Active Record — the JPA-as-domain problem again).
+  `Table` objects live in `adapter/persistence/table/` and mirror the DB exactly — the startup
+  schema check fails on any drift except column type, which it cannot see. Transactions use Spring
+  `@Transactional` on the Exposed transaction manager, never Exposed's `transaction {}` block.
+  PostGIS, CTEs and pgvector distance stay raw SQL.
+- **Conversions live in each adapter's `mapper/` package as extension functions** —
+  `adapter/graphql/mapper`, `adapter/persistence/mapper`, `adapter/client/mapper`. Resolvers and
+  repositories contain no conversion code. The field-by-field test rule is unchanged.
+
 ## Layout
 
 Package root: `org.around.ieuri`. Organized **by domain first, then hexagonal layer**, with a **CQRS split** in the application layer. Dependencies point inward only: `infrastructure → application → domain`. `domain` imports nothing external (no Spring/JPA/DGS); `application` depends only on `domain`; `infrastructure` implements `application` ports.
