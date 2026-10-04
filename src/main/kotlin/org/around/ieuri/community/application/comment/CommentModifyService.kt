@@ -14,13 +14,13 @@ import org.springframework.transaction.annotation.Transactional
 
 /** 댓글 생성·삭제. 대댓글도 글의 댓글 수에 포함된다. */
 @Service
+@Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
 class CommentModifyService(
     private val commentRepository: CommentRepository,
     private val postRepository: PostRepository,
     private val clockPort: ClockPort,
 ) : CommentCommandUseCase {
 
-    @Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
     override fun createComment(command: CreateCommentCommand, memberId: Long): Long {
         if (!postRepository.exists(command.postId)) throw PostNotFoundException()
 
@@ -36,7 +36,6 @@ class CommentModifyService(
         return commentId
     }
 
-    @Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
     override fun deleteComment(commentId: Long, memberId: Long) {
         require(commentId > 0) { "commentId는 양수여야 합니다." }
         val comment = commentRepository.findById(commentId) ?: throw CommentNotFoundException()

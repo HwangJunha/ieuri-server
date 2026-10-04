@@ -31,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional
  * - 장소 Q&A 대상은 Q&A 이전 전까지 옛 포트([SpotQaModerationPort])로 확인·숨긴다.
  */
 @Service
+@Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
 class ReportModifyService(
     private val reportRepository: ReportRepository,
     private val postRepository: PostRepository,
@@ -42,7 +43,6 @@ class ReportModifyService(
 ) : ReportCommandUseCase,
     ReportAutoHideUseCase {
 
-    @Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
     override fun report(command: ReportContentCommand, memberId: Long) {
         val report = Report.file(memberId, command.targetType, command.targetId, command.reason, command.detail)
         requireTargetExists(report.targetType, report.targetId)
@@ -52,7 +52,10 @@ class ReportModifyService(
         if (report.targetType.autoHideable) eventPublisherPort.publish(ReportFiled(report.targetType, report.targetId))
     }
 
-    /** 숨겨진 댓글·답변은 수에서 빠진다 — 이번 호출로 숨겨졌을 때만 부모의 수를 내린다. 답글은 어떤 수에도 잡히지 않는다. */
+    /**
+     * 숨겨진 댓글·답변은 수에서 빠진다 — 이번 호출로 숨겨졌을 때만 부모의 수를 내린다. 답글은 어떤 수에도 잡히지 않는다.
+     * - 커밋 뒤 리스너가 부르므로 새 트랜잭션이다.
+     */
     @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, propagation = Propagation.REQUIRES_NEW)
     override fun applyAutoHide(targetType: ReportTargetType, targetId: Long) {
         val reporters = reportRepository.countDistinctReporters(targetType, targetId)
