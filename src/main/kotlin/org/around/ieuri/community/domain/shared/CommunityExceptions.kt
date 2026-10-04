@@ -15,3 +15,6 @@ class TooManyPhotosException(message: String = "사진은 최대 5장입니다."
 class ReportDetailRequiredException(message: String = "상세 사유를 입력해 주세요.") : CommunityUserException("REPORT_DETAIL_REQUIRED", message)
 
 class AlreadyReportedException(message: String = "이미 신고한 대상입니다.") : CommunityUserException("ALREADY_REPORTED", message)
+
+/** 입력 형식·규칙 위반. 메시지가 곧 사용자에게 보이는 사유다. */
+class InvalidInputException(message: String = "잘못된 입력입니다.") : CommunityUserException("INVALID_INPUT", message)

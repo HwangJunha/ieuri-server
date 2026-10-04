@@ -31,23 +31,3 @@ class ConversationNotFoundException(message: String = "해당 대화를 찾을 �
 
 /** 뮤테이션에서 참여자가 아님. 조회·구독은 이 예외가 아니라 최상위 errors[]의 FORBIDDEN이다. */
 class NotConversationParticipantException(message: String = "대화의 참여자가 아닙니다.") : CommunityUserException("NOT_CONVERSATION_PARTICIPANT", message)
-
-/** 신고 입력 불성립: 빈 목록, 여러 대화 혼합, 자기 메시지 포함, 없는 메시지 포함. */
-class InvalidInputException(message: String = "잘못된 입력입니다.") : CommunityUserException("INVALID_INPUT", message)
-
-// ── 장소 질문/답변(SPEC-0026) ────────────────────────────────────────
-
-class QuestionNotFoundException(message: String = "해당 질문을 찾을 수 없습니다.") : CommunityUserException("QUESTION_NOT_FOUND", message)
-
-class AnswerNotFoundException(message: String = "해당 답변을 찾을 수 없습니다.") : CommunityUserException("ANSWER_NOT_FOUND", message)
-
-class ReplyNotFoundException(message: String = "해당 답글을 찾을 수 없습니다.") : CommunityUserException("REPLY_NOT_FOUND", message)
-
-/** 답글에 답글을 달려는 입력 오류(SPEC-0026 R7). */
-class ReplyToReplyNotAllowedException(message: String = "답글에는 답글을 달 수 없습니다.") : CommunityUserException("REPLY_TO_REPLY_NOT_ALLOWED", message)
-
-class NotQuestionOwnerException(message: String = "본인의 질문만 처리할 수 있습니다.") : CommunityUserException("NOT_QUESTION_OWNER", message)
-
-class NotAnswerOwnerException(message: String = "본인의 답변만 삭제할 수 있습니다.") : CommunityUserException("NOT_ANSWER_OWNER", message)
-
-class NotReplyOwnerException(message: String = "본인의 답글만 삭제할 수 있습니다.") : CommunityUserException("NOT_REPLY_OWNER", message)

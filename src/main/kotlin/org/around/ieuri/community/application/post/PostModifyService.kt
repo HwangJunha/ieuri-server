@@ -3,7 +3,6 @@ package org.around.ieuri.community.application.post
 import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.community.application.exception.SpotNotFoundInLocaleException
 import org.around.ieuri.community.application.port.out.client.ClockPort
-import org.around.ieuri.community.application.port.out.client.ObjectStoragePort
 import org.around.ieuri.community.application.port.out.client.SpotLookupPort
 import org.around.ieuri.community.application.post.provided.PostCommandUseCase
 import org.around.ieuri.community.application.post.provided.dto.CreatePostCommand
@@ -11,15 +10,14 @@ import org.around.ieuri.community.application.post.provided.dto.EditPostCommand
 import org.around.ieuri.community.application.post.provided.dto.PostTargetCommand
 import org.around.ieuri.community.application.post.provided.exception.PostNotFoundException
 import org.around.ieuri.community.application.post.required.PostRepository
+import org.around.ieuri.community.application.shared.UploadedPhotoVerifier
 import org.around.ieuri.community.domain.post.HiddenPostNotEditableException
 import org.around.ieuri.community.domain.post.Post
-import org.around.ieuri.community.domain.post.PostPhotos
 import org.around.ieuri.community.domain.post.PostSpot
 import org.around.ieuri.community.domain.post.PostTag
 import org.around.ieuri.community.domain.post.PostTags
-import org.around.ieuri.community.domain.shared.PhotoNotUploadedException
+import org.around.ieuri.community.domain.shared.AttachedPhotos
 import org.around.ieuri.community.domain.vo.ContentLanguage
-import org.around.ieuri.community.domain.vo.PhotoObjectKey
 import org.around.ieuri.community.domain.vo.SpotPoint
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -34,7 +32,7 @@ import org.springframework.transaction.annotation.Transactional
 class PostModifyService(
     private val postRepository: PostRepository,
     private val spotLookupPort: SpotLookupPort,
-    private val objectStoragePort: ObjectStoragePort,
+    private val photoVerifier: UploadedPhotoVerifier,
     private val clockPort: ClockPort,
 ) : PostCommandUseCase {
 
@@ -42,23 +40,23 @@ class PostModifyService(
         val spot = command.catalogId?.let { findSpot(it, language) }
         val post = Post.write(memberId, command.title, command.body)
         val tags = PostTags.of(command.tags.map(PostTag::parse))
-        val photos = PostPhotos.of(command.photoKeys.map(::parsePhotoKey), memberId)
-        requireUploaded(photos.keys)
+        val photos = AttachedPhotos.of(photoVerifier.parse(command.photoKeys), memberId)
+        photoVerifier.requireUploaded(photos.keys)
 
         return postRepository.insert(post, command.category, spot, tags, photos)
     }
 
     /** null은 "건드리지 않는다"이고 빈 목록(전부 제거)과 다르다. 장소는 [EditPostCommand.changeSpot]이 true일 때만 바꾸며 null이면 뗀다. */
     override fun editPost(command: EditPostCommand, memberId: Long, language: ContentLanguage) {
-        val photoKeys = command.photoKeys?.map(::parsePhotoKey)
+        val photoKeys = command.photoKeys?.let(photoVerifier::parse)
         val tags = command.tags?.map(PostTag::parse)?.let(PostTags::of)
         val spot = if (command.changeSpot) command.catalogId?.let { findSpot(it, language) } else null
-        photoKeys?.let(::requireUploaded)
+        photoKeys?.let(photoVerifier::requireUploaded)
 
         val post = postRepository.findById(command.postId) ?: throw PostNotFoundException()
 
         val edited = post.edit(memberId, command.title, command.body)
-        val photos = photoKeys?.let { PostPhotos.of(it, post.authorId) }
+        val photos = photoKeys?.let { AttachedPhotos.of(it, post.authorId) }
 
         // 읽은 뒤 신고 누적으로 숨겨졌다면 0건이다.
         if (!postRepository.updateContent(edited)) throw HiddenPostNotEditableException()
@@ -115,13 +113,5 @@ class PostModifyService(
     private fun findSpot(catalogId: Long, language: ContentLanguage): PostSpot {
         val summary = spotLookupPort.findSummary(catalogId, language) ?: throw SpotNotFoundInLocaleException()
         return PostSpot(catalogId, SpotPoint(longitude = summary.longitude, latitude = summary.latitude))
-    }
-
-    /** 형식이 어긋난 키는 미업로드와 같은 코드로 다룬다(키 존재 여부를 노출하지 않는다). */
-    private fun parsePhotoKey(raw: String): PhotoObjectKey = PhotoObjectKey.parse(raw) ?: throw PhotoNotUploadedException()
-
-    /** 하나라도 없으면 글 전체를 만들지 않는다 — 부분 생성은 없다. */
-    private fun requireUploaded(keys: List<PhotoObjectKey>) {
-        if (keys.any { objectStoragePort.findSize(it.value) == null }) throw PhotoNotUploadedException()
     }
 }

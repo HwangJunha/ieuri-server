@@ -91,6 +91,7 @@
 | D-52 | S12 | **쓰기 쪽은 판정에 필요한 최소 테이블만 읽고, 바꾸는 행만 쓴다.** `Post` 애그리게이트는 글 한 행(작성자·제목·본문·편집·숨김·삭제)이고 `findById`는 글 테이블 하나만 읽는다. 카테고리·장소·태그·사진은 도메인 값 객체(`PostTags`·`PostPhotos`·`PostSpot`)로 검증한 뒤, 서비스가 `?.let`으로 저장소의 의도별 메서드(`changeCategory`·`changeSpot`·`replaceTags`·`replacePhotos`)를 부른다. 장소는 입력의 `changeSpot` 플래그와 nullable `PostSpot`으로 다룬다(null이면 뗀다 — 2026-10-04 `SpotChange` 제거: 플래그 하나를 타입으로 감쌌을 뿐이다). 저장소 포트는 도메인 객체·값 객체만 받는다 — 저장 전달용 타입(`PostEdit` 등)을 두지 않는다 | 사용자 지적(2026-10-04): "최소한만 가져온다 — JPA 지연 로딩과 같은 맥락", 하위 항목은 GraphQL이 요청할 때 글 PK로 읽는다(읽기 쪽은 이미 필드 리졸버+DataLoader). 편집 입력의 null이 "건드리지 않는다"라 기존 자식을 알 필요가 없다. 도메인→행 변환은 어댑터의 일이고 의존이 바깥→안이라 경계 위반이 아니다 | **애그리게이트 전체 적재·전체 재기록(직전 구현)**: 테이블 5개 조회, 매번 자식 삭제·재삽입. **도메인이 변경 내용 타입(`PostEdit`)을 돌려줌**: 저장소에 넘기려고 만든 타입이라 DTO 성격(사용자 지적) |
 | D-53 | S12 | **포트 구현 클래스는 `XxxPersistenceAdapter`**(기술 이름 접두사 없음). 한 파일 한 어댑터 | 헥사고날 표준 명명(Hombergs, *Get Your Hands Dirty on Clean Architecture* — `AccountPersistenceAdapter`)이고 이 레포 관례(D-14)와 같다. 사용자 판단 위임(2026-10-04) | **`ExposedXxxRepository`**: 기술이 이름에 새어 나온다. **`XxxRepositoryImpl`**: Spring Data 사용자 정의 구현 관례라 포트 구현이라는 역할이 드러나지 않는다 |
 | D-54 | S12 | **트랜잭션은 `@Transactional(transactionManager = EXPOSED_TX)`로 통일하고, 외부 호출(R2·다른 context)은 메서드 앞 첫 쿼리 전에 둔다.** `TransactionOperations` 빈을 없앤다. **선언은 클래스 단위**이고 다른 전파가 필요한 메서드(커밋 뒤 자동 숨김의 `REQUIRES_NEW`)만 메서드에 둔다(사용자 지적). 매니저 이름 지정(`EXPOSED_TX`)은 JPA·Exposed 매니저가 함께 있는 이전 기간에만 필요하다 — 생략하면 `@Primary`인 JPA 매니저가 잡혀 Exposed 쿼리가 트랜잭션 없이 돈다. S16에서 JPA를 걷어내면 지정을 지운다. **신고 대상 판정·숨김 규칙은 응용 계층으로 올린다**: `ReportModifyService`가 대상 종류별로 각 저장소의 `exists`·`hideIfVisible`을 부르고, 숨겨진 댓글·답변이면 부모의 수를 내린다(답글은 수 없음). `ReportTargetPersistenceAdapter`를 없앤다. 장소 Q&A 대상은 Q&A 이전 커밋 전까지 옛 포트(`SpotQaModerationPort`·`SpotQuestionCounterPort`)를 쓴다. 도메인 파일은 한 파일 한 타입. **D-51을 뒤집는다** | 사용자 지적(2026-10-04): 코드베이스 표준은 `@Transactional`이고 primary/replica 라우팅도 그 `readOnly`를 따른다. 확인: Exposed는 연결을 첫 쿼리에서 잡는다(1.5.0 `TransactionManager.kt` 211행 `connectionLazy`) — 앞선 외부 호출 동안 연결·락을 잡지 않는다. `@Transactional`은 checked 예외를 감싸지 않는다. 신고 대상 어댑터는 숨김 규칙(어느 수를 내리는가)을 어댑터에 숨기고 있었다(사용자 지적). 새 Q&A 어댑터를 지금 만들면 옛 JPA 어댑터와 빈 이름이 겹친다 | **`TransactionOperations` 유지**: 방식이 둘로 갈린다. **어댑터가 대상 라우팅과 수 차감을 맡음(직전)**: 업무 규칙이 어댑터에 숨는다 |
+| D-55 | S12 | **장소 Q&A: 질문·답변·답글은 각자 한 행짜리 애그리게이트**(사진 없음 — 쓰기에서 기존 사진을 읽지 않는다). 사진 규칙은 글과 같아 `PostPhotos`를 공유 값 객체 `AttachedPhotos`로 옮기고, 본문 규칙(500자·INVALID_INPUT, 질문/답변 문구)은 `SpotQaText` 한 곳에 둔다. 키 파싱·R2 존재 확인은 공용 `UploadedPhotoVerifier`. 해결 표시는 `resolved` 한 열만, 답변 수는 원자 증감, 답변 삭제는 `DELETE … RETURNING hidden`으로 이번에 지운 답변이 보이던 것이었을 때만 수를 내린다. 물리 삭제는 사진 → 주인 순서(사진은 다형 참조라 FK가 없다). **답글 대상 id 혼동은 고치지 못한다**: 입력이 `parentAnswerId` 숫자 하나이고 답변·답글 시퀀스가 달라 서버가 종류를 구별할 수 없다 — 구별하려면 id에 종류를 담는 스키마 변경이 필요하고 이 spec은 스키마를 바꾸지 않는다(FR-002). 동작은 기존 계약(답변이 없고 같은 번호 답글이 있으면 REPLY_TO_REPLY_NOT_ALLOWED) 그대로다 | 조사 C3(해결 표시의 answer_count 되쓰기)·C5(숨김·삭제 경쟁의 이중 차감) 해소. 기존 서비스는 답글 본문 한도를 답변 상수로 판정했다(FR-006 위반). 실측: 생성 시 답변 수 1, 해결 표시 뒤에도 1, 답글의 답글 거부, 답변 삭제 시 0·답글 함께 삭제, 질문 물리 삭제 | **id 혼동을 이번에 해결(전역 id·종류 접두)**: 스키마 변경이라 별도 spec. **질문 애그리게이트에 답변을 자식으로**: 여러 사람의 답변이 한 애그리게이트를 다투게 된다(D-45) |
 ## 부족한 정보
 
 | # | 질문 (서비스 사실) | 막는 것 |
@@ -133,7 +134,7 @@ grep으로 확인한 수(worktree `82fdd48`):
 | S3~S7 | — | — | **S12~S15에 흡수(2026-09-30)** — 규칙 이동·설정 한도·변환 이동·개명을 context 이전과 함께 한다(D-36~D-41) | 폐기 |
 | S10 | B2 | QR-001 · FR-001 | Boot 4.1.1·DGS 12.1.0·codegen 8.7.0·Kotlin 2.3.21, BOM 순서 수정(D-34). 동작 불변 | 완료. 해석 결과 reactor-core 3.8.7·context-propagation 1.2.1·json-path 3.0.0·Flyway 12.4.0. 18888 기동 5.9초, 조회 비교 53/54 동일(차이 1건은 `post.viewCount` 조회 부수 효과 — 이전과 같음) |
 | S11 | B2 | FR-017 | Exposed 기반: 별도 DataSource·트랜잭션 매니저(D-33), 기동 시 스키마 검증(D-35), raw SQL 도구 실측(D-42) | 완료. 실측 코드는 커밋하지 않음. 로컬에 읽기 복제본이 없어 **읽기 전용 라우팅은 dev 배포 후 확인**. 실측 insert는 롤백 확인(잔여 0건) |
-| S12 | B2 | FR-005~FR-009 · FR-019 · AC-001~AC-007 | community: 경계 합의 → 패키지(D-36) → 도메인 모델(D-37·D-38) → 서비스(D-39) → Exposed(D-40·D-42) → mapper(D-41) → 결함(D-43) | — 진행 중. ① 테이블 선언(`d7fa8b2`) ② 글·댓글·좋아요·숨김·차단·신고 쓰기 이전(`1b14081`): 오류 경로 38/39 dev 동일(차이 1건 = 태그 6개 코드, 확정), 쓰기 단계 43/46 동일(차이 3건 = 하네스 닉네임 표기·지난 검증 잔여 데이터), 글·댓글·좋아요 수·숨김·차단 상태 검증 전부 통과 |
+| S12 | B2 | FR-005~FR-009 · FR-019 · AC-001~AC-007 | community: 경계 합의 → 패키지(D-36) → 도메인 모델(D-37·D-38) → 서비스(D-39) → Exposed(D-40·D-42) → mapper(D-41) → 결함(D-43) | — 진행 중. ① 테이블 선언(`d7fa8b2`) ③ 장소 Q&A 쓰기 이전(D-55): 오류 경로 38/39·쓰기 경로 43/46 dev 동일(이전과 같은 차이), Q&A 실측 통과. ② 글·댓글·좋아요·숨김·차단·신고 쓰기 이전(`1b14081`): 오류 경로 38/39 dev 동일(차이 1건 = 태그 6개 코드, 확정), 쓰기 단계 43/46 동일(차이 3건 = 하네스 닉네임 표기·지난 검증 잔여 데이터), 글·댓글·좋아요 수·숨김·차단 상태 검증 전부 통과 |
 | S13 | B2 | 같음 | tourism (배치 트랜잭션 매니저 포함) | |
 | S14 | B2 | 같음 | auth (트랜잭션 안 외부 I/O 분리) | |
 | S15 | B2 | 같음 | alarm | |
@@ -147,7 +148,7 @@ grep으로 확인한 수(worktree `82fdd48`):
 
 ### S12에서 지운 테스트 (PR 전에 새 구조로 다시 쓴다 — VC-007 대응표의 입력)
 
-`PostCommandServiceTest`, `CommentCommandServiceTest`, `PostLikeAndBlockServiceTest`, `PostHideCommandServiceTest`, `ReportCommandServiceTest`, `domain/PostTest`, `domain/PostTagTest`, `domain/PostLikeTest`, `domain/CommentAndBlockTest`, `domain/ReportTargetTest`, `infrastructure/mapper/CommunityMapperTest`. 검증하던 동작은 git 이력(`29d9040`)에 있다.
+`PostCommandServiceTest`, `CommentCommandServiceTest`, `PostLikeAndBlockServiceTest`, `PostHideCommandServiceTest`, `ReportCommandServiceTest`, `domain/PostTest`, `domain/PostTagTest`, `domain/PostLikeTest`, `domain/CommentAndBlockTest`, `domain/ReportTargetTest`, `infrastructure/mapper/CommunityMapperTest`, `SpotQuestionCommandServiceTest`, `SpotAnswerCommandServiceTest`, `domain/SpotQaTest`, `infrastructure/mapper/SpotQaMapperTest`, `infrastructure/SpotQaInputMapperTest`. 검증하던 동작은 git 이력(`29d9040`)에 있다.
 
 ### S12에서 생긴 응답 차이 (VC-001에 의도한 차이로 기록)
 
@@ -163,6 +164,7 @@ grep으로 확인한 수(worktree `82fdd48`):
 - 도메인 상수 한도를 설정값으로 승격
 - 애그리거트 공통 기반 클래스, 애그리거트 안의 이벤트 수집(경계 재설계 자체는 D-40으로 범위 안)
 - id의 `value class` 감싸기(`PostId` 등) — 필요해질 때 도입
+- 장소 답변·답글 id 혼동 해소(전역 id·종류 구별) — 스키마 변경이라 별도 spec(D-55)
 - Exposed 스키마 검증이 못 잡는 컬럼 타입 비교기(D-35)
 - Boot 4.2·graphql-java 26 업그레이드
 - 이전 기간의 CLAUDE.md JPA 규칙 삭제 — 마지막 context를 옮긴 뒤 S16에서 한 번에
@@ -224,6 +226,7 @@ grep으로 확인한 수(worktree `82fdd48`):
 | 2026-09-28 | C1·C2 완료 기록, D-31에 연속 `//` 포함 | 구현 결과 |
 | 2026-09-28 | B1.5 리뷰 반영: 풀 증설 경고·LIMIT 1·FCM env 경고 복원, 의미가 바뀐 주석 2곳 수정, 센서 제외 판정을 루트 기준으로 | reviewer PASS-with-warnings |
 | 2026-09-29 | D-25 뒤집음: VC 실행 도구를 서버 레포에서 빼고 ieuri-QA 스위트로 | 사용자 지시(직접 만든 도구 금지, 검증은 코드와 분리) |
+| 2026-10-04 | D-55(장소 Q&A 이전, 답글 대상 id 혼동은 스키마 변경이 필요해 남김) | 구현 결과 |
 | 2026-10-04 | D-54(`@Transactional` 통일·외부 호출은 첫 쿼리 전·신고 숨김 규칙을 서비스로), D-51 뒤집음, `SpotChange` 제거, 도메인 파일 분리 | 사용자 지적 |
 | 2026-10-04 | D-52(최소 적재·의도별 저장, 전달용 타입 없음)·D-53(`*PersistenceAdapter`). 하위 항목 편집 경로 실측(생성 정리·무변경 유지·교체·장소 뗌/붙임·위치 트리거) | 사용자 지적 |
 | 2026-10-04 | D-48(기동 스키마 검증 삭제, D-35 뒤집음)·D-49(Exposed 풀 = 메인 풀 설정) | 사용자 결정 |

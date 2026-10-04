@@ -11,9 +11,9 @@ import org.around.ieuri.community.adapter.persistence.table.PostTable
 import org.around.ieuri.community.adapter.persistence.table.PostTagTable
 import org.around.ieuri.community.application.post.required.PostRepository
 import org.around.ieuri.community.domain.post.Post
-import org.around.ieuri.community.domain.post.PostPhotos
 import org.around.ieuri.community.domain.post.PostSpot
 import org.around.ieuri.community.domain.post.PostTags
+import org.around.ieuri.community.domain.shared.AttachedPhotos
 import org.around.ieuri.community.domain.vo.TargetCategory
 import org.jetbrains.exposed.v1.core.Column
 import org.jetbrains.exposed.v1.core.and
@@ -46,7 +46,7 @@ class PostPersistenceAdapter : PostRepository {
     override fun exists(postId: Long): Boolean = PostTable.select(PostTable.id).where { (PostTable.id eq postId) and PostTable.deletedAt.isNull() }.limit(1).any()
 
     /** 글을 먼저 넣어 id를 받은 뒤 자식을 붙인다(FK 순서). 장소가 없으면 장소 행을 만들지 않는다. */
-    override fun insert(post: Post, category: TargetCategory, spot: PostSpot?, tags: PostTags, photos: PostPhotos): Long {
+    override fun insert(post: Post, category: TargetCategory, spot: PostSpot?, tags: PostTags, photos: AttachedPhotos): Long {
         val postId = PostTable.insertReturning(listOf(PostTable.id)) {
             it[authorId] = post.authorId
             it[title] = post.title
@@ -92,7 +92,7 @@ class PostPersistenceAdapter : PostRepository {
         writeTags(postId, tags)
     }
 
-    override fun replacePhotos(postId: Long, photos: PostPhotos) {
+    override fun replacePhotos(postId: Long, photos: AttachedPhotos) {
         PostPhotoTable.deleteWhere { PostPhotoTable.postId eq postId }
         writePhotos(postId, photos)
     }
@@ -155,7 +155,7 @@ class PostPersistenceAdapter : PostRepository {
         }
     }
 
-    private fun writePhotos(postId: Long, photos: PostPhotos) {
+    private fun writePhotos(postId: Long, photos: AttachedPhotos) {
         PostPhotoTable.batchInsert(photos.keys.withIndex(), shouldReturnGeneratedValues = false) { (index, key) ->
             this[PostPhotoTable.postId] = postId
             this[PostPhotoTable.objectKey] = key.value

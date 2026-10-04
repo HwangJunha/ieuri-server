@@ -11,7 +11,7 @@ import org.around.ieuri.community.application.port.out.client.ObjectStoragePort
 import org.around.ieuri.community.application.query.PostImageConfirmFailure
 import org.around.ieuri.community.application.query.PostImageConfirmResult
 import org.around.ieuri.community.application.query.PostImageUploadUrlView
-import org.around.ieuri.community.domain.post.PostPhotos
+import org.around.ieuri.community.domain.shared.AttachedPhotos
 import org.around.ieuri.community.domain.shared.PhotoNotUploadedException
 import org.around.ieuri.community.domain.shared.TooManyPhotosException
 import org.around.ieuri.community.domain.vo.ImageFormat
@@ -37,7 +37,7 @@ class PostImageUploadService(
         memberId: Long,
     ): List<PostImageUploadUrlView> {
         if (command.images.isEmpty()) return emptyList()
-        if (command.images.size > PostPhotos.MAX_PHOTOS) throw TooManyPhotosException()
+        if (command.images.size > AttachedPhotos.MAX_PHOTOS) throw TooManyPhotosException()
 
         command.images.forEach { image ->
             if (image.contentType.trim().lowercase() !in policy.allowedContentTypes) {

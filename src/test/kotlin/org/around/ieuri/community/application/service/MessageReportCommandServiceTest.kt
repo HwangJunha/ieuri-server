@@ -5,7 +5,6 @@ import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
 import org.around.ieuri.community.application.command.ReportMessagesCommand
-import org.around.ieuri.community.application.exception.InvalidInputException
 import org.around.ieuri.community.application.exception.NotConversationParticipantException
 import org.around.ieuri.community.application.port.out.persistence.ConversationRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.MessageReportRepositoryPort
@@ -14,6 +13,7 @@ import org.around.ieuri.community.domain.aggregate.Conversation
 import org.around.ieuri.community.domain.aggregate.Message
 import org.around.ieuri.community.domain.aggregate.MessageReport
 import org.around.ieuri.community.domain.shared.AlreadyReportedException
+import org.around.ieuri.community.domain.shared.InvalidInputException
 import org.around.ieuri.community.domain.shared.ReportDetailRequiredException
 import org.around.ieuri.community.domain.shared.ReportReason
 import java.time.Instant

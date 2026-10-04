@@ -1,18 +1,19 @@
 package org.around.ieuri.community.application.report
 
 import org.around.ieuri.common.persistence.ExposedConfig
+import org.around.ieuri.community.application.answer.provided.AnswerNotFoundException
+import org.around.ieuri.community.application.answer.required.SpotAnswerRepository
 import org.around.ieuri.community.application.comment.provided.CommentNotFoundException
 import org.around.ieuri.community.application.comment.required.CommentRepository
-import org.around.ieuri.community.application.exception.AnswerNotFoundException
 import org.around.ieuri.community.application.exception.MemberNotFoundException
-import org.around.ieuri.community.application.exception.QuestionNotFoundException
-import org.around.ieuri.community.application.exception.ReplyNotFoundException
 import org.around.ieuri.community.application.port.out.client.MemberLookupPort
 import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
-import org.around.ieuri.community.application.port.out.persistence.SpotQaModerationPort
-import org.around.ieuri.community.application.port.out.persistence.SpotQuestionCounterPort
 import org.around.ieuri.community.application.post.provided.exception.PostNotFoundException
 import org.around.ieuri.community.application.post.required.PostRepository
+import org.around.ieuri.community.application.question.provided.exception.QuestionNotFoundException
+import org.around.ieuri.community.application.question.required.SpotQuestionRepository
+import org.around.ieuri.community.application.reply.provided.ReplyNotFoundException
+import org.around.ieuri.community.application.reply.required.SpotAnswerReplyRepository
 import org.around.ieuri.community.application.report.provided.ReportAutoHideUseCase
 import org.around.ieuri.community.application.report.provided.ReportCommandUseCase
 import org.around.ieuri.community.application.report.provided.ReportContentCommand
@@ -28,7 +29,6 @@ import org.springframework.transaction.annotation.Transactional
 /**
  * 신고. 기록만 하고, 자동 숨김은 커밋 뒤 [applyAutoHide]가 신고자 수를 다시 세어 정한다.
  * - 회원 신고는 기록만 한다(POL-041). 회원 존재 확인(auth)은 첫 쿼리 전에 한다.
- * - 장소 Q&A 대상은 Q&A 이전 전까지 옛 포트([SpotQaModerationPort])로 확인·숨긴다.
  */
 @Service
 @Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
@@ -36,8 +36,9 @@ class ReportModifyService(
     private val reportRepository: ReportRepository,
     private val postRepository: PostRepository,
     private val commentRepository: CommentRepository,
-    private val spotQaModerationPort: SpotQaModerationPort,
-    private val spotQuestionCounterPort: SpotQuestionCounterPort,
+    private val questionRepository: SpotQuestionRepository,
+    private val answerRepository: SpotAnswerRepository,
+    private val replyRepository: SpotAnswerReplyRepository,
     private val memberLookupPort: MemberLookupPort,
     private val eventPublisherPort: CommunityEventPublisherPort,
 ) : ReportCommandUseCase,
@@ -64,9 +65,9 @@ class ReportModifyService(
         when (targetType) {
             ReportTargetType.POST -> postRepository.hideIfVisible(targetId)
             ReportTargetType.COMMENT -> commentRepository.hideIfVisible(targetId)?.let(postRepository::decreaseCommentCount)
-            ReportTargetType.SPOT_QUESTION -> spotQaModerationPort.hideQuestion(targetId)
-            ReportTargetType.SPOT_ANSWER -> spotQaModerationPort.hideAnswer(targetId)?.let(spotQuestionCounterPort::decreaseAnswerCount)
-            ReportTargetType.SPOT_ANSWER_REPLY -> spotQaModerationPort.hideReply(targetId)
+            ReportTargetType.SPOT_QUESTION -> questionRepository.hideIfVisible(targetId)
+            ReportTargetType.SPOT_ANSWER -> answerRepository.hideIfVisible(targetId)?.let(questionRepository::decreaseAnswerCount)
+            ReportTargetType.SPOT_ANSWER_REPLY -> replyRepository.hideIfVisible(targetId)
             ReportTargetType.MEMBER -> Unit
         }
     }
@@ -76,9 +77,9 @@ class ReportModifyService(
             ReportTargetType.POST -> postRepository.exists(targetId)
             ReportTargetType.COMMENT -> commentRepository.findById(targetId) != null
             ReportTargetType.MEMBER -> memberLookupPort.findAuthor(targetId) != null
-            ReportTargetType.SPOT_QUESTION -> spotQaModerationPort.questionExists(targetId)
-            ReportTargetType.SPOT_ANSWER -> spotQaModerationPort.answerExists(targetId)
-            ReportTargetType.SPOT_ANSWER_REPLY -> spotQaModerationPort.replyExists(targetId)
+            ReportTargetType.SPOT_QUESTION -> questionRepository.exists(targetId)
+            ReportTargetType.SPOT_ANSWER -> answerRepository.exists(targetId)
+            ReportTargetType.SPOT_ANSWER_REPLY -> replyRepository.exists(targetId)
         }
         if (exists) return
         throw when (targetType) {

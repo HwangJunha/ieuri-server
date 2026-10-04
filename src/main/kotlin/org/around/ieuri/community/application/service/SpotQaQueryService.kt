@@ -2,7 +2,6 @@ package org.around.ieuri.community.application.service
 
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.cursorPageOf
-import org.around.ieuri.community.application.exception.QuestionNotFoundException
 import org.around.ieuri.community.application.exception.SpotNotFoundInLocaleException
 import org.around.ieuri.community.application.policy.CommunityPolicy
 import org.around.ieuri.community.application.port.`in`.query.SpotQaQueryUseCase
@@ -17,6 +16,7 @@ import org.around.ieuri.community.application.query.SpotAnswerView
 import org.around.ieuri.community.application.query.SpotAnswersQuery
 import org.around.ieuri.community.application.query.SpotQuestionView
 import org.around.ieuri.community.application.query.SpotQuestionsQuery
+import org.around.ieuri.community.application.question.provided.exception.QuestionNotFoundException
 import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional

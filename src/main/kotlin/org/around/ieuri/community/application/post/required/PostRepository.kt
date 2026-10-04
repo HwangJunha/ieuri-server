@@ -1,9 +1,9 @@
 package org.around.ieuri.community.application.post.required
 
 import org.around.ieuri.community.domain.post.Post
-import org.around.ieuri.community.domain.post.PostPhotos
 import org.around.ieuri.community.domain.post.PostSpot
 import org.around.ieuri.community.domain.post.PostTags
+import org.around.ieuri.community.domain.shared.AttachedPhotos
 import org.around.ieuri.community.domain.vo.TargetCategory
 import java.time.Instant
 
@@ -20,7 +20,7 @@ interface PostRepository {
     fun exists(postId: Long): Boolean
 
     /** 새 글과 그 카테고리·장소·태그·사진을 넣고 id를 돌려준다. */
-    fun insert(post: Post, category: TargetCategory, spot: PostSpot?, tags: PostTags, photos: PostPhotos): Long
+    fun insert(post: Post, category: TargetCategory, spot: PostSpot?, tags: PostTags, photos: AttachedPhotos): Long
 
     /** 제목·본문·편집 표시만 쓴다. 그 사이 숨겨졌거나 삭제됐으면 0건이고 false. */
     fun updateContent(post: Post): Boolean
@@ -34,7 +34,7 @@ interface PostRepository {
     fun replaceTags(postId: Long, tags: PostTags)
 
     /** 사진 전체를 이 목록으로 바꾼다. 빈 목록이면 모두 뗀다. */
-    fun replacePhotos(postId: Long, photos: PostPhotos)
+    fun replacePhotos(postId: Long, photos: AttachedPhotos)
 
     /** 신고 누적 숨김. 보이는(숨겨지지도 삭제되지도 않은) 글만 바꾸며, 이번 호출로 숨겨졌으면 true. */
     fun hideIfVisible(postId: Long): Boolean
