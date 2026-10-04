@@ -29,6 +29,14 @@ class CommentPersistenceAdapter : CommentRepository {
         it[body] = comment.body
     }.single()[CommentTable.id]
 
+    override fun hideIfVisible(commentId: Long): Long? = CommentTable.updateReturning(
+        returning = listOf(CommentTable.postId),
+        where = { (CommentTable.id eq commentId) and CommentTable.deletedAt.isNull() and (CommentTable.hidden eq false) },
+    ) {
+        it[hidden] = true
+        it[updatedAt] = CurrentTimestampWithTimeZone
+    }.singleOrNull()?.get(CommentTable.postId)
+
     /** 숨김과 동시에 와도 행 잠금이 둘을 줄 세운다 — 뒤에 온 쪽은 앞의 결과를 보고 판정한다. */
     override fun markDeletedWasCounted(commentId: Long, deletedAt: Instant): Boolean = CommentTable.updateReturning(
         returning = listOf(CommentTable.hidden),

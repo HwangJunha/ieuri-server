@@ -312,7 +312,9 @@ Those rules are deleted in the final slice, not piecemeal.
 - **Exposed: DSL only, never DAO** (DAO is Active Record — the JPA-as-domain problem again).
   `Table` objects live in `adapter/persistence/table/` and mirror the migration — nothing checks this
   at startup (no library offers it), so a drift surfaces on the first query that touches it. Transactions use Spring
-  `@Transactional` on the Exposed transaction manager, never Exposed's `transaction {}` block.
+  `@Transactional` on the Exposed transaction manager, never Exposed's `transaction {}` block nor
+  `TransactionTemplate`. External calls (R2, another context) go at the top of the method, before the
+  first query — Exposed opens the connection on the first query, so nothing is held while they run.
   PostGIS, CTEs and pgvector distance stay raw SQL, through a `JdbcTemplate` on `exposedDataSource` (it
   joins the Exposed transaction). Declaring a table: identity id → `autoIncrement()`, read the generated
   value with `insertReturning`; `DEFAULT now()` → `databaseGenerated()`; `timestamptz` →

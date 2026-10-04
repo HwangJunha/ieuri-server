@@ -1,29 +1,14 @@
 package org.around.ieuri.community.adapter.persistence
 
-import org.around.ieuri.community.adapter.persistence.table.CommentTable
-import org.around.ieuri.community.adapter.persistence.table.PostTable
 import org.around.ieuri.community.adapter.persistence.table.ReportTable
-import org.around.ieuri.community.adapter.persistence.table.SpotAnswerReplyTable
-import org.around.ieuri.community.adapter.persistence.table.SpotAnswerTable
-import org.around.ieuri.community.adapter.persistence.table.SpotQuestionTable
 import org.around.ieuri.community.application.report.required.ReportRepository
-import org.around.ieuri.community.application.report.required.ReportTargetRepository
 import org.around.ieuri.community.domain.report.Report
 import org.around.ieuri.community.domain.report.ReportTargetType
-import org.jetbrains.exposed.v1.core.Column
-import org.jetbrains.exposed.v1.core.Table
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
-import org.jetbrains.exposed.v1.core.greater
-import org.jetbrains.exposed.v1.core.isNull
-import org.jetbrains.exposed.v1.core.minus
-import org.jetbrains.exposed.v1.javatime.CurrentTimestampWithTimeZone
 import org.jetbrains.exposed.v1.jdbc.insertIgnore
 import org.jetbrains.exposed.v1.jdbc.select
-import org.jetbrains.exposed.v1.jdbc.update
-import org.jetbrains.exposed.v1.jdbc.updateReturning
 import org.springframework.stereotype.Repository
-import java.time.OffsetDateTime
 
 @Repository
 class ReportPersistenceAdapter : ReportRepository {

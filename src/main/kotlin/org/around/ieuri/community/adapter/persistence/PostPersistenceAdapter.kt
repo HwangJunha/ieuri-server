@@ -14,7 +14,6 @@ import org.around.ieuri.community.domain.post.Post
 import org.around.ieuri.community.domain.post.PostPhotos
 import org.around.ieuri.community.domain.post.PostSpot
 import org.around.ieuri.community.domain.post.PostTags
-import org.around.ieuri.community.domain.post.SpotChange
 import org.around.ieuri.community.domain.vo.TargetCategory
 import org.jetbrains.exposed.v1.core.Column
 import org.jetbrains.exposed.v1.core.and
@@ -80,12 +79,13 @@ class PostPersistenceAdapter : PostRepository {
     }
 
     /** 장소를 떼면 행을 지운다. 위치(geography)는 트리거가 map_x·map_y로 다시 채운다. */
-    override fun changeSpot(postId: Long, change: SpotChange) {
-        when (change) {
-            is SpotChange.Set -> writeSpot(postId, change.spot)
-            SpotChange.Remove -> PostSpotTable.deleteWhere { PostSpotTable.postId eq postId }
-        }
+    override fun changeSpot(postId: Long, spot: PostSpot?) {
+        if (spot == null) PostSpotTable.deleteWhere { PostSpotTable.postId eq postId } else writeSpot(postId, spot)
     }
+
+    override fun hideIfVisible(postId: Long): Boolean = PostTable.update({
+        (PostTable.id eq postId) and PostTable.deletedAt.isNull() and (PostTable.hidden eq false)
+    }) { it[hidden] = true } > 0
 
     override fun replaceTags(postId: Long, tags: PostTags) {
         PostTagTable.deleteWhere { PostTagTable.postId eq postId }

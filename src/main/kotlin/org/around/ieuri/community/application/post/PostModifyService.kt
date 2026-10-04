@@ -17,26 +17,25 @@ import org.around.ieuri.community.domain.post.PostPhotos
 import org.around.ieuri.community.domain.post.PostSpot
 import org.around.ieuri.community.domain.post.PostTag
 import org.around.ieuri.community.domain.post.PostTags
-import org.around.ieuri.community.domain.post.SpotChange
 import org.around.ieuri.community.domain.shared.PhotoNotUploadedException
 import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.around.ieuri.community.domain.vo.PhotoObjectKey
 import org.around.ieuri.community.domain.vo.SpotPoint
-import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Service
-import org.springframework.transaction.support.TransactionOperations
+import org.springframework.transaction.annotation.Transactional
 
 /**
  * 글 쓰기·좋아요·개인 숨김.
- * - 사진 오브젝트 확인(R2)은 트랜잭션 밖에서 한다. 실패는 모두 PHOTO_NOT_UPLOADED다.
+ * - 외부 호출(R2 사진 확인)은 메서드 앞, 첫 쿼리 전에 둔다 — DB 연결은 첫 쿼리에서 잡힌다.
+ * - 사진 확인 실패는 모두 PHOTO_NOT_UPLOADED다.
  */
 @Service
+@Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
 class PostModifyService(
     private val postRepository: PostRepository,
     private val spotLookupPort: SpotLookupPort,
     private val objectStoragePort: ObjectStoragePort,
     private val clockPort: ClockPort,
-    @Qualifier(ExposedConfig.EXPOSED_TX_OPERATIONS) private val transaction: TransactionOperations,
 ) : PostCommandUseCase {
 
     override fun createPost(command: CreatePostCommand, memberId: Long, language: ContentLanguage): Long {
@@ -46,76 +45,66 @@ class PostModifyService(
         val photos = PostPhotos.of(command.photoKeys.map(::parsePhotoKey), memberId)
         requireUploaded(photos.keys)
 
-        return requireNotNull(transaction.execute { postRepository.insert(post, command.category, spot, tags, photos) })
+        return postRepository.insert(post, command.category, spot, tags, photos)
     }
 
-    /** null은 "건드리지 않는다"이고 빈 목록(전부 제거)과 다르다. 장소는 [EditPostCommand.changeSpot]으로 의도를 받는다. */
+    /** null은 "건드리지 않는다"이고 빈 목록(전부 제거)과 다르다. 장소는 [EditPostCommand.changeSpot]이 true일 때만 바꾸며 null이면 뗀다. */
     override fun editPost(command: EditPostCommand, memberId: Long, language: ContentLanguage) {
         val photoKeys = command.photoKeys?.map(::parsePhotoKey)
         val tags = command.tags?.map(PostTag::parse)?.let(PostTags::of)
-        val spotChange = if (command.changeSpot) command.catalogId?.let { SpotChange.Set(findSpot(it, language)) } ?: SpotChange.Remove else null
+        val spot = if (command.changeSpot) command.catalogId?.let { findSpot(it, language) } else null
         photoKeys?.let(::requireUploaded)
 
-        transaction.executeWithoutResult {
-            val post = postRepository.findById(command.postId) ?: throw PostNotFoundException()
+        val post = postRepository.findById(command.postId) ?: throw PostNotFoundException()
 
-            val edited = post.edit(memberId, command.title, command.body)
-            val photos = photoKeys?.let { PostPhotos.of(it, post.authorId) }
+        val edited = post.edit(memberId, command.title, command.body)
+        val photos = photoKeys?.let { PostPhotos.of(it, post.authorId) }
 
-            // 읽은 뒤 신고 누적으로 숨겨졌다면 0건이다.
-            if (!postRepository.updateContent(edited)) throw HiddenPostNotEditableException()
-            command.category?.let { postRepository.changeCategory(command.postId, it) }
-            spotChange?.let { postRepository.changeSpot(command.postId, it) }
-            tags?.let { postRepository.replaceTags(command.postId, it) }
-            photos?.let { postRepository.replacePhotos(command.postId, it) }
-        }
+        // 읽은 뒤 신고 누적으로 숨겨졌다면 0건이다.
+        if (!postRepository.updateContent(edited)) throw HiddenPostNotEditableException()
+        command.category?.let { postRepository.changeCategory(command.postId, it) }
+        if (command.changeSpot) postRepository.changeSpot(command.postId, spot)
+        tags?.let { postRepository.replaceTags(command.postId, it) }
+        photos?.let { postRepository.replacePhotos(command.postId, it) }
     }
 
     override fun deletePost(command: PostTargetCommand, memberId: Long) {
-        transaction.executeWithoutResult {
-            // 이미 삭제된 글은 조회되지 않으므로 재삭제는 POST_NOT_FOUND다.
-            val post = postRepository.findById(command.postId) ?: throw PostNotFoundException()
+        // 이미 삭제된 글은 조회되지 않으므로 재삭제는 POST_NOT_FOUND다.
+        val post = postRepository.findById(command.postId) ?: throw PostNotFoundException()
 
-            val deleted = post.delete(memberId, clockPort.now())
+        val deleted = post.delete(memberId, clockPort.now())
 
-            postRepository.markDeleted(command.postId, requireNotNull(deleted.deletedAt))
-        }
+        postRepository.markDeleted(command.postId, requireNotNull(deleted.deletedAt))
     }
 
-    override fun like(command: PostTargetCommand, memberId: Long): Int = requireNotNull(
-        transaction.execute {
-            requireExists(command.postId)
+    override fun like(command: PostTargetCommand, memberId: Long): Int {
+        requireExists(command.postId)
 
-            if (postRepository.addLike(command.postId, memberId)) postRepository.increaseLikeCount(command.postId)
+        if (postRepository.addLike(command.postId, memberId)) postRepository.increaseLikeCount(command.postId)
 
-            postRepository.likeCount(command.postId)
-        },
-    )
+        return postRepository.likeCount(command.postId)
+    }
 
-    override fun unlike(command: PostTargetCommand, memberId: Long): Int = requireNotNull(
-        transaction.execute {
-            requireExists(command.postId)
+    override fun unlike(command: PostTargetCommand, memberId: Long): Int {
+        requireExists(command.postId)
 
-            if (postRepository.removeLike(command.postId, memberId)) postRepository.decreaseLikeCount(command.postId)
+        if (postRepository.removeLike(command.postId, memberId)) postRepository.decreaseLikeCount(command.postId)
 
-            postRepository.likeCount(command.postId)
-        },
-    )
+        return postRepository.likeCount(command.postId)
+    }
 
     override fun hide(command: PostTargetCommand, memberId: Long) {
-        transaction.executeWithoutResult {
-            requireExists(command.postId)
+        requireExists(command.postId)
 
-            postRepository.addHide(memberId, command.postId)
-        }
+        postRepository.addHide(memberId, command.postId)
     }
 
     override fun unhide(command: PostTargetCommand, memberId: Long) {
-        transaction.executeWithoutResult { postRepository.removeHide(memberId, command.postId) }
+        postRepository.removeHide(memberId, command.postId)
     }
 
     override fun recordView(postId: Long) {
-        transaction.executeWithoutResult { postRepository.increaseViewCount(postId) }
+        postRepository.increaseViewCount(postId)
     }
 
     private fun requireExists(postId: Long) {

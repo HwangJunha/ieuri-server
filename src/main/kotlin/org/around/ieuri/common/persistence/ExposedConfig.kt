@@ -13,8 +13,6 @@ import org.springframework.context.annotation.Primary
 import org.springframework.jdbc.datasource.LazyConnectionDataSourceProxy
 import org.springframework.orm.jpa.JpaTransactionManager
 import org.springframework.transaction.PlatformTransactionManager
-import org.springframework.transaction.support.TransactionOperations
-import org.springframework.transaction.support.TransactionTemplate
 import javax.sql.DataSource
 
 /**
@@ -53,12 +51,6 @@ class ExposedConfig {
     ): PlatformTransactionManager = SpringTransactionManager(dataSource, DatabaseConfig {}, false)
         .also { manager -> customizers.ifAvailable { it.customize(manager) } }
 
-    /** 트랜잭션 앞에 외부 I/O(R2 등)를 두어야 하는 서비스가 범위를 직접 정할 때 쓴다. */
-    @Bean(EXPOSED_TX_OPERATIONS)
-    fun exposedTransactionOperations(
-        @Qualifier(EXPOSED_TX) transactionManager: PlatformTransactionManager,
-    ): TransactionOperations = TransactionTemplate(transactionManager)
-
     /** 이전하지 않은 context와 배치가 쓰는 기본 매니저. Boot 자동구성과 같은 모양이다. */
     @Bean
     @Primary
@@ -74,8 +66,5 @@ class ExposedConfig {
     companion object {
         /** `@Transactional(transactionManager = EXPOSED_TX)`로 쓴다. */
         const val EXPOSED_TX = "exposedTransactionManager"
-
-        /** `@Qualifier(EXPOSED_TX_OPERATIONS) TransactionOperations`로 쓴다. */
-        const val EXPOSED_TX_OPERATIONS = "exposedTransactionOperations"
     }
 }

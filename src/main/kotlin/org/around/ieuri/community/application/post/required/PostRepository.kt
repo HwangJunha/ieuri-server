@@ -4,7 +4,6 @@ import org.around.ieuri.community.domain.post.Post
 import org.around.ieuri.community.domain.post.PostPhotos
 import org.around.ieuri.community.domain.post.PostSpot
 import org.around.ieuri.community.domain.post.PostTags
-import org.around.ieuri.community.domain.post.SpotChange
 import org.around.ieuri.community.domain.vo.TargetCategory
 import java.time.Instant
 
@@ -28,13 +27,17 @@ interface PostRepository {
 
     fun changeCategory(postId: Long, category: TargetCategory)
 
-    fun changeSpot(postId: Long, change: SpotChange)
+    /** null이면 장소를 뗀다. */
+    fun changeSpot(postId: Long, spot: PostSpot?)
 
     /** 태그 전체를 이 목록으로 바꾼다. 빈 목록이면 모두 뗀다. */
     fun replaceTags(postId: Long, tags: PostTags)
 
     /** 사진 전체를 이 목록으로 바꾼다. 빈 목록이면 모두 뗀다. */
     fun replacePhotos(postId: Long, photos: PostPhotos)
+
+    /** 신고 누적 숨김. 보이는(숨겨지지도 삭제되지도 않은) 글만 바꾸며, 이번 호출로 숨겨졌으면 true. */
+    fun hideIfVisible(postId: Long): Boolean
 
     /** 이미 삭제됐으면 false. */
     fun markDeleted(postId: Long, deletedAt: Instant): Boolean
