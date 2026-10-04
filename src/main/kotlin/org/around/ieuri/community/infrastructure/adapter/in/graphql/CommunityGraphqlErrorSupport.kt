@@ -1,7 +1,7 @@
 package org.around.ieuri.community.infrastructure.adapter.`in`.graphql
 
 import org.around.ieuri.common.graphql.generated.types.UserError
-import org.around.ieuri.community.application.exception.CommunityUserException
+import org.around.ieuri.community.domain.shared.CommunityUserException
 
 /** 예외를 UserError로 매핑한다. userErrors 대상이 아니면 null(→ 상위에서 재던짐). */
 fun toCommunityUserErrorOrNull(e: Throwable): UserError? = when (e) {

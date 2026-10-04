@@ -3,7 +3,7 @@ package org.around.ieuri.community.infrastructure
 import org.around.ieuri.common.graphql.generated.types.MarkConversationReadInput
 import org.around.ieuri.common.graphql.generated.types.ReportMessagesInput
 import org.around.ieuri.common.graphql.generated.types.SendMessageInput
-import org.around.ieuri.community.domain.vo.ReportReason
+import org.around.ieuri.community.domain.shared.ReportReason
 import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper.toCommand
 import kotlin.test.Test
 import kotlin.test.assertEquals

@@ -299,13 +299,19 @@ Those rules are deleted in the final slice, not piecemeal.
   in the adapter's error handler, keeping the existing codes (POL-016).
 - **Services read as a procedure: find → domain method → save.** One `XxxModifyService` and one
   `XxxQueryService` per aggregate. An update still calls `save` — Exposed has no dirty-checking.
+- **Load the minimum, write only what changed.** A write loads only the row its decision needs
+  (`Post.findById` reads the post table alone); children are value objects validated by the domain
+  and written through intention-named repository methods the service calls with `?.let` — null means
+  "untouched". The repository port takes domain objects; no transfer type is built just to reach it.
+  Read-side children are field resolvers keyed by the parent id. Port implementations are
+  `XxxPersistenceAdapter`.
 - **Aggregate rules.** One aggregate changed per transaction; others via events. Counters (likes,
   comments, answers) are atomic increments in the repository, not aggregate state. An aggregate that
   can be changed concurrently carries a `version` column. External I/O (HTTP, Valkey, R2) runs
   outside the transaction. Reads skip the aggregate and project straight into read DTOs.
 - **Exposed: DSL only, never DAO** (DAO is Active Record — the JPA-as-domain problem again).
-  `Table` objects live in `adapter/persistence/table/` and mirror the DB exactly — the startup
-  schema check fails on any drift except column type, which it cannot see. Transactions use Spring
+  `Table` objects live in `adapter/persistence/table/` and mirror the migration — nothing checks this
+  at startup (no library offers it), so a drift surfaces on the first query that touches it. Transactions use Spring
   `@Transactional` on the Exposed transaction manager, never Exposed's `transaction {}` block.
   PostGIS, CTEs and pgvector distance stay raw SQL, through a `JdbcTemplate` on `exposedDataSource` (it
   joins the Exposed transaction). Declaring a table: identity id → `autoIncrement()`, read the generated

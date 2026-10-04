@@ -8,7 +8,7 @@ import org.around.ieuri.community.application.command.MarkConversationReadComman
 import org.around.ieuri.community.application.command.ReportMessagesCommand
 import org.around.ieuri.community.application.command.SendMessageCommand
 import org.around.ieuri.community.application.command.StartConversationCommand
-import org.around.ieuri.community.domain.vo.ReportReason
+import org.around.ieuri.community.domain.shared.ReportReason
 
 /*
  * 대화 GraphQL 입력 → Command 변환(SPEC-0017·SPEC-0021, POL-033). 호출자 id는 담지 않는다.

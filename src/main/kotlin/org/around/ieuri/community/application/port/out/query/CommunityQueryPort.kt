@@ -6,9 +6,9 @@ import org.around.ieuri.community.application.query.BlockedUserView
 import org.around.ieuri.community.application.query.CommentView
 import org.around.ieuri.community.application.query.CommunityChipView
 import org.around.ieuri.community.application.query.PostView
+import org.around.ieuri.community.domain.post.PostTag
 import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.around.ieuri.community.domain.vo.PostSortOrder
-import org.around.ieuri.community.domain.vo.PostTag
 import org.around.ieuri.community.domain.vo.TargetCategory
 
 /**

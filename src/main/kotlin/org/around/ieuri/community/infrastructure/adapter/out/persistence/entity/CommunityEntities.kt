@@ -12,9 +12,9 @@ import jakarta.persistence.PrePersist
 import jakarta.persistence.PreUpdate
 import jakarta.persistence.Table
 import org.around.ieuri.common.persistence.DbSchema
+import org.around.ieuri.community.domain.report.ReportTargetType
+import org.around.ieuri.community.domain.shared.ReportReason
 import org.around.ieuri.community.domain.vo.ContentLanguage
-import org.around.ieuri.community.domain.vo.ReportReason
-import org.around.ieuri.community.domain.vo.ReportTargetType
 import org.around.ieuri.community.domain.vo.TargetCategory
 import java.io.Serializable
 import java.time.Instant

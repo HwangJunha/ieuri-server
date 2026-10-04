@@ -7,11 +7,11 @@ import org.around.ieuri.community.application.exception.InvalidInputException
 import org.around.ieuri.community.application.exception.NotQuestionOwnerException
 import org.around.ieuri.community.application.exception.QuestionNotFoundException
 import org.around.ieuri.community.application.exception.SpotNotFoundInLocaleException
-import org.around.ieuri.community.application.exception.TooManyPhotosException
 import org.around.ieuri.community.application.port.`in`.command.SpotQuestionCommandUseCase
 import org.around.ieuri.community.application.port.out.client.SpotLookupPort
 import org.around.ieuri.community.application.port.out.persistence.SpotQuestionRepositoryPort
 import org.around.ieuri.community.domain.aggregate.SpotQuestion
+import org.around.ieuri.community.domain.shared.TooManyPhotosException
 import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional

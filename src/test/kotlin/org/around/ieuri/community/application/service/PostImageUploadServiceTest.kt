@@ -7,12 +7,12 @@ import org.around.ieuri.community.application.command.ConfirmPostImageUploadsCom
 import org.around.ieuri.community.application.command.DeletePostImageCommand
 import org.around.ieuri.community.application.command.IssuePostImageUploadUrlsCommand
 import org.around.ieuri.community.application.command.PostImageUploadRequest
-import org.around.ieuri.community.application.exception.PhotoNotUploadedException
-import org.around.ieuri.community.application.exception.TooManyPhotosException
 import org.around.ieuri.community.application.exception.UnsupportedContentTypeException
 import org.around.ieuri.community.application.policy.CommunityPolicy
 import org.around.ieuri.community.application.port.out.client.ClockPort
 import org.around.ieuri.community.application.port.out.client.ObjectStoragePort
+import org.around.ieuri.community.domain.shared.PhotoNotUploadedException
+import org.around.ieuri.community.domain.shared.TooManyPhotosException
 import org.around.ieuri.community.domain.vo.ImageFormat
 import java.time.Duration
 import java.time.Instant

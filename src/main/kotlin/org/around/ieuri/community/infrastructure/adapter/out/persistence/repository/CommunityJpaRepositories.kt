@@ -1,6 +1,6 @@
 package org.around.ieuri.community.infrastructure.adapter.out.persistence.repository
 
-import org.around.ieuri.community.domain.vo.ReportTargetType
+import org.around.ieuri.community.domain.report.ReportTargetType
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.BlockEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.CommentEntity
 import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.PostChipEntity

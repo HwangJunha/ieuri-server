@@ -1,6 +1,6 @@
 package org.around.ieuri.community.domain.aggregate
 
-import org.around.ieuri.community.domain.vo.ReportReason
+import org.around.ieuri.community.domain.shared.ReportReason
 import java.time.Instant
 
 /**

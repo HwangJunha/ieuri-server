@@ -1,6 +1,6 @@
 package org.around.ieuri.community.application.command
 
-import org.around.ieuri.community.domain.vo.ReportReason
+import org.around.ieuri.community.domain.shared.ReportReason
 
 // DM 쓰기 입력. 형식 검증만 하고 업무 불변식은 도메인이 판정한다. memberId는 담지 않는다.
 

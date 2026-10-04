@@ -3,8 +3,6 @@ package org.around.ieuri.community.application.service
 import org.around.ieuri.community.application.command.ConfirmPostImageUploadsCommand
 import org.around.ieuri.community.application.command.DeletePostImageCommand
 import org.around.ieuri.community.application.command.IssuePostImageUploadUrlsCommand
-import org.around.ieuri.community.application.exception.PhotoNotUploadedException
-import org.around.ieuri.community.application.exception.TooManyPhotosException
 import org.around.ieuri.community.application.exception.UnsupportedContentTypeException
 import org.around.ieuri.community.application.policy.CommunityPolicy
 import org.around.ieuri.community.application.port.`in`.command.PostImageUploadUseCase
@@ -13,7 +11,9 @@ import org.around.ieuri.community.application.port.out.client.ObjectStoragePort
 import org.around.ieuri.community.application.query.PostImageConfirmFailure
 import org.around.ieuri.community.application.query.PostImageConfirmResult
 import org.around.ieuri.community.application.query.PostImageUploadUrlView
-import org.around.ieuri.community.domain.aggregate.Post
+import org.around.ieuri.community.domain.post.PostPhotos
+import org.around.ieuri.community.domain.shared.PhotoNotUploadedException
+import org.around.ieuri.community.domain.shared.TooManyPhotosException
 import org.around.ieuri.community.domain.vo.ImageFormat
 import org.around.ieuri.community.domain.vo.PhotoObjectKey
 import org.springframework.stereotype.Service
@@ -37,7 +37,7 @@ class PostImageUploadService(
         memberId: Long,
     ): List<PostImageUploadUrlView> {
         if (command.images.isEmpty()) return emptyList()
-        if (command.images.size > Post.MAX_PHOTOS) throw TooManyPhotosException()
+        if (command.images.size > PostPhotos.MAX_PHOTOS) throw TooManyPhotosException()
 
         command.images.forEach { image ->
             if (image.contentType.trim().lowercase() !in policy.allowedContentTypes) {

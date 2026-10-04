@@ -11,7 +11,6 @@ import org.around.ieuri.community.application.exception.NotReplyOwnerException
 import org.around.ieuri.community.application.exception.QuestionNotFoundException
 import org.around.ieuri.community.application.exception.ReplyNotFoundException
 import org.around.ieuri.community.application.exception.ReplyToReplyNotAllowedException
-import org.around.ieuri.community.application.exception.TooManyPhotosException
 import org.around.ieuri.community.application.port.`in`.command.SpotAnswerCommandUseCase
 import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
 import org.around.ieuri.community.application.port.out.persistence.SpotAnswerReplyRepositoryPort
@@ -22,6 +21,7 @@ import org.around.ieuri.community.domain.aggregate.SpotAnswer
 import org.around.ieuri.community.domain.aggregate.SpotAnswerReply
 import org.around.ieuri.community.domain.event.SpotAnswerNotificationTriggered
 import org.around.ieuri.community.domain.event.SpotAnswerReplyNotificationTriggered
+import org.around.ieuri.community.domain.shared.TooManyPhotosException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 

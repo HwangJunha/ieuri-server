@@ -11,7 +11,7 @@ import jakarta.persistence.PrePersist
 import jakarta.persistence.PreUpdate
 import jakarta.persistence.Table
 import org.around.ieuri.common.persistence.DbSchema
-import org.around.ieuri.community.domain.vo.ReportReason
+import org.around.ieuri.community.domain.shared.ReportReason
 import java.time.Instant
 
 // DM JPA 엔티티(SPEC-0017). 다른 도메인 id는 plain 컬럼이다.

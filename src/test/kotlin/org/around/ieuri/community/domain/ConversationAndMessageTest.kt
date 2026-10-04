@@ -3,8 +3,8 @@ package org.around.ieuri.community.domain
 import org.around.ieuri.community.domain.aggregate.Conversation
 import org.around.ieuri.community.domain.aggregate.Message
 import org.around.ieuri.community.domain.aggregate.MessageReport
+import org.around.ieuri.community.domain.shared.ReportReason
 import org.around.ieuri.community.domain.vo.PhotoObjectKey
-import org.around.ieuri.community.domain.vo.ReportReason
 import java.time.Duration
 import java.time.Instant
 import kotlin.test.Test

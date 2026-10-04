@@ -14,8 +14,7 @@ import org.jetbrains.exposed.v1.core.or
 import org.jetbrains.exposed.v1.core.trim
 import org.jetbrains.exposed.v1.javatime.timestampWithTimeZone
 
-// community 스키마(V1__baseline.sql 이후). 이름·제약·인덱스는 마이그레이션과 같게 둔다 — 기동 검증(ExposedSchemaValidator)이 비교한다.
-// CHECK 조건식은 검증 대상이 아니다(이름만 비교). 조건의 원본은 마이그레이션이다.
+// community 스키마. 원본은 마이그레이션이다 — 컬럼·제약·인덱스 이름을 마이그레이션과 같게 둔다.
 
 object PostTable : Table("community.community_post") {
     val id = long("id").autoIncrement()
@@ -356,10 +355,3 @@ object MessageReportItemTable : Table("community.community_message_report_item")
         uniqueIndex("uq_community_message_report_item", reporterId, messageId)
     }
 }
-
-/** 기동 검증 대상. 새 테이블을 선언하면 여기에도 넣는다. */
-val communityTables: List<Table> = listOf(
-    PostTable, PostPhotoTable, PostTagTable, PostChipTable, PostSpotTable, CommentTable, PostLikeTable, PostHideTable,
-    BlockTable, ReportTable, SpotQuestionTable, SpotAnswerTable, SpotAnswerReplyTable, SpotQaPhotoTable,
-    SpotCatalogLanguageTable, ConversationTable, MessageTable, MessageQuoteTable, MessageReportTable, MessageReportItemTable,
-)

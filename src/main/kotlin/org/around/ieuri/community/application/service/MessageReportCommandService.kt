@@ -1,15 +1,15 @@
 package org.around.ieuri.community.application.service
 
 import org.around.ieuri.community.application.command.ReportMessagesCommand
-import org.around.ieuri.community.application.exception.AlreadyReportedException
 import org.around.ieuri.community.application.exception.InvalidInputException
 import org.around.ieuri.community.application.exception.NotConversationParticipantException
-import org.around.ieuri.community.application.exception.ReportDetailRequiredException
 import org.around.ieuri.community.application.port.`in`.command.MessageReportCommandUseCase
 import org.around.ieuri.community.application.port.out.persistence.ConversationRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.MessageReportRepositoryPort
 import org.around.ieuri.community.application.port.out.persistence.MessageRepositoryPort
 import org.around.ieuri.community.domain.aggregate.MessageReport
+import org.around.ieuri.community.domain.shared.AlreadyReportedException
+import org.around.ieuri.community.domain.shared.ReportDetailRequiredException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
