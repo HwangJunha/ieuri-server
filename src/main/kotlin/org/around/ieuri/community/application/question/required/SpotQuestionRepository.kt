@@ -4,6 +4,7 @@ import org.around.ieuri.community.domain.question.SpotAnswer
 import org.around.ieuri.community.domain.question.SpotAnswerReply
 import org.around.ieuri.community.domain.question.SpotQuestion
 import org.around.ieuri.community.domain.shared.AttachedPhotos
+import java.time.Instant
 
 /**
  * 질문 애그리게이트 저장소. 루트와 자식은 각자 필요한 한 행만 읽는다.
@@ -55,4 +56,12 @@ interface SpotQuestionRepository {
     fun increaseAnswerCount(questionId: Long)
 
     fun decreaseAnswerCount(questionId: Long)
+
+    // 탈퇴 정리: 삭제 표시만 하고 남의 자식은 칠하지 않는다 — 부모가 지워진 자식은 읽기가 거른다.
+    fun markDeletedByAuthor(authorId: Long, deletedAt: Instant): Int
+
+    /** 이번에 지운 답변 중 수에 잡혀 있던(숨겨지지 않은) 것의 질문 id를 건마다 돌려준다. */
+    fun markAnswersDeletedByAuthorCounted(authorId: Long, deletedAt: Instant): List<Long>
+
+    fun markRepliesDeletedByAuthor(authorId: Long, deletedAt: Instant): Int
 }

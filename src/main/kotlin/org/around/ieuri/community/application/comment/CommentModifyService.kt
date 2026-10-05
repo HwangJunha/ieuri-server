@@ -8,9 +8,12 @@ import org.around.ieuri.community.application.comment.required.CommentRepository
 import org.around.ieuri.community.application.port.out.client.ClockPort
 import org.around.ieuri.community.application.post.provided.exception.PostNotFoundException
 import org.around.ieuri.community.application.post.required.PostRepository
+import org.around.ieuri.community.application.withdrawal.MemberContentEraser
 import org.around.ieuri.community.domain.comment.Comment
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
+import java.time.Instant
 
 /** 댓글 생성·삭제. 대댓글도 글의 댓글 수에 포함된다. */
 @Service
@@ -19,7 +22,8 @@ class CommentModifyService(
     private val commentRepository: CommentRepository,
     private val postRepository: PostRepository,
     private val clockPort: ClockPort,
-) : CommentCommandUseCase {
+) : CommentCommandUseCase,
+    MemberContentEraser {
 
     override fun createComment(command: CreateCommentCommand, memberId: Long): Long {
         if (!postRepository.exists(command.postId)) throw PostNotFoundException()
@@ -45,5 +49,13 @@ class CommentModifyService(
         if (commentRepository.markDeletedWasCounted(commentId, requireNotNull(deleted.deletedAt))) {
             postRepository.decreaseCommentCount(comment.postId)
         }
+    }
+
+    /** 탈퇴 정리: 작성 댓글 삭제 표시, 수에 잡혀 있던 것만큼 글의 댓글 수를 내림. */
+    @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, propagation = Propagation.REQUIRES_NEW)
+    override fun eraseMemberContent(memberId: Long, deletedAt: Instant): Int {
+        val postIds = commentRepository.markDeletedByAuthorCounted(memberId, deletedAt)
+        postIds.forEach(postRepository::decreaseCommentCount)
+        return postIds.size
     }
 }

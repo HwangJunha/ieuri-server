@@ -26,4 +26,6 @@ class BlockPersistenceAdapter : BlockRepository {
     }.insertedCount > 0
 
     override fun remove(blockerId: Long, blockedId: Long): Boolean = BlockTable.deleteWhere { (BlockTable.blockerId eq blockerId) and (BlockTable.blockedId eq blockedId) } > 0
+
+    override fun removeInvolving(memberId: Long): Int = BlockTable.deleteWhere { (BlockTable.blockerId eq memberId) or (BlockTable.blockedId eq memberId) }
 }

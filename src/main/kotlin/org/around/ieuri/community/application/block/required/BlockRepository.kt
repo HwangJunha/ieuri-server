@@ -11,4 +11,7 @@ interface BlockRepository {
     fun add(block: Block): Boolean
 
     fun remove(blockerId: Long, blockedId: Long): Boolean
+
+    /** 탈퇴 정리: 회원이 걸었거나 회원을 향한 차단을 모두 지운다. */
+    fun removeInvolving(memberId: Long): Int
 }

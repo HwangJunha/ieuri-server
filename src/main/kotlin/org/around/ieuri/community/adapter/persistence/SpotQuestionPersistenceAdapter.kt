@@ -3,6 +3,7 @@ package org.around.ieuri.community.adapter.persistence
 import org.around.ieuri.community.adapter.persistence.mapper.toSpotAnswer
 import org.around.ieuri.community.adapter.persistence.mapper.toSpotAnswerReply
 import org.around.ieuri.community.adapter.persistence.mapper.toSpotQuestion
+import org.around.ieuri.community.adapter.persistence.mapper.toTimestamptz
 import org.around.ieuri.community.adapter.persistence.table.SpotAnswerReplyTable
 import org.around.ieuri.community.adapter.persistence.table.SpotAnswerTable
 import org.around.ieuri.community.adapter.persistence.table.SpotQuestionTable
@@ -28,6 +29,7 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.update
 import org.jetbrains.exposed.v1.jdbc.updateReturning
 import org.springframework.stereotype.Repository
+import java.time.Instant
 
 @Repository
 class SpotQuestionPersistenceAdapter : SpotQuestionRepository {
@@ -149,4 +151,18 @@ class SpotQuestionPersistenceAdapter : SpotQuestionRepository {
             (SpotQuestionTable.id eq questionId) and SpotQuestionTable.deletedAt.isNull() and (SpotQuestionTable.answerCount greater 0)
         }) { it[answerCount] = answerCount - 1 }
     }
+
+    override fun markDeletedByAuthor(authorId: Long, deletedAt: Instant): Int = SpotQuestionTable.update({
+        (SpotQuestionTable.authorId eq authorId) and SpotQuestionTable.deletedAt.isNull()
+    }) { it[SpotQuestionTable.deletedAt] = deletedAt.toTimestamptz() }
+
+    override fun markAnswersDeletedByAuthorCounted(authorId: Long, deletedAt: Instant): List<Long> = SpotAnswerTable.updateReturning(
+        returning = listOf(SpotAnswerTable.questionId, SpotAnswerTable.hidden),
+        where = { (SpotAnswerTable.authorId eq authorId) and SpotAnswerTable.deletedAt.isNull() },
+    ) { it[SpotAnswerTable.deletedAt] = deletedAt.toTimestamptz() }
+        .filterNot { it[SpotAnswerTable.hidden] }.map { it[SpotAnswerTable.questionId] }
+
+    override fun markRepliesDeletedByAuthor(authorId: Long, deletedAt: Instant): Int = SpotAnswerReplyTable.update({
+        (SpotAnswerReplyTable.authorId eq authorId) and SpotAnswerReplyTable.deletedAt.isNull()
+    }) { it[SpotAnswerReplyTable.deletedAt] = deletedAt.toTimestamptz() }
 }

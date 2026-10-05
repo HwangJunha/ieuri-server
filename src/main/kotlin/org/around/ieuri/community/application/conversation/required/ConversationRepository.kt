@@ -32,4 +32,7 @@ interface ConversationRepository {
 
     /** [cutoff] 이전에 만들어진 메시지 행을 최대 [limit]건 물리 삭제한다. */
     fun deleteMessagesCreatedBefore(cutoff: Instant, limit: Int): ExpiredMessages
+
+    /** 탈퇴 정리: 보낸 메시지 삭제 표시. 대화는 남는다. 보관 기간이 지나면 이 행도 물리 삭제된다. */
+    fun markMessagesDeletedBySender(senderId: Long, deletedAt: Instant): Int
 }

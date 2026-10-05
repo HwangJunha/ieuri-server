@@ -24,6 +24,7 @@ import org.jetbrains.exposed.v1.core.minus
 import org.jetbrains.exposed.v1.core.plus
 import org.jetbrains.exposed.v1.javatime.CurrentTimestampWithTimeZone
 import org.jetbrains.exposed.v1.jdbc.batchInsert
+import org.jetbrains.exposed.v1.jdbc.deleteReturning
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.insertIgnore
@@ -162,4 +163,14 @@ class PostPersistenceAdapter : PostRepository {
             this[PostPhotoTable.position] = index.toShort()
         }
     }
+
+    override fun markDeletedByAuthor(authorId: Long, deletedAt: Instant): Int = PostTable.update({
+        (PostTable.authorId eq authorId) and PostTable.deletedAt.isNull()
+    }) { it[PostTable.deletedAt] = deletedAt.toTimestamptz() }
+
+    override fun removeLikesByMember(memberId: Long): List<Long> = PostLikeTable
+        .deleteReturning(listOf(PostLikeTable.postId)) { PostLikeTable.memberId eq memberId }
+        .map { it[PostLikeTable.postId] }
+
+    override fun removeHidesByMember(memberId: Long): Int = PostHideTable.deleteWhere { PostHideTable.memberId eq memberId }
 }

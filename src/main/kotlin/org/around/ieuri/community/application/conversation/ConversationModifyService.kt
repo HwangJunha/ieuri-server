@@ -23,6 +23,7 @@ import org.around.ieuri.community.application.port.out.event.CommunityEventPubli
 import org.around.ieuri.community.application.port.out.event.ConversationEventPort
 import org.around.ieuri.community.application.query.TypingEventView
 import org.around.ieuri.community.application.question.required.SpotQuestionRepository
+import org.around.ieuri.community.application.withdrawal.MemberContentEraser
 import org.around.ieuri.community.domain.conversation.Conversation
 import org.around.ieuri.community.domain.conversation.Message
 import org.around.ieuri.community.domain.event.MessageNotificationTriggered
@@ -30,7 +31,9 @@ import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.around.ieuri.community.domain.vo.PhotoObjectKey
 import org.around.ieuri.community.domain.vo.SpotQaOrigin
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
+import java.time.Instant
 
 /**
  * 대화 시작·메시지 전송·읽음·타이핑 알림. 메시지는 루트(대화)를 통해 만든다.
@@ -50,7 +53,8 @@ class ConversationModifyService(
     private val eventPublisher: CommunityEventPublisherPort,
     private val clockPort: ClockPort,
 ) : ConversationCommandUseCase,
-    ExpiredMessageDeleteUseCase {
+    ExpiredMessageDeleteUseCase,
+    MemberContentEraser {
 
     override fun startConversation(command: StartConversationCommand, memberId: Long): Long {
         // 자기 자신과의 대화는 존재 확인보다 먼저 거부한다.
@@ -147,4 +151,8 @@ class ConversationModifyService(
             answerExcerpt = SpotQaOrigin.excerpt(answer.body),
         )
     }
+
+    /** 탈퇴 정리: 보낸 메시지 삭제 표시. 대화는 남긴다. */
+    @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, propagation = Propagation.REQUIRES_NEW)
+    override fun eraseMemberContent(memberId: Long, deletedAt: Instant): Int = conversationRepository.markMessagesDeletedBySender(memberId, deletedAt)
 }

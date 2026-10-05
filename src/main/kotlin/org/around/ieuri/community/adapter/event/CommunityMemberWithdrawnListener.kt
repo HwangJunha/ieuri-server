@@ -1,7 +1,7 @@
-package org.around.ieuri.community.infrastructure.adapter.`in`.event
+package org.around.ieuri.community.adapter.event
 
 import org.around.ieuri.auth.domain.event.MemberWithdrawn
-import org.around.ieuri.community.application.port.`in`.command.MemberDataEraseUseCase
+import org.around.ieuri.community.application.withdrawal.provided.MemberDataEraseUseCase
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import org.springframework.transaction.event.TransactionPhase

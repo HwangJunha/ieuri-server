@@ -45,4 +45,12 @@ class CommentPersistenceAdapter : CommentRepository {
         it[CommentTable.deletedAt] = deletedAt.toTimestamptz()
         it[updatedAt] = CurrentTimestampWithTimeZone
     }.singleOrNull()?.let { !it[CommentTable.hidden] } ?: false
+
+    override fun markDeletedByAuthorCounted(authorId: Long, deletedAt: Instant): List<Long> = CommentTable.updateReturning(
+        returning = listOf(CommentTable.postId, CommentTable.hidden),
+        where = { (CommentTable.authorId eq authorId) and CommentTable.deletedAt.isNull() },
+    ) {
+        it[CommentTable.deletedAt] = deletedAt.toTimestamptz()
+        it[updatedAt] = CurrentTimestampWithTimeZone
+    }.filterNot { it[CommentTable.hidden] }.map { it[CommentTable.postId] }
 }

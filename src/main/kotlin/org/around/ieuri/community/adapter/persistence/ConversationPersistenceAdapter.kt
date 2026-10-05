@@ -147,4 +147,8 @@ class ConversationPersistenceAdapter(
             it[parentId] = origin.questionId
         }
     }
+
+    override fun markMessagesDeletedBySender(senderId: Long, deletedAt: Instant): Int = MessageTable.update({
+        (MessageTable.senderId eq senderId) and MessageTable.deletedAt.isNull()
+    }) { it[MessageTable.deletedAt] = deletedAt.toTimestamptz() }
 }

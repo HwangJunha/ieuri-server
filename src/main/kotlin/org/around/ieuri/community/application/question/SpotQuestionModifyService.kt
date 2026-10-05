@@ -14,13 +14,16 @@ import org.around.ieuri.community.application.question.provided.exception.ReplyN
 import org.around.ieuri.community.application.question.provided.exception.ReplyToReplyNotAllowedException
 import org.around.ieuri.community.application.question.required.SpotQuestionRepository
 import org.around.ieuri.community.application.shared.UploadedPhotoVerifier
+import org.around.ieuri.community.application.withdrawal.MemberContentEraser
 import org.around.ieuri.community.domain.event.SpotAnswerNotificationTriggered
 import org.around.ieuri.community.domain.event.SpotAnswerReplyNotificationTriggered
 import org.around.ieuri.community.domain.question.SpotQuestion
 import org.around.ieuri.community.domain.shared.AttachedPhotos
 import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
+import java.time.Instant
 
 /** 질문·답변·답글 쓰기. 답변·답글은 루트(질문)를 통해 만들고 지운다. 외부 호출(장소 조회·R2)은 첫 쿼리 전에 한다. */
 @Service
@@ -30,7 +33,8 @@ class SpotQuestionModifyService(
     private val spotLookupPort: SpotLookupPort,
     private val photoVerifier: UploadedPhotoVerifier,
     private val eventPublisher: CommunityEventPublisherPort,
-) : SpotQuestionCommandUseCase {
+) : SpotQuestionCommandUseCase,
+    MemberContentEraser {
 
     override fun createQuestion(command: CreateSpotQuestionCommand, memberId: Long, language: ContentLanguage): Long {
         if (spotLookupPort.findSummary(command.catalogId, language) == null) throw SpotNotFoundInLocaleException()
@@ -130,5 +134,14 @@ class SpotQuestionModifyService(
         question.removeReply(reply, memberId)
 
         questionRepository.deleteReply(replyId)
+    }
+
+    /** 탈퇴 정리: 질문·답변·답글 삭제 표시, 수에 잡혀 있던 답변만큼 질문의 답변 수를 내림. */
+    @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, propagation = Propagation.REQUIRES_NEW)
+    override fun eraseMemberContent(memberId: Long, deletedAt: Instant): Int {
+        val questions = questionRepository.markDeletedByAuthor(memberId, deletedAt)
+        val answeredQuestionIds = questionRepository.markAnswersDeletedByAuthorCounted(memberId, deletedAt)
+        answeredQuestionIds.forEach(questionRepository::decreaseAnswerCount)
+        return questions + answeredQuestionIds.size + questionRepository.markRepliesDeletedByAuthor(memberId, deletedAt)
     }
 }

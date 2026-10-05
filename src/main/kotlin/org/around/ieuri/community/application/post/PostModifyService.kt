@@ -11,6 +11,7 @@ import org.around.ieuri.community.application.post.provided.dto.PostTargetComman
 import org.around.ieuri.community.application.post.provided.exception.PostNotFoundException
 import org.around.ieuri.community.application.post.required.PostRepository
 import org.around.ieuri.community.application.shared.UploadedPhotoVerifier
+import org.around.ieuri.community.application.withdrawal.MemberContentEraser
 import org.around.ieuri.community.domain.post.HiddenPostNotEditableException
 import org.around.ieuri.community.domain.post.Post
 import org.around.ieuri.community.domain.post.PostSpot
@@ -20,7 +21,9 @@ import org.around.ieuri.community.domain.shared.AttachedPhotos
 import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.around.ieuri.community.domain.vo.SpotPoint
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
+import java.time.Instant
 
 /**
  * 글 쓰기·좋아요·개인 숨김.
@@ -34,7 +37,8 @@ class PostModifyService(
     private val spotLookupPort: SpotLookupPort,
     private val photoVerifier: UploadedPhotoVerifier,
     private val clockPort: ClockPort,
-) : PostCommandUseCase {
+) : PostCommandUseCase,
+    MemberContentEraser {
 
     override fun createPost(command: CreatePostCommand, memberId: Long, language: ContentLanguage): Long {
         val spot = command.catalogId?.let { findSpot(it, language) }
@@ -113,5 +117,14 @@ class PostModifyService(
     private fun findSpot(catalogId: Long, language: ContentLanguage): PostSpot {
         val summary = spotLookupPort.findSummary(catalogId, language) ?: throw SpotNotFoundInLocaleException()
         return PostSpot(catalogId, SpotPoint(longitude = summary.longitude, latitude = summary.latitude))
+    }
+
+    /** 탈퇴 정리: 작성 글 삭제 표시, 좋아요를 지우고 그 글의 좋아요 수를 내림, 숨김 삭제. */
+    @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, propagation = Propagation.REQUIRES_NEW)
+    override fun eraseMemberContent(memberId: Long, deletedAt: Instant): Int {
+        val posts = postRepository.markDeletedByAuthor(memberId, deletedAt)
+        val likedPostIds = postRepository.removeLikesByMember(memberId)
+        likedPostIds.forEach(postRepository::decreaseLikeCount)
+        return posts + likedPostIds.size + postRepository.removeHidesByMember(memberId)
     }
 }
