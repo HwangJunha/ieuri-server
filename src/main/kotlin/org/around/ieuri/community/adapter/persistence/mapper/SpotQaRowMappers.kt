@@ -7,6 +7,7 @@ import org.around.ieuri.community.domain.question.SpotAnswer
 import org.around.ieuri.community.domain.question.SpotAnswerReply
 import org.around.ieuri.community.domain.question.SpotQuestion
 import org.jetbrains.exposed.v1.core.ResultRow
+import org.jetbrains.exposed.v1.core.statements.UpdateBuilder
 
 /** 질문 한 행. 사진은 읽기 쪽 필드 리졸버가 따로 가져온다. */
 fun ResultRow.toSpotQuestion(): SpotQuestion = SpotQuestion(
@@ -38,3 +39,25 @@ fun ResultRow.toSpotAnswerReply(): SpotAnswerReply = SpotAnswerReply(
     hidden = this[SpotAnswerReplyTable.hidden],
     deletedAt = this[SpotAnswerReplyTable.deletedAt]?.toInstant(),
 )
+
+/** 새 질문 한 행. 사진은 저장소가 따로 넣는다. */
+fun SpotQuestion.writeTo(row: UpdateBuilder<*>) {
+    row[SpotQuestionTable.catalogId] = catalogId
+    row[SpotQuestionTable.authorId] = authorId
+    row[SpotQuestionTable.body] = body
+    row[SpotQuestionTable.resolved] = resolved
+}
+
+fun SpotAnswer.writeTo(row: UpdateBuilder<*>) {
+    row[SpotAnswerTable.questionId] = questionId
+    row[SpotAnswerTable.catalogId] = catalogId
+    row[SpotAnswerTable.authorId] = authorId
+    row[SpotAnswerTable.body] = body
+}
+
+fun SpotAnswerReply.writeTo(row: UpdateBuilder<*>) {
+    row[SpotAnswerReplyTable.answerId] = answerId
+    row[SpotAnswerReplyTable.catalogId] = catalogId
+    row[SpotAnswerReplyTable.authorId] = authorId
+    row[SpotAnswerReplyTable.body] = body
+}

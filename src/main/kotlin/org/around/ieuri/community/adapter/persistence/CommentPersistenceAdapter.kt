@@ -2,6 +2,7 @@ package org.around.ieuri.community.adapter.persistence
 
 import org.around.ieuri.community.adapter.persistence.mapper.toComment
 import org.around.ieuri.community.adapter.persistence.mapper.toTimestamptz
+import org.around.ieuri.community.adapter.persistence.mapper.writeTo
 import org.around.ieuri.community.adapter.persistence.table.CommentTable
 import org.around.ieuri.community.application.comment.required.CommentRepository
 import org.around.ieuri.community.domain.comment.Comment
@@ -23,12 +24,8 @@ class CommentPersistenceAdapter : CommentRepository {
         .where { (CommentTable.id eq commentId) and CommentTable.deletedAt.isNull() }
         .singleOrNull()?.toComment()
 
-    override fun insert(comment: Comment): Long = CommentTable.insertReturning(listOf(CommentTable.id)) {
-        it[postId] = comment.postId
-        it[parentCommentId] = comment.parentCommentId
-        it[authorId] = comment.authorId
-        it[body] = comment.body
-    }.single()[CommentTable.id]
+    override fun insert(comment: Comment): Long = CommentTable.insertReturning(listOf(CommentTable.id)) { comment.writeTo(it) }
+        .single()[CommentTable.id]
 
     override fun hideIfVisible(commentId: Long): Long? = CommentTable.updateReturning(
         returning = listOf(CommentTable.postId),

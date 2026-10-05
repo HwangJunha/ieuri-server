@@ -1,5 +1,6 @@
 package org.around.ieuri.community.adapter.persistence
 
+import org.around.ieuri.community.adapter.persistence.mapper.writeTo
 import org.around.ieuri.community.adapter.persistence.table.BlockTable
 import org.around.ieuri.community.application.block.required.BlockRepository
 import org.around.ieuri.community.domain.block.Block
@@ -20,10 +21,7 @@ class BlockPersistenceAdapter : BlockRepository {
                 ((BlockTable.blockerId eq otherId) and (BlockTable.blockedId eq memberId))
         }.limit(1).any()
 
-    override fun add(block: Block): Boolean = BlockTable.insertIgnore {
-        it[blockerId] = block.blockerId
-        it[blockedId] = block.blockedId
-    }.insertedCount > 0
+    override fun add(block: Block): Boolean = BlockTable.insertIgnore { block.writeTo(it) }.insertedCount > 0
 
     override fun remove(blockerId: Long, blockedId: Long): Boolean = BlockTable.deleteWhere { (BlockTable.blockerId eq blockerId) and (BlockTable.blockedId eq blockedId) } > 0
 

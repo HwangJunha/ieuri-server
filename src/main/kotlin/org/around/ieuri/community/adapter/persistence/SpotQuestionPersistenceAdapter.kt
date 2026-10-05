@@ -4,6 +4,7 @@ import org.around.ieuri.community.adapter.persistence.mapper.toSpotAnswer
 import org.around.ieuri.community.adapter.persistence.mapper.toSpotAnswerReply
 import org.around.ieuri.community.adapter.persistence.mapper.toSpotQuestion
 import org.around.ieuri.community.adapter.persistence.mapper.toTimestamptz
+import org.around.ieuri.community.adapter.persistence.mapper.writeTo
 import org.around.ieuri.community.adapter.persistence.table.SpotAnswerReplyTable
 import org.around.ieuri.community.adapter.persistence.table.SpotAnswerTable
 import org.around.ieuri.community.adapter.persistence.table.SpotQaPhotoTable
@@ -68,34 +69,19 @@ class SpotQuestionPersistenceAdapter : SpotQuestionRepository {
         .where { (SpotAnswerReplyTable.id eq replyId) and SpotAnswerReplyTable.deletedAt.isNull() }.limit(1).any()
 
     override fun insert(question: SpotQuestion, photos: AttachedPhotos): Long {
-        val questionId = SpotQuestionTable.insertReturning(listOf(SpotQuestionTable.id)) {
-            it[catalogId] = question.catalogId
-            it[authorId] = question.authorId
-            it[body] = question.body
-            it[resolved] = question.resolved
-        }.single()[SpotQuestionTable.id]
+        val questionId = SpotQuestionTable.insertReturning(listOf(SpotQuestionTable.id)) { question.writeTo(it) }.single()[SpotQuestionTable.id]
         insertPhotos(question.kind, questionId, photos)
         return questionId
     }
 
     override fun insertAnswer(answer: SpotAnswer, photos: AttachedPhotos): Long {
-        val answerId = SpotAnswerTable.insertReturning(listOf(SpotAnswerTable.id)) {
-            it[questionId] = answer.questionId
-            it[catalogId] = answer.catalogId
-            it[authorId] = answer.authorId
-            it[body] = answer.body
-        }.single()[SpotAnswerTable.id]
+        val answerId = SpotAnswerTable.insertReturning(listOf(SpotAnswerTable.id)) { answer.writeTo(it) }.single()[SpotAnswerTable.id]
         insertPhotos(answer.kind, answerId, photos)
         return answerId
     }
 
     override fun insertReply(reply: SpotAnswerReply, photos: AttachedPhotos): Long {
-        val replyId = SpotAnswerReplyTable.insertReturning(listOf(SpotAnswerReplyTable.id)) {
-            it[answerId] = reply.answerId
-            it[catalogId] = reply.catalogId
-            it[authorId] = reply.authorId
-            it[body] = reply.body
-        }.single()[SpotAnswerReplyTable.id]
+        val replyId = SpotAnswerReplyTable.insertReturning(listOf(SpotAnswerReplyTable.id)) { reply.writeTo(it) }.single()[SpotAnswerReplyTable.id]
         insertPhotos(reply.kind, replyId, photos)
         return replyId
     }

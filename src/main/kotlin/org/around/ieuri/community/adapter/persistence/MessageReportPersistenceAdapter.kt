@@ -1,5 +1,6 @@
 package org.around.ieuri.community.adapter.persistence
 
+import org.around.ieuri.community.adapter.persistence.mapper.writeTo
 import org.around.ieuri.community.adapter.persistence.table.MessageReportItemTable
 import org.around.ieuri.community.adapter.persistence.table.MessageReportTable
 import org.around.ieuri.community.application.messagereport.required.MessageReportRepository
@@ -22,12 +23,7 @@ class MessageReportPersistenceAdapter : MessageReportRepository {
             .limit(1).any()
         if (alreadyReported) return false
 
-        val reportId = MessageReportTable.insertReturning(listOf(MessageReportTable.id)) {
-            it[reporterId] = report.reporterId
-            it[conversationId] = report.conversationId
-            it[reason] = report.reason.name
-            it[detail] = report.detail
-        }.single()[MessageReportTable.id]
+        val reportId = MessageReportTable.insertReturning(listOf(MessageReportTable.id)) { report.writeTo(it) }.single()[MessageReportTable.id]
         return report.messageIds.all { messageId ->
             MessageReportItemTable.insertIgnore {
                 it[MessageReportItemTable.reportId] = reportId

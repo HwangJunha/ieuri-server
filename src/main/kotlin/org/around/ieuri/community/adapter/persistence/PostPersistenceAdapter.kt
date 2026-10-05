@@ -2,6 +2,8 @@ package org.around.ieuri.community.adapter.persistence
 
 import org.around.ieuri.community.adapter.persistence.mapper.toPost
 import org.around.ieuri.community.adapter.persistence.mapper.toTimestamptz
+import org.around.ieuri.community.adapter.persistence.mapper.writeContentTo
+import org.around.ieuri.community.adapter.persistence.mapper.writeTo
 import org.around.ieuri.community.adapter.persistence.table.PostChipTable
 import org.around.ieuri.community.adapter.persistence.table.PostHideTable
 import org.around.ieuri.community.adapter.persistence.table.PostLikeTable
@@ -49,12 +51,7 @@ class PostPersistenceAdapter : PostRepository {
 
     /** 글을 먼저 넣어 id를 받은 뒤 자식을 붙인다(FK 순서). 장소가 없으면 장소 행을 만들지 않는다. */
     override fun insert(post: Post, category: TargetCategory, spot: PostSpot?, tags: PostTags, photos: AttachedPhotos): Long {
-        val postId = PostTable.insertReturning(listOf(PostTable.id)) {
-            it[authorId] = post.authorId
-            it[title] = post.title
-            it[body] = post.body
-            it[edited] = post.edited
-        }.single()[PostTable.id]
+        val postId = PostTable.insertReturning(listOf(PostTable.id)) { post.writeTo(it) }.single()[PostTable.id]
 
         PostChipTable.insert {
             it[PostChipTable.postId] = postId
@@ -69,9 +66,7 @@ class PostPersistenceAdapter : PostRepository {
     override fun updateContent(post: Post): Boolean {
         val postId = requireNotNull(post.id) { "저장된 글에만 쓴다." }
         return PostTable.update({ (PostTable.id eq postId) and PostTable.deletedAt.isNull() and (PostTable.hidden eq false) }) {
-            it[title] = post.title
-            it[body] = post.body
-            it[edited] = post.edited
+            post.writeContentTo(it)
             it[updatedAt] = CurrentTimestampWithTimeZone
         } > 0
     }
@@ -143,12 +138,7 @@ class PostPersistenceAdapter : PostRepository {
 
     /** map_x는 경도, map_y는 위도다. */
     private fun writeSpot(postId: Long, spot: PostSpot) {
-        PostSpotTable.upsert {
-            it[PostSpotTable.postId] = postId
-            it[catalogId] = spot.catalogId
-            it[mapX] = spot.point.longitude
-            it[mapY] = spot.point.latitude
-        }
+        PostSpotTable.upsert { spot.writeTo(it, postId) }
     }
 
     private fun writeTags(postId: Long, tags: PostTags) {

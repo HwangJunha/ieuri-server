@@ -5,6 +5,8 @@ import org.around.ieuri.community.adapter.persistence.mapper.toConversation
 import org.around.ieuri.community.adapter.persistence.mapper.toMessage
 import org.around.ieuri.community.adapter.persistence.mapper.toSpotQaOrigin
 import org.around.ieuri.community.adapter.persistence.mapper.toTimestamptz
+import org.around.ieuri.community.adapter.persistence.mapper.writeQuoteTo
+import org.around.ieuri.community.adapter.persistence.mapper.writeTo
 import org.around.ieuri.community.adapter.persistence.table.ConversationTable
 import org.around.ieuri.community.adapter.persistence.table.MessageQuoteTable
 import org.around.ieuri.community.adapter.persistence.table.MessageTable
@@ -45,24 +47,17 @@ class ConversationPersistenceAdapter(
 
     /** 경합으로 같은 쌍이 먼저 들어갔으면 삽입은 아무것도 하지 않고, 그 행의 id를 읽는다. */
     override fun insertIfAbsent(conversation: Conversation): Long {
-        ConversationTable.insertIgnore {
-            it[memberLow] = conversation.memberLow
-            it[memberHigh] = conversation.memberHigh
-        }
+        ConversationTable.insertIgnore { conversation.writeTo(it) }
         return ConversationTable.select(ConversationTable.id)
             .where { (ConversationTable.memberLow eq conversation.memberLow) and (ConversationTable.memberHigh eq conversation.memberHigh) }
             .single()[ConversationTable.id]
     }
 
     override fun insertMessage(message: Message): Message {
-        val row = MessageTable.insertReturning(listOf(MessageTable.id, MessageTable.createdAt)) {
-            it[conversationId] = message.conversationId
-            it[senderId] = message.senderId
-            it[bodyEncrypted] = cipher.encrypt(message.body)
-            it[photoObjectKey] = message.photoKey?.value
-        }.single()
+        val row = MessageTable.insertReturning(listOf(MessageTable.id, MessageTable.createdAt)) { message.writeTo(it, cipher::encrypt) }
+            .single()
         val messageId = row[MessageTable.id]
-        message.spotQaOrigin?.let { insertQuote(messageId, it) }
+        message.spotQaOrigin?.let { origin -> MessageQuoteTable.insert { origin.writeQuoteTo(it, messageId, cipher::encrypt) } }
         return Message(
             id = messageId,
             conversationId = message.conversationId,
@@ -133,19 +128,6 @@ class ConversationPersistenceAdapter(
     private fun advance(conversationId: Long, column: Column<Long?>, messageId: Long) {
         ConversationTable.update({ (ConversationTable.id eq conversationId) and (column.isNull() or (column less messageId)) }) {
             it[column] = messageId
-        }
-    }
-
-    private fun insertQuote(messageId: Long, origin: SpotQaOrigin) {
-        MessageQuoteTable.insert {
-            it[MessageQuoteTable.messageId] = messageId
-            it[quoteType] = "SPOT_ANSWER"
-            it[targetId] = origin.answerId
-            it[titleSnapshot] = origin.spotTitle
-            it[primaryExcerptEncrypted] = cipher.encrypt(origin.questionExcerpt)
-            it[secondaryExcerptEncrypted] = cipher.encrypt(origin.answerExcerpt)
-            it[contextId] = origin.catalogId
-            it[parentId] = origin.questionId
         }
     }
 
