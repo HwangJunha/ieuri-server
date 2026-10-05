@@ -19,6 +19,7 @@ import org.jetbrains.exposed.v1.core.Column
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.greater
+import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.core.isNull
 import org.jetbrains.exposed.v1.core.minus
 import org.jetbrains.exposed.v1.core.plus
@@ -83,6 +84,8 @@ class PostPersistenceAdapter : PostRepository {
     override fun changeSpot(postId: Long, spot: PostSpot?) {
         if (spot == null) PostSpotTable.deleteWhere { PostSpotTable.postId eq postId } else writeSpot(postId, spot)
     }
+
+    override fun detachSpotsOfCatalogs(catalogIds: List<Long>): Int = PostSpotTable.deleteWhere { PostSpotTable.catalogId inList catalogIds }
 
     override fun hideIfVisible(postId: Long): Boolean = PostTable.update({
         (PostTable.id eq postId) and PostTable.deletedAt.isNull() and (PostTable.hidden eq false)

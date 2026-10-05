@@ -1,7 +1,7 @@
-package org.around.ieuri.community.infrastructure.adapter.`in`.event
+package org.around.ieuri.community.adapter.event
 
-import org.around.ieuri.community.application.port.`in`.command.CatalogLanguage
-import org.around.ieuri.community.application.port.`in`.command.PostSpotCleanupUseCase
+import org.around.ieuri.community.application.catalog.provided.SpotCatalogSyncUseCase
+import org.around.ieuri.community.domain.catalog.CatalogLanguage
 import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.around.ieuri.tourism.domain.event.CatalogLanguageRef
 import org.around.ieuri.tourism.domain.event.SpotCatalogLanguagesChanged
@@ -17,12 +17,12 @@ import org.springframework.transaction.event.TransactionalEventListener
  */
 @Component
 class CommunitySpotCatalogLanguagesChangedListener(
-    private val postSpotCleanupUseCase: PostSpotCleanupUseCase,
+    private val spotCatalogSyncUseCase: SpotCatalogSyncUseCase,
 ) {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     fun on(event: SpotCatalogLanguagesChanged) {
         try {
-            postSpotCleanupUseCase.syncCatalogLanguages(event.resolved.toCatalogLanguages())
+            spotCatalogSyncUseCase.syncCatalogLanguages(event.resolved.toCatalogLanguages())
         } catch (e: Exception) {
             log.error(
                 "failed to sync community spot catalog languages: resolved={}",

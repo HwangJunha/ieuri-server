@@ -10,6 +10,7 @@ import org.springframework.boot.transaction.autoconfigure.TransactionManagerCust
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Primary
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.datasource.LazyConnectionDataSourceProxy
 import org.springframework.orm.jpa.JpaTransactionManager
 import org.springframework.transaction.PlatformTransactionManager
@@ -50,6 +51,10 @@ class ExposedConfig {
         customizers: ObjectProvider<TransactionManagerCustomizers>,
     ): PlatformTransactionManager = SpringTransactionManager(dataSource, DatabaseConfig {}, false)
         .also { manager -> customizers.ifAvailable { it.customize(manager) } }
+
+    /** DSL이 표현하지 못하는 raw SQL(PostGIS·CTE·임시 테이블)용. Exposed 트랜잭션에 합류한다. 파라미터 이름으로 주입한다. */
+    @Bean
+    fun exposedJdbcTemplate(@Qualifier("exposedDataSource") dataSource: DataSource): JdbcTemplate = JdbcTemplate(dataSource)
 
     /** 이전하지 않은 context와 배치가 쓰는 기본 매니저. Boot 자동구성과 같은 모양이다. */
     @Bean

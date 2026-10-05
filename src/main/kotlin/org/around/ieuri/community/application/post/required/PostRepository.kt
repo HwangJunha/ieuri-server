@@ -30,6 +30,9 @@ interface PostRepository {
     /** null이면 장소를 뗀다. */
     fun changeSpot(postId: Long, spot: PostSpot?)
 
+    /** 사라진 카탈로그를 가리키던 글-장소 연결을 끊고 끊은 수를 돌려준다. 한 장소를 여러 글이 참조한다. */
+    fun detachSpotsOfCatalogs(catalogIds: List<Long>): Int
+
     /** 태그 전체를 이 목록으로 바꾼다. 빈 목록이면 모두 뗀다. */
     fun replaceTags(postId: Long, tags: PostTags)
 

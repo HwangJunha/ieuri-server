@@ -1,37 +1,35 @@
-package org.around.ieuri.community.infrastructure.adapter.out.persistence
+package org.around.ieuri.community.adapter.persistence
 
-import org.around.ieuri.community.application.port.out.persistence.CatalogLanguageEntry
-import org.around.ieuri.community.application.port.out.persistence.SpotCatalogLanguagePort
+import org.around.ieuri.community.application.catalog.required.SpotCatalogLanguageRepository
+import org.around.ieuri.community.domain.catalog.CatalogLanguage
 import org.springframework.jdbc.core.JdbcTemplate
-import org.springframework.stereotype.Component
-import org.springframework.transaction.annotation.Transactional
+import org.springframework.stereotype.Repository
 
-/** 카탈로그-언어 사본 적재 전용 raw SQL 어댑터(SPEC-0029 R-15, upsert). */
-@Component
-class SpotCatalogLanguageJdbcAdapter(
-    private val jdbcTemplate: JdbcTemplate,
-) : SpotCatalogLanguagePort {
+/** 카탈로그-언어 사본. 임시 테이블을 쓰므로 raw SQL이다(Exposed 트랜잭션에 합류하는 [JdbcTemplate]). */
+@Repository
+class SpotCatalogLanguagePersistenceAdapter(
+    private val exposedJdbcTemplate: JdbcTemplate,
+) : SpotCatalogLanguageRepository {
 
     /**
      * 표 전체를 [entries]로 맞춘다(차집합만 움직인다).
      * - 주의: [entries]가 비면 표를 전부 지운다.
      */
-    @Transactional
-    override fun replaceAll(entries: List<CatalogLanguageEntry>): Int {
+    override fun replaceAll(entries: List<CatalogLanguage>): Int {
         if (entries.isEmpty()) {
-            jdbcTemplate.update(DELETE_ALL_SQL)
+            exposedJdbcTemplate.update(DELETE_ALL_SQL)
             return 0
         }
 
         // 비우고 다시 넣지 않는다 — 중간에 표가 비면 동시 조회가 글을 놓친다.
         // 정본을 임시 테이블에 싣고 차집합만 움직인다.
-        jdbcTemplate.execute(CREATE_TEMP_SQL)
-        jdbcTemplate.batchUpdate(
+        exposedJdbcTemplate.execute(CREATE_TEMP_SQL)
+        exposedJdbcTemplate.batchUpdate(
             INSERT_TEMP_SQL,
             entries.map { arrayOf<Any>(it.catalogId, it.language.name) },
         )
-        jdbcTemplate.update(DELETE_STALE_SQL)
-        jdbcTemplate.update(INSERT_NEW_SQL)
+        exposedJdbcTemplate.update(DELETE_STALE_SQL)
+        exposedJdbcTemplate.update(INSERT_NEW_SQL)
 
         return entries.size
     }
