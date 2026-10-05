@@ -100,6 +100,7 @@
 | D-61 | S12 | **탈퇴 정리는 애그리게이트별 단계(`MemberContentEraser`)다.** 글·댓글·질문·대화·차단 ModifyService가 각자 한 단계를 구현하고(`REQUIRES_NEW`), 트랜잭션 없는 `MemberDataEraseService`가 차례로 부른다. 한 단계가 실패해도 나머지는 진행하고 재시도하지 않는다(로그만). 카운터를 보정한다: 지운 좋아요만큼 좋아요 수, 수에 잡혀 있던(숨겨지지 않은) 댓글·답변만큼 댓글·답변 수를 `UPDATE … RETURNING`으로 받은 대상에 내린다 | D-45("애그리거트 종류별 REQUIRES_NEW 단계 + 카운터 보정")의 구현. D-43의 "탈퇴 시 카운터 미감소" 해소. 공용 계정이라 실측하지 못함 | **한 트랜잭션(기존)**: 한 표의 실패가 전체를 되돌려 아무것도 지워지지 않는다. **단계별 재시도**: 관찰된 실패가 없다(D-45 무재시도 유지) |
 | D-62 | S12 | **raw SQL은 `exposedJdbcTemplate`(exposedDataSource 위 `JdbcTemplate`)로 Exposed 트랜잭션에 합류한다.** 거리순 피드(PostGIS)와 카탈로그-언어 사본(임시 테이블)이 쓴다. 주입은 파라미터 이름으로 한다(메인 `jdbcTemplate`과 같은 방식, `@Primary` 없음). 사본 동기화·장소 연결 정리는 `SpotCatalogSyncService`(REQUIRES_NEW, 커밋 뒤 리스너가 부름), `OrphanPhotoService`는 지운다 | D-42의 구현. 실측: 거리순 반경 안·밖·숨김 제외가 dev와 동일 | **임시 테이블을 Exposed DSL로**: 임시 테이블 선언·차집합 SQL을 DSL로 옮겨도 얻는 것이 없다 |
 | D-63 | S12 | **조회는 애그리게이트별 QueryService(글·댓글·차단·질문·대화)이고 읽기 포트 `CommunityQueryPort`는 글·댓글·차단이 함께 쓴다.** 조회자 필터(`viewerContext`)·페이지 상한은 `application/shared`의 확장 함수. 다른 context(알림·지도)의 차단 판정은 `BlockQueryUseCase`로 간다. QueryDSL은 Exposed DSL로 옮기며 `CASE`는 같은 뜻의 조건으로(안 읽은 수: 낮은 쪽이면 low 지점, 아니면 high 지점), 대화별 마지막 메시지는 별칭 상관 서브쿼리로. community 패키지는 Target shape로 정리했다(`application/port·service·query`, `domain/vo·event`, `infrastructure` 없음) | Target shape("애그리게이트당 XxxQueryService 하나"). 읽기는 애그리게이트를 거치지 않으므로 포트를 애그리게이트마다 쪼갤 이유가 없다. 실측: 조회 루트 53/54(차이는 조회수 부수 효과), 거리순·카테고리·태그·장소·숨김·다음 페이지 커서 모두 dev와 동일 | **조회 포트도 애그리게이트별로**: 같은 모더레이션 조건을 세 어댑터가 나눠 들게 된다. **CommunityQueryService 유지**: 한 서비스가 세 애그리게이트를 맡는다 |
+| D-64 | S12 | **장소 Q&A 글의 종류(`SpotQaKind`: QUESTION·ANSWER·REPLY)는 도메인 개념이다.** 세 엔티티가 클래스 본문의 `val kind`로 자기 종류를 고정으로 든다(생성자·`copy`·`equals`에 끼지 않아 바꿀 수 없다). 사진 저장은 `entity.kind`를 `owner_type`에 옮기기만 하고, 사진 행 쓰기는 질문 어댑터의 private 함수다(`SpotQaPhotoRows.kt`·`SpotQaPhotoOwner` 삭제). 사진 자체는 엔티티에 넣지 않고 지금처럼 옆에 넘긴다 | 사용자 지적(2026-10-05): 주인 종류를 호출자가 인자로 넘기면 질문 id에 ANSWER를 붙여도 막을 수 없는 숨은 규칙이다. 종류 구분은 신고 대상(`ReportTargetType`)·알림 이벤트에 이미 있는 도메인 구분이다. 실측: Q&A 생성·삭제(행 없음), 조회 dev 동일 | **어댑터의 저장 구분값(`SpotQaPhotoOwner`)으로 유지**: 짝을 타입이 보장하지 않는다. **생성자 파라미터**: 매퍼가 다른 값을 넣을 수 있다. **사진도 엔티티 필드로**: 판정에 쓰이지 않아 D-60 기준 밖이고, 읽을 때마다 사진을 읽어야 한다 |
 ## 부족한 정보
 
 | # | 질문 (서비스 사실) | 막는 것 |
@@ -235,6 +236,7 @@ grep으로 확인한 수(worktree `82fdd48`):
 | 2026-09-28 | C1·C2 완료 기록, D-31에 연속 `//` 포함 | 구현 결과 |
 | 2026-09-28 | B1.5 리뷰 반영: 풀 증설 경고·LIMIT 1·FCM env 경고 복원, 의미가 바뀐 주석 2곳 수정, 센서 제외 판정을 루트 기준으로 | reviewer PASS-with-warnings |
 | 2026-09-29 | D-25 뒤집음: VC 실행 도구를 서버 레포에서 빼고 ieuri-QA 스위트로 | 사용자 지시(직접 만든 도구 금지, 검증은 코드와 분리) |
+| 2026-10-05 | D-64(장소 Q&A 글 종류를 도메인으로) | 사용자 승인 |
 | 2026-10-05 | D-61(탈퇴 정리 단계)·D-62(raw SQL exposedJdbcTemplate, 사본 동기화)·D-63(조회 서비스 분할·패키지 정리) | 구현 결과 |
 | 2026-10-05 | D-60(애그리게이트 안 자식 컬렉션은 작고 상한이 있을 때만 허용) | 사용자 결정 |
 | 2026-10-05 | D-59(대화 루트 애그리게이트·메시지 신고·보관 파기 분리, D-45 일부 뒤집음) | 구현 결과 |
