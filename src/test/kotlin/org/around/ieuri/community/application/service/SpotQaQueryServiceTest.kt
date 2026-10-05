@@ -6,20 +6,21 @@ import io.mockk.slot
 import io.mockk.verify
 import org.around.ieuri.common.pagination.CursorEdge
 import org.around.ieuri.common.pagination.cursorPageOf
-import org.around.ieuri.community.application.exception.QuestionNotFoundException
-import org.around.ieuri.community.application.exception.SpotNotFoundInLocaleException
-import org.around.ieuri.community.application.policy.CommunityPolicy
-import org.around.ieuri.community.application.port.out.client.SpotLookupPort
-import org.around.ieuri.community.application.port.out.query.CommunityQueryPort
-import org.around.ieuri.community.application.port.out.query.SpotAnswersSearch
-import org.around.ieuri.community.application.port.out.query.SpotQaQueryPort
-import org.around.ieuri.community.application.port.out.query.SpotQuestionsSearch
-import org.around.ieuri.community.application.query.PostSpotView
-import org.around.ieuri.community.application.query.SpotAnswerView
-import org.around.ieuri.community.application.query.SpotAnswersQuery
-import org.around.ieuri.community.application.query.SpotQuestionView
-import org.around.ieuri.community.application.query.SpotQuestionsQuery
-import org.around.ieuri.community.domain.vo.ContentLanguage
+import org.around.ieuri.community.application.question.SpotQuestionQueryService
+import org.around.ieuri.community.application.question.provided.dto.SpotAnswerView
+import org.around.ieuri.community.application.question.provided.dto.SpotAnswersQuery
+import org.around.ieuri.community.application.question.provided.dto.SpotQuestionView
+import org.around.ieuri.community.application.question.provided.dto.SpotQuestionsQuery
+import org.around.ieuri.community.application.question.provided.exception.QuestionNotFoundException
+import org.around.ieuri.community.application.question.required.SpotAnswersSearch
+import org.around.ieuri.community.application.question.required.SpotQaQueryPort
+import org.around.ieuri.community.application.question.required.SpotQuestionsSearch
+import org.around.ieuri.community.application.shared.CommunityPolicy
+import org.around.ieuri.community.application.shared.dto.PostSpotView
+import org.around.ieuri.community.application.shared.exception.SpotNotFoundInLocaleException
+import org.around.ieuri.community.application.shared.required.CommunityQueryPort
+import org.around.ieuri.community.application.shared.required.SpotLookupPort
+import org.around.ieuri.community.domain.shared.ContentLanguage
 import java.time.Duration
 import java.time.Instant
 import kotlin.test.Test
@@ -53,7 +54,7 @@ class SpotQaQueryServiceTest {
         allowedContentTypes = setOf("image/jpeg"),
     )
 
-    private val service = SpotQaQueryService(
+    private val service = SpotQuestionQueryService(
         spotQaQueryPort,
         communityQueryPort,
         spotLookupPort,

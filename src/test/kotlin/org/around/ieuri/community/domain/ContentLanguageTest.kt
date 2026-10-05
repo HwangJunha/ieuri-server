@@ -1,6 +1,6 @@
 package org.around.ieuri.community.domain
 
-import org.around.ieuri.community.domain.vo.ContentLanguage
+import org.around.ieuri.community.domain.shared.ContentLanguage
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

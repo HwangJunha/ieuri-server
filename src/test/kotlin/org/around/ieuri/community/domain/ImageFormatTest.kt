@@ -1,6 +1,6 @@
 package org.around.ieuri.community.domain
 
-import org.around.ieuri.community.domain.vo.ImageFormat
+import org.around.ieuri.community.domain.shared.ImageFormat
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull

@@ -28,6 +28,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
   **What you put in front of the user is the design**, not a request to start typing — see [Agree the design before writing it](#agree-the-design-before-writing-it). Asking "shall I proceed?" with nothing to disagree with is not approval; it is a formality that produces the same unreviewed code.
 
+  **An approval that settles a choice is acted on, not re-asked.** If the user picks an option, or
+  answers in a way that decides it ("shared에 두면 된다"), carry that out with the rest of the
+  approved work. Turning a settled answer back into a question stalls the work and makes the user
+  repeat themselves; ask again only when the answer is genuinely ambiguous between options that
+  lead to different code.
+
+- **A question is answered, not implemented.** "Why is X here?", "is this DDD?", "what does
+  Khorikov say?" get an answer — evidence, the options, a recommendation — and no edit. When the
+  answer rests on outside practice, look it up (context7 for library docs, web search for how others
+  do it) and cite the sources; say plainly when a source could not be checked rather than guessing
+  what it says.
+
 ## Overview
 
 `ieuri` is a Spring Boot 4 application written in Kotlin, exposing a GraphQL API via Netflix DGS backed by PostgreSQL through Spring Data JPA (with QueryDSL for reads), and Spring Security on the request path. Four bounded contexts are implemented — `auth` (members, tokens, RBAC), `tourism` (spots, details, reactions, festival sync), `community`, and `alarm` — plus a Spring Batch job that syncs TourAPI data.
@@ -277,6 +289,104 @@ This pass is **not another review**, and it is bounded so it cannot loop:
 
 A finding you deliberately did not fix is fine — say so in the PR with the reason. Silently leaving
 it is not.
+
+## Target shape — Exposed migration (SPEC-0039, in progress)
+
+Persistence is moving from JPA to **Exposed DSL**, one bounded context at a time: community →
+tourism → auth → alarm (decisions D-32~D-67 in `problem/SPEC-0039-server.md`). **A context that has
+been moved follows this section; one that has not still follows Layout and the JPA rules below.**
+Those rules are deleted in the final slice, not piecemeal.
+
+**A migration changes neither the GraphQL schema nor the DB schema.** Defects found on the way are
+fixed only within that bound; anything that needs a migration or a schema field is a separate SPEC
+(SPEC-0039 D-56). Work that follows from a refactor is still a refactor.
+
+- **Packages: context → layer → aggregate.** `domain/<aggregate>/` holds the root with its own
+  entities, VOs, exceptions and events; `domain/shared/` holds VOs several aggregates use.
+  `application/<aggregate>/provided/` (inbound ports, `dto/`, `exception/`) and `required/`
+  (outbound ports). No `infrastructure/adapter/in|out`.
+  - **`application/` and `domain/` list the same packages, one to one.** Each name is an aggregate,
+    or a value group with its own use cases (`catalog`). A capability with no aggregate (photo
+    upload) goes in `shared` on both sides. **A process that spans aggregates (member withdrawal)
+    gets no package at all** — see the cross-aggregate bullet below. A package on one side only is
+    a finding.
+  - **`adapter/<technology>/<role>/`.** Technology first, then role, so one directory never mixes
+    directions: `event/listener` (inbound) and `event/publisher` (Spring events out); `messaging`
+    (Valkey pub/sub — it publishes *and* subscribes, so it is not a publisher); `graphql/resolver`,
+    `dataloader`, `connection`, `support`, `mapper`; `persistence` (write adapters), `query`,
+    `mapper`, `table`; `client`, `storage`, `config`, `batch`.
+- **Domain model is an immutable `data class`.** Every field `val`, collections read-only `List`.
+  A state change validates and returns `copy(...)`. The persistence mapper rebuilds it through the
+  public constructor — there is no `restore`. **Only code inside `domain/` may call an aggregate's
+  `copy`**; that is how the invariants stay unbypassable.
+- **Rules are judged in the domain only.** The domain throws a typed exception per violation; the
+  application neither pre-validates nor interprets a `Boolean` result. Exception → error code happens
+  in the adapter's error handler, keeping the existing codes (POL-016).
+- **Services read as a procedure: find → domain method → save.** One `XxxModifyService` and one
+  `XxxQueryService` per aggregate. An update still calls `save` — Exposed has no dirty-checking.
+  Query services are per aggregate too; the outbound **read** port may be shared between them
+  (reads skip the aggregate, so splitting the port only scatters one moderation filter).
+- **The root is the only door to its children.** A child is created and removed through a root
+  method (`question.answer(...)`, `question.removeAnswer(...)`, `conversation.send(...)`), never by a
+  `write` of its own. A value that classifies an entity and never varies per instance is a body
+  `val` (`val kind = SpotQaKind.QUESTION`) — not a constructor parameter a mapper could set wrong.
+  Name such values in domain words (`SpotQaKind`), not storage words (`PhotoOwner`).
+- **A parameter the caller must pair correctly is a hidden rule.** `insertPhotos(OWNER_ANSWER,
+  questionId, …)` compiles and stores wrong data. Make the pairing come from a type — read the kind
+  off the entity — so there is nothing to get wrong.
+- **Domain events are named as facts and live with the aggregate that emits them** — `MessageSent`,
+  `SpotAnswerWritten`, one type per file, not `XxxNotificationTriggered` named for one consumer.
+- **A process across aggregates is one listener per aggregate, not an orchestrator.** The inbound
+  listener (`adapter/event/listener`) has one method per aggregate; each calls that aggregate's own
+  use case, which goes through its domain like any other write. The event carries the shared facts
+  (`occurredAt` as the single timestamp). Each method swallows and logs its own failure so one
+  aggregate cannot block the rest. There is no application-layer coordinator and no
+  `application/<process>` package (SPEC-0039 D-65).
+- **Bulk changes go through the domain item by item.** A per-row loop over the domain method keeps
+  every rule in one place; its only cost is round trips. Move to Specification + Command (one
+  definition producing both the in-memory check and the bulk SQL — Khorikov, *DDD and bulk
+  operations*) only when the volume is shown to need a single statement **and** the rule is
+  non-trivial and reused by the single-item path. Plain bulk SQL that re-states a domain rule is the
+  option to avoid: the rule then lives twice and drifts. Rows with no domain rule at all (likes,
+  hides, blocks — repository operations) may be bulk-deleted.
+- **Load the minimum, write only what changed.** A write loads only the row its decision needs
+  (`Post.findById` reads the post table alone); children are value objects validated by the domain
+  and written through intention-named repository methods the service calls with `?.let` — null means
+  "untouched". The repository port takes domain objects; no transfer type is built just to reach it.
+  Read-side children are field resolvers keyed by the parent id. Port implementations are
+  `XxxPersistenceAdapter`.
+- **A root may hold its own children as a collection — only when the set is small and bounded.**
+  The JPA ban on `@OneToMany` existed for lazy-loading surprises and N+1; Exposed loads nothing
+  implicitly, so the remaining risk is size. An unbounded child set (messages, answers) is never held:
+  the child carries the root's id and is created only by a root factory method
+  (`conversation.send(...)`, `question.answer(...)` — Vernon's `planBacklogItem`). Never across
+  aggregates.
+- **Aggregate rules.** One aggregate changed per transaction; others via events. Counters (likes,
+  comments, answers) are atomic increments in the repository, not aggregate state. An aggregate that
+  can be changed concurrently carries a `version` column. External I/O (HTTP, Valkey, R2) runs
+  outside the transaction. Reads skip the aggregate and project straight into read DTOs.
+- **Exposed: DSL only, never DAO** (DAO is Active Record — the JPA-as-domain problem again).
+  `Table` objects live in `adapter/persistence/table/` and mirror the migration — nothing checks this
+  at startup (no library offers it), so a drift surfaces on the first query that touches it. Transactions use Spring
+  `@Transactional` on the Exposed transaction manager, never Exposed's `transaction {}` block nor
+  `TransactionTemplate`. **Declare it once on the service class**; a method overrides it only for
+  `propagation = REQUIRES_NEW` — every method an `AFTER_COMMIT` listener calls needs that, because
+  `REQUIRED` there joins the already-committed transaction of the same manager and silently writes
+  nothing. Query services are `readOnly = true` at class level. External calls (R2, another context)
+  go at the top of the method, before the first query — Exposed opens the connection on the first
+  query, so nothing is held while they run. Concurrent writes use conditional, column-scoped updates
+  (`WHERE col IS NULL OR col < :v` for values that only move forward, atomic `+ 1`/`- 1` for
+  counters, `UPDATE … RETURNING` to learn what this call changed) rather than read-modify-write.
+  PostGIS, CTEs, pgvector distance and temp-table SQL stay raw SQL, through `exposedJdbcTemplate` (a
+  `JdbcTemplate` on `exposedDataSource`, injected by parameter name — it joins the Exposed
+  transaction). Declaring a table: identity id → `autoIncrement()`, read the generated
+  value with `insertReturning`; `DEFAULT now()` → `databaseGenerated()`; `timestamptz` →
+  `timestampWithTimeZone`; FKs → `onUpdate = NO_ACTION` and the DB's constraint name; CHECK, index and
+  UNIQUE names exactly as in the migration.
+- **Conversions live in each adapter's `mapper/` package as extension functions** —
+  `adapter/graphql/mapper`, `adapter/persistence/mapper`, `adapter/client/mapper`,
+  `adapter/messaging/mapper`. Resolvers and repositories contain no conversion code. The
+  field-by-field test rule is unchanged.
 
 ## Layout
 

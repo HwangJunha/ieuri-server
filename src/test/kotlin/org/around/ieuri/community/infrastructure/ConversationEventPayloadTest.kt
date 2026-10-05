@@ -1,8 +1,8 @@
 package org.around.ieuri.community.infrastructure
 
-import org.around.ieuri.community.application.query.TypingEventView
-import org.around.ieuri.community.infrastructure.adapter.out.event.mapper.NewMessagePayload
-import org.around.ieuri.community.infrastructure.adapter.out.event.mapper.TypingEventPayload
+import org.around.ieuri.community.adapter.messaging.mapper.NewMessagePayload
+import org.around.ieuri.community.adapter.messaging.mapper.TypingEventPayload
+import org.around.ieuri.community.application.conversation.provided.dto.TypingEventView
 import tools.jackson.databind.ObjectMapper
 import tools.jackson.module.kotlin.jacksonObjectMapper
 import java.time.Instant

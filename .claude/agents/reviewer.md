@@ -72,7 +72,8 @@ Load each and check the diff against it:
 
 - **`architecture-review`** — CQRS rails, mapper placement and purity, framework leaking below
   infrastructure, domain independence, `common/` bloat, required values weakened to nullable.
-- **`jpa-review`** — relations, dirty-checking on update, raw-SQL containment, query choice, migrations.
+- **`jpa-review`** — relations, dirty-checking on update, raw-SQL containment, query choice,
+  migrations; for a context already moved to Exposed, its Exposed section instead of the JPA one.
 - **`graphql-review`** — a new root where a field belonged, field-selection laziness, N+1,
   schema description bloat.
 - **`security-review`** — authorization on every mutation and member-scoped query, personal data in
@@ -127,7 +128,9 @@ These have no automated check, and several fail silently. Look for them specific
 2. **A required value accepted as nullable** — schema, `Command`, and DB column all three.
 3. **A forced-fit implementation** — machinery faking a capability the upstream doesn't have
    (a cursor over an offset-only API, repeated calls to fill values the source won't give).
-4. **`@OneToMany`, or a relation across aggregates** where an id reference belonged.
+4. **A relation across aggregates** where an id reference belonged; in a JPA context any
+   `@OneToMany`, in an Exposed context a child collection on a root that is unbounded or that no
+   rule reads whole.
 5. **A mutation or member-scoped query with no authorization**, or one trusting a `memberId`
    argument instead of the authenticated identity.
 6. **`@Transactional` or `@Async` self-invoked** from the same class — the proxy is bypassed and the
@@ -138,6 +141,13 @@ These have no automated check, and several fail silently. Look for them specific
 9. **A conversion added with no test** — GraphQL ↔ domain/`Command`, domain ↔ entity, external
    response ↔ domain. Also flag one written inline in a resolver where it has enough fields to
    swap: inline means it cannot be tested without standing up the resolver, so it must be extracted.
+10. **A domain rule judged outside the domain** — a child created without its root, a service
+    interpreting a `Boolean`, or bulk SQL re-stating a rule a domain method owns. It compiles and
+    passes; the rule just lives twice.
+11. **A method an `AFTER_COMMIT` listener calls without `REQUIRES_NEW`** in an Exposed service — it
+    works today only while the publisher uses another transaction manager.
+12. **A package on one side of `application/` ↔ `domain/` only**, or an adapter directory mixing
+    listeners with publishers — the shape rules in CLAUDE.md "Target shape".
 
 ## Judgment
 

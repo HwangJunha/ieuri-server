@@ -17,7 +17,9 @@ and still has the wrong shape.
 
 ## Never flag these — they are deliberate
 
-Domain ↔ JPA entity separation and its mappers. Port/adapter indirection. The CQRS split.
+Domain ↔ persistence separation (JPA entity or Exposed row) and its mappers. Port/adapter
+indirection. The CQRS split. Per-item loops through a domain method in place of one bulk statement —
+that is the bulk-change rule in CLAUDE.md, not an inefficiency to collapse.
 Cross-domain isolation via ports/events. Never recommend collapsing them.
 
 Duplication is also acceptable here. Readability beats line count — a bit of repeated code that
@@ -49,6 +51,15 @@ reads straight is better than an abstraction that couples two callers together.
 
 7. **Defensive branches for unobserved cases** — null checks and fallbacks for inputs a typed
    contract guarantees or that have never been seen. Speculative defense is complexity.
+
+8. **A layer with nothing to hold** — an application package or service with no domain twin that
+   only calls other aggregates in sequence (an orchestrator), a step interface implemented once per
+   aggregate just so a coordinator can loop over it. Listeners calling each aggregate's own use case
+   carry the same behaviour with nothing in between.
+
+9. **Patterns adopted ahead of their trigger** — Specification + Command for a bulk change whose
+   volume was never measured and whose rule is one condition; a shared abstraction for two callers.
+   The trigger is written down (CLAUDE.md, bulk changes); without it the simpler per-item form wins.
 
 ## Judging
 
