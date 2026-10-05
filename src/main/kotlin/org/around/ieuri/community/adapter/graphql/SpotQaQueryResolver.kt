@@ -11,7 +11,7 @@ import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.community.adapter.graphql.contentLanguage
 import org.around.ieuri.community.adapter.graphql.mapper.toGql
 import org.around.ieuri.community.adapter.graphql.mapper.toGqlOrPlaceholder
-import org.around.ieuri.community.application.question.provided.SpotQaQueryUseCase
+import org.around.ieuri.community.application.question.provided.SpotQuestionQueryUseCase
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswerReplyView
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswerView
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswersQuery
@@ -32,7 +32,7 @@ import org.around.ieuri.common.graphql.generated.types.TargetCategory as GqlTarg
 @DgsComponent
 @Component
 class SpotQaQueryResolver(
-    private val spotQaQueryUseCase: SpotQaQueryUseCase,
+    private val spotQuestionQueryUseCase: SpotQuestionQueryUseCase,
     private val currentMemberProvider: CurrentMemberProvider,
 ) {
 
@@ -51,7 +51,7 @@ class SpotQaQueryResolver(
         dfe: DgsDataFetchingEnvironment,
     ): SpotQuestionConnection {
         val onlyMine = mine ?: false
-        val page = spotQaQueryUseCase.spotQuestions(
+        val page = spotQuestionQueryUseCase.spotQuestions(
             SpotQuestionsQuery(
                 catalogId = catalogId,
                 mine = onlyMine,
@@ -75,7 +75,7 @@ class SpotQaQueryResolver(
         @InputArgument after: String?,
         dfe: DgsDataFetchingEnvironment,
     ): SpotAnswerConnection {
-        val page = spotQaQueryUseCase.spotAnswers(
+        val page = spotQuestionQueryUseCase.spotAnswers(
             SpotAnswersQuery(
                 questionId = questionId,
                 first = first ?: DEFAULT_PAGE_SIZE,

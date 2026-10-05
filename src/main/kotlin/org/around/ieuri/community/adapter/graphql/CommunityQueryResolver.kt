@@ -14,7 +14,9 @@ import org.around.ieuri.community.adapter.graphql.contentLanguage
 import org.around.ieuri.community.adapter.graphql.mapper.toGql
 import org.around.ieuri.community.adapter.graphql.mapper.toGqlOrPlaceholder
 import org.around.ieuri.community.adapter.graphql.mapper.toTargetCategories
-import org.around.ieuri.community.application.post.provided.CommunityQueryUseCase
+import org.around.ieuri.community.application.block.provided.BlockQueryUseCase
+import org.around.ieuri.community.application.comment.provided.CommentQueryUseCase
+import org.around.ieuri.community.application.post.provided.PostQueryUseCase
 import org.around.ieuri.community.application.shared.dto.BlockedUsersQuery
 import org.around.ieuri.community.application.shared.dto.CommentView
 import org.around.ieuri.community.application.shared.dto.MyPostsQuery
@@ -44,7 +46,9 @@ import org.around.ieuri.common.graphql.generated.types.TargetCategory as GqlTarg
 @DgsComponent
 @Component
 class CommunityQueryResolver(
-    private val communityQueryUseCase: CommunityQueryUseCase,
+    private val blockQueryUseCase: BlockQueryUseCase,
+    private val commentQueryUseCase: CommentQueryUseCase,
+    private val postQueryUseCase: PostQueryUseCase,
     private val memberLookupPort: MemberLookupPort,
     private val currentMemberProvider: CurrentMemberProvider,
     private val eventPublisher: CommunityEventPublisherPort,
@@ -72,7 +76,7 @@ class CommunityQueryResolver(
         if (latitude != null && longitude != null) {
             eventPublisher.publish(LocationAccessed(memberId, "posts"))
         }
-        val page = communityQueryUseCase.posts(
+        val page = postQueryUseCase.posts(
             PostsQuery(
                 catalogId = catalogId,
                 latitude = latitude,
@@ -101,7 +105,7 @@ class CommunityQueryResolver(
         @InputArgument after: String?,
     ): PostConnection {
         val memberId = currentMemberProvider.requireMemberId()
-        val page = communityQueryUseCase.myPosts(
+        val page = postQueryUseCase.myPosts(
             MyPostsQuery(first = first ?: DEFAULT_PAGE_SIZE, after = after),
             memberId = memberId,
         )
@@ -118,7 +122,7 @@ class CommunityQueryResolver(
         @InputArgument first: Int?,
         @InputArgument after: String?,
     ): CommentConnection {
-        val page = communityQueryUseCase.comments(
+        val page = commentQueryUseCase.comments(
             PostCommentsQuery(
                 postId = postId,
                 first = first ?: DEFAULT_PAGE_SIZE,
@@ -134,7 +138,7 @@ class CommunityQueryResolver(
 
     /** 차단·숨김에 걸리면 오류가 아니라 null이다 — 통상적인 부재로 다룬다. */
     @DgsQuery
-    fun post(@InputArgument id: Long): PostView? = communityQueryUseCase.post(id, currentMemberProvider.requireMemberId())
+    fun post(@InputArgument id: Long): PostView? = postQueryUseCase.post(id, currentMemberProvider.requireMemberId())
 
     @DgsQuery
     fun blockedUsers(
@@ -142,7 +146,7 @@ class CommunityQueryResolver(
         @InputArgument after: String?,
     ): GqlBlockedUserConnection {
         val memberId = currentMemberProvider.requireMemberId()
-        val page = communityQueryUseCase.blockedUsers(
+        val page = blockQueryUseCase.blockedUsers(
             BlockedUsersQuery(first = first ?: DEFAULT_PAGE_SIZE, after = after),
             memberId = memberId,
         )
@@ -163,7 +167,7 @@ class CommunityQueryResolver(
 
     /** 상단 카테고리 칩. 앱 식별은 인자가 아니라 X-App-Key 헤더에서 온다. */
     @DgsQuery
-    fun communityChips(dfe: DgsDataFetchingEnvironment): List<GqlTargetCategory> = communityQueryUseCase.communityChips(dfe.appKey(), dfe.contentLanguage())
+    fun communityChips(dfe: DgsDataFetchingEnvironment): List<GqlTargetCategory> = postQueryUseCase.communityChips(dfe.appKey(), dfe.contentLanguage())
         .map { GqlTargetCategory.valueOf(it.category.name) }
 
     /** 사용자가 입력한 태그. 별도 테이블이라 요청된 경우에만 배치로 읽는다. */

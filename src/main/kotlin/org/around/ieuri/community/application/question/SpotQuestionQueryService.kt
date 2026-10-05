@@ -3,7 +3,7 @@ package org.around.ieuri.community.application.question
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.cursorPageOf
 import org.around.ieuri.common.persistence.ExposedConfig
-import org.around.ieuri.community.application.question.provided.SpotQaQueryUseCase
+import org.around.ieuri.community.application.question.provided.SpotQuestionQueryUseCase
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswerReplyView
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswerView
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswersQuery
@@ -29,12 +29,12 @@ import org.springframework.transaction.annotation.Transactional
  */
 @Service
 @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, readOnly = true)
-class SpotQaQueryService(
+class SpotQuestionQueryService(
     private val spotQaQueryPort: SpotQaQueryPort,
     private val communityQueryPort: CommunityQueryPort,
     private val spotLookupPort: SpotLookupPort,
     private val policy: CommunityPolicy,
-) : SpotQaQueryUseCase {
+) : SpotQuestionQueryUseCase {
 
     /**
      * 질문 목록. 장소·작성자(`mine`)·id 필터가 독립적으로 함께 걸린다.

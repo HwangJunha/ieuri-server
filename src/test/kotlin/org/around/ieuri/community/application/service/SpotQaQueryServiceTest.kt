@@ -6,7 +6,7 @@ import io.mockk.slot
 import io.mockk.verify
 import org.around.ieuri.common.pagination.CursorEdge
 import org.around.ieuri.common.pagination.cursorPageOf
-import org.around.ieuri.community.application.question.SpotQaQueryService
+import org.around.ieuri.community.application.question.SpotQuestionQueryService
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswerView
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswersQuery
 import org.around.ieuri.community.application.question.provided.dto.SpotQuestionView
@@ -54,7 +54,7 @@ class SpotQaQueryServiceTest {
         allowedContentTypes = setOf("image/jpeg"),
     )
 
-    private val service = SpotQaQueryService(
+    private val service = SpotQuestionQueryService(
         spotQaQueryPort,
         communityQueryPort,
         spotLookupPort,

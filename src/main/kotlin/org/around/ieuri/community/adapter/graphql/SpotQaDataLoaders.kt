@@ -1,7 +1,7 @@
 package org.around.ieuri.community.adapter.graphql
 
 import com.netflix.graphql.dgs.DgsDataLoader
-import org.around.ieuri.community.application.question.provided.SpotQaQueryUseCase
+import org.around.ieuri.community.application.question.provided.SpotQuestionQueryUseCase
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswerReplyView
 import org.dataloader.BatchLoaderEnvironment
 import org.dataloader.MappedBatchLoader
@@ -21,7 +21,7 @@ import java.util.concurrent.CompletionStage
 @DgsDataLoader(name = SpotAnswerReplyDataLoader.NAME)
 @Component
 class SpotAnswerReplyDataLoader(
-    private val spotQaQueryUseCase: SpotQaQueryUseCase,
+    private val spotQuestionQueryUseCase: SpotQuestionQueryUseCase,
 ) : MappedBatchLoaderWithContext<Long, List<SpotAnswerReplyView>> {
 
     override fun load(
@@ -29,7 +29,7 @@ class SpotAnswerReplyDataLoader(
         environment: BatchLoaderEnvironment,
     ): CompletionStage<Map<Long, List<SpotAnswerReplyView>>> {
         val viewer = environment.requireViewer("SpotAnswerReplyDataLoader")
-        val replies = spotQaQueryUseCase.answerReplies(answerIds.toList(), viewer)
+        val replies = spotQuestionQueryUseCase.answerReplies(answerIds.toList(), viewer)
         // 답글이 없는 답변은 빈 목록으로 채운다.
         return CompletableFuture.completedFuture(answerIds.associateWith { replies[it].orEmpty() })
     }
@@ -59,11 +59,11 @@ internal fun BatchLoaderEnvironment.requireViewer(loaderName: String): Long = ke
 @DgsDataLoader(name = SpotQuestionPhotoDataLoader.NAME)
 @Component
 class SpotQuestionPhotoDataLoader(
-    private val spotQaQueryUseCase: SpotQaQueryUseCase,
+    private val spotQuestionQueryUseCase: SpotQuestionQueryUseCase,
 ) : MappedBatchLoader<Long, List<String>> {
 
     override fun load(questionIds: Set<Long>): CompletionStage<Map<Long, List<String>>> {
-        val photoKeys = spotQaQueryUseCase.questionPhotoKeys(questionIds.toList())
+        val photoKeys = spotQuestionQueryUseCase.questionPhotoKeys(questionIds.toList())
         return CompletableFuture.completedFuture(questionIds.associateWith { photoKeys[it].orEmpty() })
     }
 
@@ -75,11 +75,11 @@ class SpotQuestionPhotoDataLoader(
 @DgsDataLoader(name = SpotAnswerPhotoDataLoader.NAME)
 @Component
 class SpotAnswerPhotoDataLoader(
-    private val spotQaQueryUseCase: SpotQaQueryUseCase,
+    private val spotQuestionQueryUseCase: SpotQuestionQueryUseCase,
 ) : MappedBatchLoader<Long, List<String>> {
 
     override fun load(answerIds: Set<Long>): CompletionStage<Map<Long, List<String>>> {
-        val photoKeys = spotQaQueryUseCase.answerPhotoKeys(answerIds.toList())
+        val photoKeys = spotQuestionQueryUseCase.answerPhotoKeys(answerIds.toList())
         return CompletableFuture.completedFuture(answerIds.associateWith { photoKeys[it].orEmpty() })
     }
 
@@ -91,11 +91,11 @@ class SpotAnswerPhotoDataLoader(
 @DgsDataLoader(name = SpotAnswerReplyPhotoDataLoader.NAME)
 @Component
 class SpotAnswerReplyPhotoDataLoader(
-    private val spotQaQueryUseCase: SpotQaQueryUseCase,
+    private val spotQuestionQueryUseCase: SpotQuestionQueryUseCase,
 ) : MappedBatchLoader<Long, List<String>> {
 
     override fun load(replyIds: Set<Long>): CompletionStage<Map<Long, List<String>>> {
-        val photoKeys = spotQaQueryUseCase.replyPhotoKeys(replyIds.toList())
+        val photoKeys = spotQuestionQueryUseCase.replyPhotoKeys(replyIds.toList())
         return CompletableFuture.completedFuture(replyIds.associateWith { photoKeys[it].orEmpty() })
     }
 

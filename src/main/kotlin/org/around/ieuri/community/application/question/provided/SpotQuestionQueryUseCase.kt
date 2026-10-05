@@ -12,7 +12,7 @@ import org.around.ieuri.community.domain.shared.ContentLanguage
  * 장소 질문/답변 조회(SPEC-0026). 사진·답글은 지연 필드용 별도 메서드다.
  * - memberId가 0이면 비로그인이다 — 차단·소유 판정이 빈 상태로 흐른다.
  */
-interface SpotQaQueryUseCase {
+interface SpotQuestionQueryUseCase {
     /**
      * 질문 목록. 미해결 우선, 그 안에서 최신순이다.
      * - 장소 필터는 [language] 기준으로 검사한다: 카탈로그가 없으면 SPOT_NOT_FOUND,

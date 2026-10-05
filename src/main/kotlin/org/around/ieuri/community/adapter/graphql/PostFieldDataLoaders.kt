@@ -1,7 +1,7 @@
 package org.around.ieuri.community.adapter.graphql
 
 import com.netflix.graphql.dgs.DgsDataLoader
-import org.around.ieuri.community.application.post.provided.CommunityQueryUseCase
+import org.around.ieuri.community.application.post.provided.PostQueryUseCase
 import org.around.ieuri.community.domain.shared.TargetCategory
 import org.dataloader.BatchLoaderEnvironment
 import org.dataloader.MappedBatchLoader
@@ -18,11 +18,11 @@ import java.util.concurrent.CompletionStage
 @DgsDataLoader(name = PostTagsDataLoader.NAME)
 @Component
 class PostTagsDataLoader(
-    private val communityQueryUseCase: CommunityQueryUseCase,
+    private val postQueryUseCase: PostQueryUseCase,
 ) : MappedBatchLoader<Long, List<String>> {
 
     override fun load(postIds: Set<Long>): CompletionStage<Map<Long, List<String>>> {
-        val tags = communityQueryUseCase.postTags(postIds.toList())
+        val tags = postQueryUseCase.postTags(postIds.toList())
         return CompletableFuture.completedFuture(postIds.associateWith { tags[it].orEmpty() })
     }
 
@@ -34,11 +34,11 @@ class PostTagsDataLoader(
 @DgsDataLoader(name = PostPhotoKeysDataLoader.NAME)
 @Component
 class PostPhotoKeysDataLoader(
-    private val communityQueryUseCase: CommunityQueryUseCase,
+    private val postQueryUseCase: PostQueryUseCase,
 ) : MappedBatchLoader<Long, List<String>> {
 
     override fun load(postIds: Set<Long>): CompletionStage<Map<Long, List<String>>> {
-        val photoKeys = communityQueryUseCase.postPhotoKeys(postIds.toList())
+        val photoKeys = postQueryUseCase.postPhotoKeys(postIds.toList())
         return CompletableFuture.completedFuture(postIds.associateWith { photoKeys[it].orEmpty() })
     }
 
@@ -51,10 +51,10 @@ class PostPhotoKeysDataLoader(
 @DgsDataLoader(name = PostCategoryDataLoader.NAME)
 @Component
 class PostCategoryDataLoader(
-    private val communityQueryUseCase: CommunityQueryUseCase,
+    private val postQueryUseCase: PostQueryUseCase,
 ) : MappedBatchLoader<Long, TargetCategory> {
 
-    override fun load(postIds: Set<Long>): CompletionStage<Map<Long, TargetCategory>> = CompletableFuture.completedFuture(communityQueryUseCase.postCategories(postIds.toList()))
+    override fun load(postIds: Set<Long>): CompletionStage<Map<Long, TargetCategory>> = CompletableFuture.completedFuture(postQueryUseCase.postCategories(postIds.toList()))
 
     companion object {
         const val NAME = "postCategory"
@@ -65,10 +65,10 @@ class PostCategoryDataLoader(
 @DgsDataLoader(name = PostCatalogIdDataLoader.NAME)
 @Component
 class PostCatalogIdDataLoader(
-    private val communityQueryUseCase: CommunityQueryUseCase,
+    private val postQueryUseCase: PostQueryUseCase,
 ) : MappedBatchLoader<Long, Long> {
 
-    override fun load(postIds: Set<Long>): CompletionStage<Map<Long, Long>> = CompletableFuture.completedFuture(communityQueryUseCase.postCatalogIds(postIds.toList()))
+    override fun load(postIds: Set<Long>): CompletionStage<Map<Long, Long>> = CompletableFuture.completedFuture(postQueryUseCase.postCatalogIds(postIds.toList()))
 
     companion object {
         const val NAME = "postCatalogId"
@@ -79,7 +79,7 @@ class PostCatalogIdDataLoader(
 @DgsDataLoader(name = PostLikedDataLoader.NAME)
 @Component
 class PostLikedDataLoader(
-    private val communityQueryUseCase: CommunityQueryUseCase,
+    private val postQueryUseCase: PostQueryUseCase,
 ) : MappedBatchLoaderWithContext<Long, Boolean> {
 
     override fun load(
@@ -87,7 +87,7 @@ class PostLikedDataLoader(
         environment: BatchLoaderEnvironment,
     ): CompletionStage<Map<Long, Boolean>> {
         val memberId = environment.requireViewer("PostLikedDataLoader")
-        val liked = communityQueryUseCase.likedPostIds(postIds.toList(), memberId)
+        val liked = postQueryUseCase.likedPostIds(postIds.toList(), memberId)
         return CompletableFuture.completedFuture(postIds.associateWith { it in liked })
     }
 

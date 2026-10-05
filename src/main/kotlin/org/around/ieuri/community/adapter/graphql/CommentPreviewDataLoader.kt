@@ -1,7 +1,7 @@
 package org.around.ieuri.community.adapter.graphql
 
 import com.netflix.graphql.dgs.DgsDataLoader
-import org.around.ieuri.community.application.post.provided.CommunityQueryUseCase
+import org.around.ieuri.community.application.comment.provided.CommentQueryUseCase
 import org.around.ieuri.community.application.shared.dto.CommentView
 import org.dataloader.BatchLoaderEnvironment
 import org.dataloader.MappedBatchLoaderWithContext
@@ -16,7 +16,7 @@ import java.util.concurrent.CompletionStage
 @DgsDataLoader(name = CommentPreviewDataLoader.NAME)
 @Component
 class CommentPreviewDataLoader(
-    private val communityQueryUseCase: CommunityQueryUseCase,
+    private val commentQueryUseCase: CommentQueryUseCase,
 ) : MappedBatchLoaderWithContext<Long, List<CommentView>> {
 
     override fun load(
@@ -24,7 +24,7 @@ class CommentPreviewDataLoader(
         environment: BatchLoaderEnvironment,
     ): CompletionStage<Map<Long, List<CommentView>>> {
         val memberId = environment.requireViewer("CommentPreviewDataLoader")
-        val previews = communityQueryUseCase.commentPreviews(postIds.toList(), memberId)
+        val previews = commentQueryUseCase.commentPreviews(postIds.toList(), memberId)
         // 댓글이 없는 글은 빈 목록으로 채운다.
         val complete = postIds.associateWith { previews[it].orEmpty() }
         return CompletableFuture.completedFuture(complete)
@@ -39,7 +39,7 @@ class CommentPreviewDataLoader(
 @DgsDataLoader(name = CommentReplyDataLoader.NAME)
 @Component
 class CommentReplyDataLoader(
-    private val communityQueryUseCase: CommunityQueryUseCase,
+    private val commentQueryUseCase: CommentQueryUseCase,
 ) : MappedBatchLoaderWithContext<Long, List<CommentView>> {
 
     override fun load(
@@ -47,7 +47,7 @@ class CommentReplyDataLoader(
         environment: BatchLoaderEnvironment,
     ): CompletionStage<Map<Long, List<CommentView>>> {
         val memberId = environment.requireViewer("CommentReplyDataLoader")
-        val replies = communityQueryUseCase.commentReplies(parentCommentIds.toList(), memberId)
+        val replies = commentQueryUseCase.commentReplies(parentCommentIds.toList(), memberId)
         // 답글이 없는 댓글은 빈 목록으로 채운다.
         val complete = parentCommentIds.associateWith { replies[it].orEmpty() }
         return CompletableFuture.completedFuture(complete)
