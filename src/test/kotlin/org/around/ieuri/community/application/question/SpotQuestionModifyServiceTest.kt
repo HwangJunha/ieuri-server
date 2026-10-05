@@ -95,13 +95,22 @@ class SpotQuestionModifyServiceTest {
     fun `답변 삭제는 루트를 거쳐 작성자를 확인하고 수에 잡혀 있었을 때만 답변 수를 내린다`() {
         every { repository.findAnswer(20) } returns answer
         every { repository.findById(1) } returns question
-        every { repository.deleteAnswerWasCounted(20) } returnsMany listOf(true, false)
+        every { repository.deleteAnswerWasCounted(20) } returns true
 
-        service.deleteAnswer(20, memberId = 8)
         service.deleteAnswer(20, memberId = 8)
         verify(exactly = 1) { repository.decreaseAnswerCount(1) }
 
         assertFailsWith<NotAnswerOwnerException> { service.deleteAnswer(20, memberId = 7) }
+    }
+
+    @Test
+    fun `숨겨졌던 답변을 지우면 답변 수를 내리지 않는다`() {
+        every { repository.findAnswer(20) } returns answer
+        every { repository.findById(1) } returns question
+        every { repository.deleteAnswerWasCounted(20) } returns false
+
+        service.deleteAnswer(20, memberId = 8)
+        verify(exactly = 0) { repository.decreaseAnswerCount(any()) }
     }
 
     @Test

@@ -163,6 +163,13 @@ grep으로 확인한 수(worktree `82fdd48`):
 
 `PostCommandServiceTest`, `CommentCommandServiceTest`, `PostLikeAndBlockServiceTest`, `PostHideCommandServiceTest`, `ReportCommandServiceTest`, `domain/PostTest`, `domain/PostTagTest`, `domain/PostLikeTest`, `domain/CommentAndBlockTest`, `domain/ReportTargetTest`, `infrastructure/mapper/CommunityMapperTest`, `SpotQuestionCommandServiceTest`, `SpotAnswerCommandServiceTest`, `domain/SpotQaTest`, `infrastructure/mapper/SpotQaMapperTest`, `infrastructure/SpotQaInputMapperTest`, `ConversationCommandServiceTest`, `ConversationSpotQaOriginTest`, `MessageReportCommandServiceTest`, `MessageRetentionServiceTest`, `domain/ConversationAndMessageTest`, `domain/ConversationReadStateTest`, `infrastructure/ConversationMapperTest`, `infrastructure/mapper/ConversationSpotQaOriginMapperTest`, `MemberDataEraseServiceTest`, `OrphanPhotoServiceTest`(대상 삭제), `PostSpotCleanupServiceTest`, `CommunityQueryServiceTest`. 검증하던 동작은 git 이력(`29d9040`)에 있다.
 
+**재작성(2026-10-05, `feature/SPEC-0039-community-tests`)** — 지운 테스트를 1:1로 되살리지 않고 새 구조의 단위로 다시 썼다.
+- 도메인: `domain/post/PostTest`·`PostTagTest`, `domain/shared/AttachedPhotosTest`, `domain/comment/CommentTest`, `domain/block/BlockTest`, `domain/report/ReportTest`, `domain/question/SpotQuestionTest`, `domain/conversation/ConversationTest`, `domain/messagereport/MessageReportTest`.
+- 서비스(목 포트): 글·댓글·신고·장소 Q&A·대화·메시지 신고·보관 파기·차단·카탈로그 동기화 쓰기, 글·댓글·차단 조회.
+- 변환: `adapter/persistence/mapper`의 행 매퍼 4개(필드마다 다른 값, 불리언은 엇갈린 두 경우, null 경우), `adapter/graphql/mapper`의 글·Q&A 입력.
+- 실패 확인: 행 매퍼 `edited`↔`hidden` 교환, 댓글 카운터 조건 반전, 읽음 지점 역행 허용을 각각 넣어 해당 테스트가 빨개지는 것을 봤다. true·false를 한 번씩 돌려 "총 1회"만 보던 카운터 테스트 셋(댓글 삭제·좋아요·답변 삭제)은 조건 반전을 잡지 못해 경우별로 나눴다.
+- `./gradlew check` 통과(community 240건).
+
 ### S12에서 생긴 응답 차이 (VC-001에 의도한 차이로 기록)
 
 - `createPost` 태그 6개: `INVALID_INPUT` → `TOO_MANY_TAGS`(메시지는 같다). 판정을 도메인 한 곳으로 모으면서 생성·수정 경로의 비대칭(D-05)이 없어졌다. **클라이언트 무영향 확인 후 확정(2026-10-04)**: 클라이언트는 입력 단계에서 태그를 5개로 막아(`maxPostTags = 5`) 6개를 보내지 않고, 글 작성 화면은 이미 `TOO_MANY_TAGS` 전용 문구를 둔다(서버가 그 코드를 낸다고 가정한 주석까지 있다). D-05를 뒤집는다.

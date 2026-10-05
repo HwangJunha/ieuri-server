@@ -43,8 +43,7 @@ class PostQueryServiceTest {
 
     private val view = PostView(1, "제목", "본문", authorId = 8, likeCount = 0, commentCount = 0, viewCount = 0, ownedByViewer = false, hidden = false, edited = false, createdAt = Instant.EPOCH)
 
-    private fun query(sort: PostSortOrder, latitude: Double? = null, longitude: Double? = null, radius: Int = 1000, first: Int = 20, tag: String? = null) =
-        PostsQuery(catalogId = null, latitude = latitude, longitude = longitude, radiusMeters = radius, categories = emptySet(), tag = tag, sort = sort, first = first, after = null)
+    private fun query(sort: PostSortOrder, latitude: Double? = null, longitude: Double? = null, radius: Int = 1000, first: Int = 20, tag: String? = null) = PostsQuery(catalogId = null, latitude = latitude, longitude = longitude, radiusMeters = radius, categories = emptySet(), tag = tag, sort = sort, first = first, after = null)
 
     @Test
     fun `피드는 조회자의 차단·숨김을 조건으로 넘기고 태그를 정규화하며 페이지 크기를 절삭한다`() {

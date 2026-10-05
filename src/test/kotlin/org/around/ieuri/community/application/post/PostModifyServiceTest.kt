@@ -137,15 +137,23 @@ class PostModifyServiceTest {
     }
 
     @Test
-    fun `좋아요는 새로 눌렀을 때만 수를 올리고 갱신된 수를 돌려준다`() {
+    fun `새로 누른 좋아요는 수를 올리고 갱신된 수를 돌려준다`() {
         every { postRepository.exists(3) } returns true
         every { postRepository.likeCount(3) } returns 5
-        every { postRepository.addLike(3, memberId) } returnsMany listOf(true, false)
+        every { postRepository.addLike(3, memberId) } returns true
 
         assertEquals(5, service.like(PostTargetCommand(3), memberId))
-        assertEquals(5, service.like(PostTargetCommand(3), memberId))
-
         verify(exactly = 1) { postRepository.increaseLikeCount(3) }
+    }
+
+    @Test
+    fun `이미 누른 좋아요는 수를 올리지 않는다`() {
+        every { postRepository.exists(3) } returns true
+        every { postRepository.likeCount(3) } returns 5
+        every { postRepository.addLike(3, memberId) } returns false
+
+        service.like(PostTargetCommand(3), memberId)
+        verify(exactly = 0) { postRepository.increaseLikeCount(any()) }
     }
 
     @Test

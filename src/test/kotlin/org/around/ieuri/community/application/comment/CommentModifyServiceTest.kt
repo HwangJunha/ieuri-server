@@ -49,14 +49,23 @@ class CommentModifyServiceTest {
     }
 
     @Test
-    fun `삭제는 수에 잡혀 있던 댓글일 때만 글의 댓글 수를 내린다`() {
+    fun `수에 잡혀 있던 댓글을 지우면 글의 댓글 수를 내린다`() {
         every { commentRepository.findById(10) } returns comment
-        every { commentRepository.markDeletedWasCounted(10, now) } returnsMany listOf(true, false)
+        every { commentRepository.markDeletedWasCounted(10, now) } returns true
 
-        service.deleteComment(10, memberId)
         service.deleteComment(10, memberId)
 
         verify(exactly = 1) { postRepository.decreaseCommentCount(1) }
+    }
+
+    @Test
+    fun `숨겨졌거나 이미 지워진 댓글은 수를 내리지 않는다`() {
+        every { commentRepository.findById(10) } returns comment
+        every { commentRepository.markDeletedWasCounted(10, now) } returns false
+
+        service.deleteComment(10, memberId)
+
+        verify(exactly = 0) { postRepository.decreaseCommentCount(any()) }
     }
 
     @Test
