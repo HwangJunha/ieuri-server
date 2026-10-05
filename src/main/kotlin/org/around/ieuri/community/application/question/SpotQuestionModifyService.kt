@@ -1,9 +1,6 @@
 package org.around.ieuri.community.application.question
 
 import org.around.ieuri.common.persistence.ExposedConfig
-import org.around.ieuri.community.application.exception.SpotNotFoundInLocaleException
-import org.around.ieuri.community.application.port.out.client.SpotLookupPort
-import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
 import org.around.ieuri.community.application.question.provided.SpotQuestionCommandUseCase
 import org.around.ieuri.community.application.question.provided.dto.CreateSpotAnswerCommand
 import org.around.ieuri.community.application.question.provided.dto.CreateSpotAnswerReplyCommand
@@ -14,12 +11,15 @@ import org.around.ieuri.community.application.question.provided.exception.ReplyN
 import org.around.ieuri.community.application.question.provided.exception.ReplyToReplyNotAllowedException
 import org.around.ieuri.community.application.question.required.SpotQuestionRepository
 import org.around.ieuri.community.application.shared.UploadedPhotoVerifier
+import org.around.ieuri.community.application.shared.exception.SpotNotFoundInLocaleException
+import org.around.ieuri.community.application.shared.required.CommunityEventPublisherPort
+import org.around.ieuri.community.application.shared.required.SpotLookupPort
 import org.around.ieuri.community.application.withdrawal.MemberContentEraser
-import org.around.ieuri.community.domain.event.SpotAnswerNotificationTriggered
-import org.around.ieuri.community.domain.event.SpotAnswerReplyNotificationTriggered
 import org.around.ieuri.community.domain.question.SpotQuestion
 import org.around.ieuri.community.domain.shared.AttachedPhotos
-import org.around.ieuri.community.domain.vo.ContentLanguage
+import org.around.ieuri.community.domain.shared.ContentLanguage
+import org.around.ieuri.community.domain.shared.SpotAnswerNotificationTriggered
+import org.around.ieuri.community.domain.shared.SpotAnswerReplyNotificationTriggered
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional

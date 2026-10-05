@@ -4,7 +4,7 @@ import org.around.ieuri.community.application.conversation.provided.dto.MarkConv
 import org.around.ieuri.community.application.conversation.provided.dto.NotifyTypingCommand
 import org.around.ieuri.community.application.conversation.provided.dto.SendMessageCommand
 import org.around.ieuri.community.application.conversation.provided.dto.StartConversationCommand
-import org.around.ieuri.community.domain.vo.ContentLanguage
+import org.around.ieuri.community.domain.shared.ContentLanguage
 
 /** 대화·메시지 쓰기. 대화 시작과 첫 메시지 전송은 별개라 빈 대화가 존재할 수 있다. */
 interface ConversationCommandUseCase {

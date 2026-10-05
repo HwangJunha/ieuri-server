@@ -1,8 +1,8 @@
 package org.around.ieuri.community.adapter.event
 
-import org.around.ieuri.community.application.event.PostViewed
+import org.around.ieuri.community.adapter.config.CommunityAsyncConfig
+import org.around.ieuri.community.application.post.PostViewed
 import org.around.ieuri.community.application.post.provided.PostCommandUseCase
-import org.around.ieuri.community.infrastructure.adapter.out.event.CommunityAsyncConfig
 import org.slf4j.LoggerFactory
 import org.springframework.context.event.EventListener
 import org.springframework.scheduling.annotation.Async

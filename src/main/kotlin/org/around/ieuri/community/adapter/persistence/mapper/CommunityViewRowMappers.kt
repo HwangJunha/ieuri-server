@@ -7,14 +7,14 @@ import org.around.ieuri.community.adapter.persistence.table.PostTable
 import org.around.ieuri.community.adapter.persistence.table.SpotAnswerReplyTable
 import org.around.ieuri.community.adapter.persistence.table.SpotAnswerTable
 import org.around.ieuri.community.adapter.persistence.table.SpotQuestionTable
-import org.around.ieuri.community.application.query.CommentView
-import org.around.ieuri.community.application.query.ConversationSpotQaOriginView
-import org.around.ieuri.community.application.query.MessageView
-import org.around.ieuri.community.application.query.PostAuthorView
-import org.around.ieuri.community.application.query.PostView
-import org.around.ieuri.community.application.query.SpotAnswerReplyView
-import org.around.ieuri.community.application.query.SpotAnswerView
-import org.around.ieuri.community.application.query.SpotQuestionView
+import org.around.ieuri.community.application.conversation.provided.dto.ConversationSpotQaOriginView
+import org.around.ieuri.community.application.conversation.provided.dto.MessageView
+import org.around.ieuri.community.application.question.provided.dto.SpotAnswerReplyView
+import org.around.ieuri.community.application.question.provided.dto.SpotAnswerView
+import org.around.ieuri.community.application.question.provided.dto.SpotQuestionView
+import org.around.ieuri.community.application.shared.dto.CommentView
+import org.around.ieuri.community.application.shared.dto.PostAuthorView
+import org.around.ieuri.community.application.shared.dto.PostView
 import org.jetbrains.exposed.v1.core.ResultRow
 
 // 읽기 행 → read DTO. 한 행이 가진 것만 옮기고 나머지(작성자 표시 정보·사진 등)는 필드 리졸버가 채운다.

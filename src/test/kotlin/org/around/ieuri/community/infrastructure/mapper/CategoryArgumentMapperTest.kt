@@ -1,8 +1,8 @@
 package org.around.ieuri.community.infrastructure.mapper
 
 import org.around.ieuri.common.error.EmptyCategorySetException
-import org.around.ieuri.community.domain.vo.TargetCategory
-import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper.toTargetCategories
+import org.around.ieuri.community.adapter.graphql.mapper.toTargetCategories
+import org.around.ieuri.community.domain.shared.TargetCategory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

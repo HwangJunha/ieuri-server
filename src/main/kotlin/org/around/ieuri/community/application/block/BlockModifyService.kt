@@ -3,8 +3,8 @@ package org.around.ieuri.community.application.block
 import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.community.application.block.provided.BlockCommandUseCase
 import org.around.ieuri.community.application.block.required.BlockRepository
-import org.around.ieuri.community.application.exception.MemberNotFoundException
-import org.around.ieuri.community.application.port.out.client.MemberLookupPort
+import org.around.ieuri.community.application.shared.exception.MemberNotFoundException
+import org.around.ieuri.community.application.shared.required.MemberLookupPort
 import org.around.ieuri.community.application.withdrawal.MemberContentEraser
 import org.around.ieuri.community.domain.block.Block
 import org.springframework.stereotype.Service

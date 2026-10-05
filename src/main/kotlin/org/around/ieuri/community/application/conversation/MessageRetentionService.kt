@@ -2,7 +2,7 @@ package org.around.ieuri.community.application.conversation
 
 import org.around.ieuri.community.application.conversation.provided.ExpiredMessageDeleteUseCase
 import org.around.ieuri.community.application.conversation.provided.MessageRetentionUseCase
-import org.around.ieuri.community.application.port.out.client.ObjectStoragePort
+import org.around.ieuri.community.application.shared.required.ObjectStoragePort
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 

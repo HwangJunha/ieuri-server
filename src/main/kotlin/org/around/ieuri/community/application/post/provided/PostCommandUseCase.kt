@@ -3,7 +3,7 @@ package org.around.ieuri.community.application.post.provided
 import org.around.ieuri.community.application.post.provided.dto.CreatePostCommand
 import org.around.ieuri.community.application.post.provided.dto.EditPostCommand
 import org.around.ieuri.community.application.post.provided.dto.PostTargetCommand
-import org.around.ieuri.community.domain.vo.ContentLanguage
+import org.around.ieuri.community.domain.shared.ContentLanguage
 
 /**
  * 글 쓰기·좋아요·개인 숨김. memberId는 인증 컨텍스트에서 온다.

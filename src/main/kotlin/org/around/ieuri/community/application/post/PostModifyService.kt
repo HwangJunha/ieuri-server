@@ -1,9 +1,6 @@
 package org.around.ieuri.community.application.post
 
 import org.around.ieuri.common.persistence.ExposedConfig
-import org.around.ieuri.community.application.exception.SpotNotFoundInLocaleException
-import org.around.ieuri.community.application.port.out.client.ClockPort
-import org.around.ieuri.community.application.port.out.client.SpotLookupPort
 import org.around.ieuri.community.application.post.provided.PostCommandUseCase
 import org.around.ieuri.community.application.post.provided.dto.CreatePostCommand
 import org.around.ieuri.community.application.post.provided.dto.EditPostCommand
@@ -11,15 +8,18 @@ import org.around.ieuri.community.application.post.provided.dto.PostTargetComman
 import org.around.ieuri.community.application.post.provided.exception.PostNotFoundException
 import org.around.ieuri.community.application.post.required.PostRepository
 import org.around.ieuri.community.application.shared.UploadedPhotoVerifier
+import org.around.ieuri.community.application.shared.exception.SpotNotFoundInLocaleException
+import org.around.ieuri.community.application.shared.required.ClockPort
+import org.around.ieuri.community.application.shared.required.SpotLookupPort
 import org.around.ieuri.community.application.withdrawal.MemberContentEraser
 import org.around.ieuri.community.domain.post.HiddenPostNotEditableException
 import org.around.ieuri.community.domain.post.Post
 import org.around.ieuri.community.domain.post.PostSpot
 import org.around.ieuri.community.domain.post.PostTag
 import org.around.ieuri.community.domain.post.PostTags
+import org.around.ieuri.community.domain.post.SpotPoint
 import org.around.ieuri.community.domain.shared.AttachedPhotos
-import org.around.ieuri.community.domain.vo.ContentLanguage
-import org.around.ieuri.community.domain.vo.SpotPoint
+import org.around.ieuri.community.domain.shared.ContentLanguage
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional

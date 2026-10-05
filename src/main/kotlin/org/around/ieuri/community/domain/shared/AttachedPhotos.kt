@@ -1,6 +1,6 @@
 package org.around.ieuri.community.domain.shared
 
-import org.around.ieuri.community.domain.vo.PhotoObjectKey
+import org.around.ieuri.community.domain.shared.PhotoObjectKey
 
 /**
  * 글·질문·답변·답글에 붙는 사진 목록(표시 순서). 본인에게 발급되고 업로드 확인(`images/`)을 마친 키만 붙일 수 있다.

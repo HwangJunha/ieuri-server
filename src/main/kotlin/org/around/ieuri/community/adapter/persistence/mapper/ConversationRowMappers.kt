@@ -5,8 +5,8 @@ import org.around.ieuri.community.adapter.persistence.table.MessageQuoteTable
 import org.around.ieuri.community.adapter.persistence.table.MessageTable
 import org.around.ieuri.community.domain.conversation.Conversation
 import org.around.ieuri.community.domain.conversation.Message
-import org.around.ieuri.community.domain.vo.PhotoObjectKey
-import org.around.ieuri.community.domain.vo.SpotQaOrigin
+import org.around.ieuri.community.domain.conversation.SpotQaOrigin
+import org.around.ieuri.community.domain.shared.PhotoObjectKey
 import org.jetbrains.exposed.v1.core.ResultRow
 
 fun ResultRow.toConversation(): Conversation = Conversation(

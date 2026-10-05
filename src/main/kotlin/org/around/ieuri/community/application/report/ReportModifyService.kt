@@ -3,9 +3,6 @@ package org.around.ieuri.community.application.report
 import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.community.application.comment.provided.CommentNotFoundException
 import org.around.ieuri.community.application.comment.required.CommentRepository
-import org.around.ieuri.community.application.exception.MemberNotFoundException
-import org.around.ieuri.community.application.port.out.client.MemberLookupPort
-import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
 import org.around.ieuri.community.application.post.provided.exception.PostNotFoundException
 import org.around.ieuri.community.application.post.required.PostRepository
 import org.around.ieuri.community.application.question.provided.exception.AnswerNotFoundException
@@ -16,6 +13,9 @@ import org.around.ieuri.community.application.report.provided.ReportAutoHideUseC
 import org.around.ieuri.community.application.report.provided.ReportCommandUseCase
 import org.around.ieuri.community.application.report.provided.ReportContentCommand
 import org.around.ieuri.community.application.report.required.ReportRepository
+import org.around.ieuri.community.application.shared.exception.MemberNotFoundException
+import org.around.ieuri.community.application.shared.required.CommunityEventPublisherPort
+import org.around.ieuri.community.application.shared.required.MemberLookupPort
 import org.around.ieuri.community.domain.report.Report
 import org.around.ieuri.community.domain.report.ReportFiled
 import org.around.ieuri.community.domain.report.ReportTargetType

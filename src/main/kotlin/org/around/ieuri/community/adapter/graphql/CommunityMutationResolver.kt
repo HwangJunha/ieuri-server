@@ -34,17 +34,17 @@ import org.around.ieuri.common.graphql.generated.types.UnhidePostPayload
 import org.around.ieuri.common.graphql.generated.types.UnlikePostInput
 import org.around.ieuri.common.graphql.generated.types.UnlikePostPayload
 import org.around.ieuri.common.security.CurrentMemberProvider
+import org.around.ieuri.community.adapter.graphql.contentLanguage
 import org.around.ieuri.community.adapter.graphql.mapper.toCommand
 import org.around.ieuri.community.adapter.graphql.mapper.toResponse
+import org.around.ieuri.community.adapter.graphql.withCommunityUserErrors
 import org.around.ieuri.community.application.block.provided.BlockCommandUseCase
-import org.around.ieuri.community.application.command.DeletePostImageCommand
 import org.around.ieuri.community.application.comment.provided.CommentCommandUseCase
-import org.around.ieuri.community.application.port.`in`.command.PostImageUploadUseCase
+import org.around.ieuri.community.application.photo.provided.PostImageUploadUseCase
+import org.around.ieuri.community.application.photo.provided.dto.DeletePostImageCommand
 import org.around.ieuri.community.application.post.provided.PostCommandUseCase
 import org.around.ieuri.community.application.post.provided.dto.PostTargetCommand
 import org.around.ieuri.community.application.report.provided.ReportCommandUseCase
-import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.withCommunityUserErrors
-import org.around.ieuri.community.infrastructure.locale.contentLanguage
 import org.springframework.stereotype.Component
 
 /**

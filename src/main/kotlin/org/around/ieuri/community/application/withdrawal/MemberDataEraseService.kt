@@ -1,6 +1,6 @@
 package org.around.ieuri.community.application.withdrawal
 
-import org.around.ieuri.community.application.port.out.client.ClockPort
+import org.around.ieuri.community.application.shared.required.ClockPort
 import org.around.ieuri.community.application.withdrawal.provided.MemberDataEraseUseCase
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service

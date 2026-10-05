@@ -5,9 +5,9 @@ import org.around.ieuri.community.application.comment.provided.CommentCommandUse
 import org.around.ieuri.community.application.comment.provided.CommentNotFoundException
 import org.around.ieuri.community.application.comment.provided.dto.CreateCommentCommand
 import org.around.ieuri.community.application.comment.required.CommentRepository
-import org.around.ieuri.community.application.port.out.client.ClockPort
 import org.around.ieuri.community.application.post.provided.exception.PostNotFoundException
 import org.around.ieuri.community.application.post.required.PostRepository
+import org.around.ieuri.community.application.shared.required.ClockPort
 import org.around.ieuri.community.application.withdrawal.MemberContentEraser
 import org.around.ieuri.community.domain.comment.Comment
 import org.springframework.stereotype.Service

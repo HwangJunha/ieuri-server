@@ -2,7 +2,7 @@ package org.around.ieuri.community.adapter.event
 
 import org.around.ieuri.community.application.catalog.provided.SpotCatalogSyncUseCase
 import org.around.ieuri.community.domain.catalog.CatalogLanguage
-import org.around.ieuri.community.domain.vo.ContentLanguage
+import org.around.ieuri.community.domain.shared.ContentLanguage
 import org.around.ieuri.tourism.domain.event.CatalogLanguageRef
 import org.around.ieuri.tourism.domain.event.SpotCatalogLanguagesChanged
 import org.slf4j.LoggerFactory

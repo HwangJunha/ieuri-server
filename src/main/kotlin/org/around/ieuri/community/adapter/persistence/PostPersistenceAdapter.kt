@@ -14,7 +14,7 @@ import org.around.ieuri.community.domain.post.Post
 import org.around.ieuri.community.domain.post.PostSpot
 import org.around.ieuri.community.domain.post.PostTags
 import org.around.ieuri.community.domain.shared.AttachedPhotos
-import org.around.ieuri.community.domain.vo.TargetCategory
+import org.around.ieuri.community.domain.shared.TargetCategory
 import org.jetbrains.exposed.v1.core.Column
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq

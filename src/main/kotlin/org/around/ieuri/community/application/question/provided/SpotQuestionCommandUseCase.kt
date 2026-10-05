@@ -3,7 +3,7 @@ package org.around.ieuri.community.application.question.provided
 import org.around.ieuri.community.application.question.provided.dto.CreateSpotAnswerCommand
 import org.around.ieuri.community.application.question.provided.dto.CreateSpotAnswerReplyCommand
 import org.around.ieuri.community.application.question.provided.dto.CreateSpotQuestionCommand
-import org.around.ieuri.community.domain.vo.ContentLanguage
+import org.around.ieuri.community.domain.shared.ContentLanguage
 
 /** 장소 질문 애그리게이트 쓰기(질문·답변·답글). 장소 반응 여부로 막지 않는다. */
 interface SpotQuestionCommandUseCase {

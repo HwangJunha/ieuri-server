@@ -1,8 +1,8 @@
 package org.around.ieuri.community.application.shared
 
-import org.around.ieuri.community.application.port.out.client.ObjectStoragePort
+import org.around.ieuri.community.application.shared.required.ObjectStoragePort
 import org.around.ieuri.community.domain.shared.PhotoNotUploadedException
-import org.around.ieuri.community.domain.vo.PhotoObjectKey
+import org.around.ieuri.community.domain.shared.PhotoObjectKey
 import org.springframework.stereotype.Component
 
 /**

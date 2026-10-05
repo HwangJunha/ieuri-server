@@ -4,7 +4,7 @@ import org.around.ieuri.community.domain.post.Post
 import org.around.ieuri.community.domain.post.PostSpot
 import org.around.ieuri.community.domain.post.PostTags
 import org.around.ieuri.community.domain.shared.AttachedPhotos
-import org.around.ieuri.community.domain.vo.TargetCategory
+import org.around.ieuri.community.domain.shared.TargetCategory
 import java.time.Instant
 
 /**

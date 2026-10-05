@@ -1,7 +1,7 @@
 package org.around.ieuri.community.adapter.persistence.query
 
 import org.around.ieuri.community.adapter.persistence.mapper.toTimestamptz
-import org.around.ieuri.community.application.port.out.query.ViewerContext
+import org.around.ieuri.community.application.shared.required.ViewerContext
 import org.jetbrains.exposed.v1.core.Column
 import org.jetbrains.exposed.v1.core.Op
 import org.jetbrains.exposed.v1.core.and

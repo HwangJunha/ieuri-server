@@ -1,6 +1,6 @@
 package org.around.ieuri.tourism.infrastructure.adapter.out.client
 
-import org.around.ieuri.community.application.port.`in`.query.CommunityQueryUseCase
+import org.around.ieuri.community.application.post.provided.CommunityQueryUseCase
 import org.around.ieuri.tourism.application.port.out.client.MapViewerBlockPort
 import org.springframework.stereotype.Component
 

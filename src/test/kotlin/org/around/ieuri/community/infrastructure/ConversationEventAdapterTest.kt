@@ -2,9 +2,9 @@ package org.around.ieuri.community.infrastructure
 
 import io.mockk.every
 import io.mockk.mockk
-import org.around.ieuri.community.infrastructure.adapter.out.event.ValkeyConversationEventAdapter
-import org.around.ieuri.community.infrastructure.adapter.out.event.mapper.NewMessagePayload
-import org.around.ieuri.community.infrastructure.adapter.out.event.mapper.TypingEventPayload
+import org.around.ieuri.community.adapter.event.ValkeyConversationEventAdapter
+import org.around.ieuri.community.adapter.event.mapper.NewMessagePayload
+import org.around.ieuri.community.adapter.event.mapper.TypingEventPayload
 import org.junit.jupiter.api.Test
 import org.springframework.data.redis.connection.ReactiveSubscription
 import org.springframework.data.redis.core.StringRedisTemplate

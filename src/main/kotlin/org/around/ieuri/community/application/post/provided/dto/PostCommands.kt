@@ -1,6 +1,6 @@
 package org.around.ieuri.community.application.post.provided.dto
 
-import org.around.ieuri.community.domain.vo.TargetCategory
+import org.around.ieuri.community.domain.shared.TargetCategory
 
 // 글 쓰기 입력. 형식 검증만 하고 업무 규칙은 도메인이 판정한다. memberId는 담지 않는다.
 
