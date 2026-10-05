@@ -4,9 +4,9 @@ import org.around.ieuri.alarm.application.port.`in`.command.PushDispatchRequest
 import org.around.ieuri.alarm.application.port.`in`.command.PushDispatchUseCase
 import org.around.ieuri.alarm.domain.vo.PushDestination
 import org.around.ieuri.alarm.infrastructure.config.AlarmAsyncConfig
-import org.around.ieuri.community.domain.conversation.MessageSent
-import org.around.ieuri.community.domain.question.SpotAnswerWritten
-import org.around.ieuri.community.domain.question.SpotReplyWritten
+import org.around.ieuri.community.domain.conversation.event.MessageSent
+import org.around.ieuri.community.domain.question.event.SpotAnswerWritten
+import org.around.ieuri.community.domain.question.event.SpotReplyWritten
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Component

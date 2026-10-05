@@ -14,9 +14,9 @@ import org.around.ieuri.community.application.shared.UploadedPhotoVerifier
 import org.around.ieuri.community.application.shared.exception.SpotNotFoundInLocaleException
 import org.around.ieuri.community.application.shared.required.CommunityEventPublisherPort
 import org.around.ieuri.community.application.shared.required.SpotLookupPort
-import org.around.ieuri.community.domain.question.SpotAnswerWritten
 import org.around.ieuri.community.domain.question.SpotQuestion
-import org.around.ieuri.community.domain.question.SpotReplyWritten
+import org.around.ieuri.community.domain.question.event.SpotAnswerWritten
+import org.around.ieuri.community.domain.question.event.SpotReplyWritten
 import org.around.ieuri.community.domain.shared.AttachedPhotos
 import org.around.ieuri.community.domain.shared.ContentLanguage
 import org.springframework.stereotype.Service

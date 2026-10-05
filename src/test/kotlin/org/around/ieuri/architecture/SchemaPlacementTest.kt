@@ -6,6 +6,7 @@ import jakarta.persistence.Table
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import org.jetbrains.exposed.v1.core.Table as ExposedTable
 
 /**
  * 스키마 분할의 배치표 검증(SPEC-0023). 실제 DB 배치는 부팅 시 `ddl-auto: validate`가 잡는다.
@@ -55,7 +56,7 @@ class SchemaPlacementTest {
             .forEach { put(it, "alarm") }
     }
 
-    /** 엔티티가 없는 테이블 — raw SQL로만 접근한다. */
+    /** JPA 엔티티도 Exposed 테이블 선언도 없는 테이블 — raw SQL로만 접근하거나, 쓰는 코드가 없다. */
     private val tablesWithoutEntity = setOf(
         "congestion_area",
         // vector 타입은 JPA가 표현하지 못한다(SPEC-0035).
@@ -64,10 +65,18 @@ class SchemaPlacementTest {
         "kto_concentration_rate",
         "kto_stay_intensity",
         "kto_spending_intensity",
+        // 고아 사진 판정을 지우며 테이블만 남겼다(SPEC-0039 D-45). 쓰는 코드가 없다.
+        "community_orphan_photo_object",
     )
 
     private val entities: List<JavaClass> = ArchitectureClasses.main
         .filter { it.isAnnotatedWith(Entity::class.java) }
+
+    /** Exposed로 옮긴 context의 `Table` 선언(object). 이름은 `스키마.테이블`이다. */
+    private val exposedTables: Map<String, String> = ArchitectureClasses.main
+        .filter { it.isAssignableTo(ExposedTable::class.java) && it.name.endsWith("Table") }
+        .mapNotNull { Class.forName(it.name).kotlin.objectInstance as? ExposedTable }
+        .associate { it.tableName.substringAfter('.') to it.tableName.substringBefore('.', missingDelimiterValue = "") }
 
     /** AC-6 — 전량 배정, 중복 0, 미배정 0. Map이므로 중복 키는 구조적으로 불가능하다. */
     @Test
@@ -106,10 +115,22 @@ class SchemaPlacementTest {
         assertTrue(mismatched.isEmpty(), "배치표와 어긋나는 엔티티:\n${mismatched.joinToString("\n")}")
     }
 
-    /** 엔티티 없는 테이블을 명시 목록으로 고정한다 — 위 테스트는 존재하는 엔티티만 보므로 매핑 누락을 못 잡는다. */
+    /** Exposed 테이블 선언도 스키마를 명시하고, 그 (스키마, 테이블) 쌍이 배치표와 일치한다. */
+    @Test
+    fun `Exposed 테이블 선언의 스키마와 테이블 쌍이 배치표와 일치한다`() {
+        assertTrue(exposedTables.isNotEmpty(), "Exposed 테이블 선언을 찾지 못했다 — 탐색 조건이 틀렸다")
+        val mismatched = exposedTables.mapNotNull { (table, schema) ->
+            val expected = placement[table] ?: return@mapNotNull "배치표에 없는 테이블 '$table'"
+            if (schema == expected) null else "$table: 기대 '$expected', 실제 '$schema'"
+        }
+
+        assertTrue(mismatched.isEmpty(), "배치표와 어긋나는 Exposed 테이블:\n${mismatched.joinToString("\n")}")
+    }
+
+    /** 매핑 없는 테이블을 명시 목록으로 고정한다 — 위 테스트들은 존재하는 선언만 보므로 매핑 누락을 못 잡는다. */
     @Test
     fun `엔티티 없는 테이블은 raw SQL 전용뿐이다`() {
-        val mappedTables = entities.map { tableOf(it) }.toSet()
+        val mappedTables = entities.map { tableOf(it) }.toSet() + exposedTables.keys
         val actuallyMissing = placement.keys - mappedTables
 
         assertEquals(
