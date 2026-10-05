@@ -1,8 +1,5 @@
-package org.around.ieuri.community.infrastructure
+package org.around.ieuri.community.adapter.persistence.query
 
-import org.around.ieuri.community.adapter.persistence.query.decodeSpotQuestionCursor
-import org.around.ieuri.community.adapter.persistence.query.encodeCursor
-import org.around.ieuri.community.adapter.persistence.query.encodeSpotQuestionCursor
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals

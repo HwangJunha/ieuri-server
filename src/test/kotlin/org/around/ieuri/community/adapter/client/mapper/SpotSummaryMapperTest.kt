@@ -1,6 +1,5 @@
-package org.around.ieuri.community.infrastructure.mapper
+package org.around.ieuri.community.adapter.client.mapper
 
-import org.around.ieuri.community.adapter.client.mapper.toPostSpotView
 import org.around.ieuri.community.domain.shared.TargetCategory
 import org.around.ieuri.tourism.application.query.SpotSummaryView
 import kotlin.test.Test

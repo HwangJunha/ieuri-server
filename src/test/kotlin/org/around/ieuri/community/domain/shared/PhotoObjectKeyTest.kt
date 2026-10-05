@@ -1,6 +1,5 @@
-package org.around.ieuri.community.domain
+package org.around.ieuri.community.domain.shared
 
-import org.around.ieuri.community.domain.shared.PhotoObjectKey
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals

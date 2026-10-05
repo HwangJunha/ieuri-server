@@ -1,4 +1,4 @@
-package org.around.ieuri.community.application.service
+package org.around.ieuri.community.application.question
 
 import io.mockk.every
 import io.mockk.mockk
@@ -6,7 +6,6 @@ import io.mockk.slot
 import io.mockk.verify
 import org.around.ieuri.common.pagination.CursorEdge
 import org.around.ieuri.common.pagination.cursorPageOf
-import org.around.ieuri.community.application.question.SpotQuestionQueryService
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswerView
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswersQuery
 import org.around.ieuri.community.application.question.provided.dto.SpotQuestionView
@@ -33,7 +32,7 @@ import kotlin.test.assertTrue
  * 질문·답변 조회(SPEC-0026 R1, R11, R12, R16).
  * - 질문의 숨김이 조회 시점에 답변을 함께 가린다(답변 레코드는 건드리지 않는다).
  */
-class SpotQaQueryServiceTest {
+class SpotQuestionQueryServiceTest {
 
     private val memberId = 7L
     private val catalogId = 11L

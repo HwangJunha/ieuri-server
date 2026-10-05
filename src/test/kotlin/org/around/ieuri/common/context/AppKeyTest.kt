@@ -1,6 +1,5 @@
-package org.around.ieuri.community.domain
+package org.around.ieuri.common.context
 
-import org.around.ieuri.common.context.AppKey
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

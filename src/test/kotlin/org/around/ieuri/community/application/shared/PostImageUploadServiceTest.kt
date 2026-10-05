@@ -1,10 +1,8 @@
-package org.around.ieuri.community.application.service
+package org.around.ieuri.community.application.shared
 
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import org.around.ieuri.community.application.shared.CommunityPolicy
-import org.around.ieuri.community.application.shared.PostImageUploadService
 import org.around.ieuri.community.application.shared.exception.UnsupportedContentTypeException
 import org.around.ieuri.community.application.shared.provided.dto.ConfirmPostImageUploadsCommand
 import org.around.ieuri.community.application.shared.provided.dto.DeletePostImageCommand

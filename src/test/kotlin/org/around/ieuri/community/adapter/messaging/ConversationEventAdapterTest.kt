@@ -1,8 +1,7 @@
-package org.around.ieuri.community.infrastructure
+package org.around.ieuri.community.adapter.messaging
 
 import io.mockk.every
 import io.mockk.mockk
-import org.around.ieuri.community.adapter.messaging.ValkeyConversationEventAdapter
 import org.around.ieuri.community.adapter.messaging.mapper.NewMessagePayload
 import org.around.ieuri.community.adapter.messaging.mapper.TypingEventPayload
 import org.junit.jupiter.api.Test

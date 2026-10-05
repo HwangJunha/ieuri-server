@@ -1,7 +1,5 @@
-package org.around.ieuri.community.infrastructure
+package org.around.ieuri.community.adapter.messaging.mapper
 
-import org.around.ieuri.community.adapter.messaging.mapper.NewMessagePayload
-import org.around.ieuri.community.adapter.messaging.mapper.TypingEventPayload
 import org.around.ieuri.community.application.conversation.provided.dto.TypingEventView
 import tools.jackson.databind.ObjectMapper
 import tools.jackson.module.kotlin.jacksonObjectMapper

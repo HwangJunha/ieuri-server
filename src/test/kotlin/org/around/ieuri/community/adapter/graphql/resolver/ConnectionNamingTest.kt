@@ -1,9 +1,7 @@
-package org.around.ieuri.community.infrastructure
+package org.around.ieuri.community.adapter.graphql.resolver
 
 import com.netflix.graphql.dgs.DgsData
 import com.netflix.graphql.dgs.DgsQuery
-import org.around.ieuri.community.adapter.graphql.resolver.CommunityQueryResolver
-import org.around.ieuri.community.adapter.graphql.resolver.ConversationQueryResolver
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
