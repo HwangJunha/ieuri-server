@@ -20,9 +20,7 @@ import org.around.ieuri.common.graphql.generated.types.ResolveSpotQuestionInput
 import org.around.ieuri.common.graphql.generated.types.ResolveSpotQuestionPayload
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.community.adapter.graphql.mapper.toCommand
-import org.around.ieuri.community.application.qa.provided.SpotAnswerCommandUseCase
-import org.around.ieuri.community.application.qa.provided.SpotAnswerReplyCommandUseCase
-import org.around.ieuri.community.application.qa.provided.SpotQuestionCommandUseCase
+import org.around.ieuri.community.application.question.provided.SpotQuestionCommandUseCase
 import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.withCommunityUserErrors
 import org.around.ieuri.community.infrastructure.locale.contentLanguage
 import org.springframework.stereotype.Component
@@ -35,8 +33,6 @@ import org.springframework.stereotype.Component
 @Component
 class SpotQaMutationResolver(
     private val questionCommandUseCase: SpotQuestionCommandUseCase,
-    private val answerCommandUseCase: SpotAnswerCommandUseCase,
-    private val replyCommandUseCase: SpotAnswerReplyCommandUseCase,
     private val currentMemberProvider: CurrentMemberProvider,
 ) {
 
@@ -73,7 +69,7 @@ class SpotQaMutationResolver(
         onError = { CreateSpotAnswerPayload(success = false, userErrors = it, answerId = null) },
     ) {
         val memberId = currentMemberProvider.requireMemberId()
-        val answerId = answerCommandUseCase.createAnswer(input.toCommand(), memberId)
+        val answerId = questionCommandUseCase.createAnswer(input.toCommand(), memberId)
         CreateSpotAnswerPayload(success = true, userErrors = emptyList(), answerId = answerId)
     }
 
@@ -82,7 +78,7 @@ class SpotQaMutationResolver(
         onError = { DeleteSpotAnswerPayload(success = false, userErrors = it) },
     ) {
         val memberId = currentMemberProvider.requireMemberId()
-        answerCommandUseCase.deleteAnswer(input.answerId, memberId)
+        questionCommandUseCase.deleteAnswer(input.answerId, memberId)
         DeleteSpotAnswerPayload(success = true, userErrors = emptyList())
     }
 
@@ -91,7 +87,7 @@ class SpotQaMutationResolver(
         onError = { CreateSpotAnswerReplyPayload(success = false, userErrors = it, replyId = null) },
     ) {
         val memberId = currentMemberProvider.requireMemberId()
-        val replyId = replyCommandUseCase.createReply(input.toCommand(), memberId)
+        val replyId = questionCommandUseCase.createReply(input.toCommand(), memberId)
         CreateSpotAnswerReplyPayload(success = true, userErrors = emptyList(), replyId = replyId)
     }
 
@@ -100,7 +96,7 @@ class SpotQaMutationResolver(
         onError = { DeleteSpotAnswerReplyPayload(success = false, userErrors = it) },
     ) {
         val memberId = currentMemberProvider.requireMemberId()
-        replyCommandUseCase.deleteReply(input.replyId, memberId)
+        questionCommandUseCase.deleteReply(input.replyId, memberId)
         DeleteSpotAnswerReplyPayload(success = true, userErrors = emptyList())
     }
 }

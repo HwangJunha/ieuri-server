@@ -13,12 +13,12 @@ import org.around.ieuri.community.application.port.out.query.CommunityQueryPort
 import org.around.ieuri.community.application.port.out.query.SpotAnswersSearch
 import org.around.ieuri.community.application.port.out.query.SpotQaQueryPort
 import org.around.ieuri.community.application.port.out.query.SpotQuestionsSearch
-import org.around.ieuri.community.application.qa.provided.exception.QuestionNotFoundException
 import org.around.ieuri.community.application.query.PostSpotView
 import org.around.ieuri.community.application.query.SpotAnswerView
 import org.around.ieuri.community.application.query.SpotAnswersQuery
 import org.around.ieuri.community.application.query.SpotQuestionView
 import org.around.ieuri.community.application.query.SpotQuestionsQuery
+import org.around.ieuri.community.application.question.provided.exception.QuestionNotFoundException
 import org.around.ieuri.community.domain.vo.ContentLanguage
 import java.time.Duration
 import java.time.Instant

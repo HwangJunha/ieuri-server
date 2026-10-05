@@ -8,12 +8,10 @@ import org.around.ieuri.community.application.port.out.client.MemberLookupPort
 import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
 import org.around.ieuri.community.application.post.provided.exception.PostNotFoundException
 import org.around.ieuri.community.application.post.required.PostRepository
-import org.around.ieuri.community.application.qa.provided.AnswerNotFoundException
-import org.around.ieuri.community.application.qa.provided.ReplyNotFoundException
-import org.around.ieuri.community.application.qa.provided.exception.QuestionNotFoundException
-import org.around.ieuri.community.application.qa.required.SpotAnswerReplyRepository
-import org.around.ieuri.community.application.qa.required.SpotAnswerRepository
-import org.around.ieuri.community.application.qa.required.SpotQuestionRepository
+import org.around.ieuri.community.application.question.provided.exception.AnswerNotFoundException
+import org.around.ieuri.community.application.question.provided.exception.QuestionNotFoundException
+import org.around.ieuri.community.application.question.provided.exception.ReplyNotFoundException
+import org.around.ieuri.community.application.question.required.SpotQuestionRepository
 import org.around.ieuri.community.application.report.provided.ReportAutoHideUseCase
 import org.around.ieuri.community.application.report.provided.ReportCommandUseCase
 import org.around.ieuri.community.application.report.provided.ReportContentCommand
@@ -37,8 +35,6 @@ class ReportModifyService(
     private val postRepository: PostRepository,
     private val commentRepository: CommentRepository,
     private val questionRepository: SpotQuestionRepository,
-    private val answerRepository: SpotAnswerRepository,
-    private val replyRepository: SpotAnswerReplyRepository,
     private val memberLookupPort: MemberLookupPort,
     private val eventPublisherPort: CommunityEventPublisherPort,
 ) : ReportCommandUseCase,
@@ -66,8 +62,8 @@ class ReportModifyService(
             ReportTargetType.POST -> postRepository.hideIfVisible(targetId)
             ReportTargetType.COMMENT -> commentRepository.hideIfVisible(targetId)?.let(postRepository::decreaseCommentCount)
             ReportTargetType.SPOT_QUESTION -> questionRepository.hideIfVisible(targetId)
-            ReportTargetType.SPOT_ANSWER -> answerRepository.hideIfVisible(targetId)?.let(questionRepository::decreaseAnswerCount)
-            ReportTargetType.SPOT_ANSWER_REPLY -> replyRepository.hideIfVisible(targetId)
+            ReportTargetType.SPOT_ANSWER -> questionRepository.hideAnswerIfVisible(targetId)?.let(questionRepository::decreaseAnswerCount)
+            ReportTargetType.SPOT_ANSWER_REPLY -> questionRepository.hideReplyIfVisible(targetId)
             ReportTargetType.MEMBER -> Unit
         }
     }
@@ -78,8 +74,8 @@ class ReportModifyService(
             ReportTargetType.COMMENT -> commentRepository.findById(targetId) != null
             ReportTargetType.MEMBER -> memberLookupPort.findAuthor(targetId) != null
             ReportTargetType.SPOT_QUESTION -> questionRepository.exists(targetId)
-            ReportTargetType.SPOT_ANSWER -> answerRepository.exists(targetId)
-            ReportTargetType.SPOT_ANSWER_REPLY -> replyRepository.exists(targetId)
+            ReportTargetType.SPOT_ANSWER -> questionRepository.answerExists(targetId)
+            ReportTargetType.SPOT_ANSWER_REPLY -> questionRepository.replyExists(targetId)
         }
         if (exists) return
         throw when (targetType) {

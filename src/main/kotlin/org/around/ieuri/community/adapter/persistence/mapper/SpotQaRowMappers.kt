@@ -3,9 +3,9 @@ package org.around.ieuri.community.adapter.persistence.mapper
 import org.around.ieuri.community.adapter.persistence.table.SpotAnswerReplyTable
 import org.around.ieuri.community.adapter.persistence.table.SpotAnswerTable
 import org.around.ieuri.community.adapter.persistence.table.SpotQuestionTable
-import org.around.ieuri.community.domain.qa.SpotAnswer
-import org.around.ieuri.community.domain.qa.SpotAnswerReply
-import org.around.ieuri.community.domain.qa.SpotQuestion
+import org.around.ieuri.community.domain.question.SpotAnswer
+import org.around.ieuri.community.domain.question.SpotAnswerReply
+import org.around.ieuri.community.domain.question.SpotQuestion
 import org.jetbrains.exposed.v1.core.ResultRow
 
 /** 질문 한 행. 사진은 읽기 쪽 필드 리졸버가 따로 가져온다. */
