@@ -3,8 +3,8 @@ package org.around.ieuri.community.application.comment
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import org.around.ieuri.community.application.comment.provided.CommentNotFoundException
 import org.around.ieuri.community.application.comment.provided.dto.CreateCommentCommand
+import org.around.ieuri.community.application.comment.provided.exception.CommentNotFoundException
 import org.around.ieuri.community.application.comment.required.CommentRepository
 import org.around.ieuri.community.application.post.provided.exception.PostNotFoundException
 import org.around.ieuri.community.application.post.required.PostRepository
