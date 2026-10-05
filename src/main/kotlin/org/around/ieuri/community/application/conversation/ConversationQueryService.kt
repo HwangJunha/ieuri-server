@@ -65,15 +65,13 @@ class ConversationQueryService(
             .filter { it.senderId != memberId }
     }
 
-    /**
-     * 새 메시지 구독. 이벤트의 id로 DB에서 다시 읽어 내려준다(POL-013).
-     * - 읽는 사이에 사라진 메시지는 조용히 건너뛴다.
-     */
-    override fun newMessage(conversationId: Long, memberId: Long): Flux<MessageView> {
+    /** 새 메시지 구독. 브로커는 id만 싣는다(POL-013) — 본문은 호출자가 [message]로 다시 읽는다. */
+    override fun newMessageIds(conversationId: Long, memberId: Long): Flux<Long> {
         requireParticipant(conversationId, memberId)
         return conversationEventPort.subscribeNewMessage(conversationId)
-            .mapNotNull { conversationQueryPort.findMessage(conversationId, it, memberId) }
     }
+
+    override fun message(conversationId: Long, messageId: Long, memberId: Long): MessageView? = conversationQueryPort.findMessage(conversationId, messageId, memberId)
 
     /** 읽기 포트로 판정한다. 결과가 없으면 "없거나 볼 수 없다"이다. */
     private fun requireParticipant(conversationId: Long, memberId: Long) {
