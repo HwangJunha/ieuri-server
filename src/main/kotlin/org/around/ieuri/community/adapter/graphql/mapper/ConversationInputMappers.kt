@@ -1,13 +1,13 @@
-package org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper
+package org.around.ieuri.community.adapter.graphql.mapper
 
 import org.around.ieuri.common.graphql.generated.types.MarkConversationReadInput
 import org.around.ieuri.common.graphql.generated.types.ReportMessagesInput
 import org.around.ieuri.common.graphql.generated.types.SendMessageInput
 import org.around.ieuri.common.graphql.generated.types.StartConversationInput
-import org.around.ieuri.community.application.command.MarkConversationReadCommand
-import org.around.ieuri.community.application.command.ReportMessagesCommand
-import org.around.ieuri.community.application.command.SendMessageCommand
-import org.around.ieuri.community.application.command.StartConversationCommand
+import org.around.ieuri.community.application.conversation.provided.dto.MarkConversationReadCommand
+import org.around.ieuri.community.application.conversation.provided.dto.SendMessageCommand
+import org.around.ieuri.community.application.conversation.provided.dto.StartConversationCommand
+import org.around.ieuri.community.application.messagereport.provided.dto.ReportMessagesCommand
 import org.around.ieuri.community.domain.shared.ReportReason
 
 /*

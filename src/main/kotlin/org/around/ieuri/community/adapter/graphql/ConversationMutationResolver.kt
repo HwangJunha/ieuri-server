@@ -1,4 +1,4 @@
-package org.around.ieuri.community.infrastructure.adapter.`in`.graphql
+package org.around.ieuri.community.adapter.graphql
 
 import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
@@ -15,11 +15,12 @@ import org.around.ieuri.common.graphql.generated.types.SendMessagePayload
 import org.around.ieuri.common.graphql.generated.types.StartConversationInput
 import org.around.ieuri.common.graphql.generated.types.StartConversationPayload
 import org.around.ieuri.common.security.CurrentMemberProvider
-import org.around.ieuri.community.application.command.NotifyTypingCommand
-import org.around.ieuri.community.application.command.StartConversationCommand
-import org.around.ieuri.community.application.port.`in`.command.ConversationCommandUseCase
-import org.around.ieuri.community.application.port.`in`.command.MessageReportCommandUseCase
-import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.mapper.toCommand
+import org.around.ieuri.community.adapter.graphql.mapper.toCommand
+import org.around.ieuri.community.application.conversation.provided.ConversationCommandUseCase
+import org.around.ieuri.community.application.conversation.provided.dto.NotifyTypingCommand
+import org.around.ieuri.community.application.conversation.provided.dto.StartConversationCommand
+import org.around.ieuri.community.application.messagereport.provided.MessageReportCommandUseCase
+import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.withCommunityUserErrors
 import org.around.ieuri.community.infrastructure.locale.contentLanguage
 import org.springframework.stereotype.Component
 

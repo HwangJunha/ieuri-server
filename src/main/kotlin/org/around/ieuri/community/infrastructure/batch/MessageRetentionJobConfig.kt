@@ -1,6 +1,6 @@
 package org.around.ieuri.community.infrastructure.batch
 
-import org.around.ieuri.community.application.port.`in`.command.MessageRetentionUseCase
+import org.around.ieuri.community.application.conversation.provided.MessageRetentionUseCase
 import org.around.ieuri.community.infrastructure.config.MessageRetentionProperties
 import org.slf4j.LoggerFactory
 import org.springframework.batch.core.job.Job
