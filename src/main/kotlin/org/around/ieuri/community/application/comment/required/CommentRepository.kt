@@ -19,6 +19,6 @@ interface CommentRepository {
      */
     fun markDeletedWasCounted(commentId: Long, deletedAt: Instant): Boolean
 
-    /** 탈퇴 정리: 작성 댓글 삭제 표시. 이번에 지운 것 중 수에 잡혀 있던(숨겨지지 않은) 댓글의 글 id를 건마다 돌려준다. */
-    fun markDeletedByAuthorCounted(authorId: Long, deletedAt: Instant): List<Long>
+    /** 탈퇴 정리: 삭제되지 않은 작성 댓글 id. */
+    fun findIdsByAuthor(authorId: Long): List<Long>
 }

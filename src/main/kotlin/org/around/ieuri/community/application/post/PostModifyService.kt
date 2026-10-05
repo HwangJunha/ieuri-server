@@ -11,7 +11,6 @@ import org.around.ieuri.community.application.shared.UploadedPhotoVerifier
 import org.around.ieuri.community.application.shared.exception.SpotNotFoundInLocaleException
 import org.around.ieuri.community.application.shared.required.ClockPort
 import org.around.ieuri.community.application.shared.required.SpotLookupPort
-import org.around.ieuri.community.application.withdrawal.MemberContentEraser
 import org.around.ieuri.community.domain.post.HiddenPostNotEditableException
 import org.around.ieuri.community.domain.post.Post
 import org.around.ieuri.community.domain.post.PostSpot
@@ -37,8 +36,7 @@ class PostModifyService(
     private val spotLookupPort: SpotLookupPort,
     private val photoVerifier: UploadedPhotoVerifier,
     private val clockPort: ClockPort,
-) : PostCommandUseCase,
-    MemberContentEraser {
+) : PostCommandUseCase {
 
     override fun createPost(command: CreatePostCommand, memberId: Long, language: ContentLanguage): Long {
         val spot = command.catalogId?.let { findSpot(it, language) }
@@ -119,10 +117,15 @@ class PostModifyService(
         return PostSpot(catalogId, SpotPoint(longitude = summary.longitude, latitude = summary.latitude))
     }
 
-    /** 탈퇴 정리: 작성 글 삭제 표시, 좋아요를 지우고 그 글의 좋아요 수를 내림, 숨김 삭제. */
+    /** 작성 글은 사용자 삭제와 같은 도메인 판정으로 하나씩 지운다. 좋아요·숨김은 저장소 연산이라 한 번에 지우고 좋아요 수를 내린다. */
     @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, propagation = Propagation.REQUIRES_NEW)
     override fun eraseMemberContent(memberId: Long, deletedAt: Instant): Int {
-        val posts = postRepository.markDeletedByAuthor(memberId, deletedAt)
+        var posts = 0
+        postRepository.findIdsByAuthor(memberId).forEach { postId ->
+            val post = postRepository.findById(postId) ?: return@forEach
+            val deleted = post.delete(memberId, deletedAt)
+            if (postRepository.markDeleted(postId, requireNotNull(deleted.deletedAt))) posts++
+        }
         val likedPostIds = postRepository.removeLikesByMember(memberId)
         likedPostIds.forEach(postRepository::decreaseLikeCount)
         return posts + likedPostIds.size + postRepository.removeHidesByMember(memberId)

@@ -167,9 +167,9 @@ class PostPersistenceAdapter : PostRepository {
         }
     }
 
-    override fun markDeletedByAuthor(authorId: Long, deletedAt: Instant): Int = PostTable.update({
-        (PostTable.authorId eq authorId) and PostTable.deletedAt.isNull()
-    }) { it[PostTable.deletedAt] = deletedAt.toTimestamptz() }
+    override fun findIdsByAuthor(authorId: Long): List<Long> = PostTable.select(PostTable.id)
+        .where { (PostTable.authorId eq authorId) and PostTable.deletedAt.isNull() }
+        .map { it[PostTable.id] }
 
     override fun removeLikesByMember(memberId: Long): List<Long> = PostLikeTable
         .deleteReturning(listOf(PostLikeTable.postId)) { PostLikeTable.memberId eq memberId }

@@ -10,6 +10,7 @@ import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.isNull
 import org.jetbrains.exposed.v1.javatime.CurrentTimestampWithTimeZone
 import org.jetbrains.exposed.v1.jdbc.insertReturning
+import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.updateReturning
 import org.springframework.stereotype.Repository
@@ -46,11 +47,7 @@ class CommentPersistenceAdapter : CommentRepository {
         it[updatedAt] = CurrentTimestampWithTimeZone
     }.singleOrNull()?.let { !it[CommentTable.hidden] } ?: false
 
-    override fun markDeletedByAuthorCounted(authorId: Long, deletedAt: Instant): List<Long> = CommentTable.updateReturning(
-        returning = listOf(CommentTable.postId, CommentTable.hidden),
-        where = { (CommentTable.authorId eq authorId) and CommentTable.deletedAt.isNull() },
-    ) {
-        it[CommentTable.deletedAt] = deletedAt.toTimestamptz()
-        it[updatedAt] = CurrentTimestampWithTimeZone
-    }.filterNot { it[CommentTable.hidden] }.map { it[CommentTable.postId] }
+    override fun findIdsByAuthor(authorId: Long): List<Long> = CommentTable.select(CommentTable.id)
+        .where { (CommentTable.authorId eq authorId) and CommentTable.deletedAt.isNull() }
+        .map { it[CommentTable.id] }
 }

@@ -14,7 +14,6 @@ import org.around.ieuri.community.application.shared.UploadedPhotoVerifier
 import org.around.ieuri.community.application.shared.exception.SpotNotFoundInLocaleException
 import org.around.ieuri.community.application.shared.required.CommunityEventPublisherPort
 import org.around.ieuri.community.application.shared.required.SpotLookupPort
-import org.around.ieuri.community.application.withdrawal.MemberContentEraser
 import org.around.ieuri.community.domain.question.SpotQuestion
 import org.around.ieuri.community.domain.shared.AttachedPhotos
 import org.around.ieuri.community.domain.shared.ContentLanguage
@@ -33,8 +32,7 @@ class SpotQuestionModifyService(
     private val spotLookupPort: SpotLookupPort,
     private val photoVerifier: UploadedPhotoVerifier,
     private val eventPublisher: CommunityEventPublisherPort,
-) : SpotQuestionCommandUseCase,
-    MemberContentEraser {
+) : SpotQuestionCommandUseCase {
 
     override fun createQuestion(command: CreateSpotQuestionCommand, memberId: Long, language: ContentLanguage): Long {
         if (spotLookupPort.findSummary(command.catalogId, language) == null) throw SpotNotFoundInLocaleException()
@@ -136,12 +134,33 @@ class SpotQuestionModifyService(
         questionRepository.deleteReply(replyId)
     }
 
-    /** 탈퇴 정리: 질문·답변·답글 삭제 표시, 수에 잡혀 있던 답변만큼 질문의 답변 수를 내림. */
+    /**
+     * 답글 → 답변 → 질문 순으로 하나씩, 루트(질문)의 탈퇴 메서드를 거쳐 삭제 표시한다. 수에 잡혀 있던 답변만 답변 수를 내린다.
+     * - 순서 주의: 자식은 루트를 읽어 판정하므로 질문보다 먼저 처리한다. 루트가 이미 없으면 자식은 읽기에서 걸러지므로 건너뛴다.
+     */
     @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, propagation = Propagation.REQUIRES_NEW)
     override fun eraseMemberContent(memberId: Long, deletedAt: Instant): Int {
-        val questions = questionRepository.markDeletedByAuthor(memberId, deletedAt)
-        val answeredQuestionIds = questionRepository.markAnswersDeletedByAuthorCounted(memberId, deletedAt)
-        answeredQuestionIds.forEach(questionRepository::decreaseAnswerCount)
-        return questions + answeredQuestionIds.size + questionRepository.markRepliesDeletedByAuthor(memberId, deletedAt)
+        var erased = 0
+        questionRepository.findReplyIdsByAuthor(memberId).forEach { replyId ->
+            val reply = questionRepository.findReply(replyId) ?: return@forEach
+            val question = questionRepository.findByAnswerId(reply.answerId) ?: return@forEach
+            val withdrawn = question.withdrawReply(reply, memberId, deletedAt)
+            if (questionRepository.markReplyDeleted(replyId, requireNotNull(withdrawn.deletedAt))) erased++
+        }
+        questionRepository.findAnswerIdsByAuthor(memberId).forEach { answerId ->
+            val answer = questionRepository.findAnswer(answerId) ?: return@forEach
+            val question = questionRepository.findById(answer.questionId) ?: return@forEach
+            val withdrawn = question.withdrawAnswer(answer, memberId, deletedAt)
+            if (questionRepository.markAnswerDeletedWasCounted(answerId, requireNotNull(withdrawn.deletedAt))) {
+                questionRepository.decreaseAnswerCount(answer.questionId)
+            }
+            erased++
+        }
+        questionRepository.findIdsByAuthor(memberId).forEach { questionId ->
+            val question = questionRepository.findById(questionId) ?: return@forEach
+            val withdrawn = question.withdraw(memberId, deletedAt)
+            if (questionRepository.markDeleted(questionId, requireNotNull(withdrawn.deletedAt))) erased++
+        }
+        return erased
     }
 }

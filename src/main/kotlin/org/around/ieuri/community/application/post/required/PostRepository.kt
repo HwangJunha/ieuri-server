@@ -72,8 +72,8 @@ interface PostRepository {
 
     // 탈퇴 정리
 
-    /** 작성 글 삭제 표시. 이미 삭제된 글의 시각은 덮어쓰지 않는다. */
-    fun markDeletedByAuthor(authorId: Long, deletedAt: Instant): Int
+    /** 삭제되지 않은 작성 글 id. */
+    fun findIdsByAuthor(authorId: Long): List<Long>
 
     /** 회원의 좋아요를 지우고, 좋아요가 있던 글 id(한 건마다 하나)를 돌려준다. */
     fun removeLikesByMember(memberId: Long): List<Long>

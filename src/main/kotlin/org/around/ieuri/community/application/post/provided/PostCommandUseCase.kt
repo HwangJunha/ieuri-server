@@ -4,6 +4,7 @@ import org.around.ieuri.community.application.post.provided.dto.CreatePostComman
 import org.around.ieuri.community.application.post.provided.dto.EditPostCommand
 import org.around.ieuri.community.application.post.provided.dto.PostTargetCommand
 import org.around.ieuri.community.domain.shared.ContentLanguage
+import java.time.Instant
 
 /**
  * 글 쓰기·좋아요·개인 숨김. memberId는 인증 컨텍스트에서 온다.
@@ -32,4 +33,7 @@ interface PostCommandUseCase {
 
     /** 조회수 +1. 삭제된 글이면 아무것도 하지 않는다. */
     fun recordView(postId: Long)
+
+    /** 탈퇴 정리. 탈퇴 커밋 뒤 리스너가 부르며 새 트랜잭션이다. 한 번의 탈퇴는 모든 애그리게이트에 같은 [deletedAt]을 남긴다. 바뀐 행 수(로그용). */
+    fun eraseMemberContent(memberId: Long, deletedAt: Instant): Int
 }

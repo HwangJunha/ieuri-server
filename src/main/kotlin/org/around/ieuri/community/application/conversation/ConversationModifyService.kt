@@ -23,7 +23,6 @@ import org.around.ieuri.community.application.shared.required.CommunityEventPubl
 import org.around.ieuri.community.application.shared.required.MemberLookupPort
 import org.around.ieuri.community.application.shared.required.ObjectStoragePort
 import org.around.ieuri.community.application.shared.required.SpotLookupPort
-import org.around.ieuri.community.application.withdrawal.MemberContentEraser
 import org.around.ieuri.community.domain.conversation.Conversation
 import org.around.ieuri.community.domain.conversation.Message
 import org.around.ieuri.community.domain.conversation.SpotQaOrigin
@@ -53,8 +52,7 @@ class ConversationModifyService(
     private val eventPublisher: CommunityEventPublisherPort,
     private val clockPort: ClockPort,
 ) : ConversationCommandUseCase,
-    ExpiredMessageDeleteUseCase,
-    MemberContentEraser {
+    ExpiredMessageDeleteUseCase {
 
     override fun startConversation(command: StartConversationCommand, memberId: Long): Long {
         // 자기 자신과의 대화는 존재 확인보다 먼저 거부한다.
@@ -152,7 +150,11 @@ class ConversationModifyService(
         )
     }
 
-    /** 탈퇴 정리: 보낸 메시지 삭제 표시. 대화는 남긴다. */
+    /** 대화마다 루트가 참여자를 확인한 뒤 그 대화의 보낸 메시지를 삭제 표시한다. 대화는 남긴다. 메시지 한 건 단위의 규칙은 없다. */
     @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, propagation = Propagation.REQUIRES_NEW)
-    override fun eraseMemberContent(memberId: Long, deletedAt: Instant): Int = conversationRepository.markMessagesDeletedBySender(memberId, deletedAt)
+    override fun eraseMemberContent(memberId: Long, deletedAt: Instant): Int = conversationRepository.findIdsByParticipant(memberId).sumOf { conversationId ->
+        val conversation = conversationRepository.findById(conversationId) ?: return@sumOf 0
+        conversation.requireParticipant(memberId)
+        conversationRepository.markMessagesDeletedBySender(conversationId, memberId, deletedAt)
+    }
 }

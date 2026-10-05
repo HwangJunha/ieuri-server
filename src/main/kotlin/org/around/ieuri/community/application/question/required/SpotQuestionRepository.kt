@@ -57,11 +57,18 @@ interface SpotQuestionRepository {
 
     fun decreaseAnswerCount(questionId: Long)
 
-    // 탈퇴 정리: 삭제 표시만 하고 남의 자식은 칠하지 않는다 — 부모가 지워진 자식은 읽기가 거른다.
-    fun markDeletedByAuthor(authorId: Long, deletedAt: Instant): Int
+    // 탈퇴 정리: 삭제되지 않은 작성 글 id와 삭제 표시. 표시만 하고 물리 삭제하지 않는다.
+    fun findIdsByAuthor(authorId: Long): List<Long>
 
-    /** 이번에 지운 답변 중 수에 잡혀 있던(숨겨지지 않은) 것의 질문 id를 건마다 돌려준다. */
-    fun markAnswersDeletedByAuthorCounted(authorId: Long, deletedAt: Instant): List<Long>
+    fun findAnswerIdsByAuthor(authorId: Long): List<Long>
 
-    fun markRepliesDeletedByAuthor(authorId: Long, deletedAt: Instant): Int
+    fun findReplyIdsByAuthor(authorId: Long): List<Long>
+
+    /** 그 사이 삭제됐으면 false. */
+    fun markDeleted(questionId: Long, deletedAt: Instant): Boolean
+
+    /** 이번 호출로 표시했고 그때 숨겨져 있지 않았으면 true — 그때만 질문의 답변 수에 잡혀 있었다. */
+    fun markAnswerDeletedWasCounted(answerId: Long, deletedAt: Instant): Boolean
+
+    fun markReplyDeleted(replyId: Long, deletedAt: Instant): Boolean
 }

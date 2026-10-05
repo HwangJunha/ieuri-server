@@ -149,7 +149,11 @@ class ConversationPersistenceAdapter(
         }
     }
 
-    override fun markMessagesDeletedBySender(senderId: Long, deletedAt: Instant): Int = MessageTable.update({
-        (MessageTable.senderId eq senderId) and MessageTable.deletedAt.isNull()
+    override fun findIdsByParticipant(memberId: Long): List<Long> = ConversationTable.select(ConversationTable.id)
+        .where { (ConversationTable.memberLow eq memberId) or (ConversationTable.memberHigh eq memberId) }
+        .map { it[ConversationTable.id] }
+
+    override fun markMessagesDeletedBySender(conversationId: Long, senderId: Long, deletedAt: Instant): Int = MessageTable.update({
+        (MessageTable.conversationId eq conversationId) and (MessageTable.senderId eq senderId) and MessageTable.deletedAt.isNull()
     }) { it[MessageTable.deletedAt] = deletedAt.toTimestamptz() }
 }

@@ -5,7 +5,6 @@ import org.around.ieuri.community.application.block.provided.BlockCommandUseCase
 import org.around.ieuri.community.application.block.required.BlockRepository
 import org.around.ieuri.community.application.shared.exception.MemberNotFoundException
 import org.around.ieuri.community.application.shared.required.MemberLookupPort
-import org.around.ieuri.community.application.withdrawal.MemberContentEraser
 import org.around.ieuri.community.domain.block.Block
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
@@ -18,8 +17,7 @@ import java.time.Instant
 class BlockModifyService(
     private val blockRepository: BlockRepository,
     private val memberLookupPort: MemberLookupPort,
-) : BlockCommandUseCase,
-    MemberContentEraser {
+) : BlockCommandUseCase {
 
     override fun block(targetMemberId: Long, memberId: Long) {
         requirePositive(targetMemberId)
@@ -43,7 +41,7 @@ class BlockModifyService(
         if (memberLookupPort.findAuthor(memberId) == null) throw MemberNotFoundException()
     }
 
-    /** 탈퇴 정리: 회원이 걸었거나 회원을 향한 차단 삭제. */
+    /** 회원이 걸었거나 회원을 향한 차단을 지운다. 차단 해제에는 판정할 규칙이 없어 한 번에 지운다. */
     @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, propagation = Propagation.REQUIRES_NEW)
     override fun eraseMemberContent(memberId: Long, deletedAt: Instant): Int = blockRepository.removeInvolving(memberId)
 }

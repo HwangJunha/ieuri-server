@@ -4,6 +4,7 @@ import org.around.ieuri.community.application.question.provided.dto.CreateSpotAn
 import org.around.ieuri.community.application.question.provided.dto.CreateSpotAnswerReplyCommand
 import org.around.ieuri.community.application.question.provided.dto.CreateSpotQuestionCommand
 import org.around.ieuri.community.domain.shared.ContentLanguage
+import java.time.Instant
 
 /** 장소 질문 애그리게이트 쓰기(질문·답변·답글). 장소 반응 여부로 막지 않는다. */
 interface SpotQuestionCommandUseCase {
@@ -26,4 +27,7 @@ interface SpotQuestionCommandUseCase {
     fun createReply(command: CreateSpotAnswerReplyCommand, memberId: Long): Long
 
     fun deleteReply(replyId: Long, memberId: Long)
+
+    /** 탈퇴 정리. 탈퇴 커밋 뒤 리스너가 부르며 새 트랜잭션이다. 한 번의 탈퇴는 모든 애그리게이트에 같은 [deletedAt]을 남긴다. 바뀐 행 수(로그용). */
+    fun eraseMemberContent(memberId: Long, deletedAt: Instant): Int
 }

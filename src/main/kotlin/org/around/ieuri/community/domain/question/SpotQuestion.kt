@@ -70,6 +70,23 @@ data class SpotQuestion(
         if (reply.authorId != memberId) throw NotReplyOwnerException()
     }
 
+    // 탈퇴: 삭제 표시만 한다 — 사용자 삭제와 달리 남의 답변·답글은 지우지 않는다(부모가 지워진 글은 읽기가 거른다).
+
+    fun withdraw(memberId: Long, at: Instant): SpotQuestion {
+        requireAuthor(memberId)
+        return copy(deletedAt = at)
+    }
+
+    fun withdrawAnswer(answer: SpotAnswer, memberId: Long, at: Instant): SpotAnswer {
+        removeAnswer(answer, memberId)
+        return answer.copy(deletedAt = at)
+    }
+
+    fun withdrawReply(reply: SpotAnswerReply, memberId: Long, at: Instant): SpotAnswerReply {
+        removeReply(reply, memberId)
+        return reply.copy(deletedAt = at)
+    }
+
     private fun requireOwn(answer: SpotAnswer) {
         require(answer.questionId == requireLoadedId()) { "다른 질문의 답변이다." }
     }

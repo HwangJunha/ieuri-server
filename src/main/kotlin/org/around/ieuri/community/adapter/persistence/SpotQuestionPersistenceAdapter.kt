@@ -156,19 +156,31 @@ class SpotQuestionPersistenceAdapter : SpotQuestionRepository {
         }) { it[answerCount] = answerCount - 1 }
     }
 
-    override fun markDeletedByAuthor(authorId: Long, deletedAt: Instant): Int = SpotQuestionTable.update({
-        (SpotQuestionTable.authorId eq authorId) and SpotQuestionTable.deletedAt.isNull()
-    }) { it[SpotQuestionTable.deletedAt] = deletedAt.toTimestamptz() }
+    override fun findIdsByAuthor(authorId: Long): List<Long> = SpotQuestionTable.select(SpotQuestionTable.id)
+        .where { (SpotQuestionTable.authorId eq authorId) and SpotQuestionTable.deletedAt.isNull() }
+        .map { it[SpotQuestionTable.id] }
 
-    override fun markAnswersDeletedByAuthorCounted(authorId: Long, deletedAt: Instant): List<Long> = SpotAnswerTable.updateReturning(
-        returning = listOf(SpotAnswerTable.questionId, SpotAnswerTable.hidden),
-        where = { (SpotAnswerTable.authorId eq authorId) and SpotAnswerTable.deletedAt.isNull() },
+    override fun findAnswerIdsByAuthor(authorId: Long): List<Long> = SpotAnswerTable.select(SpotAnswerTable.id)
+        .where { (SpotAnswerTable.authorId eq authorId) and SpotAnswerTable.deletedAt.isNull() }
+        .map { it[SpotAnswerTable.id] }
+
+    override fun findReplyIdsByAuthor(authorId: Long): List<Long> = SpotAnswerReplyTable.select(SpotAnswerReplyTable.id)
+        .where { (SpotAnswerReplyTable.authorId eq authorId) and SpotAnswerReplyTable.deletedAt.isNull() }
+        .map { it[SpotAnswerReplyTable.id] }
+
+    override fun markDeleted(questionId: Long, deletedAt: Instant): Boolean = SpotQuestionTable.update({
+        (SpotQuestionTable.id eq questionId) and SpotQuestionTable.deletedAt.isNull()
+    }) { it[SpotQuestionTable.deletedAt] = deletedAt.toTimestamptz() } > 0
+
+    override fun markAnswerDeletedWasCounted(answerId: Long, deletedAt: Instant): Boolean = SpotAnswerTable.updateReturning(
+        returning = listOf(SpotAnswerTable.hidden),
+        where = { (SpotAnswerTable.id eq answerId) and SpotAnswerTable.deletedAt.isNull() },
     ) { it[SpotAnswerTable.deletedAt] = deletedAt.toTimestamptz() }
-        .filterNot { it[SpotAnswerTable.hidden] }.map { it[SpotAnswerTable.questionId] }
+        .singleOrNull()?.let { !it[SpotAnswerTable.hidden] } ?: false
 
-    override fun markRepliesDeletedByAuthor(authorId: Long, deletedAt: Instant): Int = SpotAnswerReplyTable.update({
-        (SpotAnswerReplyTable.authorId eq authorId) and SpotAnswerReplyTable.deletedAt.isNull()
-    }) { it[SpotAnswerReplyTable.deletedAt] = deletedAt.toTimestamptz() }
+    override fun markReplyDeleted(replyId: Long, deletedAt: Instant): Boolean = SpotAnswerReplyTable.update({
+        (SpotAnswerReplyTable.id eq replyId) and SpotAnswerReplyTable.deletedAt.isNull()
+    }) { it[SpotAnswerReplyTable.deletedAt] = deletedAt.toTimestamptz() } > 0
 
     // 사진은 다형 참조(owner_type·owner_id)라 FK가 없다 — 주인을 지우기 전에 사진을 먼저 지운다.
     private fun insertPhotos(kind: SpotQaKind, ownerId: Long, photos: AttachedPhotos) {
