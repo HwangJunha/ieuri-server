@@ -2,6 +2,7 @@ package org.around.ieuri.community.application.service
 
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.cursorPageOf
+import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.community.application.exception.SpotNotFoundInLocaleException
 import org.around.ieuri.community.application.policy.CommunityPolicy
 import org.around.ieuri.community.application.port.`in`.query.SpotQaQueryUseCase
@@ -27,7 +28,7 @@ import org.springframework.transaction.annotation.Transactional
  * - 개인 숨김(hiddenPostIds)은 글 전용이라 읽지 않는다.
  */
 @Service
-@Transactional(readOnly = true)
+@Transactional(transactionManager = ExposedConfig.EXPOSED_TX, readOnly = true)
 class SpotQaQueryService(
     private val spotQaQueryPort: SpotQaQueryPort,
     private val communityQueryPort: CommunityQueryPort,

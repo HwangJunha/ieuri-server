@@ -45,25 +45,7 @@ interface SpotQaQueryPort {
     fun findAnswerPhotoKeys(answerIds: List<Long>): Map<Long, List<String>>
 
     fun findReplyPhotoKeys(replyIds: List<Long>): Map<Long, List<String>>
-
-    /**
-     * DM 출처 스냅샷의 재료(SPEC-0026 R14). 답변 하나에서 질문·장소까지 한 번에 읽는다.
-     * - 삭제된 답변·질문이면 null — 호출자는 거절하지 않고 출처 없이 대화를 연다.
-     * - 장소명은 담기지 않는다(tourism 소유).
-     */
-    fun findAnswerOriginSource(answerId: Long): SpotQaOriginSource?
 }
-
-/** 출처 스냅샷을 만들 재료. 본문 전체를 담는다 — 100자 절삭은 값 객체가 한다. */
-data class SpotQaOriginSource(
-    val catalogId: Long,
-    val questionId: Long,
-    val questionBody: String,
-    val answerId: Long,
-    val answerBody: String,
-    /** 답변 작성자. 대화 상대가 이 사람인지 호출자가 판정한다. */
-    val answerAuthorId: Long,
-)
 
 /**
  * 질문 목록 조회 조건.

@@ -3,6 +3,7 @@ package org.around.ieuri.community.application.service
 import org.around.ieuri.common.context.AppKey
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.cursorPageOf
+import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.community.application.event.PostViewed
 import org.around.ieuri.community.application.policy.CommunityPolicy
 import org.around.ieuri.community.application.port.`in`.query.CommunityQueryUseCase
@@ -36,7 +37,7 @@ import org.springframework.transaction.annotation.Transactional
  * - 피드·단건·댓글은 모두 [viewerContext]를 거친다 — 한 경로라도 빠지면 차단·숨김이 무력화된다.
  */
 @Service
-@Transactional(readOnly = true)
+@Transactional(transactionManager = ExposedConfig.EXPOSED_TX, readOnly = true)
 class CommunityQueryService(
     private val communityQueryPort: CommunityQueryPort,
     private val postSpatialQueryPort: PostSpatialQueryPort,

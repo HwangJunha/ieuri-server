@@ -85,7 +85,8 @@ class ConversationPersistenceAdapter(
             }
         return MessageTable.selectAll()
             .where { (MessageTable.id inList messageIds) and MessageTable.deletedAt.isNull() }
-            .map { it.toMessage(cipher.decrypt(it[MessageTable.bodyEncrypted]), origins[it[MessageTable.id]]) }
+            // 본문이 빈 과거 메시지는 복호화를 건너뛴다 — 빈 값은 base64 디코딩에서 터진다.
+            .map { it.toMessage(it[MessageTable.bodyEncrypted].takeIf(String::isNotEmpty)?.let(cipher::decrypt).orEmpty(), origins[it[MessageTable.id]]) }
     }
 
     /** 읽음 지점을 지워진 메시지로 밀지 않는다 — 세는 쪽과 같은 집합을 본다. */

@@ -1,33 +1,29 @@
-package org.around.ieuri.community.infrastructure.adapter.out.query
+package org.around.ieuri.community.adapter.persistence.query
 
-import com.querydsl.jpa.impl.JPAQueryFactory
 import org.around.ieuri.common.pagination.CursorEdge
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.cursorPageOf
+import org.around.ieuri.community.adapter.persistence.mapper.toPostView
+import org.around.ieuri.community.adapter.persistence.table.PostTable
 import org.around.ieuri.community.application.port.out.query.PostSpatialQueryPort
 import org.around.ieuri.community.application.port.out.query.PostsSearch
-import org.around.ieuri.community.application.port.out.query.ViewerContext
 import org.around.ieuri.community.application.query.PostView
-import org.around.ieuri.community.infrastructure.adapter.out.persistence.entity.QPostEntity
+import org.jetbrains.exposed.v1.core.inList
+import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Component
-import org.springframework.transaction.annotation.Transactional
 import java.sql.Timestamp
 
 /**
- * 거리순 피드 전용 raw SQL 어댑터(PostGIS). `location`(geography)은 엔티티에 매핑되지 않는다.
+ * 거리순 피드 전용 raw SQL 어댑터(PostGIS). `ST_*`는 DSL이 표현하지 못해 Exposed 트랜잭션에 합류하는 [JdbcTemplate]을 쓴다.
  * - 모더레이션·카테고리·태그·언어 조건을 이 SQL이 전부 담는다 — 뒤에서 거르면 페이지 크기가 깨진다.
  * - 장소 없는 글은 오지 않는다(community_post_spot INNER JOIN).
  */
 @Component
 class PostSpatialQueryAdapter(
-    private val jdbcTemplate: JdbcTemplate,
-    private val queryFactory: JPAQueryFactory,
+    private val exposedJdbcTemplate: JdbcTemplate,
 ) : PostSpatialQueryPort {
 
-    private val post = QPostEntity.postEntity
-
-    @Transactional(readOnly = true)
     override fun findPostsByDistance(search: PostsSearch): CursorPage<PostView> {
         val area = requireNotNull(search.area) { "거리순은 좌표를 준 경우에만 온다." }
         val cursor = search.after?.let { decodeDistanceCursor(it) }
@@ -111,7 +107,7 @@ class PostSpatialQueryAdapter(
         center() // ORDER BY의 거리 계산
         params += search.first + 1
 
-        val rows = jdbcTemplate.query(
+        val rows = exposedJdbcTemplate.query(
             """
             SELECT p.id AS post_id, ST_Distance(ps.location, $CENTER) AS distance_meters
             FROM community_post p
@@ -131,22 +127,20 @@ class PostSpatialQueryAdapter(
             return cursorPageOf(emptyList(), hasNextPage = false, hasPreviousPage = cursor != null)
         }
 
-        // 생 SQL은 id와 거리만 정하고, 본문은 엔티티로 읽는다.
-        val entities = queryFactory
-            .selectFrom(post)
-            .where(post.id.`in`(pageRows.map { it.first }))
-            .fetch()
-            .associateBy { requireNotNull(it.id) }
+        // 생 SQL은 id와 거리만 정하고, 본문은 DSL로 읽는다.
+        val posts = PostTable.selectAll()
+            .where { PostTable.id inList pageRows.map { it.first } }
+            .associateBy { it[PostTable.id] }
 
         val edges = pageRows.map { (postId, distanceMeters) ->
-            val entity = requireNotNull(entities[postId]) { "방금 조회한 글($postId)이 없다." }
+            val row = requireNotNull(posts[postId]) { "방금 조회한 글($postId)이 없다." }
             CursorEdge(
                 cursor = encodeDistanceCursor(
                     distanceMeters = distanceMeters,
-                    createdAt = requireNotNull(entity.createdAt),
+                    createdAt = row[PostTable.createdAt].toInstant(),
                     id = postId,
                 ),
-                node = entity.toPostView(search.viewer),
+                node = row.toPostView(search.viewer.memberId),
             )
         }
         return cursorPageOf(edges, hasNextPage = hasNextPage, hasPreviousPage = cursor != null)

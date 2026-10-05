@@ -1,4 +1,4 @@
-package org.around.ieuri.community.infrastructure.adapter.out.query
+package org.around.ieuri.community.adapter.persistence.query
 
 import java.nio.charset.StandardCharsets
 import java.time.Instant
