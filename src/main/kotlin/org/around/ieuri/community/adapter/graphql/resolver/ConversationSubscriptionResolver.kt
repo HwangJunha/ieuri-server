@@ -1,4 +1,4 @@
-package org.around.ieuri.community.adapter.graphql
+package org.around.ieuri.community.adapter.graphql.resolver
 
 import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment

@@ -1,4 +1,4 @@
-package org.around.ieuri.community.adapter.graphql
+package org.around.ieuri.community.adapter.graphql.resolver
 
 import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsData
@@ -8,6 +8,11 @@ import com.netflix.graphql.dgs.InputArgument
 import graphql.language.OperationDefinition
 import org.around.ieuri.common.graphql.loader
 import org.around.ieuri.common.security.CurrentMemberProvider
+import org.around.ieuri.community.adapter.graphql.connection.ConversationConnection
+import org.around.ieuri.community.adapter.graphql.connection.ConversationEdge
+import org.around.ieuri.community.adapter.graphql.connection.MessageConnection
+import org.around.ieuri.community.adapter.graphql.connection.MessageEdge
+import org.around.ieuri.community.adapter.graphql.dataloader.PostAuthorDataLoader
 import org.around.ieuri.community.adapter.graphql.mapper.toGql
 import org.around.ieuri.community.adapter.graphql.mapper.toGqlOrPlaceholder
 import org.around.ieuri.community.application.conversation.provided.ConversationQueryUseCase

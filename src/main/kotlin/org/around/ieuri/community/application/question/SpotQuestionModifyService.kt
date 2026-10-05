@@ -14,11 +14,11 @@ import org.around.ieuri.community.application.shared.UploadedPhotoVerifier
 import org.around.ieuri.community.application.shared.exception.SpotNotFoundInLocaleException
 import org.around.ieuri.community.application.shared.required.CommunityEventPublisherPort
 import org.around.ieuri.community.application.shared.required.SpotLookupPort
+import org.around.ieuri.community.domain.question.SpotAnswerNotificationTriggered
+import org.around.ieuri.community.domain.question.SpotAnswerReplyNotificationTriggered
 import org.around.ieuri.community.domain.question.SpotQuestion
 import org.around.ieuri.community.domain.shared.AttachedPhotos
 import org.around.ieuri.community.domain.shared.ContentLanguage
-import org.around.ieuri.community.domain.shared.SpotAnswerNotificationTriggered
-import org.around.ieuri.community.domain.shared.SpotAnswerReplyNotificationTriggered
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional

@@ -1,4 +1,4 @@
-package org.around.ieuri.community.adapter.event.mapper
+package org.around.ieuri.community.adapter.messaging.mapper
 
 import org.around.ieuri.community.application.conversation.provided.dto.TypingEventView
 import java.time.Instant

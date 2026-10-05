@@ -1,4 +1,4 @@
-package org.around.ieuri.community.adapter.graphql
+package org.around.ieuri.community.adapter.graphql.resolver
 
 import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsData
@@ -8,9 +8,21 @@ import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.common.graphql.loader
 import org.around.ieuri.common.graphql.tokenPresentation
 import org.around.ieuri.common.security.CurrentMemberProvider
-import org.around.ieuri.community.adapter.graphql.contentLanguage
+import org.around.ieuri.community.adapter.graphql.connection.SpotAnswerConnection
+import org.around.ieuri.community.adapter.graphql.connection.SpotAnswerEdge
+import org.around.ieuri.community.adapter.graphql.connection.SpotQuestionConnection
+import org.around.ieuri.community.adapter.graphql.connection.SpotQuestionEdge
+import org.around.ieuri.community.adapter.graphql.dataloader.ANONYMOUS
+import org.around.ieuri.community.adapter.graphql.dataloader.PostAuthorDataLoader
+import org.around.ieuri.community.adapter.graphql.dataloader.PostSpotDataLoader
+import org.around.ieuri.community.adapter.graphql.dataloader.SpotAnswerPhotoDataLoader
+import org.around.ieuri.community.adapter.graphql.dataloader.SpotAnswerReplyDataLoader
+import org.around.ieuri.community.adapter.graphql.dataloader.SpotAnswerReplyPhotoDataLoader
+import org.around.ieuri.community.adapter.graphql.dataloader.SpotQuestionPhotoDataLoader
+import org.around.ieuri.community.adapter.graphql.dataloader.ViewerId
 import org.around.ieuri.community.adapter.graphql.mapper.toGql
 import org.around.ieuri.community.adapter.graphql.mapper.toGqlOrPlaceholder
+import org.around.ieuri.community.adapter.graphql.support.contentLanguage
 import org.around.ieuri.community.application.question.provided.SpotQuestionQueryUseCase
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswerReplyView
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswerView

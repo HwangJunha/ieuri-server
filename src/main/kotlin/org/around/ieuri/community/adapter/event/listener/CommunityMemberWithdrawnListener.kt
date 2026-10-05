@@ -1,4 +1,4 @@
-package org.around.ieuri.community.adapter.event
+package org.around.ieuri.community.adapter.event.listener
 
 import org.around.ieuri.auth.domain.event.MemberWithdrawn
 import org.around.ieuri.community.application.block.provided.BlockCommandUseCase

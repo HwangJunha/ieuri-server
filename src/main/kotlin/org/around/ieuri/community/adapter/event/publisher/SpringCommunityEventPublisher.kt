@@ -1,4 +1,4 @@
-package org.around.ieuri.community.adapter.event
+package org.around.ieuri.community.adapter.event.publisher
 
 import org.around.ieuri.community.application.shared.required.CommunityEventPublisherPort
 import org.springframework.context.ApplicationEventPublisher

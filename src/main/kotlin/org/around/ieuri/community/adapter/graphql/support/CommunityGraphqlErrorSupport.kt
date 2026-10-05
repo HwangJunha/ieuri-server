@@ -1,4 +1,4 @@
-package org.around.ieuri.community.adapter.graphql
+package org.around.ieuri.community.adapter.graphql.support
 
 import org.around.ieuri.common.graphql.generated.types.UserError
 import org.around.ieuri.community.domain.shared.CommunityUserException

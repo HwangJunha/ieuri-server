@@ -1,4 +1,4 @@
-package org.around.ieuri.community.adapter.graphql
+package org.around.ieuri.community.adapter.graphql.resolver
 
 import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
@@ -15,9 +15,9 @@ import org.around.ieuri.common.graphql.generated.types.SendMessagePayload
 import org.around.ieuri.common.graphql.generated.types.StartConversationInput
 import org.around.ieuri.common.graphql.generated.types.StartConversationPayload
 import org.around.ieuri.common.security.CurrentMemberProvider
-import org.around.ieuri.community.adapter.graphql.contentLanguage
 import org.around.ieuri.community.adapter.graphql.mapper.toCommand
-import org.around.ieuri.community.adapter.graphql.withCommunityUserErrors
+import org.around.ieuri.community.adapter.graphql.support.contentLanguage
+import org.around.ieuri.community.adapter.graphql.support.withCommunityUserErrors
 import org.around.ieuri.community.application.conversation.provided.ConversationCommandUseCase
 import org.around.ieuri.community.application.conversation.provided.dto.NotifyTypingCommand
 import org.around.ieuri.community.application.conversation.provided.dto.StartConversationCommand

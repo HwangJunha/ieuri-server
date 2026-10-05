@@ -1,4 +1,4 @@
-package org.around.ieuri.community.adapter.graphql
+package org.around.ieuri.community.adapter.graphql.dataloader
 
 import com.netflix.graphql.dgs.DgsDataLoader
 import org.around.ieuri.community.application.shared.dto.PostAuthorView

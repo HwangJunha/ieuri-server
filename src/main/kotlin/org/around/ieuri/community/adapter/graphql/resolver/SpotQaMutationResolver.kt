@@ -1,4 +1,4 @@
-package org.around.ieuri.community.adapter.graphql
+package org.around.ieuri.community.adapter.graphql.resolver
 
 import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
@@ -19,9 +19,9 @@ import org.around.ieuri.common.graphql.generated.types.DeleteSpotQuestionPayload
 import org.around.ieuri.common.graphql.generated.types.ResolveSpotQuestionInput
 import org.around.ieuri.common.graphql.generated.types.ResolveSpotQuestionPayload
 import org.around.ieuri.common.security.CurrentMemberProvider
-import org.around.ieuri.community.adapter.graphql.contentLanguage
 import org.around.ieuri.community.adapter.graphql.mapper.toCommand
-import org.around.ieuri.community.adapter.graphql.withCommunityUserErrors
+import org.around.ieuri.community.adapter.graphql.support.contentLanguage
+import org.around.ieuri.community.adapter.graphql.support.withCommunityUserErrors
 import org.around.ieuri.community.application.question.provided.SpotQuestionCommandUseCase
 import org.springframework.stereotype.Component
 

@@ -1,7 +1,7 @@
-package org.around.ieuri.community.adapter.event
+package org.around.ieuri.community.adapter.messaging
 
-import org.around.ieuri.community.adapter.event.mapper.NewMessagePayload
-import org.around.ieuri.community.adapter.event.mapper.TypingEventPayload
+import org.around.ieuri.community.adapter.messaging.mapper.NewMessagePayload
+import org.around.ieuri.community.adapter.messaging.mapper.TypingEventPayload
 import org.around.ieuri.community.application.conversation.provided.dto.TypingEventView
 import org.around.ieuri.community.application.conversation.required.ConversationEventPort
 import org.slf4j.LoggerFactory

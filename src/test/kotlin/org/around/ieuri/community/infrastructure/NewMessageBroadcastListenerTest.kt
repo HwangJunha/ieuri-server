@@ -2,7 +2,7 @@ package org.around.ieuri.community.infrastructure
 
 import io.mockk.mockk
 import io.mockk.verify
-import org.around.ieuri.community.adapter.event.NewMessageBroadcastListener
+import org.around.ieuri.community.adapter.event.listener.NewMessageBroadcastListener
 import org.around.ieuri.community.application.conversation.NewMessageStored
 import org.around.ieuri.community.application.conversation.required.ConversationEventPort
 import org.junit.jupiter.api.Test

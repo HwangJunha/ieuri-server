@@ -1,4 +1,4 @@
-package org.around.ieuri.community.adapter.graphql
+package org.around.ieuri.community.adapter.graphql.support
 
 import graphql.schema.DataFetchingEnvironment
 import org.around.ieuri.common.graphql.acceptLanguage
