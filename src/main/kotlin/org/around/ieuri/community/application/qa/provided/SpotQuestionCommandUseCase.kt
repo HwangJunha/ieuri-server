@@ -1,6 +1,6 @@
-package org.around.ieuri.community.application.question.provided
+package org.around.ieuri.community.application.qa.provided
 
-import org.around.ieuri.community.application.question.provided.dto.CreateSpotQuestionCommand
+import org.around.ieuri.community.application.qa.provided.dto.CreateSpotQuestionCommand
 import org.around.ieuri.community.domain.vo.ContentLanguage
 
 /** 장소 질문 쓰기. 장소 반응 여부로 막지 않는다. */

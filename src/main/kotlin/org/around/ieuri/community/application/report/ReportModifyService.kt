@@ -1,8 +1,6 @@
 package org.around.ieuri.community.application.report
 
 import org.around.ieuri.common.persistence.ExposedConfig
-import org.around.ieuri.community.application.answer.provided.AnswerNotFoundException
-import org.around.ieuri.community.application.answer.required.SpotAnswerRepository
 import org.around.ieuri.community.application.comment.provided.CommentNotFoundException
 import org.around.ieuri.community.application.comment.required.CommentRepository
 import org.around.ieuri.community.application.exception.MemberNotFoundException
@@ -10,10 +8,12 @@ import org.around.ieuri.community.application.port.out.client.MemberLookupPort
 import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
 import org.around.ieuri.community.application.post.provided.exception.PostNotFoundException
 import org.around.ieuri.community.application.post.required.PostRepository
-import org.around.ieuri.community.application.question.provided.exception.QuestionNotFoundException
-import org.around.ieuri.community.application.question.required.SpotQuestionRepository
-import org.around.ieuri.community.application.reply.provided.ReplyNotFoundException
-import org.around.ieuri.community.application.reply.required.SpotAnswerReplyRepository
+import org.around.ieuri.community.application.qa.provided.AnswerNotFoundException
+import org.around.ieuri.community.application.qa.provided.ReplyNotFoundException
+import org.around.ieuri.community.application.qa.provided.exception.QuestionNotFoundException
+import org.around.ieuri.community.application.qa.required.SpotAnswerReplyRepository
+import org.around.ieuri.community.application.qa.required.SpotAnswerRepository
+import org.around.ieuri.community.application.qa.required.SpotQuestionRepository
 import org.around.ieuri.community.application.report.provided.ReportAutoHideUseCase
 import org.around.ieuri.community.application.report.provided.ReportCommandUseCase
 import org.around.ieuri.community.application.report.provided.ReportContentCommand

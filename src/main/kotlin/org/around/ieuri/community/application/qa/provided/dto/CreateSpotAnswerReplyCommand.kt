@@ -1,4 +1,4 @@
-package org.around.ieuri.community.application.reply.provided.dto
+package org.around.ieuri.community.application.qa.provided.dto
 
 data class CreateSpotAnswerReplyCommand(
     /** 답글을 달 대상 답변. 답글 id를 넘기면 REPLY_TO_REPLY_NOT_ALLOWED다. */

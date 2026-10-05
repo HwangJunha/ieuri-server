@@ -1,6 +1,6 @@
-package org.around.ieuri.community.application.question.required
+package org.around.ieuri.community.application.qa.required
 
-import org.around.ieuri.community.domain.question.SpotQuestion
+import org.around.ieuri.community.domain.qa.SpotQuestion
 import org.around.ieuri.community.domain.shared.AttachedPhotos
 
 /** 질문 저장소. 해결 표시·숨김은 각자 한 열만, 답변 수는 원자적 증감만 쓴다. */

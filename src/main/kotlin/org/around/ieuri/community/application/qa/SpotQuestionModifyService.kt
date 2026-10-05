@@ -1,14 +1,14 @@
-package org.around.ieuri.community.application.question
+package org.around.ieuri.community.application.qa
 
 import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.community.application.exception.SpotNotFoundInLocaleException
 import org.around.ieuri.community.application.port.out.client.SpotLookupPort
-import org.around.ieuri.community.application.question.provided.SpotQuestionCommandUseCase
-import org.around.ieuri.community.application.question.provided.dto.CreateSpotQuestionCommand
-import org.around.ieuri.community.application.question.provided.exception.QuestionNotFoundException
-import org.around.ieuri.community.application.question.required.SpotQuestionRepository
+import org.around.ieuri.community.application.qa.provided.SpotQuestionCommandUseCase
+import org.around.ieuri.community.application.qa.provided.dto.CreateSpotQuestionCommand
+import org.around.ieuri.community.application.qa.provided.exception.QuestionNotFoundException
+import org.around.ieuri.community.application.qa.required.SpotQuestionRepository
 import org.around.ieuri.community.application.shared.UploadedPhotoVerifier
-import org.around.ieuri.community.domain.question.SpotQuestion
+import org.around.ieuri.community.domain.qa.SpotQuestion
 import org.around.ieuri.community.domain.shared.AttachedPhotos
 import org.around.ieuri.community.domain.vo.ContentLanguage
 import org.springframework.stereotype.Service

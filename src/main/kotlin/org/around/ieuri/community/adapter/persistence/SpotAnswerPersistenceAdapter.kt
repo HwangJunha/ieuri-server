@@ -3,8 +3,8 @@ package org.around.ieuri.community.adapter.persistence
 import org.around.ieuri.community.adapter.persistence.mapper.toSpotAnswer
 import org.around.ieuri.community.adapter.persistence.table.SpotAnswerReplyTable
 import org.around.ieuri.community.adapter.persistence.table.SpotAnswerTable
-import org.around.ieuri.community.application.answer.required.SpotAnswerRepository
-import org.around.ieuri.community.domain.answer.SpotAnswer
+import org.around.ieuri.community.application.qa.required.SpotAnswerRepository
+import org.around.ieuri.community.domain.qa.SpotAnswer
 import org.around.ieuri.community.domain.shared.AttachedPhotos
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq

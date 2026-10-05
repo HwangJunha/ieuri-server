@@ -1,4 +1,4 @@
-package org.around.ieuri.community.domain.question
+package org.around.ieuri.community.domain.qa
 
 import org.around.ieuri.community.domain.shared.CommunityUserException
 

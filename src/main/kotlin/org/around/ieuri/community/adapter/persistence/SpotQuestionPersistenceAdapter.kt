@@ -4,8 +4,8 @@ import org.around.ieuri.community.adapter.persistence.mapper.toSpotQuestion
 import org.around.ieuri.community.adapter.persistence.table.SpotAnswerReplyTable
 import org.around.ieuri.community.adapter.persistence.table.SpotAnswerTable
 import org.around.ieuri.community.adapter.persistence.table.SpotQuestionTable
-import org.around.ieuri.community.application.question.required.SpotQuestionRepository
-import org.around.ieuri.community.domain.question.SpotQuestion
+import org.around.ieuri.community.application.qa.required.SpotQuestionRepository
+import org.around.ieuri.community.domain.qa.SpotQuestion
 import org.around.ieuri.community.domain.shared.AttachedPhotos
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq

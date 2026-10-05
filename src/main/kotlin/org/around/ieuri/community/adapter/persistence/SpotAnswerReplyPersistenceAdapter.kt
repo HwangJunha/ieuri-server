@@ -2,8 +2,8 @@ package org.around.ieuri.community.adapter.persistence
 
 import org.around.ieuri.community.adapter.persistence.mapper.toSpotAnswerReply
 import org.around.ieuri.community.adapter.persistence.table.SpotAnswerReplyTable
-import org.around.ieuri.community.application.reply.required.SpotAnswerReplyRepository
-import org.around.ieuri.community.domain.reply.SpotAnswerReply
+import org.around.ieuri.community.application.qa.required.SpotAnswerReplyRepository
+import org.around.ieuri.community.domain.qa.SpotAnswerReply
 import org.around.ieuri.community.domain.shared.AttachedPhotos
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq

@@ -20,9 +20,9 @@ import org.around.ieuri.common.graphql.generated.types.ResolveSpotQuestionInput
 import org.around.ieuri.common.graphql.generated.types.ResolveSpotQuestionPayload
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.community.adapter.graphql.mapper.toCommand
-import org.around.ieuri.community.application.answer.provided.SpotAnswerCommandUseCase
-import org.around.ieuri.community.application.question.provided.SpotQuestionCommandUseCase
-import org.around.ieuri.community.application.reply.provided.SpotAnswerReplyCommandUseCase
+import org.around.ieuri.community.application.qa.provided.SpotAnswerCommandUseCase
+import org.around.ieuri.community.application.qa.provided.SpotAnswerReplyCommandUseCase
+import org.around.ieuri.community.application.qa.provided.SpotQuestionCommandUseCase
 import org.around.ieuri.community.infrastructure.adapter.`in`.graphql.withCommunityUserErrors
 import org.around.ieuri.community.infrastructure.locale.contentLanguage
 import org.springframework.stereotype.Component

@@ -1,6 +1,6 @@
-package org.around.ieuri.community.application.reply.required
+package org.around.ieuri.community.application.qa.required
 
-import org.around.ieuri.community.domain.reply.SpotAnswerReply
+import org.around.ieuri.community.domain.qa.SpotAnswerReply
 import org.around.ieuri.community.domain.shared.AttachedPhotos
 
 interface SpotAnswerReplyRepository {

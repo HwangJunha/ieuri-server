@@ -1,4 +1,6 @@
-package org.around.ieuri.community.domain.shared
+package org.around.ieuri.community.domain.qa
+
+import org.around.ieuri.community.domain.shared.InvalidInputException
 
 /** 장소 질문·답변·답글 본문. 트리밍 후 판정하며 위반은 INVALID_INPUT이다. 한도는 셋이 같다. */
 object SpotQaText {

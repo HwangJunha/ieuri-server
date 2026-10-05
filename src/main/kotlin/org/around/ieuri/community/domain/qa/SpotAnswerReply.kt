@@ -1,7 +1,5 @@
-package org.around.ieuri.community.domain.reply
+package org.around.ieuri.community.domain.qa
 
-import org.around.ieuri.community.domain.answer.SpotAnswer
-import org.around.ieuri.community.domain.shared.SpotQaText
 import java.time.Instant
 
 /**

@@ -1,16 +1,16 @@
-package org.around.ieuri.community.application.answer
+package org.around.ieuri.community.application.qa
 
 import org.around.ieuri.common.persistence.ExposedConfig
-import org.around.ieuri.community.application.answer.provided.AnswerNotFoundException
-import org.around.ieuri.community.application.answer.provided.SpotAnswerCommandUseCase
-import org.around.ieuri.community.application.answer.provided.dto.CreateSpotAnswerCommand
-import org.around.ieuri.community.application.answer.required.SpotAnswerRepository
 import org.around.ieuri.community.application.port.out.event.CommunityEventPublisherPort
-import org.around.ieuri.community.application.question.provided.exception.QuestionNotFoundException
-import org.around.ieuri.community.application.question.required.SpotQuestionRepository
+import org.around.ieuri.community.application.qa.provided.AnswerNotFoundException
+import org.around.ieuri.community.application.qa.provided.SpotAnswerCommandUseCase
+import org.around.ieuri.community.application.qa.provided.dto.CreateSpotAnswerCommand
+import org.around.ieuri.community.application.qa.provided.exception.QuestionNotFoundException
+import org.around.ieuri.community.application.qa.required.SpotAnswerRepository
+import org.around.ieuri.community.application.qa.required.SpotQuestionRepository
 import org.around.ieuri.community.application.shared.UploadedPhotoVerifier
-import org.around.ieuri.community.domain.answer.SpotAnswer
 import org.around.ieuri.community.domain.event.SpotAnswerNotificationTriggered
+import org.around.ieuri.community.domain.qa.SpotAnswer
 import org.around.ieuri.community.domain.shared.AttachedPhotos
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional

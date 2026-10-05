@@ -1,4 +1,4 @@
-package org.around.ieuri.community.application.answer.provided.dto
+package org.around.ieuri.community.application.qa.provided.dto
 
 data class CreateSpotAnswerCommand(
     val questionId: Long,

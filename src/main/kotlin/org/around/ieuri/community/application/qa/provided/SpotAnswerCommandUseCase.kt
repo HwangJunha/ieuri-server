@@ -1,6 +1,6 @@
-package org.around.ieuri.community.application.answer.provided
+package org.around.ieuri.community.application.qa.provided
 
-import org.around.ieuri.community.application.answer.provided.dto.CreateSpotAnswerCommand
+import org.around.ieuri.community.application.qa.provided.dto.CreateSpotAnswerCommand
 import org.around.ieuri.community.domain.shared.CommunityUserException
 
 /** 답변 쓰기. 질문의 답변 수를 함께 바꾼다. */

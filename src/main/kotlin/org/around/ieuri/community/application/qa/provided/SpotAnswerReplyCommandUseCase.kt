@@ -1,6 +1,6 @@
-package org.around.ieuri.community.application.reply.provided
+package org.around.ieuri.community.application.qa.provided
 
-import org.around.ieuri.community.application.reply.provided.dto.CreateSpotAnswerReplyCommand
+import org.around.ieuri.community.application.qa.provided.dto.CreateSpotAnswerReplyCommand
 import org.around.ieuri.community.domain.shared.CommunityUserException
 
 /** 답글 쓰기. 답글은 어떤 수에도 잡히지 않는다. */
