@@ -25,7 +25,7 @@ import org.around.ieuri.community.application.shared.required.ObjectStoragePort
 import org.around.ieuri.community.application.shared.required.SpotLookupPort
 import org.around.ieuri.community.domain.conversation.Conversation
 import org.around.ieuri.community.domain.conversation.Message
-import org.around.ieuri.community.domain.conversation.MessageNotificationTriggered
+import org.around.ieuri.community.domain.conversation.MessageSent
 import org.around.ieuri.community.domain.conversation.SpotQaOrigin
 import org.around.ieuri.community.domain.shared.ContentLanguage
 import org.around.ieuri.community.domain.shared.PhotoObjectKey
@@ -82,7 +82,7 @@ class ConversationModifyService(
         // 브로커 발행은 커밋 뒤 리스너가 한다. 본문은 싣지 않고 id만 싣는다(POL-013).
         eventPublisher.publish(NewMessageStored(command.conversationId, messageId))
         eventPublisher.publish(
-            MessageNotificationTriggered(
+            MessageSent(
                 conversationId = command.conversationId,
                 messageId = messageId,
                 senderId = memberId,

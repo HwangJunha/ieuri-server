@@ -14,9 +14,9 @@ import org.around.ieuri.community.application.shared.UploadedPhotoVerifier
 import org.around.ieuri.community.application.shared.exception.SpotNotFoundInLocaleException
 import org.around.ieuri.community.application.shared.required.CommunityEventPublisherPort
 import org.around.ieuri.community.application.shared.required.SpotLookupPort
-import org.around.ieuri.community.domain.question.SpotAnswerNotificationTriggered
-import org.around.ieuri.community.domain.question.SpotAnswerReplyNotificationTriggered
+import org.around.ieuri.community.domain.question.SpotAnswerWritten
 import org.around.ieuri.community.domain.question.SpotQuestion
+import org.around.ieuri.community.domain.question.SpotReplyWritten
 import org.around.ieuri.community.domain.shared.AttachedPhotos
 import org.around.ieuri.community.domain.shared.ContentLanguage
 import org.springframework.stereotype.Service
@@ -75,7 +75,7 @@ class SpotQuestionModifyService(
 
         // 푸시 알림 트리거. 자기 질문에 자기가 답한 경우는 alarm이 거른다.
         eventPublisher.publish(
-            SpotAnswerNotificationTriggered(
+            SpotAnswerWritten(
                 spotId = question.catalogId,
                 questionId = command.questionId,
                 answerId = answerId,
@@ -113,7 +113,7 @@ class SpotQuestionModifyService(
 
         // 푸시 알림 트리거. 수신자는 답변 작성자이며 질문 작성자에게는 보내지 않는다.
         eventPublisher.publish(
-            SpotAnswerReplyNotificationTriggered(
+            SpotReplyWritten(
                 spotId = question.catalogId,
                 questionId = answer.questionId,
                 replyId = replyId,

@@ -4,9 +4,9 @@ import org.around.ieuri.alarm.application.port.`in`.command.PushDispatchRequest
 import org.around.ieuri.alarm.application.port.`in`.command.PushDispatchUseCase
 import org.around.ieuri.alarm.domain.vo.PushDestination
 import org.around.ieuri.alarm.infrastructure.config.AlarmAsyncConfig
-import org.around.ieuri.community.domain.conversation.MessageNotificationTriggered
-import org.around.ieuri.community.domain.question.SpotAnswerNotificationTriggered
-import org.around.ieuri.community.domain.question.SpotAnswerReplyNotificationTriggered
+import org.around.ieuri.community.domain.conversation.MessageSent
+import org.around.ieuri.community.domain.question.SpotAnswerWritten
+import org.around.ieuri.community.domain.question.SpotReplyWritten
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Component
@@ -27,7 +27,7 @@ class AlarmPushTriggerListener(
 
     @Async(AlarmAsyncConfig.PUSH_EXECUTOR)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    fun onMessage(event: MessageNotificationTriggered) {
+    fun onMessage(event: MessageSent) {
         dispatchQuietly(
             PushDispatchRequest(
                 recipientId = event.recipientId,
@@ -41,7 +41,7 @@ class AlarmPushTriggerListener(
 
     @Async(AlarmAsyncConfig.PUSH_EXECUTOR)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    fun onSpotAnswer(event: SpotAnswerNotificationTriggered) {
+    fun onSpotAnswer(event: SpotAnswerWritten) {
         dispatchQuietly(
             PushDispatchRequest(
                 recipientId = event.recipientId,
@@ -55,7 +55,7 @@ class AlarmPushTriggerListener(
 
     @Async(AlarmAsyncConfig.PUSH_EXECUTOR)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    fun onSpotAnswerReply(event: SpotAnswerReplyNotificationTriggered) {
+    fun onSpotAnswerReply(event: SpotReplyWritten) {
         dispatchQuietly(
             PushDispatchRequest(
                 recipientId = event.recipientId,
