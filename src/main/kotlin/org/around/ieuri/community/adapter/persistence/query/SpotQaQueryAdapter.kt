@@ -2,7 +2,6 @@ package org.around.ieuri.community.adapter.persistence.query
 
 import org.around.ieuri.common.pagination.CursorEdge
 import org.around.ieuri.common.pagination.CursorPage
-import org.around.ieuri.community.adapter.persistence.SpotQaPhotoOwner
 import org.around.ieuri.community.adapter.persistence.mapper.toSpotAnswerReplyView
 import org.around.ieuri.community.adapter.persistence.mapper.toSpotAnswerView
 import org.around.ieuri.community.adapter.persistence.mapper.toSpotQuestionView
@@ -19,6 +18,7 @@ import org.around.ieuri.community.application.question.required.SpotAnswersSearc
 import org.around.ieuri.community.application.question.required.SpotQaQueryPort
 import org.around.ieuri.community.application.question.required.SpotQuestionsSearch
 import org.around.ieuri.community.application.shared.required.ViewerContext
+import org.around.ieuri.community.domain.question.SpotQaKind
 import org.jetbrains.exposed.v1.core.Op
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
@@ -112,17 +112,17 @@ class SpotQaQueryAdapter : SpotQaQueryPort {
             .groupBy({ it[SpotAnswerReplyTable.answerId] }, { it.toSpotAnswerReplyView(viewer.memberId) })
     }
 
-    override fun findQuestionPhotoKeys(questionIds: List<Long>): Map<Long, List<String>> = findPhotoKeys(SpotQaPhotoOwner.QUESTION, questionIds)
+    override fun findQuestionPhotoKeys(questionIds: List<Long>): Map<Long, List<String>> = findPhotoKeys(SpotQaKind.QUESTION, questionIds)
 
-    override fun findAnswerPhotoKeys(answerIds: List<Long>): Map<Long, List<String>> = findPhotoKeys(SpotQaPhotoOwner.ANSWER, answerIds)
+    override fun findAnswerPhotoKeys(answerIds: List<Long>): Map<Long, List<String>> = findPhotoKeys(SpotQaKind.ANSWER, answerIds)
 
-    override fun findReplyPhotoKeys(replyIds: List<Long>): Map<Long, List<String>> = findPhotoKeys(SpotQaPhotoOwner.REPLY, replyIds)
+    override fun findReplyPhotoKeys(replyIds: List<Long>): Map<Long, List<String>> = findPhotoKeys(SpotQaKind.REPLY, replyIds)
 
     /** 첨부 순서대로. */
-    private fun findPhotoKeys(owner: SpotQaPhotoOwner, ownerIds: List<Long>): Map<Long, List<String>> {
+    private fun findPhotoKeys(kind: SpotQaKind, ownerIds: List<Long>): Map<Long, List<String>> {
         if (ownerIds.isEmpty()) return emptyMap()
         return SpotQaPhotoTable.select(SpotQaPhotoTable.ownerId, SpotQaPhotoTable.objectKey)
-            .where { (SpotQaPhotoTable.ownerType eq owner.name) and (SpotQaPhotoTable.ownerId inList ownerIds) }
+            .where { (SpotQaPhotoTable.ownerType eq kind.name) and (SpotQaPhotoTable.ownerId inList ownerIds) }
             .orderBy(SpotQaPhotoTable.position to SortOrder.ASC)
             .groupBy({ it[SpotQaPhotoTable.ownerId] }, { it[SpotQaPhotoTable.objectKey] })
     }

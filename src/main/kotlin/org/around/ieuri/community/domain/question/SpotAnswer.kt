@@ -11,4 +11,6 @@ data class SpotAnswer(
     val body: String,
     val hidden: Boolean,
     val deletedAt: Instant?,
-)
+) {
+    val kind: SpotQaKind = SpotQaKind.ANSWER
+}

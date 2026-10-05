@@ -17,6 +17,8 @@ data class SpotQuestion(
     val hidden: Boolean,
     val deletedAt: Instant?,
 ) {
+    val kind: SpotQaKind = SpotQaKind.QUESTION
+
     /** 작성자만 바꿀 수 있다. 이미 그 상태여도 성공이다(멱등). */
     fun resolve(memberId: Long, resolved: Boolean): SpotQuestion {
         requireAuthor(memberId)

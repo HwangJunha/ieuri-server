@@ -6,10 +6,12 @@ import org.around.ieuri.community.adapter.persistence.mapper.toSpotQuestion
 import org.around.ieuri.community.adapter.persistence.mapper.toTimestamptz
 import org.around.ieuri.community.adapter.persistence.table.SpotAnswerReplyTable
 import org.around.ieuri.community.adapter.persistence.table.SpotAnswerTable
+import org.around.ieuri.community.adapter.persistence.table.SpotQaPhotoTable
 import org.around.ieuri.community.adapter.persistence.table.SpotQuestionTable
 import org.around.ieuri.community.application.question.required.SpotQuestionRepository
 import org.around.ieuri.community.domain.question.SpotAnswer
 import org.around.ieuri.community.domain.question.SpotAnswerReply
+import org.around.ieuri.community.domain.question.SpotQaKind
 import org.around.ieuri.community.domain.question.SpotQuestion
 import org.around.ieuri.community.domain.shared.AttachedPhotos
 import org.jetbrains.exposed.v1.core.JoinType
@@ -21,6 +23,8 @@ import org.jetbrains.exposed.v1.core.isNull
 import org.jetbrains.exposed.v1.core.minus
 import org.jetbrains.exposed.v1.core.plus
 import org.jetbrains.exposed.v1.javatime.CurrentTimestampWithTimeZone
+import org.jetbrains.exposed.v1.jdbc.Query
+import org.jetbrains.exposed.v1.jdbc.batchInsert
 import org.jetbrains.exposed.v1.jdbc.deleteReturning
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insertReturning
@@ -70,7 +74,7 @@ class SpotQuestionPersistenceAdapter : SpotQuestionRepository {
             it[body] = question.body
             it[resolved] = question.resolved
         }.single()[SpotQuestionTable.id]
-        insertSpotQaPhotos(SpotQaPhotoOwner.QUESTION, questionId, photos)
+        insertPhotos(question.kind, questionId, photos)
         return questionId
     }
 
@@ -81,7 +85,7 @@ class SpotQuestionPersistenceAdapter : SpotQuestionRepository {
             it[authorId] = answer.authorId
             it[body] = answer.body
         }.single()[SpotAnswerTable.id]
-        insertSpotQaPhotos(SpotQaPhotoOwner.ANSWER, answerId, photos)
+        insertPhotos(answer.kind, answerId, photos)
         return answerId
     }
 
@@ -92,7 +96,7 @@ class SpotQuestionPersistenceAdapter : SpotQuestionRepository {
             it[authorId] = reply.authorId
             it[body] = reply.body
         }.single()[SpotAnswerReplyTable.id]
-        insertSpotQaPhotos(SpotQaPhotoOwner.REPLY, replyId, photos)
+        insertPhotos(reply.kind, replyId, photos)
         return replyId
     }
 
@@ -107,23 +111,23 @@ class SpotQuestionPersistenceAdapter : SpotQuestionRepository {
     override fun deleteWithDescendants(questionId: Long) {
         val answerIds = SpotAnswerTable.select(SpotAnswerTable.id).where { SpotAnswerTable.questionId eq questionId }
         val replyIds = SpotAnswerReplyTable.select(SpotAnswerReplyTable.id).where { SpotAnswerReplyTable.answerId inSubQuery answerIds }
-        deleteSpotQaPhotos(SpotQaPhotoOwner.REPLY, replyIds)
-        deleteSpotQaPhotos(SpotQaPhotoOwner.ANSWER, answerIds)
-        deleteSpotQaPhotos(SpotQaPhotoOwner.QUESTION, questionId)
+        deletePhotos(SpotQaKind.REPLY, replyIds)
+        deletePhotos(SpotQaKind.ANSWER, answerIds)
+        deletePhotos(SpotQaKind.QUESTION, questionId)
         SpotQuestionTable.deleteWhere { SpotQuestionTable.id eq questionId }
     }
 
     /** 순서 주의: 답글 → 답변 사진을 먼저 지운 뒤 답변을 지운다. 답글 행은 FK CASCADE가 따라 지운다. */
     override fun deleteAnswerWasCounted(answerId: Long): Boolean {
-        deleteSpotQaPhotos(SpotQaPhotoOwner.REPLY, SpotAnswerReplyTable.select(SpotAnswerReplyTable.id).where { SpotAnswerReplyTable.answerId eq answerId })
-        deleteSpotQaPhotos(SpotQaPhotoOwner.ANSWER, answerId)
+        deletePhotos(SpotQaKind.REPLY, SpotAnswerReplyTable.select(SpotAnswerReplyTable.id).where { SpotAnswerReplyTable.answerId eq answerId })
+        deletePhotos(SpotQaKind.ANSWER, answerId)
         return SpotAnswerTable.deleteReturning(listOf(SpotAnswerTable.hidden)) { SpotAnswerTable.id eq answerId }
             .singleOrNull()?.let { !it[SpotAnswerTable.hidden] } ?: false
     }
 
     /** 사진을 먼저 지운다(FK가 없다). */
     override fun deleteReply(replyId: Long) {
-        deleteSpotQaPhotos(SpotQaPhotoOwner.REPLY, replyId)
+        deletePhotos(SpotQaKind.REPLY, replyId)
         SpotAnswerReplyTable.deleteWhere { SpotAnswerReplyTable.id eq replyId }
     }
 
@@ -165,4 +169,23 @@ class SpotQuestionPersistenceAdapter : SpotQuestionRepository {
     override fun markRepliesDeletedByAuthor(authorId: Long, deletedAt: Instant): Int = SpotAnswerReplyTable.update({
         (SpotAnswerReplyTable.authorId eq authorId) and SpotAnswerReplyTable.deletedAt.isNull()
     }) { it[SpotAnswerReplyTable.deletedAt] = deletedAt.toTimestamptz() }
+
+    // 사진은 다형 참조(owner_type·owner_id)라 FK가 없다 — 주인을 지우기 전에 사진을 먼저 지운다.
+    private fun insertPhotos(kind: SpotQaKind, ownerId: Long, photos: AttachedPhotos) {
+        SpotQaPhotoTable.batchInsert(photos.keys.withIndex(), shouldReturnGeneratedValues = false) { (index, key) ->
+            this[SpotQaPhotoTable.ownerType] = kind.name
+            this[SpotQaPhotoTable.ownerId] = ownerId
+            this[SpotQaPhotoTable.objectKey] = key.value
+            this[SpotQaPhotoTable.position] = index.toShort()
+        }
+    }
+
+    private fun deletePhotos(kind: SpotQaKind, ownerId: Long) {
+        SpotQaPhotoTable.deleteWhere { (SpotQaPhotoTable.ownerType eq kind.name) and (SpotQaPhotoTable.ownerId eq ownerId) }
+    }
+
+    /** [ownerIds]는 주인 id 한 열을 고르는 서브쿼리다. */
+    private fun deletePhotos(kind: SpotQaKind, ownerIds: Query) {
+        SpotQaPhotoTable.deleteWhere { (SpotQaPhotoTable.ownerType eq kind.name) and (SpotQaPhotoTable.ownerId inSubQuery ownerIds) }
+    }
 }
