@@ -1,14 +1,14 @@
-package org.around.ieuri.community.application.photo
+package org.around.ieuri.community.application.shared
 
-import org.around.ieuri.community.application.photo.provided.PostImageUploadUseCase
-import org.around.ieuri.community.application.photo.provided.dto.ConfirmPostImageUploadsCommand
-import org.around.ieuri.community.application.photo.provided.dto.DeletePostImageCommand
-import org.around.ieuri.community.application.photo.provided.dto.IssuePostImageUploadUrlsCommand
 import org.around.ieuri.community.application.shared.CommunityPolicy
 import org.around.ieuri.community.application.shared.dto.PostImageConfirmFailure
 import org.around.ieuri.community.application.shared.dto.PostImageConfirmResult
 import org.around.ieuri.community.application.shared.dto.PostImageUploadUrlView
 import org.around.ieuri.community.application.shared.exception.UnsupportedContentTypeException
+import org.around.ieuri.community.application.shared.provided.PostImageUploadUseCase
+import org.around.ieuri.community.application.shared.provided.dto.ConfirmPostImageUploadsCommand
+import org.around.ieuri.community.application.shared.provided.dto.DeletePostImageCommand
+import org.around.ieuri.community.application.shared.provided.dto.IssuePostImageUploadUrlsCommand
 import org.around.ieuri.community.application.shared.required.ClockPort
 import org.around.ieuri.community.application.shared.required.ObjectStoragePort
 import org.around.ieuri.community.domain.shared.AttachedPhotos

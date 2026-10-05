@@ -1,10 +1,10 @@
-package org.around.ieuri.community.application.photo.provided
+package org.around.ieuri.community.application.shared.provided
 
-import org.around.ieuri.community.application.photo.provided.dto.ConfirmPostImageUploadsCommand
-import org.around.ieuri.community.application.photo.provided.dto.DeletePostImageCommand
-import org.around.ieuri.community.application.photo.provided.dto.IssuePostImageUploadUrlsCommand
 import org.around.ieuri.community.application.shared.dto.PostImageConfirmResult
 import org.around.ieuri.community.application.shared.dto.PostImageUploadUrlView
+import org.around.ieuri.community.application.shared.provided.dto.ConfirmPostImageUploadsCommand
+import org.around.ieuri.community.application.shared.provided.dto.DeletePostImageCommand
+import org.around.ieuri.community.application.shared.provided.dto.IssuePostImageUploadUrlsCommand
 
 /** 사진 업로드. 서버는 바이트를 중계하지 않고 URL 발급과 업로드 확인만 한다. */
 interface PostImageUploadUseCase {
