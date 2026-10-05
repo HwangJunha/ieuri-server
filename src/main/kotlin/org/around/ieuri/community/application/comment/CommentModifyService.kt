@@ -2,8 +2,8 @@ package org.around.ieuri.community.application.comment
 
 import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.community.application.comment.provided.CommentCommandUseCase
-import org.around.ieuri.community.application.comment.provided.CommentNotFoundException
 import org.around.ieuri.community.application.comment.provided.dto.CreateCommentCommand
+import org.around.ieuri.community.application.comment.provided.exception.CommentNotFoundException
 import org.around.ieuri.community.application.comment.required.CommentRepository
 import org.around.ieuri.community.application.post.provided.exception.PostNotFoundException
 import org.around.ieuri.community.application.post.required.PostRepository

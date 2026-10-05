@@ -31,12 +31,19 @@ class ConversationSubscriptionResolver(
         dfe: DgsDataFetchingEnvironment,
     ): Publisher<TypingEventView> = conversationQueryUseCase.typingIndicator(conversationId, liveMemberId(dfe))
 
-    /** 새 메시지. 끊긴 동안의 메시지는 클라이언트가 재연결 후 conversationMessages로 메꾼다. */
+    /**
+     * 새 메시지. 끊긴 동안의 메시지는 클라이언트가 재연결 후 conversationMessages로 메꾼다.
+     * - 이벤트마다 유스케이스를 거쳐 읽는다 — 그래야 읽기마다 트랜잭션이 열린다. 읽는 사이 사라진 메시지는 건너뛴다.
+     */
     @DgsSubscription
     fun newMessage(
         @InputArgument conversationId: Long,
         dfe: DgsDataFetchingEnvironment,
-    ): Publisher<MessageView> = conversationQueryUseCase.newMessage(conversationId, liveMemberId(dfe))
+    ): Publisher<MessageView> {
+        val memberId = liveMemberId(dfe)
+        return conversationQueryUseCase.newMessageIds(conversationId, memberId)
+            .mapNotNull { conversationQueryUseCase.message(conversationId, it, memberId) }
+    }
 
     /**
      * 구독을 열 자격이 있는 회원 id(SPEC-0032 R7).

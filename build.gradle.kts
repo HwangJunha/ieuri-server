@@ -39,9 +39,6 @@ dependencies {
     implementation("org.jetbrains.exposed:exposed-jdbc:${property("exposedVersion")}")
     implementation("org.jetbrains.exposed:exposed-java-time:${property("exposedVersion")}")
     implementation("org.jetbrains.exposed:spring7-transaction:${property("exposedVersion")}")
-    // 기동 시 스키마 검증(D-35).
-    implementation("org.jetbrains.exposed:exposed-migration-core:${property("exposedVersion")}")
-    implementation("org.jetbrains.exposed:exposed-migration-jdbc:${property("exposedVersion")}")
     // k8s 프로브용 health와 메트릭 노출. 노출 범위는 application.yaml의 management 블록이 정한다.
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     // 이 의존을 빼면 /actuator/prometheus가 404가 된다(management 설정과 무관하게).

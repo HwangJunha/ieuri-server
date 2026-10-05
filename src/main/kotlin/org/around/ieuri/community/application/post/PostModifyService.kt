@@ -50,15 +50,16 @@ class PostModifyService(
 
     /** null은 "건드리지 않는다"이고 빈 목록(전부 제거)과 다르다. 장소는 [EditPostCommand.changeSpot]이 true일 때만 바꾸며 null이면 뗀다. */
     override fun editPost(command: EditPostCommand, memberId: Long, language: ContentLanguage) {
-        val photoKeys = command.photoKeys?.let(photoVerifier::parse)
+        // 개수·소유·확정을 먼저 판정하고 R2 확인은 그 뒤에 한다 — 남의 키 존재를 응답으로 드러내지 않는다.
+        // 소유자는 수정자다(작성자만 수정할 수 있다).
+        val photos = command.photoKeys?.let { AttachedPhotos.of(photoVerifier.parse(it), memberId) }
         val tags = command.tags?.map(PostTag::parse)?.let(PostTags::of)
         val spot = if (command.changeSpot) command.catalogId?.let { findSpot(it, language) } else null
-        photoKeys?.let(photoVerifier::requireUploaded)
+        photos?.let { photoVerifier.requireUploaded(it.keys) }
 
         val post = postRepository.findById(command.postId) ?: throw PostNotFoundException()
 
         val edited = post.edit(memberId, command.title, command.body)
-        val photos = photoKeys?.let { AttachedPhotos.of(it, post.authorId) }
 
         // 읽은 뒤 신고 누적으로 숨겨졌다면 0건이다.
         if (!postRepository.updateContent(edited)) throw HiddenPostNotEditableException()

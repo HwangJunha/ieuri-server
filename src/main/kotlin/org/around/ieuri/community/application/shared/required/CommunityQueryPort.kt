@@ -48,9 +48,6 @@ interface CommunityQueryPort {
     /** [memberId]가 좋아요한 글의 id만. 차단은 이 판정에 영향을 주지 않는다. */
     fun findLikedPostIds(memberId: Long, postIds: List<Long>): Set<Long>
 
-    /** 갱신된 좋아요 수. 카운터를 원자적으로 올린 뒤 읽는다. 글이 없으면 null. */
-    fun findLikeCount(postId: Long): Int?
-
     /**
      * 여러 최상위 댓글의 대댓글을 한 번에. 오래된 순이며 페이지네이션이 없다.
      * 대댓글이 없는 댓글은 결과에 키가 없다.

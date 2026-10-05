@@ -21,12 +21,6 @@ interface ConversationQueryPort {
      * - [memberId]는 ownedByViewer 판정용이다. 참여자 검사는 구독 시작 시점에 끝났다.
      */
     fun findMessage(conversationId: Long, messageId: Long, memberId: Long): MessageView?
-
-    /** 대화별 안 읽은 메시지 수를 한 번에 센다. 결과에 없는 대화는 0건이며 자기 메시지는 세지 않는다. */
-    fun countUnreadOf(conversationIds: List<Long>, memberId: Long): Map<Long, Int>
-
-    /** 그 대화의 마지막 메시지 id. 메시지가 없으면 null이다. */
-    fun findLastMessageId(conversationId: Long): Long?
 }
 
 data class ConversationsSearch(

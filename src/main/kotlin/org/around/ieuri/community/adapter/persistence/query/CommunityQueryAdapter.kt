@@ -113,10 +113,6 @@ class CommunityQueryAdapter : CommunityQueryPort {
         return previews
     }
 
-    override fun findLikeCount(postId: Long): Int? = PostTable.select(PostTable.likeCount)
-        .where { PostTable.id eq postId }
-        .singleOrNull()?.get(PostTable.likeCount)
-
     /** 내가 쓴 글. [visibleToViewer]를 쓰지 않는다 — 숨김 글도 포함, 삭제된 글만 뺀다. */
     override fun findMyPosts(search: MyPostsSearch): CursorPage<PostView> {
         val cursor = search.after?.let(::decodeCursor)

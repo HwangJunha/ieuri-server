@@ -62,13 +62,13 @@ class SpotQuestionModifyService(
     }
 
     override fun createAnswer(command: CreateSpotAnswerCommand, memberId: Long): Long {
-        val photoKeys = photoVerifier.parse(command.photoKeys)
-        photoVerifier.requireUploaded(photoKeys)
+        // 개수·소유·확정을 먼저 판정하고 R2 확인은 그 뒤에 한다 — 남의 키 존재를 응답으로 드러내지 않는다.
+        val photos = AttachedPhotos.of(photoVerifier.parse(command.photoKeys), memberId)
+        photoVerifier.requireUploaded(photos.keys)
 
         val question = questionRepository.findById(command.questionId) ?: throw QuestionNotFoundException()
 
         val answer = question.answer(memberId, command.body)
-        val photos = AttachedPhotos.of(photoKeys, memberId)
 
         val answerId = questionRepository.insertAnswer(answer, photos)
         questionRepository.increaseAnswerCount(command.questionId)
@@ -98,8 +98,9 @@ class SpotQuestionModifyService(
     }
 
     override fun createReply(command: CreateSpotAnswerReplyCommand, memberId: Long): Long {
-        val photoKeys = photoVerifier.parse(command.photoKeys)
-        photoVerifier.requireUploaded(photoKeys)
+        // 개수·소유·확정을 먼저 판정하고 R2 확인은 그 뒤에 한다 — 남의 키 존재를 응답으로 드러내지 않는다.
+        val photos = AttachedPhotos.of(photoVerifier.parse(command.photoKeys), memberId)
+        photoVerifier.requireUploaded(photos.keys)
 
         // 답변과 답글은 id 공간이 달라, 답변이 없을 때만 같은 번호의 답글이 있는지로 오류를 고른다.
         val answer = questionRepository.findAnswer(command.parentAnswerId)
@@ -107,7 +108,6 @@ class SpotQuestionModifyService(
         val question = questionRepository.findById(answer.questionId) ?: throw QuestionNotFoundException()
 
         val reply = question.reply(answer, memberId, command.body)
-        val photos = AttachedPhotos.of(photoKeys, memberId)
 
         val replyId = questionRepository.insertReply(reply, photos)
 
