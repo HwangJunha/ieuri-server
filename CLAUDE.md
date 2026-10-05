@@ -305,6 +305,12 @@ Those rules are deleted in the final slice, not piecemeal.
   "untouched". The repository port takes domain objects; no transfer type is built just to reach it.
   Read-side children are field resolvers keyed by the parent id. Port implementations are
   `XxxPersistenceAdapter`.
+- **A root may hold its own children as a collection — only when the set is small and bounded.**
+  The JPA ban on `@OneToMany` existed for lazy-loading surprises and N+1; Exposed loads nothing
+  implicitly, so the remaining risk is size. An unbounded child set (messages, answers) is never held:
+  the child carries the root's id and is created only by a root factory method
+  (`conversation.send(...)`, `question.answer(...)` — Vernon's `planBacklogItem`). Never across
+  aggregates.
 - **Aggregate rules.** One aggregate changed per transaction; others via events. Counters (likes,
   comments, answers) are atomic increments in the repository, not aggregate state. An aggregate that
   can be changed concurrently carries a `version` column. External I/O (HTTP, Valkey, R2) runs
