@@ -17,8 +17,8 @@ import org.around.ieuri.community.application.shared.exception.MemberNotFoundExc
 import org.around.ieuri.community.application.shared.required.CommunityEventPublisherPort
 import org.around.ieuri.community.application.shared.required.MemberLookupPort
 import org.around.ieuri.community.domain.report.Report
-import org.around.ieuri.community.domain.report.ReportFiled
 import org.around.ieuri.community.domain.report.ReportTargetType
+import org.around.ieuri.community.domain.report.event.ReportFiled
 import org.around.ieuri.community.domain.shared.AlreadyReportedException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation

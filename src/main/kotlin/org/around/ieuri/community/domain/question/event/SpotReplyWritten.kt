@@ -1,4 +1,4 @@
-package org.around.ieuri.community.domain.question
+package org.around.ieuri.community.domain.question.event
 
 /** 내 답변에 답글이 달림 — 알림 트리거. 목적지는 그 답변이 속한 질문 상세다. 본문을 싣지 않고 id만 싣는다(POL-013). */
 data class SpotReplyWritten(

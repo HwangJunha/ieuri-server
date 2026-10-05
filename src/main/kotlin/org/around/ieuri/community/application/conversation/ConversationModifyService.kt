@@ -25,8 +25,8 @@ import org.around.ieuri.community.application.shared.required.ObjectStoragePort
 import org.around.ieuri.community.application.shared.required.SpotLookupPort
 import org.around.ieuri.community.domain.conversation.Conversation
 import org.around.ieuri.community.domain.conversation.Message
-import org.around.ieuri.community.domain.conversation.MessageSent
 import org.around.ieuri.community.domain.conversation.SpotQaOrigin
+import org.around.ieuri.community.domain.conversation.event.MessageSent
 import org.around.ieuri.community.domain.shared.ContentLanguage
 import org.around.ieuri.community.domain.shared.PhotoObjectKey
 import org.springframework.stereotype.Service

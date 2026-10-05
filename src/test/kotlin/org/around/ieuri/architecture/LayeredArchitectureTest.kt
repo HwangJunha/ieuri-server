@@ -82,8 +82,8 @@ class LayeredArchitectureTest {
     /**
      * 도메인 간 상호작용은 상대 도메인의 `port/in` 또는 발행된 도메인 이벤트로만 한다.
      * - `common..`: 공유 커널.
-     * - `..port.in..`·`..application.query..`: 호출하는 쪽은 `adapter.out.client`여야 한다.
-     * - `..domain.event..`: 구독하는 쪽은 `adapter.in.event`여야 한다(POL-028).
+     * - `..port.in..`·`..application..provided..`·`..application.query..`: 호출하는 쪽은 client 어댑터여야 한다.
+     * - `..domain..event..`(옛 `domain.event`, 새 `domain.<aggregate>.event`): 구독하는 쪽은 이벤트 어댑터여야 한다(POL-028).
      */
     @Test
     fun `도메인은 다른 도메인의 내부에 의존하지 않는다`() {
@@ -93,10 +93,10 @@ class LayeredArchitectureTest {
                 DescribedPredicate.alwaysTrue<JavaClass>(),
                 JavaClass.Predicates.resideInAPackage("org.around.ieuri.common.."),
             )
-            // 인바운드 포트 호출은 어댑터(infrastructure)에서만 허용한다.
+            // 인바운드 포트 호출은 어댑터(infrastructure)에서만 허용한다. 상대가 새 구조로 옮겼으면 그 포트는 `provided`에 있다.
             .ignoreDependency(
                 JavaClass.Predicates.resideInAPackage("..infrastructure.adapter.out.client.."),
-                JavaClass.Predicates.resideInAPackage("..application.port.in.."),
+                JavaClass.Predicates.resideInAnyPackage("..application.port.in..", "..application..provided.."),
             )
             // 인바운드 포트가 돌려주는 read DTO. 포트만 허용하고 반환 타입을 막으면 포트를 쓸 수 없다.
             .ignoreDependency(
@@ -104,18 +104,19 @@ class LayeredArchitectureTest {
                 JavaClass.Predicates.resideInAPackage("..application.query.."),
             )
             // 발행된 도메인 이벤트 구독은 인바운드 이벤트 어댑터에서만 허용한다.
+            // 이벤트는 옛 구조면 `domain.event`, 새 구조면 애그리게이트 안의 `domain.<aggregate>.event`에 있다.
             .ignoreDependency(
                 JavaClass.Predicates.resideInAPackage("..infrastructure.adapter.in.event.."),
-                JavaClass.Predicates.resideInAPackage("..domain.event.."),
+                JavaClass.Predicates.resideInAPackage("..domain..event.."),
             )
-            // 새 구조(SPEC-0039 D-47): `adapter.client` → 상대의 `provided`(포트·DTO), `adapter.event` → 상대의 `domain.event`.
+            // 새 구조(SPEC-0039 D-47): `adapter.client` → 상대의 `provided`(포트·DTO), `adapter.event` → 상대의 이벤트.
             .ignoreDependency(
                 JavaClass.Predicates.resideInAPackage("..adapter.client.."),
                 JavaClass.Predicates.resideInAnyPackage("..application..provided..", "..application.port.in..", "..application.query.."),
             )
             .ignoreDependency(
                 JavaClass.Predicates.resideInAPackage("..adapter.event.."),
-                JavaClass.Predicates.resideInAPackage("..domain.event.."),
+                JavaClass.Predicates.resideInAPackage("..domain..event.."),
             )
             .because("도메인 간 상호작용은 상대 도메인의 port/in 또는 발행된 도메인 이벤트로만 한다")
             .check(classes)

@@ -1,4 +1,4 @@
-package org.around.ieuri.community.domain.conversation
+package org.around.ieuri.community.domain.conversation.event
 
 /** DM 새 메시지 도착 알림 트리거. alarm이 구독한다. 본문을 싣지 않고 id만 싣는다(POL-013). */
 data class MessageSent(

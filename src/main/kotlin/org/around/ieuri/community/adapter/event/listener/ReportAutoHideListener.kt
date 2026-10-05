@@ -1,7 +1,7 @@
 package org.around.ieuri.community.adapter.event.listener
 
 import org.around.ieuri.community.application.report.provided.ReportAutoHideUseCase
-import org.around.ieuri.community.domain.report.ReportFiled
+import org.around.ieuri.community.domain.report.event.ReportFiled
 import org.springframework.stereotype.Component
 import org.springframework.transaction.event.TransactionPhase
 import org.springframework.transaction.event.TransactionalEventListener
