@@ -110,7 +110,7 @@ class ConversationQueryAdapter(
      * 내 읽음 지점 이후, 상대가 보낸, 지워지지 않은 메시지 수. 읽음 지점이 null이면 전부다. 0인 대화는 키가 없다.
      * - 목록과 같은 집합(지워지지 않은 메시지)을 센다 — 다르면 뱃지가 사라지지 않는다.
      */
-    override fun countUnreadOf(conversationIds: List<Long>, memberId: Long): Map<Long, Int> {
+    private fun countUnreadOf(conversationIds: List<Long>, memberId: Long): Map<Long, Int> {
         if (conversationIds.isEmpty()) return emptyMap()
         val count = MessageTable.id.count()
         return MessageTable
@@ -124,13 +124,6 @@ class ConversationQueryAdapter(
             }
             .groupBy(MessageTable.conversationId)
             .associate { it[MessageTable.conversationId] to it[count].toInt() }
-    }
-
-    override fun findLastMessageId(conversationId: Long): Long? {
-        val maxId = MessageTable.id.max()
-        return MessageTable.select(maxId)
-            .where { (MessageTable.conversationId eq conversationId) and MessageTable.deletedAt.isNull() }
-            .single()[maxId]
     }
 
     /** 대화별 최대 createdAt 행만 읽고(상관 서브쿼리), 동시각이면 id가 큰 쪽을 취한다. */
