@@ -3,8 +3,8 @@ package org.around.ieuri.community.adapter.event.listener
 import org.around.ieuri.community.application.catalog.provided.SpotCatalogSyncUseCase
 import org.around.ieuri.community.domain.catalog.CatalogLanguage
 import org.around.ieuri.community.domain.shared.ContentLanguage
-import org.around.ieuri.tourism.domain.event.CatalogLanguageRef
-import org.around.ieuri.tourism.domain.event.SpotCatalogLanguagesChanged
+import org.around.ieuri.tourism.domain.catalog.event.CatalogLanguageRef
+import org.around.ieuri.tourism.domain.catalog.event.SpotCatalogLanguagesChanged
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import org.springframework.transaction.event.TransactionPhase

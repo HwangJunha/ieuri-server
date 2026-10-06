@@ -5,7 +5,7 @@ import org.around.ieuri.community.adapter.client.mapper.toChipViewOrNull
 import org.around.ieuri.community.application.shared.dto.CommunityChipView
 import org.around.ieuri.community.application.shared.required.CategoryConfigPort
 import org.around.ieuri.community.domain.shared.ContentLanguage
-import org.around.ieuri.tourism.application.port.`in`.query.SpotQueryUseCase
+import org.around.ieuri.tourism.application.shared.provided.SpotQueryUseCase
 import org.springframework.stereotype.Component
 
 /** tourism의 인바운드 포트로 앱별 카테고리 구성(`app_category`)을 조회한다(SPEC-0020). */

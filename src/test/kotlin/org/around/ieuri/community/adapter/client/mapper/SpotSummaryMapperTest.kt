@@ -1,7 +1,7 @@
 package org.around.ieuri.community.adapter.client.mapper
 
 import org.around.ieuri.community.domain.shared.TargetCategory
-import org.around.ieuri.tourism.application.query.SpotSummaryView
+import org.around.ieuri.tourism.application.shared.provided.dto.SpotSummaryView
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull

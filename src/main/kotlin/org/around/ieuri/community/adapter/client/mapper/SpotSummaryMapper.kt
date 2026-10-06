@@ -2,7 +2,7 @@ package org.around.ieuri.community.adapter.client.mapper
 
 import org.around.ieuri.community.application.shared.dto.PostSpotView
 import org.around.ieuri.community.domain.shared.TargetCategory
-import org.around.ieuri.tourism.application.query.SpotSummaryView
+import org.around.ieuri.tourism.application.shared.provided.dto.SpotSummaryView
 
 /**
  * tourism 응답 → 커뮤니티 read DTO 변환(POL-033).

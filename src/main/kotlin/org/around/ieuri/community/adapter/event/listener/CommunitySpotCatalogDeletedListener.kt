@@ -1,7 +1,7 @@
 package org.around.ieuri.community.adapter.event.listener
 
 import org.around.ieuri.community.application.catalog.provided.SpotCatalogSyncUseCase
-import org.around.ieuri.tourism.domain.event.SpotCatalogDeleted
+import org.around.ieuri.tourism.domain.catalog.event.SpotCatalogDeleted
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import org.springframework.transaction.event.TransactionPhase

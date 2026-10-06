@@ -4,7 +4,7 @@ import org.around.ieuri.community.adapter.client.mapper.toPostSpotView
 import org.around.ieuri.community.application.shared.dto.PostSpotView
 import org.around.ieuri.community.application.shared.required.SpotLookupPort
 import org.around.ieuri.community.domain.shared.ContentLanguage
-import org.around.ieuri.tourism.application.port.`in`.query.SpotQueryUseCase
+import org.around.ieuri.tourism.application.shared.provided.SpotQueryUseCase
 import org.springframework.stereotype.Component
 
 /**

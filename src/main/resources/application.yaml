@@ -242,7 +242,7 @@ ieuri:
     connect-timeout-millis: 5000
     read-timeout-millis: 10000
   # 한국관광공사 빅데이터 4종(SPEC-0015). 키가 비어 있어도 기동은 된다 — 배치 경로에서만 쓴다.
-  tour-stats:
+  kto-big-data:
     # TourAPI와 같은 data.go.kr 계정 키다. 별도 키를 발급하면 여기만 바꾼다.
     service-key: ${IEURI_KTO_BIGDATA_API_KEY:${IEURI_TOUR_API_KEY_ENCODING:}}
     base-urls:

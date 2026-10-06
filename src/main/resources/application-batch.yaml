@@ -46,7 +46,7 @@ ieuri:
   # 한국관광공사 관광통계 4종(SPEC-0015). 갱신 주기가 갈려 잡을 나눴다 — 묶으면 월 단위가 매일 헛돈다.
   #   tourStatsVisitorCountSyncJob · tourStatsConcentrationRateSyncJob        매일
   #   tourStatsStayIntensitySyncJob · tourStatsSpendingIntensitySyncJob       매월 17일 이후
-  tour-stats:
+  region-metric:
     sync:
       # 월 지표의 기준월 탐색 창(개월). 이번 달부터 거슬러 올라가며 데이터가 있는 첫 달을 쓴다.
       # 창 안에 데이터가 없으면 0건 적재로 정상 종료한다. 월은 실행당 한 번만 정한다.
@@ -66,4 +66,4 @@ ieuri:
 logging:
   level:
     org.springframework.batch: INFO
-    org.around.ieuri.tourism.infrastructure.batch: INFO
+    org.around.ieuri.tourism.adapter.batch: INFO
