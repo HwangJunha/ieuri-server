@@ -1,7 +1,7 @@
 package org.around.ieuri.tourism.application.footprint
 
 import org.around.ieuri.common.persistence.ExposedConfig
-import org.around.ieuri.tourism.application.footprint.NationwideMapPolicy
+import org.around.ieuri.tourism.application.footprint.FootprintPolicy
 import org.around.ieuri.tourism.application.footprint.provided.FootprintCommandUseCase
 import org.around.ieuri.tourism.application.footprint.provided.dto.MapShareLinkView
 import org.around.ieuri.tourism.application.footprint.provided.dto.RecordVisitsCommand
@@ -28,7 +28,7 @@ class FootprintModifyService(
     private val footprintQueryPort: FootprintQueryPort,
     private val mapCellQueryPort: MapCellQueryPort,
     private val mapCellDistrictQueryPort: MapCellDistrictQueryPort,
-    private val policy: NationwideMapPolicy,
+    private val policy: FootprintPolicy,
 ) : FootprintCommandUseCase {
 
     /** 없는 코드는 버리지 않고 DISTRICT_NOT_FOUND의 근거로 돌려준다. 이번 요청으로 방문이 된 칸만 돌려준다. */

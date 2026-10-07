@@ -1,10 +1,9 @@
 package org.around.ieuri.tourism.application.recommendation
 
 import org.around.ieuri.common.persistence.ExposedConfig
-import org.around.ieuri.tourism.application.catalog.MapViewportPolicy
-import org.around.ieuri.tourism.application.catalog.boundsOf
 import org.around.ieuri.tourism.application.catalog.provided.dto.MapSpotView
 import org.around.ieuri.tourism.application.catalog.provided.exception.BboxTooLargeException
+import org.around.ieuri.tourism.application.catalog.provided.exception.InvalidBboxException
 import org.around.ieuri.tourism.application.catalog.required.MapCandidateSearch
 import org.around.ieuri.tourism.application.catalog.required.MapCandidateView
 import org.around.ieuri.tourism.application.catalog.required.MapQueryPort
@@ -18,6 +17,7 @@ import org.around.ieuri.tourism.domain.recommendation.RankedSpot
 import org.around.ieuri.tourism.domain.recommendation.ScoreReaction
 import org.around.ieuri.tourism.domain.recommendation.TasteNormalization
 import org.around.ieuri.tourism.domain.shared.DomainLocale
+import org.around.ieuri.tourism.domain.shared.MapBounds
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -34,7 +34,7 @@ class MapRecommendationService(
     private val mapQueryPort: MapQueryPort,
     private val spotQueryPort: SpotQueryPort,
     private val tasteSimilarityQueryPort: TasteSimilarityQueryPort,
-    private val viewportPolicy: MapViewportPolicy,
+    private val policy: MapRecommendationPolicy,
     private val recommendationPolicy: RecommendationPolicy,
 ) : MapRecommendationUseCase {
 
@@ -47,10 +47,10 @@ class MapRecommendationService(
     ): List<MapSpotView> {
         // 원시 좌표 → 도메인 VO. 범위·뒤집힘 실패는 INVALID_BBOX로 번역된다.
         val bounds = boundsOf(query.minLat, query.minLng, query.maxLat, query.maxLng)
-        if (bounds.areaInSquareDegrees > viewportPolicy.maxAreaInSquareDegrees) {
+        if (bounds.areaInSquareDegrees > policy.maxAreaInSquareDegrees) {
             throw BboxTooLargeException("지도를 확대해 주세요.")
         }
-        val first = query.first.coerceIn(1, viewportPolicy.maxRecommendationSize)
+        val first = query.first.coerceIn(1, policy.maxSize)
 
         // 반응은 활성 언어 단위로 읽으며, 제외가 아니라 점수 배율과 취향의 재료로만 쓴다(D-13).
         val reactions = spotQueryPort.findReactedSpotIdsByReaction(memberId, locale)
@@ -64,7 +64,7 @@ class MapRecommendationService(
                 categories = query.categories,
                 // 제외는 클라이언트가 이미 그린 마커뿐이다.
                 excludedSpotIds = query.excludedSpotIds,
-                limit = viewportPolicy.recommendationCandidateCap,
+                limit = policy.candidateCap,
             ),
         )
         val taste = tasteOf(liked, disliked, candidates, locale)
@@ -145,4 +145,8 @@ class MapRecommendationService(
         lng = lng,
         lat = lat,
     )
+
+    /** 뷰포트 사각형을 만든다. [MapBounds]의 불변식 위반은 INVALID_BBOX로 번역한다. */
+    private fun boundsOf(minLat: Double, minLng: Double, maxLat: Double, maxLng: Double): MapBounds = MapBounds.ofOrNull(minLat = minLat, minLng = minLng, maxLat = maxLat, maxLng = maxLng)
+        ?: throw InvalidBboxException()
 }

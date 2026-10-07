@@ -3,7 +3,6 @@ package org.around.ieuri.tourism.application.relation
 import org.around.ieuri.common.pagination.CursorEdge
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.persistence.ExposedConfig
-import org.around.ieuri.tourism.application.footprint.NationwideMapPolicy
 import org.around.ieuri.tourism.application.footprint.required.MapOwnerLookupPort
 import org.around.ieuri.tourism.application.relation.provided.MapRelationQueryUseCase
 import org.around.ieuri.tourism.application.relation.provided.dto.MapRelationView
@@ -18,7 +17,7 @@ import org.springframework.transaction.annotation.Transactional
 class MapRelationQueryService(
     private val mapRelationQueryPort: MapRelationQueryPort,
     private val mapOwnerLookupPort: MapOwnerLookupPort,
-    private val policy: NationwideMapPolicy,
+    private val policy: MapRelationPolicy,
 ) : MapRelationQueryUseCase {
 
     /**
@@ -27,7 +26,7 @@ class MapRelationQueryService(
      * - 페이지 경계(hasNextPage·endCursor)는 거르기 전의 읽어 온 행으로 정한다.
      */
     override fun mapRelations(query: MapRelationsQuery, memberId: Long): CursorPage<MapRelationView> {
-        val first = query.first.coerceIn(1, policy.maxRelationPageSize)
+        val first = query.first.coerceIn(1, policy.maxPageSize)
         val page = mapRelationQueryPort.findRelations(memberId, first, query.after)
 
         val nicknames = mapOwnerLookupPort.findNicknames(page.edges.map { it.node.counterpartId })

@@ -6,7 +6,6 @@ import io.mockk.verify
 import org.around.ieuri.common.pagination.CursorEdge
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.CursorPageInfo
-import org.around.ieuri.tourism.application.footprint.NationwideMapPolicy
 import org.around.ieuri.tourism.application.footprint.required.MapOwnerLookupPort
 import org.around.ieuri.tourism.application.relation.provided.dto.MapRelationsQuery
 import org.around.ieuri.tourism.application.relation.required.MapRelationOverlap
@@ -24,7 +23,7 @@ class MapRelationQueryServiceTest {
     private val service = MapRelationQueryService(
         mapRelationQueryPort = relationQueryPort,
         mapOwnerLookupPort = ownerLookupPort,
-        policy = NationwideMapPolicy(maxCellSpotPageSize = 50, shareUrlBase = "https://www.ieuri.co.kr/tour/korea-map", maxRelationPageSize = 50),
+        policy = MapRelationPolicy(maxPageSize = 50),
     )
 
     @Test

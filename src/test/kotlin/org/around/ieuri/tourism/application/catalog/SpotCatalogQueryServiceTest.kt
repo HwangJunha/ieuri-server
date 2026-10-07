@@ -69,8 +69,6 @@ class SpotCatalogQueryServiceTest {
         maxAreaInSquareDegrees = 4.0,
         maxSpotMarkers = 3,
         maxEventMarkers = 2,
-        recommendationCandidateCap = 2_000,
-        maxRecommendationSize = 100,
     )
     private val eventPublisher = mockk<CatalogEventPublisherPort>(relaxed = true)
     private val service = SpotCatalogQueryService(

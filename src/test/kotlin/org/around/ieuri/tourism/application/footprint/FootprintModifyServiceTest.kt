@@ -3,7 +3,7 @@ package org.around.ieuri.tourism.application.footprint
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import org.around.ieuri.tourism.application.footprint.NationwideMapPolicy
+import org.around.ieuri.tourism.application.footprint.FootprintPolicy
 import org.around.ieuri.tourism.application.footprint.provided.dto.RecordVisitsCommand
 import org.around.ieuri.tourism.application.footprint.provided.dto.RemoveVisitCommand
 import org.around.ieuri.tourism.application.footprint.required.FootprintQueryPort
@@ -35,7 +35,7 @@ class FootprintModifyServiceTest {
         queryPort,
         mapCellQueryPort,
         mapCellDistrictQueryPort,
-        NationwideMapPolicy(maxCellSpotPageSize = 50, shareUrlBase = "https://www.ieuri.co.kr/tour/korea-map", maxRelationPageSize = 50),
+        FootprintPolicy(maxCellSpotPageSize = 50, shareUrlBase = "https://www.ieuri.co.kr/tour/korea-map"),
     )
 
     private val issued = ShareLink("already-issued", Instant.parse("2026-08-01T00:00:00Z"))

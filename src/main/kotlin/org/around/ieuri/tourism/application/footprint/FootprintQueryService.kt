@@ -1,7 +1,7 @@
 package org.around.ieuri.tourism.application.footprint
 
 import org.around.ieuri.common.persistence.ExposedConfig
-import org.around.ieuri.tourism.application.footprint.NationwideMapPolicy
+import org.around.ieuri.tourism.application.footprint.FootprintPolicy
 import org.around.ieuri.tourism.application.footprint.provided.FootprintQueryUseCase
 import org.around.ieuri.tourism.application.footprint.provided.dto.CellImageView
 import org.around.ieuri.tourism.application.footprint.provided.dto.CellSpotView
@@ -32,7 +32,7 @@ class FootprintQueryService(
     private val cellImageQueryPort: CellImageQueryPort,
     private val mapOwnerLookupPort: MapOwnerLookupPort,
     private val mapViewerBlockPort: MapViewerBlockPort,
-    private val policy: NationwideMapPolicy,
+    private val policy: FootprintPolicy,
 ) : FootprintQueryUseCase {
 
     override fun mapCells(locale: DomainLocale, memberId: Long?): List<MapCellView> {

@@ -14,8 +14,6 @@ import org.around.ieuri.tourism.application.catalog.provided.dto.SearchSpotsQuer
 import org.around.ieuri.tourism.application.catalog.provided.dto.SearchUserError
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotSearchResultView
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotSuggestionView
-import org.around.ieuri.tourism.application.catalog.provided.exception.InvalidCoordinatesException
-import org.around.ieuri.tourism.application.catalog.provided.exception.RadiusTooLargeException
 import org.around.ieuri.tourism.application.catalog.required.CatalogEventPublisherPort
 import org.around.ieuri.tourism.application.catalog.required.FestivalQueryPort
 import org.around.ieuri.tourism.application.catalog.required.OngoingFestivalSearch
@@ -23,7 +21,6 @@ import org.around.ieuri.tourism.application.catalog.required.PopularSpotQueryPor
 import org.around.ieuri.tourism.application.catalog.required.PopularSpotSearch
 import org.around.ieuri.tourism.application.catalog.required.SpotSearchPort
 import org.around.ieuri.tourism.application.catalog.required.SpotSearchQuery
-import org.around.ieuri.tourism.domain.shared.Coordinates
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -54,8 +51,8 @@ class SpotDiscoveryService(
      */
     override fun searchSpots(query: SearchSpotsQuery, locale: DomainLocale, memberId: Long?): SpotSearchResultView {
         auditLocationAccess(memberId, "searchSpots")
-        val center = validatedCenter(query.latitude, query.longitude)
-        validateRadius(query.radiusMeters)
+        val center = coordinatesOf(query.latitude, query.longitude)
+        requireRadiusWithin(query.radiusMeters, policy.maxRadiusMeters)
 
         val text = query.query.trim()
         val page = query.page.coerceAtLeast(1)
@@ -94,8 +91,8 @@ class SpotDiscoveryService(
         memberId: Long?,
     ): List<SpotSuggestionView> {
         auditLocationAccess(memberId, "spotSearchSuggestions")
-        val center = validatedCenter(latitude, longitude)
-        validateRadius(radiusMeters)
+        val center = coordinatesOf(latitude, longitude)
+        requireRadiusWithin(radiusMeters, policy.maxRadiusMeters)
 
         val prefix = query.trim()
         if (prefix.isEmpty()) return emptyList()
@@ -119,8 +116,8 @@ class SpotDiscoveryService(
         memberId: Long?,
     ): CursorPage<FestivalView> {
         auditLocationAccess(memberId, "ongoingFestivals")
-        val center = validatedCenter(query.latitude, query.longitude)
-        validateRadius(query.radiusMeters)
+        val center = coordinatesOf(query.latitude, query.longitude)
+        requireRadiusWithin(query.radiusMeters, policy.maxRadiusMeters)
 
         val first = query.first.coerceIn(1, policy.maxSearchPageSize)
         val search = OngoingFestivalSearch(
@@ -142,8 +139,8 @@ class SpotDiscoveryService(
         memberId: Long?,
     ): CursorPage<PopularSpotView> {
         auditLocationAccess(memberId, "popularSpots")
-        val center = validatedCenter(query.latitude, query.longitude)
-        validateRadius(query.radiusMeters)
+        val center = coordinatesOf(query.latitude, query.longitude)
+        requireRadiusWithin(query.radiusMeters, policy.maxRadiusMeters)
 
         val first = query.first.coerceIn(1, policy.maxSearchPageSize)
         val search = PopularSpotSearch(
@@ -186,19 +183,6 @@ class SpotDiscoveryService(
             )
 
         else -> null
-    }
-
-    private fun validatedCenter(latitude: Double, longitude: Double): Coordinates = try {
-        Coordinates(latitude, longitude)
-    } catch (e: IllegalArgumentException) {
-        throw InvalidCoordinatesException(e.message ?: "유효하지 않은 좌표입니다.")
-    }
-
-    private fun validateRadius(radiusMeters: Int) {
-        if (radiusMeters <= 0) throw InvalidCoordinatesException("반경은 양수여야 합니다.")
-        if (radiusMeters > policy.maxRadiusMeters) {
-            throw RadiusTooLargeException("반경은 최대 ${policy.maxRadiusMeters}m까지 허용됩니다.")
-        }
     }
 
     private companion object {

@@ -4,7 +4,6 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
-import org.around.ieuri.tourism.application.catalog.MapViewportPolicy
 import org.around.ieuri.tourism.application.catalog.provided.exception.BboxTooLargeException
 import org.around.ieuri.tourism.application.catalog.provided.exception.InvalidBboxException
 import org.around.ieuri.tourism.application.catalog.required.MapCandidateSearch
@@ -33,14 +32,10 @@ class MapRecommendationServiceTest {
     private val spotQueryPort = mockk<SpotQueryPort>()
     private val tasteSimilarityQueryPort = mockk<TasteSimilarityQueryPort>()
 
-    private val viewportPolicy = MapViewportPolicy(
-        minZoom = 1,
-        maxZoom = 14,
+    private val mapPolicy = MapRecommendationPolicy(
         maxAreaInSquareDegrees = 4.0,
-        maxSpotMarkers = 500,
-        maxEventMarkers = 200,
-        recommendationCandidateCap = 2_000,
-        maxRecommendationSize = 100,
+        candidateCap = 2_000,
+        maxSize = 100,
     )
     private val recommendationPolicy = RecommendationPolicy(
         score = RecommendationScore(
@@ -60,7 +55,7 @@ class MapRecommendationServiceTest {
         mapQueryPort,
         spotQueryPort,
         tasteSimilarityQueryPort,
-        viewportPolicy,
+        mapPolicy,
         recommendationPolicy,
     )
 

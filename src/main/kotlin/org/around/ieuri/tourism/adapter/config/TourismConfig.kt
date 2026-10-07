@@ -11,11 +11,13 @@ import org.around.ieuri.tourism.adapter.batch.SpotSyncProperties
 import org.around.ieuri.tourism.application.catalog.MapViewportPolicy
 import org.around.ieuri.tourism.application.catalog.SpotQueryPolicy
 import org.around.ieuri.tourism.application.congestion.SeoulOpenDataPolicy
-import org.around.ieuri.tourism.application.footprint.NationwideMapPolicy
+import org.around.ieuri.tourism.application.footprint.FootprintPolicy
 import org.around.ieuri.tourism.application.recommendation.EmbeddingSpec
+import org.around.ieuri.tourism.application.recommendation.MapRecommendationPolicy
 import org.around.ieuri.tourism.application.recommendation.RecommendationPolicy
 import org.around.ieuri.tourism.application.region.RegionMetricSyncPolicy
 import org.around.ieuri.tourism.application.region.RegionRecommendationPolicy
+import org.around.ieuri.tourism.application.relation.MapRelationPolicy
 import org.around.ieuri.tourism.domain.recommendation.CategoryDiversity
 import org.around.ieuri.tourism.domain.recommendation.RecommendationScore
 import org.around.ieuri.tourism.domain.region.DistanceScoring
@@ -138,11 +140,13 @@ class TourismConfig {
     }
 
     @Bean
-    fun nationwideMapPolicy(properties: NationwideMapProperties): NationwideMapPolicy = NationwideMapPolicy(
+    fun footprintPolicy(properties: NationwideMapProperties): FootprintPolicy = FootprintPolicy(
         maxCellSpotPageSize = properties.maxCellSpotPageSize,
         shareUrlBase = properties.shareUrlBase,
-        maxRelationPageSize = properties.maxRelationPageSize,
     )
+
+    @Bean
+    fun mapRelationPolicy(properties: NationwideMapProperties): MapRelationPolicy = MapRelationPolicy(maxPageSize = properties.maxRelationPageSize)
 
     @Bean
     fun mapViewportPolicy(properties: MapViewportProperties): MapViewportPolicy = MapViewportPolicy(
@@ -151,8 +155,14 @@ class TourismConfig {
         maxAreaInSquareDegrees = properties.maxAreaSquareDegrees,
         maxSpotMarkers = properties.maxSpotMarkers,
         maxEventMarkers = properties.maxEventMarkers,
-        recommendationCandidateCap = properties.recommendationCandidateCap,
-        maxRecommendationSize = properties.maxRecommendationSize,
+    )
+
+    /** 지도 영역 추천 정책. 뷰포트와 같은 설정 묶음(`map-viewport`)에서 읽는다 — 설정 키는 바꾸지 않는다. */
+    @Bean
+    fun mapRecommendationPolicy(properties: MapViewportProperties): MapRecommendationPolicy = MapRecommendationPolicy(
+        maxAreaInSquareDegrees = properties.maxAreaSquareDegrees,
+        candidateCap = properties.recommendationCandidateCap,
+        maxSize = properties.maxRecommendationSize,
     )
 
     @Bean
