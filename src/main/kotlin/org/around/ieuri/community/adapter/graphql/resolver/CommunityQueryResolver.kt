@@ -8,7 +8,6 @@ import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.common.event.LocationAccessed
 import org.around.ieuri.common.graphql.appKey
 import org.around.ieuri.common.graphql.loader
-import org.around.ieuri.common.pagination.CursorPageInfo
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.community.adapter.graphql.connection.CommentConnection
 import org.around.ieuri.community.adapter.graphql.connection.CommentEdge
@@ -47,7 +46,6 @@ import org.springframework.stereotype.Component
 import java.util.concurrent.CompletableFuture
 import org.around.ieuri.common.graphql.generated.types.BlockedUserConnection as GqlBlockedUserConnection
 import org.around.ieuri.common.graphql.generated.types.BlockedUserEdge as GqlBlockedUserEdge
-import org.around.ieuri.common.graphql.generated.types.PageInfo as GqlPageInfo
 import org.around.ieuri.common.graphql.generated.types.PostAuthor as GqlPostAuthor
 import org.around.ieuri.common.graphql.generated.types.PostSortOrder as GqlPostSortOrder
 import org.around.ieuri.common.graphql.generated.types.PostSpot as GqlPostSpot

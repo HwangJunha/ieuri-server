@@ -6,7 +6,6 @@ import org.around.ieuri.auth.application.command.IssueProfileImageUploadUrlComma
 import org.around.ieuri.auth.application.command.RemoveProfileImageCommand
 import org.around.ieuri.auth.application.exception.ImageTooLargeException
 import org.around.ieuri.auth.application.exception.InvalidNicknameException
-import org.around.ieuri.auth.application.exception.MemberNotFoundException
 import org.around.ieuri.auth.application.exception.ObjectKeyNotFoundException
 import org.around.ieuri.auth.application.exception.PhotoNotUploadedException
 import org.around.ieuri.auth.application.exception.UnsupportedImageTypeException

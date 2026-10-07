@@ -2,7 +2,6 @@ package org.around.ieuri.community.adapter.persistence.query
 
 import org.around.ieuri.common.pagination.CursorEdge
 import org.around.ieuri.common.pagination.CursorPage
-import org.around.ieuri.common.pagination.cursorPageOf
 import org.around.ieuri.community.adapter.persistence.mapper.toCommentView
 import org.around.ieuri.community.adapter.persistence.mapper.toPostView
 import org.around.ieuri.community.adapter.persistence.table.BlockTable

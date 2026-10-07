@@ -7,7 +7,6 @@ import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.common.graphql.appKey
 import org.around.ieuri.common.graphql.tokenPresentation
-import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.tourism.adapter.graphql.dataloader.CategoryDisplayDataLoader
 import org.around.ieuri.tourism.adapter.graphql.mapper.toCategorySelection

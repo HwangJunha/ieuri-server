@@ -2,7 +2,6 @@ package org.around.ieuri.tourism.domain.catalog
 
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class SpotReactionTest {

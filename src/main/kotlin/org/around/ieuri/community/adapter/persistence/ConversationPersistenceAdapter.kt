@@ -14,7 +14,6 @@ import org.around.ieuri.community.application.conversation.provided.dto.ExpiredM
 import org.around.ieuri.community.application.conversation.required.ConversationRepository
 import org.around.ieuri.community.domain.conversation.Conversation
 import org.around.ieuri.community.domain.conversation.Message
-import org.around.ieuri.community.domain.conversation.SpotQaOrigin
 import org.jetbrains.exposed.v1.core.Column
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq

@@ -1,7 +1,6 @@
 package org.around.ieuri.tourism.adapter.config
 
 import org.springframework.boot.context.properties.ConfigurationProperties
-import java.time.Duration
 
 /**
  * TourAPI 접근 설정. serviceKey는 4개 언어 공용이며 환경변수로만 주입한다(응답·로그·GraphQL 노출 금지).

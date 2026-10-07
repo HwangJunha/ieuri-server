@@ -7,7 +7,6 @@ import io.mockk.verify
 import org.around.ieuri.alarm.application.command.DeleteDeviceTokenCommand
 import org.around.ieuri.alarm.application.command.RegisterDeviceTokenCommand
 import org.around.ieuri.alarm.application.port.out.persistence.DeviceTokenRepositoryPort
-import org.around.ieuri.alarm.application.port.out.persistence.NotificationPreferenceRepositoryPort
 import org.around.ieuri.alarm.domain.aggregate.DeviceToken
 import org.around.ieuri.alarm.domain.vo.AlarmLocale
 import org.around.ieuri.alarm.domain.vo.DevicePlatform

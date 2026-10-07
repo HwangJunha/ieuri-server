@@ -1,6 +1,5 @@
 package org.around.ieuri.community.application.shared.dto
 
-import org.around.ieuri.community.domain.post.PostTag
 import org.around.ieuri.community.domain.shared.PostSortOrder
 import org.around.ieuri.community.domain.shared.TargetCategory
 import java.time.Instant

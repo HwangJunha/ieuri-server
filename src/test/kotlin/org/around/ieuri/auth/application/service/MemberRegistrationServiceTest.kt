@@ -22,7 +22,6 @@ import org.around.ieuri.auth.application.exception.NotEmailMemberException
 import org.around.ieuri.auth.application.exception.PasswordPolicyViolationException
 import org.around.ieuri.auth.application.exception.ResendCooldownActiveException
 import org.around.ieuri.auth.application.exception.VerificationNotFoundException
-import org.around.ieuri.auth.application.exception.VerificationRateLimitedException
 import org.around.ieuri.auth.application.policy.VerificationPolicy
 import org.around.ieuri.auth.application.port.out.client.SnsIdentity
 import org.around.ieuri.auth.application.port.out.client.SnsIdentityVerifierPort
@@ -31,7 +30,6 @@ import org.around.ieuri.auth.application.port.out.event.DomainEventPublisherPort
 import org.around.ieuri.auth.application.port.out.persistence.AuditLogPort
 import org.around.ieuri.auth.application.port.out.persistence.EmailAuthentication
 import org.around.ieuri.auth.application.port.out.persistence.EmailVerificationRepositoryPort
-import org.around.ieuri.auth.application.port.out.persistence.MemberProfileRepositoryPort
 import org.around.ieuri.auth.application.port.out.persistence.MemberRepositoryPort
 import org.around.ieuri.auth.application.port.out.persistence.PasswordResetRepositoryPort
 import org.around.ieuri.auth.application.port.out.persistence.RoleRepositoryPort
@@ -46,7 +44,6 @@ import org.around.ieuri.auth.domain.aggregate.EmailVerification
 import org.around.ieuri.auth.domain.aggregate.Member
 import org.around.ieuri.auth.domain.aggregate.PasswordReset
 import org.around.ieuri.auth.domain.event.EmailVerified
-import org.around.ieuri.auth.domain.event.MemberRegistered
 import org.around.ieuri.auth.domain.strategy.NicknameGenerator
 import org.around.ieuri.auth.domain.vo.Email
 import org.around.ieuri.auth.domain.vo.MemberStatus

@@ -1,12 +1,9 @@
 package org.around.ieuri.community.application.shared.required
 
-import org.around.ieuri.common.context.AppKey
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.community.application.shared.dto.BlockedUserView
 import org.around.ieuri.community.application.shared.dto.CommentView
-import org.around.ieuri.community.application.shared.dto.CommunityChipView
 import org.around.ieuri.community.application.shared.dto.PostView
-import org.around.ieuri.community.domain.post.PostTag
 import org.around.ieuri.community.domain.shared.ContentLanguage
 import org.around.ieuri.community.domain.shared.PostSortOrder
 import org.around.ieuri.community.domain.shared.TargetCategory

@@ -20,7 +20,6 @@ import org.around.ieuri.community.adapter.graphql.support.contentLanguage
 import org.around.ieuri.community.adapter.graphql.support.withCommunityUserErrors
 import org.around.ieuri.community.application.conversation.provided.ConversationCommandUseCase
 import org.around.ieuri.community.application.conversation.provided.dto.NotifyTypingCommand
-import org.around.ieuri.community.application.conversation.provided.dto.StartConversationCommand
 import org.around.ieuri.community.application.messagereport.provided.MessageReportCommandUseCase
 import org.springframework.stereotype.Component
 
