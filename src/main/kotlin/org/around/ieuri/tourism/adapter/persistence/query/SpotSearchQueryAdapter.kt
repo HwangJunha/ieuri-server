@@ -1,9 +1,9 @@
 package org.around.ieuri.tourism.adapter.persistence.query
 
+import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
 import org.around.ieuri.tourism.application.catalog.required.SpotSearchHit
 import org.around.ieuri.tourism.application.catalog.required.SpotSearchPort
 import org.around.ieuri.tourism.application.catalog.required.SpotSearchQuery
-import org.around.ieuri.tourism.application.catalog.required.SpotSearchResult
 import org.around.ieuri.tourism.application.catalog.required.SpotSuggestionHit
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.Coordinates
@@ -77,9 +77,9 @@ class SpotSearchQueryAdapter(
         return rows.mapNotNull { row ->
             val card = cards[row.catalogId] ?: return@mapNotNull null
             SpotSearchHit(
-                spot = SpotSearchResult(
+                spot = SpotView(
                     // 클라이언트에 나가는 id는 카탈로그 id다(SPEC-0019).
-                    spotId = row.catalogId,
+                    id = row.catalogId,
                     title = row.title,
                     address = row.address,
                     thumbnailImageUrl = card.thumbnailImageUrl.orEmpty(),

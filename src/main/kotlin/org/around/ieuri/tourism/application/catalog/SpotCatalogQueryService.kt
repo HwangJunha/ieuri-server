@@ -2,13 +2,13 @@ package org.around.ieuri.tourism.application.catalog
 
 import org.around.ieuri.common.event.LocationAccessed
 import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.common.pagination.OffsetPage
 import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.catalog.provided.SpotCatalogQueryUseCase
 import org.around.ieuri.tourism.application.catalog.provided.dto.LikedSpotView
 import org.around.ieuri.tourism.application.catalog.provided.dto.LikedSpotsQuery
 import org.around.ieuri.tourism.application.catalog.provided.dto.MapViewportQuery
 import org.around.ieuri.tourism.application.catalog.provided.dto.MapViewportView
-import org.around.ieuri.tourism.application.catalog.provided.dto.SpotPageView
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotSummaryView
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotsQuery
@@ -24,7 +24,6 @@ import org.around.ieuri.tourism.application.catalog.required.MapViewportSearch
 import org.around.ieuri.tourism.application.catalog.required.NearbySpotSearch
 import org.around.ieuri.tourism.application.catalog.required.SpotBasics
 import org.around.ieuri.tourism.application.catalog.required.SpotQueryPort
-import org.around.ieuri.tourism.application.catalog.required.SpotSearchResult
 import org.around.ieuri.tourism.application.catalog.required.SpotSpatialQueryPort
 import org.around.ieuri.tourism.application.congestion.provided.CongestionQueryUseCase
 import org.around.ieuri.tourism.domain.shared.DomainLocale
@@ -49,7 +48,7 @@ class SpotCatalogQueryService(
 ) : SpotCatalogQueryUseCase {
 
     /** 주변 관광지 한 페이지. 거리 오름차순 + id 타이브레이크로 정렬된다. */
-    override fun spots(query: SpotsQuery, locale: DomainLocale, memberId: Long?): SpotPageView {
+    override fun spots(query: SpotsQuery, locale: DomainLocale, memberId: Long?): OffsetPage<SpotView> {
         // 좌표 조회 사실을 남긴다(SPEC-0032 R19). 좌표는 넘기지 않고, 비로그인은 발행하지 않는다.
         memberId?.let { eventPublisher.publish(LocationAccessed(it, "spots")) }
         val center = coordinatesOf(query.latitude, query.longitude)
@@ -74,13 +73,7 @@ class SpotCatalogQueryService(
         val results = spotSpatialQueryPort.searchNearby(search)
         val totalCount = spotSpatialQueryPort.countNearby(search)
 
-        return SpotPageView(
-            items = results.map { it.toView() },
-            page = page,
-            // totalCount와 같은 조건으로 판정해야 둘이 모순되지 않는다.
-            hasNext = page.toLong() * size < totalCount.toLong(),
-            totalCount = totalCount,
-        )
+        return OffsetPage.of(results, page = page, size = size, totalCount = totalCount)
     }
 
     /**
@@ -160,20 +153,6 @@ class SpotCatalogQueryService(
             else -> trimmed
         }
     }
-
-    /** 읽기 DTO → 응답 뷰. attributionText는 copyright에서 도출한다. */
-    private fun SpotSearchResult.toView(): SpotView = SpotView(
-        id = spotId,
-        title = title,
-        address = address,
-        thumbnailImageUrl = thumbnailImageUrl,
-        distanceMeters = distanceMeters,
-        category = category,
-        copyright = copyright,
-        attributionText = copyright.attributionText,
-        mapX = mapX,
-        mapY = mapY,
-    )
 
     private fun SpotBasics.toSummary(catalogId: Long) = SpotSummaryView(
         id = catalogId,

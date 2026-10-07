@@ -2,6 +2,7 @@ package org.around.ieuri.tourism.application.catalog.required
 
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.tourism.application.catalog.provided.dto.LikedSpotView
+import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
 import org.around.ieuri.tourism.domain.catalog.CategorySelection
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.Coordinates
@@ -48,7 +49,7 @@ data class SpotSearchQuery(
 
 /** 검색 결과 1건. [relevance]는 BM25 원점수가 아니라 거리 가중까지 끝난 최종 정렬 점수다. */
 data class SpotSearchHit(
-    val spot: SpotSearchResult,
+    val spot: SpotView,
     val relevance: Double,
 )
 

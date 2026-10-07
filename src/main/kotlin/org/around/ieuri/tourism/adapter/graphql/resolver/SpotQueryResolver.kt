@@ -11,19 +11,17 @@ import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.tourism.adapter.graphql.dataloader.CategoryDisplayDataLoader
 import org.around.ieuri.tourism.adapter.graphql.mapper.toCategorySelection
+import org.around.ieuri.tourism.adapter.graphql.mapper.toGql
+import org.around.ieuri.tourism.adapter.graphql.mapper.toGqlSpotPage
 import org.around.ieuri.tourism.adapter.graphql.support.domainLocale
 import org.around.ieuri.tourism.application.catalog.provided.SpotCatalogQueryUseCase
 import org.around.ieuri.tourism.application.catalog.provided.dto.LikedSpotView
 import org.around.ieuri.tourism.application.catalog.provided.dto.LikedSpotsQuery
-import org.around.ieuri.tourism.application.catalog.provided.dto.SpotPageView
-import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotsQuery
 import org.around.ieuri.tourism.application.category.provided.CategoryQueryUseCase
 import org.around.ieuri.tourism.application.category.provided.dto.CategoryDisplay
 import org.around.ieuri.tourism.application.spot.provided.SpotDetailQueryUseCase
 import org.around.ieuri.tourism.application.spot.provided.dto.SpotDetailView
-import org.around.ieuri.tourism.application.spot.provided.dto.SpotImageView
-import org.around.ieuri.tourism.application.spot.provided.dto.SpotIntroView
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.dataloader.DataLoader
 import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
@@ -31,7 +29,6 @@ import org.around.ieuri.common.graphql.generated.types.LikedSpot as GqlLikedSpot
 import org.around.ieuri.common.graphql.generated.types.LikedSpotConnection as GqlLikedSpotConnection
 import org.around.ieuri.common.graphql.generated.types.LikedSpotEdge as GqlLikedSpotEdge
 import org.around.ieuri.common.graphql.generated.types.PageInfo as GqlPageInfo
-import org.around.ieuri.common.graphql.generated.types.Spot as GqlSpot
 import org.around.ieuri.common.graphql.generated.types.SpotCategory as GqlSpotCategory
 import org.around.ieuri.common.graphql.generated.types.SpotImage as GqlSpotImage
 import org.around.ieuri.common.graphql.generated.types.SpotInfoItem as GqlSpotInfoItem
@@ -74,7 +71,7 @@ class SpotQueryResolver(
             // 비로그인 허용 — memberId가 있으면 이미 반응한 항목을 제외한다.
             memberId = memberId,
         )
-        return result.toGql()
+        return result.toGqlSpotPage()
     }
 
     /**
@@ -141,7 +138,7 @@ class SpotQueryResolver(
         catalogId = dfe.catalogId(),
         category = SpotCategory(categoryCode),
         locale = dfe.domainLocale(),
-    ).map { GqlSpotInfoItem(name = it.name, text = it.text) }
+    ).map { it.toGql() }
 
     @DgsData(parentType = "SpotDetail", field = "likeCount")
     fun likeCount(dfe: DgsDataFetchingEnvironment): Int = // GraphQL likeCount는 Int!. 반응 수가 Int 범위를 넘을 일은 없다.
@@ -235,44 +232,6 @@ class SpotQueryResolver(
         thumbnailImageUrl = thumbnailImageUrl,
         address = address,
         category = GqlSpotCategory(code = category.code, label = category.code, iconUrl = null),
-        copyright = GqlCopyrightType.valueOf(copyright.name),
-        attributionText = attributionText,
-    )
-
-    private fun SpotPageView.toGql(): GqlSpotPage = GqlSpotPage(
-        items = items.map { it.toGql() },
-        page = page,
-        hasNext = hasNext,
-        totalCount = totalCount,
-    )
-
-    private fun SpotView.toGql(): GqlSpot = GqlSpot(
-        id = id,
-        title = title,
-        address = address,
-        thumbnailImageUrl = thumbnailImageUrl,
-        distanceMeters = distanceMeters,
-        category = GqlSpotCategory(code = category.code, label = category.code, iconUrl = null),
-        copyright = GqlCopyrightType.valueOf(copyright.name),
-        attributionText = attributionText,
-        mapX = mapX,
-        mapY = mapY,
-    )
-
-    private fun SpotIntroView.toGql(): GqlSpotIntro = GqlSpotIntro(
-        businessHours = businessHours,
-        closedDays = closedDays,
-        parking = parking,
-        inquiryPhone = inquiryPhone,
-        fee = fee,
-        petAllowed = petAllowed,
-        creditCardAccepted = creditCardAccepted,
-    )
-
-    private fun SpotImageView.toGql(): GqlSpotImage = GqlSpotImage(
-        imageUrl = imageUrl,
-        thumbnailUrl = thumbnailUrl,
-        caption = caption,
         copyright = GqlCopyrightType.valueOf(copyright.name),
         attributionText = attributionText,
     )

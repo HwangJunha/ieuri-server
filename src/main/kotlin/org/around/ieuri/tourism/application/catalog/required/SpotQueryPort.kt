@@ -82,19 +82,6 @@ data class NearbySpotSearch(
     val offset: Int,
 )
 
-/** 반경 조회 결과 1건(read DTO). [distanceMeters]는 요청 좌표로부터의 구면 거리(미터). */
-data class SpotSearchResult(
-    val spotId: Long,
-    val title: String,
-    val address: String?,
-    val thumbnailImageUrl: String,
-    val mapX: Double,
-    val mapY: Double,
-    val category: SpotCategory,
-    val copyright: CopyrightType,
-    val distanceMeters: Double,
-)
-
 /** `spot.id`가 가리키는 행의 upstream 식별 정보와 카탈로그 좌표. */
 data class SpotIdentity(
     /**

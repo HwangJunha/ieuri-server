@@ -8,7 +8,6 @@ import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
 import org.around.ieuri.tourism.application.catalog.requireRadiusWithin
 import org.around.ieuri.tourism.application.catalog.required.NearbySpotSearch
 import org.around.ieuri.tourism.application.catalog.required.SpotQueryPort
-import org.around.ieuri.tourism.application.catalog.required.SpotSearchResult
 import org.around.ieuri.tourism.application.catalog.required.SpotSpatialQueryPort
 import org.around.ieuri.tourism.application.recommendation.RecommendationPolicy
 import org.around.ieuri.tourism.application.recommendation.provided.RecommendedSpotsUseCase
@@ -64,18 +63,18 @@ class RecommendedSpotsQueryService(
             ),
         )
         val taste = tasteOf(liked, disliked, candidates, locale)
-        val byId = candidates.associateBy { it.spotId }
+        val byId = candidates.associateBy { it.id }
         val ranked = candidates.map {
-            RankedSpot(it.spotId, it.category, policy.score.score(it.distanceMeters, it.title, taste[it.spotId]))
+            RankedSpot(it.id, it.category, policy.score.score(it.distanceMeters, it.title, taste[it.id]))
         }
-        return policy.diversity.order(ranked).take(first).map { byId.getValue(it).toView() }
+        return policy.diversity.order(ranked).take(first).map { byId.getValue(it) }
     }
 
     /** 후보별 취향 요인. 반응이 최소량 미만이거나 좋아요 평균 벡터가 없으면 비어 있다. */
     private fun tasteOf(
         liked: Set<Long>,
         disliked: Set<Long>,
-        candidates: List<SpotSearchResult>,
+        candidates: List<SpotView>,
         locale: DomainLocale,
     ): Map<Long, Double> {
         if (candidates.isEmpty() || liked.size + disliked.size < policy.tasteMinReactions) return emptyMap()
@@ -83,7 +82,7 @@ class RecommendedSpotsQueryService(
             tasteSimilarityQueryPort.findSimilarities(
                 likedCatalogIds = liked,
                 dislikedCatalogIds = disliked,
-                candidateCatalogIds = candidates.map { it.spotId },
+                candidateCatalogIds = candidates.map { it.id },
                 language = locale,
                 model = policy.embedding.model,
             )
@@ -98,18 +97,4 @@ class RecommendedSpotsQueryService(
             }.toMap(),
         )
     }
-
-    /** attributionText는 copyright에서 파생된다. */
-    private fun SpotSearchResult.toView(): SpotView = SpotView(
-        id = spotId,
-        title = title,
-        address = address,
-        thumbnailImageUrl = thumbnailImageUrl,
-        distanceMeters = distanceMeters,
-        category = category,
-        copyright = copyright,
-        attributionText = copyright.attributionText,
-        mapX = mapX,
-        mapY = mapY,
-    )
 }

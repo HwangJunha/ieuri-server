@@ -1,11 +1,11 @@
 package org.around.ieuri.tourism.application.spot.provided
 
 import org.around.ieuri.tourism.application.spot.provided.dto.SpotDetailView
-import org.around.ieuri.tourism.application.spot.provided.dto.SpotImageView
-import org.around.ieuri.tourism.application.spot.provided.dto.SpotInfoItemView
-import org.around.ieuri.tourism.application.spot.provided.dto.SpotIntroView
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.DomainLocale
+import org.around.ieuri.tourism.domain.spot.SpotImage
+import org.around.ieuri.tourism.domain.spot.SpotInfoItem
+import org.around.ieuri.tourism.domain.spot.SpotIntro
 
 /** spot 상세 조회(CQRS 읽기). 본문과 하위 필드는 각자 따로 조회한다 — 선택된 필드만 I/O가 일어난다. */
 interface SpotDetailQueryUseCase {
@@ -18,13 +18,13 @@ interface SpotDetailQueryUseCase {
     fun spotDetail(catalogId: Long, locale: DomainLocale): SpotDetailView
 
     /** 갤러리(요청 시에만). 캐시 → 미스면 detailImage2 1콜. */
-    fun spotGallery(catalogId: Long, locale: DomainLocale): List<SpotImageView>
+    fun spotGallery(catalogId: Long, locale: DomainLocale): List<SpotImage>
 
     /** 운영 정보(요청 시에만). 캐시 → 미스면 detailIntro2 1콜. 표시할 값이 없으면 null. */
-    fun spotIntro(catalogId: Long, category: SpotCategory, locale: DomainLocale): SpotIntroView?
+    fun spotIntro(catalogId: Long, category: SpotCategory, locale: DomainLocale): SpotIntro?
 
     /** 이용안내 항목(요청 시에만). 캐시 → 미스면 detailInfo2 1콜. */
-    fun spotInfoItems(catalogId: Long, category: SpotCategory, locale: DomainLocale): List<SpotInfoItemView>
+    fun spotInfoItems(catalogId: Long, category: SpotCategory, locale: DomainLocale): List<SpotInfoItem>
 
     /**
      * 좋아요 수(요청 시에만). 캐시하지 않고 매번 집계한다.

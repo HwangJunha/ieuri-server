@@ -8,6 +8,7 @@ import org.around.ieuri.common.graphql.tokenPresentation
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.tourism.adapter.graphql.mapper.toCategorySelection
+import org.around.ieuri.tourism.adapter.graphql.mapper.toGqlSearchConnection
 import org.around.ieuri.tourism.adapter.graphql.support.domainLocale
 import org.around.ieuri.tourism.application.catalog.provided.SpotDiscoveryUseCase
 import org.around.ieuri.tourism.application.catalog.provided.dto.FestivalView
@@ -24,7 +25,6 @@ import org.around.ieuri.common.graphql.generated.types.PopularSpotConnection as 
 import org.around.ieuri.common.graphql.generated.types.PopularSpotEdge as GqlPopularSpotEdge
 import org.around.ieuri.common.graphql.generated.types.Spot as GqlSpot
 import org.around.ieuri.common.graphql.generated.types.SpotCategory as GqlSpotCategory
-import org.around.ieuri.common.graphql.generated.types.SpotSearchConnection as GqlSpotSearchConnection
 import org.around.ieuri.common.graphql.generated.types.SpotSearchPayload as GqlSpotSearchPayload
 import org.around.ieuri.common.graphql.generated.types.SpotSuggestion as GqlSpotSuggestion
 import org.around.ieuri.common.graphql.generated.types.UserError as GqlUserError
@@ -78,12 +78,7 @@ class SpotDiscoveryResolver(
                 GqlUserError(code = it.code, message = it.message, field = it.field)
             },
             // 검증 실패에도 connection은 존재하며 비어 있다.
-            connection = GqlSpotSearchConnection(
-                items = result.items.map { it.toGql() },
-                page = result.page,
-                hasNext = result.hasNext,
-                totalCount = result.totalCount,
-            ),
+            connection = result.results.toGqlSearchConnection(),
         )
     }
 

@@ -3,11 +3,11 @@ package org.around.ieuri.tourism.adapter.persistence.query
 import org.around.ieuri.common.persistence.geographyPoint
 import org.around.ieuri.common.persistence.stDWithin
 import org.around.ieuri.common.persistence.stDistance
-import org.around.ieuri.tourism.adapter.persistence.mapper.toSpotSearchResult
+import org.around.ieuri.tourism.adapter.persistence.mapper.toSpotView
 import org.around.ieuri.tourism.adapter.persistence.table.SpotCatalogTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotCatalogTranslationTable
+import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
 import org.around.ieuri.tourism.application.catalog.required.NearbySpotSearch
-import org.around.ieuri.tourism.application.catalog.required.SpotSearchResult
 import org.around.ieuri.tourism.application.catalog.required.SpotSpatialQueryPort
 import org.jetbrains.exposed.v1.core.JoinType
 import org.jetbrains.exposed.v1.core.Op
@@ -31,7 +31,7 @@ import org.springframework.stereotype.Component
 class SpotSpatialQueryAdapter : SpotSpatialQueryPort {
 
     /** 반경 안 관광지 한 페이지. 거리 오름차순, 등거리는 id 오름차순이다(POL-019·055). */
-    override fun searchNearby(query: NearbySpotSearch): List<SpotSearchResult> {
+    override fun searchNearby(query: NearbySpotSearch): List<SpotView> {
         val translation = SpotCatalogTranslationTable
         val distance = stDistance(translation.location, center(query)).alias("distance_meters")
         val ranked = translation.select(translation.catalogId, translation.title, translation.address, translation.mapX, translation.mapY, translation.category, distance)
@@ -47,7 +47,7 @@ class SpotSpatialQueryAdapter : SpotSpatialQueryPort {
                 SpotCatalogTable.thumbnailImageUrl, SpotCatalogTable.copyright,
             )
             .orderBy(rankedDistance to SortOrder.ASC, ranked[translation.catalogId] to SortOrder.ASC)
-            .map { it.toSpotSearchResult(ranked, distanceMeters = it[rankedDistance]) }
+            .map { it.toSpotView(ranked, distanceMeters = it[rankedDistance]) }
     }
 
     /** 카탈로그를 조인하지 않아도 수가 같다 — UNIQUE(catalog_id, language)와 catalog_id NOT NULL FK에 기댄다. */

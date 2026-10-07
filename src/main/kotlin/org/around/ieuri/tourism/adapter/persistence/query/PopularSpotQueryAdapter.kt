@@ -78,7 +78,6 @@ class PopularSpotQueryAdapter(
                         distanceMeters = rs.getDouble("distance_meters"),
                         category = SpotCategory(rs.getString("category")),
                         copyright = copyright,
-                        attributionText = copyright.attributionText,
                         mapX = rs.getDouble("map_x"),
                         mapY = rs.getDouble("map_y"),
                     ),

@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.application.catalog.provided.dto
 
+import org.around.ieuri.common.pagination.OffsetPage
 import org.around.ieuri.tourism.domain.catalog.CategorySelection
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.CopyrightType
@@ -17,15 +18,7 @@ data class SpotsQuery(
     val size: Int,
 )
 
-/** spots 응답. [items]는 거리 오름차순 정렬된 한 페이지다. */
-data class SpotPageView(
-    val items: List<SpotView>,
-    val page: Int,
-    val hasNext: Boolean,
-    val totalCount: Int?,
-)
-
-/** spots 응답의 카드 1장. */
+/** 주변·검색·추천 목록의 카드 1장. [distanceMeters]는 요청 좌표로부터의 구면 거리(미터)다. */
 data class SpotView(
     val id: Long,
     val title: String,
@@ -34,10 +27,11 @@ data class SpotView(
     val distanceMeters: Double,
     val category: SpotCategory,
     val copyright: CopyrightType,
-    val attributionText: String,
     val mapX: Double,
     val mapY: Double,
-)
+) {
+    val attributionText: String get() = copyright.attributionText
+}
 
 /** 좋아요 목록 조회 입력(SPEC-0008). 언어는 Accept-Language, 회원은 인증 컨텍스트에서 온다. */
 data class LikedSpotsQuery(
@@ -79,10 +73,7 @@ data class SearchSpotsQuery(
 /** 검색 응답. 검증 실패도 이 형태로 돌아온다(POL-015) — [userErrors]가 있으면 [items]는 비고 [totalCount]는 0이다. */
 data class SpotSearchResultView(
     val userErrors: List<SearchUserError>,
-    val items: List<SpotView>,
-    val page: Int,
-    val hasNext: Boolean,
-    val totalCount: Int,
+    val results: OffsetPage<SpotView>,
 ) {
     val success: Boolean get() = userErrors.isEmpty()
 }

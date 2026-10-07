@@ -2,6 +2,7 @@ package org.around.ieuri.tourism.application.catalog
 
 import org.around.ieuri.common.event.LocationAccessed
 import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.common.pagination.OffsetPage
 import org.around.ieuri.common.pagination.keysetPageOf
 import org.around.ieuri.common.pagination.map
 import org.around.ieuri.common.persistence.ExposedConfig
@@ -15,7 +16,6 @@ import org.around.ieuri.tourism.application.catalog.provided.dto.SearchSpotsQuer
 import org.around.ieuri.tourism.application.catalog.provided.dto.SearchUserError
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotSearchResultView
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotSuggestionView
-import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
 import org.around.ieuri.tourism.application.catalog.provided.exception.InvalidCoordinatesException
 import org.around.ieuri.tourism.application.catalog.provided.exception.RadiusTooLargeException
 import org.around.ieuri.tourism.application.catalog.required.CatalogEventPublisherPort
@@ -25,7 +25,6 @@ import org.around.ieuri.tourism.application.catalog.required.PopularSpotQueryPor
 import org.around.ieuri.tourism.application.catalog.required.PopularSpotSearch
 import org.around.ieuri.tourism.application.catalog.required.SpotSearchPort
 import org.around.ieuri.tourism.application.catalog.required.SpotSearchQuery
-import org.around.ieuri.tourism.application.catalog.required.SpotSearchResult
 import org.around.ieuri.tourism.domain.catalog.DistanceCursor
 import org.around.ieuri.tourism.domain.catalog.LikeCountCursor
 import org.around.ieuri.tourism.domain.shared.Coordinates
@@ -81,11 +80,7 @@ class SpotDiscoveryService(
         val totalCount = spotSearchPort.count(search)
         return SpotSearchResultView(
             userErrors = emptyList(),
-            items = spotSearchPort.search(search).map { it.spot.toView() },
-            page = page,
-            // totalCount에서 도출한다(`spots`와 같은 규약).
-            hasNext = page.toLong() * size < totalCount.toLong(),
-            totalCount = totalCount,
+            results = OffsetPage.of(spotSearchPort.search(search).map { it.spot }, page = page, size = size, totalCount = totalCount),
         )
     }
 
@@ -178,13 +173,7 @@ class SpotDiscoveryService(
     }
 
     /** 검증 실패 시의 응답. connection이 non-null이라 빈 값이라도 있어야 한다(POL-015). */
-    private fun emptyResult(errors: List<SearchUserError>, page: Int) = SpotSearchResultView(
-        userErrors = errors,
-        items = emptyList(),
-        page = page,
-        hasNext = false,
-        totalCount = 0,
-    )
+    private fun emptyResult(errors: List<SearchUserError>, page: Int) = SpotSearchResultView(userErrors = errors, results = OffsetPage.empty(page))
 
     /**
      * 검색 입력 검증(R8). 트림 후 비었으면 EMPTY_QUERY, 길이 상한을 넘으면 QUERY_TOO_LONG,
@@ -224,20 +213,6 @@ class SpotDiscoveryService(
             throw RadiusTooLargeException("반경은 최대 ${policy.maxRadiusMeters}m까지 허용됩니다.")
         }
     }
-
-    /** attributionText는 copyright에서 파생된다. */
-    private fun SpotSearchResult.toView(): SpotView = SpotView(
-        id = spotId,
-        title = title,
-        address = address,
-        thumbnailImageUrl = thumbnailImageUrl,
-        distanceMeters = distanceMeters,
-        category = category,
-        copyright = copyright,
-        attributionText = copyright.attributionText,
-        mapX = mapX,
-        mapY = mapY,
-    )
 
     private companion object {
         const val FIELD_QUERY = "query"

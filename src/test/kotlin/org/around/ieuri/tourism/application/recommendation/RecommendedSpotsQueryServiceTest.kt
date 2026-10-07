@@ -6,11 +6,11 @@ import io.mockk.slot
 import io.mockk.verify
 import org.around.ieuri.common.event.LocationAccessed
 import org.around.ieuri.tourism.application.catalog.SpotQueryPolicy
+import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
 import org.around.ieuri.tourism.application.catalog.provided.exception.InvalidCoordinatesException
 import org.around.ieuri.tourism.application.catalog.provided.exception.RadiusTooLargeException
 import org.around.ieuri.tourism.application.catalog.required.NearbySpotSearch
 import org.around.ieuri.tourism.application.catalog.required.SpotQueryPort
-import org.around.ieuri.tourism.application.catalog.required.SpotSearchResult
 import org.around.ieuri.tourism.application.catalog.required.SpotSpatialQueryPort
 import org.around.ieuri.tourism.application.recommendation.provided.dto.RecommendedSpotsQuery
 import org.around.ieuri.tourism.application.recommendation.required.RecommendationEventPublisherPort
@@ -204,8 +204,8 @@ class RecommendedSpotsQueryServiceTest {
         assertEquals(listOf(1L), service.recommendedSpots(query(), DomainLocale.EN, 7L).map { it.id })
     }
 
-    private fun card(id: Long, distance: Double, category: SpotCategory, title: String = "spot-$id") = SpotSearchResult(
-        spotId = id,
+    private fun card(id: Long, distance: Double, category: SpotCategory, title: String = "spot-$id") = SpotView(
+        id = id,
         title = title,
         address = null,
         thumbnailImageUrl = "https://img/$id.jpg",

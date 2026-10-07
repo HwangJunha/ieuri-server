@@ -8,8 +8,8 @@ import org.around.ieuri.tourism.adapter.persistence.table.MapCellTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotCatalogTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotCatalogTranslationTable
 import org.around.ieuri.tourism.application.catalog.provided.dto.MapSpotView
+import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
 import org.around.ieuri.tourism.application.catalog.required.MapCandidateView
-import org.around.ieuri.tourism.application.catalog.required.SpotSearchResult
 import org.around.ieuri.tourism.application.footprint.provided.dto.CellSpotView
 import org.around.ieuri.tourism.application.region.provided.dto.RegionRow
 import org.around.ieuri.tourism.domain.category.SpotCategory
@@ -79,8 +79,8 @@ fun ResultRow.toMapCandidateView(distanceMeters: Double): MapCandidateView = Map
 )
 
 /** 반경 조회 한 건. 번역 열은 거리순으로 자른 [ranked]에서, 썸네일·저작권만 카탈로그에서 온다. id는 카탈로그 id다. */
-fun ResultRow.toSpotSearchResult(ranked: QueryAlias, distanceMeters: Double): SpotSearchResult = SpotSearchResult(
-    spotId = this[ranked[SpotCatalogTranslationTable.catalogId]],
+fun ResultRow.toSpotView(ranked: QueryAlias, distanceMeters: Double): SpotView = SpotView(
+    id = this[ranked[SpotCatalogTranslationTable.catalogId]],
     title = this[ranked[SpotCatalogTranslationTable.title]],
     address = this[ranked[SpotCatalogTranslationTable.address]],
     thumbnailImageUrl = this[SpotCatalogTable.thumbnailImageUrl],

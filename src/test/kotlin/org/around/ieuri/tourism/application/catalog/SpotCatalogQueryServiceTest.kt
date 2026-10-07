@@ -13,6 +13,7 @@ import org.around.ieuri.tourism.application.catalog.provided.dto.LikedSpotView
 import org.around.ieuri.tourism.application.catalog.provided.dto.LikedSpotsQuery
 import org.around.ieuri.tourism.application.catalog.provided.dto.MapSpotView
 import org.around.ieuri.tourism.application.catalog.provided.dto.MapViewportQuery
+import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotsQuery
 import org.around.ieuri.tourism.application.catalog.provided.exception.BboxTooLargeException
 import org.around.ieuri.tourism.application.catalog.provided.exception.EmptyQueryException
@@ -28,7 +29,6 @@ import org.around.ieuri.tourism.application.catalog.required.MapViewportSearch
 import org.around.ieuri.tourism.application.catalog.required.NearbySpotSearch
 import org.around.ieuri.tourism.application.catalog.required.SpotBasics
 import org.around.ieuri.tourism.application.catalog.required.SpotQueryPort
-import org.around.ieuri.tourism.application.catalog.required.SpotSearchResult
 import org.around.ieuri.tourism.application.catalog.required.SpotSpatialQueryPort
 import org.around.ieuri.tourism.application.congestion.provided.CongestionQueryUseCase
 import org.around.ieuri.tourism.application.congestion.provided.dto.CulturalEventView
@@ -93,8 +93,8 @@ class SpotCatalogQueryServiceTest {
     }
 
     /** 읽기 DTO 픽스처. 거리는 DB가 계산한 값으로 직접 지정한다. */
-    private fun result(id: Long, distanceMeters: Double): SpotSearchResult = SpotSearchResult(
-        spotId = id,
+    private fun result(id: Long, distanceMeters: Double): SpotView = SpotView(
+        id = id,
         title = "spot-$id",
         address = "서울 어딘가",
         thumbnailImageUrl = "https://img/$id.jpg",

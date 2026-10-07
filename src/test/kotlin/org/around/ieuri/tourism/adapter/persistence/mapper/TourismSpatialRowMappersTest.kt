@@ -150,9 +150,9 @@ class TourismSpatialRowMappersTest {
                 SpotCatalogTable.thumbnailImageUrl to "https://img/c.jpg",
                 SpotCatalogTable.copyright to "TYPE3",
             ),
-        ).toSpotSearchResult(ranked, distanceMeters = 42.0)
+        ).toSpotView(ranked, distanceMeters = 42.0)
 
-        assertEquals(11L, result.spotId)
+        assertEquals(11L, result.id)
         assertEquals("광장시장", result.title)
         assertNull(result.address)
         assertEquals("https://img/c.jpg", result.thumbnailImageUrl)

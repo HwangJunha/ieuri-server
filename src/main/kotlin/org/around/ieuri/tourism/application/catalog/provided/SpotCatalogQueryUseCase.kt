@@ -1,12 +1,13 @@
 package org.around.ieuri.tourism.application.catalog.provided
 
 import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.common.pagination.OffsetPage
 import org.around.ieuri.tourism.application.catalog.provided.dto.LikedSpotView
 import org.around.ieuri.tourism.application.catalog.provided.dto.LikedSpotsQuery
 import org.around.ieuri.tourism.application.catalog.provided.dto.MapViewportQuery
 import org.around.ieuri.tourism.application.catalog.provided.dto.MapViewportView
-import org.around.ieuri.tourism.application.catalog.provided.dto.SpotPageView
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotSummaryView
+import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotsQuery
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 
@@ -16,7 +17,7 @@ interface SpotCatalogQueryUseCase {
      * 위치 기반 관광지 오프셋 페이지. 거리 오름차순.
      * - [memberId]가 있으면 이미 반응한 관광지를 제외하고 좌표 조회 사실을 남긴다(SPEC-0032 R19). null은 비로그인이다.
      */
-    fun spots(query: SpotsQuery, locale: DomainLocale, memberId: Long?): SpotPageView
+    fun spots(query: SpotsQuery, locale: DomainLocale, memberId: Long?): OffsetPage<SpotView>
 
     /**
      * 회원이 좋아요한 spot 한 페이지. likedAt 내림차순, 동률은 spot.id.

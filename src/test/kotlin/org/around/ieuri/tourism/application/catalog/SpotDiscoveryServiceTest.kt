@@ -21,7 +21,6 @@ import org.around.ieuri.tourism.application.catalog.required.PopularSpotSearch
 import org.around.ieuri.tourism.application.catalog.required.SpotSearchHit
 import org.around.ieuri.tourism.application.catalog.required.SpotSearchPort
 import org.around.ieuri.tourism.application.catalog.required.SpotSearchQuery
-import org.around.ieuri.tourism.application.catalog.required.SpotSearchResult
 import org.around.ieuri.tourism.application.catalog.required.SpotSuggestionHit
 import org.around.ieuri.tourism.domain.catalog.CategorySelection
 import org.around.ieuri.tourism.domain.catalog.DistanceCursor
@@ -94,7 +93,7 @@ class SpotDiscoveryServiceTest {
 
         val result = service.searchSpots(searchQuery(query = "경복궁"), DomainLocale.KO, memberId = null)
 
-        assertEquals(listOf(1L, 2L), result.items.map { it.id })
+        assertEquals(listOf(1L, 2L), result.results.items.map { it.id })
     }
 
     /** AC-1.3 — 0건은 오류가 아니다. */
@@ -103,8 +102,8 @@ class SpotDiscoveryServiceTest {
         val result = service.searchSpots(searchQuery(query = "없는장소"), DomainLocale.KO, memberId = null)
 
         assertTrue(result.success)
-        assertTrue(result.items.isEmpty())
-        assertEquals(0, result.totalCount)
+        assertTrue(result.results.items.isEmpty())
+        assertEquals(0, result.results.totalCount)
     }
 
     /** AC-1.2 — 반경은 포트로 넘어가며 서비스가 임의로 넓히지 않는다. */
@@ -213,7 +212,7 @@ class SpotDiscoveryServiceTest {
 
         val result = service.searchSpots(searchQuery(query = "경복궁", size = 20), DomainLocale.KO, memberId = null)
 
-        assertFalse(result.hasNext)
+        assertFalse(result.results.hasNext)
     }
 
     /** AC-7.3 — 전체 건수가 남아 있으면 다음 페이지가 있다. hasNext는 totalCount에서 도출된다. */
@@ -224,9 +223,9 @@ class SpotDiscoveryServiceTest {
 
         val result = service.searchSpots(searchQuery(query = "경복궁", size = 2), DomainLocale.KO, memberId = null)
 
-        assertTrue(result.hasNext)
-        assertEquals(listOf(1L, 2L), result.items.map { it.id })
-        assertEquals(5, result.totalCount)
+        assertTrue(result.results.hasNext)
+        assertEquals(listOf(1L, 2L), result.results.items.map { it.id })
+        assertEquals(5, result.results.totalCount)
     }
 
     /** 마지막 페이지 경계 — 2페이지에서 4건을 소진하면 다음이 없다. */
@@ -237,7 +236,7 @@ class SpotDiscoveryServiceTest {
 
         val result = service.searchSpots(searchQuery(query = "경복궁", page = 2, size = 2), DomainLocale.KO, memberId = null)
 
-        assertFalse(result.hasNext)
+        assertFalse(result.results.hasNext)
     }
 
     /** POL-018 — 상한 초과는 거절이 아니라 클램프다. */
@@ -260,7 +259,7 @@ class SpotDiscoveryServiceTest {
 
         assertFalse(result.success)
         assertEquals(listOf("EMPTY_QUERY"), result.userErrors.map { it.code })
-        assertTrue(result.items.isEmpty())
+        assertTrue(result.results.items.isEmpty())
         verify(exactly = 0) { spotSearchPort.search(any()) }
         verify(exactly = 0) { spotSearchPort.count(any()) }
     }
@@ -628,8 +627,8 @@ class SpotDiscoveryServiceTest {
     private fun selection(category: SpotCategory?) = category?.let { CategorySelection.ofValues(setOf(it)) } ?: CategorySelection.UNFILTERED
 
     private fun hit(spotId: Long, title: String = "장소$spotId", relevance: Double = 1.0) = SpotSearchHit(
-        spot = SpotSearchResult(
-            spotId = spotId,
+        spot = SpotView(
+            id = spotId,
             title = title,
             address = "서울시 종로구",
             thumbnailImageUrl = "https://img/$spotId.jpg",
@@ -666,7 +665,6 @@ class SpotDiscoveryServiceTest {
             distanceMeters = 100.0,
             category = SpotCategory.TOURIST_SPOT,
             copyright = CopyrightType.TYPE1,
-            attributionText = CopyrightType.TYPE1.attributionText,
             mapX = 126.9,
             mapY = 37.5,
         ),

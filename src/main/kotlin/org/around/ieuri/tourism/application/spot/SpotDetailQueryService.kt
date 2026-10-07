@@ -7,9 +7,6 @@ import org.around.ieuri.tourism.application.category.provided.exception.UnknownC
 import org.around.ieuri.tourism.application.category.required.AppCategoryQueryPort
 import org.around.ieuri.tourism.application.spot.provided.SpotDetailQueryUseCase
 import org.around.ieuri.tourism.application.spot.provided.dto.SpotDetailView
-import org.around.ieuri.tourism.application.spot.provided.dto.SpotImageView
-import org.around.ieuri.tourism.application.spot.provided.dto.SpotInfoItemView
-import org.around.ieuri.tourism.application.spot.provided.dto.SpotIntroView
 import org.around.ieuri.tourism.application.spot.provided.exception.SpotDetailNotFoundException
 import org.around.ieuri.tourism.application.spot.provided.exception.SpotNotFoundInLocaleQueryException
 import org.around.ieuri.tourism.application.spot.required.SpotCachePort
@@ -22,6 +19,7 @@ import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.shared.SpotQueryException
 import org.around.ieuri.tourism.domain.spot.SpotDetail
 import org.around.ieuri.tourism.domain.spot.SpotImage
+import org.around.ieuri.tourism.domain.spot.SpotInfoItem
 import org.around.ieuri.tourism.domain.spot.SpotIntro
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -91,62 +89,62 @@ class SpotDetailQueryService(
         return SpotDetail.absent(basics.title, basics.category, basics.thumbnailImageUrl, basics.address, basics.copyright)
     }
 
-    override fun spotGallery(catalogId: Long, locale: DomainLocale): List<SpotImageView> {
+    override fun spotGallery(catalogId: Long, locale: DomainLocale): List<SpotImage> {
         val identity = resolve(catalogId, locale)
         val spotId = identity.spotId
-        spotCachePort.getGallery(spotId)?.let { return it.map { image -> image.toView() } }
+        spotCachePort.getGallery(spotId)?.let { return it }
 
         detailQueryPort.findGallery(spotId)?.let { stored ->
             spotCachePort.putGallery(spotId, stored)
-            return stored.map { it.toView() }
+            return stored
         }
 
         val fetched = tourInfoPort.findGallery(identity.toQuery(locale))
         spotCachePort.putGallery(spotId, fetched)
         eventPublisher.publish(SpotGalleryFetched(spotId, fetched))
-        return fetched.map { it.toView() }
+        return fetched
     }
 
-    override fun spotIntro(catalogId: Long, category: SpotCategory, locale: DomainLocale): SpotIntroView? {
+    override fun spotIntro(catalogId: Long, category: SpotCategory, locale: DomainLocale): SpotIntro? {
         requireKnownCategory(category)
         val identity = resolve(catalogId, locale)
         val spotId = identity.spotId
         // 히트 판정은 value가 아니라 래퍼로 한다 — 값은 정상적으로 null일 수 있다.
         val cached = spotCachePort.getIntro(spotId, category)
-        if (cached != null) return cached.value?.toView()
+        if (cached != null) return cached.value
 
         val stored = detailQueryPort.findIntro(spotId, category)
         if (stored != null) {
             spotCachePort.putIntro(spotId, category, stored.value)
-            return stored.value?.toView()
+            return stored.value
         }
 
         val intro = tourInfoPort.findIntro(identity.toQuery(locale), category)
         spotCachePort.putIntro(spotId, category, intro)
         eventPublisher.publish(SpotIntroFetched(spotId, category, intro))
-        return intro?.toView()
+        return intro
     }
 
     override fun spotInfoItems(
         catalogId: Long,
         category: SpotCategory,
         locale: DomainLocale,
-    ): List<SpotInfoItemView> {
+    ): List<SpotInfoItem> {
         requireKnownCategory(category)
         val identity = resolve(catalogId, locale)
         val spotId = identity.spotId
         spotCachePort.getInfoItems(spotId, category)
-            ?.let { return it.map { item -> SpotInfoItemView(item.name, item.text) } }
+            ?.let { return it }
 
         detailQueryPort.findInfoItems(spotId, category)?.let { stored ->
             spotCachePort.putInfoItems(spotId, category, stored)
-            return stored.map { SpotInfoItemView(it.name, it.text) }
+            return stored
         }
 
         val fetched = tourInfoPort.findInfoItems(identity.toQuery(locale), category)
         spotCachePort.putInfoItems(spotId, category, fetched)
         eventPublisher.publish(SpotInfoItemsFetched(spotId, category, fetched))
-        return fetched.map { SpotInfoItemView(it.name, it.text) }
+        return fetched
     }
 
     /** 좋아요 수. 캐시하지 않고 매번 집계한다. */
@@ -193,23 +191,5 @@ class SpotDetailQueryService(
         attributionText = attributionText,
         mapX = identity.mapX,
         mapY = identity.mapY,
-    )
-
-    private fun SpotIntro.toView(): SpotIntroView = SpotIntroView(
-        businessHours = businessHours,
-        closedDays = closedDays,
-        parking = parking,
-        inquiryPhone = inquiryPhone,
-        fee = fee,
-        petAllowed = petAllowed,
-        creditCardAccepted = creditCardAccepted,
-    )
-
-    private fun SpotImage.toView(): SpotImageView = SpotImageView(
-        imageUrl = imageUrl,
-        thumbnailUrl = thumbnailUrl,
-        caption = caption,
-        copyright = copyright,
-        attributionText = attributionText,
     )
 }
