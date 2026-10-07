@@ -140,6 +140,7 @@
 | D-101 | S13 | **번역 노출 규칙은 일괄 SQL(`refreshTranslationVisibility`) 한 곳에 둔다. 도메인은 "원본이 붙으면 노출"만 안다(`SpotCatalog.attach`·`CatalogOrigin.toTranslation`).** 처음에는 Specification(`TranslationVisibility`)+Command로 정했다가 같은 날 철회했다 | 철회 근거(reviewer, 2026-10-07): 단건 경로는 원본이 막 붙은 순간이라 규칙이 항상 참이고, 원본이 빠지는 일은 일괄 경로(동기화 삭제·분할)에만 있어 "숨긴다"는 판정은 SQL에만 생긴다. CLAUDE.md의 Specification+Command 조건(단건 경로가 그 규칙을 재사용)이 성립하지 않아 Spec은 아무 것도 판정하지 않는 형태만 남았다(사용자 결정 2026-10-07). 카탈로그 43,883건·번역 82,314건이라 건별 도메인 반복도 택하지 않는다 | **Specification+Command**: 단건 경로에서 판정할 일이 없어 형태만 남는다. **건별 반복**: 매일 4만 왕복이다. **도메인이 SQL을 만들기**: 도메인이 영속 기술을 알게 된다 |
 | D-102 | S13 | **판정은 도메인으로, DTO는 도메인 값을 보여 주기만 한다.** 끝난 축제(`EndedFestivals` — 수집 제외와 정리가 같은 판정, 저장소는 기간만 읽고 정한 id만 지운다), 등록 시군구만 적재(`RegisteredDistricts`, R9), 카테고리 표시 폴백(`SpotCategory.defaultLabel`)을 도메인으로 옮겼다. DTO에서는 `PrefetchTarget.absentDetail()`·`CategoryDisplay.fallback()`을 지우고, 세 페이지 DTO의 `hasMore()`는 `OffsetPage.hasNextPage` 하나로 모았다 | 사용자 결정: DTO는 도메인 값을 그대로 보여 주는 정도만. 끝난 축제 판정은 도메인(`FestivalPeriod.isEndedAsOf`)과 SQL(`event_end_date < asOf`)에 두 번 있었다. DB CHECK(`event_end_date >= event_start_date`)로 기간 행이 도메인 불변식을 어기지 않음을 확인했다(384건, 위반 0) | **SQL 판정 유지**: 규칙이 두 곳. **자료가 있는 달 탐색·임베딩 차원 확인을 도메인으로**: 업스트림 응답을 다루는 수집 절차라 도메인 규칙이 아니다 |
 | D-103 | S13 | **배치 서비스는 비즈니스 단위로 둔다 — 무조건 Modify/Query에 합치지 않는다.** 원본 동기화·카탈로그 정리·상세 사전 확보·지역 지표 수집·대표 위치 선정·임베딩 생성은 각자 다른 비즈니스라 유지한다(19~135줄). 실제 중복만 없앴다: `SpotPrefetchQueryService`(포트 통과)를 `SpotDetailReadService`로 합치고, 임베딩 라벨은 `CategoryQueryUseCase.categoryDisplays`를 재사용한다. 카탈로그 배정이 `spot.catalog_id`를 같은 트랜잭션에서 쓰는 것은 유지한다 — 배정 직후 그 연결로 축제 기간을 계산해, 이벤트로 나누면 순서가 깨진다 | 사용자 지적(2026-10-07): 배치마다 서비스가 느는 구조가 문제지만, 새 비즈니스면 알맞은 이름으로 만들어도 되고 클래스 크기가 기준이다. 처음 제안(거의 다 합치기)은 서로 다른 비즈니스를 한 클래스에 섞어 철회했다. D-81·D-83은 그대로다 | **모두 Modify/Query로 합치기**: 반응과 카탈로그 정리처럼 성격이 다른 일이 섞인다. **사전 확보 조율을 tasklet으로**: 정책(낡은 행 재확보·한도 초과 시 미저장)이 어댑터로 샌다 |
+| D-104 | S13 | **D-102 범위 밖에 남았던 판정 3건도 도메인으로 옮긴다.** 취향 최소 반응 수(`TasteThreshold`)와 유사도→취향 요인 계산(`RecommendationScore.tasteFactors`)은 내 주변·지도 추천 두 서비스에 같은 식으로 있던 것을 하나로 모았고, `TasteSimilarity`는 도메인 값이 되어 도메인으로 옮겼다. 시도 최소 시군구 수는 `ProvinceEligibility`다. 칸 → 읽기 모델 변환(`MapCell.toView`)은 dto 패키지에서 `application/footprint`(internal)로 옮겼다 | 5차 reviewer가 D-102와 같은 종류("규칙이 두 곳", DTO 패키지의 동작)로 짚었고, 사용자가 이번 작업에 넣기로 했다(2026-10-07). 유사도 조회와 실패 시 취향 없이 진행하는 처리는 서비스마다 남는다 — 포트 호출이라 도메인 몫이 아니다 | **취향 계산 전체를 공용 application 컴포넌트로**: 유스케이스가 아닌 서비스가 하나 생겨, 배치·조회마다 서비스가 느는 구조(D-103)와 같은 모양이 된다. **정책 값(Int)으로 두기**: 비교식이 두 서비스에 남는다 |
 
 ## 부족한 정보
 
@@ -309,6 +310,7 @@ grep으로 확인한 수(worktree `82fdd48`):
 
 | 날짜 | 무엇을 | 왜 |
 |---|---|---|
+| 2026-10-07 | D-104(취향 최소 반응 수·취향 요인 계산·시도 최소 시군구 수를 도메인으로, 칸 변환을 dto 밖으로) | 사용자 결정 |
 | 2026-10-07 | D-101 철회 — 노출 규칙 Specification을 지우고 일괄 SQL 한 곳으로(단건 경로에서 항상 참이라 판정할 것이 없다) | 사용자 결정 |
 | 2026-10-07 | D-101(노출 규칙 Specification)·D-102(판정은 도메인, DTO는 보여 주기만)·D-103(배치 서비스는 비즈니스 단위, 실제 중복만 제거) | 사용자 결정 |
 | 2026-10-07 | D-100(포트 파일에서 데이터 타입을 dto/로 분리) | 사용자 지시 |
