@@ -315,8 +315,11 @@ fixed only within that bound; anything that needs a migration or a schema field 
     `readItems`) and a `private` type only its file uses.
     A file named `XxxReadModels.kt` holding ten views is the shape to avoid.
   - **`application/` and `domain/` list the same packages, one to one.** Each name is an aggregate,
-    or a value group with its own use cases (`catalog`). A capability with no aggregate (photo
-    upload) goes in `shared` on both sides. **A process that spans aggregates (member withdrawal)
+    or a value group with its own use cases (`catalog`). A capability several aggregates use but
+    none owns gets its own package on both sides, named for the capability (`photo`: upload URL,
+    verification, deletion); other aggregates reach it through its `provided/` use case, never its
+    port. `shared` keeps only values, exceptions and read DTOs several aggregates use as-is.
+    **A process that spans aggregates (member withdrawal)
     gets no package at all** — see the cross-aggregate bullet below. A package on one side only is
     a finding.
   - **`adapter/<technology>/<role>/`.** Technology first, then role, so one directory never mixes
