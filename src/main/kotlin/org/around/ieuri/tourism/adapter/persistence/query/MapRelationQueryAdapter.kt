@@ -1,11 +1,12 @@
 package org.around.ieuri.tourism.adapter.persistence.query
 
+import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.common.pagination.keysetPageOf
 import org.around.ieuri.tourism.adapter.persistence.table.MapCellDistrictTable
 import org.around.ieuri.tourism.adapter.persistence.table.MapRelationTable
 import org.around.ieuri.tourism.adapter.persistence.table.MemberDistrictVisitTable
 import org.around.ieuri.tourism.application.relation.required.MapRelationOverlap
 import org.around.ieuri.tourism.application.relation.required.MapRelationQueryPort
-import org.around.ieuri.tourism.domain.relation.RelationCursor
 import org.jetbrains.exposed.v1.core.JoinType
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
@@ -24,25 +25,24 @@ import java.time.ZoneOffset
 @Component
 class MapRelationQueryAdapter : MapRelationQueryPort {
 
-    override fun findRelations(memberId: Long, limit: Int, after: RelationCursor?): List<MapRelationOverlap> {
-        val page = MapRelationTable.select(MapRelationTable.counterpartId, MapRelationTable.createdAt)
+    override fun findRelations(memberId: Long, first: Int, after: String?): CursorPage<MapRelationOverlap> {
+        val seek = after?.let(RelationCursor::decode)
+        val rows = MapRelationTable.select(MapRelationTable.counterpartId, MapRelationTable.createdAt)
             .where {
                 val mine = MapRelationTable.ownerId eq memberId
-                if (after == null) {
+                if (seek == null) {
                     mine
                 } else {
-                    val at = after.createdAt.atOffset(ZoneOffset.UTC)
-                    mine and ((MapRelationTable.createdAt less at) or ((MapRelationTable.createdAt eq at) and (MapRelationTable.counterpartId less after.counterpartId)))
+                    val at = seek.createdAt.atOffset(ZoneOffset.UTC)
+                    mine and ((MapRelationTable.createdAt less at) or ((MapRelationTable.createdAt eq at) and (MapRelationTable.counterpartId less seek.counterpartId)))
                 }
             }
             .orderBy(MapRelationTable.createdAt to SortOrder.DESC, MapRelationTable.counterpartId to SortOrder.DESC)
-            .limit(limit)
+            .limit(first + 1)
             .map { it[MapRelationTable.counterpartId] to it[MapRelationTable.createdAt].toInstant() }
-        if (page.isEmpty()) return emptyList()
-
-        val cellsByMember = visitedCells(page.map { it.first } + memberId)
+        val cellsByMember = if (rows.isEmpty()) emptyMap() else visitedCells(rows.map { it.first } + memberId)
         val mine = cellsByMember[memberId].orEmpty()
-        return page.map { (counterpartId, createdAt) ->
+        val overlaps = rows.map { (counterpartId, createdAt) ->
             val theirs = cellsByMember[counterpartId].orEmpty()
             MapRelationOverlap(
                 counterpartId = counterpartId,
@@ -51,6 +51,7 @@ class MapRelationQueryAdapter : MapRelationQueryPort {
                 createdAt = createdAt,
             )
         }
+        return keysetPageOf(overlaps, first = first, after = after) { RelationCursor(it.createdAt, it.counterpartId).encode() }
     }
 
     /** 회원별 방문 칸(중복 없음). 방문이 없는 회원은 키가 없다. */

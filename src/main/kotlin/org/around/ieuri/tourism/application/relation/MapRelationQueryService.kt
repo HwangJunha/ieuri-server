@@ -2,7 +2,6 @@ package org.around.ieuri.tourism.application.relation
 
 import org.around.ieuri.common.pagination.CursorEdge
 import org.around.ieuri.common.pagination.CursorPage
-import org.around.ieuri.common.pagination.CursorPageInfo
 import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.footprint.NationwideMapPolicy
 import org.around.ieuri.tourism.application.footprint.required.MapOwnerLookupPort
@@ -10,8 +9,6 @@ import org.around.ieuri.tourism.application.relation.provided.MapRelationQueryUs
 import org.around.ieuri.tourism.application.relation.provided.dto.MapRelationView
 import org.around.ieuri.tourism.application.relation.provided.dto.MapRelationsQuery
 import org.around.ieuri.tourism.application.relation.required.MapRelationQueryPort
-import org.around.ieuri.tourism.application.shared.exception.InvalidCursorException
-import org.around.ieuri.tourism.domain.relation.RelationCursor
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -31,23 +28,14 @@ class MapRelationQueryService(
      */
     override fun mapRelations(query: MapRelationsQuery, memberId: Long): CursorPage<MapRelationView> {
         val first = query.first.coerceIn(1, policy.maxRelationPageSize)
-        val after = query.after?.let {
-            try {
-                RelationCursor.decode(it)
-            } catch (e: IllegalArgumentException) {
-                throw InvalidCursorException(cause = e)
-            }
-        }
+        val page = mapRelationQueryPort.findRelations(memberId, first, query.after)
 
-        val fetched = mapRelationQueryPort.findRelations(memberId, first + 1, after)
-        val hasNextPage = fetched.size > first
-        val page = fetched.take(first)
-
-        val nicknames = mapOwnerLookupPort.findNicknames(page.map { it.counterpartId })
-        val edges = page.mapNotNull { overlap ->
+        val nicknames = mapOwnerLookupPort.findNicknames(page.edges.map { it.node.counterpartId })
+        val edges = page.edges.mapNotNull { edge ->
+            val overlap = edge.node
             nicknames[overlap.counterpartId]?.let { nickname ->
                 CursorEdge(
-                    cursor = RelationCursor(overlap.createdAt, overlap.counterpartId).encode(),
+                    cursor = edge.cursor,
                     node = MapRelationView(
                         memberId = overlap.counterpartId,
                         nickname = nickname,
@@ -60,17 +48,10 @@ class MapRelationQueryService(
             }
         }
 
-        // endCursor는 걸러진 뒤가 아니라 읽어 온 마지막 행에서 뽑는다.
-        val lastCursor = page.lastOrNull()?.let { RelationCursor(it.createdAt, it.counterpartId).encode() }
-
+        // hasNextPage·endCursor는 거르기 전 그대로 두고, startCursor만 남은 엣지에서 다시 뽑는다.
         return CursorPage(
             edges = edges,
-            pageInfo = CursorPageInfo(
-                hasNextPage = hasNextPage,
-                hasPreviousPage = query.after != null,
-                startCursor = edges.firstOrNull()?.cursor,
-                endCursor = lastCursor,
-            ),
+            pageInfo = page.pageInfo.copy(startCursor = edges.firstOrNull()?.cursor),
             totalCount = null,
         )
     }

@@ -1,5 +1,6 @@
-package org.around.ieuri.tourism.domain.catalog
+package org.around.ieuri.tourism.adapter.persistence.query
 
+import org.around.ieuri.tourism.application.shared.exception.InvalidCursorException
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.DisplayName
@@ -39,7 +40,7 @@ class LikedSpotCursorTest {
         // 이관 이전 형식: {updatedAt}|{spotId}. 필드 타입이 새 형식과 같다.
         val legacy = encodeRaw("$updatedAt|4321")
 
-        assertThrows(IllegalArgumentException::class.java) { LikedSpotCursor.decode(legacy) }
+        assertThrows(InvalidCursorException::class.java) { LikedSpotCursor.decode(legacy) }
     }
 
     @Test
@@ -47,16 +48,16 @@ class LikedSpotCursorTest {
     fun `rejects unknown prefix`() {
         val other = encodeRaw("v3|$updatedAt|4321")
 
-        assertThrows(IllegalArgumentException::class.java) { LikedSpotCursor.decode(other) }
+        assertThrows(InvalidCursorException::class.java) { LikedSpotCursor.decode(other) }
     }
 
     @Test
     @DisplayName("필드 수가 다르면 거부한다")
     fun `rejects wrong field count`() {
-        assertThrows(IllegalArgumentException::class.java) {
+        assertThrows(InvalidCursorException::class.java) {
             LikedSpotCursor.decode(encodeRaw("v2|$updatedAt|4321|extra"))
         }
-        assertThrows(IllegalArgumentException::class.java) {
+        assertThrows(InvalidCursorException::class.java) {
             LikedSpotCursor.decode(encodeRaw("v2|$updatedAt"))
         }
     }
@@ -64,11 +65,11 @@ class LikedSpotCursorTest {
     @Test
     @DisplayName("Base64가 아니거나 값이 깨진 커서는 거부한다")
     fun `rejects malformed cursor`() {
-        assertThrows(IllegalArgumentException::class.java) { LikedSpotCursor.decode("!!!not-base64!!!") }
-        assertThrows(IllegalArgumentException::class.java) {
+        assertThrows(InvalidCursorException::class.java) { LikedSpotCursor.decode("!!!not-base64!!!") }
+        assertThrows(InvalidCursorException::class.java) {
             LikedSpotCursor.decode(encodeRaw("v2|not-an-instant|4321"))
         }
-        assertThrows(IllegalArgumentException::class.java) {
+        assertThrows(InvalidCursorException::class.java) {
             LikedSpotCursor.decode(encodeRaw("v2|$updatedAt|not-a-number"))
         }
     }

@@ -5,6 +5,9 @@ import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
 import org.around.ieuri.common.event.LocationAccessed
+import org.around.ieuri.common.pagination.CursorEdge
+import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.common.pagination.cursorPageOf
 import org.around.ieuri.tourism.application.catalog.provided.dto.FestivalView
 import org.around.ieuri.tourism.application.catalog.provided.dto.OngoingFestivalsQuery
 import org.around.ieuri.tourism.application.catalog.provided.dto.PopularSpotView
@@ -22,8 +25,6 @@ import org.around.ieuri.tourism.application.catalog.required.PopularSpotSearch
 import org.around.ieuri.tourism.application.catalog.required.SpotSearchPort
 import org.around.ieuri.tourism.application.catalog.required.SpotSearchQuery
 import org.around.ieuri.tourism.domain.catalog.CategorySelection
-import org.around.ieuri.tourism.domain.catalog.DistanceCursor
-import org.around.ieuri.tourism.domain.catalog.LikeCountCursor
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.CopyrightType
 import org.around.ieuri.tourism.domain.shared.DomainLocale
@@ -76,8 +77,8 @@ class SpotDiscoveryServiceTest {
         every { spotSearchPort.search(any()) } returns emptyList()
         every { spotSearchPort.count(any()) } returns 0
         every { spotSearchPort.suggest(any(), any(), any(), any(), any()) } returns emptyList()
-        every { festivalQueryPort.findOngoing(any()) } returns emptyList()
-        every { popularSpotQueryPort.findPopular(any()) } returns emptyList()
+        every { festivalQueryPort.findOngoing(any()) } returns page()
+        every { popularSpotQueryPort.findPopular(any()) } returns page()
     }
 
     // ── R1 · BM25 관련도 검색 ────────────────────────────────────────────────
@@ -373,7 +374,7 @@ class SpotDiscoveryServiceTest {
     @Test
     fun `진행 중 판정 기준일은 시계에서 온다`() {
         val captured = slot<OngoingFestivalSearch>()
-        every { festivalQueryPort.findOngoing(capture(captured)) } returns emptyList()
+        every { festivalQueryPort.findOngoing(capture(captured)) } returns page()
 
         service.ongoingFestivals(festivalQuery(), DomainLocale.KO, memberId = null)
 
@@ -392,7 +393,7 @@ class SpotDiscoveryServiceTest {
     /** 포트가 돌려준 순서(거리 오름차순)를 서비스가 보존한다. */
     @Test
     fun `축제는 포트가 준 순서를 보존한다`() {
-        every { festivalQueryPort.findOngoing(any()) } returns listOf(
+        every { festivalQueryPort.findOngoing(any()) } returns page(
             festival(id = 1L, distanceMeters = 500.0),
             festival(id = 2L, distanceMeters = 5_000.0),
         )
@@ -402,23 +403,12 @@ class SpotDiscoveryServiceTest {
         assertEquals(listOf(1L, 2L), page.edges.map { it.node.spot.id })
     }
 
-    /** 축제도 한 건 더 읽어 다음 페이지를 판정한다. */
-    @Test
-    fun `축제도 요청보다 한 건 더 오면 hasNextPage가 true다`() {
-        every { festivalQueryPort.findOngoing(any()) } returns (1..3L).map { festival(id = it) }
-
-        val page = service.ongoingFestivals(festivalQuery(first = 2), DomainLocale.KO, memberId = null)
-
-        assertTrue(page.pageInfo.hasNextPage)
-        assertEquals(listOf(1L, 2L), page.edges.map { it.node.spot.id })
-    }
-
     // ── R18 · 인기 ─────────────────────────────────────────────────────────
 
     /** AC-18.1 — 포트가 준 좋아요 내림차순을 보존하고 likeCount를 함께 싣는다. */
     @Test
     fun `인기 목록은 좋아요 수와 함께 반환된다`() {
-        every { popularSpotQueryPort.findPopular(any()) } returns listOf(
+        every { popularSpotQueryPort.findPopular(any()) } returns page(
             popular(spotId = 1L, likeCount = 30L),
             popular(spotId = 2L, likeCount = 12L),
         )
@@ -433,7 +423,7 @@ class SpotDiscoveryServiceTest {
     @Test
     fun `좋아요 하한 10이 포트로 전달된다`() {
         val captured = slot<PopularSpotSearch>()
-        every { popularSpotQueryPort.findPopular(capture(captured)) } returns emptyList()
+        every { popularSpotQueryPort.findPopular(capture(captured)) } returns page()
 
         service.popularSpots(popularQuery(), DomainLocale.KO, memberId = null)
 
@@ -448,28 +438,11 @@ class SpotDiscoveryServiceTest {
         assertTrue(page.edges.isEmpty())
     }
 
-    /** AC-18.3 — 커서가 (좋아요 수, id)라 동점에서도 페이지 간 중복이 없다. */
-    @Test
-    fun `인기 커서는 좋아요 수와 id를 함께 인코딩한다`() {
-        every { popularSpotQueryPort.findPopular(any()) } returns listOf(
-            popular(spotId = 1L, likeCount = 12L),
-            popular(spotId = 2L, likeCount = 12L),
-        )
-
-        val page = service.popularSpots(popularQuery(), DomainLocale.KO, memberId = null)
-
-        val decoded = page.edges.map {
-            LikeCountCursor.decode(it.cursor)
-        }
-        assertEquals(listOf(1L, 2L), decoded.map { it.spotId })
-        assertEquals(listOf(12L, 12L), decoded.map { it.likeCount })
-    }
-
     /** 카테고리 필터는 인기 목록에도 적용된다. */
     @Test
     fun `인기 목록도 카테고리를 포트로 전달한다`() {
         val captured = slot<PopularSpotSearch>()
-        every { popularSpotQueryPort.findPopular(capture(captured)) } returns emptyList()
+        every { popularSpotQueryPort.findPopular(capture(captured)) } returns page()
 
         service.popularSpots(popularQuery(category = SpotCategory.TOURIST_SPOT), DomainLocale.KO, memberId = null)
 
@@ -511,57 +484,30 @@ class SpotDiscoveryServiceTest {
         }
     }
 
-    /** 커서를 넘겨 받은 페이지는 앞 페이지가 있다 — 커서 커넥션 2종 공통이다. */
+    /** 커서의 속은 쿼리 어댑터만 안다 — 서비스는 받은 문자열을 그대로 넘긴다. */
     @Test
-    fun `after를 주면 hasPreviousPage가 true다`() {
-        val festivals = service.ongoingFestivals(
-            festivalQuery(after = DistanceCursor(100.0, 1L).encode()),
-            DomainLocale.KO,
-            memberId = null,
-        )
-        val popular = service.popularSpots(
-            popularQuery(after = LikeCountCursor(12L, 1L).encode()),
-            DomainLocale.KO,
-            memberId = null,
-        )
-
-        assertTrue(festivals.pageInfo.hasPreviousPage)
-        assertTrue(popular.pageInfo.hasPreviousPage)
-    }
-
-    /** 축제·인기의 after도 디코딩되어 포트의 seek 조건으로 넘어간다. */
-    @Test
-    fun `축제와 인기의 after 커서도 디코딩되어 포트로 전달된다`() {
+    fun `축제와 인기의 after는 해석하지 않고 그대로 포트로 넘긴다`() {
         val festivalSearch = slot<OngoingFestivalSearch>()
-        every { festivalQueryPort.findOngoing(capture(festivalSearch)) } returns emptyList()
+        every { festivalQueryPort.findOngoing(capture(festivalSearch)) } returns page()
         val popularSearch = slot<PopularSpotSearch>()
-        every { popularSpotQueryPort.findPopular(capture(popularSearch)) } returns emptyList()
+        every { popularSpotQueryPort.findPopular(capture(popularSearch)) } returns page()
 
-        service.ongoingFestivals(
-            festivalQuery(after = DistanceCursor(1234.5, 7L).encode()),
-            DomainLocale.KO,
-            memberId = null,
-        )
-        service.popularSpots(
-            popularQuery(after = LikeCountCursor(99L, 3L).encode()),
-            DomainLocale.KO,
-            memberId = null,
-        )
+        service.ongoingFestivals(festivalQuery(after = "festival-cursor"), DomainLocale.KO, memberId = null)
+        service.popularSpots(popularQuery(after = "popular-cursor"), DomainLocale.KO, memberId = null)
 
-        assertEquals(DistanceCursor(1234.5, 7L), festivalSearch.captured.after)
-        assertEquals(LikeCountCursor(99L, 3L), popularSearch.captured.after)
+        assertEquals("festival-cursor", festivalSearch.captured.after)
+        assertEquals("popular-cursor", popularSearch.captured.after)
     }
 
-    /** 다른 커넥션의 커서를 넘기면 조용히 엉뚱한 위치로 뛰지 않고 거절된다. */
+    /** 페이지 크기는 상한으로 자른 값이 포트로 간다. */
     @Test
-    fun `종류가 다른 커서는 거절된다`() {
-        assertFailsWith<IllegalArgumentException> {
-            service.ongoingFestivals(
-                festivalQuery(after = LikeCountCursor(1L, 1L).encode()),
-                DomainLocale.KO,
-                memberId = null,
-            )
-        }
+    fun `축제와 인기의 페이지 크기는 상한으로 잘려 포트로 간다`() {
+        val festivalSearch = slot<OngoingFestivalSearch>()
+        every { festivalQueryPort.findOngoing(capture(festivalSearch)) } returns page()
+
+        service.ongoingFestivals(festivalQuery(first = 999), DomainLocale.KO, memberId = null)
+
+        assertEquals(policy.maxSearchPageSize, festivalSearch.captured.limit)
     }
 
     /** first가 0이나 음수여도 최소 1로 올린다 — 스키마가 임의의 Int를 허용한다. */
@@ -697,4 +643,11 @@ class SpotDiscoveryServiceTest {
 
         verify(exactly = 0) { eventPublisher.publish(any()) }
     }
+
+    /** 포트가 돌려주는 커서 페이지. 커서 문자열은 서비스가 해석하지 않으므로 아무 값이나 둔다. */
+    private fun <T> page(vararg nodes: T): CursorPage<T> = cursorPageOf(
+        edges = nodes.mapIndexed { index, node -> CursorEdge("c-$index", node) },
+        hasNextPage = false,
+        hasPreviousPage = false,
+    )
 }

@@ -1,7 +1,7 @@
 package org.around.ieuri.tourism.application.catalog.required
 
+import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.tourism.application.catalog.provided.dto.FestivalView
-import org.around.ieuri.tourism.domain.catalog.DistanceCursor
 import org.around.ieuri.tourism.domain.shared.Coordinates
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import java.time.LocalDate
@@ -15,7 +15,7 @@ interface FestivalQueryPort {
      * 반경 안에서 [asOf]가 행사 기간에 포함된 축제. 거리 오름차순 + id 오름차순.
      * - `limit + 1`건까지 돌려준다 — 초과분은 다음 페이지 판정용이다.
      */
-    fun findOngoing(query: OngoingFestivalSearch): List<FestivalView>
+    fun findOngoing(query: OngoingFestivalSearch): CursorPage<FestivalView>
 }
 
 /**
@@ -28,5 +28,6 @@ data class OngoingFestivalSearch(
     val radiusMeters: Int,
     val asOf: LocalDate,
     val limit: Int,
-    val after: DistanceCursor?,
+    /** 앞 페이지의 endCursor. 읽지 못하면 INVALID_CURSOR다. */
+    val after: String?,
 )

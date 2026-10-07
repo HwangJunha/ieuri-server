@@ -6,8 +6,6 @@ import org.around.ieuri.common.pagination.CursorPageInfo
 import org.around.ieuri.tourism.application.catalog.provided.dto.LikedSpotView
 import org.around.ieuri.tourism.application.catalog.required.LikedSpotSearchPort
 import org.around.ieuri.tourism.application.catalog.required.LikedSpotsSearch
-import org.around.ieuri.tourism.application.shared.exception.InvalidCursorException
-import org.around.ieuri.tourism.domain.catalog.LikedSpotCursor
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.CopyrightType
 import org.springframework.beans.factory.annotation.Qualifier
@@ -34,13 +32,7 @@ class LikedSpotSearchQueryAdapter(
 
     private fun runSearch(query: LikedSpotsSearch, text: String): List<LikedSpotView> {
         val limit = query.first + 1
-        val cursor = query.after?.let {
-            try {
-                LikedSpotCursor.decode(it)
-            } catch (e: IllegalArgumentException) {
-                throw InvalidCursorException(cause = e)
-            }
-        }
+        val cursor = query.after?.let { LikedSpotCursor.decode(it) }
 
         val conditions = mutableListOf(
             "r.member_id = ?",

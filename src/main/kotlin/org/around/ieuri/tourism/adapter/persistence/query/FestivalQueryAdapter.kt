@@ -1,5 +1,7 @@
 package org.around.ieuri.tourism.adapter.persistence.query
 
+import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.common.pagination.keysetPageOf
 import org.around.ieuri.tourism.application.catalog.provided.dto.FestivalView
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
 import org.around.ieuri.tourism.application.catalog.required.FestivalQueryPort
@@ -23,22 +25,23 @@ class FestivalQueryAdapter(
     @Qualifier("searchJdbcTemplate") private val jdbcTemplate: JdbcTemplate,
 ) : FestivalQueryPort {
 
-    /** 거리 오름차순 + id 오름차순. `limit + 1`건을 읽어 호출자가 다음 페이지 존재를 판정한다. */
-    override fun findOngoing(query: OngoingFestivalSearch): List<FestivalView> {
+    /** 거리 오름차순 + id 오름차순. `limit + 1`건을 읽어 다음 페이지 존재를 판정하고 커서를 붙인다. */
+    override fun findOngoing(query: OngoingFestivalSearch): CursorPage<FestivalView> {
+        val after = query.after?.let(DistanceCursor::decode)
         val (where, whereParams) = whereClause(query)
         // 파라미터는 `?` 등장 순서다: SELECT의 거리 중심 → 번역 JOIN → WHERE.
         val params = (listOf<Any>(query.center.longitude, query.center.latitude) + whereParams).toMutableList()
 
-        val seek = if (query.after != null) {
-            params += query.after.distanceMeters
-            params += query.after.spotId
+        val seek = if (after != null) {
+            params += after.distanceMeters
+            params += after.spotId
             "WHERE (distance_meters, id) > (?, ?)"
         } else {
             ""
         }
         params += query.limit + 1
 
-        return jdbcTemplate.query(
+        val rows = jdbcTemplate.query(
             """
             SELECT * FROM (
                 SELECT cat.id, t.title, t.address, cat.thumbnail_image_url, cat.map_x, cat.map_y,
@@ -76,6 +79,7 @@ class FestivalQueryAdapter(
             },
             *params.toTypedArray(),
         )
+        return keysetPageOf(rows, first = query.limit, after = query.after) { DistanceCursor(it.spot.distanceMeters, it.spot.id).encode() }
     }
 
     /**

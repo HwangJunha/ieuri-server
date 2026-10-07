@@ -3,7 +3,6 @@ package org.around.ieuri.tourism.application.catalog
 import org.around.ieuri.common.event.LocationAccessed
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.OffsetPage
-import org.around.ieuri.common.pagination.keysetPageOf
 import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.catalog.SpotQueryPolicy
 import org.around.ieuri.tourism.application.catalog.provided.SpotDiscoveryUseCase
@@ -24,8 +23,6 @@ import org.around.ieuri.tourism.application.catalog.required.PopularSpotQueryPor
 import org.around.ieuri.tourism.application.catalog.required.PopularSpotSearch
 import org.around.ieuri.tourism.application.catalog.required.SpotSearchPort
 import org.around.ieuri.tourism.application.catalog.required.SpotSearchQuery
-import org.around.ieuri.tourism.domain.catalog.DistanceCursor
-import org.around.ieuri.tourism.domain.catalog.LikeCountCursor
 import org.around.ieuri.tourism.domain.shared.Coordinates
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.springframework.stereotype.Service
@@ -37,7 +34,6 @@ import java.time.ZoneId
 /**
  * spot 발견 조회 구현(SPEC-0013).
  * - 좌표·반경 검증은 `spots`와 같은 예외를 쓴다.
- * - 커서 페이지는 한 건 더 읽어 다음 페이지 존재를 판정한다.
  * - 전체 건수는 검색만 센다.
  * - 정렬 키에 spot id를 tie-breaker로 붙인다(R7).
  */
@@ -133,14 +129,10 @@ class SpotDiscoveryService(
             radiusMeters = query.radiusMeters,
             asOf = LocalDate.ofInstant(clock.instant(), FESTIVAL_ZONE),
             limit = first,
-            after = query.after?.let { DistanceCursor.decode(it) },
+            after = query.after,
         )
 
-        return keysetPageOf(
-            rows = festivalQueryPort.findOngoing(search),
-            first = first,
-            after = query.after,
-        ) { DistanceCursor(it.spot.distanceMeters, it.spot.id).encode() }
+        return festivalQueryPort.findOngoing(search)
     }
 
     /** 인기 spot(R18). 좋아요 하한은 정책값이며 클라이언트가 고를 수 없다. */
@@ -161,14 +153,10 @@ class SpotDiscoveryService(
             categories = query.categories,
             minLikeCount = policy.minPopularLikeCount,
             limit = first,
-            after = query.after?.let { LikeCountCursor.decode(it) },
+            after = query.after,
         )
 
-        return keysetPageOf(
-            rows = popularSpotQueryPort.findPopular(search),
-            first = first,
-            after = query.after,
-        ) { LikeCountCursor(it.likeCount, it.spot.id).encode() }
+        return popularSpotQueryPort.findPopular(search)
     }
 
     /** 검증 실패 시의 응답. connection이 non-null이라 빈 값이라도 있어야 한다(POL-015). */

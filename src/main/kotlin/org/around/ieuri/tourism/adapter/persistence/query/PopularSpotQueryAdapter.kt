@@ -1,5 +1,7 @@
 package org.around.ieuri.tourism.adapter.persistence.query
 
+import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.common.pagination.keysetPageOf
 import org.around.ieuri.tourism.application.catalog.provided.dto.PopularSpotView
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
 import org.around.ieuri.tourism.application.catalog.required.PopularSpotQueryPort
@@ -23,25 +25,26 @@ class PopularSpotQueryAdapter(
 ) : PopularSpotQueryPort {
 
     /**
-     * 좋아요 내림차순 + id 오름차순. `limit + 1`건을 읽어 호출자가 다음 페이지 존재를 판정한다.
+     * 좋아요 내림차순 + id 오름차순. `limit + 1`건을 읽어 다음 페이지 존재를 판정하고 커서를 붙인다.
      * - seek을 한 줄로 쓰려고 like_count 부호를 뒤집는다. 커서에는 원래 값이 실린다.
      */
-    override fun findPopular(query: PopularSpotSearch): List<PopularSpotView> {
+    override fun findPopular(query: PopularSpotSearch): CursorPage<PopularSpotView> {
+        val after = query.after?.let(LikeCountCursor::decode)
         val (where, whereParams) = whereClause(query)
         // 파라미터는 `?` 등장 순서다: SELECT의 거리 중심 → 두 JOIN → WHERE → HAVING.
         val params = (listOf<Any>(query.center.longitude, query.center.latitude) + whereParams).toMutableList()
         params += query.minLikeCount // HAVING
 
-        val seek = if (query.after != null) {
-            params += -query.after.likeCount
-            params += query.after.spotId
+        val seek = if (after != null) {
+            params += -after.likeCount
+            params += after.spotId
             "WHERE (-like_count, id) > (?, ?)"
         } else {
             ""
         }
         params += query.limit + 1
 
-        return jdbcTemplate.query(
+        val rows = jdbcTemplate.query(
             """
             SELECT * FROM (
                 SELECT cat.id, t.title, t.address, cat.thumbnail_image_url, cat.map_x, cat.map_y,
@@ -86,6 +89,7 @@ class PopularSpotQueryAdapter(
             },
             *params.toTypedArray(),
         )
+        return keysetPageOf(rows, first = query.limit, after = query.after) { LikeCountCursor(it.likeCount, it.spot.id).encode() }
     }
 
     /**

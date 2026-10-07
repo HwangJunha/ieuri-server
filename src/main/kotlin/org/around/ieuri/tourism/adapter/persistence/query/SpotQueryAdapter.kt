@@ -15,8 +15,6 @@ import org.around.ieuri.tourism.application.catalog.required.LikedSpotsSearch
 import org.around.ieuri.tourism.application.catalog.required.SpotBasics
 import org.around.ieuri.tourism.application.catalog.required.SpotIdentity
 import org.around.ieuri.tourism.application.catalog.required.SpotQueryPort
-import org.around.ieuri.tourism.application.shared.exception.InvalidCursorException
-import org.around.ieuri.tourism.domain.catalog.LikedSpotCursor
 import org.around.ieuri.tourism.domain.catalog.ReactionType
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.jetbrains.exposed.v1.core.JoinType
@@ -136,14 +134,7 @@ class SpotQueryAdapter : SpotQueryPort {
     }
 
     override fun findLikedSpots(query: LikedSpotsSearch): CursorPage<LikedSpotView> {
-        val cursor = query.after?.let {
-            // 구 커서(v2 접두사 없음)는 형식 단계에서 거부된다(SPEC-0019 §4.3).
-            try {
-                LikedSpotCursor.decode(it)
-            } catch (e: IllegalArgumentException) {
-                throw InvalidCursorException(cause = e)
-            }
-        }
+        val cursor = query.after?.let { LikedSpotCursor.decode(it) }
 
         var condition: Op<Boolean> = (SpotReactionTable.memberId eq query.memberId) and
             (SpotReactionTable.reaction eq ReactionType.LIKE.name) and
