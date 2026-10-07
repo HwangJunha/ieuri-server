@@ -132,6 +132,10 @@
 | D-93 | S13 | **조회가 무엇을 돌려주는지의 경계: 답이 도메인 객체 자체면 도메인을, 아니면 읽기 모델을 돌려준다.** 셋 다 "예"일 때 도메인이다 — ① 도메인 모델이 답의 모든 필드를 갖는가 ② 누가 물어도 같은 답인가 ③ 페이지·정렬처럼 조회 방식이 만든 값이 없는가. 기존 코드는 차근차근 맞춘다 | 사용자 결정(2026-10-07). splearn은 `MemberFinder.find(): Member`처럼 도메인을 돌려주지만, 조회가 "id로 하나"뿐이라 답이 곧 도메인이다. 요청 좌표로부터의 거리·집계·번역 조인·페이지는 도메인이 가질 수 없는 값이라 읽기 모델이 필요하다 | **읽기는 늘 DTO**: 도메인과 필드가 같은 뷰를 한 벌 더 만들고 서비스가 손으로 복사하게 된다(D-94의 원인). **늘 도메인**: 거리·관련도를 도메인이 품게 된다 |
 | D-94 | S13 | **같은 질문에 답하는 읽기 모델은 한 벌만 둔다. 소유는 질문의 주인이다.** `SpotSearchResult`(required)를 지우고 `SpotView`(catalog `provided/dto`, 주변·검색·추천 카드)를 읽기 포트가 직접 돌려준다 — `attributionText`는 `copyright`에서 도출하는 속성이다. 상세 하위 필드는 D-93에 따라 도메인(`SpotImage`·`SpotIntro`·`SpotInfoItem`)을 돌려주고 같은 모양의 뷰 3개를 지웠다. `SpotDetailView`는 카탈로그 id·좌표를 합치므로 읽기 모델로 남긴다. GraphQL 변환은 리졸버에서 `SpotGqlMapper`로 옮겼다(중복 `SpotView.toGql` 제거) | `SpotSearchResult` → `SpotView` 복사가 서비스 3곳(catalog 2·recommendation 1)에 똑같이 있었다. 추천도 같은 카드를 돌려주므로 catalog가 소유하고 추천이 가져다 쓴다 | **유지**: `MapCandidateView`(점수용 거리 포함) → `MapSpotView`(뷰포트 마커, 거리 없음), `SpotBasics`(부재 응답 재료) → `SpotSummaryView`(다른 도메인용 요약)는 묻는 것이 달라 두 벌이 맞다 |
 | D-95 | S13 | **오프셋 페이지는 `common/pagination/OffsetPage<T>` 하나다**(`CursorPage<T>`와 나란히). `hasNext`는 `OffsetPage.of(items, page, size, totalCount)`가 전체 건수에서 도출한다. `SpotPageView`를 지우고 `spots`는 `OffsetPage<SpotView>`, 검색은 `userErrors` + `results: OffsetPage<SpotView>`다. `dto` 패키지는 유지한다(사용자 선호) | 커서 페이지는 공통 제네릭인데 오프셋 페이지만 응답마다 선언했고, 필드가 GraphQL `SpotPage`를 그대로 베꼈다. `hasNext` 계산식이 `spots`·검색 두 곳에 같았다. 순수 값 모양이라 공통에 둘 대상이다(D-91의 "공통 VO·DTO") | **Spring Data `Page`·`Slice`**: application이 영속 라이브러리에 묶이고 Exposed 이전으로 사라질 의존이다. **`dto` 패키지 폐지**: 사용자가 따로 두는 쪽을 선호 |
+| D-96 | S13 | **커서는 쿼리 어댑터가 소유한다.** 커서 타입(`DistanceCursor`·`LikeCountCursor`·`RelationCursor`·`LikedSpotCursor`)을 도메인에서 `adapter/persistence/query/KeysetCursors`로 옮기고, 포트는 불투명 문자열 `after`를 받아 커서가 채워진 `CursorPage`를 돌려준다. base64 포장은 `common/pagination/CursorToken` 하나다. 바이트 형식은 그대로이고, 읽지 못하는 커서는 어느 목록이든 INVALID_CURSOR다. 쓰이지 않던 `CursorQuery`는 지웠다 | 커서는 조회가 만든 값이라 D-93 ③에 걸려 도메인일 수 없다. keyset 조건과 다음 커서를 같은 곳(쿼리)이 만들어야 정렬 키와 어긋나지 않는다. 이전에는 축제·인기·관계는 서비스가, 좋아요 목록은 어댑터가 디코딩해 규칙이 둘이었고, base64 코드가 여러 벌이었다. 관계 목록은 어댑터가 거르기 전 행으로 pageInfo를 채우고 서비스가 startCursor만 다시 뽑는다 | **커서 타입을 application(포트 입력)에**: 서비스가 정렬 키 구조를 알게 된다. **community 커서도 함께**: community `shared` 정리 때 같은 규칙으로 |
+| D-97 | S13 | **ktlint `no-unused-imports`를 켠다**(`.editorconfig`). 저장소 전체 위반 20건은 import 줄 삭제뿐이다 | ktlint 1.7부터 이 규칙이 기본 꺼짐이라(ktlint 문서, standard rules) 테스트 분할 때 복사된 import 216줄을 잡지 못했다. 쓰지 않는 import는 패키지 간 의존을 실제보다 넓게 보이게 해 D-84의 목적을 흐린다. 사용자 승인(B-2 A) | **tourism만 스크립트로 정리**: 다음 복사 때 다시 쌓인다 |
+| D-98 | S13 | **외부 I/O를 끼는 조회는 트랜잭션 없는 오케스트레이터와 readOnly 읽기 서비스로 나눈다**(D-83 선례): `SpotDetailQueryService` + `SpotDetailReadService`, `CongestionQueryService` + `CongestionAreaReadService`. 좋아요 수·내 반응은 카탈로그의 반응을 읽으므로 `SpotCatalogQueryUseCase`로 옮겼다. **예외**: `mapViewport`의 캐시된 문화행사(Valkey 읽기)는 catalog 트랜잭션 안에 남는다 | 상세는 본문·하위 필드 미스 때 TourAPI를, 혼잡도는 서울 열린데이터를 DB 조회 뒤에 불러 그동안 연결을 잡았다(CLAUDE.md "외부 I/O는 트랜잭션 밖"). 사용자 승인(B-1 A) | **그대로 두고 기록**: 업스트림이 느릴 때 풀이 마른다. **뷰포트도 분리**: HTTP 없이 Valkey 읽기 하나라 서비스 쌍을 하나 더 늘릴 값이 없다 |
+| D-99 | S13 | **정책값은 쓰는 쪽이 소유한다**: 지도 추천 한도는 `MapRecommendationPolicy`, 관계 페이지 크기는 `MapRelationPolicy`. 설정 키·`*Properties`는 그대로다. 응용 계층 이름은 `Footprint*`(`FootprintPolicy`·`FootprintCommands`), 스키마 루트 `nationwideMap`을 따르는 어댑터 이름(리졸버·GraphQL 매퍼·설정)은 남긴다 | `MapViewportPolicy`가 추천 한도를, `NationwideMapPolicy`가 관계 페이지 크기를 들고 있어 소유자가 보이지 않았다(D-84와 같은 이유) | **설정 키도 개명**: 배포 매니페스트·환경 변수를 함께 바꿔야 한다 — 이 SPEC의 범위(D-56)를 넘는다 |
 
 ## 부족한 정보
 
@@ -210,6 +214,8 @@ grep으로 확인한 수(worktree `82fdd48`):
 
 **4차(2026-10-07, D-93~D-95)** — `OffsetPageTest`(다음 페이지 판정·경계·오버플로·빈 페이지), `SpotGqlMapperTest`에 오프셋 페이지·이미지·운영 정보·이용안내 변환(필드별, 선택 필드 null)을 더했다. 실패 확인 6건(경계 `<=`, Int 곱 오버플로, 이미지·운영 정보·이용안내 필드 교환, 항목 순서 뒤집기) 모두 빨개졌다. 재측정 조회 46/54·오류 38/39·쓰기 45/46(이전과 같음), 갤러리·운영 정보·이용안내 필드 응답 정상.
 
+**5차(2026-10-07, D-96~D-99)** — 커서 테스트를 어댑터 패키지(`KeysetCursorsTest`·`LikedSpotCursorTest`)로 옮겨 바이트 형식 고정·접두사 없는 커서 거부를 더했고, `keysetPageOf`는 `common/pagination/CursorPageTest`로 고정했다. 리졸버에서 옮긴 변환(지도·혼잡도·지역 추천·관계 커넥션·공유 링크·카테고리·자동완성·축제·좋아요·인기)마다 필드별 테스트를 뒀다. 오케스트레이터 테스트는 실제 읽기 서비스에 목 포트를 물려 기존 스텁을 그대로 쓴다. 구조로 보장돼 지운 테스트: "likeCount는 3단 폴백에 들어가지 않는다"(다른 서비스), 커서 디코딩·인코딩 서비스 테스트(어댑터로). 실패 확인 8건(인구 하한·상한, 뷰포트 위경도, 행사 위경도, 좌표 입력, 축제 기간, 카테고리 라벨, 공유 링크 시각 교환, 커서 접두사 검사 제거) 모두 빨개졌다. 재측정 조회 46/54·오류 38/39·쓰기 45/46(이전과 같음), 운영 정보·갤러리 응답 정상. 잘못된 축제·인기 커서의 오류 코드는 런타임으로 확인하지 못했다(아래 응답 차이).
+
 ### S12에서 생긴 응답 차이 (VC-001에 의도한 차이로 기록)
 
 - `createPost` 태그 6개: `INVALID_INPUT` → `TOO_MANY_TAGS`(메시지는 같다). 판정을 도메인 한 곳으로 모으면서 생성·수정 경로의 비대칭(D-05)이 없어졌다. **클라이언트 무영향 확인 후 확정(2026-10-04)**: 클라이언트는 입력 단계에서 태그를 5개로 막아(`maxPostTags = 5`) 6개를 보내지 않고, 글 작성 화면은 이미 `TOO_MANY_TAGS` 전용 문구를 둔다(서버가 그 코드를 낸다고 가정한 주석까지 있다). D-05를 뒤집는다.
@@ -223,6 +229,7 @@ grep으로 확인한 수(worktree `82fdd48`):
 
 - `spotDetail.category`가 채워진다(`code`·`label`). dev는 `category.code` null 오류(errors x3)였다 — 읽기 모델의 분류가 값 클래스라 실행 중 문자열로 풀려 생성 타입 자리에 들어갔다. `SpotDetail.category` 필드 리졸버가 생성 타입으로 옮긴다.
 - tourism 업무 예외가 제 코드로 나간다: `SPOT_NOT_FOUND`·`MAP_CELL_NOT_FOUND`·`SHARE_LINK_NOT_FOUND`(조회·`createMapRelation`)·`RADIUS_TOO_LARGE`·`INVALID_ZOOM`·`BBOX_TOO_LARGE`. dev는 전부 `INTERNAL_ERROR`였다 — 리졸버 예외가 `InvocationTargetException`에 싸여 tourism 처리기가 알아보지 못했다. 처리기가 원인 사슬에서 찾는다.
+- 읽지 못하는 축제·인기 커서가 INVALID_CURSOR로 나간다(D-96). 이전에는 서비스가 디코딩하며 `IllegalArgumentException`을 그대로 올려 업무 예외로 분류되지 않았다 — 관계·좋아요 목록은 이미 INVALID_CURSOR였다. 런타임 비교는 하지 못했다(단위 테스트로만 확인).
 - 이 둘을 빼면 조회 53/54(조회수 부수 효과), 오류 경로 39/39, 쓰기 경로 45/46(하네스 닉네임 표기)이 dev와 같다.
 
 ## 이번 범위 아님
@@ -256,14 +263,9 @@ grep으로 확인한 수(worktree `82fdd48`):
 - 잡 빈 이름의 `tourStats*` — 매니페스트 CronJob이 참조한다
 - 상세 갤러리·이용안내가 빈 결과면 행을 남기지 않아 매일 다시 확보하는 결함(기존 동작)
 - tourism 검색 노드(`searchJdbcTemplate`) 어댑터 — 메인 DB가 아니라 Exposed 이전 대상이 아니다
-- community `shared` 정리(splearn 방식, 포트를 shared에서 빼기 — D-91과 같은 원칙) — 별도로. tourism 진입점 이동으로 community는 import 줄과 주입 타입만 바뀌었다(D-91)
-- `NationwideMap*` 이름(리졸버·정책·명령·GraphQL 매퍼) — 스키마 루트 `nationwideMap`을 따르는 어댑터 이름이라 남긴다. 개명은 서비스·유스케이스만(D-86)
-- 다른 패키지 값을 든 정책 객체(`MapViewportPolicy`의 추천 한도, `NationwideMapPolicy`의 관계 페이지 크기)와 `SpotDiscoveryService`의 중복 좌표·반경 검증 — 이번 재편 전부터 있던 묶음이라 따로
-- `CongestionQueryService.seoulCongestion`이 readOnly 트랜잭션 안에서 DB 조회 뒤 HTTP를 부르는 것 — 옛 `MapQueryService` 구조 그대로이며, 동작 불변 범위에서 별도로 다룬다
-- ktlint가 쓰지 않는 import를 잡지 못하는 원인 조사 — 이번에는 변경 파일을 직접 정리했다
-- D-93 경계를 기존 조회 전체에 적용 — 이번에는 두 벌이던 곳(`SpotSearchResult`·상세 하위 필드 뷰)만. 나머지는 차근차근
-- `SpotQueryResolver`에 남은 좋아요 목록 변환(`LikedSpotView`·`CursorPage`)의 mapper 이동 — 이번에 바뀐 변환만 옮겼다
-- `ConsistencyConventionTest`에 `org.springframework.data..` 금지 추가 — 결정 대기
+- community `shared` 정리(splearn 방식, 포트를 shared에서 빼기 — D-91과 같은 원칙)와 community 커서(D-96) — tourism 다음, 같은 브랜치에서. tourism 진입점 이동으로 community는 import 줄과 주입 타입만 바뀌었다(D-91)
+- 어댑터의 `NationwideMap*` 이름(리졸버·GraphQL 매퍼·설정) — 스키마 루트 `nationwideMap`을 따른다. 응용 계층은 `Footprint*`로 바꿨다(D-99)
+- `ConsistencyConventionTest`에 `org.springframework.data..` 금지 추가 — 하지 않기로 했다(사용자 결정 2026-10-07)
 - community `spotAnswers(없는 질문)`의 `INTERNAL_ERROR` — community 조회 예외라 S13 범위 밖
 
 ## 설계
@@ -303,6 +305,7 @@ grep으로 확인한 수(worktree `82fdd48`):
 
 | 날짜 | 무엇을 | 왜 |
 |---|---|---|
+| 2026-10-07 | D-96(커서는 쿼리 어댑터)·D-97(ktlint 미사용 import)·D-98(외부 I/O 오케스트레이터)·D-99(정책 소유·Footprint 이름), D-93 기준을 tourism 전체에 적용 | 사용자 결정(tourism은 GraphQL 계약만 지키면 지금 다 한다) |
 | 2026-10-07 | D-93(조회 반환의 경계: 도메인 vs 읽기 모델)·D-94(읽기 모델 한 벌)·D-95(`OffsetPage<T>`) | 사용자 결정(경계 표 채택, 읽기 모델 하나로, dto 패키지 유지, 함께 진행) |
 | 2026-10-07 | D-91(shared에 포트 없음, D-84 일부·D-87 뒤집음)·D-92(감사 이벤트는 서비스가 발행) | 사용자 지시(shared에는 공통 exception·VO·DTO만, splearn 기준) |
 | 2026-10-07 | D-84~D-90(shared 최소화·패키지 1:1·조회 서비스 애그리게이트별 분할·community 진입점·지역 지표 배치 단순화·강도 테이블 명시·지문 DSL), D-78·D-82·D-83 일부 바꿈 | 사용자 지시(shared에 다 넣으면 DDD 의미가 없다, 배치 복잡, 테이블 추상화 금지) |
