@@ -5,7 +5,7 @@ import org.around.ieuri.tourism.application.shared.exception.InvalidCursorExcept
 import java.time.Instant
 
 // keyset 커서 — 정렬 키를 담는다. 정렬을 아는 쿼리 어댑터만 만들고 읽는다(SPEC-0039 D-96).
-// 형식은 클라이언트가 들고 있는 값이라 바꾸지 않는다. 읽지 못하면 모두 INVALID_CURSOR다.
+// 형식은 클라이언트가 들고 있는 값이라 바꾸지 않는다. 읽지 못할 때의 오류 응답도 dev와 같게 둔다 — 거리순·인기순은 업무 예외가 아니다.
 
 /** 진행 중 축제 — 거리 오름차순이므로 다음 페이지는 이 값보다 **먼** 행이다. */
 internal data class DistanceCursor(val distanceMeters: Double, val spotId: Long) {
@@ -14,7 +14,10 @@ internal data class DistanceCursor(val distanceMeters: Double, val spotId: Long)
     companion object {
         private const val PREFIX = "d"
 
-        fun decode(cursor: String): DistanceCursor = decodeKeyset(PREFIX, cursor) { key, id -> DistanceCursor(key.toDouble(), id) }
+        fun decode(cursor: String): DistanceCursor {
+            val (key, spotId) = decodeSpotKeyset(PREFIX, cursor, "거리순")
+            return DistanceCursor(key.toDouble(), spotId)
+        }
     }
 }
 
@@ -25,7 +28,10 @@ internal data class LikeCountCursor(val likeCount: Long, val spotId: Long) {
     companion object {
         private const val PREFIX = "l"
 
-        fun decode(cursor: String): LikeCountCursor = decodeKeyset(PREFIX, cursor) { key, id -> LikeCountCursor(key.toLong(), id) }
+        fun decode(cursor: String): LikeCountCursor {
+            val (key, spotId) = decodeSpotKeyset(PREFIX, cursor, "인기순")
+            return LikeCountCursor(key.toLong(), spotId)
+        }
     }
 }
 
@@ -56,6 +62,19 @@ internal data class LikedSpotCursor(val updatedAt: Instant, val catalogId: Long)
             LikedSpotCursor(updatedAt = Instant.parse(parts[1]), catalogId = parts[2].toLong())
         }
     }
+}
+
+/**
+ * 거리순·인기순 커서를 (정렬 키 문자열, spotId)로 되돌린다. 읽지 못하면 [IllegalArgumentException]이다 — INVALID_CURSOR가 아니다(dev 응답 유지).
+ * - 정렬 키의 숫자 변환은 호출부에서 한다. 이 try 밖이라 다른 예외가 올라가는 것까지 dev와 같다.
+ */
+private fun decodeSpotKeyset(prefix: String, cursor: String, label: String): Pair<String, Long> = try {
+    val decoded = CursorToken.unwrap(cursor)
+    require(decoded.startsWith("$prefix:")) { "$label 커서가 아닙니다." }
+    val (key, spotId) = decoded.removePrefix("$prefix:").split("|", limit = 2)
+    key to spotId.toLong()
+} catch (e: RuntimeException) {
+    throw IllegalArgumentException("유효하지 않은 커서입니다.", e)
 }
 
 /** `접두사:정렬키|id` 형식. 접두사로 종류를 구분해 다른 목록의 커서를 거부한다. */

@@ -11,7 +11,6 @@ import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.tourism.adapter.graphql.dataloader.CategoryDisplayDataLoader
 import org.around.ieuri.tourism.adapter.graphql.mapper.toCategorySelection
 import org.around.ieuri.tourism.adapter.graphql.mapper.toGql
-import org.around.ieuri.tourism.adapter.graphql.mapper.toGqlCodeOnly
 import org.around.ieuri.tourism.adapter.graphql.mapper.toGqlLikedSpotConnection
 import org.around.ieuri.tourism.adapter.graphql.mapper.toGqlSpotPage
 import org.around.ieuri.tourism.adapter.graphql.support.domainLocale
@@ -94,13 +93,6 @@ class SpotQueryResolver(
         dfe: DgsDataFetchingEnvironment,
         @InputArgument id: Long,
     ): SpotDetailView = detailQueryUseCase.spotDetail(catalogId = id, locale = dfe.domainLocale())
-
-    /**
-     * 분류. 읽기 모델의 분류는 값 클래스라 실행 중에 문자열로 풀린다 — 생성 타입으로 옮겨야 `code`·`label`이 풀린다.
-     * - `label`·`iconUrl`은 `CategoryDisplayResolver`가 언어에 맞춰 채운다.
-     */
-    @DgsData(parentType = "SpotDetail", field = "category")
-    fun category(dfe: DgsDataFetchingEnvironment): GqlSpotCategory = requireNotNull(dfe.getSource<SpotDetailView>()).category.toGqlCodeOnly()
 
     /**
      * 갤러리(SPEC-0008 R-5). nullable — 조회 실패는 이 필드만 null로 두고 `errors[]`에 싣는다(AC-17).

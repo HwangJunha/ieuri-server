@@ -25,11 +25,11 @@ class TourismQueryExceptionHandler(
     override fun handleException(
         parameters: DataFetcherExceptionHandlerParameters,
     ): CompletableFuture<DataFetcherExceptionHandlerResult> {
-        // 리졸버 예외는 InvocationTargetException 등에 싸여 온다 — 원인 사슬에서 찾는다.
-        val ex = generateSequence(parameters.exception) { it.cause.takeIf { cause -> cause !== it } }
-            .filterIsInstance<SpotQueryException>()
-            .firstOrNull()
-            ?: return delegate.handleException(parameters)
+        // 겉 예외만 본다. 원인 사슬을 풀면 응답 코드가 dev와 달라진다(SPEC-0039 D-112).
+        val ex = parameters.exception
+        if (ex !is SpotQueryException) {
+            return delegate.handleException(parameters)
+        }
 
         val error = SpotQueryGraphQLError(
             message = ex.message ?: ex.logicalCode,

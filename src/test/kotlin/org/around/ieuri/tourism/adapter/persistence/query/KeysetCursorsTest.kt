@@ -28,17 +28,17 @@ class KeysetCursorsTest {
     }
 
     @Test
-    fun `다른 종류의 커서는 거부된다`() {
+    fun `다른 종류의 커서는 거부된다 - 거리순·인기순은 dev처럼 업무 예외가 아니다`() {
         val distance = DistanceCursor(distanceMeters = 100.0, spotId = 1L).encode()
-        assertFailsWith<InvalidCursorException> { LikeCountCursor.decode(distance) }
+        assertFailsWith<IllegalArgumentException> { LikeCountCursor.decode(distance) }
         val like = LikeCountCursor(likeCount = 1L, spotId = 1L).encode()
-        assertFailsWith<InvalidCursorException> { DistanceCursor.decode(like) }
+        assertFailsWith<IllegalArgumentException> { DistanceCursor.decode(like) }
     }
 
     @Test
     fun `조작된 커서는 거부된다`() {
-        assertFailsWith<InvalidCursorException> { LikeCountCursor.decode("!!!not-base64!!!") }
-        assertFailsWith<InvalidCursorException> { DistanceCursor.decode("") }
+        assertFailsWith<IllegalArgumentException> { LikeCountCursor.decode("!!!not-base64!!!") }
+        assertFailsWith<IllegalArgumentException> { DistanceCursor.decode("") }
     }
 
     @Test
@@ -59,8 +59,8 @@ class KeysetCursorsTest {
     /** 접두사 없이 값만 맞는 문자열은 정렬 키로 해석되면 안 된다 — 엉뚱한 위치로 뛴다. */
     @Test
     fun `접두사가 없는 커서는 값이 맞아도 거부된다`() {
-        assertFailsWith<InvalidCursorException> { DistanceCursor.decode(wrap("5|1")) }
-        assertFailsWith<InvalidCursorException> { LikeCountCursor.decode(wrap("5|1")) }
+        assertFailsWith<IllegalArgumentException> { DistanceCursor.decode(wrap("5|1")) }
+        assertFailsWith<IllegalArgumentException> { LikeCountCursor.decode(wrap("5|1")) }
     }
 
     /** 클라이언트가 들고 있는 커서가 계속 통해야 한다 — 바이트 형식을 고정한다. */
