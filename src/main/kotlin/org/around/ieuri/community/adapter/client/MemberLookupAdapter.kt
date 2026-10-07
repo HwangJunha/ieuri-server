@@ -1,9 +1,9 @@
 package org.around.ieuri.community.adapter.client
 
 import org.around.ieuri.auth.application.port.`in`.query.MemberQueryUseCase
-import org.around.ieuri.community.adapter.client.mapper.toMemberSummaryView
-import org.around.ieuri.community.application.shared.required.MemberLookupPort
-import org.around.ieuri.community.application.shared.required.dto.MemberSummaryView
+import org.around.ieuri.community.adapter.client.mapper.toMemberSummary
+import org.around.ieuri.community.application.lookup.required.MemberLookupPort
+import org.around.ieuri.community.domain.lookup.MemberSummary
 import org.springframework.stereotype.Component
 
 /**
@@ -15,9 +15,9 @@ class MemberLookupAdapter(
     private val memberQueryUseCase: MemberQueryUseCase,
 ) : MemberLookupPort {
 
-    override fun findAuthor(memberId: Long): MemberSummaryView? = memberQueryUseCase.memberPublicProfile(memberId)?.toMemberSummaryView()
+    override fun findAuthor(memberId: Long): MemberSummary? = memberQueryUseCase.memberPublicProfile(memberId)?.toMemberSummary()
 
     /** 한 번의 조회로 여러 작성자를 가져온다. */
-    override fun findAuthors(memberIds: List<Long>): Map<Long, MemberSummaryView> = memberQueryUseCase.memberPublicProfiles(memberIds.distinct())
-        .mapValues { (_, profile) -> profile.toMemberSummaryView() }
+    override fun findAuthors(memberIds: List<Long>): Map<Long, MemberSummary> = memberQueryUseCase.memberPublicProfiles(memberIds.distinct())
+        .mapValues { (_, profile) -> profile.toMemberSummary() }
 }

@@ -1,6 +1,6 @@
 package org.around.ieuri.community.application.block.provided.dto
 
-import org.around.ieuri.community.application.shared.required.dto.MemberSummaryView
+import org.around.ieuri.community.domain.lookup.MemberSummary
 import java.time.Instant
 
 /**
@@ -9,6 +9,6 @@ import java.time.Instant
  */
 data class BlockedUserView(
     val memberId: Long,
-    val member: MemberSummaryView?,
+    val member: MemberSummary?,
     val blockedAt: Instant,
 )

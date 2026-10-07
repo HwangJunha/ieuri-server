@@ -35,8 +35,8 @@ import org.around.ieuri.community.application.post.provided.PostQueryUseCase
 import org.around.ieuri.community.application.post.provided.dto.MyPostsQuery
 import org.around.ieuri.community.application.post.provided.dto.PostView
 import org.around.ieuri.community.application.post.provided.dto.PostsQuery
-import org.around.ieuri.community.application.shared.required.dto.MemberSummaryView
-import org.around.ieuri.community.application.shared.required.dto.SpotSummaryView
+import org.around.ieuri.community.domain.lookup.MemberSummary
+import org.around.ieuri.community.domain.lookup.SpotSummary
 import org.around.ieuri.community.domain.post.PostSortOrder
 import org.around.ieuri.community.domain.post.TargetCategory
 import org.springframework.stereotype.Component
@@ -209,7 +209,7 @@ class CommunityQueryResolver(
             if (catalogId == null) {
                 CompletableFuture.completedFuture(null)
             } else {
-                dfe.loader<SpotSummaryView>(PostSpotDataLoader.NAME)
+                dfe.loader<SpotSummary>(PostSpotDataLoader.NAME)
                     .load(catalogId, dfe.contentLanguage())
                     .thenApply { it?.toGql() }
             }
@@ -236,7 +236,7 @@ class CommunityQueryResolver(
     }
 
     /** 작성자를 배치로 읽는다. 회원 정보가 없으면(탈퇴) 대체 표기로 채운다. */
-    private fun DgsDataFetchingEnvironment.loadAuthor(memberId: Long): CompletableFuture<GqlPostAuthor> = loader<MemberSummaryView>(PostAuthorDataLoader.NAME)
+    private fun DgsDataFetchingEnvironment.loadAuthor(memberId: Long): CompletableFuture<GqlPostAuthor> = loader<MemberSummary>(PostAuthorDataLoader.NAME)
         .load(memberId)
         .thenApply { it.toGqlOrPlaceholder(memberId) }
 
@@ -251,7 +251,7 @@ class CommunityQueryResolver(
 
     private fun TargetCategory.toGql() = GqlTargetCategory.valueOf(name)
 
-    private fun SpotSummaryView.toGql() = GqlPostSpot(
+    private fun SpotSummary.toGql() = GqlPostSpot(
         id = id,
         title = title,
         thumbnailImageUrl = thumbnailImageUrl,

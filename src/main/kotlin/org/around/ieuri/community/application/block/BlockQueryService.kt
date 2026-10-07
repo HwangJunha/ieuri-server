@@ -8,8 +8,8 @@ import org.around.ieuri.community.application.block.provided.dto.BlockedUserView
 import org.around.ieuri.community.application.block.provided.dto.BlockedUsersQuery
 import org.around.ieuri.community.application.block.required.BlockQueryPort
 import org.around.ieuri.community.application.block.required.dto.BlockedUsersSearch
+import org.around.ieuri.community.application.lookup.provided.MemberLookupUseCase
 import org.around.ieuri.community.application.shared.PagePolicy
-import org.around.ieuri.community.application.shared.required.MemberLookupPort
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -17,7 +17,7 @@ import org.springframework.transaction.annotation.Transactional
 @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, readOnly = true)
 class BlockQueryService(
     private val blockQueryPort: BlockQueryPort,
-    private val memberLookupPort: MemberLookupPort,
+    private val memberLookup: MemberLookupUseCase,
     private val pagePolicy: PagePolicy,
 ) : BlockQueryUseCase {
 
@@ -26,7 +26,7 @@ class BlockQueryService(
         val page = blockQueryPort.findBlockedUsers(
             BlockedUsersSearch(memberId = memberId, first = pagePolicy.clamp(query.first), after = query.after),
         )
-        val members = memberLookupPort.findAuthors(page.edges.map { it.node.memberId })
+        val members = memberLookup.members(page.edges.map { it.node.memberId })
         return page.map { it.copy(member = members[it.memberId]) }
     }
 

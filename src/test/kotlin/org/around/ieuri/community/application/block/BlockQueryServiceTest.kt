@@ -7,9 +7,9 @@ import org.around.ieuri.common.pagination.cursorPageOf
 import org.around.ieuri.community.application.block.provided.dto.BlockedUserView
 import org.around.ieuri.community.application.block.provided.dto.BlockedUsersQuery
 import org.around.ieuri.community.application.block.required.BlockQueryPort
+import org.around.ieuri.community.application.lookup.provided.MemberLookupUseCase
 import org.around.ieuri.community.application.shared.PagePolicy
-import org.around.ieuri.community.application.shared.required.MemberLookupPort
-import org.around.ieuri.community.application.shared.required.dto.MemberSummaryView
+import org.around.ieuri.community.domain.lookup.MemberSummary
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -20,7 +20,7 @@ import kotlin.test.assertTrue
 class BlockQueryServiceTest {
 
     private val queries = mockk<BlockQueryPort>()
-    private val members = mockk<MemberLookupPort>()
+    private val members = mockk<MemberLookupUseCase>()
     private val service = BlockQueryService(queries, members, PagePolicy(maxPageSize = 50))
 
     @Test
@@ -44,7 +44,7 @@ class BlockQueryServiceTest {
             hasNextPage = true,
             hasPreviousPage = false,
         )
-        every { members.findAuthors(listOf(9L, 11L)) } returns mapOf(9L to MemberSummaryView(9, "상대", null))
+        every { members.members(listOf(9L, 11L)) } returns mapOf(9L to MemberSummary(9, "상대", null))
 
         val page = service.blockedUsers(BlockedUsersQuery(first = 2, after = null), memberId = 7)
 

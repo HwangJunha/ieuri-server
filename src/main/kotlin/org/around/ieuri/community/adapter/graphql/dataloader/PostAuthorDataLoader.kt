@@ -1,8 +1,8 @@
 package org.around.ieuri.community.adapter.graphql.dataloader
 
 import com.netflix.graphql.dgs.DgsDataLoader
-import org.around.ieuri.community.application.shared.required.MemberLookupPort
-import org.around.ieuri.community.application.shared.required.dto.MemberSummaryView
+import org.around.ieuri.community.application.lookup.provided.MemberLookupUseCase
+import org.around.ieuri.community.domain.lookup.MemberSummary
 import org.dataloader.MappedBatchLoader
 import org.springframework.stereotype.Component
 import java.util.concurrent.CompletableFuture
@@ -12,10 +12,10 @@ import java.util.concurrent.CompletionStage
 @DgsDataLoader(name = PostAuthorDataLoader.NAME)
 @Component
 class PostAuthorDataLoader(
-    private val memberLookupPort: MemberLookupPort,
-) : MappedBatchLoader<Long, MemberSummaryView> {
+    private val memberLookup: MemberLookupUseCase,
+) : MappedBatchLoader<Long, MemberSummary> {
 
-    override fun load(memberIds: Set<Long>): CompletionStage<Map<Long, MemberSummaryView>> = CompletableFuture.completedFuture(memberLookupPort.findAuthors(memberIds.toList()))
+    override fun load(memberIds: Set<Long>): CompletionStage<Map<Long, MemberSummary>> = CompletableFuture.completedFuture(memberLookup.members(memberIds.toList()))
 
     companion object {
         const val NAME = "postAuthor"

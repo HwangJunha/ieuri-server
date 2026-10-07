@@ -4,6 +4,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
+import org.around.ieuri.community.application.lookup.provided.SpotLookupUseCase
 import org.around.ieuri.community.application.photo.UploadedPhotoService
 import org.around.ieuri.community.application.photo.required.ObjectStoragePort
 import org.around.ieuri.community.application.post.provided.dto.CreatePostCommand
@@ -12,8 +13,7 @@ import org.around.ieuri.community.application.post.provided.dto.PostTargetComman
 import org.around.ieuri.community.application.post.provided.exception.PostNotFoundException
 import org.around.ieuri.community.application.post.required.PostRepository
 import org.around.ieuri.community.application.shared.exception.SpotNotFoundInLocaleException
-import org.around.ieuri.community.application.shared.required.SpotLookupPort
-import org.around.ieuri.community.application.shared.required.dto.SpotSummaryView
+import org.around.ieuri.community.domain.lookup.SpotSummary
 import org.around.ieuri.community.domain.photo.AttachedPhotos
 import org.around.ieuri.community.domain.photo.PhotoNotUploadedException
 import org.around.ieuri.community.domain.photo.PhotoObjectKey
@@ -36,10 +36,10 @@ class PostModifyServiceTest {
     private val memberId = 7L
     private val now = Instant.parse("2026-10-05T00:00:00Z")
     private val postRepository = mockk<PostRepository>(relaxUnitFun = true)
-    private val spotLookupPort = mockk<SpotLookupPort>()
+    private val spotLookup = mockk<SpotLookupUseCase>()
     private val objectStoragePort = mockk<ObjectStoragePort>()
     private val clockPort = Clock.fixed(now, ZoneOffset.UTC)
-    private val service = PostModifyService(postRepository, spotLookupPort, UploadedPhotoService(objectStoragePort), clockPort)
+    private val service = PostModifyService(postRepository, spotLookup, UploadedPhotoService(objectStoragePort), clockPort)
 
     private val stored = Post(id = 3, authorId = memberId, title = "제목", body = "본문", edited = false, hidden = false, deletedAt = null)
     private val photoKey = PhotoObjectKey.issue(memberId, UUID.randomUUID()).toConfirmed().value
@@ -55,8 +55,8 @@ class PostModifyServiceTest {
 
     @Test
     fun `장소를 붙이면 경도·위도를 그 순서대로 글에 복사한다`() {
-        every { spotLookupPort.findSummary(343259, ContentLanguage.KO) } returns
-            SpotSummaryView(id = 1, title = "남산", thumbnailImageUrl = "", category = null, longitude = 127.01, latitude = 37.55)
+        every { spotLookup.spot(343259, ContentLanguage.KO) } returns
+            SpotSummary(id = 1, title = "남산", thumbnailImageUrl = "", category = null, longitude = 127.01, latitude = 37.55)
         every { objectStoragePort.findSize(photoKey) } returns 10
         val spot = slot<PostSpot?>()
         every { postRepository.insert(any(), TargetCategory.RESTAURANT, captureNullable(spot), any(), any()) } returns 9
@@ -69,7 +69,7 @@ class PostModifyServiceTest {
 
     @Test
     fun `활성 언어에서 해소되지 않는 장소는 SPOT_NOT_FOUND_IN_LOCALE이고 저장하지 않는다`() {
-        every { spotLookupPort.findSummary(any(), any()) } returns null
+        every { spotLookup.spot(any(), any()) } returns null
 
         assertFailsWith<SpotNotFoundInLocaleException> { service.createPost(create(catalogId = 1), memberId, ContentLanguage.EN) }
         verify(exactly = 0) { postRepository.insert(any(), any(), any(), any(), any()) }

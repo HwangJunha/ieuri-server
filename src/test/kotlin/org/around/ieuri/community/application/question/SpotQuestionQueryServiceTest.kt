@@ -7,6 +7,7 @@ import io.mockk.verify
 import org.around.ieuri.common.pagination.CursorEdge
 import org.around.ieuri.common.pagination.cursorPageOf
 import org.around.ieuri.community.application.block.provided.BlockQueryUseCase
+import org.around.ieuri.community.application.lookup.provided.SpotLookupUseCase
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswerView
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswersQuery
 import org.around.ieuri.community.application.question.provided.dto.SpotQuestionView
@@ -17,8 +18,7 @@ import org.around.ieuri.community.application.question.required.dto.SpotAnswersS
 import org.around.ieuri.community.application.question.required.dto.SpotQuestionsSearch
 import org.around.ieuri.community.application.shared.PagePolicy
 import org.around.ieuri.community.application.shared.exception.SpotNotFoundInLocaleException
-import org.around.ieuri.community.application.shared.required.SpotLookupPort
-import org.around.ieuri.community.application.shared.required.dto.SpotSummaryView
+import org.around.ieuri.community.domain.lookup.SpotSummary
 import org.around.ieuri.community.domain.shared.ContentLanguage
 import java.time.Instant
 import kotlin.test.Test
@@ -41,21 +41,21 @@ class SpotQuestionQueryServiceTest {
 
     private val spotQaQueryPort = mockk<SpotQaQueryPort>()
     private val blockQueryUseCase = mockk<BlockQueryUseCase>()
-    private val spotLookupPort = mockk<SpotLookupPort>()
+    private val spotLookup = mockk<SpotLookupUseCase>()
 
     private val policy = PagePolicy(maxPageSize = 50)
 
     private val service = SpotQuestionQueryService(
         spotQaQueryPort,
         blockQueryUseCase,
-        spotLookupPort,
+        spotLookup,
         policy,
     )
 
     private fun givenSpotExists(exists: Boolean = true) {
-        every { spotLookupPort.findSummary(catalogId, language) } returns
+        every { spotLookup.spot(catalogId, language) } returns
             if (exists) {
-                SpotSummaryView(
+                SpotSummary(
                     id = catalogId,
                     title = "경복궁",
                     thumbnailImageUrl = "https://cdn/x.jpg",
@@ -116,8 +116,8 @@ class SpotQuestionQueryServiceTest {
     @Test
     fun `활성 언어를 조회 조건으로 내려보낸다`() {
         // 존재 검사도 그 언어로 간다(R-16).
-        every { spotLookupPort.findSummary(catalogId, ContentLanguage.JA) } returns
-            SpotSummaryView(
+        every { spotLookup.spot(catalogId, ContentLanguage.JA) } returns
+            SpotSummary(
                 id = catalogId,
                 title = "景福宮",
                 thumbnailImageUrl = "https://cdn/x.jpg",
@@ -272,7 +272,7 @@ class SpotQuestionQueryServiceTest {
             language,
         )
 
-        verify(exactly = 0) { spotLookupPort.findSummary(any(), any()) }
+        verify(exactly = 0) { spotLookup.spot(any(), any()) }
     }
 
     // ── 답변 목록과 숨김 종속(R11) ─────────────────────────────────

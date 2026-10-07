@@ -14,19 +14,19 @@ import org.around.ieuri.community.application.conversation.provided.exception.Ph
 import org.around.ieuri.community.application.conversation.required.ConversationEventPort
 import org.around.ieuri.community.application.conversation.required.ConversationEventPublisherPort
 import org.around.ieuri.community.application.conversation.required.ConversationRepository
+import org.around.ieuri.community.application.lookup.provided.MemberLookupUseCase
+import org.around.ieuri.community.application.lookup.provided.SpotLookupUseCase
 import org.around.ieuri.community.application.photo.UploadedPhotoService
 import org.around.ieuri.community.application.photo.required.ObjectStoragePort
 import org.around.ieuri.community.application.question.required.SpotQuestionRepository
 import org.around.ieuri.community.application.shared.exception.MemberNotFoundException
-import org.around.ieuri.community.application.shared.required.MemberLookupPort
-import org.around.ieuri.community.application.shared.required.SpotLookupPort
-import org.around.ieuri.community.application.shared.required.dto.MemberSummaryView
-import org.around.ieuri.community.application.shared.required.dto.SpotSummaryView
 import org.around.ieuri.community.domain.conversation.Conversation
 import org.around.ieuri.community.domain.conversation.Message
 import org.around.ieuri.community.domain.conversation.NotConversationParticipantException
 import org.around.ieuri.community.domain.conversation.SelfConversationException
 import org.around.ieuri.community.domain.conversation.event.MessageSent
+import org.around.ieuri.community.domain.lookup.MemberSummary
+import org.around.ieuri.community.domain.lookup.SpotSummary
 import org.around.ieuri.community.domain.photo.PhotoObjectKey
 import org.around.ieuri.community.domain.question.SpotAnswer
 import org.around.ieuri.community.domain.question.SpotQuestion
@@ -46,8 +46,8 @@ class ConversationModifyServiceTest {
     private val conversations = mockk<ConversationRepository>(relaxUnitFun = true)
     private val blocks = mockk<BlockRepository>()
     private val questions = mockk<SpotQuestionRepository>()
-    private val members = mockk<MemberLookupPort>()
-    private val spots = mockk<SpotLookupPort>()
+    private val members = mockk<MemberLookupUseCase>()
+    private val spots = mockk<SpotLookupUseCase>()
     private val storage = mockk<ObjectStoragePort>()
     private val conversationEvents = mockk<ConversationEventPort>(relaxUnitFun = true)
     private val events = mockk<ConversationEventPublisherPort>(relaxUnitFun = true)
@@ -61,15 +61,15 @@ class ConversationModifyServiceTest {
     @Test
     fun `자기 자신과의 대화는 회원 조회보다 먼저 거부한다`() {
         assertFailsWith<SelfConversationException> { service.startConversation(StartConversationCommand(7), memberId = 7) }
-        verify(exactly = 0) { members.findAuthor(any()) }
+        verify(exactly = 0) { members.member(any()) }
     }
 
     @Test
     fun `없는 회원은 MEMBER_NOT_FOUND, 차단 관계면 BLOCKED이고 둘 다 저장하지 않는다`() {
-        every { members.findAuthor(9) } returns null
+        every { members.member(9) } returns null
         assertFailsWith<MemberNotFoundException> { service.startConversation(StartConversationCommand(9), 7) }
 
-        every { members.findAuthor(9) } returns MemberSummaryView(9, "상대", null)
+        every { members.member(9) } returns MemberSummary(9, "상대", null)
         every { blocks.existsBetween(7, 9) } returns true
         assertFailsWith<BlockedException> { service.startConversation(StartConversationCommand(9), 7) }
 
@@ -78,7 +78,7 @@ class ConversationModifyServiceTest {
 
     @Test
     fun `대화 시작은 정렬된 쌍으로 저장하고 기존 대화면 그 id다`() {
-        every { members.findAuthor(7) } returns MemberSummaryView(7, "나", null)
+        every { members.member(7) } returns MemberSummary(7, "나", null)
         every { blocks.existsBetween(9, 7) } returns false
         val pair = slot<Conversation>()
         every { conversations.insertIfAbsent(capture(pair)) } returns 5
@@ -132,7 +132,7 @@ class ConversationModifyServiceTest {
         every { questions.findAnswer(20) } returns SpotAnswer(20, 1, 343259, authorId = 9, body = "답변", hidden = false, deletedAt = null)
         every { questions.findAnswer(21) } returns SpotAnswer(21, 1, 343259, authorId = 8, body = "남의 답변", hidden = false, deletedAt = null)
         every { questions.findById(1) } returns SpotQuestion(1, 343259, 7, "질문", false, false, null)
-        every { spots.findSummary(343259, ContentLanguage.KO) } returns SpotSummaryView(343259, "남산", "", null, 127.0, 37.5)
+        every { spots.spot(343259, ContentLanguage.KO) } returns SpotSummary(343259, "남산", "", null, 127.0, 37.5)
         val sent = mutableListOf<Message>()
         every { conversations.insertMessage(capture(sent)) } answers { stored(firstArg()) }
 

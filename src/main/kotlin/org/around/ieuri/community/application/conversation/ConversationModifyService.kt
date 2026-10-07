@@ -16,11 +16,11 @@ import org.around.ieuri.community.application.conversation.provided.exception.Ph
 import org.around.ieuri.community.application.conversation.required.ConversationEventPort
 import org.around.ieuri.community.application.conversation.required.ConversationEventPublisherPort
 import org.around.ieuri.community.application.conversation.required.ConversationRepository
+import org.around.ieuri.community.application.lookup.provided.MemberLookupUseCase
+import org.around.ieuri.community.application.lookup.provided.SpotLookupUseCase
 import org.around.ieuri.community.application.photo.provided.UploadedPhotoUseCase
 import org.around.ieuri.community.application.question.required.SpotQuestionRepository
 import org.around.ieuri.community.application.shared.exception.MemberNotFoundException
-import org.around.ieuri.community.application.shared.required.MemberLookupPort
-import org.around.ieuri.community.application.shared.required.SpotLookupPort
 import org.around.ieuri.community.domain.conversation.Conversation
 import org.around.ieuri.community.domain.conversation.Message
 import org.around.ieuri.community.domain.conversation.SpotQaOrigin
@@ -44,8 +44,8 @@ class ConversationModifyService(
     private val conversationRepository: ConversationRepository,
     private val blockRepository: BlockRepository,
     private val questionRepository: SpotQuestionRepository,
-    private val memberLookupPort: MemberLookupPort,
-    private val spotLookupPort: SpotLookupPort,
+    private val memberLookup: MemberLookupUseCase,
+    private val spotLookup: SpotLookupUseCase,
     private val uploadedPhotos: UploadedPhotoUseCase,
     private val conversationEventPort: ConversationEventPort,
     private val eventPublisher: ConversationEventPublisherPort,
@@ -56,7 +56,7 @@ class ConversationModifyService(
     override fun startConversation(command: StartConversationCommand, memberId: Long): Long {
         // 자기 자신과의 대화는 존재 확인보다 먼저 거부한다.
         val conversation = Conversation.start(memberId, command.counterpartMemberId)
-        if (memberLookupPort.findAuthor(command.counterpartMemberId) == null) throw MemberNotFoundException()
+        if (memberLookup.member(command.counterpartMemberId) == null) throw MemberNotFoundException()
 
         requireNotBlocked(memberId, command.counterpartMemberId)
 
@@ -137,7 +137,7 @@ class ConversationModifyService(
         val answer = questionRepository.findAnswer(answerId) ?: return null
         if (answer.authorId != counterpartId) return null
         val question = questionRepository.findById(answer.questionId) ?: return null
-        val spot = spotLookupPort.findSummary(answer.catalogId, language) ?: return null
+        val spot = spotLookup.spot(answer.catalogId, language) ?: return null
 
         return SpotQaOrigin(
             catalogId = answer.catalogId,

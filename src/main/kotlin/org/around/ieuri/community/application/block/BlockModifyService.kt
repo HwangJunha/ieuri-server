@@ -3,8 +3,8 @@ package org.around.ieuri.community.application.block
 import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.community.application.block.provided.BlockCommandUseCase
 import org.around.ieuri.community.application.block.required.BlockRepository
+import org.around.ieuri.community.application.lookup.provided.MemberLookupUseCase
 import org.around.ieuri.community.application.shared.exception.MemberNotFoundException
-import org.around.ieuri.community.application.shared.required.MemberLookupPort
 import org.around.ieuri.community.domain.block.Block
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
@@ -16,7 +16,7 @@ import java.time.Instant
 @Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
 class BlockModifyService(
     private val blockRepository: BlockRepository,
-    private val memberLookupPort: MemberLookupPort,
+    private val memberLookup: MemberLookupUseCase,
 ) : BlockCommandUseCase {
 
     override fun block(targetMemberId: Long, memberId: Long) {
@@ -38,7 +38,7 @@ class BlockModifyService(
     private fun requirePositive(targetMemberId: Long) = require(targetMemberId > 0) { "targetMemberId는 양수여야 합니다." }
 
     private fun requireMemberExists(memberId: Long) {
-        if (memberLookupPort.findAuthor(memberId) == null) throw MemberNotFoundException()
+        if (memberLookup.member(memberId) == null) throw MemberNotFoundException()
     }
 
     /** 회원이 걸었거나 회원을 향한 차단을 지운다. 차단 해제에는 판정할 규칙이 없어 한 번에 지운다. */

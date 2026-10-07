@@ -19,7 +19,7 @@ class SpotSummaryMapperTest {
             categoryCode = "TOURIST_SPOT",
             longitude = 126.9770,
             latitude = 37.5796,
-        ).toSpotSummaryView()
+        ).toSpotSummary()
 
         assertEquals(11094L, view.id)
         assertEquals("경복궁", view.title)
@@ -34,11 +34,11 @@ class SpotSummaryMapperTest {
     fun `언어 전용 카테고리도 옮겨진다`() {
         assertEquals(
             TargetCategory.TRAVEL_COURSE,
-            summary(categoryCode = "TRAVEL_COURSE").toSpotSummaryView().category,
+            summary(categoryCode = "TRAVEL_COURSE").toSpotSummary().category,
         )
         assertEquals(
             TargetCategory.TRANSPORT,
-            summary(categoryCode = "TRANSPORT").toSpotSummaryView().category,
+            summary(categoryCode = "TRANSPORT").toSpotSummary().category,
         )
     }
 
@@ -47,7 +47,7 @@ class SpotSummaryMapperTest {
         TargetCategory.entries.forEach { category ->
             assertEquals(
                 category,
-                summary(categoryCode = category.name).toSpotSummaryView().category,
+                summary(categoryCode = category.name).toSpotSummary().category,
                 "${category.name}이 옮겨지지 않는다",
             )
         }
@@ -55,8 +55,8 @@ class SpotSummaryMapperTest {
 
     @Test
     fun `모르는 카테고리 코드는 null이다 - 칩으로 걸러지지 않을 뿐 조회는 성공한다`() {
-        assertNull(summary(categoryCode = "UNKNOWN_CODE").toSpotSummaryView().category)
-        assertNull(summary(categoryCode = "").toSpotSummaryView().category)
+        assertNull(summary(categoryCode = "UNKNOWN_CODE").toSpotSummary().category)
+        assertNull(summary(categoryCode = "").toSpotSummary().category)
     }
 
     private fun summary(categoryCode: String) = SpotSummaryView(

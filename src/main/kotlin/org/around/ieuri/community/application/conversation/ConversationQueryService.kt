@@ -11,9 +11,9 @@ import org.around.ieuri.community.application.conversation.required.Conversation
 import org.around.ieuri.community.application.conversation.required.ConversationQueryPort
 import org.around.ieuri.community.application.conversation.required.dto.ConversationMessagesSearch
 import org.around.ieuri.community.application.conversation.required.dto.ConversationsSearch
+import org.around.ieuri.community.application.lookup.provided.MemberLookupUseCase
 import org.around.ieuri.community.application.shared.PagePolicy
-import org.around.ieuri.community.application.shared.required.MemberLookupPort
-import org.around.ieuri.community.application.shared.required.dto.MemberSummaryView
+import org.around.ieuri.community.domain.lookup.MemberSummary
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import reactor.core.publisher.Flux
@@ -27,7 +27,7 @@ import reactor.core.publisher.Flux
 class ConversationQueryService(
     private val conversationQueryPort: ConversationQueryPort,
     private val conversationEventPort: ConversationEventPort,
-    private val memberLookupPort: MemberLookupPort,
+    private val memberLookup: MemberLookupUseCase,
     private val pagePolicy: PagePolicy,
 ) : ConversationQueryUseCase {
 
@@ -76,7 +76,7 @@ class ConversationQueryService(
 
     override fun message(conversationId: Long, messageId: Long, memberId: Long): MessageView? = conversationQueryPort.findMessage(conversationId, messageId, memberId)
 
-    override fun sender(memberId: Long): MemberSummaryView? = memberLookupPort.findAuthor(memberId)
+    override fun sender(memberId: Long): MemberSummary? = memberLookup.member(memberId)
 
     /** 읽기 포트로 판정한다. 결과가 없으면 "없거나 볼 수 없다"이다. */
     private fun requireParticipant(conversationId: Long, memberId: Long) {

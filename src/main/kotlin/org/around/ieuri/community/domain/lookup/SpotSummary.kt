@@ -1,9 +1,9 @@
-package org.around.ieuri.community.application.shared.required.dto
+package org.around.ieuri.community.domain.lookup
 
 import org.around.ieuri.community.domain.post.TargetCategory
 
-/** 피드 카드의 장소 칩. [id]는 `spot.id`가 아니라 카탈로그 id다(SPEC-0019). */
-data class SpotSummaryView(
+/** community가 보는 장소(tourism 소유)의 요약. [id]는 `spot.id`가 아니라 카탈로그 id다(SPEC-0019). */
+data class SpotSummary(
     val id: Long,
     val title: String,
     val thumbnailImageUrl: String,

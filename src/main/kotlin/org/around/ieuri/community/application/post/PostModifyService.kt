@@ -1,6 +1,7 @@
 package org.around.ieuri.community.application.post
 
 import org.around.ieuri.common.persistence.ExposedConfig
+import org.around.ieuri.community.application.lookup.provided.SpotLookupUseCase
 import org.around.ieuri.community.application.photo.provided.UploadedPhotoUseCase
 import org.around.ieuri.community.application.post.provided.PostCommandUseCase
 import org.around.ieuri.community.application.post.provided.dto.CreatePostCommand
@@ -9,7 +10,6 @@ import org.around.ieuri.community.application.post.provided.dto.PostTargetComman
 import org.around.ieuri.community.application.post.provided.exception.PostNotFoundException
 import org.around.ieuri.community.application.post.required.PostRepository
 import org.around.ieuri.community.application.shared.exception.SpotNotFoundInLocaleException
-import org.around.ieuri.community.application.shared.required.SpotLookupPort
 import org.around.ieuri.community.domain.photo.AttachedPhotos
 import org.around.ieuri.community.domain.post.HiddenPostNotEditableException
 import org.around.ieuri.community.domain.post.Post
@@ -33,7 +33,7 @@ import java.time.Instant
 @Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
 class PostModifyService(
     private val postRepository: PostRepository,
-    private val spotLookupPort: SpotLookupPort,
+    private val spotLookup: SpotLookupUseCase,
     private val uploadedPhotos: UploadedPhotoUseCase,
     private val clock: Clock,
 ) : PostCommandUseCase {
@@ -114,7 +114,7 @@ class PostModifyService(
 
     /** 장소는 활성 언어에서 해소되는 것만 붙일 수 있다. 좌표를 글에 복사한다. */
     private fun findSpot(catalogId: Long, language: ContentLanguage): PostSpot {
-        val summary = spotLookupPort.findSummary(catalogId, language) ?: throw SpotNotFoundInLocaleException()
+        val summary = spotLookup.spot(catalogId, language) ?: throw SpotNotFoundInLocaleException()
         return PostSpot(catalogId, SpotPoint(longitude = summary.longitude, latitude = summary.latitude))
     }
 

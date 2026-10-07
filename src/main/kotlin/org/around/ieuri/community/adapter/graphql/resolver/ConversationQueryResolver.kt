@@ -19,7 +19,7 @@ import org.around.ieuri.community.application.conversation.provided.Conversation
 import org.around.ieuri.community.application.conversation.provided.dto.ConversationView
 import org.around.ieuri.community.application.conversation.provided.dto.MessageView
 import org.around.ieuri.community.application.conversation.provided.dto.TypingEventView
-import org.around.ieuri.community.application.shared.required.dto.MemberSummaryView
+import org.around.ieuri.community.domain.lookup.MemberSummary
 import org.springframework.stereotype.Component
 import java.util.concurrent.CompletableFuture
 import org.around.ieuri.common.graphql.generated.types.ConversationSpotQaOrigin as GqlConversationSpotQaOrigin
@@ -115,7 +115,7 @@ class ConversationQueryResolver(
 
     private fun DgsDataFetchingEnvironment.loadAuthor(
         memberId: Long,
-    ): CompletableFuture<GqlPostAuthor> = loader<MemberSummaryView>(PostAuthorDataLoader.NAME)
+    ): CompletableFuture<GqlPostAuthor> = loader<MemberSummary>(PostAuthorDataLoader.NAME)
         .load(memberId)
         .thenApply { it.toGqlOrPlaceholder(memberId) }
 

@@ -1,8 +1,8 @@
 package org.around.ieuri.community.adapter.graphql.dataloader
 
 import com.netflix.graphql.dgs.DgsDataLoader
-import org.around.ieuri.community.application.shared.required.SpotLookupPort
-import org.around.ieuri.community.application.shared.required.dto.SpotSummaryView
+import org.around.ieuri.community.application.lookup.provided.SpotLookupUseCase
+import org.around.ieuri.community.domain.lookup.SpotSummary
 import org.around.ieuri.community.domain.shared.ContentLanguage
 import org.dataloader.BatchLoaderEnvironment
 import org.dataloader.MappedBatchLoaderWithContext
@@ -18,20 +18,20 @@ import java.util.concurrent.CompletionStage
 @DgsDataLoader(name = PostSpotDataLoader.NAME)
 @Component
 class PostSpotDataLoader(
-    private val spotLookupPort: SpotLookupPort,
-) : MappedBatchLoaderWithContext<Long, SpotSummaryView> {
+    private val spotLookup: SpotLookupUseCase,
+) : MappedBatchLoaderWithContext<Long, SpotSummary> {
 
     override fun load(
         catalogIds: Set<Long>,
         environment: BatchLoaderEnvironment,
-    ): CompletionStage<Map<Long, SpotSummaryView>> {
+    ): CompletionStage<Map<Long, SpotSummary>> {
         val language = environment.keyContexts.values
             .filterIsInstance<ContentLanguage>()
             .firstOrNull()
             ?: error("PostSpotDataLoader는 keyContext로 언어를 받아야 한다 — 리졸버가 load(key, language)로 부른다.")
 
         return CompletableFuture.completedFuture(
-            spotLookupPort.findSummaries(catalogIds.toList(), language),
+            spotLookup.spots(catalogIds.toList(), language),
         )
     }
 

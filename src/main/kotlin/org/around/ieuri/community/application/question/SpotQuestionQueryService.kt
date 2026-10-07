@@ -4,6 +4,7 @@ import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.cursorPageOf
 import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.community.application.block.provided.BlockQueryUseCase
+import org.around.ieuri.community.application.lookup.provided.SpotLookupUseCase
 import org.around.ieuri.community.application.question.provided.SpotQuestionQueryUseCase
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswerReplyView
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswerView
@@ -16,7 +17,6 @@ import org.around.ieuri.community.application.question.required.dto.SpotAnswersS
 import org.around.ieuri.community.application.question.required.dto.SpotQuestionsSearch
 import org.around.ieuri.community.application.shared.PagePolicy
 import org.around.ieuri.community.application.shared.exception.SpotNotFoundInLocaleException
-import org.around.ieuri.community.application.shared.required.SpotLookupPort
 import org.around.ieuri.community.application.shared.required.dto.ViewerContext
 import org.around.ieuri.community.domain.shared.ContentLanguage
 import org.springframework.stereotype.Service
@@ -32,7 +32,7 @@ import org.springframework.transaction.annotation.Transactional
 class SpotQuestionQueryService(
     private val spotQaQueryPort: SpotQaQueryPort,
     private val blockQueryUseCase: BlockQueryUseCase,
-    private val spotLookupPort: SpotLookupPort,
+    private val spotLookup: SpotLookupUseCase,
     private val pagePolicy: PagePolicy,
 ) : SpotQuestionQueryUseCase {
 
@@ -47,7 +47,7 @@ class SpotQuestionQueryService(
         language: ContentLanguage,
     ): CursorPage<SpotQuestionView> {
         query.catalogId?.let {
-            if (spotLookupPort.findSummary(it, language) == null) {
+            if (spotLookup.spot(it, language) == null) {
                 throw SpotNotFoundInLocaleException()
             }
         }

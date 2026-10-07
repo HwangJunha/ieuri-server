@@ -4,13 +4,13 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import org.around.ieuri.community.application.comment.required.CommentRepository
+import org.around.ieuri.community.application.lookup.provided.MemberLookupUseCase
 import org.around.ieuri.community.application.post.provided.exception.PostNotFoundException
 import org.around.ieuri.community.application.post.required.PostRepository
 import org.around.ieuri.community.application.question.required.SpotQuestionRepository
 import org.around.ieuri.community.application.report.provided.dto.ReportContentCommand
 import org.around.ieuri.community.application.report.required.ReportEventPublisherPort
 import org.around.ieuri.community.application.report.required.ReportRepository
-import org.around.ieuri.community.application.shared.required.MemberLookupPort
 import org.around.ieuri.community.domain.report.Report
 import org.around.ieuri.community.domain.report.ReportTargetType
 import org.around.ieuri.community.domain.report.event.ReportFiled
@@ -25,9 +25,9 @@ class ReportModifyServiceTest {
     private val postRepository = mockk<PostRepository>(relaxed = true)
     private val commentRepository = mockk<CommentRepository>()
     private val questionRepository = mockk<SpotQuestionRepository>(relaxed = true)
-    private val memberLookupPort = mockk<MemberLookupPort>()
+    private val memberLookup = mockk<MemberLookupUseCase>()
     private val eventPublisher = mockk<ReportEventPublisherPort>(relaxUnitFun = true)
-    private val service = ReportModifyService(reportRepository, postRepository, commentRepository, questionRepository, memberLookupPort, eventPublisher)
+    private val service = ReportModifyService(reportRepository, postRepository, commentRepository, questionRepository, memberLookup, eventPublisher)
 
     @Test
     fun `자동 숨김 대상 신고는 기록 뒤 이벤트를 낸다`() {

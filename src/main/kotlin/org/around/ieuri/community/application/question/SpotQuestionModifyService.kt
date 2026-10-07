@@ -1,6 +1,7 @@
 package org.around.ieuri.community.application.question
 
 import org.around.ieuri.common.persistence.ExposedConfig
+import org.around.ieuri.community.application.lookup.provided.SpotLookupUseCase
 import org.around.ieuri.community.application.photo.provided.UploadedPhotoUseCase
 import org.around.ieuri.community.application.question.provided.SpotQuestionCommandUseCase
 import org.around.ieuri.community.application.question.provided.dto.CreateSpotAnswerCommand
@@ -13,7 +14,6 @@ import org.around.ieuri.community.application.question.provided.exception.ReplyT
 import org.around.ieuri.community.application.question.required.SpotQuestionEventPublisherPort
 import org.around.ieuri.community.application.question.required.SpotQuestionRepository
 import org.around.ieuri.community.application.shared.exception.SpotNotFoundInLocaleException
-import org.around.ieuri.community.application.shared.required.SpotLookupPort
 import org.around.ieuri.community.domain.photo.AttachedPhotos
 import org.around.ieuri.community.domain.question.SpotQuestion
 import org.around.ieuri.community.domain.question.event.SpotAnswerWritten
@@ -29,13 +29,13 @@ import java.time.Instant
 @Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
 class SpotQuestionModifyService(
     private val questionRepository: SpotQuestionRepository,
-    private val spotLookupPort: SpotLookupPort,
+    private val spotLookup: SpotLookupUseCase,
     private val uploadedPhotos: UploadedPhotoUseCase,
     private val eventPublisher: SpotQuestionEventPublisherPort,
 ) : SpotQuestionCommandUseCase {
 
     override fun createQuestion(command: CreateSpotQuestionCommand, memberId: Long, language: ContentLanguage): Long {
-        if (spotLookupPort.findSummary(command.catalogId, language) == null) throw SpotNotFoundInLocaleException()
+        if (spotLookup.spot(command.catalogId, language) == null) throw SpotNotFoundInLocaleException()
         val question = SpotQuestion.write(command.catalogId, memberId, command.body)
         val photos = AttachedPhotos.of(uploadedPhotos.parse(command.photoKeys), memberId)
         uploadedPhotos.requireUploaded(photos.keys)
