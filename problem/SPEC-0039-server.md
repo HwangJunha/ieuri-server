@@ -147,7 +147,7 @@
 | D-108 | S14 | **설정값은 쓰는 쪽이 갖는다.** `PagePolicy`(목록 `first` 상한, 다섯 애그리게이트 공용이라 `shared`)·`PostPolicy`(반경)·`CommentPolicy`(미리보기 개수)·`PhotoPolicy`(업로드). 설정 키는 그대로다 | 사용자 결정 4, tourism D-99 선례 | **`CommunityPolicy` 하나 유지**: 사진 서비스가 페이지 상한을, 댓글이 업로드 설정을 들고 다닌다 |
 | D-109 | S14 | **`ClockPort`는 지우고 `java.time.Clock`(common 빈)을 쓴다. `SpotNotFoundException`은 지운다** — 던지는 곳도 오류 코드로 바꾸는 곳도 없던 타입이라 응답은 바뀌지 않는다 | 사용자 결정 5·6. tourism·auth가 이미 `Clock`을 주입한다 | **`SpotNotFoundInLocaleException`으로 합치기(제안 원안)**: 쓰이지 않는 타입이라 합칠 대상이 없다 |
 | D-110 | S14 | **리졸버가 포트를 부르던 것을 서비스로 옮겼다.** 위치 조회 이벤트(`posts`)는 `PostQueryService`가, 차단 목록의 회원 정보는 `BlockQueryService`가 채운다(`BlockedUserView.member`가 null이면 리졸버가 대체 표기). 구독의 발신자 조회는 `ConversationQueryUseCase.sender`다 | 사용자 결정 7, D-92 선례 | — |
-| D-111 | S14 | **[사용자 결정 대기] 장소·회원 조회 포트(`SpotLookupPort`·`MemberLookupPort`)는 아직 `shared`에 있다.** 결정 2(애그리게이트마다 포트, 어댑터 하나)를 적용하려다 멈췄다 | 반증: GraphQL의 작성자·장소 DataLoader는 글·댓글·질문·대화가 함께 쓰는데 주인 애그리게이트가 없다 — 결정 2의 모양으로는 받을 곳이 없다. 서비스 쪽만 나누면 같은 시그니처의 포트가 6개 생기고 DataLoader용 경로가 따로 남는다 | **결정 2 그대로**: 포트 6개 + DataLoader용 공용 경로. **`photo`처럼 조회를 자기 패키지(application·domain)로**: 조회 유스케이스 하나를 서비스와 DataLoader가 함께 쓴다. **`shared` 유지**: 읽기 포트 공유는 CLAUDE.md가 허용한다 |
+| D-111 | S14 | **장소·회원 조회는 `lookup` 패키지(application·domain)다.** `SpotLookupUseCase`·`MemberLookupUseCase`를 글·질문·대화·차단·신고 서비스와 GraphQL DataLoader가 함께 쓰고, 포트(`SpotLookupPort`·`MemberLookupPort`)는 `lookup/required`에만 있다. 조회 결과는 도메인 값 `SpotSummary`·`MemberSummary`(옛 `PostSpotView`·`PostAuthorView`)다. 결정 2(애그리게이트마다 포트, 어댑터 하나)를 바꾼다 | 결정 2를 적용하려다 반증이 나왔다: DataLoader는 네 애그리게이트가 함께 써서 주인이 없고, 서비스 쪽만 나누면 시그니처가 같은 포트가 6개 생긴다. D-106(`photo`)과 같은 모양을 골랐다(사용자 결정 2026-10-08) | **결정 2 그대로**: 위 반증. **`shared` 유지**: DataLoader가 포트를 직접 부르는 것이 남는다 |
 
 ## 부족한 정보
 
@@ -317,6 +317,7 @@ grep으로 확인한 수(worktree `82fdd48`):
 
 | 날짜 | 무엇을 | 왜 |
 |---|---|---|
+| 2026-10-08 | D-111 확정 — 조회는 `lookup` 패키지(결정 2를 바꿈) | 사용자 결정 |
 | 2026-10-08 | D-105~D-110(community shared 정리, 결정 1·3~7), D-111(조회 포트 결정 대기), D-66을 D-106이 바꿈 | 사용자 결정 |
 | 2026-10-07 | D-104(취향 최소 반응 수·취향 요인 계산·시도 최소 시군구 수를 도메인으로, 칸 변환을 dto 밖으로) | 사용자 결정 |
 | 2026-10-07 | D-101 철회 — 노출 규칙 Specification을 지우고 일괄 SQL 한 곳으로(단건 경로에서 항상 참이라 판정할 것이 없다) | 사용자 결정 |

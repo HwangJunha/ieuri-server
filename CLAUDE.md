@@ -317,8 +317,8 @@ fixed only within that bound; anything that needs a migration or a schema field 
   - **`application/` and `domain/` list the same packages, one to one.** Each name is an aggregate,
     or a value group with its own use cases (`catalog`). A capability several aggregates use but
     none owns gets its own package on both sides, named for the capability (`photo`: upload URL,
-    verification, deletion); other aggregates reach it through its `provided/` use case, never its
-    port. `shared` keeps only values, exceptions and read DTOs several aggregates use as-is.
+    verification, deletion; `lookup`: another context's spots and members); other aggregates and
+    DataLoaders reach it through its `provided/` use case, never its port. `shared` keeps only values, exceptions and read DTOs several aggregates use as-is.
     **A process that spans aggregates (member withdrawal)
     gets no package at all** — see the cross-aggregate bullet below. A package on one side only is
     a finding.
