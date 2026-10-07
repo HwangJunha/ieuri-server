@@ -10,6 +10,7 @@ import org.around.ieuri.tourism.adapter.graphql.mapper.toGql
 import org.around.ieuri.tourism.adapter.graphql.support.domainLocale
 import org.around.ieuri.tourism.application.catalog.provided.SpotCatalogQueryUseCase
 import org.around.ieuri.tourism.application.catalog.provided.dto.MapViewportQuery
+import org.around.ieuri.tourism.application.congestion.provided.CongestionAreaReadUseCase
 import org.around.ieuri.tourism.application.congestion.provided.CongestionQueryUseCase
 import org.around.ieuri.common.graphql.generated.types.CongestionAreaBoundary as GqlCongestionAreaBoundary
 import org.around.ieuri.common.graphql.generated.types.MapBoundsInput as GqlMapBoundsInput
@@ -25,6 +26,7 @@ import org.around.ieuri.common.graphql.generated.types.SeoulCongestionResult as 
 class MapQueryResolver(
     private val catalogQueryUseCase: SpotCatalogQueryUseCase,
     private val congestionQueryUseCase: CongestionQueryUseCase,
+    private val congestionAreaReadUseCase: CongestionAreaReadUseCase,
 ) {
 
     @DgsQuery
@@ -54,5 +56,5 @@ class MapQueryResolver(
     ).toGql()
 
     @DgsQuery
-    fun seoulCongestionAreas(dfe: DgsDataFetchingEnvironment): List<GqlCongestionAreaBoundary> = congestionQueryUseCase.seoulCongestionAreas(dfe.domainLocale()).map { it.toGql() }
+    fun seoulCongestionAreas(dfe: DgsDataFetchingEnvironment): List<GqlCongestionAreaBoundary> = congestionAreaReadUseCase.seoulCongestionAreas(dfe.domainLocale()).map { it.toGql() }
 }

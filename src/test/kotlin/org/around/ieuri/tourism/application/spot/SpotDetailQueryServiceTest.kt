@@ -21,7 +21,6 @@ import org.around.ieuri.tourism.application.spot.required.SpotDetailQueryPort
 import org.around.ieuri.tourism.application.spot.required.SpotEventPublisherPort
 import org.around.ieuri.tourism.application.spot.required.StoredDetail
 import org.around.ieuri.tourism.application.spot.required.TourInfoPort
-import org.around.ieuri.tourism.domain.catalog.ReactionType
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.CopyrightType
 import org.around.ieuri.tourism.domain.shared.DomainLocale
@@ -44,13 +43,13 @@ class SpotDetailQueryServiceTest {
     private val detailRepository = mockk<SpotDetailQueryPort>()
     private val eventPublisher = mockk<SpotEventPublisherPort>(relaxed = true)
     private val appCategoryQueryPort = mockk<AppCategoryQueryPort>()
+
+    /** DB 단계는 실제 읽기 서비스에 목 포트를 물려 쓴다 — 단계별 스텁이 포트 수준에 그대로 남는다. */
     private val service = SpotDetailQueryService(
-        tourInfoPort,
-        spotQueryPort,
-        spotCachePort,
-        detailRepository,
-        eventPublisher,
-        appCategoryQueryPort,
+        read = SpotDetailReadService(spotQueryPort, detailRepository, appCategoryQueryPort),
+        tourInfoPort = tourInfoPort,
+        spotCachePort = spotCachePort,
+        eventPublisher = eventPublisher,
     )
 
     init {
@@ -197,16 +196,6 @@ class SpotDetailQueryServiceTest {
 
         assertEquals(1, result.size)
         verify(exactly = 0) { tourInfoPort.findInfoItems(any(), any()) }
-    }
-
-    @Test
-    fun `likeCount는 3단 폴백 경로에 들어가지 않는다(AC-38)`() {
-        every { spotQueryPort.countLikes(100L, DomainLocale.KO) } returns 7L
-
-        assertEquals(7L, service.spotLikeCount(100L, DomainLocale.KO))
-
-        verify(exactly = 0) { detailRepository.findDetail(any()) }
-        verify(exactly = 0) { eventPublisher.publish(any()) }
     }
 
     /** intro·infoItems는 정의된 카테고리만 받는다(SPEC-0020). */
@@ -501,40 +490,6 @@ class SpotDetailQueryServiceTest {
         verify(exactly = 1) {
             spotCachePort.putInfoItems(spotIdOf(100L), SpotCategory.TOURIST_SPOT, items)
         }
-    }
-
-    // ── 지연 필드: 좋아요 수 ─────────────────────────────────────────
-
-    @Test
-    fun `AC-14 - 좋아요 수는 캐시하지 않고 매번 집계한다`() {
-        every { spotQueryPort.countLikes(100L, DomainLocale.KO) } returns 3L
-
-        assertEquals(3L, service.spotLikeCount(100L, DomainLocale.KO))
-        verify(exactly = 0) { spotCachePort.getDetail(any()) }
-    }
-
-    @Test
-    fun `AC-12 - 반응이 없으면 좋아요 수는 0`() {
-        every { spotQueryPort.countLikes(any(), any()) } returns 0L
-        assertEquals(0L, service.spotLikeCount(100L, DomainLocale.KO))
-    }
-
-    @Test
-    fun `AC-13_5 - 좋아요 수는 활성 언어 안에서만 센다`() {
-        every { spotQueryPort.countLikes(100L, DomainLocale.EN) } returns 5L
-        every { spotQueryPort.countLikes(100L, DomainLocale.JA) } returns 1L
-
-        assertEquals(5L, service.spotLikeCount(100L, DomainLocale.EN))
-        assertEquals(1L, service.spotLikeCount(100L, DomainLocale.JA))
-    }
-
-    @Test
-    fun `AC-13_2 - 다른 언어에서 누른 반응은 이 언어에 보이지 않는다`() {
-        every { spotQueryPort.findReaction(100L, 7L, DomainLocale.EN) } returns ReactionType.LIKE
-        every { spotQueryPort.findReaction(100L, 7L, DomainLocale.JA) } returns null
-
-        assertEquals(ReactionType.LIKE, service.spotViewerReaction(100L, 7L, DomainLocale.EN))
-        assertNull(service.spotViewerReaction(100L, 7L, DomainLocale.JA))
     }
 
     // ── SPEC-0008 상세 본문 부재: 부재는 적재하고 성공, 실패는 적재하지 않고 표면화 ──

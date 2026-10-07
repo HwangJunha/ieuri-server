@@ -33,6 +33,7 @@ import org.around.ieuri.tourism.application.catalog.required.SpotSpatialQueryPor
 import org.around.ieuri.tourism.application.congestion.provided.CongestionQueryUseCase
 import org.around.ieuri.tourism.application.congestion.provided.dto.CulturalEventView
 import org.around.ieuri.tourism.domain.catalog.CategorySelection
+import org.around.ieuri.tourism.domain.catalog.ReactionType
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.CopyrightType
 import org.around.ieuri.tourism.domain.shared.DomainLocale
@@ -678,5 +679,40 @@ class SpotCatalogQueryServiceTest {
 
         verify(exactly = 1) { eventPublisher.publish(LocationAccessed(7L, "spots")) }
         verify(exactly = 1) { eventPublisher.publish(any()) }
+    }
+
+    // ── 지연 필드: 좋아요 수 ─────────────────────────────────────────
+
+    @Test
+    fun `AC-14 - 좋아요 수는 매번 집계한다`() {
+        every { spotQueryPort.countLikes(100L, DomainLocale.KO) } returns 3L
+
+        assertEquals(3L, service.spotLikeCount(100L, DomainLocale.KO))
+        assertEquals(3L, service.spotLikeCount(100L, DomainLocale.KO))
+        verify(exactly = 2) { spotQueryPort.countLikes(100L, DomainLocale.KO) }
+    }
+
+    @Test
+    fun `AC-12 - 반응이 없으면 좋아요 수는 0`() {
+        every { spotQueryPort.countLikes(any(), any()) } returns 0L
+        assertEquals(0L, service.spotLikeCount(100L, DomainLocale.KO))
+    }
+
+    @Test
+    fun `AC-13_5 - 좋아요 수는 활성 언어 안에서만 센다`() {
+        every { spotQueryPort.countLikes(100L, DomainLocale.EN) } returns 5L
+        every { spotQueryPort.countLikes(100L, DomainLocale.JA) } returns 1L
+
+        assertEquals(5L, service.spotLikeCount(100L, DomainLocale.EN))
+        assertEquals(1L, service.spotLikeCount(100L, DomainLocale.JA))
+    }
+
+    @Test
+    fun `AC-13_2 - 다른 언어에서 누른 반응은 이 언어에 보이지 않는다`() {
+        every { spotQueryPort.findReaction(100L, 7L, DomainLocale.EN) } returns ReactionType.LIKE
+        every { spotQueryPort.findReaction(100L, 7L, DomainLocale.JA) } returns null
+
+        assertEquals(ReactionType.LIKE, service.spotViewerReaction(100L, 7L, DomainLocale.EN))
+        assertNull(service.spotViewerReaction(100L, 7L, DomainLocale.JA))
     }
 }

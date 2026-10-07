@@ -1,7 +1,6 @@
 package org.around.ieuri.tourism.application.spot.provided
 
 import org.around.ieuri.tourism.application.spot.provided.dto.SpotDetailView
-import org.around.ieuri.tourism.domain.catalog.ReactionType
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.spot.SpotImage
@@ -26,16 +25,4 @@ interface SpotDetailQueryUseCase {
 
     /** 이용안내 항목(요청 시에만). 캐시 → 미스면 detailInfo2 1콜. */
     fun spotInfoItems(catalogId: Long, category: SpotCategory, locale: DomainLocale): List<SpotInfoItem>
-
-    /**
-     * 좋아요 수(요청 시에만). 캐시하지 않고 매번 집계한다.
-     * - [locale] 안에서만 센다(SPEC-0029 AC-13.5).
-     */
-    fun spotLikeCount(catalogId: Long, locale: DomainLocale): Long
-
-    /**
-     * 이 회원이 [locale]에서 이 장소에 남긴 최신 반응.
-     * - 반응한 적 없으면 null이며, 다른 언어에서 누른 것은 보이지 않는다(AC-13.2).
-     */
-    fun spotViewerReaction(catalogId: Long, memberId: Long, locale: DomainLocale): ReactionType?
 }

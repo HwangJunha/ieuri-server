@@ -9,6 +9,7 @@ import org.around.ieuri.tourism.application.catalog.provided.dto.MapViewportView
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotSummaryView
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotsQuery
+import org.around.ieuri.tourism.domain.catalog.ReactionType
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 
 /** 카탈로그 조회(CQRS 읽기) — 주변 목록, 좋아요 목록, 지도 뷰포트, 다른 도메인용 요약. 언어는 명시 파라미터로 받는다. */
@@ -46,4 +47,16 @@ interface SpotCatalogQueryUseCase {
 
     /** 여러 카탈로그 요약을 한 번에. [languageCode]에서 해소되지 않는 id는 결과에 키가 없다. */
     fun spotSummaries(catalogIds: List<Long>, languageCode: String): Map<Long, SpotSummaryView>
+
+    /**
+     * 좋아요 수(요청 시에만). 캐시하지 않고 매번 집계한다.
+     * - [locale] 안에서만 센다(SPEC-0029 AC-13.5).
+     */
+    fun spotLikeCount(catalogId: Long, locale: DomainLocale): Long
+
+    /**
+     * 이 회원이 [locale]에서 이 장소에 남긴 최신 반응.
+     * - 반응한 적 없으면 null이며, 다른 언어에서 누른 것은 보이지 않는다(AC-13.2).
+     */
+    fun spotViewerReaction(catalogId: Long, memberId: Long, locale: DomainLocale): ReactionType?
 }

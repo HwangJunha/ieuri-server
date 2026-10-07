@@ -134,7 +134,7 @@ class SpotQueryResolver(
 
     @DgsData(parentType = "SpotDetail", field = "likeCount")
     fun likeCount(dfe: DgsDataFetchingEnvironment): Int = // GraphQL likeCount는 Int!. 반응 수가 Int 범위를 넘을 일은 없다.
-        detailQueryUseCase.spotLikeCount(dfe.catalogId(), dfe.domainLocale()).toInt()
+        catalogQueryUseCase.spotLikeCount(dfe.catalogId(), dfe.domainLocale()).toInt()
 
     /**
      * 호출자가 이 장소에 남긴 반응. 비로그인이면 null이다.
@@ -144,7 +144,7 @@ class SpotQueryResolver(
     fun viewerReaction(dfe: DgsDataFetchingEnvironment): String? {
         // 만료 토큰이면 null이 아니라 오류다(R1).
         val memberId = dfe.viewerMemberId() ?: return null
-        return detailQueryUseCase.spotViewerReaction(dfe.catalogId(), memberId, dfe.domainLocale())?.name
+        return catalogQueryUseCase.spotViewerReaction(dfe.catalogId(), memberId, dfe.domainLocale())?.name
     }
 
     /** 뷰어 신원. 비로그인은 null, 만료 토큰은 오류다(SPEC-0032 R1). */

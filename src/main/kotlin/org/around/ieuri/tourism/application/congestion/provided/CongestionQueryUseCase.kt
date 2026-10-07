@@ -1,6 +1,5 @@
 package org.around.ieuri.tourism.application.congestion.provided
 
-import org.around.ieuri.tourism.application.congestion.provided.dto.CongestionAreaBoundaryView
 import org.around.ieuri.tourism.application.congestion.provided.dto.CulturalEventView
 import org.around.ieuri.tourism.application.congestion.provided.dto.SeoulCongestionView
 import org.around.ieuri.tourism.domain.shared.DomainLocale
@@ -19,9 +18,6 @@ interface CongestionQueryUseCase {
         bounds: MapBounds?,
         locale: DomainLocale,
     ): SeoulCongestionView
-
-    /** 혼잡도 구역의 폴리곤 경계와 메타데이터(R16·R17). DB 조회다. */
-    fun seoulCongestionAreas(locale: DomainLocale): List<CongestionAreaBoundaryView>
 
     /**
      * bbox에 걸치는 구역의 캐시된 문화행사(R12). 업스트림을 부르지 않는다.

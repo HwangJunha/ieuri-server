@@ -49,8 +49,9 @@ class CongestionQueryServiceTest {
         maxAreaIds = 3,
     )
 
+    /** 구역 조회는 실제 읽기 서비스에 목 포트를 물려 쓴다. */
     private val service = CongestionQueryService(
-        congestionAreaQueryPort = congestionAreaQueryPort,
+        areas = CongestionAreaReadService(congestionAreaQueryPort, openDataPolicy),
         seoulOpenDataPort = seoulOpenDataPort,
         cachePort = cachePort,
         openDataPolicy = openDataPolicy,

@@ -1,35 +1,28 @@
 package org.around.ieuri.tourism.application.congestion
 
-import org.around.ieuri.common.persistence.ExposedConfig
+import org.around.ieuri.tourism.application.congestion.provided.CongestionAreaReadUseCase
 import org.around.ieuri.tourism.application.congestion.provided.CongestionQueryUseCase
-import org.around.ieuri.tourism.application.congestion.provided.dto.CongestionAreaBoundaryView
 import org.around.ieuri.tourism.application.congestion.provided.dto.CongestionAreaView
 import org.around.ieuri.tourism.application.congestion.provided.dto.CulturalEventView
 import org.around.ieuri.tourism.application.congestion.provided.dto.SeoulCongestionView
-import org.around.ieuri.tourism.application.congestion.provided.exception.AreaFilterRequiredException
-import org.around.ieuri.tourism.application.congestion.provided.exception.CongestionAreaNotFoundException
-import org.around.ieuri.tourism.application.congestion.provided.exception.TooManyAreaIdsException
-import org.around.ieuri.tourism.application.congestion.required.CongestionAreaQueryPort
 import org.around.ieuri.tourism.application.congestion.required.SeoulOpenDataCachePort
 import org.around.ieuri.tourism.application.congestion.required.SeoulOpenDataPort
 import org.around.ieuri.tourism.application.congestion.required.SeoulOpenDataSnapshot
-import org.around.ieuri.tourism.domain.shared.AreaName
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.shared.MapBounds
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.time.Duration
 import java.time.LocalDateTime
 
 /**
  * 서울 실시간 혼잡도 조회 구현(SPEC-0014). 캐시 우선이며, 신선도는 저장 시각 기준이다.
+ * - 트랜잭션이 없다 — 구역 조회는 [CongestionAreaReadUseCase]가 짧게 열고, Valkey·서울 열린데이터는 연결을 잡지 않고 부른다(D-83).
  * - 업스트림 장애는 예외가 아니라 degraded로 표현한다(R11). 입력 검증 실패는 예외다.
  */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX, readOnly = true)
 class CongestionQueryService(
-    private val congestionAreaQueryPort: CongestionAreaQueryPort,
+    private val areas: CongestionAreaReadUseCase,
     private val seoulOpenDataPort: SeoulOpenDataPort,
     private val cachePort: SeoulOpenDataCachePort,
     private val openDataPolicy: SeoulOpenDataPolicy,
@@ -46,17 +39,16 @@ class CongestionQueryService(
         bounds: MapBounds?,
         locale: DomainLocale,
     ): SeoulCongestionView {
-        val (requestedCodes, names) = resolveAreas(areaIds, bounds)
-        if (requestedCodes.isEmpty()) {
+        val requested = areas.requestedAreas(areaIds, bounds)
+        if (requested.isEmpty()) {
             return SeoulCongestionView(areas = emptyList(), degraded = false, staleSince = null)
         }
 
-        val areas = mutableListOf<CongestionAreaView>()
+        val views = mutableListOf<CongestionAreaView>()
         var degraded = false
         var staleSince: LocalDateTime? = null
 
-        for (code in requestedCodes) {
-            val name = names[code] ?: continue
+        for ((code, name) in requested) {
             // 업스트림은 국문명으로 조회한다 — 활성 언어와 무관하게 항상 ko를 넘긴다.
             val resolved = resolveSnapshot(code, name.ko)
             val snapshot = resolved.snapshot
@@ -67,7 +59,7 @@ class CongestionQueryService(
                 // 만료된 캐시면 그 시각을 알린다(R11). 여러 구역이면 가장 오래된 시각을 쓴다.
                 staleSince = listOfNotNull(staleSince, congestion.observedAt).minOrNull()
             }
-            areas += CongestionAreaView(
+            views += CongestionAreaView(
                 id = code,
                 name = name.resolve(locale),
                 congestion = congestion,
@@ -76,42 +68,7 @@ class CongestionQueryService(
             )
         }
 
-        return SeoulCongestionView(areas = areas, degraded = degraded, staleSince = staleSince)
-    }
-
-    override fun seoulCongestionAreas(locale: DomainLocale): List<CongestionAreaBoundaryView> = congestionAreaQueryPort.findAllBoundaries(locale)
-
-    /**
-     * 조회 대상 구역과 그 이름. [areaIds]가 우선하고, 없으면 bbox에 걸치는 구역을 찾는다.
-     * - 둘 다 없으면 거절한다(R6). 빈 목록(`areaIds: []`)은 지정으로 보고 빈 결과를 낸다.
-     */
-    private fun resolveAreas(
-        areaIds: List<String>?,
-        bounds: MapBounds?,
-    ): Pair<List<String>, Map<String, AreaName>> {
-        if (areaIds != null) {
-            if (areaIds.size > openDataPolicy.maxAreaIds) {
-                throw TooManyAreaIdsException(
-                    "한 번에 조회할 수 있는 구역은 ${openDataPolicy.maxAreaIds}곳까지입니다.",
-                )
-            }
-            val distinct = areaIds.distinct()
-            if (distinct.isEmpty()) return emptyList<String>() to emptyMap()
-            // 존재하지 않는 코드는 무시하지 않고 거절한다.
-            val known = congestionAreaQueryPort.findNamesByCodes(distinct)
-            val unknown = distinct.filterNot(known::containsKey)
-            if (unknown.isNotEmpty()) {
-                throw CongestionAreaNotFoundException("해당 구역을 찾을 수 없습니다: ${unknown.joinToString()}")
-            }
-            return distinct to known
-        }
-        if (bounds != null) {
-            val codes = congestionAreaQueryPort.findAreaCodesWithin(bounds)
-                .take(openDataPolicy.maxAreaIds)
-            if (codes.isEmpty()) return emptyList<String>() to emptyMap()
-            return codes to congestionAreaQueryPort.findNamesByCodes(codes)
-        }
-        throw AreaFilterRequiredException("조회할 구역 또는 지도 영역이 필요합니다.")
+        return SeoulCongestionView(areas = views, degraded = degraded, staleSince = staleSince)
     }
 
     /**
@@ -143,7 +100,7 @@ class CongestionQueryService(
      * bbox에 걸치는 구역의 캐시된 문화행사(R12). 업스트림을 부르지 않는다.
      * - 캐시가 비어 있으면 행사도 비어 있다(혼잡도 조회가 채운다).
      */
-    override fun cachedEventsWithin(bounds: MapBounds): List<CulturalEventView> = congestionAreaQueryPort.findAreaCodesWithin(bounds)
+    override fun cachedEventsWithin(bounds: MapBounds): List<CulturalEventView> = areas.areaCodesWithin(bounds)
         .mapNotNull { cachePort.get(it)?.snapshot?.events }
         .flatten()
         .distinctBy { it.id }

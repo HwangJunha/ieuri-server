@@ -26,6 +26,7 @@ import org.around.ieuri.tourism.application.catalog.required.SpotBasics
 import org.around.ieuri.tourism.application.catalog.required.SpotQueryPort
 import org.around.ieuri.tourism.application.catalog.required.SpotSpatialQueryPort
 import org.around.ieuri.tourism.application.congestion.provided.CongestionQueryUseCase
+import org.around.ieuri.tourism.domain.catalog.ReactionType
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -131,6 +132,12 @@ class SpotCatalogQueryService(
     /** 카탈로그 여러 행을 읽는다. [languageCode]에서 해소되지 않는 id는 결과에 키가 없다(SPEC-0029 R-24). */
     override fun spotSummaries(catalogIds: List<Long>, languageCode: String): Map<Long, SpotSummaryView> = spotQueryPort.findSpotBasicsIn(catalogIds, DomainLocale.fromLanguageTag(languageCode))
         .mapValues { (catalogId, basics) -> basics.toSummary(catalogId) }
+
+    /** 좋아요 수. 캐시하지 않고 매번 집계한다. */
+    override fun spotLikeCount(catalogId: Long, locale: DomainLocale): Long = spotQueryPort.countLikes(catalogId, locale)
+
+    /** 최신 반응. 캐시하지 않는다. */
+    override fun spotViewerReaction(catalogId: Long, memberId: Long, locale: DomainLocale): ReactionType? = spotQueryPort.findReaction(catalogId, memberId, locale)
 
     /** 좋아요 목록과 그 안의 검색이 공유하는 조회 조건. */
     private fun searchOf(query: LikedSpotsQuery, locale: DomainLocale, memberId: Long) = LikedSpotsSearch(
