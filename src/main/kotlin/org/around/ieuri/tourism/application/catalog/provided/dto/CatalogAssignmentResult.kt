@@ -17,16 +17,3 @@ data class CatalogAssignmentResult(
     /** 이 회차가 무언가 읽었는가. 언어 소진 판정의 기준이다. */
     val processed: Int get() = assigned + skipped
 }
-
-/** 분할 결과. [catalogsSplit]은 갈라진 옛 카탈로그 수, [catalogsCreated]는 새로 만든 카탈로그 수다. */
-data class CatalogSplitResult(
-    val catalogsSplit: Int,
-    val catalogsCreated: Int,
-    val spotsMoved: Int,
-)
-
-/** 시군구 귀속 결과. [unassigned]는 바다·경계 밖 좌표라 0이 되지 않는다 — 갑자기 커지면 경계·좌표 적재를 의심한다. */
-data class DistrictAssignmentResult(
-    val assigned: Int,
-    val unassigned: Int,
-)

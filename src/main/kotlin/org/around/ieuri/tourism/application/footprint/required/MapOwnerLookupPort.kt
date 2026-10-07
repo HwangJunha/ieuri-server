@@ -13,9 +13,3 @@ interface MapOwnerLookupPort {
     /** 여러 회원의 닉네임을 한 번에. 없는 회원은 결과에 키가 없다. */
     fun findNicknames(memberIds: Collection<Long>): Map<Long, String>
 }
-
-/** 차단 판정. 양방향이라 누가 걸었는지는 묻지 않는다(POL-041). */
-interface MapViewerBlockPort {
-
-    fun isBlockedBetween(memberId: Long, counterpartId: Long): Boolean
-}
