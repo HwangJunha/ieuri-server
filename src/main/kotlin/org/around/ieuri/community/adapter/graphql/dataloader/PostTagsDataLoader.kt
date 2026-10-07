@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 
+/** 필드가 선택됐을 때만 페이지 단위로 읽는다. 값이 없는 글은 빈 목록으로 채운다 — 키를 빠뜨리면 리졸버가 null을 받는다. */
 @DgsDataLoader(name = PostTagsDataLoader.NAME)
 @Component
 class PostTagsDataLoader(

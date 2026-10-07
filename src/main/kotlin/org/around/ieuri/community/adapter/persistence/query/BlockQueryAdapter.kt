@@ -37,7 +37,7 @@ class BlockQueryAdapter : BlockQueryPort {
             val blockedAt = row[BlockTable.createdAt].toInstant()
             CursorEdge(
                 encodeCursor(blockedAt, row[BlockTable.id]),
-                BlockedUserView(memberId = row[BlockTable.blockedId], member = null, blockedAt = blockedAt),
+                BlockedUserView(memberId = row[BlockTable.blockedId], blockedAt = blockedAt),
             )
         }
     }

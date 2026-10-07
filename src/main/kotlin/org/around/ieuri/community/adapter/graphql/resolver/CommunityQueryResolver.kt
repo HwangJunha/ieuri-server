@@ -31,6 +31,7 @@ import org.around.ieuri.community.application.block.provided.dto.BlockedUsersQue
 import org.around.ieuri.community.application.comment.provided.CommentQueryUseCase
 import org.around.ieuri.community.application.comment.provided.dto.CommentView
 import org.around.ieuri.community.application.comment.provided.dto.PostCommentsQuery
+import org.around.ieuri.community.application.lookup.provided.MemberLookupUseCase
 import org.around.ieuri.community.application.post.provided.PostQueryUseCase
 import org.around.ieuri.community.application.post.provided.dto.MyPostsQuery
 import org.around.ieuri.community.application.post.provided.dto.PostView
@@ -58,6 +59,7 @@ class CommunityQueryResolver(
     private val blockQueryUseCase: BlockQueryUseCase,
     private val commentQueryUseCase: CommentQueryUseCase,
     private val postQueryUseCase: PostQueryUseCase,
+    private val memberLookupUseCase: MemberLookupUseCase,
     private val currentMemberProvider: CurrentMemberProvider,
 ) {
 
@@ -153,11 +155,13 @@ class CommunityQueryResolver(
             BlockedUsersQuery(first = first ?: DEFAULT_PAGE_SIZE, after = after),
             memberId = memberId,
         )
+        // 회원 정보가 목록의 본체라 지연시키지 않고 한 번에 읽는다.
+        val members = memberLookupUseCase.members(page.edges.map { it.node.memberId })
         return GqlBlockedUserConnection(
             edges = page.edges.map {
                 GqlBlockedUserEdge(
                     cursor = it.cursor,
-                    node = it.node.member.toGqlOrPlaceholder(it.node.memberId),
+                    node = members[it.node.memberId].toGqlOrPlaceholder(it.node.memberId),
                     blockedAt = it.node.blockedAt.toString(),
                 )
             },

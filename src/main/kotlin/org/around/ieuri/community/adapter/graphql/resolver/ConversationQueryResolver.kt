@@ -19,6 +19,7 @@ import org.around.ieuri.community.application.conversation.provided.Conversation
 import org.around.ieuri.community.application.conversation.provided.dto.ConversationView
 import org.around.ieuri.community.application.conversation.provided.dto.MessageView
 import org.around.ieuri.community.application.conversation.provided.dto.TypingEventView
+import org.around.ieuri.community.application.lookup.provided.MemberLookupUseCase
 import org.around.ieuri.community.domain.lookup.MemberSummary
 import org.springframework.stereotype.Component
 import java.util.concurrent.CompletableFuture
@@ -33,6 +34,7 @@ import org.around.ieuri.common.graphql.generated.types.PostAuthor as GqlPostAuth
 @Component
 class ConversationQueryResolver(
     private val conversationQueryUseCase: ConversationQueryUseCase,
+    private val memberLookupUseCase: MemberLookupUseCase,
     private val currentMemberProvider: CurrentMemberProvider,
 ) {
 
@@ -103,7 +105,7 @@ class ConversationQueryResolver(
     private fun DgsDataFetchingEnvironment.loadSender(senderId: Long): CompletableFuture<GqlPostAuthor> {
         if (isSubscription()) {
             return CompletableFuture.completedFuture(
-                conversationQueryUseCase.sender(senderId).toGqlOrPlaceholder(senderId),
+                memberLookupUseCase.member(senderId).toGqlOrPlaceholder(senderId),
             )
         }
         return loadAuthor(senderId)

@@ -318,10 +318,11 @@ fixed only within that bound; anything that needs a migration or a schema field 
     or a value group with its own use cases (`catalog`). A capability several aggregates use but
     none owns gets its own package on both sides, named for the capability (`photo`: upload URL,
     verification, deletion; `lookup`: another context's spots and members); other aggregates and
-    DataLoaders reach it through its `provided/` use case, never its port. `shared` keeps only values, exceptions and read DTOs several aggregates use as-is.
-    **A process that spans aggregates (member withdrawal)
-    gets no package at all** — see the cross-aggregate bullet below. A package on one side only is
-    a finding.
+    DataLoaders reach it through its `provided/` use case, never its port. `shared` keeps only what
+    several aggregates use as-is: values, exceptions, a policy every list shares (`PagePolicy`) and
+    the read-port condition object (`ViewerContext`). **A process that spans aggregates (member
+    withdrawal) gets no package at all** — see the cross-aggregate bullet below. A package on one
+    side only is a finding.
   - **`adapter/<technology>/<role>/`.** Technology first, then role, so one directory never mixes
     directions: `event/listener` (inbound) and `event/publisher` (Spring events out); `messaging`
     (Valkey pub/sub — it publishes *and* subscribes, so it is not a publisher); `graphql/resolver`,
