@@ -4,10 +4,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.CopyrightType
 import org.around.ieuri.tourism.domain.spot.SpotDetail
-import org.around.ieuri.tourism.domain.spot.SpotImage
-import org.around.ieuri.tourism.domain.spot.SpotInfoItem
-import org.around.ieuri.tourism.domain.spot.SpotIntro
-
 /**
  * 상세 캐시 직렬화 전용 DTO(어댑터 내부). 미정의 필드는 무시한다.
  * - attributionText(파생값)는 담지 않는다. 옛 항목의 `bodyAbsent`는 무시된다. 갤러리 등은 각자 자기 키에 저장된다.
@@ -47,69 +43,4 @@ data class CachedSpotDetail(
             copyright = detail.copyright,
         )
     }
-}
-
-@JsonIgnoreProperties(ignoreUnknown = true)
-data class CachedSpotImage(
-    val imageUrl: String = "",
-    val thumbnailUrl: String? = null,
-    val caption: String? = null,
-    val copyright: CopyrightType = CopyrightType.UNSPECIFIED,
-) {
-    fun toDomain(): SpotImage = SpotImage(
-        imageUrl = imageUrl,
-        thumbnailUrl = thumbnailUrl,
-        caption = caption,
-        copyright = copyright,
-    )
-
-    companion object {
-        fun from(image: SpotImage): CachedSpotImage = CachedSpotImage(
-            imageUrl = image.imageUrl,
-            thumbnailUrl = image.thumbnailUrl,
-            caption = image.caption,
-            copyright = image.copyright,
-        )
-    }
-}
-
-@JsonIgnoreProperties(ignoreUnknown = true)
-data class CachedSpotIntro(
-    val businessHours: String? = null,
-    val closedDays: String? = null,
-    val parking: String? = null,
-    val inquiryPhone: String? = null,
-    val fee: String? = null,
-    val petAllowed: String? = null,
-    val creditCardAccepted: String? = null,
-) {
-    fun toDomain(): SpotIntro = SpotIntro(
-        businessHours = businessHours,
-        closedDays = closedDays,
-        parking = parking,
-        inquiryPhone = inquiryPhone,
-        fee = fee,
-        petAllowed = petAllowed,
-        creditCardAccepted = creditCardAccepted,
-    )
-
-    companion object {
-        fun from(intro: SpotIntro): CachedSpotIntro = CachedSpotIntro(
-            businessHours = intro.businessHours,
-            closedDays = intro.closedDays,
-            parking = intro.parking,
-            inquiryPhone = intro.inquiryPhone,
-            fee = intro.fee,
-            petAllowed = intro.petAllowed,
-            creditCardAccepted = intro.creditCardAccepted,
-        )
-    }
-}
-
-@JsonIgnoreProperties(ignoreUnknown = true)
-data class CachedSpotInfoItem(
-    val name: String = "",
-    val text: String = "",
-) {
-    fun toDomain(): SpotInfoItem = SpotInfoItem(name = name, text = text)
 }

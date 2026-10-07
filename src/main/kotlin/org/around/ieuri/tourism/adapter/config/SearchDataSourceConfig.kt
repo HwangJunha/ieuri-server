@@ -3,14 +3,12 @@ package org.around.ieuri.tourism.adapter.config
 import com.zaxxer.hikari.HikariDataSource
 import org.flywaydb.core.Flyway
 import org.springframework.beans.factory.annotation.Qualifier
-import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.jdbc.DataSourceBuilder
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.jdbc.core.JdbcTemplate
 import javax.sql.DataSource
-
 /**
  * 검색 전용 노드 접속(SPEC-0013). 메인 DB와 다른 인스턴스다(pg_search, 논리 복제 구독자).
  * - 빈을 조건부로 만들지 않는다 — 접속 정보가 틀리면 부팅은 되고 검색만 실패한다.
@@ -64,12 +62,3 @@ class SearchDataSourceConfig {
     @Bean
     fun searchJdbcTemplate(@Qualifier("searchDataSource") searchDataSource: DataSource): JdbcTemplate = JdbcTemplate(searchDataSource)
 }
-
-/** 검색 노드 접속 설정. */
-@ConfigurationProperties(prefix = "ieuri.search-datasource")
-data class SearchDataSourceProperties(
-    val url: String = "",
-    val username: String = "",
-    val password: String = "",
-    val maxPoolSize: Int = 5,
-)

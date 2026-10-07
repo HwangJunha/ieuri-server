@@ -35,23 +35,3 @@ class CatalogIndex(
         return singleOrNull { it.mapX == origin.mapX && it.mapY == origin.mapY && it.thumbnailImageUrl == origin.thumbnailImageUrl }?.catalogId
     }
 }
-
-/** 같은 제목 키를 가진 KO 카탈로그 후보. 좌표·썸네일로 동명이인과 같은 건물의 다른 매장을 가른다. */
-data class CatalogCandidate(
-    val catalogId: Long,
-    val mapX: Double,
-    val mapY: Double,
-    val thumbnailImageUrl: String,
-)
-
-/** 원본 하나의 배정 판정. */
-sealed interface CatalogAssignment {
-    /** 기존 카탈로그에 붙는다. */
-    data class Join(val catalogId: Long) : CatalogAssignment
-
-    /** 새 카탈로그를 만든다. */
-    data class Found(val catalog: SpotCatalog) : CatalogAssignment
-
-    /** 표시할 제목이 없어 미배정으로 남긴다. */
-    data object Skip : CatalogAssignment
-}

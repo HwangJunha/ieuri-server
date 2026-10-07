@@ -13,6 +13,7 @@ import java.time.Instant
 
 /**
  * 상세 조회의 DB 단계. 호출마다 읽기 전용 트랜잭션 하나다 — 캐시·업스트림을 끼는 [SpotDetailQueryUseCase]가 단계마다 부른다.
+ * - 상세 사전 확보 배치도 대상 조회([prefetchTargets])에 쓴다.
  * - 적재 조회는 미적재면 null이다(빈 목록·값 없음과 구분된다).
  */
 interface SpotDetailReadUseCase {
