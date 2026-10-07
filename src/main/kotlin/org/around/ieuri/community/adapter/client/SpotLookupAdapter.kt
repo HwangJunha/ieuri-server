@@ -4,7 +4,7 @@ import org.around.ieuri.community.adapter.client.mapper.toPostSpotView
 import org.around.ieuri.community.application.shared.dto.PostSpotView
 import org.around.ieuri.community.application.shared.required.SpotLookupPort
 import org.around.ieuri.community.domain.shared.ContentLanguage
-import org.around.ieuri.tourism.application.shared.provided.SpotQueryUseCase
+import org.around.ieuri.tourism.application.catalog.provided.SpotCatalogQueryUseCase
 import org.springframework.stereotype.Component
 
 /**
@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component
  */
 @Component
 class SpotLookupAdapter(
-    private val spotQueryUseCase: SpotQueryUseCase,
+    private val spotQueryUseCase: SpotCatalogQueryUseCase,
 ) : SpotLookupPort {
 
     override fun findSummary(catalogId: Long, language: ContentLanguage): PostSpotView? = spotQueryUseCase.spotSummary(catalogId, language.name)?.toPostSpotView()

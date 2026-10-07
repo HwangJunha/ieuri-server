@@ -6,16 +6,16 @@ import io.mockk.slot
 import io.mockk.verify
 import org.around.ieuri.common.event.LocationAccessed
 import org.around.ieuri.tourism.application.catalog.SpotQueryPolicy
+import org.around.ieuri.tourism.application.catalog.provided.exception.InvalidCoordinatesException
 import org.around.ieuri.tourism.application.catalog.provided.exception.RadiusTooLargeException
 import org.around.ieuri.tourism.application.catalog.required.NearbySpotSearch
 import org.around.ieuri.tourism.application.catalog.required.SpotQueryPort
 import org.around.ieuri.tourism.application.catalog.required.SpotSearchResult
 import org.around.ieuri.tourism.application.catalog.required.SpotSpatialQueryPort
 import org.around.ieuri.tourism.application.recommendation.provided.dto.RecommendedSpotsQuery
+import org.around.ieuri.tourism.application.recommendation.required.RecommendationEventPublisherPort
 import org.around.ieuri.tourism.application.recommendation.required.TasteSimilarity
 import org.around.ieuri.tourism.application.recommendation.required.TasteSimilarityQueryPort
-import org.around.ieuri.tourism.application.shared.provided.exception.InvalidCoordinatesException
-import org.around.ieuri.tourism.application.shared.required.TourismEventPublisherPort
 import org.around.ieuri.tourism.domain.catalog.CategorySelection
 import org.around.ieuri.tourism.domain.catalog.ReactionType
 import org.around.ieuri.tourism.domain.category.SpotCategory
@@ -34,7 +34,7 @@ class RecommendedSpotsQueryServiceTest {
     private val spotQueryPort = mockk<SpotQueryPort>()
     private val spotSpatialQueryPort = mockk<SpotSpatialQueryPort>()
     private val tasteSimilarityQueryPort = mockk<TasteSimilarityQueryPort>()
-    private val eventPublisher = mockk<TourismEventPublisherPort>(relaxed = true)
+    private val eventPublisher = mockk<RecommendationEventPublisherPort>(relaxed = true)
     private val spotQueryPolicy = SpotQueryPolicy(
         maxRadiusMeters = 100_000,
         maxPageSize = 100,

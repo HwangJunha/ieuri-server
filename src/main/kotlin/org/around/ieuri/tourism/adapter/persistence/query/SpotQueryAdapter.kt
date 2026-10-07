@@ -15,7 +15,7 @@ import org.around.ieuri.tourism.application.catalog.required.LikedSpotsSearch
 import org.around.ieuri.tourism.application.catalog.required.SpotBasics
 import org.around.ieuri.tourism.application.catalog.required.SpotIdentity
 import org.around.ieuri.tourism.application.catalog.required.SpotQueryPort
-import org.around.ieuri.tourism.application.shared.provided.exception.InvalidCursorException
+import org.around.ieuri.tourism.application.shared.exception.InvalidCursorException
 import org.around.ieuri.tourism.domain.catalog.LikedSpotCursor
 import org.around.ieuri.tourism.domain.catalog.ReactionType
 import org.around.ieuri.tourism.domain.shared.DomainLocale

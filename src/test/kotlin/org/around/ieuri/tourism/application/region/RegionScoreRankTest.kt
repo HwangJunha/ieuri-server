@@ -1,10 +1,12 @@
 package org.around.ieuri.tourism.application.region
 
+import io.mockk.mockk
 import org.around.ieuri.tourism.application.region.provided.dto.OriginDistrict
 import org.around.ieuri.tourism.application.region.provided.dto.RecommendedRegionItemView
 import org.around.ieuri.tourism.application.region.provided.dto.RecommendedRegionQuery
 import org.around.ieuri.tourism.application.region.provided.dto.RegionMetric
 import org.around.ieuri.tourism.application.region.provided.dto.RegionRow
+import org.around.ieuri.tourism.application.region.required.RegionEventPublisherPort
 import org.around.ieuri.tourism.domain.region.DistanceScoring
 import org.around.ieuri.tourism.domain.region.FreshnessDecay
 import org.around.ieuri.tourism.domain.region.RegionScoreFactor
@@ -37,6 +39,7 @@ class RegionScoreRankTest {
     ) = RegionRecommendationService(
         RegionMetricQueryPortStub(fixtures, OriginDistrict(code = "11999", provinceCode = "11")),
         policy,
+        mockk<RegionEventPublisherPort>(relaxed = true),
     )
 
     /** 모든 지역이 같은 좌표라 순위 차이는 지정한 지표에서만 온다. */
@@ -70,7 +73,7 @@ class RegionScoreRankTest {
             ),
         )
 
-        val regions = service.recommendedRegions(query(), DomainLocale.KO).regions.associateBy { it.code }
+        val regions = service.recommendedRegions(query(), DomainLocale.KO, memberId = null).regions.associateBy { it.code }
 
         assertEquals(1, regions.getValue("11170").rankOf(RegionScoreFactor.STAY_INTENSITY))
         assertEquals(2, regions.getValue("11200").rankOf(RegionScoreFactor.STAY_INTENSITY))
@@ -88,7 +91,7 @@ class RegionScoreRankTest {
             ),
         )
 
-        val regions = service.recommendedRegions(query(), DomainLocale.KO).regions.associateBy { it.code }
+        val regions = service.recommendedRegions(query(), DomainLocale.KO, memberId = null).regions.associateBy { it.code }
 
         assertEquals(1, regions.getValue("11170").rankOf(RegionScoreFactor.CONGESTION))
         assertEquals(2, regions.getValue("11200").rankOf(RegionScoreFactor.CONGESTION))
@@ -110,7 +113,7 @@ class RegionScoreRankTest {
             },
         )
 
-        val regions = service.recommendedRegions(query(limit = 3), DomainLocale.KO).regions
+        val regions = service.recommendedRegions(query(limit = 3), DomainLocale.KO, memberId = null).regions
 
         assertEquals(listOf("11100", "11101", "11102"), regions.map { it.code })
         assertEquals(listOf(1, 2, 3), regions.map { it.rankOf(RegionScoreFactor.STAY_INTENSITY) })
@@ -136,7 +139,7 @@ class RegionScoreRankTest {
             ),
         )
 
-        val regions = service.recommendedRegions(query(), DomainLocale.KO).regions.associateBy { it.code }
+        val regions = service.recommendedRegions(query(), DomainLocale.KO, memberId = null).regions.associateBy { it.code }
 
         assertEquals(1, regions.getValue("11110").rankOf(RegionScoreFactor.STAY_INTENSITY))
         assertEquals(2, regions.getValue("11170").rankOf(RegionScoreFactor.STAY_INTENSITY))
@@ -171,7 +174,7 @@ class RegionScoreRankTest {
             ),
         )
 
-        val regions = service.recommendedRegions(query(), DomainLocale.KO).regions.associateBy { it.code }
+        val regions = service.recommendedRegions(query(), DomainLocale.KO, memberId = null).regions.associateBy { it.code }
 
         assertEquals(3, regions.getValue("11200").rankOf(RegionScoreFactor.STAY_INTENSITY))
         assertEquals(2, regions.getValue("11200").rankOf(RegionScoreFactor.SPENDING_INTENSITY))
@@ -193,7 +196,7 @@ class RegionScoreRankTest {
 
         val service = service(listOf(at("11110", 37.90), at("11170", 37.50), at("11200", 37.70)))
 
-        val regions = service.recommendedRegions(query(), DomainLocale.KO).regions.associateBy { it.code }
+        val regions = service.recommendedRegions(query(), DomainLocale.KO, memberId = null).regions.associateBy { it.code }
 
         // origin이 위도 37.5라 11170이 가장 가깝다.
         assertEquals(1, regions.getValue("11170").rankOf(RegionScoreFactor.DISTANCE))
@@ -213,7 +216,7 @@ class RegionScoreRankTest {
             policy = policy(minFactorCount = 2),
         )
 
-        val regions = service.recommendedRegions(query(), DomainLocale.KO).regions.associateBy { it.code }
+        val regions = service.recommendedRegions(query(), DomainLocale.KO, memberId = null).regions.associateBy { it.code }
 
         assertEquals(setOf("11110", "11170"), regions.keys)
         assertEquals(1, regions.getValue("11110").rankOf(RegionScoreFactor.DISTANCE))
@@ -231,7 +234,7 @@ class RegionScoreRankTest {
             ),
         )
 
-        val regions = service.recommendedRegions(query(), DomainLocale.KO).regions
+        val regions = service.recommendedRegions(query(), DomainLocale.KO, memberId = null).regions
 
         assertTrue(regions.all { it.valueOf(RegionScoreFactor.STAY_INTENSITY) == 50.0 })
         assertEquals(listOf(1, 1, 1), regions.map { it.rankOf(RegionScoreFactor.STAY_INTENSITY) })

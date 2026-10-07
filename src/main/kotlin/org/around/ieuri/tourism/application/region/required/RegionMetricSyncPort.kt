@@ -8,8 +8,8 @@ import java.time.YearMonth
 
 /**
  * KTO 빅데이터 4종 수집 아웃바운드 포트(SPEC-0015 R4~R6). 호출 단위가 종마다 다르다.
- * - 업스트림 장애는 [org.around.ieuri.tourism.application.shared.provided.exception.UpstreamUnavailableException] ·
- *   [org.around.ieuri.tourism.application.shared.provided.exception.UpstreamRateLimitedException]으로 던진다(R8).
+ * - 업스트림 장애는 [org.around.ieuri.tourism.application.shared.exception.UpstreamUnavailableException] ·
+ *   [org.around.ieuri.tourism.application.shared.exception.UpstreamRateLimitedException]으로 던진다(R8).
  * - 빈 응답은 장애가 아니라 빈 페이지로 반환된다.
  */
 interface RegionMetricSyncPort {

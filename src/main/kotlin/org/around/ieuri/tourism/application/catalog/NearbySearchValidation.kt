@@ -1,8 +1,8 @@
 package org.around.ieuri.tourism.application.catalog
 
 import org.around.ieuri.tourism.application.catalog.provided.exception.InvalidBboxException
+import org.around.ieuri.tourism.application.catalog.provided.exception.InvalidCoordinatesException
 import org.around.ieuri.tourism.application.catalog.provided.exception.RadiusTooLargeException
-import org.around.ieuri.tourism.application.shared.provided.exception.InvalidCoordinatesException
 import org.around.ieuri.tourism.domain.shared.Coordinates
 import org.around.ieuri.tourism.domain.shared.MapBounds
 

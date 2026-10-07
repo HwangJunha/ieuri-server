@@ -4,6 +4,7 @@ import org.around.ieuri.common.context.AppKey
 import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.category.provided.CategoryMappingQueryUseCase
 import org.around.ieuri.tourism.application.category.provided.CategoryQueryUseCase
+import org.around.ieuri.tourism.application.category.provided.dto.AppCategoryCode
 import org.around.ieuri.tourism.application.category.provided.dto.AppCategoryView
 import org.around.ieuri.tourism.application.category.provided.dto.CategoryDisplay
 import org.around.ieuri.tourism.application.category.required.AppCategoryQueryPort
@@ -23,6 +24,9 @@ class CategoryQueryService(
     CategoryMappingQueryUseCase {
 
     override fun availableCategories(appKey: AppKey, locale: DomainLocale): List<AppCategoryView> = appCategoryQueryPort.findCategories(appKey, locale)
+
+    override fun availableCategoryCodes(appKey: AppKey, languageCode: String): List<AppCategoryCode> = availableCategories(appKey, DomainLocale.fromLanguageTag(languageCode))
+        .map { AppCategoryCode(category = it.category.code, label = it.label, iconUrl = it.iconUrl) }
 
     /** 요청한 모든 코드에 값이 있다 — 표시 정보가 없는 코드는 폴백으로 채운다. */
     override fun categoryDisplays(codes: Set<String>, locale: DomainLocale): Map<String, CategoryDisplay> {

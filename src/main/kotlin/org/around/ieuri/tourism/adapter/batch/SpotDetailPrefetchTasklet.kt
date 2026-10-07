@@ -1,6 +1,6 @@
 package org.around.ieuri.tourism.adapter.batch
 
-import org.around.ieuri.tourism.application.shared.provided.exception.UpstreamRateLimitedException
+import org.around.ieuri.tourism.application.shared.exception.UpstreamRateLimitedException
 import org.around.ieuri.tourism.application.spot.provided.SpotDetailPrefetchUseCase
 import org.around.ieuri.tourism.application.spot.required.SpotDetailPart
 import org.slf4j.LoggerFactory

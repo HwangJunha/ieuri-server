@@ -5,7 +5,6 @@ import org.around.ieuri.tourism.application.catalog.required.SpotIdentity
 import org.around.ieuri.tourism.application.catalog.required.SpotQueryPort
 import org.around.ieuri.tourism.application.category.provided.exception.UnknownCategoryException
 import org.around.ieuri.tourism.application.category.required.AppCategoryQueryPort
-import org.around.ieuri.tourism.application.shared.required.TourismEventPublisherPort
 import org.around.ieuri.tourism.application.spot.provided.SpotDetailQueryUseCase
 import org.around.ieuri.tourism.application.spot.provided.dto.SpotDetailView
 import org.around.ieuri.tourism.application.spot.provided.dto.SpotImageView
@@ -16,6 +15,7 @@ import org.around.ieuri.tourism.application.spot.provided.exception.SpotNotFound
 import org.around.ieuri.tourism.application.spot.required.SpotCachePort
 import org.around.ieuri.tourism.application.spot.required.SpotDetailQuery
 import org.around.ieuri.tourism.application.spot.required.SpotDetailQueryPort
+import org.around.ieuri.tourism.application.spot.required.SpotEventPublisherPort
 import org.around.ieuri.tourism.application.spot.required.TourInfoPort
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.DomainLocale
@@ -37,7 +37,7 @@ class SpotDetailQueryService(
     private val spotQueryPort: SpotQueryPort,
     private val spotCachePort: SpotCachePort,
     private val detailQueryPort: SpotDetailQueryPort,
-    private val eventPublisher: TourismEventPublisherPort,
+    private val eventPublisher: SpotEventPublisherPort,
     private val appCategoryQueryPort: AppCategoryQueryPort,
 ) : SpotDetailQueryUseCase {
 

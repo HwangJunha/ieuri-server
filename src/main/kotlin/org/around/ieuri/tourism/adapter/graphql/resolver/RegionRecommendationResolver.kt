@@ -4,10 +4,10 @@ import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
-import org.around.ieuri.common.event.LocationAccessed
 import org.around.ieuri.common.graphql.tokenPresentation
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.tourism.adapter.graphql.support.domainLocale
+import org.around.ieuri.tourism.application.catalog.provided.exception.InvalidCoordinatesException
 import org.around.ieuri.tourism.application.region.RegionRecommendationPolicy
 import org.around.ieuri.tourism.application.region.provided.RegionRecommendationUseCase
 import org.around.ieuri.tourism.application.region.provided.dto.RecommendedRegionItemView
@@ -15,8 +15,6 @@ import org.around.ieuri.tourism.application.region.provided.dto.RecommendedRegio
 import org.around.ieuri.tourism.application.region.provided.dto.RecommendedRegionView
 import org.around.ieuri.tourism.application.region.provided.dto.RegionScoreView
 import org.around.ieuri.tourism.application.region.provided.exception.InvalidLimitException
-import org.around.ieuri.tourism.application.shared.provided.exception.InvalidCoordinatesException
-import org.around.ieuri.tourism.application.shared.required.TourismEventPublisherPort
 import org.around.ieuri.tourism.domain.shared.Coordinates
 import org.around.ieuri.common.graphql.generated.types.Coordinates as GqlCoordinates
 import org.around.ieuri.common.graphql.generated.types.CoordinatesInput as GqlCoordinatesInput
@@ -35,7 +33,6 @@ class RegionRecommendationResolver(
     private val regionRecommendationUseCase: RegionRecommendationUseCase,
     private val policy: RegionRecommendationPolicy,
     private val currentMemberProvider: CurrentMemberProvider,
-    private val eventPublisher: TourismEventPublisherPort,
 ) {
 
     /** 추천 시군구 목록. 입력 검증(형식·범위)은 이 어댑터가 한다. */
@@ -45,16 +42,15 @@ class RegionRecommendationResolver(
         @InputArgument origin: GqlCoordinatesInput,
         @InputArgument limit: Int?,
     ): GqlRecommendedRegionResult {
-        // 좌표 조회 사실을 남긴다(SPEC-0032 R19). origin은 넘기지 않는다.
-        // 만료 토큰은 비로그인으로 흘리지 않고 오류다. 비로그인은 발행하지 않는다.
-        currentMemberProvider.optionalMemberId(dfe.tokenPresentation())
-            ?.let { eventPublisher.publish(LocationAccessed(it, "recommendedRegions")) }
+        // 만료 토큰은 비로그인으로 흘리지 않고 오류다 — 조회 기록 없이 지나가지 않게 한다.
+        val memberId = currentMemberProvider.optionalMemberId(dfe.tokenPresentation())
         return regionRecommendationUseCase.recommendedRegions(
             RecommendedRegionQuery(
                 origin = origin.toDomain(),
                 limit = resolveLimit(limit),
             ),
             locale = dfe.domainLocale(),
+            memberId = memberId,
         ).toGql()
     }
 

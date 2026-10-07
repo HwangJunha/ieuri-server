@@ -4,7 +4,6 @@ import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
-import org.around.ieuri.common.event.LocationAccessed
 import org.around.ieuri.common.graphql.tokenPresentation
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.security.CurrentMemberProvider
@@ -16,7 +15,6 @@ import org.around.ieuri.tourism.application.catalog.provided.dto.OngoingFestival
 import org.around.ieuri.tourism.application.catalog.provided.dto.PopularSpotsQuery
 import org.around.ieuri.tourism.application.catalog.provided.dto.SearchSpotsQuery
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
-import org.around.ieuri.tourism.application.shared.required.TourismEventPublisherPort
 import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
 import org.around.ieuri.common.graphql.generated.types.Festival as GqlFestival
 import org.around.ieuri.common.graphql.generated.types.FestivalConnection as GqlFestivalConnection
@@ -40,18 +38,13 @@ import org.around.ieuri.common.graphql.generated.types.UserError as GqlUserError
 class SpotDiscoveryResolver(
     private val spotDiscoveryUseCase: SpotDiscoveryUseCase,
     private val currentMemberProvider: CurrentMemberProvider,
-    private val eventPublisher: TourismEventPublisherPort,
 ) {
 
     /**
-     * 좌표를 받는 연산의 조회 사실을 남긴다(SPEC-0032 R19). 좌표는 넘기지 않는다.
+     * 조회 사실을 남길 회원 id. 비로그인은 null이다(SPEC-0032 R19).
      * - 만료 토큰은 비로그인으로 흘리지 않고 오류다 — 기록 없이 지나가지 않게 한다(POL-057).
      */
-    private fun auditLocationAccess(dfe: DgsDataFetchingEnvironment, operation: String) {
-        // 비로그인은 남길 "누구"가 없어 발행하지 않는다.
-        val memberId = currentMemberProvider.optionalMemberId(dfe.tokenPresentation()) ?: return
-        eventPublisher.publish(LocationAccessed(memberId, operation))
-    }
+    private fun DgsDataFetchingEnvironment.viewerMemberId(): Long? = currentMemberProvider.optionalMemberId(tokenPresentation())
 
     @DgsQuery
     fun searchSpots(
@@ -64,7 +57,7 @@ class SpotDiscoveryResolver(
         @InputArgument page: Int?,
         @InputArgument size: Int?,
     ): GqlSpotSearchPayload {
-        auditLocationAccess(dfe, "searchSpots")
+        val memberId = dfe.viewerMemberId()
         val result = spotDiscoveryUseCase.searchSpots(
             SearchSpotsQuery(
                 query = query,
@@ -76,6 +69,7 @@ class SpotDiscoveryResolver(
                 size = size ?: DEFAULT_PAGE_SIZE,
             ),
             locale = dfe.domainLocale(),
+            memberId = memberId,
         )
 
         return GqlSpotSearchPayload(
@@ -102,7 +96,7 @@ class SpotDiscoveryResolver(
         @InputArgument radiusMeters: Int?,
         @InputArgument limit: Int?,
     ): List<GqlSpotSuggestion> {
-        auditLocationAccess(dfe, "spotSearchSuggestions")
+        val memberId = dfe.viewerMemberId()
         return spotDiscoveryUseCase.spotSearchSuggestions(
             query = query,
             latitude = latitude,
@@ -110,6 +104,7 @@ class SpotDiscoveryResolver(
             radiusMeters = radiusMeters ?: DEFAULT_RADIUS_METERS,
             limit = limit ?: DEFAULT_SUGGESTION_LIMIT,
             locale = dfe.domainLocale(),
+            memberId = memberId,
         ).map {
             GqlSpotSuggestion(
                 id = it.id,
@@ -128,7 +123,7 @@ class SpotDiscoveryResolver(
         @InputArgument first: Int?,
         @InputArgument after: String?,
     ): GqlFestivalConnection {
-        auditLocationAccess(dfe, "ongoingFestivals")
+        val memberId = dfe.viewerMemberId()
         val page = spotDiscoveryUseCase.ongoingFestivals(
             OngoingFestivalsQuery(
                 latitude = latitude,
@@ -138,6 +133,7 @@ class SpotDiscoveryResolver(
                 after = after,
             ),
             locale = dfe.domainLocale(),
+            memberId = memberId,
         )
         return GqlFestivalConnection(
             edges = page.edges.map { GqlFestivalEdge(cursor = it.cursor, node = it.node.toGql()) },
@@ -155,7 +151,7 @@ class SpotDiscoveryResolver(
         @InputArgument first: Int?,
         @InputArgument after: String?,
     ): GqlPopularSpotConnection {
-        auditLocationAccess(dfe, "popularSpots")
+        val memberId = dfe.viewerMemberId()
         val page = spotDiscoveryUseCase.popularSpots(
             PopularSpotsQuery(
                 latitude = latitude,
@@ -166,6 +162,7 @@ class SpotDiscoveryResolver(
                 after = after,
             ),
             locale = dfe.domainLocale(),
+            memberId = memberId,
         )
         return GqlPopularSpotConnection(
             edges = page.edges.map {

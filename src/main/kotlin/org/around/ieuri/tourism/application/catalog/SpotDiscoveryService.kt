@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.application.catalog
 
+import org.around.ieuri.common.event.LocationAccessed
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.keysetPageOf
 import org.around.ieuri.common.pagination.map
@@ -15,7 +16,9 @@ import org.around.ieuri.tourism.application.catalog.provided.dto.SearchUserError
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotSearchResultView
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotSuggestionView
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
+import org.around.ieuri.tourism.application.catalog.provided.exception.InvalidCoordinatesException
 import org.around.ieuri.tourism.application.catalog.provided.exception.RadiusTooLargeException
+import org.around.ieuri.tourism.application.catalog.required.CatalogEventPublisherPort
 import org.around.ieuri.tourism.application.catalog.required.FestivalQueryPort
 import org.around.ieuri.tourism.application.catalog.required.OngoingFestivalSearch
 import org.around.ieuri.tourism.application.catalog.required.PopularSpotQueryPort
@@ -23,7 +26,6 @@ import org.around.ieuri.tourism.application.catalog.required.PopularSpotSearch
 import org.around.ieuri.tourism.application.catalog.required.SpotSearchPort
 import org.around.ieuri.tourism.application.catalog.required.SpotSearchQuery
 import org.around.ieuri.tourism.application.catalog.required.SpotSearchResult
-import org.around.ieuri.tourism.application.shared.provided.exception.InvalidCoordinatesException
 import org.around.ieuri.tourism.domain.catalog.DistanceCursor
 import org.around.ieuri.tourism.domain.catalog.LikeCountCursor
 import org.around.ieuri.tourism.domain.shared.Coordinates
@@ -49,13 +51,15 @@ class SpotDiscoveryService(
     private val popularSpotQueryPort: PopularSpotQueryPort,
     private val policy: SpotQueryPolicy,
     private val clock: Clock,
+    private val eventPublisher: CatalogEventPublisherPort,
 ) : SpotDiscoveryUseCase {
 
     /**
      * 검색(R1-R8). 질의 검증이 포트 호출보다 먼저다(AC-8.1).
      * - 질의 오류는 userErrors로, 좌표·반경 오류는 예외로 던진다.
      */
-    override fun searchSpots(query: SearchSpotsQuery, locale: DomainLocale): SpotSearchResultView {
+    override fun searchSpots(query: SearchSpotsQuery, locale: DomainLocale, memberId: Long?): SpotSearchResultView {
+        auditLocationAccess(memberId, "searchSpots")
         val center = validatedCenter(query.latitude, query.longitude)
         validateRadius(query.radiusMeters)
 
@@ -97,7 +101,9 @@ class SpotDiscoveryService(
         radiusMeters: Int,
         limit: Int,
         locale: DomainLocale,
+        memberId: Long?,
     ): List<SpotSuggestionView> {
+        auditLocationAccess(memberId, "spotSearchSuggestions")
         val center = validatedCenter(latitude, longitude)
         validateRadius(radiusMeters)
 
@@ -120,7 +126,9 @@ class SpotDiscoveryService(
     override fun ongoingFestivals(
         query: OngoingFestivalsQuery,
         locale: DomainLocale,
+        memberId: Long?,
     ): CursorPage<FestivalView> {
+        auditLocationAccess(memberId, "ongoingFestivals")
         val center = validatedCenter(query.latitude, query.longitude)
         validateRadius(query.radiusMeters)
 
@@ -145,7 +153,9 @@ class SpotDiscoveryService(
     override fun popularSpots(
         query: PopularSpotsQuery,
         locale: DomainLocale,
+        memberId: Long?,
     ): CursorPage<PopularSpotView> {
+        auditLocationAccess(memberId, "popularSpots")
         val center = validatedCenter(query.latitude, query.longitude)
         validateRadius(query.radiusMeters)
 
@@ -235,5 +245,10 @@ class SpotDiscoveryService(
 
         /** 행사 기간 판정의 기준 시간대. */
         val FESTIVAL_ZONE: ZoneId = ZoneId.of("Asia/Seoul")
+    }
+
+    /** 좌표를 받는 연산의 조회 사실을 남긴다(SPEC-0032 R19). 좌표는 넘기지 않고, 비로그인은 발행하지 않는다. */
+    private fun auditLocationAccess(memberId: Long?, operation: String) {
+        memberId?.let { eventPublisher.publish(LocationAccessed(it, operation)) }
     }
 }

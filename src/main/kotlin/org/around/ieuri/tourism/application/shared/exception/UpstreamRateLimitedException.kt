@@ -1,4 +1,4 @@
-package org.around.ieuri.tourism.application.shared.provided.exception
+package org.around.ieuri.tourism.application.shared.exception
 
 import org.around.ieuri.tourism.domain.shared.SpotQueryException
 import org.around.ieuri.tourism.domain.shared.SpotQueryException.Classification

@@ -2,9 +2,9 @@ package org.around.ieuri.tourism.adapter.client.tourapi
 
 import io.mockk.mockk
 import org.around.ieuri.tourism.adapter.config.TourApiProperties
-import org.around.ieuri.tourism.application.shared.provided.exception.UpstreamRateLimitedException
-import org.around.ieuri.tourism.application.shared.provided.exception.UpstreamTooManyRequestsException
-import org.around.ieuri.tourism.application.shared.provided.exception.UpstreamUnavailableException
+import org.around.ieuri.tourism.application.shared.exception.UpstreamRateLimitedException
+import org.around.ieuri.tourism.application.shared.exception.UpstreamTooManyRequestsException
+import org.around.ieuri.tourism.application.shared.exception.UpstreamUnavailableException
 import org.junit.jupiter.api.Test
 import org.springframework.http.HttpStatus
 import org.springframework.web.client.HttpClientErrorException

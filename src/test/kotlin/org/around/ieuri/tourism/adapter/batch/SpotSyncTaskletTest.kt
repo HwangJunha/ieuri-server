@@ -4,7 +4,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
-import org.around.ieuri.tourism.application.shared.provided.exception.UpstreamUnavailableException
+import org.around.ieuri.tourism.application.shared.exception.UpstreamUnavailableException
 import org.around.ieuri.tourism.application.spot.provided.FestivalSweepResult
 import org.around.ieuri.tourism.application.spot.provided.SpotSyncPageResult
 import org.around.ieuri.tourism.application.spot.provided.SpotSyncUseCase

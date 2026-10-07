@@ -5,11 +5,11 @@ import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
 import io.mockk.verifyOrder
+import org.around.ieuri.tourism.application.catalog.required.CatalogEventPublisherPort
 import org.around.ieuri.tourism.application.catalog.required.CatalogLanguage
 import org.around.ieuri.tourism.application.catalog.required.SpotCatalogQueryPort
 import org.around.ieuri.tourism.application.catalog.required.SpotCatalogRepository
 import org.around.ieuri.tourism.application.catalog.required.VisibilityRefreshResult
-import org.around.ieuri.tourism.application.shared.required.TourismEventPublisherPort
 import org.around.ieuri.tourism.domain.catalog.CatalogCandidate
 import org.around.ieuri.tourism.domain.catalog.CatalogOrigin
 import org.around.ieuri.tourism.domain.catalog.CatalogSplit
@@ -33,7 +33,7 @@ class SpotCatalogCurationServiceTest {
 
     private val repository = mockk<SpotCatalogRepository>(relaxed = true)
     private val queryPort = mockk<SpotCatalogQueryPort>()
-    private val events = mockk<TourismEventPublisherPort>(relaxed = true)
+    private val events = mockk<CatalogEventPublisherPort>(relaxed = true)
     private val service = SpotCatalogCurationService(repository, queryPort, events)
 
     private fun origin(spotId: Long, language: DomainLocale, title: String, mapX: Double = 129.1, mapY: Double = 35.1) = CatalogOrigin(

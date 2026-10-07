@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.application.catalog
 
+import org.around.ieuri.common.event.LocationAccessed
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.catalog.provided.SpotCatalogQueryUseCase
@@ -8,17 +9,20 @@ import org.around.ieuri.tourism.application.catalog.provided.dto.LikedSpotsQuery
 import org.around.ieuri.tourism.application.catalog.provided.dto.MapViewportQuery
 import org.around.ieuri.tourism.application.catalog.provided.dto.MapViewportView
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotPageView
+import org.around.ieuri.tourism.application.catalog.provided.dto.SpotSummaryView
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotsQuery
 import org.around.ieuri.tourism.application.catalog.provided.exception.BboxTooLargeException
 import org.around.ieuri.tourism.application.catalog.provided.exception.EmptyQueryException
 import org.around.ieuri.tourism.application.catalog.provided.exception.InvalidZoomException
 import org.around.ieuri.tourism.application.catalog.provided.exception.QueryTooLongException
+import org.around.ieuri.tourism.application.catalog.required.CatalogEventPublisherPort
 import org.around.ieuri.tourism.application.catalog.required.LikedSpotSearchPort
 import org.around.ieuri.tourism.application.catalog.required.LikedSpotsSearch
 import org.around.ieuri.tourism.application.catalog.required.MapQueryPort
 import org.around.ieuri.tourism.application.catalog.required.MapViewportSearch
 import org.around.ieuri.tourism.application.catalog.required.NearbySpotSearch
+import org.around.ieuri.tourism.application.catalog.required.SpotBasics
 import org.around.ieuri.tourism.application.catalog.required.SpotQueryPort
 import org.around.ieuri.tourism.application.catalog.required.SpotSearchResult
 import org.around.ieuri.tourism.application.catalog.required.SpotSpatialQueryPort
@@ -39,12 +43,15 @@ class SpotCatalogQueryService(
     private val likedSpotSearchPort: LikedSpotSearchPort,
     private val mapQueryPort: MapQueryPort,
     private val congestionQueryUseCase: CongestionQueryUseCase,
+    private val eventPublisher: CatalogEventPublisherPort,
     private val policy: SpotQueryPolicy,
     private val viewportPolicy: MapViewportPolicy,
 ) : SpotCatalogQueryUseCase {
 
     /** 주변 관광지 한 페이지. 거리 오름차순 + id 타이브레이크로 정렬된다. */
     override fun spots(query: SpotsQuery, locale: DomainLocale, memberId: Long?): SpotPageView {
+        // 좌표 조회 사실을 남긴다(SPEC-0032 R19). 좌표는 넘기지 않고, 비로그인은 발행하지 않는다.
+        memberId?.let { eventPublisher.publish(LocationAccessed(it, "spots")) }
         val center = coordinatesOf(query.latitude, query.longitude)
         requireRadiusWithin(query.radiusMeters, policy.maxRadiusMeters)
 
@@ -125,6 +132,13 @@ class SpotCatalogQueryService(
         )
     }
 
+    /** 카탈로그 한 행을 읽는다. [languageCode]에서 해소되지 않으면 null이다 — 다른 언어로 대신하지 않는다. */
+    override fun spotSummary(catalogId: Long, languageCode: String): SpotSummaryView? = spotQueryPort.findSpotBasics(catalogId, DomainLocale.fromLanguageTag(languageCode))?.toSummary(catalogId)
+
+    /** 카탈로그 여러 행을 읽는다. [languageCode]에서 해소되지 않는 id는 결과에 키가 없다(SPEC-0029 R-24). */
+    override fun spotSummaries(catalogIds: List<Long>, languageCode: String): Map<Long, SpotSummaryView> = spotQueryPort.findSpotBasicsIn(catalogIds, DomainLocale.fromLanguageTag(languageCode))
+        .mapValues { (catalogId, basics) -> basics.toSummary(catalogId) }
+
     /** 좋아요 목록과 그 안의 검색이 공유하는 조회 조건. */
     private fun searchOf(query: LikedSpotsQuery, locale: DomainLocale, memberId: Long) = LikedSpotsSearch(
         memberId = memberId,
@@ -159,5 +173,14 @@ class SpotCatalogQueryService(
         attributionText = copyright.attributionText,
         mapX = mapX,
         mapY = mapY,
+    )
+
+    private fun SpotBasics.toSummary(catalogId: Long) = SpotSummaryView(
+        id = catalogId,
+        title = title,
+        thumbnailImageUrl = thumbnailImageUrl,
+        categoryCode = category.code,
+        longitude = longitude,
+        latitude = latitude,
     )
 }

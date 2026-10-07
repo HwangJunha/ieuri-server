@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.application.region
 
+import org.around.ieuri.common.event.LocationAccessed
 import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.region.RegionRecommendationPolicy
 import org.around.ieuri.tourism.application.region.provided.RegionRecommendationUseCase
@@ -10,6 +11,7 @@ import org.around.ieuri.tourism.application.region.provided.dto.RecommendedRegio
 import org.around.ieuri.tourism.application.region.provided.dto.RegionMetricRow
 import org.around.ieuri.tourism.application.region.provided.dto.RegionScoreView
 import org.around.ieuri.tourism.application.region.provided.dto.ScoredFactor
+import org.around.ieuri.tourism.application.region.required.RegionEventPublisherPort
 import org.around.ieuri.tourism.application.region.required.RegionMetricQueryPort
 import org.around.ieuri.tourism.domain.region.RegionScore
 import org.around.ieuri.tourism.domain.region.RegionScoreCalculator
@@ -30,12 +32,16 @@ import org.springframework.transaction.annotation.Transactional
 class RegionRecommendationService(
     private val regionMetricQueryPort: RegionMetricQueryPort,
     private val policy: RegionRecommendationPolicy,
+    private val eventPublisher: RegionEventPublisherPort,
 ) : RegionRecommendationUseCase {
 
     override fun recommendedRegions(
         query: RecommendedRegionQuery,
         locale: DomainLocale,
+        memberId: Long?,
     ): RecommendedRegionView {
+        // 좌표 조회 사실을 남긴다(SPEC-0032 R19). origin은 넘기지 않고, 비로그인은 발행하지 않는다.
+        memberId?.let { eventPublisher.publish(LocationAccessed(it, "recommendedRegions")) }
         // 어느 시군구에도 걸리지 않는 좌표(바다·해외)는 빈 목록이다 — 오류도, 전국 폴백도 아니다.
         val originDistrict = regionMetricQueryPort.findDistrictAt(query.origin)
             ?: return RecommendedRegionView(regions = emptyList())

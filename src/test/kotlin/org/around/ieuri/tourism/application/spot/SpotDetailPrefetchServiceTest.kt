@@ -3,8 +3,8 @@ package org.around.ieuri.tourism.application.spot
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import org.around.ieuri.tourism.application.shared.provided.exception.UpstreamRateLimitedException
-import org.around.ieuri.tourism.application.shared.provided.exception.UpstreamUnavailableException
+import org.around.ieuri.tourism.application.shared.exception.UpstreamRateLimitedException
+import org.around.ieuri.tourism.application.shared.exception.UpstreamUnavailableException
 import org.around.ieuri.tourism.application.spot.provided.SpotCommandUseCase
 import org.around.ieuri.tourism.application.spot.provided.SpotPrefetchQueryUseCase
 import org.around.ieuri.tourism.application.spot.required.PrefetchTarget

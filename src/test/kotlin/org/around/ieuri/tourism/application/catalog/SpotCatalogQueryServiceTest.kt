@@ -4,6 +4,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
+import org.around.ieuri.common.event.LocationAccessed
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.CursorPageInfo
 import org.around.ieuri.tourism.application.catalog.MapViewportPolicy
@@ -15,20 +16,22 @@ import org.around.ieuri.tourism.application.catalog.provided.dto.MapViewportQuer
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotsQuery
 import org.around.ieuri.tourism.application.catalog.provided.exception.BboxTooLargeException
 import org.around.ieuri.tourism.application.catalog.provided.exception.EmptyQueryException
+import org.around.ieuri.tourism.application.catalog.provided.exception.InvalidCoordinatesException
 import org.around.ieuri.tourism.application.catalog.provided.exception.InvalidZoomException
 import org.around.ieuri.tourism.application.catalog.provided.exception.QueryTooLongException
 import org.around.ieuri.tourism.application.catalog.provided.exception.RadiusTooLargeException
+import org.around.ieuri.tourism.application.catalog.required.CatalogEventPublisherPort
 import org.around.ieuri.tourism.application.catalog.required.LikedSpotSearchPort
 import org.around.ieuri.tourism.application.catalog.required.LikedSpotsSearch
 import org.around.ieuri.tourism.application.catalog.required.MapQueryPort
 import org.around.ieuri.tourism.application.catalog.required.MapViewportSearch
 import org.around.ieuri.tourism.application.catalog.required.NearbySpotSearch
+import org.around.ieuri.tourism.application.catalog.required.SpotBasics
 import org.around.ieuri.tourism.application.catalog.required.SpotQueryPort
 import org.around.ieuri.tourism.application.catalog.required.SpotSearchResult
 import org.around.ieuri.tourism.application.catalog.required.SpotSpatialQueryPort
 import org.around.ieuri.tourism.application.congestion.provided.CongestionQueryUseCase
 import org.around.ieuri.tourism.application.congestion.provided.dto.CulturalEventView
-import org.around.ieuri.tourism.application.shared.provided.exception.InvalidCoordinatesException
 import org.around.ieuri.tourism.domain.catalog.CategorySelection
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.CopyrightType
@@ -39,6 +42,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /** SpotCatalogQueryService — 주변 목록의 페이지·검증·반응 제외, 좋아요 목록과 그 안의 검색. */
@@ -68,12 +72,14 @@ class SpotCatalogQueryServiceTest {
         recommendationCandidateCap = 2_000,
         maxRecommendationSize = 100,
     )
+    private val eventPublisher = mockk<CatalogEventPublisherPort>(relaxed = true)
     private val service = SpotCatalogQueryService(
         spotQueryPort,
         spotSpatialQueryPort,
         likedSpotSearchPort,
         mapQueryPort,
         congestionQueryUseCase,
+        eventPublisher,
         policy,
         viewportPolicy,
     )
@@ -622,5 +628,58 @@ class SpotCatalogQueryServiceTest {
 
         assertEquals(events.take(viewportPolicy.maxEventMarkers), result.events)
         assertTrue(result.truncated)
+    }
+
+    /** 필드마다 다른 값 — 경도·위도가 뒤바뀌면 실패한다. */
+    private fun basics() = SpotBasics(
+        title = "경복궁",
+        address = "서울 종로구",
+        thumbnailImageUrl = "https://img/100.jpg",
+        category = SpotCategory("TOURIST_SPOT"),
+        copyright = CopyrightType.TYPE1,
+        longitude = 126.977,
+        latitude = 37.579,
+    )
+
+    @Test
+    fun `spotSummary는 카탈로그 id와 spot 행 값을 필드별로 옮긴다`() {
+        every { spotQueryPort.findSpotBasics(100L, DomainLocale.JA) } returns basics()
+
+        val summary = service.spotSummary(100L, "JA")
+
+        assertEquals(100L, summary?.id)
+        assertEquals("경복궁", summary?.title)
+        assertEquals("https://img/100.jpg", summary?.thumbnailImageUrl)
+        assertEquals("TOURIST_SPOT", summary?.categoryCode)
+        assertEquals(126.977, summary?.longitude)
+        assertEquals(37.579, summary?.latitude)
+    }
+
+    @Test
+    fun `spotSummary는 그 언어에 없으면 다른 언어로 대신하지 않고 null이다`() {
+        every { spotQueryPort.findSpotBasics(100L, DomainLocale.EN) } returns null
+
+        assertNull(service.spotSummary(100L, "EN"))
+    }
+
+    @Test
+    fun `spotSummaries는 해소된 id만 키로 두고 같은 변환을 쓴다`() {
+        every { spotQueryPort.findSpotBasicsIn(listOf(100L, 200L), DomainLocale.KO) } returns mapOf(200L to basics())
+
+        val summaries = service.spotSummaries(listOf(100L, 200L), "KO")
+
+        assertEquals(setOf(200L), summaries.keys)
+        assertEquals(200L, summaries[200L]?.id)
+        assertEquals(126.977, summaries[200L]?.longitude)
+        assertEquals(37.579, summaries[200L]?.latitude)
+    }
+
+    @Test
+    fun `회원의 주변 조회는 좌표 조회 사실을 남기고, 비로그인은 남기지 않는다`() {
+        service.spots(query(), DomainLocale.KO, memberId = 7L)
+        service.spots(query(), DomainLocale.KO, memberId = null)
+
+        verify(exactly = 1) { eventPublisher.publish(LocationAccessed(7L, "spots")) }
+        verify(exactly = 1) { eventPublisher.publish(any()) }
     }
 }

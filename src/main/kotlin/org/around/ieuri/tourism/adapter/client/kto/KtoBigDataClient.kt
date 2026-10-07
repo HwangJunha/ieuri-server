@@ -11,8 +11,8 @@ import org.around.ieuri.tourism.application.region.provided.dto.SyncDemandIntens
 import org.around.ieuri.tourism.application.region.provided.dto.SyncVisitorCountCommand
 import org.around.ieuri.tourism.application.region.required.RegionMetricSyncPage
 import org.around.ieuri.tourism.application.region.required.RegionMetricSyncPort
-import org.around.ieuri.tourism.application.shared.provided.exception.UpstreamRateLimitedException
-import org.around.ieuri.tourism.application.shared.provided.exception.UpstreamUnavailableException
+import org.around.ieuri.tourism.application.shared.exception.UpstreamRateLimitedException
+import org.around.ieuri.tourism.application.shared.exception.UpstreamUnavailableException
 import org.slf4j.LoggerFactory
 import org.springframework.core.ParameterizedTypeReference
 import org.springframework.stereotype.Component

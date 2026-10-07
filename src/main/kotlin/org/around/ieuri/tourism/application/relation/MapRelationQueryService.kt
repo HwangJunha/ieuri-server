@@ -10,7 +10,7 @@ import org.around.ieuri.tourism.application.relation.provided.MapRelationQueryUs
 import org.around.ieuri.tourism.application.relation.provided.dto.MapRelationView
 import org.around.ieuri.tourism.application.relation.provided.dto.MapRelationsQuery
 import org.around.ieuri.tourism.application.relation.required.MapRelationQueryPort
-import org.around.ieuri.tourism.application.shared.provided.exception.InvalidCursorException
+import org.around.ieuri.tourism.application.shared.exception.InvalidCursorException
 import org.around.ieuri.tourism.domain.relation.RelationCursor
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional

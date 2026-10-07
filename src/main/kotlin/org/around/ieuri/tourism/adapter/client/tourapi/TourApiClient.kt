@@ -8,9 +8,9 @@ import org.around.ieuri.tourism.adapter.client.tourapi.mapper.toSpotIntroOrNull
 import org.around.ieuri.tourism.adapter.config.TourApiProperties
 import org.around.ieuri.tourism.application.category.provided.CategoryMappingQueryUseCase
 import org.around.ieuri.tourism.application.category.required.CategoryExternalMappingPort
-import org.around.ieuri.tourism.application.shared.provided.exception.UpstreamRateLimitedException
-import org.around.ieuri.tourism.application.shared.provided.exception.UpstreamTooManyRequestsException
-import org.around.ieuri.tourism.application.shared.provided.exception.UpstreamUnavailableException
+import org.around.ieuri.tourism.application.shared.exception.UpstreamRateLimitedException
+import org.around.ieuri.tourism.application.shared.exception.UpstreamTooManyRequestsException
+import org.around.ieuri.tourism.application.shared.exception.UpstreamUnavailableException
 import org.around.ieuri.tourism.application.spot.required.NearbySpotQuery
 import org.around.ieuri.tourism.application.spot.required.NearbySpotResult
 import org.around.ieuri.tourism.application.spot.required.SpotDetailQuery

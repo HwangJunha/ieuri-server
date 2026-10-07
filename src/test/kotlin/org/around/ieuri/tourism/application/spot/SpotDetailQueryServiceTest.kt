@@ -9,8 +9,7 @@ import org.around.ieuri.tourism.application.catalog.required.SpotIdentity
 import org.around.ieuri.tourism.application.catalog.required.SpotQueryPort
 import org.around.ieuri.tourism.application.category.provided.exception.UnknownCategoryException
 import org.around.ieuri.tourism.application.category.required.AppCategoryQueryPort
-import org.around.ieuri.tourism.application.shared.provided.exception.UpstreamUnavailableException
-import org.around.ieuri.tourism.application.shared.required.TourismEventPublisherPort
+import org.around.ieuri.tourism.application.shared.exception.UpstreamUnavailableException
 import org.around.ieuri.tourism.application.spot.SpotDetailAbsent
 import org.around.ieuri.tourism.application.spot.SpotDetailFetched
 import org.around.ieuri.tourism.application.spot.provided.exception.SpotDetailNotFoundException
@@ -20,6 +19,7 @@ import org.around.ieuri.tourism.application.spot.required.CachedIntro
 import org.around.ieuri.tourism.application.spot.required.SpotCachePort
 import org.around.ieuri.tourism.application.spot.required.SpotDetailQuery
 import org.around.ieuri.tourism.application.spot.required.SpotDetailQueryPort
+import org.around.ieuri.tourism.application.spot.required.SpotEventPublisherPort
 import org.around.ieuri.tourism.application.spot.required.StoredDetail
 import org.around.ieuri.tourism.application.spot.required.StoredIntro
 import org.around.ieuri.tourism.application.spot.required.TourInfoPort
@@ -46,7 +46,7 @@ class SpotDetailQueryServiceTest {
     private val spotQueryPort = mockk<SpotQueryPort>()
     private val spotCachePort = mockk<SpotCachePort>()
     private val detailRepository = mockk<SpotDetailQueryPort>()
-    private val eventPublisher = mockk<TourismEventPublisherPort>(relaxed = true)
+    private val eventPublisher = mockk<SpotEventPublisherPort>(relaxed = true)
     private val appCategoryQueryPort = mockk<AppCategoryQueryPort>()
     private val service = SpotDetailQueryService(
         tourInfoPort,

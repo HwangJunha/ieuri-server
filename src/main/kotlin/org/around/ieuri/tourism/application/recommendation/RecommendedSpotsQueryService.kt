@@ -13,8 +13,8 @@ import org.around.ieuri.tourism.application.catalog.required.SpotSpatialQueryPor
 import org.around.ieuri.tourism.application.recommendation.RecommendationPolicy
 import org.around.ieuri.tourism.application.recommendation.provided.RecommendedSpotsUseCase
 import org.around.ieuri.tourism.application.recommendation.provided.dto.RecommendedSpotsQuery
+import org.around.ieuri.tourism.application.recommendation.required.RecommendationEventPublisherPort
 import org.around.ieuri.tourism.application.recommendation.required.TasteSimilarityQueryPort
-import org.around.ieuri.tourism.application.shared.required.TourismEventPublisherPort
 import org.around.ieuri.tourism.domain.catalog.ReactionType
 import org.around.ieuri.tourism.domain.recommendation.RankedSpot
 import org.around.ieuri.tourism.domain.recommendation.TasteNormalization
@@ -34,7 +34,7 @@ class RecommendedSpotsQueryService(
     private val spotQueryPort: SpotQueryPort,
     private val spotSpatialQueryPort: SpotSpatialQueryPort,
     private val tasteSimilarityQueryPort: TasteSimilarityQueryPort,
-    private val eventPublisher: TourismEventPublisherPort,
+    private val eventPublisher: RecommendationEventPublisherPort,
     private val spotQueryPolicy: SpotQueryPolicy,
     private val policy: RecommendationPolicy,
 ) : RecommendedSpotsUseCase {

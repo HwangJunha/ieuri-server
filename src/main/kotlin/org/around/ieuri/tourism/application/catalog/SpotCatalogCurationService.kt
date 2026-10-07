@@ -5,9 +5,9 @@ import org.around.ieuri.tourism.application.catalog.provided.SpotCatalogCuration
 import org.around.ieuri.tourism.application.catalog.provided.dto.CatalogAssignmentResult
 import org.around.ieuri.tourism.application.catalog.provided.dto.CatalogSplitResult
 import org.around.ieuri.tourism.application.catalog.provided.dto.DistrictAssignmentResult
+import org.around.ieuri.tourism.application.catalog.required.CatalogEventPublisherPort
 import org.around.ieuri.tourism.application.catalog.required.SpotCatalogQueryPort
 import org.around.ieuri.tourism.application.catalog.required.SpotCatalogRepository
-import org.around.ieuri.tourism.application.shared.required.TourismEventPublisherPort
 import org.around.ieuri.tourism.domain.catalog.CatalogAssignment
 import org.around.ieuri.tourism.domain.catalog.CatalogIndex
 import org.around.ieuri.tourism.domain.catalog.CatalogOrigin
@@ -29,7 +29,7 @@ import org.springframework.transaction.annotation.Transactional
 class SpotCatalogCurationService(
     private val catalogRepository: SpotCatalogRepository,
     private val catalogQueryPort: SpotCatalogQueryPort,
-    private val eventPublisher: TourismEventPublisherPort,
+    private val eventPublisher: CatalogEventPublisherPort,
 ) : SpotCatalogCurationUseCase {
 
     private val log = LoggerFactory.getLogger(javaClass)

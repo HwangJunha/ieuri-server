@@ -1,9 +1,13 @@
 package org.around.ieuri.tourism.application.region
 
+import io.mockk.mockk
+import io.mockk.verify
+import org.around.ieuri.common.event.LocationAccessed
 import org.around.ieuri.tourism.application.region.provided.dto.OriginDistrict
 import org.around.ieuri.tourism.application.region.provided.dto.RecommendedRegionQuery
 import org.around.ieuri.tourism.application.region.provided.dto.RegionMetric
 import org.around.ieuri.tourism.application.region.provided.dto.RegionRow
+import org.around.ieuri.tourism.application.region.required.RegionEventPublisherPort
 import org.around.ieuri.tourism.domain.region.DistanceScoring
 import org.around.ieuri.tourism.domain.region.FreshnessDecay
 import org.around.ieuri.tourism.domain.region.RegionScoreFactor
@@ -39,7 +43,7 @@ class RegionCandidateSelectionTest {
         fixtures: List<RegionFixture>,
         originDistrict: OriginDistrict? = null,
         policy: RegionRecommendationPolicy = policy(),
-    ) = RegionRecommendationService(stub(fixtures, originDistrict), policy)
+    ) = RegionRecommendationService(stub(fixtures, originDistrict), policy, mockk<RegionEventPublisherPort>(relaxed = true))
 
     /** 지표 4종이 모두 있는 후보 — 거리까지 5항목이라 최소 항목 수를 넘겨 선별 규칙만 남긴다. */
     private fun fixture(
@@ -60,7 +64,7 @@ class RegionCandidateSelectionTest {
 
     private fun query(origin: Coordinates = GANGNAM) = RecommendedRegionQuery(origin = origin, limit = 10)
 
-    private fun RegionRecommendationService.codes(origin: Coordinates = GANGNAM): List<String> = recommendedRegions(query(origin), DomainLocale.KO).regions.map { it.code }
+    private fun RegionRecommendationService.codes(origin: Coordinates = GANGNAM): List<String> = recommendedRegions(query(origin), DomainLocale.KO, memberId = null).regions.map { it.code }
 
     @Test
     fun `origin이 속한 시군구는 결과에 오지 않는다 — 현재 위치 확인이 아니라 추천이다`() {
@@ -111,7 +115,7 @@ class RegionCandidateSelectionTest {
             originDistrict = OriginDistrict(code = "11680", provinceCode = "11"),
         )
 
-        RegionRecommendationService(stub, policy()).recommendedRegions(query(), DomainLocale.KO)
+        RegionRecommendationService(stub, policy(), mockk<RegionEventPublisherPort>(relaxed = true)).recommendedRegions(query(), DomainLocale.KO, memberId = null)
 
         assertEquals(
             listOf("11"),
@@ -135,10 +139,10 @@ class RegionCandidateSelectionTest {
             // 바다·해외 — 경계 안에 있는 지역이 없다.
             originDistrict = null,
         )
-        val service = RegionRecommendationService(stub, policy())
+        val service = RegionRecommendationService(stub, policy(), mockk<RegionEventPublisherPort>(relaxed = true))
 
         val regions = service
-            .recommendedRegions(query(Coordinates(latitude = 35.0, longitude = 129.9)), DomainLocale.KO)
+            .recommendedRegions(query(Coordinates(latitude = 35.0, longitude = 129.9)), DomainLocale.KO, memberId = null)
             .regions
 
         assertTrue(regions.isEmpty(), "전국으로 되돌아가면 안 된다: ${regions.map { it.code }}")
@@ -228,7 +232,7 @@ class RegionCandidateSelectionTest {
             originDistrict = OriginDistrict(code = "11680", provinceCode = "11"),
         )
 
-        val regions = service.recommendedRegions(query(), DomainLocale.KO).regions
+        val regions = service.recommendedRegions(query(), DomainLocale.KO, memberId = null).regions
 
         // 남은 후보 구간이 10~20이라 체류 강도가 큰 쪽이 만점이다.
         val top = regions.single { it.code == "11170" }
@@ -237,6 +241,18 @@ class RegionCandidateSelectionTest {
             top.scores.single { it.score.factor == RegionScoreFactor.STAY_INTENSITY }.score.value,
             1e-9,
         )
+    }
+
+    @Test
+    fun `회원의 지역 추천은 좌표 조회 사실을 남기고, 비로그인은 남기지 않는다`() {
+        val events = mockk<RegionEventPublisherPort>(relaxed = true)
+        val service = RegionRecommendationService(stub(emptyList(), originDistrict = null), policy(), events)
+
+        service.recommendedRegions(query(), DomainLocale.KO, memberId = 7L)
+        service.recommendedRegions(query(), DomainLocale.KO, memberId = null)
+
+        verify(exactly = 1) { events.publish(LocationAccessed(7L, "recommendedRegions")) }
+        verify(exactly = 1) { events.publish(any()) }
     }
 
     private companion object {

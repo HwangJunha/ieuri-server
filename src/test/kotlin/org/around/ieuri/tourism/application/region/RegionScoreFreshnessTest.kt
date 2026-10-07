@@ -1,10 +1,12 @@
 package org.around.ieuri.tourism.application.region
 
+import io.mockk.mockk
 import org.around.ieuri.tourism.application.region.provided.dto.OriginDistrict
 import org.around.ieuri.tourism.application.region.provided.dto.RecommendedRegionItemView
 import org.around.ieuri.tourism.application.region.provided.dto.RecommendedRegionQuery
 import org.around.ieuri.tourism.application.region.provided.dto.RegionMetric
 import org.around.ieuri.tourism.application.region.provided.dto.RegionRow
+import org.around.ieuri.tourism.application.region.required.RegionEventPublisherPort
 import org.around.ieuri.tourism.domain.region.DistanceScoring
 import org.around.ieuri.tourism.domain.region.FreshnessDecay
 import org.around.ieuri.tourism.domain.region.RegionScoreFactor
@@ -38,6 +40,7 @@ class RegionScoreFreshnessTest {
             OriginDistrict(code = "11999", provinceCode = "11"),
         ),
         policy,
+        mockk<RegionEventPublisherPort>(relaxed = true),
     )
 
     private fun fixture(
@@ -80,7 +83,7 @@ class RegionScoreFreshnessTest {
             fixture(code = "11710", visitorCount = 600_000.0, visitorAgeDays = 30),
         )
 
-        val regions = service.recommendedRegions(query(), DomainLocale.KO).regions.associateBy { it.code }
+        val regions = service.recommendedRegions(query(), DomainLocale.KO, memberId = null).regions.associateBy { it.code }
 
         val fresh = regions.getValue("11680").score(RegionScoreFactor.VISITOR_VOLUME).score.value
         val stale = regions.getValue("11710").score(RegionScoreFactor.VISITOR_VOLUME).score.value
@@ -94,7 +97,7 @@ class RegionScoreFreshnessTest {
             fixture(code = "11710", visitorCount = 600_000.0, visitorAgeDays = 7),
         )
 
-        val regions = service.recommendedRegions(query(), DomainLocale.KO).regions.associateBy { it.code }
+        val regions = service.recommendedRegions(query(), DomainLocale.KO, memberId = null).regions.associateBy { it.code }
 
         assertEquals(
             regions.getValue("11680").score(RegionScoreFactor.VISITOR_VOLUME).score.value,
@@ -110,7 +113,7 @@ class RegionScoreFreshnessTest {
             fixture(code = "11710", visitorCount = 400_000.0, visitorAgeDays = 0, stayIntensity = 30.0),
         )
 
-        val regions = service.recommendedRegions(query(), DomainLocale.KO).regions.associateBy { it.code }
+        val regions = service.recommendedRegions(query(), DomainLocale.KO, memberId = null).regions.associateBy { it.code }
 
         // 정규화 최댓값 = 100점. 감쇠가 걸렸다면 절반 이하로 떨어진다.
         assertEquals(100.0, regions.getValue("11680").score(RegionScoreFactor.STAY_INTENSITY).score.value, 1e-9)
@@ -123,7 +126,7 @@ class RegionScoreFreshnessTest {
             fixture(code = "11710", visitorCount = 600_000.0, visitorAgeDays = null),
         )
 
-        val regions = service.recommendedRegions(query(), DomainLocale.KO).regions.associateBy { it.code }
+        val regions = service.recommendedRegions(query(), DomainLocale.KO, memberId = null).regions.associateBy { it.code }
 
         assertEquals(
             regions.getValue("11680").score(RegionScoreFactor.VISITOR_VOLUME).score.value,
@@ -138,7 +141,7 @@ class RegionScoreFreshnessTest {
             fixture(code = "11680", visitorCount = null, visitorAgeDays = null),
         )
 
-        val region = service.recommendedRegions(query(), DomainLocale.KO).regions.single()
+        val region = service.recommendedRegions(query(), DomainLocale.KO, memberId = null).regions.single()
 
         assertTrue(region.scores.none { it.score.factor == RegionScoreFactor.VISITOR_VOLUME })
         assertEquals(region.scores.size, region.scoreFactorCount)
@@ -153,7 +156,7 @@ class RegionScoreFreshnessTest {
             fixture(code = "11710", visitorCount = 600_000.0, visitorAgeDays = 0),
         )
 
-        val regions = service.recommendedRegions(query(), DomainLocale.KO).regions
+        val regions = service.recommendedRegions(query(), DomainLocale.KO, memberId = null).regions
 
         assertEquals("11710", regions.first().code, "신선한 쪽이 앞에 와야 한다")
         assertEquals(1, regions.first().score(RegionScoreFactor.VISITOR_VOLUME).rank)
@@ -178,7 +181,7 @@ class RegionScoreFreshnessTest {
         )
 
         val regions = service(staleFixture("11680", stay = 70.0), staleFixture("11710", stay = 30.0))
-            .recommendedRegions(query(), DomainLocale.KO)
+            .recommendedRegions(query(), DomainLocale.KO, memberId = null)
             .regions
             .associateBy { it.code }
 
@@ -192,7 +195,7 @@ class RegionScoreFreshnessTest {
             fixture(code = "11710", visitorCount = 300_000.0, visitorAgeDays = 0),
         )
 
-        val regions = service.recommendedRegions(query(), DomainLocale.KO).regions.associateBy { it.code }
+        val regions = service.recommendedRegions(query(), DomainLocale.KO, memberId = null).regions.associateBy { it.code }
 
         // 방문자수가 큰 쪽이 만점, 작은 쪽이 0점이다(정규화 양 끝).
         assertEquals(100.0, regions.getValue("11680").score(RegionScoreFactor.VISITOR_VOLUME).score.value, 1e-9)

@@ -1,4 +1,4 @@
-package org.around.ieuri.tourism.application.shared.provided.dto
+package org.around.ieuri.tourism.application.catalog.provided.dto
 
 /** 카탈로그 한 행의 요약. upstream 호출 없이 만들어지며, 다른 도메인이 장소 확인·표시에 쓴다. */
 data class SpotSummaryView(

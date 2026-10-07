@@ -5,7 +5,6 @@ import com.netflix.graphql.dgs.DgsData
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
-import org.around.ieuri.common.event.LocationAccessed
 import org.around.ieuri.common.graphql.appKey
 import org.around.ieuri.common.graphql.tokenPresentation
 import org.around.ieuri.common.pagination.CursorPage
@@ -21,7 +20,6 @@ import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotsQuery
 import org.around.ieuri.tourism.application.category.provided.CategoryQueryUseCase
 import org.around.ieuri.tourism.application.category.provided.dto.CategoryDisplay
-import org.around.ieuri.tourism.application.shared.required.TourismEventPublisherPort
 import org.around.ieuri.tourism.application.spot.provided.SpotDetailQueryUseCase
 import org.around.ieuri.tourism.application.spot.provided.dto.SpotDetailView
 import org.around.ieuri.tourism.application.spot.provided.dto.SpotImageView
@@ -50,7 +48,6 @@ class SpotQueryResolver(
     private val detailQueryUseCase: SpotDetailQueryUseCase,
     private val categoryQueryUseCase: CategoryQueryUseCase,
     private val currentMemberProvider: CurrentMemberProvider,
-    private val eventPublisher: TourismEventPublisherPort,
 ) {
     @DgsQuery
     fun spots(
@@ -64,8 +61,6 @@ class SpotQueryResolver(
     ): GqlSpotPage {
         // 만료 토큰은 비로그인으로 강등하지 않고 오류다(R1).
         val memberId = dfe.viewerMemberId()
-        // 좌표 조회 사실을 남긴다(R19). 좌표는 넘기지 않고, 비로그인은 발행하지 않는다.
-        memberId?.let { eventPublisher.publish(LocationAccessed(it, "spots")) }
         val result = catalogQueryUseCase.spots(
             SpotsQuery(
                 latitude = latitude,

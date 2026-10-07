@@ -1,4 +1,4 @@
-package org.around.ieuri.tourism.application.shared.provided.exception
+package org.around.ieuri.tourism.adapter.graphql.support
 
 import org.around.ieuri.auth.application.exception.InactiveMemberException
 import org.around.ieuri.auth.application.exception.InvalidCredentialsException
@@ -12,7 +12,6 @@ import org.around.ieuri.auth.application.exception.VerificationNotFoundException
 import org.around.ieuri.auth.application.exception.VerificationRateLimitedException
 import org.around.ieuri.auth.infrastructure.adapter.`in`.graphql.toUserErrorOrNull
 import org.around.ieuri.common.security.UnauthorizedException
-import org.around.ieuri.tourism.adapter.graphql.support.toReactionUserErrorOrNull
 import org.around.ieuri.tourism.application.catalog.provided.exception.SpotNotFoundException
 import org.around.ieuri.tourism.domain.catalog.ReactionUserException
 import kotlin.test.Test

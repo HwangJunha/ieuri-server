@@ -53,4 +53,18 @@ class CategoryQueryServiceTest {
         assertEquals("BRAND_NEW", result["BRAND_NEW"]?.label)
         assertNull(result["BRAND_NEW"]?.iconUrl)
     }
+
+    /** 다른 도메인이 쓰는 문자열 경로. */
+    @Test
+    fun `availableCategoryCodes는 문자열 축으로 같은 구성을 돌려준다`() {
+        val appKey = AppKey("k-trip-spot")
+        every { appCategoryQueryPort.findCategories(appKey, DomainLocale.JA) } returns
+            listOf(AppCategoryView(SpotCategory("TRANSPORT"), "交通", "https://cdn/transport.png"))
+
+        val result = service.availableCategoryCodes(appKey, "JA")
+
+        assertEquals(listOf("TRANSPORT"), result.map { it.category })
+        assertEquals(listOf("交通"), result.map { it.label })
+        assertEquals(listOf("https://cdn/transport.png"), result.map { it.iconUrl })
+    }
 }

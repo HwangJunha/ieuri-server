@@ -4,13 +4,16 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
+import org.around.ieuri.common.event.LocationAccessed
 import org.around.ieuri.tourism.application.catalog.provided.dto.FestivalView
 import org.around.ieuri.tourism.application.catalog.provided.dto.OngoingFestivalsQuery
 import org.around.ieuri.tourism.application.catalog.provided.dto.PopularSpotView
 import org.around.ieuri.tourism.application.catalog.provided.dto.PopularSpotsQuery
 import org.around.ieuri.tourism.application.catalog.provided.dto.SearchSpotsQuery
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
+import org.around.ieuri.tourism.application.catalog.provided.exception.InvalidCoordinatesException
 import org.around.ieuri.tourism.application.catalog.provided.exception.RadiusTooLargeException
+import org.around.ieuri.tourism.application.catalog.required.CatalogEventPublisherPort
 import org.around.ieuri.tourism.application.catalog.required.FestivalQueryPort
 import org.around.ieuri.tourism.application.catalog.required.OngoingFestivalSearch
 import org.around.ieuri.tourism.application.catalog.required.PopularSpotQueryPort
@@ -20,7 +23,6 @@ import org.around.ieuri.tourism.application.catalog.required.SpotSearchPort
 import org.around.ieuri.tourism.application.catalog.required.SpotSearchQuery
 import org.around.ieuri.tourism.application.catalog.required.SpotSearchResult
 import org.around.ieuri.tourism.application.catalog.required.SpotSuggestionHit
-import org.around.ieuri.tourism.application.shared.provided.exception.InvalidCoordinatesException
 import org.around.ieuri.tourism.domain.catalog.CategorySelection
 import org.around.ieuri.tourism.domain.catalog.DistanceCursor
 import org.around.ieuri.tourism.domain.catalog.LikeCountCursor
@@ -61,12 +63,15 @@ class SpotDiscoveryServiceTest {
         minPopularLikeCount = 10,
     )
 
+    private val eventPublisher = mockk<CatalogEventPublisherPort>(relaxed = true)
+
     private val service = SpotDiscoveryService(
         spotSearchPort,
         festivalQueryPort,
         popularSpotQueryPort,
         policy,
         clock,
+        eventPublisher,
     )
 
     init {
@@ -87,7 +92,7 @@ class SpotDiscoveryServiceTest {
             hit(spotId = 2L, title = "경복궁로 카페", relevance = 0.3),
         )
 
-        val result = service.searchSpots(searchQuery(query = "경복궁"), DomainLocale.KO)
+        val result = service.searchSpots(searchQuery(query = "경복궁"), DomainLocale.KO, memberId = null)
 
         assertEquals(listOf(1L, 2L), result.items.map { it.id })
     }
@@ -95,7 +100,7 @@ class SpotDiscoveryServiceTest {
     /** AC-1.3 — 0건은 오류가 아니다. */
     @Test
     fun `결과가 없어도 오류가 아니라 빈 페이지다`() {
-        val result = service.searchSpots(searchQuery(query = "없는장소"), DomainLocale.KO)
+        val result = service.searchSpots(searchQuery(query = "없는장소"), DomainLocale.KO, memberId = null)
 
         assertTrue(result.success)
         assertTrue(result.items.isEmpty())
@@ -108,7 +113,7 @@ class SpotDiscoveryServiceTest {
         val captured = slot<SpotSearchQuery>()
         every { spotSearchPort.search(capture(captured)) } returns emptyList()
 
-        service.searchSpots(searchQuery(query = "경복궁", radiusMeters = 5_000), DomainLocale.KO)
+        service.searchSpots(searchQuery(query = "경복궁", radiusMeters = 5_000), DomainLocale.KO, memberId = null)
 
         assertEquals(5_000, captured.captured.radiusMeters)
     }
@@ -121,7 +126,7 @@ class SpotDiscoveryServiceTest {
         val captured = slot<SpotSearchQuery>()
         every { spotSearchPort.search(capture(captured)) } returns emptyList()
 
-        service.searchSpots(searchQuery(query = "경복궁 야간개장"), DomainLocale.KO)
+        service.searchSpots(searchQuery(query = "경복궁 야간개장"), DomainLocale.KO, memberId = null)
 
         assertEquals("경복궁 야간개장", captured.captured.text)
     }
@@ -132,7 +137,7 @@ class SpotDiscoveryServiceTest {
         val captured = slot<SpotSearchQuery>()
         every { spotSearchPort.search(capture(captured)) } returns emptyList()
 
-        service.searchSpots(searchQuery(query = "金閣寺"), DomainLocale.JA)
+        service.searchSpots(searchQuery(query = "金閣寺"), DomainLocale.JA, memberId = null)
 
         assertEquals(DomainLocale.JA, captured.captured.language)
     }
@@ -148,6 +153,7 @@ class SpotDiscoveryServiceTest {
         service.searchSpots(
             searchQuery(query = "경복궁", category = SpotCategory.TOURIST_SPOT),
             DomainLocale.KO,
+            memberId = null,
         )
 
         assertEquals(CategorySelection.ofValues(setOf(SpotCategory.TOURIST_SPOT)), captured.captured.categories)
@@ -159,7 +165,7 @@ class SpotDiscoveryServiceTest {
         val captured = slot<SpotSearchQuery>()
         every { spotSearchPort.search(capture(captured)) } returns emptyList()
 
-        service.searchSpots(searchQuery(query = "경복궁"), DomainLocale.KO)
+        service.searchSpots(searchQuery(query = "경복궁"), DomainLocale.KO, memberId = null)
 
         assertEquals(CategorySelection.UNFILTERED, captured.captured.categories)
     }
@@ -172,7 +178,7 @@ class SpotDiscoveryServiceTest {
         val captured = slot<SpotSearchQuery>()
         every { spotSearchPort.search(capture(captured)) } returns emptyList()
 
-        service.searchSpots(searchQuery(query = "경복궁", page = 3, size = 20), DomainLocale.KO)
+        service.searchSpots(searchQuery(query = "경복궁", page = 3, size = 20), DomainLocale.KO, memberId = null)
 
         assertEquals(40, captured.captured.offset)
         assertEquals(20, captured.captured.limit)
@@ -184,7 +190,7 @@ class SpotDiscoveryServiceTest {
         val captured = slot<SpotSearchQuery>()
         every { spotSearchPort.search(capture(captured)) } returns emptyList()
 
-        service.searchSpots(searchQuery(query = "경복궁"), DomainLocale.KO)
+        service.searchSpots(searchQuery(query = "경복궁"), DomainLocale.KO, memberId = null)
 
         assertEquals(0, captured.captured.offset)
     }
@@ -192,7 +198,7 @@ class SpotDiscoveryServiceTest {
     /** 페이지 상한을 넘으면 PAGE_TOO_DEEP이고 포트를 호출하지 않는다. */
     @Test
     fun `페이지가 너무 깊으면 PAGE_TOO_DEEP이다`() {
-        val result = service.searchSpots(searchQuery(query = "경복궁", page = 501), DomainLocale.KO)
+        val result = service.searchSpots(searchQuery(query = "경복궁", page = 501), DomainLocale.KO, memberId = null)
 
         assertFalse(result.success)
         assertEquals(listOf("PAGE_TOO_DEEP"), result.userErrors.map { it.code })
@@ -205,7 +211,7 @@ class SpotDiscoveryServiceTest {
         every { spotSearchPort.search(any()) } returns listOf(hit(spotId = 1L))
         every { spotSearchPort.count(any()) } returns 1
 
-        val result = service.searchSpots(searchQuery(query = "경복궁", size = 20), DomainLocale.KO)
+        val result = service.searchSpots(searchQuery(query = "경복궁", size = 20), DomainLocale.KO, memberId = null)
 
         assertFalse(result.hasNext)
     }
@@ -216,7 +222,7 @@ class SpotDiscoveryServiceTest {
         every { spotSearchPort.search(any()) } returns (1..2L).map { hit(spotId = it) }
         every { spotSearchPort.count(any()) } returns 5
 
-        val result = service.searchSpots(searchQuery(query = "경복궁", size = 2), DomainLocale.KO)
+        val result = service.searchSpots(searchQuery(query = "경복궁", size = 2), DomainLocale.KO, memberId = null)
 
         assertTrue(result.hasNext)
         assertEquals(listOf(1L, 2L), result.items.map { it.id })
@@ -229,7 +235,7 @@ class SpotDiscoveryServiceTest {
         every { spotSearchPort.search(any()) } returns (3..4L).map { hit(spotId = it) }
         every { spotSearchPort.count(any()) } returns 4
 
-        val result = service.searchSpots(searchQuery(query = "경복궁", page = 2, size = 2), DomainLocale.KO)
+        val result = service.searchSpots(searchQuery(query = "경복궁", page = 2, size = 2), DomainLocale.KO, memberId = null)
 
         assertFalse(result.hasNext)
     }
@@ -240,7 +246,7 @@ class SpotDiscoveryServiceTest {
         val captured = slot<SpotSearchQuery>()
         every { spotSearchPort.search(capture(captured)) } returns emptyList()
 
-        service.searchSpots(searchQuery(query = "경복궁", size = 999), DomainLocale.KO)
+        service.searchSpots(searchQuery(query = "경복궁", size = 999), DomainLocale.KO, memberId = null)
 
         assertEquals(50, captured.captured.limit)
     }
@@ -250,7 +256,7 @@ class SpotDiscoveryServiceTest {
     /** AC-8.1 — 빈 질의는 EMPTY_QUERY이고 **검색 포트를 호출하지 않는다.** */
     @Test
     fun `빈 질의는 EMPTY_QUERY이고 포트를 호출하지 않는다`() {
-        val result = service.searchSpots(searchQuery(query = ""), DomainLocale.KO)
+        val result = service.searchSpots(searchQuery(query = ""), DomainLocale.KO, memberId = null)
 
         assertFalse(result.success)
         assertEquals(listOf("EMPTY_QUERY"), result.userErrors.map { it.code })
@@ -262,7 +268,7 @@ class SpotDiscoveryServiceTest {
     /** AC-8.2 — 공백뿐인 질의도 트림 후 EMPTY_QUERY다. */
     @Test
     fun `공백뿐인 질의는 트림 후 EMPTY_QUERY다`() {
-        val result = service.searchSpots(searchQuery(query = "   \t \n "), DomainLocale.KO)
+        val result = service.searchSpots(searchQuery(query = "   \t \n "), DomainLocale.KO, memberId = null)
 
         assertEquals(listOf("EMPTY_QUERY"), result.userErrors.map { it.code })
         verify(exactly = 0) { spotSearchPort.search(any()) }
@@ -271,7 +277,7 @@ class SpotDiscoveryServiceTest {
     /** AC-8.3 — 100자 초과는 QUERY_TOO_LONG. */
     @Test
     fun `100자를 초과하는 질의는 QUERY_TOO_LONG이다`() {
-        val result = service.searchSpots(searchQuery(query = "가".repeat(101)), DomainLocale.KO)
+        val result = service.searchSpots(searchQuery(query = "가".repeat(101)), DomainLocale.KO, memberId = null)
 
         assertFalse(result.success)
         assertEquals(listOf("QUERY_TOO_LONG"), result.userErrors.map { it.code })
@@ -281,7 +287,7 @@ class SpotDiscoveryServiceTest {
     /** 경계 — 정확히 100자는 통과한다. */
     @Test
     fun `정확히 100자인 질의는 통과한다`() {
-        val result = service.searchSpots(searchQuery(query = "가".repeat(100)), DomainLocale.KO)
+        val result = service.searchSpots(searchQuery(query = "가".repeat(100)), DomainLocale.KO, memberId = null)
 
         assertTrue(result.success)
         verify(exactly = 1) { spotSearchPort.search(any()) }
@@ -292,13 +298,13 @@ class SpotDiscoveryServiceTest {
     fun `길이 상한은 트림 후 기준이다`() {
         val padded = "  " + "가".repeat(100) + "  "
 
-        assertTrue(service.searchSpots(searchQuery(query = padded), DomainLocale.KO).success)
+        assertTrue(service.searchSpots(searchQuery(query = padded), DomainLocale.KO, memberId = null).success)
     }
 
     /** AC-4.3 — 한 글자 질의도 거절되지 않는다. */
     @Test
     fun `한 글자 질의도 검색이 수행된다`() {
-        val result = service.searchSpots(searchQuery(query = "궁"), DomainLocale.KO)
+        val result = service.searchSpots(searchQuery(query = "궁"), DomainLocale.KO, memberId = null)
 
         assertTrue(result.success)
         verify(exactly = 1) { spotSearchPort.search(any()) }
@@ -308,7 +314,7 @@ class SpotDiscoveryServiceTest {
     @Test
     fun `반경 상한을 넘으면 예외가 전파된다`() {
         assertFailsWith<RadiusTooLargeException> {
-            service.searchSpots(searchQuery(query = "경복궁", radiusMeters = 100_001), DomainLocale.KO)
+            service.searchSpots(searchQuery(query = "경복궁", radiusMeters = 100_001), DomainLocale.KO, memberId = null)
         }
     }
 
@@ -322,7 +328,7 @@ class SpotDiscoveryServiceTest {
             SpotSuggestionHit(2L, "경복궁 수문장 교대식", SpotCategory.FESTIVAL_EVENT),
         )
 
-        val result = service.spotSearchSuggestions("경복", 37.5, 127.0, 20_000, 10, DomainLocale.KO)
+        val result = service.spotSearchSuggestions("경복", 37.5, 127.0, 20_000, 10, DomainLocale.KO, memberId = null)
 
         assertEquals(listOf("경복궁", "경복궁 수문장 교대식"), result.map { it.title })
         assertEquals(listOf(1L, 2L), result.map { it.id })
@@ -336,7 +342,7 @@ class SpotDiscoveryServiceTest {
             spotSearchPort.suggest(any(), any(), any(), any(), capture(captured))
         } returns emptyList()
 
-        service.spotSearchSuggestions("경복", 37.5, 127.0, 20_000, 100, DomainLocale.KO)
+        service.spotSearchSuggestions("경복", 37.5, 127.0, 20_000, 100, DomainLocale.KO, memberId = null)
 
         assertEquals(10, captured.captured)
     }
@@ -344,7 +350,7 @@ class SpotDiscoveryServiceTest {
     /** AC-9.4 — 빈 질의는 오류가 아니라 빈 목록이고, 포트를 호출하지 않는다. */
     @Test
     fun `자동완성의 빈 질의는 빈 목록이고 포트를 호출하지 않는다`() {
-        val result = service.spotSearchSuggestions("  ", 37.5, 127.0, 20_000, 10, DomainLocale.KO)
+        val result = service.spotSearchSuggestions("  ", 37.5, 127.0, 20_000, 10, DomainLocale.KO, memberId = null)
 
         assertTrue(result.isEmpty())
         verify(exactly = 0) { spotSearchPort.suggest(any(), any(), any(), any(), any()) }
@@ -358,7 +364,7 @@ class SpotDiscoveryServiceTest {
             spotSearchPort.suggest(any(), any(), any(), capture(captured), any())
         } returns emptyList()
 
-        service.spotSearchSuggestions("경복", 37.5, 127.0, 3_000, 10, DomainLocale.KO)
+        service.spotSearchSuggestions("경복", 37.5, 127.0, 3_000, 10, DomainLocale.KO, memberId = null)
 
         assertEquals(3_000, captured.captured)
     }
@@ -371,7 +377,7 @@ class SpotDiscoveryServiceTest {
         val captured = slot<OngoingFestivalSearch>()
         every { festivalQueryPort.findOngoing(capture(captured)) } returns emptyList()
 
-        service.ongoingFestivals(festivalQuery(), DomainLocale.KO)
+        service.ongoingFestivals(festivalQuery(), DomainLocale.KO, memberId = null)
 
         assertEquals(today, captured.captured.asOf)
     }
@@ -379,7 +385,7 @@ class SpotDiscoveryServiceTest {
     /** AC-17.4 — 0건은 오류가 아니다. */
     @Test
     fun `진행 중 축제가 없어도 오류가 아니라 빈 결과다`() {
-        val page = service.ongoingFestivals(festivalQuery(), DomainLocale.KO)
+        val page = service.ongoingFestivals(festivalQuery(), DomainLocale.KO, memberId = null)
 
         assertTrue(page.edges.isEmpty())
         assertFalse(page.pageInfo.hasNextPage)
@@ -393,7 +399,7 @@ class SpotDiscoveryServiceTest {
             festival(id = 2L, distanceMeters = 5_000.0),
         )
 
-        val page = service.ongoingFestivals(festivalQuery(), DomainLocale.KO)
+        val page = service.ongoingFestivals(festivalQuery(), DomainLocale.KO, memberId = null)
 
         assertEquals(listOf(1L, 2L), page.edges.map { it.node.id })
     }
@@ -403,7 +409,7 @@ class SpotDiscoveryServiceTest {
     fun `축제도 요청보다 한 건 더 오면 hasNextPage가 true다`() {
         every { festivalQueryPort.findOngoing(any()) } returns (1..3L).map { festival(id = it) }
 
-        val page = service.ongoingFestivals(festivalQuery(first = 2), DomainLocale.KO)
+        val page = service.ongoingFestivals(festivalQuery(first = 2), DomainLocale.KO, memberId = null)
 
         assertTrue(page.pageInfo.hasNextPage)
         assertEquals(listOf(1L, 2L), page.edges.map { it.node.id })
@@ -419,7 +425,7 @@ class SpotDiscoveryServiceTest {
             popular(spotId = 2L, likeCount = 12L),
         )
 
-        val page = service.popularSpots(popularQuery(), DomainLocale.KO)
+        val page = service.popularSpots(popularQuery(), DomainLocale.KO, memberId = null)
 
         assertEquals(listOf(1L, 2L), page.edges.map { it.node.spot.id })
         assertEquals(listOf(30L, 12L), page.edges.map { it.node.likeCount })
@@ -431,7 +437,7 @@ class SpotDiscoveryServiceTest {
         val captured = slot<PopularSpotSearch>()
         every { popularSpotQueryPort.findPopular(capture(captured)) } returns emptyList()
 
-        service.popularSpots(popularQuery(), DomainLocale.KO)
+        service.popularSpots(popularQuery(), DomainLocale.KO, memberId = null)
 
         assertEquals(10, captured.captured.minLikeCount)
     }
@@ -439,7 +445,7 @@ class SpotDiscoveryServiceTest {
     /** AC-18.4 — 조건을 만족하는 spot이 없으면 빈 결과가 정상이다. */
     @Test
     fun `인기 조건을 만족하는 spot이 없으면 빈 결과다`() {
-        val page = service.popularSpots(popularQuery(), DomainLocale.KO)
+        val page = service.popularSpots(popularQuery(), DomainLocale.KO, memberId = null)
 
         assertTrue(page.edges.isEmpty())
     }
@@ -452,7 +458,7 @@ class SpotDiscoveryServiceTest {
             popular(spotId = 2L, likeCount = 12L),
         )
 
-        val page = service.popularSpots(popularQuery(), DomainLocale.KO)
+        val page = service.popularSpots(popularQuery(), DomainLocale.KO, memberId = null)
 
         val decoded = page.edges.map {
             LikeCountCursor.decode(it.cursor)
@@ -467,7 +473,7 @@ class SpotDiscoveryServiceTest {
         val captured = slot<PopularSpotSearch>()
         every { popularSpotQueryPort.findPopular(capture(captured)) } returns emptyList()
 
-        service.popularSpots(popularQuery(category = SpotCategory.TOURIST_SPOT), DomainLocale.KO)
+        service.popularSpots(popularQuery(category = SpotCategory.TOURIST_SPOT), DomainLocale.KO, memberId = null)
 
         assertEquals(CategorySelection.ofValues(setOf(SpotCategory.TOURIST_SPOT)), captured.captured.categories)
     }
@@ -478,32 +484,32 @@ class SpotDiscoveryServiceTest {
     @Test
     fun `네 조회 모두 반경 상한을 넘으면 거절한다`() {
         assertFailsWith<RadiusTooLargeException> {
-            service.searchSpots(searchQuery(query = "경복궁", radiusMeters = 100_001), DomainLocale.KO)
+            service.searchSpots(searchQuery(query = "경복궁", radiusMeters = 100_001), DomainLocale.KO, memberId = null)
         }
         assertFailsWith<RadiusTooLargeException> {
-            service.spotSearchSuggestions("경복", 37.5, 127.0, 100_001, 10, DomainLocale.KO)
+            service.spotSearchSuggestions("경복", 37.5, 127.0, 100_001, 10, DomainLocale.KO, memberId = null)
         }
         assertFailsWith<RadiusTooLargeException> {
-            service.ongoingFestivals(festivalQuery(radiusMeters = 100_001), DomainLocale.KO)
+            service.ongoingFestivals(festivalQuery(radiusMeters = 100_001), DomainLocale.KO, memberId = null)
         }
         assertFailsWith<RadiusTooLargeException> {
-            service.popularSpots(popularQuery(radiusMeters = 100_001), DomainLocale.KO)
+            service.popularSpots(popularQuery(radiusMeters = 100_001), DomainLocale.KO, memberId = null)
         }
     }
 
     @Test
     fun `네 조회 모두 좌표 범위를 벗어나면 거절한다`() {
         assertFailsWith<InvalidCoordinatesException> {
-            service.searchSpots(searchQuery(query = "경복궁", latitude = 91.0), DomainLocale.KO)
+            service.searchSpots(searchQuery(query = "경복궁", latitude = 91.0), DomainLocale.KO, memberId = null)
         }
         assertFailsWith<InvalidCoordinatesException> {
-            service.spotSearchSuggestions("경복", 91.0, 127.0, 20_000, 10, DomainLocale.KO)
+            service.spotSearchSuggestions("경복", 91.0, 127.0, 20_000, 10, DomainLocale.KO, memberId = null)
         }
         assertFailsWith<InvalidCoordinatesException> {
-            service.ongoingFestivals(festivalQuery(latitude = 91.0), DomainLocale.KO)
+            service.ongoingFestivals(festivalQuery(latitude = 91.0), DomainLocale.KO, memberId = null)
         }
         assertFailsWith<InvalidCoordinatesException> {
-            service.popularSpots(popularQuery(latitude = 91.0), DomainLocale.KO)
+            service.popularSpots(popularQuery(latitude = 91.0), DomainLocale.KO, memberId = null)
         }
     }
 
@@ -513,10 +519,12 @@ class SpotDiscoveryServiceTest {
         val festivals = service.ongoingFestivals(
             festivalQuery(after = DistanceCursor(100.0, 1L).encode()),
             DomainLocale.KO,
+            memberId = null,
         )
         val popular = service.popularSpots(
             popularQuery(after = LikeCountCursor(12L, 1L).encode()),
             DomainLocale.KO,
+            memberId = null,
         )
 
         assertTrue(festivals.pageInfo.hasPreviousPage)
@@ -534,10 +542,12 @@ class SpotDiscoveryServiceTest {
         service.ongoingFestivals(
             festivalQuery(after = DistanceCursor(1234.5, 7L).encode()),
             DomainLocale.KO,
+            memberId = null,
         )
         service.popularSpots(
             popularQuery(after = LikeCountCursor(99L, 3L).encode()),
             DomainLocale.KO,
+            memberId = null,
         )
 
         assertEquals(DistanceCursor(1234.5, 7L), festivalSearch.captured.after)
@@ -551,6 +561,7 @@ class SpotDiscoveryServiceTest {
             service.ongoingFestivals(
                 festivalQuery(after = LikeCountCursor(1L, 1L).encode()),
                 DomainLocale.KO,
+                memberId = null,
             )
         }
     }
@@ -561,7 +572,7 @@ class SpotDiscoveryServiceTest {
         val captured = slot<SpotSearchQuery>()
         every { spotSearchPort.search(capture(captured)) } returns emptyList()
 
-        service.searchSpots(searchQuery(query = "경복궁", size = 0), DomainLocale.KO)
+        service.searchSpots(searchQuery(query = "경복궁", size = 0), DomainLocale.KO, memberId = null)
 
         assertEquals(1, captured.captured.limit)
     }
@@ -661,4 +672,34 @@ class SpotDiscoveryServiceTest {
         ),
         likeCount = likeCount,
     )
+
+    @Test
+    fun `회원의 발견 조회는 연산 이름으로 좌표 조회 사실을 남긴다`() {
+        service.searchSpots(searchQuery(query = "경복궁"), DomainLocale.KO, memberId = 7L)
+        service.spotSearchSuggestions("경복", 37.5, 127.0, 20_000, 10, DomainLocale.KO, memberId = 7L)
+        service.ongoingFestivals(festivalQuery(), DomainLocale.KO, memberId = 7L)
+        service.popularSpots(popularQuery(), DomainLocale.KO, memberId = 7L)
+
+        verify(exactly = 1) { eventPublisher.publish(LocationAccessed(7L, "searchSpots")) }
+        verify(exactly = 1) { eventPublisher.publish(LocationAccessed(7L, "spotSearchSuggestions")) }
+        verify(exactly = 1) { eventPublisher.publish(LocationAccessed(7L, "ongoingFestivals")) }
+        verify(exactly = 1) { eventPublisher.publish(LocationAccessed(7L, "popularSpots")) }
+    }
+
+    @Test
+    fun `입력이 잘못돼도 조회 사실은 먼저 남는다`() {
+        assertFailsWith<RadiusTooLargeException> {
+            service.ongoingFestivals(festivalQuery(radiusMeters = 100_001), DomainLocale.KO, memberId = 7L)
+        }
+
+        verify(exactly = 1) { eventPublisher.publish(LocationAccessed(7L, "ongoingFestivals")) }
+    }
+
+    @Test
+    fun `비로그인 발견 조회는 아무것도 발행하지 않는다`() {
+        service.searchSpots(searchQuery(query = "경복궁"), DomainLocale.KO, memberId = null)
+        service.popularSpots(popularQuery(), DomainLocale.KO, memberId = null)
+
+        verify(exactly = 0) { eventPublisher.publish(any()) }
+    }
 }

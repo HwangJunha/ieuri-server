@@ -6,14 +6,15 @@ import org.around.ieuri.tourism.application.catalog.provided.dto.LikedSpotsQuery
 import org.around.ieuri.tourism.application.catalog.provided.dto.MapViewportQuery
 import org.around.ieuri.tourism.application.catalog.provided.dto.MapViewportView
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotPageView
+import org.around.ieuri.tourism.application.catalog.provided.dto.SpotSummaryView
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotsQuery
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 
-/** 카탈로그 목록 조회(CQRS 읽기) — 주변 목록, 좋아요 목록, 지도 뷰포트. 언어는 명시 파라미터로 받는다. */
+/** 카탈로그 조회(CQRS 읽기) — 주변 목록, 좋아요 목록, 지도 뷰포트, 다른 도메인용 요약. 언어는 명시 파라미터로 받는다. */
 interface SpotCatalogQueryUseCase {
     /**
      * 위치 기반 관광지 오프셋 페이지. 거리 오름차순.
-     * - [memberId]가 있으면 이미 반응한 관광지를 제외한다. null이면 제외 없음.
+     * - [memberId]가 있으면 이미 반응한 관광지를 제외하고 좌표 조회 사실을 남긴다(SPEC-0032 R19). null은 비로그인이다.
      */
     fun spots(query: SpotsQuery, locale: DomainLocale, memberId: Long?): SpotPageView
 
@@ -35,4 +36,13 @@ interface SpotCatalogQueryUseCase {
      * - 상한을 넘으면 잘리고 잘림 플래그가 선다.
      */
     fun mapViewport(query: MapViewportQuery, locale: DomainLocale): MapViewportView
+
+    /**
+     * 카탈로그가 보유한 최소 식별 정보. upstream을 호출하지 않는다. 다른 도메인이 쓰는 진입점이다.
+     * - [languageCode]에서 해소되지 않으면 예외가 아니라 null이다(SPEC-0029 R-24). 모르는 언어 코드는 폴백 언어로 읽는다.
+     */
+    fun spotSummary(catalogId: Long, languageCode: String): SpotSummaryView?
+
+    /** 여러 카탈로그 요약을 한 번에. [languageCode]에서 해소되지 않는 id는 결과에 키가 없다. */
+    fun spotSummaries(catalogIds: List<Long>, languageCode: String): Map<Long, SpotSummaryView>
 }
