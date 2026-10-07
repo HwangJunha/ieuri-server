@@ -298,9 +298,14 @@ tourism → auth → alarm (decisions D-32~D-67 in `problem/SPEC-0039-server.md`
 been moved follows this section; one that has not still follows Layout and the JPA rules below.**
 Those rules are deleted in the final slice, not piecemeal.
 
-**A migration changes neither the GraphQL schema nor the DB schema.** Defects found on the way are
-fixed only within that bound; anything that needs a migration or a schema field is a separate SPEC
-(SPEC-0039 D-56). Work that follows from a refactor is still a refactor.
+**A migration changes neither the GraphQL schema nor the DB schema — nor any response.** The deployed
+dev server (`api-dev.ieuri.co.kr`) is the answer key: every query, error and subscription returns
+exactly what dev returns, **defects included**. A changed response is a production incident for the
+client, not a fix. A defect that shows in a response is recorded and left alone; fixing it is a
+separate SPEC agreed with the client (SPEC-0039 D-112). Mutations may differ only in generated
+values (ids, times, tokens); what a query reads back after them must match. Anything that needs a
+migration or a schema field is a separate SPEC (D-56). Work that follows from a refactor is still a
+refactor.
 
 - **Packages: context → layer → aggregate.** `domain/<aggregate>/` holds the root with its own
   entities, VOs, exceptions and events; `domain/shared/` holds VOs several aggregates use.
