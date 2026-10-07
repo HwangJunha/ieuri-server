@@ -309,7 +309,10 @@ fixed only within that bound; anything that needs a migration or a schema field 
   - **`provided/` and `required/` hold port interfaces only.** Every data type a port takes or
     returns goes in that side's `dto/` — never declared next to the interface
     (SpotSearchPort's `SpotSearchQuery` lives in `required/dto/`) (SPEC-0039 D-100).
-  - **One top-level type per file, named after it** — interfaces, DTOs, events, policies alike.
+  - **One top-level type per file, named after it** — interfaces, DTOs, events, policies alike, in every
+    layer. The only files that keep several are sets bound by a `private` member they share (Exposed
+    `Table` groups sharing a constant, keyset cursors sharing the codec, deserializers sharing
+    `readItems`) and a `private` type only its file uses.
     A file named `XxxReadModels.kt` holding ten views is the shape to avoid.
   - **`application/` and `domain/` list the same packages, one to one.** Each name is an aggregate,
     or a value group with its own use cases (`catalog`). A capability with no aggregate (photo
