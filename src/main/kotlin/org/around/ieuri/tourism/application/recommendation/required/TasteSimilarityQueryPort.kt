@@ -1,6 +1,6 @@
 package org.around.ieuri.tourism.application.recommendation.required
 
-import org.around.ieuri.tourism.application.recommendation.required.dto.TasteSimilarity
+import org.around.ieuri.tourism.domain.recommendation.TasteSimilarity
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 
 /** 취향 유사도 조회 포트(SPEC-0035). 좋아요·싫어요 벡터 평균과 후보 벡터의 코사인 유사도를 DB에서 구한다. */

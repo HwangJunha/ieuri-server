@@ -14,6 +14,7 @@ import org.around.ieuri.tourism.application.recommendation.required.dto.SpotEmbe
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.recommendation.CategoryDiversity
 import org.around.ieuri.tourism.domain.recommendation.RecommendationScore
+import org.around.ieuri.tourism.domain.recommendation.TasteThreshold
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.spot.TaxRefundTitleRule
 import kotlin.test.Test
@@ -29,7 +30,7 @@ class SpotEmbeddingSyncServiceTest {
         score = RecommendationScore(5_000.0, 0.8, TaxRefundTitleRule(emptyList()), tasteWeight = 0.5),
         diversity = CategoryDiversity(0.1),
         candidateCap = 300,
-        tasteMinReactions = 5,
+        tasteThreshold = TasteThreshold(5),
         embedding = EmbeddingSpec(model = "voyage-4", dimension = 3, retryCount = 2, overviewMaxChars = 500),
     )
     private val service = SpotEmbeddingSyncService(SpotEmbeddingStoreService(storePort, CategoryQueryService(categoryPort, mockk()), policy), embeddingPort, policy)

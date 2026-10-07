@@ -17,6 +17,7 @@ import org.around.ieuri.tourism.domain.catalog.ReactionType
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.recommendation.CategoryDiversity
 import org.around.ieuri.tourism.domain.recommendation.RecommendationScore
+import org.around.ieuri.tourism.domain.recommendation.TasteThreshold
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.shared.MapBounds
 import org.around.ieuri.tourism.domain.spot.TaxRefundTitleRule
@@ -48,7 +49,7 @@ class MapRecommendationServiceTest {
         ),
         diversity = CategoryDiversity(penalty = 0.1),
         candidateCap = 300,
-        tasteMinReactions = 3,
+        tasteThreshold = TasteThreshold(3),
         embedding = EmbeddingSpec(model = "voyage-4", dimension = 4, retryCount = 1, overviewMaxChars = 500),
     )
     private val service = MapRecommendationService(

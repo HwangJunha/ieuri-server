@@ -6,7 +6,6 @@ import org.around.ieuri.tourism.application.footprint.provided.dto.CellImageView
 import org.around.ieuri.tourism.application.footprint.provided.dto.CellSpotView
 import org.around.ieuri.tourism.application.footprint.provided.dto.MapCellView
 import org.around.ieuri.tourism.application.footprint.provided.dto.SharedMapView
-import org.around.ieuri.tourism.application.footprint.provided.dto.toView
 import org.around.ieuri.tourism.application.footprint.provided.exception.MapCellNotFoundException
 import org.around.ieuri.tourism.application.footprint.provided.exception.ShareLinkBlockedException
 import org.around.ieuri.tourism.application.footprint.provided.exception.ShareLinkNotFoundException

@@ -9,6 +9,7 @@ import org.around.ieuri.tourism.application.region.required.dto.RegionMetric
 import org.around.ieuri.tourism.application.region.required.dto.RegionRow
 import org.around.ieuri.tourism.domain.region.DistanceScoring
 import org.around.ieuri.tourism.domain.region.FreshnessDecay
+import org.around.ieuri.tourism.domain.region.ProvinceEligibility
 import org.around.ieuri.tourism.domain.region.RegionScoreFactor
 import org.around.ieuri.tourism.domain.region.RegionScoreWeights
 import org.around.ieuri.tourism.domain.shared.AreaName
@@ -28,7 +29,7 @@ class RegionScoreFreshnessTest {
         freshnessDecay = FreshnessDecay(plateauDays = 7, halfLifeDays = 23.0),
         minFactorCount = 2,
         // 시도 규모 필터를 무력화한다(선별은 RegionCandidateSelectionTest가 본다).
-        minDistrictsPerProvince = 1,
+        provinceEligibility = ProvinceEligibility(1),
         defaultLimit = 10,
         maxLimit = 50,
     )

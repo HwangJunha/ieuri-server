@@ -15,7 +15,6 @@ import org.around.ieuri.tourism.application.recommendation.required.Recommendati
 import org.around.ieuri.tourism.application.recommendation.required.TasteSimilarityQueryPort
 import org.around.ieuri.tourism.domain.catalog.ReactionType
 import org.around.ieuri.tourism.domain.recommendation.RankedSpot
-import org.around.ieuri.tourism.domain.recommendation.TasteNormalization
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -76,7 +75,7 @@ class RecommendedSpotsQueryService(
         candidates: List<SpotView>,
         locale: DomainLocale,
     ): Map<Long, Double> {
-        if (candidates.isEmpty() || liked.size + disliked.size < policy.tasteMinReactions) return emptyMap()
+        if (candidates.isEmpty() || !policy.tasteThreshold.isMetBy(liked, disliked)) return emptyMap()
         val similarities = try {
             tasteSimilarityQueryPort.findSimilarities(
                 likedCatalogIds = liked,
@@ -89,11 +88,6 @@ class RecommendedSpotsQueryService(
             log.warn("취향 유사도 조회 실패, 취향 없이 진행: {}", e.javaClass.simpleName)
             return emptyMap()
         }
-        // 후보 집단 안에서 0~1로 펼친다.
-        return TasteNormalization.normalize(
-            similarities.mapNotNull { (id, s) ->
-                s.like?.let { like -> id to policy.score.tasteFactor(like, s.dislike) }
-            }.toMap(),
-        )
+        return policy.score.tasteFactors(similarities)
     }
 }

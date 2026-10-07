@@ -9,6 +9,7 @@ import org.around.ieuri.tourism.application.region.required.dto.RegionMetric
 import org.around.ieuri.tourism.application.region.required.dto.RegionRow
 import org.around.ieuri.tourism.domain.region.DistanceScoring
 import org.around.ieuri.tourism.domain.region.FreshnessDecay
+import org.around.ieuri.tourism.domain.region.ProvinceEligibility
 import org.around.ieuri.tourism.domain.region.RegionScoreFactor
 import org.around.ieuri.tourism.domain.region.RegionScoreWeights
 import org.around.ieuri.tourism.domain.shared.AreaName
@@ -27,7 +28,7 @@ class RegionScoreRankTest {
         distanceScoring = DistanceScoring(30_000.0),
         freshnessDecay = FreshnessDecay(plateauDays = 7, halfLifeDays = 23.0),
         minFactorCount = minFactorCount,
-        minDistrictsPerProvince = 1,
+        provinceEligibility = ProvinceEligibility(1),
         defaultLimit = 10,
         maxLimit = 50,
     )

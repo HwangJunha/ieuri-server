@@ -14,7 +14,6 @@ import org.around.ieuri.tourism.application.recommendation.required.TasteSimilar
 import org.around.ieuri.tourism.domain.catalog.ReactionType
 import org.around.ieuri.tourism.domain.recommendation.RankedSpot
 import org.around.ieuri.tourism.domain.recommendation.ScoreReaction
-import org.around.ieuri.tourism.domain.recommendation.TasteNormalization
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.shared.MapBounds
 import org.slf4j.LoggerFactory
@@ -93,11 +92,7 @@ class MapRecommendationService(
         candidates: List<MapCandidateView>,
         locale: DomainLocale,
     ): Map<Long, Double> {
-        if (candidates.isEmpty() ||
-            liked.size + disliked.size < recommendationPolicy.tasteMinReactions
-        ) {
-            return emptyMap()
-        }
+        if (candidates.isEmpty() || !recommendationPolicy.tasteThreshold.isMetBy(liked, disliked)) return emptyMap()
         val similarities = try {
             tasteSimilarityQueryPort.findSimilarities(
                 likedCatalogIds = liked,
@@ -110,12 +105,7 @@ class MapRecommendationService(
             log.warn("취향 유사도 조회 실패, 취향 없이 진행: {}", e.javaClass.simpleName)
             return emptyMap()
         }
-        // 후보 집단 안에서 0~1로 펼친다.
-        return TasteNormalization.normalize(
-            similarities.mapNotNull { (id, s) ->
-                s.like?.let { like -> id to recommendationPolicy.score.tasteFactor(like, s.dislike) }
-            }.toMap(),
-        )
+        return recommendationPolicy.score.tasteFactors(similarities)
     }
 
     /** 좌표가 정확히 같은 후보를 점수 최고 1건으로 접는다(D-14). 동점이면 id 오름차순이다. */

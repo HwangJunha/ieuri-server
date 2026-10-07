@@ -20,8 +20,10 @@ import org.around.ieuri.tourism.application.region.RegionRecommendationPolicy
 import org.around.ieuri.tourism.application.relation.MapRelationPolicy
 import org.around.ieuri.tourism.domain.recommendation.CategoryDiversity
 import org.around.ieuri.tourism.domain.recommendation.RecommendationScore
+import org.around.ieuri.tourism.domain.recommendation.TasteThreshold
 import org.around.ieuri.tourism.domain.region.DistanceScoring
 import org.around.ieuri.tourism.domain.region.FreshnessDecay
+import org.around.ieuri.tourism.domain.region.ProvinceEligibility
 import org.around.ieuri.tourism.domain.region.RegionScoreWeights
 import org.around.ieuri.tourism.domain.spot.SpotExclusionRule
 import org.around.ieuri.tourism.domain.spot.TaxRefundTitleRule
@@ -70,7 +72,7 @@ class TourismConfig {
         ),
         diversity = CategoryDiversity(properties.categoryRepeatPenalty),
         candidateCap = properties.candidateCap,
-        tasteMinReactions = properties.tasteMinReactions,
+        tasteThreshold = TasteThreshold(properties.tasteMinReactions),
         embedding = EmbeddingSpec(
             model = properties.embedding.model,
             dimension = properties.embedding.dimension,
@@ -195,7 +197,7 @@ class TourismConfig {
             halfLifeDays = properties.freshnessHalfLifeDays,
         ),
         minFactorCount = properties.minFactorCount,
-        minDistrictsPerProvince = properties.minDistrictsPerProvince,
+        provinceEligibility = ProvinceEligibility(properties.minDistrictsPerProvince),
         defaultLimit = properties.defaultLimit,
         maxLimit = properties.maxLimit,
     )

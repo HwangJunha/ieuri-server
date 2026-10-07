@@ -15,12 +15,13 @@ import org.around.ieuri.tourism.application.catalog.required.dto.NearbySpotSearc
 import org.around.ieuri.tourism.application.recommendation.provided.dto.RecommendedSpotsQuery
 import org.around.ieuri.tourism.application.recommendation.required.RecommendationEventPublisherPort
 import org.around.ieuri.tourism.application.recommendation.required.TasteSimilarityQueryPort
-import org.around.ieuri.tourism.application.recommendation.required.dto.TasteSimilarity
 import org.around.ieuri.tourism.domain.catalog.CategorySelection
 import org.around.ieuri.tourism.domain.catalog.ReactionType
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.recommendation.CategoryDiversity
 import org.around.ieuri.tourism.domain.recommendation.RecommendationScore
+import org.around.ieuri.tourism.domain.recommendation.TasteSimilarity
+import org.around.ieuri.tourism.domain.recommendation.TasteThreshold
 import org.around.ieuri.tourism.domain.shared.CopyrightType
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.spot.TaxRefundTitleRule
@@ -49,7 +50,7 @@ class RecommendedSpotsQueryServiceTest {
         score = RecommendationScore(5_000.0, 0.8, TaxRefundTitleRule(listOf("[Tax Refund Shop]")), tasteWeight = 0.5),
         diversity = CategoryDiversity(penalty = 0.1),
         candidateCap = 300,
-        tasteMinReactions = 3,
+        tasteThreshold = TasteThreshold(3),
         embedding = EmbeddingSpec(model = "voyage-4", dimension = 4, retryCount = 1, overviewMaxChars = 500),
     )
     private val service = RecommendedSpotsQueryService(

@@ -69,4 +69,22 @@ class RecommendationScoreTest {
         val expected = (0.5 * score().distanceFactor(1_000.0) + 0.5 * 0.9) * 0.8
         assertEquals(expected, score().score(1_000.0, "[Tax Refund Shop] a", taste = 0.9), 1e-9)
     }
+
+    @Test
+    fun `취향 요인은 후보 집단 안에서 0~1로 펼치고, 좋아요 유사도가 없는 후보는 뺀다`() {
+        val factors = score().tasteFactors(
+            mapOf(
+                1L to TasteSimilarity(like = 0.8, dislike = 0.3),
+                2L to TasteSimilarity(like = 0.0, dislike = null),
+                3L to TasteSimilarity(like = 0.4, dislike = 0.0),
+                4L to TasteSimilarity(like = null, dislike = 0.2),
+            ),
+        )
+
+        assertEquals(setOf(1L, 2L, 3L), factors.keys)
+        assertEquals(1.0, factors.getValue(1L), 1e-9)
+        assertEquals(0.0, factors.getValue(2L), 1e-9)
+        // 요인 0.75 / 0.5 / 0.7 → (0.7 − 0.5) ÷ (0.75 − 0.5)
+        assertEquals(0.8, factors.getValue(3L), 1e-9)
+    }
 }

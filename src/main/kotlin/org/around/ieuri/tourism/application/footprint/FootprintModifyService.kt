@@ -7,7 +7,6 @@ import org.around.ieuri.tourism.application.footprint.provided.dto.RecordVisitsC
 import org.around.ieuri.tourism.application.footprint.provided.dto.RecordVisitsResult
 import org.around.ieuri.tourism.application.footprint.provided.dto.RemoveVisitCommand
 import org.around.ieuri.tourism.application.footprint.provided.dto.RemoveVisitResult
-import org.around.ieuri.tourism.application.footprint.provided.dto.toView
 import org.around.ieuri.tourism.application.footprint.required.FootprintQueryPort
 import org.around.ieuri.tourism.application.footprint.required.FootprintRepository
 import org.around.ieuri.tourism.application.footprint.required.MapCellDistrictQueryPort

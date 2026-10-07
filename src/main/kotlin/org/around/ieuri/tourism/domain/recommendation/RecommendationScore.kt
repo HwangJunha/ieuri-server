@@ -34,6 +34,11 @@ class RecommendationScore(
 
     fun tasteFactor(likeSimilarity: Double, dislikeSimilarity: Double?): Double = ((likeSimilarity - (dislikeSimilarity ?: 0.0) + 1.0) / 2.0).coerceIn(0.0, 1.0)
 
+    /** 후보별 취향 요인을 후보 집단 안에서 0~1로 펼친다([TasteNormalization]). 좋아요 유사도가 없는 후보는 키가 없다. */
+    fun tasteFactors(similarities: Map<Long, TasteSimilarity>): Map<Long, Double> = TasteNormalization.normalize(
+        similarities.mapNotNull { (id, s) -> s.like?.let { like -> id to tasteFactor(like, s.dislike) } }.toMap(),
+    )
+
     fun score(
         distanceMeters: Double,
         title: String,
