@@ -4,6 +4,7 @@ import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.community.application.conversation.provided.dto.ConversationView
 import org.around.ieuri.community.application.conversation.provided.dto.MessageView
 import org.around.ieuri.community.application.conversation.provided.dto.TypingEventView
+import org.around.ieuri.community.application.shared.required.dto.MemberSummaryView
 import reactor.core.publisher.Flux
 
 /** 대화 조회 유스케이스(R8·R10). 참여자가 아니면 최상위 errors[]의 FORBIDDEN이다. */
@@ -29,4 +30,7 @@ interface ConversationQueryUseCase {
 
     /** 메시지 단건. 대화로도 범위를 좁히며 지워졌으면 null이다. 참여자 검사는 구독 시작 때 끝났다. */
     fun message(conversationId: Long, messageId: Long, memberId: Long): MessageView?
+
+    /** 메시지·타이핑 발신자. 없는 회원(탈퇴)이면 null이며 리졸버가 대체 표기로 채운다. 구독 경로 전용이다(DataLoader를 못 쓴다). */
+    fun sender(memberId: Long): MemberSummaryView?
 }

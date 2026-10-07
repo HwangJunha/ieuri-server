@@ -4,9 +4,9 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import org.around.ieuri.community.application.block.required.BlockRepository
-import org.around.ieuri.community.application.shared.dto.PostAuthorView
 import org.around.ieuri.community.application.shared.exception.MemberNotFoundException
 import org.around.ieuri.community.application.shared.required.MemberLookupPort
+import org.around.ieuri.community.application.shared.required.dto.MemberSummaryView
 import org.around.ieuri.community.domain.block.Block
 import org.around.ieuri.community.domain.block.CannotBlockSelfException
 import java.time.Instant
@@ -31,7 +31,7 @@ class BlockModifyServiceTest {
         every { members.findAuthor(8) } returns null
         assertFailsWith<MemberNotFoundException> { service.block(8, 7) }
 
-        every { members.findAuthor(9) } returns PostAuthorView(9, "상대", null)
+        every { members.findAuthor(9) } returns MemberSummaryView(9, "상대", null)
         every { blocks.add(Block(7, 9)) } returns true
         service.block(9, 7)
         verify { blocks.add(Block(blockerId = 7, blockedId = 9)) }

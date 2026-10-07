@@ -4,42 +4,41 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
+import org.around.ieuri.common.event.LocationAccessed
 import org.around.ieuri.common.pagination.cursorPageOf
-import org.around.ieuri.community.application.shared.CommunityPolicy
-import org.around.ieuri.community.application.shared.dto.PostView
-import org.around.ieuri.community.application.shared.dto.PostsQuery
-import org.around.ieuri.community.application.shared.required.CategoryConfigPort
-import org.around.ieuri.community.application.shared.required.CommunityEventPublisherPort
-import org.around.ieuri.community.application.shared.required.CommunityQueryPort
-import org.around.ieuri.community.application.shared.required.PostSpatialQueryPort
-import org.around.ieuri.community.application.shared.required.PostsSearch
-import org.around.ieuri.community.application.shared.required.ViewerContext
+import org.around.ieuri.community.application.block.provided.BlockQueryUseCase
+import org.around.ieuri.community.application.post.provided.dto.PostView
+import org.around.ieuri.community.application.post.provided.dto.PostsQuery
+import org.around.ieuri.community.application.post.required.CategoryConfigPort
+import org.around.ieuri.community.application.post.required.PostEventPublisherPort
+import org.around.ieuri.community.application.post.required.PostQueryPort
+import org.around.ieuri.community.application.post.required.PostSpatialQueryPort
+import org.around.ieuri.community.application.post.required.dto.PostsSearch
+import org.around.ieuri.community.application.shared.PagePolicy
+import org.around.ieuri.community.application.shared.required.dto.ViewerContext
+import org.around.ieuri.community.domain.post.PostSortOrder
 import org.around.ieuri.community.domain.shared.ContentLanguage
-import org.around.ieuri.community.domain.shared.PostSortOrder
-import java.time.Duration
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class PostQueryServiceTest {
 
     private val memberId = 7L
-    private val queries = mockk<CommunityQueryPort> {
-        every { findBlockedMemberIds(memberId) } returns setOf(9L)
+    private val queries = mockk<PostQueryPort> {
         every { findHiddenPostIds(memberId) } returns setOf(3L)
     }
+    private val blocks = mockk<BlockQueryUseCase> {
+        every { blockedMemberIds(memberId) } returns setOf(9L)
+    }
     private val spatial = mockk<PostSpatialQueryPort>()
-    private val events = mockk<CommunityEventPublisherPort>(relaxUnitFun = true)
-    private val policy = CommunityPolicy(
-        maxPageSize = 50,
-        commentPreviewSize = 3,
-        maxRadiusMeters = 100_000,
-        uploadUrlTtl = Duration.ofMinutes(30),
-        maxUploadBytes = 10,
-        allowedContentTypes = setOf("image/jpeg"),
-    )
-    private val service = PostQueryService(queries, spatial, mockk<CategoryConfigPort>(), events, policy)
+    private val events = mockk<PostEventPublisherPort>(relaxUnitFun = true)
+    private val pagePolicy = PagePolicy(maxPageSize = 50)
+    private val policy = PostPolicy(maxRadiusMeters = 100_000)
+    private val service = PostQueryService(queries, spatial, mockk<CategoryConfigPort>(), blocks, events, pagePolicy, policy)
 
     private val view = PostView(1, "제목", "본문", authorId = 8, likeCount = 0, commentCount = 0, viewCount = 0, ownedByViewer = false, hidden = false, edited = false, createdAt = Instant.EPOCH)
 
@@ -54,7 +53,7 @@ class PostQueryServiceTest {
 
         assertEquals(ViewerContext(memberId, setOf(9L), setOf(3L)), search.captured.viewer)
         assertEquals("seoul", search.captured.normalizedTag)
-        assertEquals(policy.maxPageSize, search.captured.first)
+        assertEquals(pagePolicy.maxPageSize, search.captured.first)
         assertNull(search.captured.area)
     }
 
@@ -89,5 +88,30 @@ class PostQueryServiceTest {
 
         verify(exactly = 1) { events.publish(PostViewed(1)) }
         verify(exactly = 0) { events.publish(PostViewed(2)) }
+    }
+
+    @Test
+    fun `좌표를 보낸 피드 조회만 위치 조회로 남긴다`() {
+        every { queries.findPosts(any()) } returns cursorPageOf(emptyList(), false, false)
+        every { spatial.findPostsByDistance(any()) } returns cursorPageOf(emptyList(), false, false)
+
+        service.posts(query(PostSortOrder.LATEST), memberId, ContentLanguage.KO)
+        service.posts(query(PostSortOrder.LATEST, latitude = 37.5), memberId, ContentLanguage.KO)
+        verify(exactly = 0) { events.publish(any<LocationAccessed>()) }
+
+        service.posts(query(PostSortOrder.DISTANCE, latitude = 37.5, longitude = 127.0), memberId, ContentLanguage.KO)
+        verify(exactly = 1) { events.publish(LocationAccessed(memberId, "posts")) }
+    }
+
+    @Test
+    fun `노출 판정은 단건과 같은 필터를 거치고 조회 이벤트를 내지 않는다`() {
+        val viewer = slot<ViewerContext>()
+        every { queries.findPost(1, capture(viewer)) } returns view
+        every { queries.findPost(2, any()) } returns null
+
+        assertTrue(service.isVisible(1, memberId))
+        assertFalse(service.isVisible(2, memberId))
+        assertEquals(ViewerContext(memberId, setOf(9L), setOf(3L)), viewer.captured)
+        verify(exactly = 0) { events.publish(any()) }
     }
 }

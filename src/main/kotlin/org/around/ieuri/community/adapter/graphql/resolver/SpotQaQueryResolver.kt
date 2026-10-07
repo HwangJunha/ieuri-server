@@ -29,8 +29,8 @@ import org.around.ieuri.community.application.question.provided.dto.SpotAnswerVi
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswersQuery
 import org.around.ieuri.community.application.question.provided.dto.SpotQuestionView
 import org.around.ieuri.community.application.question.provided.dto.SpotQuestionsQuery
-import org.around.ieuri.community.application.shared.dto.PostAuthorView
-import org.around.ieuri.community.application.shared.dto.PostSpotView
+import org.around.ieuri.community.application.shared.required.dto.MemberSummaryView
+import org.around.ieuri.community.application.shared.required.dto.SpotSummaryView
 import org.springframework.stereotype.Component
 import java.util.concurrent.CompletableFuture
 import org.around.ieuri.common.graphql.generated.types.PostAuthor as GqlPostAuthor
@@ -110,7 +110,7 @@ class SpotQaQueryResolver(
     @DgsData(parentType = "SpotQuestion", field = "spot")
     fun questionSpot(dfe: DgsDataFetchingEnvironment): CompletableFuture<GqlPostSpot> {
         val catalogId = dfe.questionSource().catalogId
-        return dfe.loader<PostSpotView>(PostSpotDataLoader.NAME)
+        return dfe.loader<SpotSummaryView>(PostSpotDataLoader.NAME)
             .load(catalogId, dfe.contentLanguage())
             .thenApply { summary ->
                 requireNotNull(summary) { "질문이 가리키는 장소($catalogId)를 찾을 수 없다." }.toGql()
@@ -160,7 +160,7 @@ class SpotQaQueryResolver(
     /** 작성자를 배치로 읽는다. 회원 정보가 없으면(탈퇴) 대체 표기로 채운다. */
     private fun DgsDataFetchingEnvironment.loadAuthor(
         memberId: Long,
-    ): CompletableFuture<GqlPostAuthor> = loader<PostAuthorView>(PostAuthorDataLoader.NAME)
+    ): CompletableFuture<GqlPostAuthor> = loader<MemberSummaryView>(PostAuthorDataLoader.NAME)
         .load(memberId)
         .thenApply { it.toGqlOrPlaceholder(memberId) }
 
@@ -174,7 +174,7 @@ class SpotQaQueryResolver(
     private fun DgsDataFetchingEnvironment.replySource(): SpotAnswerReplyView = getSource<SpotAnswerReplyView>()
         ?: error("SpotAnswerReply 필드 리졸버는 부모가 반환한 SpotAnswerReplyView를 소스로 받아야 한다.")
 
-    private fun PostSpotView.toGql(): GqlPostSpot = GqlPostSpot(
+    private fun SpotSummaryView.toGql(): GqlPostSpot = GqlPostSpot(
         id = id,
         title = title,
         thumbnailImageUrl = thumbnailImageUrl,

@@ -2,8 +2,8 @@ package org.around.ieuri.community.adapter.client
 
 import org.around.ieuri.common.context.AppKey
 import org.around.ieuri.community.adapter.client.mapper.toChipViewOrNull
-import org.around.ieuri.community.application.shared.dto.CommunityChipView
-import org.around.ieuri.community.application.shared.required.CategoryConfigPort
+import org.around.ieuri.community.application.post.provided.dto.CommunityChipView
+import org.around.ieuri.community.application.post.required.CategoryConfigPort
 import org.around.ieuri.community.domain.shared.ContentLanguage
 import org.around.ieuri.tourism.application.category.provided.CategoryQueryUseCase
 import org.springframework.stereotype.Component

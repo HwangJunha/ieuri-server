@@ -1,6 +1,6 @@
 package org.around.ieuri.community.domain.conversation
 
-import org.around.ieuri.community.domain.shared.PhotoObjectKey
+import org.around.ieuri.community.domain.photo.PhotoObjectKey
 import java.time.Duration
 import java.time.Instant
 import java.util.UUID

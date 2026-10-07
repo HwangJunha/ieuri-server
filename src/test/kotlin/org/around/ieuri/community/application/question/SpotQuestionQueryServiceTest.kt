@@ -6,21 +6,20 @@ import io.mockk.slot
 import io.mockk.verify
 import org.around.ieuri.common.pagination.CursorEdge
 import org.around.ieuri.common.pagination.cursorPageOf
+import org.around.ieuri.community.application.block.provided.BlockQueryUseCase
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswerView
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswersQuery
 import org.around.ieuri.community.application.question.provided.dto.SpotQuestionView
 import org.around.ieuri.community.application.question.provided.dto.SpotQuestionsQuery
 import org.around.ieuri.community.application.question.provided.exception.QuestionNotFoundException
-import org.around.ieuri.community.application.question.required.SpotAnswersSearch
 import org.around.ieuri.community.application.question.required.SpotQaQueryPort
-import org.around.ieuri.community.application.question.required.SpotQuestionsSearch
-import org.around.ieuri.community.application.shared.CommunityPolicy
-import org.around.ieuri.community.application.shared.dto.PostSpotView
+import org.around.ieuri.community.application.question.required.dto.SpotAnswersSearch
+import org.around.ieuri.community.application.question.required.dto.SpotQuestionsSearch
+import org.around.ieuri.community.application.shared.PagePolicy
 import org.around.ieuri.community.application.shared.exception.SpotNotFoundInLocaleException
-import org.around.ieuri.community.application.shared.required.CommunityQueryPort
 import org.around.ieuri.community.application.shared.required.SpotLookupPort
+import org.around.ieuri.community.application.shared.required.dto.SpotSummaryView
 import org.around.ieuri.community.domain.shared.ContentLanguage
-import java.time.Duration
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -41,21 +40,14 @@ class SpotQuestionQueryServiceTest {
     private val language = ContentLanguage.EN
 
     private val spotQaQueryPort = mockk<SpotQaQueryPort>()
-    private val communityQueryPort = mockk<CommunityQueryPort>()
+    private val blockQueryUseCase = mockk<BlockQueryUseCase>()
     private val spotLookupPort = mockk<SpotLookupPort>()
 
-    private val policy = CommunityPolicy(
-        maxPageSize = 50,
-        commentPreviewSize = 3,
-        maxRadiusMeters = 100_000,
-        uploadUrlTtl = Duration.ofMinutes(30),
-        maxUploadBytes = 10_000_000,
-        allowedContentTypes = setOf("image/jpeg"),
-    )
+    private val policy = PagePolicy(maxPageSize = 50)
 
     private val service = SpotQuestionQueryService(
         spotQaQueryPort,
-        communityQueryPort,
+        blockQueryUseCase,
         spotLookupPort,
         policy,
     )
@@ -63,7 +55,7 @@ class SpotQuestionQueryServiceTest {
     private fun givenSpotExists(exists: Boolean = true) {
         every { spotLookupPort.findSummary(catalogId, language) } returns
             if (exists) {
-                PostSpotView(
+                SpotSummaryView(
                     id = catalogId,
                     title = "경복궁",
                     thumbnailImageUrl = "https://cdn/x.jpg",
@@ -77,7 +69,7 @@ class SpotQuestionQueryServiceTest {
     }
 
     private fun givenBlockedMembers(ids: Set<Long> = emptySet()) {
-        every { communityQueryPort.findBlockedMemberIds(memberId) } returns ids
+        every { blockQueryUseCase.blockedMemberIds(memberId) } returns ids
     }
 
     private fun questionView(hidden: Boolean = false, ownedByViewer: Boolean = false) = SpotQuestionView(
@@ -125,7 +117,7 @@ class SpotQuestionQueryServiceTest {
     fun `활성 언어를 조회 조건으로 내려보낸다`() {
         // 존재 검사도 그 언어로 간다(R-16).
         every { spotLookupPort.findSummary(catalogId, ContentLanguage.JA) } returns
-            PostSpotView(
+            SpotSummaryView(
                 id = catalogId,
                 title = "景福宮",
                 thumbnailImageUrl = "https://cdn/x.jpg",
@@ -193,7 +185,7 @@ class SpotQuestionQueryServiceTest {
             language = language,
         )
 
-        verify(exactly = 0) { communityQueryPort.findBlockedMemberIds(any()) }
+        verify(exactly = 0) { blockQueryUseCase.blockedMemberIds(any()) }
     }
 
     // ── 필터 조합(장소·작성자·id) ──────────────────────────────────

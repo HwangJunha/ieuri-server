@@ -12,9 +12,9 @@ import org.around.ieuri.community.application.question.required.SpotQuestionRepo
 import org.around.ieuri.community.application.report.provided.ReportAutoHideUseCase
 import org.around.ieuri.community.application.report.provided.ReportCommandUseCase
 import org.around.ieuri.community.application.report.provided.dto.ReportContentCommand
+import org.around.ieuri.community.application.report.required.ReportEventPublisherPort
 import org.around.ieuri.community.application.report.required.ReportRepository
 import org.around.ieuri.community.application.shared.exception.MemberNotFoundException
-import org.around.ieuri.community.application.shared.required.CommunityEventPublisherPort
 import org.around.ieuri.community.application.shared.required.MemberLookupPort
 import org.around.ieuri.community.domain.report.Report
 import org.around.ieuri.community.domain.report.ReportTargetType
@@ -36,7 +36,7 @@ class ReportModifyService(
     private val commentRepository: CommentRepository,
     private val questionRepository: SpotQuestionRepository,
     private val memberLookupPort: MemberLookupPort,
-    private val eventPublisherPort: CommunityEventPublisherPort,
+    private val eventPublisherPort: ReportEventPublisherPort,
 ) : ReportCommandUseCase,
     ReportAutoHideUseCase {
 

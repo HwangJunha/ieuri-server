@@ -5,7 +5,6 @@ import com.netflix.graphql.dgs.DgsData
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
-import org.around.ieuri.common.event.LocationAccessed
 import org.around.ieuri.common.graphql.appKey
 import org.around.ieuri.common.graphql.loader
 import org.around.ieuri.common.security.CurrentMemberProvider
@@ -28,20 +27,18 @@ import org.around.ieuri.community.adapter.graphql.mapper.toGqlOrPlaceholder
 import org.around.ieuri.community.adapter.graphql.mapper.toTargetCategories
 import org.around.ieuri.community.adapter.graphql.support.contentLanguage
 import org.around.ieuri.community.application.block.provided.BlockQueryUseCase
+import org.around.ieuri.community.application.block.provided.dto.BlockedUsersQuery
 import org.around.ieuri.community.application.comment.provided.CommentQueryUseCase
+import org.around.ieuri.community.application.comment.provided.dto.CommentView
+import org.around.ieuri.community.application.comment.provided.dto.PostCommentsQuery
 import org.around.ieuri.community.application.post.provided.PostQueryUseCase
-import org.around.ieuri.community.application.shared.dto.BlockedUsersQuery
-import org.around.ieuri.community.application.shared.dto.CommentView
-import org.around.ieuri.community.application.shared.dto.MyPostsQuery
-import org.around.ieuri.community.application.shared.dto.PostAuthorView
-import org.around.ieuri.community.application.shared.dto.PostCommentsQuery
-import org.around.ieuri.community.application.shared.dto.PostSpotView
-import org.around.ieuri.community.application.shared.dto.PostView
-import org.around.ieuri.community.application.shared.dto.PostsQuery
-import org.around.ieuri.community.application.shared.required.CommunityEventPublisherPort
-import org.around.ieuri.community.application.shared.required.MemberLookupPort
-import org.around.ieuri.community.domain.shared.PostSortOrder
-import org.around.ieuri.community.domain.shared.TargetCategory
+import org.around.ieuri.community.application.post.provided.dto.MyPostsQuery
+import org.around.ieuri.community.application.post.provided.dto.PostView
+import org.around.ieuri.community.application.post.provided.dto.PostsQuery
+import org.around.ieuri.community.application.shared.required.dto.MemberSummaryView
+import org.around.ieuri.community.application.shared.required.dto.SpotSummaryView
+import org.around.ieuri.community.domain.post.PostSortOrder
+import org.around.ieuri.community.domain.post.TargetCategory
 import org.springframework.stereotype.Component
 import java.util.concurrent.CompletableFuture
 import org.around.ieuri.common.graphql.generated.types.BlockedUserConnection as GqlBlockedUserConnection
@@ -61,9 +58,7 @@ class CommunityQueryResolver(
     private val blockQueryUseCase: BlockQueryUseCase,
     private val commentQueryUseCase: CommentQueryUseCase,
     private val postQueryUseCase: PostQueryUseCase,
-    private val memberLookupPort: MemberLookupPort,
     private val currentMemberProvider: CurrentMemberProvider,
-    private val eventPublisher: CommunityEventPublisherPort,
 ) {
 
     /**
@@ -84,10 +79,6 @@ class CommunityQueryResolver(
         dfe: DgsDataFetchingEnvironment,
     ): PostConnection {
         val memberId = currentMemberProvider.requireMemberId()
-        // 좌표를 보낸 호출만 위치 조회로 남긴다(SPEC-0032 R19). 좌표 값은 싣지 않는다.
-        if (latitude != null && longitude != null) {
-            eventPublisher.publish(LocationAccessed(memberId, "posts"))
-        }
         val page = postQueryUseCase.posts(
             PostsQuery(
                 catalogId = catalogId,
@@ -162,14 +153,11 @@ class CommunityQueryResolver(
             BlockedUsersQuery(first = first ?: DEFAULT_PAGE_SIZE, after = after),
             memberId = memberId,
         )
-        // 회원 정보가 목록의 본체라 지연시키지 않고 한 번에 읽는다.
-        val authors = memberLookupPort.findAuthors(page.edges.map { it.node.member.id })
         return GqlBlockedUserConnection(
             edges = page.edges.map {
-                val memberId = it.node.member.id
                 GqlBlockedUserEdge(
                     cursor = it.cursor,
-                    node = authors[memberId].toGqlOrPlaceholder(memberId),
+                    node = it.node.member.toGqlOrPlaceholder(it.node.memberId),
                     blockedAt = it.node.blockedAt.toString(),
                 )
             },
@@ -221,7 +209,7 @@ class CommunityQueryResolver(
             if (catalogId == null) {
                 CompletableFuture.completedFuture(null)
             } else {
-                dfe.loader<PostSpotView>(PostSpotDataLoader.NAME)
+                dfe.loader<SpotSummaryView>(PostSpotDataLoader.NAME)
                     .load(catalogId, dfe.contentLanguage())
                     .thenApply { it?.toGql() }
             }
@@ -248,7 +236,7 @@ class CommunityQueryResolver(
     }
 
     /** 작성자를 배치로 읽는다. 회원 정보가 없으면(탈퇴) 대체 표기로 채운다. */
-    private fun DgsDataFetchingEnvironment.loadAuthor(memberId: Long): CompletableFuture<GqlPostAuthor> = loader<PostAuthorView>(PostAuthorDataLoader.NAME)
+    private fun DgsDataFetchingEnvironment.loadAuthor(memberId: Long): CompletableFuture<GqlPostAuthor> = loader<MemberSummaryView>(PostAuthorDataLoader.NAME)
         .load(memberId)
         .thenApply { it.toGqlOrPlaceholder(memberId) }
 
@@ -263,7 +251,7 @@ class CommunityQueryResolver(
 
     private fun TargetCategory.toGql() = GqlTargetCategory.valueOf(name)
 
-    private fun PostSpotView.toGql() = GqlPostSpot(
+    private fun SpotSummaryView.toGql() = GqlPostSpot(
         id = id,
         title = title,
         thumbnailImageUrl = thumbnailImageUrl,

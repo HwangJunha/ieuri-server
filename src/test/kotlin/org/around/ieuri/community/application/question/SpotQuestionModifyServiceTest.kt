@@ -4,19 +4,19 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import io.mockk.verifyOrder
+import org.around.ieuri.community.application.photo.UploadedPhotoService
+import org.around.ieuri.community.application.photo.required.ObjectStoragePort
 import org.around.ieuri.community.application.question.provided.dto.CreateSpotAnswerCommand
 import org.around.ieuri.community.application.question.provided.dto.CreateSpotAnswerReplyCommand
 import org.around.ieuri.community.application.question.provided.dto.CreateSpotQuestionCommand
 import org.around.ieuri.community.application.question.provided.exception.AnswerNotFoundException
 import org.around.ieuri.community.application.question.provided.exception.QuestionNotFoundException
 import org.around.ieuri.community.application.question.provided.exception.ReplyToReplyNotAllowedException
+import org.around.ieuri.community.application.question.required.SpotQuestionEventPublisherPort
 import org.around.ieuri.community.application.question.required.SpotQuestionRepository
-import org.around.ieuri.community.application.shared.UploadedPhotoVerifier
-import org.around.ieuri.community.application.shared.dto.PostSpotView
 import org.around.ieuri.community.application.shared.exception.SpotNotFoundInLocaleException
-import org.around.ieuri.community.application.shared.required.CommunityEventPublisherPort
-import org.around.ieuri.community.application.shared.required.ObjectStoragePort
 import org.around.ieuri.community.application.shared.required.SpotLookupPort
+import org.around.ieuri.community.application.shared.required.dto.SpotSummaryView
 import org.around.ieuri.community.domain.question.NotAnswerOwnerException
 import org.around.ieuri.community.domain.question.SpotAnswer
 import org.around.ieuri.community.domain.question.SpotAnswerReply
@@ -35,8 +35,8 @@ class SpotQuestionModifyServiceTest {
     private val repository = mockk<SpotQuestionRepository>(relaxUnitFun = true)
     private val spotLookupPort = mockk<SpotLookupPort>()
     private val objectStoragePort = mockk<ObjectStoragePort>()
-    private val eventPublisher = mockk<CommunityEventPublisherPort>(relaxUnitFun = true)
-    private val service = SpotQuestionModifyService(repository, spotLookupPort, UploadedPhotoVerifier(objectStoragePort), eventPublisher)
+    private val eventPublisher = mockk<SpotQuestionEventPublisherPort>(relaxUnitFun = true)
+    private val service = SpotQuestionModifyService(repository, spotLookupPort, UploadedPhotoService(objectStoragePort), eventPublisher)
 
     private val question = SpotQuestion(id = 1, catalogId = 343259, authorId = 7, body = "질문", resolved = false, hidden = false, deletedAt = null)
     private val answer = SpotAnswer(id = 20, questionId = 1, catalogId = 343259, authorId = 8, body = "답변", hidden = false, deletedAt = null)
@@ -49,7 +49,7 @@ class SpotQuestionModifyServiceTest {
         assertFailsWith<SpotNotFoundInLocaleException> { service.createQuestion(CreateSpotQuestionCommand(343259, "질문", emptyList()), 7, ContentLanguage.JA) }
         verify(exactly = 0) { repository.insert(any(), any()) }
 
-        every { spotLookupPort.findSummary(343259, ContentLanguage.KO) } returns PostSpotView(1, "남산", "", null, 127.0, 37.5)
+        every { spotLookupPort.findSummary(343259, ContentLanguage.KO) } returns SpotSummaryView(1, "남산", "", null, 127.0, 37.5)
         every { repository.insert(any(), any()) } returns 1
         assertEquals(1L, service.createQuestion(CreateSpotQuestionCommand(343259, "질문", emptyList()), 7, ContentLanguage.KO))
     }

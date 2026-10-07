@@ -1,10 +1,10 @@
 package org.around.ieuri.community.application.post.required
 
+import org.around.ieuri.community.domain.photo.AttachedPhotos
 import org.around.ieuri.community.domain.post.Post
 import org.around.ieuri.community.domain.post.PostSpot
 import org.around.ieuri.community.domain.post.PostTags
-import org.around.ieuri.community.domain.shared.AttachedPhotos
-import org.around.ieuri.community.domain.shared.TargetCategory
+import org.around.ieuri.community.domain.post.TargetCategory
 import java.time.Instant
 
 /**

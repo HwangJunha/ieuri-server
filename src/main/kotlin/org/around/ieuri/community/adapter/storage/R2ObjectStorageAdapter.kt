@@ -1,7 +1,7 @@
 package org.around.ieuri.community.adapter.storage
 
 import org.around.ieuri.community.adapter.config.R2Properties
-import org.around.ieuri.community.application.shared.required.ObjectStoragePort
+import org.around.ieuri.community.application.photo.required.ObjectStoragePort
 import org.springframework.stereotype.Component
 import software.amazon.awssdk.services.s3.S3Client
 import software.amazon.awssdk.services.s3.model.CopyObjectRequest

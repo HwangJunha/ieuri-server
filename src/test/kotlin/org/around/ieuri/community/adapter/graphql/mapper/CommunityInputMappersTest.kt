@@ -7,11 +7,11 @@ import org.around.ieuri.common.graphql.generated.types.CreatePostInput
 import org.around.ieuri.common.graphql.generated.types.EditPostInput
 import org.around.ieuri.common.graphql.generated.types.PostImageUploadRequest
 import org.around.ieuri.common.graphql.generated.types.ReportContentInput
-import org.around.ieuri.community.application.shared.dto.PostImageConfirmFailure
-import org.around.ieuri.community.application.shared.dto.PostImageUploadUrlView
+import org.around.ieuri.community.application.photo.provided.dto.PostImageConfirmFailure
+import org.around.ieuri.community.application.photo.provided.dto.PostImageUploadUrlView
+import org.around.ieuri.community.domain.post.TargetCategory
 import org.around.ieuri.community.domain.report.ReportTargetType
 import org.around.ieuri.community.domain.shared.ReportReason
-import org.around.ieuri.community.domain.shared.TargetCategory
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals

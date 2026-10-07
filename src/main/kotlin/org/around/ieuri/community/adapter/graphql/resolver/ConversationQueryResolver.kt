@@ -19,8 +19,7 @@ import org.around.ieuri.community.application.conversation.provided.Conversation
 import org.around.ieuri.community.application.conversation.provided.dto.ConversationView
 import org.around.ieuri.community.application.conversation.provided.dto.MessageView
 import org.around.ieuri.community.application.conversation.provided.dto.TypingEventView
-import org.around.ieuri.community.application.shared.dto.PostAuthorView
-import org.around.ieuri.community.application.shared.required.MemberLookupPort
+import org.around.ieuri.community.application.shared.required.dto.MemberSummaryView
 import org.springframework.stereotype.Component
 import java.util.concurrent.CompletableFuture
 import org.around.ieuri.common.graphql.generated.types.ConversationSpotQaOrigin as GqlConversationSpotQaOrigin
@@ -34,7 +33,6 @@ import org.around.ieuri.common.graphql.generated.types.PostAuthor as GqlPostAuth
 @Component
 class ConversationQueryResolver(
     private val conversationQueryUseCase: ConversationQueryUseCase,
-    private val memberLookupPort: MemberLookupPort,
     private val currentMemberProvider: CurrentMemberProvider,
 ) {
 
@@ -105,7 +103,7 @@ class ConversationQueryResolver(
     private fun DgsDataFetchingEnvironment.loadSender(senderId: Long): CompletableFuture<GqlPostAuthor> {
         if (isSubscription()) {
             return CompletableFuture.completedFuture(
-                memberLookupPort.findAuthor(senderId).toGqlOrPlaceholder(senderId),
+                conversationQueryUseCase.sender(senderId).toGqlOrPlaceholder(senderId),
             )
         }
         return loadAuthor(senderId)
@@ -117,7 +115,7 @@ class ConversationQueryResolver(
 
     private fun DgsDataFetchingEnvironment.loadAuthor(
         memberId: Long,
-    ): CompletableFuture<GqlPostAuthor> = loader<PostAuthorView>(PostAuthorDataLoader.NAME)
+    ): CompletableFuture<GqlPostAuthor> = loader<MemberSummaryView>(PostAuthorDataLoader.NAME)
         .load(memberId)
         .thenApply { it.toGqlOrPlaceholder(memberId) }
 

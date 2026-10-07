@@ -5,7 +5,8 @@ import io.mockk.mockk
 import io.mockk.verify
 import org.around.ieuri.community.application.conversation.provided.ExpiredMessageDeleteUseCase
 import org.around.ieuri.community.application.conversation.provided.dto.ExpiredMessages
-import org.around.ieuri.community.application.shared.required.ObjectStoragePort
+import org.around.ieuri.community.application.photo.UploadedPhotoService
+import org.around.ieuri.community.application.photo.required.ObjectStoragePort
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -13,7 +14,7 @@ class MessageRetentionServiceTest {
 
     private val rows = mockk<ExpiredMessageDeleteUseCase>()
     private val storage = mockk<ObjectStoragePort>(relaxUnitFun = true)
-    private val service = MessageRetentionService(rows, storage)
+    private val service = MessageRetentionService(rows, UploadedPhotoService(storage))
 
     @Test
     fun `행을 지운 뒤 그 사진을 지우고 지운 행 수를 돌려준다`() {

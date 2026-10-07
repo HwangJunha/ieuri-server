@@ -1,7 +1,7 @@
 package org.around.ieuri.community.adapter.graphql.mapper
 
 import org.around.ieuri.common.error.EmptyCategorySetException
-import org.around.ieuri.community.domain.shared.TargetCategory
+import org.around.ieuri.community.domain.post.TargetCategory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

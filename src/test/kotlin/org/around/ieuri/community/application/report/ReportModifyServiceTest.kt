@@ -8,8 +8,8 @@ import org.around.ieuri.community.application.post.provided.exception.PostNotFou
 import org.around.ieuri.community.application.post.required.PostRepository
 import org.around.ieuri.community.application.question.required.SpotQuestionRepository
 import org.around.ieuri.community.application.report.provided.dto.ReportContentCommand
+import org.around.ieuri.community.application.report.required.ReportEventPublisherPort
 import org.around.ieuri.community.application.report.required.ReportRepository
-import org.around.ieuri.community.application.shared.required.CommunityEventPublisherPort
 import org.around.ieuri.community.application.shared.required.MemberLookupPort
 import org.around.ieuri.community.domain.report.Report
 import org.around.ieuri.community.domain.report.ReportTargetType
@@ -26,7 +26,7 @@ class ReportModifyServiceTest {
     private val commentRepository = mockk<CommentRepository>()
     private val questionRepository = mockk<SpotQuestionRepository>(relaxed = true)
     private val memberLookupPort = mockk<MemberLookupPort>()
-    private val eventPublisher = mockk<CommunityEventPublisherPort>(relaxUnitFun = true)
+    private val eventPublisher = mockk<ReportEventPublisherPort>(relaxUnitFun = true)
     private val service = ReportModifyService(reportRepository, postRepository, commentRepository, questionRepository, memberLookupPort, eventPublisher)
 
     @Test

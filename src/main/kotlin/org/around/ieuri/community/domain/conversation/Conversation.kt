@@ -1,7 +1,6 @@
 package org.around.ieuri.community.domain.conversation
 
-import org.around.ieuri.community.domain.conversation.SpotQaOrigin
-import org.around.ieuri.community.domain.shared.PhotoObjectKey
+import org.around.ieuri.community.domain.photo.PhotoObjectKey
 import java.time.Instant
 
 /**

@@ -2,7 +2,7 @@ package org.around.ieuri.community.application.conversation
 
 import org.around.ieuri.community.application.conversation.provided.ExpiredMessageDeleteUseCase
 import org.around.ieuri.community.application.conversation.provided.MessageRetentionUseCase
-import org.around.ieuri.community.application.shared.required.ObjectStoragePort
+import org.around.ieuri.community.application.photo.provided.UploadedPhotoUseCase
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service
 @Service
 class MessageRetentionService(
     private val expiredMessageDeleteUseCase: ExpiredMessageDeleteUseCase,
-    private val objectStoragePort: ObjectStoragePort,
+    private val uploadedPhotos: UploadedPhotoUseCase,
 ) : MessageRetentionUseCase {
 
     override fun purgeExpiredBatch(limit: Int): Int {
@@ -22,7 +22,7 @@ class MessageRetentionService(
 
         var photoFailures = 0
         deleted.photoObjectKeys.forEach { key ->
-            runCatching { objectStoragePort.delete(key) }.onFailure { photoFailures += 1 }
+            runCatching { uploadedPhotos.delete(key) }.onFailure { photoFailures += 1 }
         }
         // 키에 memberId가 있어 로그에 싣지 않는다(POL-013).
         if (photoFailures > 0) log.warn("failed to delete {} expired DM photo objects", photoFailures)

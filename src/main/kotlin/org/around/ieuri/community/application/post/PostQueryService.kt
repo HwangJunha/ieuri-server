@@ -1,27 +1,28 @@
 package org.around.ieuri.community.application.post
 
 import org.around.ieuri.common.context.AppKey
+import org.around.ieuri.common.event.LocationAccessed
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.persistence.ExposedConfig
+import org.around.ieuri.community.application.block.provided.BlockQueryUseCase
 import org.around.ieuri.community.application.post.provided.PostQueryUseCase
-import org.around.ieuri.community.application.shared.CommunityPolicy
-import org.around.ieuri.community.application.shared.clampPageSize
-import org.around.ieuri.community.application.shared.dto.CommunityChipView
-import org.around.ieuri.community.application.shared.dto.MyPostsQuery
-import org.around.ieuri.community.application.shared.dto.PostView
-import org.around.ieuri.community.application.shared.dto.PostsQuery
-import org.around.ieuri.community.application.shared.required.CategoryConfigPort
-import org.around.ieuri.community.application.shared.required.CommunityEventPublisherPort
-import org.around.ieuri.community.application.shared.required.CommunityQueryPort
-import org.around.ieuri.community.application.shared.required.MyPostsSearch
-import org.around.ieuri.community.application.shared.required.PostSpatialQueryPort
-import org.around.ieuri.community.application.shared.required.PostsArea
-import org.around.ieuri.community.application.shared.required.PostsSearch
-import org.around.ieuri.community.application.shared.viewerContext
+import org.around.ieuri.community.application.post.provided.dto.CommunityChipView
+import org.around.ieuri.community.application.post.provided.dto.MyPostsQuery
+import org.around.ieuri.community.application.post.provided.dto.PostView
+import org.around.ieuri.community.application.post.provided.dto.PostsQuery
+import org.around.ieuri.community.application.post.required.CategoryConfigPort
+import org.around.ieuri.community.application.post.required.PostEventPublisherPort
+import org.around.ieuri.community.application.post.required.PostQueryPort
+import org.around.ieuri.community.application.post.required.PostSpatialQueryPort
+import org.around.ieuri.community.application.post.required.dto.MyPostsSearch
+import org.around.ieuri.community.application.post.required.dto.PostsArea
+import org.around.ieuri.community.application.post.required.dto.PostsSearch
+import org.around.ieuri.community.application.shared.PagePolicy
+import org.around.ieuri.community.application.shared.required.dto.ViewerContext
+import org.around.ieuri.community.domain.post.PostSortOrder
 import org.around.ieuri.community.domain.post.PostTag
+import org.around.ieuri.community.domain.post.TargetCategory
 import org.around.ieuri.community.domain.shared.ContentLanguage
-import org.around.ieuri.community.domain.shared.PostSortOrder
-import org.around.ieuri.community.domain.shared.TargetCategory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -29,15 +30,19 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, readOnly = true)
 class PostQueryService(
-    private val communityQueryPort: CommunityQueryPort,
+    private val postQueryPort: PostQueryPort,
     private val postSpatialQueryPort: PostSpatialQueryPort,
     private val categoryConfigPort: CategoryConfigPort,
-    private val eventPublisher: CommunityEventPublisherPort,
-    private val policy: CommunityPolicy,
+    private val blockQueryUseCase: BlockQueryUseCase,
+    private val eventPublisher: PostEventPublisherPort,
+    private val pagePolicy: PagePolicy,
+    private val policy: PostPolicy,
 ) : PostQueryUseCase {
 
     /** 인자 조합이 범위(장소 하나·좌표 반경·카테고리·전체)를 정한다. 거리순은 PostGIS 전용 포트로 간다. */
     override fun posts(query: PostsQuery, memberId: Long, language: ContentLanguage): CursorPage<PostView> {
+        // 좌표를 보낸 호출만 위치 조회로 남긴다(SPEC-0032 R19). 좌표 값은 싣지 않는다.
+        if (query.hasCoordinates) eventPublisher.publish(LocationAccessed(memberId, "posts"))
         val search = PostsSearch(
             catalogId = query.catalogId,
             area = resolveArea(query),
@@ -47,37 +52,39 @@ class PostQueryService(
             sort = effectiveSort(query),
             hiddenByViewer = query.hiddenByViewer,
             language = language,
-            first = policy.clampPageSize(query.first),
+            first = pagePolicy.clamp(query.first),
             after = query.after,
-            viewer = communityQueryPort.viewerContext(memberId),
+            viewer = viewerContext(memberId),
         )
         return when (search.sort) {
-            PostSortOrder.LATEST -> communityQueryPort.findPosts(search)
+            PostSortOrder.LATEST -> postQueryPort.findPosts(search)
             PostSortOrder.DISTANCE -> postSpatialQueryPort.findPostsByDistance(search)
         }
     }
 
     /** 조회수는 여기서만 오르며(피드 목록에서는 오르지 않음) 이벤트로 비동기 증가한다. 못 본 글은 세지 않는다. */
     override fun post(postId: Long, memberId: Long): PostView? {
-        val view = communityQueryPort.findPost(postId, communityQueryPort.viewerContext(memberId)) ?: return null
+        val view = postQueryPort.findPost(postId, viewerContext(memberId)) ?: return null
         eventPublisher.publish(PostViewed(postId))
         return view
     }
 
     /** 조회자 필터를 쓰지 않는다 — 자기가 숨긴 자기 글도 보인다. */
-    override fun myPosts(query: MyPostsQuery, memberId: Long): CursorPage<PostView> = communityQueryPort.findMyPosts(
-        MyPostsSearch(memberId = memberId, first = policy.clampPageSize(query.first), after = query.after),
+    override fun myPosts(query: MyPostsQuery, memberId: Long): CursorPage<PostView> = postQueryPort.findMyPosts(
+        MyPostsSearch(memberId = memberId, first = pagePolicy.clamp(query.first), after = query.after),
     )
 
-    override fun postTags(postIds: List<Long>): Map<Long, List<String>> = communityQueryPort.findTagsOf(postIds)
+    override fun postTags(postIds: List<Long>): Map<Long, List<String>> = postQueryPort.findTagsOf(postIds)
 
-    override fun postPhotoKeys(postIds: List<Long>): Map<Long, List<String>> = communityQueryPort.findPhotoKeysOf(postIds)
+    override fun postPhotoKeys(postIds: List<Long>): Map<Long, List<String>> = postQueryPort.findPhotoKeysOf(postIds)
 
-    override fun postCategories(postIds: List<Long>): Map<Long, TargetCategory> = communityQueryPort.findCategoriesOf(postIds)
+    override fun postCategories(postIds: List<Long>): Map<Long, TargetCategory> = postQueryPort.findCategoriesOf(postIds)
 
-    override fun postCatalogIds(postIds: List<Long>): Map<Long, Long> = communityQueryPort.findCatalogIdsOf(postIds)
+    override fun postCatalogIds(postIds: List<Long>): Map<Long, Long> = postQueryPort.findCatalogIdsOf(postIds)
 
-    override fun likedPostIds(postIds: List<Long>, memberId: Long): Set<Long> = communityQueryPort.findLikedPostIds(memberId, postIds)
+    override fun likedPostIds(postIds: List<Long>, memberId: Long): Set<Long> = postQueryPort.findLikedPostIds(memberId, postIds)
+
+    override fun isVisible(postId: Long, memberId: Long): Boolean = postQueryPort.findPost(postId, viewerContext(memberId)) != null
 
     /** 칩 구성은 tourism의 `app_category`가 소유한다. */
     override fun communityChips(appKey: AppKey, language: ContentLanguage): List<CommunityChipView> = categoryConfigPort.findCategories(appKey, language)
@@ -94,4 +101,11 @@ class PostQueryService(
             radiusMeters = query.radiusMeters.coerceIn(1, policy.maxRadiusMeters),
         )
     }
+
+    /** 조회자의 양방향 차단 회원과 숨긴 글. 피드·단건이 모두 이 값을 조건으로 건다 — 한 경로라도 빠지면 차단·숨김이 무력화된다. */
+    private fun viewerContext(memberId: Long): ViewerContext = ViewerContext(
+        memberId = memberId,
+        blockedMemberIds = blockQueryUseCase.blockedMemberIds(memberId),
+        hiddenPostIds = postQueryPort.findHiddenPostIds(memberId),
+    )
 }

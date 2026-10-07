@@ -14,10 +14,10 @@ import org.around.ieuri.community.adapter.persistence.table.SpotQuestionTable
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswerReplyView
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswerView
 import org.around.ieuri.community.application.question.provided.dto.SpotQuestionView
-import org.around.ieuri.community.application.question.required.SpotAnswersSearch
 import org.around.ieuri.community.application.question.required.SpotQaQueryPort
-import org.around.ieuri.community.application.question.required.SpotQuestionsSearch
-import org.around.ieuri.community.application.shared.required.ViewerContext
+import org.around.ieuri.community.application.question.required.dto.SpotAnswersSearch
+import org.around.ieuri.community.application.question.required.dto.SpotQuestionsSearch
+import org.around.ieuri.community.application.shared.required.dto.ViewerContext
 import org.around.ieuri.community.domain.question.SpotQaKind
 import org.jetbrains.exposed.v1.core.Op
 import org.jetbrains.exposed.v1.core.SortOrder

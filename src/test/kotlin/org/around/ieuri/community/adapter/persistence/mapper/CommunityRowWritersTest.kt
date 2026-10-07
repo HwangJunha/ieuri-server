@@ -18,6 +18,7 @@ import org.around.ieuri.community.domain.conversation.Conversation
 import org.around.ieuri.community.domain.conversation.Message
 import org.around.ieuri.community.domain.conversation.SpotQaOrigin
 import org.around.ieuri.community.domain.messagereport.MessageReport
+import org.around.ieuri.community.domain.photo.PhotoObjectKey
 import org.around.ieuri.community.domain.post.Post
 import org.around.ieuri.community.domain.post.PostSpot
 import org.around.ieuri.community.domain.post.SpotPoint
@@ -26,7 +27,6 @@ import org.around.ieuri.community.domain.question.SpotAnswerReply
 import org.around.ieuri.community.domain.question.SpotQuestion
 import org.around.ieuri.community.domain.report.Report
 import org.around.ieuri.community.domain.report.ReportTargetType
-import org.around.ieuri.community.domain.shared.PhotoObjectKey
 import org.around.ieuri.community.domain.shared.ReportReason
 import org.jetbrains.exposed.v1.core.InternalApi
 import org.jetbrains.exposed.v1.core.Table

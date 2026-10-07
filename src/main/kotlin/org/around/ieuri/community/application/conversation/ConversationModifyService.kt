@@ -2,7 +2,6 @@ package org.around.ieuri.community.application.conversation
 
 import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.community.application.block.required.BlockRepository
-import org.around.ieuri.community.application.conversation.NewMessageStored
 import org.around.ieuri.community.application.conversation.provided.ConversationCommandUseCase
 import org.around.ieuri.community.application.conversation.provided.ExpiredMessageDeleteUseCase
 import org.around.ieuri.community.application.conversation.provided.dto.ExpiredMessages
@@ -13,25 +12,25 @@ import org.around.ieuri.community.application.conversation.provided.dto.StartCon
 import org.around.ieuri.community.application.conversation.provided.dto.TypingEventView
 import org.around.ieuri.community.application.conversation.provided.exception.BlockedException
 import org.around.ieuri.community.application.conversation.provided.exception.ConversationNotFoundException
+import org.around.ieuri.community.application.conversation.provided.exception.PhotoNotConfirmedException
 import org.around.ieuri.community.application.conversation.required.ConversationEventPort
+import org.around.ieuri.community.application.conversation.required.ConversationEventPublisherPort
 import org.around.ieuri.community.application.conversation.required.ConversationRepository
+import org.around.ieuri.community.application.photo.provided.UploadedPhotoUseCase
 import org.around.ieuri.community.application.question.required.SpotQuestionRepository
 import org.around.ieuri.community.application.shared.exception.MemberNotFoundException
-import org.around.ieuri.community.application.shared.exception.PhotoNotConfirmedException
-import org.around.ieuri.community.application.shared.required.ClockPort
-import org.around.ieuri.community.application.shared.required.CommunityEventPublisherPort
 import org.around.ieuri.community.application.shared.required.MemberLookupPort
-import org.around.ieuri.community.application.shared.required.ObjectStoragePort
 import org.around.ieuri.community.application.shared.required.SpotLookupPort
 import org.around.ieuri.community.domain.conversation.Conversation
 import org.around.ieuri.community.domain.conversation.Message
 import org.around.ieuri.community.domain.conversation.SpotQaOrigin
 import org.around.ieuri.community.domain.conversation.event.MessageSent
+import org.around.ieuri.community.domain.photo.PhotoObjectKey
 import org.around.ieuri.community.domain.shared.ContentLanguage
-import org.around.ieuri.community.domain.shared.PhotoObjectKey
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
 import java.time.Instant
 
 /**
@@ -47,10 +46,10 @@ class ConversationModifyService(
     private val questionRepository: SpotQuestionRepository,
     private val memberLookupPort: MemberLookupPort,
     private val spotLookupPort: SpotLookupPort,
-    private val objectStoragePort: ObjectStoragePort,
+    private val uploadedPhotos: UploadedPhotoUseCase,
     private val conversationEventPort: ConversationEventPort,
-    private val eventPublisher: CommunityEventPublisherPort,
-    private val clockPort: ClockPort,
+    private val eventPublisher: ConversationEventPublisherPort,
+    private val clock: Clock,
 ) : ConversationCommandUseCase,
     ExpiredMessageDeleteUseCase {
 
@@ -110,12 +109,12 @@ class ConversationModifyService(
     override fun notifyTyping(command: NotifyTypingCommand, memberId: Long) {
         requireConversation(command.conversationId).requireParticipant(memberId)
 
-        conversationEventPort.publishTyping(TypingEventView(conversationId = command.conversationId, senderId = memberId, emittedAt = clockPort.now()))
+        conversationEventPort.publishTyping(TypingEventView(conversationId = command.conversationId, senderId = memberId, emittedAt = Instant.now(clock)))
     }
 
     override fun deleteExpiredMessages(limit: Int): ExpiredMessages {
         require(limit > 0) { "limit은 양수여야 합니다." }
-        return conversationRepository.deleteMessagesCreatedBefore(Message.retentionCutoff(clockPort.now()), limit)
+        return conversationRepository.deleteMessagesCreatedBefore(Message.retentionCutoff(Instant.now(clock)), limit)
     }
 
     /** 존재 확인이 먼저, 참여자 판정이 그다음이다 — 두 실패는 서로 다른 코드다. */
@@ -129,7 +128,7 @@ class ConversationModifyService(
     private fun verifiedPhotoKey(raw: String, memberId: Long): PhotoObjectKey {
         val key = PhotoObjectKey.parse(raw) ?: throw PhotoNotConfirmedException()
         if (!key.ownedBy(memberId) || !key.confirmed) throw PhotoNotConfirmedException()
-        if (objectStoragePort.findSize(key.value) == null) throw PhotoNotConfirmedException()
+        if (!uploadedPhotos.isUploaded(key)) throw PhotoNotConfirmedException()
         return key
     }
 

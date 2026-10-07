@@ -5,9 +5,9 @@ import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.cursorPageOf
 import org.around.ieuri.community.adapter.persistence.mapper.toPostView
 import org.around.ieuri.community.adapter.persistence.table.PostTable
-import org.around.ieuri.community.application.shared.dto.PostView
-import org.around.ieuri.community.application.shared.required.PostSpatialQueryPort
-import org.around.ieuri.community.application.shared.required.PostsSearch
+import org.around.ieuri.community.application.post.provided.dto.PostView
+import org.around.ieuri.community.application.post.required.PostSpatialQueryPort
+import org.around.ieuri.community.application.post.required.dto.PostsSearch
 import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.springframework.jdbc.core.JdbcTemplate

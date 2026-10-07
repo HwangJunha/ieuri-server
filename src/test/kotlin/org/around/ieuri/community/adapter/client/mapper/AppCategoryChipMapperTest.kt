@@ -1,6 +1,6 @@
 package org.around.ieuri.community.adapter.client.mapper
 
-import org.around.ieuri.community.domain.shared.TargetCategory
+import org.around.ieuri.community.domain.post.TargetCategory
 import org.around.ieuri.tourism.application.category.provided.dto.AppCategoryCode
 import kotlin.test.Test
 import kotlin.test.assertEquals

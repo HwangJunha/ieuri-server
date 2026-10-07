@@ -9,6 +9,15 @@ import kotlin.test.assertFailsWith
 class CommunityCursorTest {
 
     @Test
+    fun `커서 바이트는 클라이언트가 들고 있는 형식 그대로다 - 최신순·거리순·질문 목록`() {
+        val at = Instant.parse("2026-10-01T00:00:00Z")
+
+        assertEquals("MjAyNi0xMC0wMVQwMDowMDowMFp8NQ", encodeCursor(at, 5L))
+        assertEquals("ZDoxMjAuNXwyMDI2LTEwLTAxVDAwOjAwOjAwWnw1", encodeDistanceCursor(120.5, at, 5L))
+        assertEquals("cTp0cnVlfDIwMjYtMTAtMDFUMDA6MDA6MDBafDU", encodeSpotQuestionCursor(true, at, 5L))
+    }
+
+    @Test
     fun `인코딩한 커서는 원래 정렬 키로 복원된다`() {
         val createdAt = Instant.parse("2026-08-05T01:02:03.123456789Z")
         val decoded = decodeCursor(encodeCursor(createdAt, 42L))

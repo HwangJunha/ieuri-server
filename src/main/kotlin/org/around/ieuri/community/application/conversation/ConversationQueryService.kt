@@ -8,10 +8,12 @@ import org.around.ieuri.community.application.conversation.provided.dto.Conversa
 import org.around.ieuri.community.application.conversation.provided.dto.MessageView
 import org.around.ieuri.community.application.conversation.provided.dto.TypingEventView
 import org.around.ieuri.community.application.conversation.required.ConversationEventPort
-import org.around.ieuri.community.application.conversation.required.ConversationMessagesSearch
 import org.around.ieuri.community.application.conversation.required.ConversationQueryPort
-import org.around.ieuri.community.application.conversation.required.ConversationsSearch
-import org.around.ieuri.community.application.shared.CommunityPolicy
+import org.around.ieuri.community.application.conversation.required.dto.ConversationMessagesSearch
+import org.around.ieuri.community.application.conversation.required.dto.ConversationsSearch
+import org.around.ieuri.community.application.shared.PagePolicy
+import org.around.ieuri.community.application.shared.required.MemberLookupPort
+import org.around.ieuri.community.application.shared.required.dto.MemberSummaryView
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import reactor.core.publisher.Flux
@@ -25,7 +27,8 @@ import reactor.core.publisher.Flux
 class ConversationQueryService(
     private val conversationQueryPort: ConversationQueryPort,
     private val conversationEventPort: ConversationEventPort,
-    private val policy: CommunityPolicy,
+    private val memberLookupPort: MemberLookupPort,
+    private val pagePolicy: PagePolicy,
 ) : ConversationQueryUseCase {
 
     override fun conversations(
@@ -73,6 +76,8 @@ class ConversationQueryService(
 
     override fun message(conversationId: Long, messageId: Long, memberId: Long): MessageView? = conversationQueryPort.findMessage(conversationId, messageId, memberId)
 
+    override fun sender(memberId: Long): MemberSummaryView? = memberLookupPort.findAuthor(memberId)
+
     /** 읽기 포트로 판정한다. 결과가 없으면 "없거나 볼 수 없다"이다. */
     private fun requireParticipant(conversationId: Long, memberId: Long) {
         conversationQueryPort.findConversation(conversationId, memberId)
@@ -80,7 +85,7 @@ class ConversationQueryService(
     }
 
     /** 상한 초과는 오류가 아니라 절삭이다(POL-018). null이면 계약의 기본값이다. */
-    private fun clampPageSize(first: Int?, default: Int): Int = (first ?: default).coerceIn(1, policy.maxPageSize)
+    private fun clampPageSize(first: Int?, default: Int): Int = pagePolicy.clamp(first ?: default)
 
     private companion object {
         const val DEFAULT_CONVERSATIONS_PAGE_SIZE = 20

@@ -8,10 +8,11 @@ import org.around.ieuri.community.application.comment.provided.exception.Comment
 import org.around.ieuri.community.application.comment.required.CommentRepository
 import org.around.ieuri.community.application.post.provided.exception.PostNotFoundException
 import org.around.ieuri.community.application.post.required.PostRepository
-import org.around.ieuri.community.application.shared.required.ClockPort
 import org.around.ieuri.community.domain.comment.Comment
 import org.around.ieuri.community.domain.comment.NotCommentOwnerException
+import java.time.Clock
 import java.time.Instant
+import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -22,7 +23,7 @@ class CommentModifyServiceTest {
     private val now = Instant.parse("2026-10-05T00:00:00Z")
     private val commentRepository = mockk<CommentRepository>()
     private val postRepository = mockk<PostRepository>(relaxUnitFun = true)
-    private val clockPort = mockk<ClockPort> { every { now() } returns now }
+    private val clockPort = Clock.fixed(now, ZoneOffset.UTC)
     private val service = CommentModifyService(commentRepository, postRepository, clockPort)
 
     private val comment = Comment(id = 10, postId = 1, parentCommentId = null, authorId = memberId, body = "댓글", hidden = false, deletedAt = null)
