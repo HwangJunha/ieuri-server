@@ -26,10 +26,5 @@ data class CatalogOrigin(
     fun standardValues(): CatalogStandardValues = CatalogStandardValues(mapX, mapY, thumbnailImageUrl, category, copyright)
 
     /** 이 원본이 만드는 번역. 표시용 제목이 없으면 원문 제목을 쓴다(분할 경로). */
-    fun toTranslation(): CatalogTranslation = CatalogTranslation(
-        language,
-        displayTitle ?: title,
-        address,
-        visible = TranslationVisibility.isSatisfiedBy(language, originLanguages = setOf(language)),
-    )
+    fun toTranslation(): CatalogTranslation = CatalogTranslation(language, displayTitle ?: title, address, visible = true)
 }

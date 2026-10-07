@@ -22,12 +22,11 @@ data class SpotCatalog(
 
     /**
      * 원본 하나를 붙였을 때 바뀌는 번역. 바뀌는 것이 없으면 null이다.
-     * - 그 언어 번역이 이미 있으면 제목·주소를 덮지 않는다(SPEC-0019 R-4). 노출은 [TranslationVisibility]가 정한다 — 원본이 붙었으니 감춰져 있었다면 되살아난다.
+     * - 그 언어 번역이 이미 있으면 제목·주소를 덮지 않는다(SPEC-0019 R-4). 감춰져 있었다면 되살린다 — 원본이 돌아왔다는 뜻이다.
      */
     fun attach(origin: CatalogOrigin): CatalogTranslation? {
         val existing = translationIn(origin.language) ?: return origin.toTranslation()
-        val visible = TranslationVisibility.isSatisfiedBy(existing.language, originLanguages = setOf(origin.language))
-        return if (existing.visible == visible) null else existing.copy(visible = visible)
+        return if (existing.visible) null else existing.copy(visible = true)
     }
 
     /** 좋아요/싫어요. 이 언어에 보이는 번역이 없으면 그 언어에서는 볼 수 없는 장소다(SPEC-0029 R-12). */
