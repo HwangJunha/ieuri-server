@@ -305,7 +305,10 @@ fixed only within that bound; anything that needs a migration or a schema field 
 - **Packages: context → layer → aggregate.** `domain/<aggregate>/` holds the root with its own
   entities, VOs, exceptions and events; `domain/shared/` holds VOs several aggregates use.
   `application/<aggregate>/provided/` (inbound ports, `dto/`, `exception/`) and `required/`
-  (outbound ports). No `infrastructure/adapter/in|out`.
+  (outbound ports, `dto/`). No `infrastructure/adapter/in|out`.
+  - **`provided/` and `required/` hold port interfaces only.** Every data type a port takes or
+    returns goes in that side's `dto/`, one type per file — never declared next to the interface
+    (SpotSearchPort's `SpotSearchQuery` lives in `required/dto/`) (SPEC-0039 D-100).
   - **`application/` and `domain/` list the same packages, one to one.** Each name is an aggregate,
     or a value group with its own use cases (`catalog`). A capability with no aggregate (photo
     upload) goes in `shared` on both sides. **A process that spans aggregates (member withdrawal)
