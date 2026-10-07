@@ -1,7 +1,7 @@
 package org.around.ieuri.tourism.domain.spot
 
+import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.CopyrightType
-import org.around.ieuri.tourism.domain.shared.SpotCategory
 
 /**
  * 관광지 상세 본문(도메인 모델). 본문만 담으며 식별자는 읽기 DTO `SpotDetailView`가 소유한다.

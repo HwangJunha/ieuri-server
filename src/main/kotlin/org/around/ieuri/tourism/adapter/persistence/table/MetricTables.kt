@@ -39,8 +39,7 @@ object KtoConcentrationRateTable : Table("tour.kto_concentration_rate") {
     }
 }
 
-/** 체류·소비 강도는 열 구성이 같다. */
-abstract class KtoDemandIntensityTable(name: String, naturalKey: String) : Table(name) {
+object KtoStayIntensityTable : Table("tour.kto_stay_intensity") {
     val id = long("id").autoIncrement()
     val districtCode = varchar("district_code", 5)
     val baseMonth = date("base_month")
@@ -51,13 +50,24 @@ abstract class KtoDemandIntensityTable(name: String, naturalKey: String) : Table
     override val primaryKey = PrimaryKey(id)
 
     init {
-        uniqueIndex(naturalKey, districtCode, baseMonth, indicatorCode)
+        uniqueIndex("uk_kto_stay_intensity_natural", districtCode, baseMonth, indicatorCode)
     }
 }
 
-object KtoStayIntensityTable : KtoDemandIntensityTable("tour.kto_stay_intensity", "uk_kto_stay_intensity_natural")
+object KtoSpendingIntensityTable : Table("tour.kto_spending_intensity") {
+    val id = long("id").autoIncrement()
+    val districtCode = varchar("district_code", 5)
+    val baseMonth = date("base_month")
+    val indicatorCode = varchar("indicator_cd", 32)
+    val indicatorValue = decimal("indicator_value", 30, 10)
+    val createdAt = timestampWithTimeZone("created_at").databaseGenerated()
+    val updatedAt = timestampWithTimeZone("updated_at").databaseGenerated()
+    override val primaryKey = PrimaryKey(id)
 
-object KtoSpendingIntensityTable : KtoDemandIntensityTable("tour.kto_spending_intensity", "uk_kto_spending_intensity_natural")
+    init {
+        uniqueIndex("uk_kto_spending_intensity_natural", districtCode, baseMonth, indicatorCode)
+    }
+}
 
 object CongestionAreaTable : Table("tour.congestion_area") {
     val areaCd = varchar("area_cd", 16)

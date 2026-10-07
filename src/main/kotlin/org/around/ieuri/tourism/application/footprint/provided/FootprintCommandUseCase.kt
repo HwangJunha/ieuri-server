@@ -1,10 +1,10 @@
 package org.around.ieuri.tourism.application.footprint.provided
 
+import org.around.ieuri.tourism.application.footprint.provided.dto.MapShareLinkView
 import org.around.ieuri.tourism.application.footprint.provided.dto.RecordVisitsCommand
 import org.around.ieuri.tourism.application.footprint.provided.dto.RecordVisitsResult
 import org.around.ieuri.tourism.application.footprint.provided.dto.RemoveVisitCommand
 import org.around.ieuri.tourism.application.footprint.provided.dto.RemoveVisitResult
-import org.around.ieuri.tourism.application.shared.provided.dto.MapShareLinkView
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 
 /** 발자취 쓰기 — 방문 기록과 공유 링크(SPEC-0030 R3·R4·R12·R14). */

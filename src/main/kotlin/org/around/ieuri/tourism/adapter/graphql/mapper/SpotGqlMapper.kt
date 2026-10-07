@@ -1,6 +1,6 @@
 package org.around.ieuri.tourism.adapter.graphql.mapper
 
-import org.around.ieuri.tourism.application.shared.provided.dto.SpotView
+import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
 import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
 import org.around.ieuri.common.graphql.generated.types.Spot as GqlSpot
 import org.around.ieuri.common.graphql.generated.types.SpotCategory as GqlSpotCategory

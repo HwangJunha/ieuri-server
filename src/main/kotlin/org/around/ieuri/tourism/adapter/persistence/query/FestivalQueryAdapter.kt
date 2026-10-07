@@ -1,10 +1,10 @@
 package org.around.ieuri.tourism.adapter.persistence.query
 
-import org.around.ieuri.tourism.application.shared.provided.dto.FestivalView
-import org.around.ieuri.tourism.application.shared.required.FestivalQueryPort
-import org.around.ieuri.tourism.application.shared.required.OngoingFestivalSearch
+import org.around.ieuri.tourism.application.catalog.provided.dto.FestivalView
+import org.around.ieuri.tourism.application.catalog.required.FestivalQueryPort
+import org.around.ieuri.tourism.application.catalog.required.OngoingFestivalSearch
+import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.CopyrightType
-import org.around.ieuri.tourism.domain.shared.SpotCategory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Component

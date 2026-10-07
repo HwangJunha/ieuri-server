@@ -3,9 +3,9 @@ package org.around.ieuri.tourism.adapter.client.kto.mapper
 import org.around.ieuri.tourism.adapter.client.kto.dto.KtoConcentrationRateItem
 import org.around.ieuri.tourism.adapter.client.kto.dto.KtoDemandIntensityItem
 import org.around.ieuri.tourism.adapter.client.kto.dto.KtoVisitorCountItem
-import org.around.ieuri.tourism.application.shared.provided.dto.SyncConcentrationRateCommand
-import org.around.ieuri.tourism.application.shared.provided.dto.SyncDemandIntensityCommand
-import org.around.ieuri.tourism.application.shared.provided.dto.SyncVisitorCountCommand
+import org.around.ieuri.tourism.application.region.provided.dto.SyncConcentrationRateCommand
+import org.around.ieuri.tourism.application.region.provided.dto.SyncDemandIntensityCommand
+import org.around.ieuri.tourism.application.region.provided.dto.SyncVisitorCountCommand
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter

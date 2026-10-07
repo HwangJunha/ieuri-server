@@ -2,7 +2,7 @@ package org.around.ieuri.tourism.adapter.client.voyage
 
 import org.around.ieuri.tourism.adapter.client.voyage.mapper.toVectors
 import org.around.ieuri.tourism.adapter.config.VoyageProperties
-import org.around.ieuri.tourism.application.shared.required.TextEmbeddingPort
+import org.around.ieuri.tourism.application.recommendation.required.TextEmbeddingPort
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.stereotype.Component

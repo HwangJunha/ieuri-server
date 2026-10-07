@@ -1,6 +1,6 @@
 package org.around.ieuri.tourism.adapter.config
 
-import org.around.ieuri.tourism.domain.shared.RegionScoreFactor
+import org.around.ieuri.tourism.domain.region.RegionScoreFactor
 import org.springframework.boot.context.properties.ConfigurationProperties
 
 /**

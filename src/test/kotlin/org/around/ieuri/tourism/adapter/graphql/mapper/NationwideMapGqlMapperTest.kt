@@ -2,8 +2,8 @@ package org.around.ieuri.tourism.adapter.graphql.mapper
 
 import org.around.ieuri.common.graphql.generated.types.RecordVisitsInput
 import org.around.ieuri.common.graphql.generated.types.RemoveVisitInput
+import org.around.ieuri.tourism.application.footprint.provided.dto.CellSpotView
 import org.around.ieuri.tourism.application.relation.provided.dto.MapRelationView
-import org.around.ieuri.tourism.application.shared.provided.dto.CellSpotView
 import org.around.ieuri.tourism.domain.shared.Coordinates
 import java.time.Instant
 import kotlin.test.Test

@@ -2,8 +2,8 @@ package org.around.ieuri.tourism.adapter.persistence.query
 
 import org.around.ieuri.tourism.adapter.persistence.mapper.toCellImageView
 import org.around.ieuri.tourism.adapter.persistence.table.MapCellImageTable
-import org.around.ieuri.tourism.application.shared.provided.dto.CellImageView
-import org.around.ieuri.tourism.application.shared.required.CellImageQueryPort
+import org.around.ieuri.tourism.application.footprint.provided.dto.CellImageView
+import org.around.ieuri.tourism.application.footprint.required.CellImageQueryPort
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.springframework.stereotype.Component

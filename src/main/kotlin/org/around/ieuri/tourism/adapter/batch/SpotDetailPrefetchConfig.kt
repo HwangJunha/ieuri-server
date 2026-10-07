@@ -1,11 +1,11 @@
 package org.around.ieuri.tourism.adapter.batch
 
-import org.around.ieuri.tourism.application.shared.required.TourInfoPort
 import org.around.ieuri.tourism.application.spot.SpotDetailPrefetchPolicy
 import org.around.ieuri.tourism.application.spot.SpotDetailPrefetchService
 import org.around.ieuri.tourism.application.spot.provided.SpotCommandUseCase
 import org.around.ieuri.tourism.application.spot.provided.SpotDetailPrefetchUseCase
 import org.around.ieuri.tourism.application.spot.provided.SpotPrefetchQueryUseCase
+import org.around.ieuri.tourism.application.spot.required.TourInfoPort
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration

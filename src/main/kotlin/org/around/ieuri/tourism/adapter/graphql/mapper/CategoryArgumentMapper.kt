@@ -1,8 +1,8 @@
 package org.around.ieuri.tourism.adapter.graphql.mapper
 
 import org.around.ieuri.common.error.EmptyCategorySetException
-import org.around.ieuri.tourism.domain.shared.CategorySelection
-import org.around.ieuri.tourism.domain.shared.SpotCategory
+import org.around.ieuri.tourism.domain.catalog.CategorySelection
+import org.around.ieuri.tourism.domain.category.SpotCategory
 
 /**
  * GraphQL 카테고리 인자 → [CategorySelection](SPEC-0020 R5). 모든 조회 연산이 이 함수를 지난다.

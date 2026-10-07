@@ -1,6 +1,6 @@
 package org.around.ieuri.tourism.domain.spot
 
-import org.around.ieuri.tourism.domain.shared.SpotCategory
+import org.around.ieuri.tourism.domain.category.SpotCategory
 
 /**
  * 비관광 spot 제외 판정(SPEC-0018). 제목과 카테고리만 보는 순수 함수다.

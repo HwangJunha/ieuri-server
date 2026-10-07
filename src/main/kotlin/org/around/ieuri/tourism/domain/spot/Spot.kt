@@ -1,9 +1,9 @@
 package org.around.ieuri.tourism.domain.spot
 
+import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.Coordinates
 import org.around.ieuri.tourism.domain.shared.CopyrightType
 import org.around.ieuri.tourism.domain.shared.DomainLocale
-import org.around.ieuri.tourism.domain.shared.SpotCategory
 
 /**
  * 언어별 TourAPI 원본 관광지 하나. 자연키는 (contentId, language)이며 배치가 전량 수집해 맞춘다.

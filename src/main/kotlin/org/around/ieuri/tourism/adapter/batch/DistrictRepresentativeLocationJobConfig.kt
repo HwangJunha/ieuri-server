@@ -1,7 +1,7 @@
 package org.around.ieuri.tourism.adapter.batch
 
 import org.around.ieuri.tourism.adapter.config.DistrictRepresentativeProperties
-import org.around.ieuri.tourism.application.shared.provided.DistrictRepresentativeUseCase
+import org.around.ieuri.tourism.application.region.provided.DistrictRepresentativeUseCase
 import org.springframework.batch.core.job.Job
 import org.springframework.batch.core.job.builder.JobBuilder
 import org.springframework.batch.core.repository.JobRepository

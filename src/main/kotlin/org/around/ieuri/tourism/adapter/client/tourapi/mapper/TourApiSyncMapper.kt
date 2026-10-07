@@ -2,13 +2,13 @@ package org.around.ieuri.tourism.adapter.client.tourapi.mapper
 
 import org.around.ieuri.tourism.adapter.client.tourapi.TourApiFestivalResponse
 import org.around.ieuri.tourism.adapter.client.tourapi.TourApiResponse
-import org.around.ieuri.tourism.application.shared.required.NearbySpotData
+import org.around.ieuri.tourism.application.spot.required.NearbySpotData
 import org.around.ieuri.tourism.domain.catalog.CatalogStandardValues
+import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.Coordinates
 import org.around.ieuri.tourism.domain.shared.CopyrightType
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.shared.FestivalPeriod
-import org.around.ieuri.tourism.domain.shared.SpotCategory
 import org.around.ieuri.tourism.domain.spot.Spot
 import org.around.ieuri.tourism.domain.spot.SpotFestival
 import java.time.LocalDate

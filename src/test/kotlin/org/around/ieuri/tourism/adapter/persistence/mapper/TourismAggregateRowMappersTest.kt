@@ -12,14 +12,14 @@ import org.around.ieuri.tourism.adapter.persistence.table.SpotDetailIntroTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotDetailTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotFestivalTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotTable
-import org.around.ieuri.tourism.application.shared.provided.dto.SyncConcentrationRateCommand
-import org.around.ieuri.tourism.application.shared.provided.dto.SyncDemandIntensityCommand
-import org.around.ieuri.tourism.application.shared.provided.dto.SyncVisitorCountCommand
+import org.around.ieuri.tourism.application.region.provided.dto.SyncConcentrationRateCommand
+import org.around.ieuri.tourism.application.region.provided.dto.SyncDemandIntensityCommand
+import org.around.ieuri.tourism.application.region.provided.dto.SyncVisitorCountCommand
+import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.Coordinates
 import org.around.ieuri.tourism.domain.shared.CopyrightType
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.shared.FestivalPeriod
-import org.around.ieuri.tourism.domain.shared.SpotCategory
 import org.around.ieuri.tourism.domain.spot.Spot
 import org.around.ieuri.tourism.domain.spot.SpotDetail
 import org.around.ieuri.tourism.domain.spot.SpotFestival
@@ -255,17 +255,24 @@ class TourismAggregateRowMappersTest {
     }
 
     @Test
-    fun `강도 쓰기는 넘겨받은 표의 열에 쓴다 — 체류와 소비가 섞이지 않는다`() {
-        val command = SyncDemandIntensityCommand("11110", LocalDate.of(2026, 6, 1), "S1", BigDecimal("7.25"))
-        val stay = row(KtoStayIntensityTable)
-        val spending = row(KtoSpendingIntensityTable)
-        command.writeTo(stay, KtoStayIntensityTable)
-        command.writeTo(spending, KtoSpendingIntensityTable)
+    fun `체류 강도 쓰기는 시군구·기준월·지표·값을 바꾸지 않는다`() {
+        val row = row(KtoStayIntensityTable)
+        SyncDemandIntensityCommand("11110", LocalDate.of(2026, 6, 1), "21", BigDecimal("7.25")).writeStayIntensityTo(row)
 
-        assertEquals("11110", stay.values[KtoStayIntensityTable.districtCode])
-        assertEquals(LocalDate.of(2026, 6, 1), stay.values[KtoStayIntensityTable.baseMonth])
-        assertEquals("S1", stay.values[KtoStayIntensityTable.indicatorCode])
-        assertEquals(BigDecimal("7.25"), stay.values[KtoStayIntensityTable.indicatorValue])
-        assertEquals("S1", spending.values[KtoSpendingIntensityTable.indicatorCode])
+        assertEquals("11110", row.values[KtoStayIntensityTable.districtCode])
+        assertEquals(LocalDate.of(2026, 6, 1), row.values[KtoStayIntensityTable.baseMonth])
+        assertEquals("21", row.values[KtoStayIntensityTable.indicatorCode])
+        assertEquals(BigDecimal("7.25"), row.values[KtoStayIntensityTable.indicatorValue])
+    }
+
+    @Test
+    fun `소비 강도 쓰기는 시군구·기준월·지표·값을 바꾸지 않는다`() {
+        val row = row(KtoSpendingIntensityTable)
+        SyncDemandIntensityCommand("26110", LocalDate.of(2026, 5, 1), "22", BigDecimal("3.5")).writeSpendingIntensityTo(row)
+
+        assertEquals("26110", row.values[KtoSpendingIntensityTable.districtCode])
+        assertEquals(LocalDate.of(2026, 5, 1), row.values[KtoSpendingIntensityTable.baseMonth])
+        assertEquals("22", row.values[KtoSpendingIntensityTable.indicatorCode])
+        assertEquals(BigDecimal("3.5"), row.values[KtoSpendingIntensityTable.indicatorValue])
     }
 }

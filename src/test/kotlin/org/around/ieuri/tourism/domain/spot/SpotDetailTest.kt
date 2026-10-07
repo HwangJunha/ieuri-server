@@ -1,7 +1,7 @@
 package org.around.ieuri.tourism.domain.spot
 
+import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.CopyrightType
-import org.around.ieuri.tourism.domain.shared.SpotCategory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

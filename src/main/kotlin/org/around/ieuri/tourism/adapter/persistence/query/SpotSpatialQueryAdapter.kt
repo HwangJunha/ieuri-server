@@ -6,9 +6,9 @@ import org.around.ieuri.common.persistence.stDistance
 import org.around.ieuri.tourism.adapter.persistence.mapper.toSpotSearchResult
 import org.around.ieuri.tourism.adapter.persistence.table.SpotCatalogTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotCatalogTranslationTable
-import org.around.ieuri.tourism.application.shared.required.NearbySpotSearch
-import org.around.ieuri.tourism.application.shared.required.SpotSearchResult
-import org.around.ieuri.tourism.application.shared.required.SpotSpatialQueryPort
+import org.around.ieuri.tourism.application.catalog.required.NearbySpotSearch
+import org.around.ieuri.tourism.application.catalog.required.SpotSearchResult
+import org.around.ieuri.tourism.application.catalog.required.SpotSpatialQueryPort
 import org.jetbrains.exposed.v1.core.JoinType
 import org.jetbrains.exposed.v1.core.Op
 import org.jetbrains.exposed.v1.core.SortOrder
@@ -32,21 +32,21 @@ class SpotSpatialQueryAdapter : SpotSpatialQueryPort {
 
     /** 반경 안 관광지 한 페이지. 거리 오름차순, 등거리는 id 오름차순이다(POL-019·055). */
     override fun searchNearby(query: NearbySpotSearch): List<SpotSearchResult> {
-        val t = SpotCatalogTranslationTable
-        val distance = stDistance(t.location, center(query)).alias("distance_meters")
-        val ranked = t.select(t.catalogId, t.title, t.address, t.mapX, t.mapY, t.category, distance)
+        val translation = SpotCatalogTranslationTable
+        val distance = stDistance(translation.location, center(query)).alias("distance_meters")
+        val ranked = translation.select(translation.catalogId, translation.title, translation.address, translation.mapX, translation.mapY, translation.category, distance)
             .where { nearby(query) }
-            .orderBy(distance.delegate to SortOrder.ASC, t.catalogId to SortOrder.ASC)
+            .orderBy(distance.delegate to SortOrder.ASC, translation.catalogId to SortOrder.ASC)
             .limit(query.limit)
             .offset(query.offset.toLong())
             .alias("ranked")
         val rankedDistance = ranked[distance]
-        return ranked.join(SpotCatalogTable, JoinType.INNER, ranked[t.catalogId], SpotCatalogTable.id)
+        return ranked.join(SpotCatalogTable, JoinType.INNER, ranked[translation.catalogId], SpotCatalogTable.id)
             .select(
-                ranked[t.catalogId], ranked[t.title], ranked[t.address], ranked[t.mapX], ranked[t.mapY], ranked[t.category], rankedDistance,
+                ranked[translation.catalogId], ranked[translation.title], ranked[translation.address], ranked[translation.mapX], ranked[translation.mapY], ranked[translation.category], rankedDistance,
                 SpotCatalogTable.thumbnailImageUrl, SpotCatalogTable.copyright,
             )
-            .orderBy(rankedDistance to SortOrder.ASC, ranked[t.catalogId] to SortOrder.ASC)
+            .orderBy(rankedDistance to SortOrder.ASC, ranked[translation.catalogId] to SortOrder.ASC)
             .map { it.toSpotSearchResult(ranked, distanceMeters = it[rankedDistance]) }
     }
 
@@ -59,12 +59,12 @@ class SpotSpatialQueryAdapter : SpotSpatialQueryPort {
      * - 이미 반응한 카탈로그는 DB 단계에서 뺀다 — 조회 후 거르면 페이지가 size보다 작아진다.
      */
     private fun nearby(query: NearbySpotSearch): Op<Boolean> {
-        val t = SpotCatalogTranslationTable
-        var condition = (t.visible eq true) and (t.language eq query.language.name) and
-            stDWithin(t.location, center(query), query.radiusMeters.toDouble())
+        val translation = SpotCatalogTranslationTable
+        var condition = (translation.visible eq true) and (translation.language eq query.language.name) and
+            stDWithin(translation.location, center(query), query.radiusMeters.toDouble())
         // 다중 선택은 OR(SPEC-0020). 비어 있으면 조건을 걸지 않는다.
-        if (!query.categories.isUnfiltered) condition = condition and (t.category inList query.categories.codes())
-        if (query.excludedSpotIds.isNotEmpty()) condition = condition and (t.catalogId neq allFrom(query.excludedSpotIds.toList()))
+        if (!query.categories.isUnfiltered) condition = condition and (translation.category inList query.categories.codes())
+        if (query.excludedSpotIds.isNotEmpty()) condition = condition and (translation.catalogId neq allFrom(query.excludedSpotIds.toList()))
         return condition
     }
 

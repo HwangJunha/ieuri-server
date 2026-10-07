@@ -1,8 +1,8 @@
 package org.around.ieuri.tourism.adapter.graphql.dataloader
 
 import com.netflix.graphql.dgs.DgsDataLoader
-import org.around.ieuri.tourism.application.shared.provided.SpotQueryUseCase
-import org.around.ieuri.tourism.application.shared.provided.dto.CategoryDisplay
+import org.around.ieuri.tourism.application.category.provided.CategoryQueryUseCase
+import org.around.ieuri.tourism.application.category.provided.dto.CategoryDisplay
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.dataloader.BatchLoaderEnvironment
 import org.dataloader.MappedBatchLoaderWithContext
@@ -20,7 +20,7 @@ import java.util.concurrent.CompletionStage
 @DgsDataLoader
 @Component
 class CategoryDisplayDataLoader(
-    private val spotQueryUseCase: SpotQueryUseCase,
+    private val categoryQueryUseCase: CategoryQueryUseCase,
 ) : MappedBatchLoaderWithContext<String, CategoryDisplay> {
 
     override fun load(
@@ -32,6 +32,6 @@ class CategoryDisplayDataLoader(
             .firstOrNull()
             ?: error("CategoryDisplayDataLoader는 keyContext로 언어를 받아야 한다 — 리졸버가 load(code, locale)로 부른다.")
 
-        return CompletableFuture.completedFuture(spotQueryUseCase.categoryDisplays(codes, locale))
+        return CompletableFuture.completedFuture(categoryQueryUseCase.categoryDisplays(codes, locale))
     }
 }

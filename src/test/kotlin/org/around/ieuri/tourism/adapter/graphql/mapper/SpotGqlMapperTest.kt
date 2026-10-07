@@ -1,8 +1,8 @@
 package org.around.ieuri.tourism.adapter.graphql.mapper
 
-import org.around.ieuri.tourism.application.shared.provided.dto.SpotView
+import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
+import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.CopyrightType
-import org.around.ieuri.tourism.domain.shared.SpotCategory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull

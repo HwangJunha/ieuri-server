@@ -7,16 +7,16 @@ import org.around.ieuri.tourism.adapter.persistence.table.MapCellDistrictTable
 import org.around.ieuri.tourism.adapter.persistence.table.MapCellTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotCatalogTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotCatalogTranslationTable
-import org.around.ieuri.tourism.application.shared.provided.dto.CellSpotView
-import org.around.ieuri.tourism.application.shared.provided.dto.MapSpotView
-import org.around.ieuri.tourism.application.shared.provided.dto.RegionRow
-import org.around.ieuri.tourism.application.shared.required.MapCandidateView
-import org.around.ieuri.tourism.application.shared.required.SpotSearchResult
+import org.around.ieuri.tourism.application.catalog.provided.dto.MapSpotView
+import org.around.ieuri.tourism.application.catalog.required.MapCandidateView
+import org.around.ieuri.tourism.application.catalog.required.SpotSearchResult
+import org.around.ieuri.tourism.application.footprint.provided.dto.CellSpotView
+import org.around.ieuri.tourism.application.region.provided.dto.RegionRow
+import org.around.ieuri.tourism.domain.category.SpotCategory
+import org.around.ieuri.tourism.domain.footprint.MapCellDistrictRow
 import org.around.ieuri.tourism.domain.shared.AreaName
 import org.around.ieuri.tourism.domain.shared.Coordinates
 import org.around.ieuri.tourism.domain.shared.CopyrightType
-import org.around.ieuri.tourism.domain.shared.MapCellDistrictRow
-import org.around.ieuri.tourism.domain.shared.SpotCategory
 import org.jetbrains.exposed.v1.core.QueryAlias
 import org.jetbrains.exposed.v1.core.ResultRow
 

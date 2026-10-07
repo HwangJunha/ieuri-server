@@ -1,9 +1,9 @@
 package org.around.ieuri.tourism.adapter.client.tourapi
 
 import org.around.ieuri.tourism.adapter.config.TourApiProperties
-import org.around.ieuri.tourism.application.shared.provided.CategoryMappingQueryUseCase
-import org.around.ieuri.tourism.application.shared.required.CategoryExternalMappingPort
-import org.around.ieuri.tourism.domain.shared.SpotCategory
+import org.around.ieuri.tourism.application.category.provided.CategoryMappingQueryUseCase
+import org.around.ieuri.tourism.application.category.required.CategoryExternalMappingPort
+import org.around.ieuri.tourism.domain.category.SpotCategory
 
 /**
  * TourAPI contentTypeId 매핑의 테스트 대역(SPEC-0020, V59). `category_external_mapping` 표를 DB 없이 고정한다.

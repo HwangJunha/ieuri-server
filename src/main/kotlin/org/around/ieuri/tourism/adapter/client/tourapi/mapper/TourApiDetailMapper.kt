@@ -4,8 +4,8 @@ import org.around.ieuri.tourism.adapter.client.tourapi.TourApiDetailCommonRespon
 import org.around.ieuri.tourism.adapter.client.tourapi.TourApiDetailImageResponse
 import org.around.ieuri.tourism.adapter.client.tourapi.TourApiDetailInfoResponse
 import org.around.ieuri.tourism.adapter.client.tourapi.TourApiDetailIntroResponse
+import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.CopyrightType
-import org.around.ieuri.tourism.domain.shared.SpotCategory
 import org.around.ieuri.tourism.domain.spot.SpotDetail
 import org.around.ieuri.tourism.domain.spot.SpotImage
 import org.around.ieuri.tourism.domain.spot.SpotInfoItem

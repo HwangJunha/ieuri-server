@@ -8,20 +8,20 @@ import org.around.ieuri.tourism.adapter.persistence.table.SpotCatalogTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotCatalogTranslationTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotReactionTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotTable
-import org.around.ieuri.tourism.application.shared.provided.dto.AppCategoryView
-import org.around.ieuri.tourism.application.shared.provided.dto.CategoryDisplay
-import org.around.ieuri.tourism.application.shared.provided.dto.CellImageView
-import org.around.ieuri.tourism.application.shared.provided.dto.LikedSpotView
-import org.around.ieuri.tourism.application.shared.required.DistrictRegion
-import org.around.ieuri.tourism.application.shared.required.SpotBasics
-import org.around.ieuri.tourism.application.shared.required.SpotIdentity
+import org.around.ieuri.tourism.application.catalog.provided.dto.LikedSpotView
+import org.around.ieuri.tourism.application.catalog.required.SpotBasics
+import org.around.ieuri.tourism.application.catalog.required.SpotIdentity
+import org.around.ieuri.tourism.application.category.provided.dto.AppCategoryView
+import org.around.ieuri.tourism.application.category.provided.dto.CategoryDisplay
+import org.around.ieuri.tourism.application.footprint.provided.dto.CellImageView
+import org.around.ieuri.tourism.application.region.required.DistrictRegion
 import org.around.ieuri.tourism.application.spot.required.PrefetchTarget
 import org.around.ieuri.tourism.domain.catalog.CatalogCandidate
 import org.around.ieuri.tourism.domain.catalog.CatalogOrigin
-import org.around.ieuri.tourism.domain.shared.CellImageKind
+import org.around.ieuri.tourism.domain.category.SpotCategory
+import org.around.ieuri.tourism.domain.footprint.CellImageKind
 import org.around.ieuri.tourism.domain.shared.CopyrightType
 import org.around.ieuri.tourism.domain.shared.DomainLocale
-import org.around.ieuri.tourism.domain.shared.SpotCategory
 import org.jetbrains.exposed.v1.core.ResultRow
 
 // tourism 조회 행 → 읽기 모델·조회 결과. 좌표는 경도가 map_x, 위도가 map_y다.

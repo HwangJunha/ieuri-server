@@ -8,18 +8,19 @@ import org.apache.hc.core5.util.Timeout
 import org.around.ieuri.tourism.adapter.batch.FestivalSyncProperties
 import org.around.ieuri.tourism.adapter.batch.RegionMetricSyncProperties
 import org.around.ieuri.tourism.adapter.batch.SpotSyncProperties
-import org.around.ieuri.tourism.application.shared.EmbeddingSpec
-import org.around.ieuri.tourism.application.shared.MapViewportPolicy
-import org.around.ieuri.tourism.application.shared.NationwideMapPolicy
-import org.around.ieuri.tourism.application.shared.RecommendationPolicy
-import org.around.ieuri.tourism.application.shared.RegionRecommendationPolicy
-import org.around.ieuri.tourism.application.shared.SeoulOpenDataPolicy
-import org.around.ieuri.tourism.application.shared.SpotQueryPolicy
-import org.around.ieuri.tourism.domain.shared.CategoryDiversity
-import org.around.ieuri.tourism.domain.shared.DistanceScoring
-import org.around.ieuri.tourism.domain.shared.FreshnessDecay
-import org.around.ieuri.tourism.domain.shared.RecommendationScore
-import org.around.ieuri.tourism.domain.shared.RegionScoreWeights
+import org.around.ieuri.tourism.application.catalog.MapViewportPolicy
+import org.around.ieuri.tourism.application.catalog.SpotQueryPolicy
+import org.around.ieuri.tourism.application.congestion.SeoulOpenDataPolicy
+import org.around.ieuri.tourism.application.footprint.NationwideMapPolicy
+import org.around.ieuri.tourism.application.recommendation.EmbeddingSpec
+import org.around.ieuri.tourism.application.recommendation.RecommendationPolicy
+import org.around.ieuri.tourism.application.region.RegionMetricSyncPolicy
+import org.around.ieuri.tourism.application.region.RegionRecommendationPolicy
+import org.around.ieuri.tourism.domain.recommendation.CategoryDiversity
+import org.around.ieuri.tourism.domain.recommendation.RecommendationScore
+import org.around.ieuri.tourism.domain.region.DistanceScoring
+import org.around.ieuri.tourism.domain.region.FreshnessDecay
+import org.around.ieuri.tourism.domain.region.RegionScoreWeights
 import org.around.ieuri.tourism.domain.spot.SpotExclusionRule
 import org.around.ieuri.tourism.domain.spot.TaxRefundTitleRule
 import org.springframework.boot.context.properties.EnableConfigurationProperties
@@ -152,6 +153,13 @@ class TourismConfig {
         maxEventMarkers = properties.maxEventMarkers,
         recommendationCandidateCap = properties.recommendationCandidateCap,
         maxRecommendationSize = properties.maxRecommendationSize,
+    )
+
+    @Bean
+    fun regionMetricSyncPolicy(properties: KtoBigDataProperties, syncProperties: RegionMetricSyncProperties): RegionMetricSyncPolicy = RegionMetricSyncPolicy(
+        pageSize = properties.pageSize,
+        visitorBackfillDays = syncProperties.visitorBackfillDays,
+        monthlyLookbackMonths = syncProperties.monthlyLookbackMonths,
     )
 
     @Bean

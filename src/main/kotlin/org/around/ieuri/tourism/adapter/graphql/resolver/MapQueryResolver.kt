@@ -7,17 +7,18 @@ import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.tourism.adapter.graphql.mapper.toCategorySelection
 import org.around.ieuri.tourism.adapter.graphql.mapper.toGql
 import org.around.ieuri.tourism.adapter.graphql.support.domainLocale
-import org.around.ieuri.tourism.application.shared.provided.MapQueryUseCase
-import org.around.ieuri.tourism.application.shared.provided.dto.CongestionAreaBoundaryView
-import org.around.ieuri.tourism.application.shared.provided.dto.CongestionAreaView
-import org.around.ieuri.tourism.application.shared.provided.dto.CulturalEventView
-import org.around.ieuri.tourism.application.shared.provided.dto.MapViewportQuery
-import org.around.ieuri.tourism.application.shared.provided.dto.MapViewportView
-import org.around.ieuri.tourism.application.shared.provided.dto.SeoulCongestionView
-import org.around.ieuri.tourism.application.shared.provided.exception.InvalidBboxException
-import org.around.ieuri.tourism.domain.shared.CommercialStatus
-import org.around.ieuri.tourism.domain.shared.CongestionForecast
-import org.around.ieuri.tourism.domain.shared.CongestionSnapshot
+import org.around.ieuri.tourism.application.catalog.provided.SpotCatalogQueryUseCase
+import org.around.ieuri.tourism.application.catalog.provided.dto.MapViewportQuery
+import org.around.ieuri.tourism.application.catalog.provided.dto.MapViewportView
+import org.around.ieuri.tourism.application.catalog.provided.exception.InvalidBboxException
+import org.around.ieuri.tourism.application.congestion.provided.CongestionQueryUseCase
+import org.around.ieuri.tourism.application.congestion.provided.dto.CongestionAreaBoundaryView
+import org.around.ieuri.tourism.application.congestion.provided.dto.CongestionAreaView
+import org.around.ieuri.tourism.application.congestion.provided.dto.CulturalEventView
+import org.around.ieuri.tourism.application.congestion.provided.dto.SeoulCongestionView
+import org.around.ieuri.tourism.domain.congestion.CommercialStatus
+import org.around.ieuri.tourism.domain.congestion.CongestionForecast
+import org.around.ieuri.tourism.domain.congestion.CongestionSnapshot
 import org.around.ieuri.tourism.domain.shared.MapBounds
 import org.around.ieuri.common.graphql.generated.types.CommercialActivityLevel as GqlCommercialActivityLevel
 import org.around.ieuri.common.graphql.generated.types.CommercialStatus as GqlCommercialStatus
@@ -38,7 +39,8 @@ import org.around.ieuri.common.graphql.generated.types.SeoulCongestionResult as 
  */
 @DgsComponent
 class MapQueryResolver(
-    private val mapQueryUseCase: MapQueryUseCase,
+    private val catalogQueryUseCase: SpotCatalogQueryUseCase,
+    private val congestionQueryUseCase: CongestionQueryUseCase,
 ) {
 
     @DgsQuery
@@ -47,7 +49,7 @@ class MapQueryResolver(
         @InputArgument bbox: GqlMapBoundsInput,
         @InputArgument zoom: Int,
         @InputArgument categories: List<String>?,
-    ): GqlMapViewportResult = mapQueryUseCase.mapViewport(
+    ): GqlMapViewportResult = catalogQueryUseCase.mapViewport(
         MapViewportQuery(
             bounds = bbox.toBounds(),
             zoom = zoom,
@@ -61,14 +63,14 @@ class MapQueryResolver(
         dfe: DgsDataFetchingEnvironment,
         @InputArgument areaIds: List<String>?,
         @InputArgument bbox: GqlMapBoundsInput?,
-    ): GqlSeoulCongestionResult = mapQueryUseCase.seoulCongestion(
+    ): GqlSeoulCongestionResult = congestionQueryUseCase.seoulCongestion(
         areaIds = areaIds,
         bounds = bbox?.toBounds(),
         locale = dfe.domainLocale(),
     ).toGql()
 
     @DgsQuery
-    fun seoulCongestionAreas(dfe: DgsDataFetchingEnvironment): List<GqlCongestionAreaBoundary> = mapQueryUseCase.seoulCongestionAreas(dfe.domainLocale()).map { it.toGql() }
+    fun seoulCongestionAreas(dfe: DgsDataFetchingEnvironment): List<GqlCongestionAreaBoundary> = congestionQueryUseCase.seoulCongestionAreas(dfe.domainLocale()).map { it.toGql() }
 
     /**
      * 입력 bbox → 도메인 VO. 실패는 `INVALID_BBOX`다(R4).

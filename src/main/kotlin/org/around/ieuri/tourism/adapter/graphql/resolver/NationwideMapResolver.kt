@@ -11,12 +11,10 @@ import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.tourism.adapter.graphql.dataloader.CellImageDataLoader
 import org.around.ieuri.tourism.adapter.graphql.mapper.toGql
 import org.around.ieuri.tourism.adapter.graphql.support.domainLocale
-import org.around.ieuri.tourism.application.shared.NationwideMapPolicy
-import org.around.ieuri.tourism.application.shared.provided.NationwideMapUseCase
-import org.around.ieuri.tourism.application.shared.provided.dto.CellImageView
-import org.around.ieuri.tourism.application.shared.provided.dto.CellSpotView
-import org.around.ieuri.tourism.application.shared.provided.dto.MapCellView
-import org.around.ieuri.tourism.application.shared.provided.dto.SharedMapView
+import org.around.ieuri.tourism.application.footprint.provided.FootprintQueryUseCase
+import org.around.ieuri.tourism.application.footprint.provided.dto.CellImageView
+import org.around.ieuri.tourism.application.footprint.provided.dto.MapCellView
+import org.around.ieuri.tourism.application.footprint.provided.dto.SharedMapView
 import java.util.concurrent.CompletableFuture
 import org.around.ieuri.common.graphql.generated.types.CellImage as GqlCellImage
 import org.around.ieuri.common.graphql.generated.types.CellSpot as GqlCellSpot
@@ -28,7 +26,7 @@ import org.around.ieuri.common.graphql.generated.types.Coordinates as GqlCoordin
  */
 @DgsComponent
 class NationwideMapResolver(
-    private val nationwideMapUseCase: NationwideMapUseCase,
+    private val nationwideMapUseCase: FootprintQueryUseCase,
     private val currentMemberProvider: CurrentMemberProvider,
 ) {
 

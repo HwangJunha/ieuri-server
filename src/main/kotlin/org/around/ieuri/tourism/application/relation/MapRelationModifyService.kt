@@ -1,12 +1,12 @@
 package org.around.ieuri.tourism.application.relation
 
 import org.around.ieuri.common.persistence.ExposedConfig
+import org.around.ieuri.tourism.application.footprint.provided.exception.ShareLinkBlockedException
+import org.around.ieuri.tourism.application.footprint.provided.exception.ShareLinkNotFoundException
 import org.around.ieuri.tourism.application.footprint.required.FootprintQueryPort
+import org.around.ieuri.tourism.application.footprint.required.MapViewerBlockPort
 import org.around.ieuri.tourism.application.relation.provided.MapRelationCommandUseCase
 import org.around.ieuri.tourism.application.relation.required.MapRelationRepository
-import org.around.ieuri.tourism.application.shared.provided.exception.ShareLinkBlockedException
-import org.around.ieuri.tourism.application.shared.provided.exception.ShareLinkNotFoundException
-import org.around.ieuri.tourism.application.shared.required.MapViewerBlockPort
 import org.around.ieuri.tourism.domain.footprint.ShareToken
 import org.around.ieuri.tourism.domain.relation.MapRelation
 import org.springframework.stereotype.Service

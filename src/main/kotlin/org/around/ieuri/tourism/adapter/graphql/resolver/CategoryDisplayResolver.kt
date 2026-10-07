@@ -5,7 +5,7 @@ import com.netflix.graphql.dgs.DgsData
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import org.around.ieuri.tourism.adapter.graphql.dataloader.CategoryDisplayDataLoader
 import org.around.ieuri.tourism.adapter.graphql.support.domainLocale
-import org.around.ieuri.tourism.application.shared.provided.dto.CategoryDisplay
+import org.around.ieuri.tourism.application.category.provided.dto.CategoryDisplay
 import org.dataloader.DataLoader
 import java.util.concurrent.CompletableFuture
 import org.around.ieuri.common.graphql.generated.types.SpotCategory as GqlSpotCategory

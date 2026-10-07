@@ -1,7 +1,7 @@
 package org.around.ieuri.tourism.adapter.graphql.support
 
 import org.around.ieuri.common.graphql.generated.types.UserError
-import org.around.ieuri.tourism.domain.shared.ReactionUserException
+import org.around.ieuri.tourism.domain.catalog.ReactionUserException
 
 /**
  * tourism 뮤테이션(reactToSpot)의 오류 규약(BaseResponse).

@@ -8,14 +8,14 @@ import org.around.ieuri.common.event.LocationAccessed
 import org.around.ieuri.common.graphql.tokenPresentation
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.tourism.adapter.graphql.support.domainLocale
-import org.around.ieuri.tourism.application.shared.RegionRecommendationPolicy
-import org.around.ieuri.tourism.application.shared.provided.RegionRecommendationUseCase
-import org.around.ieuri.tourism.application.shared.provided.dto.RecommendedRegionItemView
-import org.around.ieuri.tourism.application.shared.provided.dto.RecommendedRegionQuery
-import org.around.ieuri.tourism.application.shared.provided.dto.RecommendedRegionView
-import org.around.ieuri.tourism.application.shared.provided.dto.RegionScoreView
+import org.around.ieuri.tourism.application.region.RegionRecommendationPolicy
+import org.around.ieuri.tourism.application.region.provided.RegionRecommendationUseCase
+import org.around.ieuri.tourism.application.region.provided.dto.RecommendedRegionItemView
+import org.around.ieuri.tourism.application.region.provided.dto.RecommendedRegionQuery
+import org.around.ieuri.tourism.application.region.provided.dto.RecommendedRegionView
+import org.around.ieuri.tourism.application.region.provided.dto.RegionScoreView
+import org.around.ieuri.tourism.application.region.provided.exception.InvalidLimitException
 import org.around.ieuri.tourism.application.shared.provided.exception.InvalidCoordinatesException
-import org.around.ieuri.tourism.application.shared.provided.exception.InvalidLimitException
 import org.around.ieuri.tourism.application.shared.required.TourismEventPublisherPort
 import org.around.ieuri.tourism.domain.shared.Coordinates
 import org.around.ieuri.common.graphql.generated.types.Coordinates as GqlCoordinates

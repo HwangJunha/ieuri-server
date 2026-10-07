@@ -1,9 +1,9 @@
 package org.around.ieuri.tourism.adapter.client.tourapi
 
 import org.around.ieuri.tourism.adapter.config.TourApiProperties
+import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.CopyrightType
 import org.around.ieuri.tourism.domain.shared.DomainLocale
-import org.around.ieuri.tourism.domain.shared.SpotCategory
 import org.springframework.web.client.RestClient
 import tools.jackson.module.kotlin.jacksonObjectMapper
 import kotlin.test.Test

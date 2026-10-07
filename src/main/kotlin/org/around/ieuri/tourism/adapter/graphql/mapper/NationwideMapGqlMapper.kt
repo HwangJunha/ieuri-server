@@ -1,11 +1,11 @@
 package org.around.ieuri.tourism.adapter.graphql.mapper
 
 import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.tourism.application.footprint.provided.dto.CellImageView
+import org.around.ieuri.tourism.application.footprint.provided.dto.CellSpotView
 import org.around.ieuri.tourism.application.footprint.provided.dto.RecordVisitsCommand
 import org.around.ieuri.tourism.application.footprint.provided.dto.RemoveVisitCommand
 import org.around.ieuri.tourism.application.relation.provided.dto.MapRelationView
-import org.around.ieuri.tourism.application.shared.provided.dto.CellImageView
-import org.around.ieuri.tourism.application.shared.provided.dto.CellSpotView
 import org.around.ieuri.tourism.domain.shared.Coordinates
 import org.around.ieuri.common.graphql.generated.types.CellImage as GqlCellImage
 import org.around.ieuri.common.graphql.generated.types.CellImageKind as GqlCellImageKind

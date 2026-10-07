@@ -1,8 +1,8 @@
 package org.around.ieuri.tourism.adapter.client.seoulopendata.mapper
 
 import org.around.ieuri.tourism.adapter.client.seoulopendata.SeoulOpenDataResponse
-import org.around.ieuri.tourism.domain.shared.CommercialActivityLevel
-import org.around.ieuri.tourism.domain.shared.CongestionLevel
+import org.around.ieuri.tourism.domain.congestion.CommercialActivityLevel
+import org.around.ieuri.tourism.domain.congestion.CongestionLevel
 import java.time.LocalDateTime
 import kotlin.test.Test
 import kotlin.test.assertEquals

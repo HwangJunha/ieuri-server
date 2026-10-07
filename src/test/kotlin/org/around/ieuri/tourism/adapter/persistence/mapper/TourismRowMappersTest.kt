@@ -13,10 +13,10 @@ import org.around.ieuri.tourism.domain.catalog.CatalogStandardValues
 import org.around.ieuri.tourism.domain.catalog.CatalogTranslation
 import org.around.ieuri.tourism.domain.catalog.ReactionType
 import org.around.ieuri.tourism.domain.catalog.SpotReaction
-import org.around.ieuri.tourism.domain.shared.CellImageKind
+import org.around.ieuri.tourism.domain.category.SpotCategory
+import org.around.ieuri.tourism.domain.footprint.CellImageKind
 import org.around.ieuri.tourism.domain.shared.CopyrightType
 import org.around.ieuri.tourism.domain.shared.DomainLocale
-import org.around.ieuri.tourism.domain.shared.SpotCategory
 import org.jetbrains.exposed.v1.core.InternalApi
 import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.Table

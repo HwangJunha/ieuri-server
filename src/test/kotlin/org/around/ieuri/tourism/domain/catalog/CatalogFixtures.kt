@@ -1,8 +1,8 @@
 package org.around.ieuri.tourism.domain.catalog
 
+import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.CopyrightType
 import org.around.ieuri.tourism.domain.shared.DomainLocale
-import org.around.ieuri.tourism.domain.shared.SpotCategory
 
 internal const val THUMB = "https://img/1.jpg"
 internal const val MAP_X = 129.1234

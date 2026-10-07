@@ -2,16 +2,17 @@ package org.around.ieuri.tourism.adapter.persistence
 
 import org.around.ieuri.common.persistence.setFromInsert
 import org.around.ieuri.common.persistence.touchedWhenChanged
+import org.around.ieuri.tourism.adapter.persistence.mapper.writeSpendingIntensityTo
+import org.around.ieuri.tourism.adapter.persistence.mapper.writeStayIntensityTo
 import org.around.ieuri.tourism.adapter.persistence.mapper.writeTo
 import org.around.ieuri.tourism.adapter.persistence.table.KtoConcentrationRateTable
-import org.around.ieuri.tourism.adapter.persistence.table.KtoDemandIntensityTable
 import org.around.ieuri.tourism.adapter.persistence.table.KtoSpendingIntensityTable
 import org.around.ieuri.tourism.adapter.persistence.table.KtoStayIntensityTable
 import org.around.ieuri.tourism.adapter.persistence.table.KtoVisitorCountTable
-import org.around.ieuri.tourism.application.shared.provided.dto.SyncConcentrationRateCommand
-import org.around.ieuri.tourism.application.shared.provided.dto.SyncDemandIntensityCommand
-import org.around.ieuri.tourism.application.shared.provided.dto.SyncVisitorCountCommand
-import org.around.ieuri.tourism.application.shared.required.RegionMetricStorePort
+import org.around.ieuri.tourism.application.region.provided.dto.SyncConcentrationRateCommand
+import org.around.ieuri.tourism.application.region.provided.dto.SyncDemandIntensityCommand
+import org.around.ieuri.tourism.application.region.provided.dto.SyncVisitorCountCommand
+import org.around.ieuri.tourism.application.region.required.RegionMetricStorePort
 import org.jetbrains.exposed.v1.jdbc.batchUpsert
 import org.springframework.stereotype.Component
 
@@ -53,22 +54,34 @@ class RegionMetricPersistenceAdapter : RegionMetricStorePort {
         return records.size
     }
 
-    override fun upsertStayIntensities(records: List<SyncDemandIntensityCommand>): Int = upsertDemandIntensity(KtoStayIntensityTable, records)
-
-    override fun upsertSpendingIntensities(records: List<SyncDemandIntensityCommand>): Int = upsertDemandIntensity(KtoSpendingIntensityTable, records)
-
-    private fun upsertDemandIntensity(table: KtoDemandIntensityTable, records: List<SyncDemandIntensityCommand>): Int {
-        table.batchUpsert(
+    override fun upsertStayIntensities(records: List<SyncDemandIntensityCommand>): Int {
+        KtoStayIntensityTable.batchUpsert(
             records,
-            table.districtCode,
-            table.baseMonth,
-            table.indicatorCode,
+            KtoStayIntensityTable.districtCode,
+            KtoStayIntensityTable.baseMonth,
+            KtoStayIntensityTable.indicatorCode,
             shouldReturnGeneratedValues = false,
             onUpdate = {
-                it.setFromInsert(table.indicatorValue)
-                it[table.updatedAt] = touchedWhenChanged(table.updatedAt, listOf(table.indicatorValue))
+                it.setFromInsert(KtoStayIntensityTable.indicatorValue)
+                it[KtoStayIntensityTable.updatedAt] = touchedWhenChanged(KtoStayIntensityTable.updatedAt, listOf(KtoStayIntensityTable.indicatorValue))
             },
-        ) { it.writeTo(this, table) }
+        ) { it.writeStayIntensityTo(this) }
+        return records.size
+    }
+
+    override fun upsertSpendingIntensities(records: List<SyncDemandIntensityCommand>): Int {
+        KtoSpendingIntensityTable.batchUpsert(
+            records,
+            KtoSpendingIntensityTable.districtCode,
+            KtoSpendingIntensityTable.baseMonth,
+            KtoSpendingIntensityTable.indicatorCode,
+            shouldReturnGeneratedValues = false,
+            onUpdate = {
+                it.setFromInsert(KtoSpendingIntensityTable.indicatorValue)
+                it[KtoSpendingIntensityTable.updatedAt] =
+                    touchedWhenChanged(KtoSpendingIntensityTable.updatedAt, listOf(KtoSpendingIntensityTable.indicatorValue))
+            },
+        ) { it.writeSpendingIntensityTo(this) }
         return records.size
     }
 }

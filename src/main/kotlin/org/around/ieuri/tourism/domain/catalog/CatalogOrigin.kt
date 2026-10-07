@@ -1,8 +1,8 @@
 package org.around.ieuri.tourism.domain.catalog
 
+import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.CopyrightType
 import org.around.ieuri.tourism.domain.shared.DomainLocale
-import org.around.ieuri.tourism.domain.shared.SpotCategory
 
 /** 카탈로그에 붙는(또는 붙을) 언어별 원본 spot 한 건. 판정에 필요한 값만 담는다. */
 data class CatalogOrigin(

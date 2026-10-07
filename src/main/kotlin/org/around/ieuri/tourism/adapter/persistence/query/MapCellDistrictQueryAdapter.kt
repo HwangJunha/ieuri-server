@@ -1,7 +1,7 @@
 package org.around.ieuri.tourism.adapter.persistence.query
 
 import org.around.ieuri.tourism.adapter.persistence.table.MapCellDistrictTable
-import org.around.ieuri.tourism.application.shared.required.MapCellDistrictQueryPort
+import org.around.ieuri.tourism.application.footprint.required.MapCellDistrictQueryPort
 import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.jdbc.select
 import org.springframework.stereotype.Component

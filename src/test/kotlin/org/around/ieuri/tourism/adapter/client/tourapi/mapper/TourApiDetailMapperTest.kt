@@ -3,8 +3,8 @@ package org.around.ieuri.tourism.adapter.client.tourapi.mapper
 import org.around.ieuri.tourism.adapter.client.tourapi.TourApiDetailCommonResponse
 import org.around.ieuri.tourism.adapter.client.tourapi.TourApiDetailImageResponse
 import org.around.ieuri.tourism.adapter.client.tourapi.TourApiDetailIntroResponse
+import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.CopyrightType
-import org.around.ieuri.tourism.domain.shared.SpotCategory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

@@ -9,14 +9,13 @@ import org.around.ieuri.tourism.adapter.persistence.mapper.toRegionRow
 import org.around.ieuri.tourism.adapter.persistence.table.AreaTable
 import org.around.ieuri.tourism.adapter.persistence.table.DistrictTable
 import org.around.ieuri.tourism.adapter.persistence.table.KtoConcentrationRateTable
-import org.around.ieuri.tourism.adapter.persistence.table.KtoDemandIntensityTable
 import org.around.ieuri.tourism.adapter.persistence.table.KtoSpendingIntensityTable
 import org.around.ieuri.tourism.adapter.persistence.table.KtoStayIntensityTable
 import org.around.ieuri.tourism.adapter.persistence.table.KtoVisitorCountTable
-import org.around.ieuri.tourism.application.shared.provided.dto.OriginDistrict
-import org.around.ieuri.tourism.application.shared.provided.dto.RegionMetric
-import org.around.ieuri.tourism.application.shared.provided.dto.RegionRow
-import org.around.ieuri.tourism.application.shared.required.RegionMetricQueryPort
+import org.around.ieuri.tourism.application.region.provided.dto.OriginDistrict
+import org.around.ieuri.tourism.application.region.provided.dto.RegionMetric
+import org.around.ieuri.tourism.application.region.provided.dto.RegionRow
+import org.around.ieuri.tourism.application.region.required.RegionMetricQueryPort
 import org.around.ieuri.tourism.domain.shared.Coordinates
 import org.jetbrains.exposed.v1.core.CustomFunction
 import org.jetbrains.exposed.v1.core.CustomOperator
@@ -74,13 +73,13 @@ class RegionMetricQueryAdapter : RegionMetricQueryPort {
 
     /** 그 시도 시군구별 오늘 예측 집중률의 평균. 오늘 행이 없으면 다른 날로 밀지 않고 결측이다(R14). */
     override fun findConcentrationRates(provinceCode: String): Map<String, RegionMetric> {
-        val k = KtoConcentrationRateTable
-        val value = average(k.concentrationRate)
-        return k.join(DistrictTable, JoinType.INNER, DistrictTable.code, k.districtCode)
-            .select(k.districtCode, value)
-            .where { (DistrictTable.areaCd eq provinceCode) and (k.targetDate eq today()) }
-            .groupBy(k.districtCode)
-            .associate { it[k.districtCode] to RegionMetric(rawValue = it[value]) }
+        val averageRate = average(KtoConcentrationRateTable.concentrationRate)
+        return KtoConcentrationRateTable
+            .join(DistrictTable, JoinType.INNER, DistrictTable.code, KtoConcentrationRateTable.districtCode)
+            .select(KtoConcentrationRateTable.districtCode, averageRate)
+            .where { (DistrictTable.areaCd eq provinceCode) and (KtoConcentrationRateTable.targetDate eq today()) }
+            .groupBy(KtoConcentrationRateTable.districtCode)
+            .associate { it[KtoConcentrationRateTable.districtCode] to RegionMetric(rawValue = it[averageRate]) }
     }
 
     /**
@@ -88,48 +87,51 @@ class RegionMetricQueryAdapter : RegionMetricQueryPort {
      * - 7일은 지역별 최신 기준일에서 되짚는다. 일별 합계를 낸 뒤 평균한다 — 순서가 뒤집히면 구분별 평균이 된다.
      */
     override fun findVisitorCounts(provinceCode: String): Map<String, RegionMetric> {
-        val k = KtoVisitorCountTable
-        val m = KtoVisitorCountTable.alias("latest")
-        val windowStart = CustomOperator<LocalDate>(
-            "-",
-            JavaLocalDateColumnType(),
-            wrapAsExpression<LocalDate>(m.select(m[k.baseDate].max()).where { m[k.districtCode] eq k.districtCode }),
-            intLiteral(VISITOR_WINDOW_DAYS),
+        val visitors = KtoVisitorCountTable
+        val sameDistrictVisitors = KtoVisitorCountTable.alias("same_district")
+        val latestBaseDate = wrapAsExpression<LocalDate>(
+            sameDistrictVisitors.select(sameDistrictVisitors[visitors.baseDate].max())
+                .where { sameDistrictVisitors[visitors.districtCode] eq visitors.districtCode },
         )
-        val dayTotal = k.touristCount.sum().alias("day_total")
-        val daily = k.join(DistrictTable, JoinType.INNER, DistrictTable.code, k.districtCode)
-            .select(k.districtCode, k.baseDate, dayTotal)
-            .where { (DistrictTable.areaCd eq provinceCode) and (k.visitorType inList VISITOR_TYPES) and (k.baseDate greater windowStart) }
-            .groupBy(k.districtCode, k.baseDate)
-            .alias("daily")
+        val windowStart = CustomOperator<LocalDate>("-", JavaLocalDateColumnType(), latestBaseDate, intLiteral(VISITOR_WINDOW_DAYS))
+        val dailyTotal = visitors.touristCount.sum().alias("daily_total")
+        val dailyVisitors = visitors.join(DistrictTable, JoinType.INNER, DistrictTable.code, visitors.districtCode)
+            .select(visitors.districtCode, visitors.baseDate, dailyTotal)
+            .where { (DistrictTable.areaCd eq provinceCode) and (visitors.visitorType inList VISITOR_TYPES) and (visitors.baseDate greater windowStart) }
+            .groupBy(visitors.districtCode, visitors.baseDate)
+            .alias("daily_visitors")
 
-        val value = average(daily[dayTotal])
-        val latest = daily[k.baseDate].max()
+        val districtCode = dailyVisitors[visitors.districtCode]
+        val averageDailyVisitors = average(dailyVisitors[dailyTotal])
+        val latestDay = dailyVisitors[visitors.baseDate].max()
         val today = today()
-        return daily.select(daily[k.districtCode], value, latest)
-            .groupBy(daily[k.districtCode])
+        return dailyVisitors.select(districtCode, averageDailyVisitors, latestDay)
+            .groupBy(districtCode)
             .associate { row ->
-                row[daily[k.districtCode]] to RegionMetric(
-                    rawValue = row[value],
-                    ageDays = row[latest]?.let { ChronoUnit.DAYS.between(it, today) },
+                row[districtCode] to RegionMetric(
+                    rawValue = row[averageDailyVisitors],
+                    ageDays = row[latestDay]?.let { ChronoUnit.DAYS.between(it, today) },
                 )
             }
     }
 
     /** 그 시도 시군구별 최신 월 체류 강도. 월 단위라 수십 일 지난 값이 정상이다. */
-    override fun findStayIntensities(provinceCode: String): Map<String, RegionMetric> = findLatestMonthly(KtoStayIntensityTable, provinceCode)
+    override fun findStayIntensities(provinceCode: String): Map<String, RegionMetric> = KtoStayIntensityTable
+        .join(DistrictTable, JoinType.INNER, DistrictTable.code, KtoStayIntensityTable.districtCode)
+        .select(KtoStayIntensityTable.districtCode, KtoStayIntensityTable.indicatorValue)
+        .where { DistrictTable.areaCd eq provinceCode }
+        .withDistinctOn(KtoStayIntensityTable.districtCode to SortOrder.ASC)
+        .orderBy(KtoStayIntensityTable.districtCode to SortOrder.ASC, KtoStayIntensityTable.baseMonth to SortOrder.DESC)
+        .associate { it[KtoStayIntensityTable.districtCode] to RegionMetric(rawValue = it[KtoStayIntensityTable.indicatorValue].toDouble()) }
 
     /** 그 시도 시군구별 최신 월 소비 강도. 외지인 소비 기준이며 외국인 소비는 포함하지 않는다. */
-    override fun findSpendingIntensities(provinceCode: String): Map<String, RegionMetric> = findLatestMonthly(KtoSpendingIntensityTable, provinceCode)
-
-    /** 월 지표 공통 형태 — 그 시도의 지역마다 자기 최신 월 1행. */
-    private fun findLatestMonthly(table: KtoDemandIntensityTable, provinceCode: String): Map<String, RegionMetric> = table
-        .join(DistrictTable, JoinType.INNER, DistrictTable.code, table.districtCode)
-        .select(table.districtCode, table.indicatorValue)
+    override fun findSpendingIntensities(provinceCode: String): Map<String, RegionMetric> = KtoSpendingIntensityTable
+        .join(DistrictTable, JoinType.INNER, DistrictTable.code, KtoSpendingIntensityTable.districtCode)
+        .select(KtoSpendingIntensityTable.districtCode, KtoSpendingIntensityTable.indicatorValue)
         .where { DistrictTable.areaCd eq provinceCode }
-        .withDistinctOn(table.districtCode to SortOrder.ASC)
-        .orderBy(table.districtCode to SortOrder.ASC, table.baseMonth to SortOrder.DESC)
-        .associate { it[table.districtCode] to RegionMetric(rawValue = it[table.indicatorValue].toDouble()) }
+        .withDistinctOn(KtoSpendingIntensityTable.districtCode to SortOrder.ASC)
+        .orderBy(KtoSpendingIntensityTable.districtCode to SortOrder.ASC, KtoSpendingIntensityTable.baseMonth to SortOrder.DESC)
+        .associate { it[KtoSpendingIntensityTable.districtCode] to RegionMetric(rawValue = it[KtoSpendingIntensityTable.indicatorValue].toDouble()) }
 
     /** `AVG(expr)`를 실수로 읽는다 — Exposed의 `avg()`는 소수 둘째 자리에서 자른다. */
     private fun average(expression: Expression<*>): ExpressionWithColumnType<Double> = CustomFunction("AVG", DoubleColumnType(), expression)

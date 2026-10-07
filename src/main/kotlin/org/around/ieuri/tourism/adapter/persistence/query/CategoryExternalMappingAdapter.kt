@@ -2,8 +2,8 @@ package org.around.ieuri.tourism.adapter.persistence.query
 
 import org.around.ieuri.tourism.adapter.persistence.table.CategoryExternalMappingTable
 import org.around.ieuri.tourism.adapter.persistence.table.CategoryTable
-import org.around.ieuri.tourism.application.shared.required.CategoryExternalMappingPort
-import org.around.ieuri.tourism.domain.shared.SpotCategory
+import org.around.ieuri.tourism.application.category.required.CategoryExternalMappingPort
+import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.jetbrains.exposed.v1.core.JoinType
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq

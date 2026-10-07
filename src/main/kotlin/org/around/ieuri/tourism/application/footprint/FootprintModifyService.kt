@@ -1,21 +1,21 @@
 package org.around.ieuri.tourism.application.footprint
 
 import org.around.ieuri.common.persistence.ExposedConfig
+import org.around.ieuri.tourism.application.footprint.NationwideMapPolicy
 import org.around.ieuri.tourism.application.footprint.provided.FootprintCommandUseCase
+import org.around.ieuri.tourism.application.footprint.provided.dto.MapShareLinkView
 import org.around.ieuri.tourism.application.footprint.provided.dto.RecordVisitsCommand
 import org.around.ieuri.tourism.application.footprint.provided.dto.RecordVisitsResult
 import org.around.ieuri.tourism.application.footprint.provided.dto.RemoveVisitCommand
 import org.around.ieuri.tourism.application.footprint.provided.dto.RemoveVisitResult
+import org.around.ieuri.tourism.application.footprint.provided.dto.toView
 import org.around.ieuri.tourism.application.footprint.required.FootprintQueryPort
 import org.around.ieuri.tourism.application.footprint.required.FootprintRepository
-import org.around.ieuri.tourism.application.shared.NationwideMapPolicy
-import org.around.ieuri.tourism.application.shared.provided.dto.MapShareLinkView
-import org.around.ieuri.tourism.application.shared.provided.dto.toView
-import org.around.ieuri.tourism.application.shared.required.MapCellDistrictQueryPort
-import org.around.ieuri.tourism.application.shared.required.MapCellQueryPort
+import org.around.ieuri.tourism.application.footprint.required.MapCellDistrictQueryPort
+import org.around.ieuri.tourism.application.footprint.required.MapCellQueryPort
+import org.around.ieuri.tourism.domain.footprint.MapCellGrouping
 import org.around.ieuri.tourism.domain.footprint.ShareToken
 import org.around.ieuri.tourism.domain.shared.DomainLocale
-import org.around.ieuri.tourism.domain.shared.MapCellGrouping
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional

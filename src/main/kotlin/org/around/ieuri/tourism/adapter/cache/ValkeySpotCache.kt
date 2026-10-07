@@ -3,8 +3,7 @@ package org.around.ieuri.tourism.adapter.cache
 import org.around.ieuri.tourism.application.spot.required.CachedDetail
 import org.around.ieuri.tourism.application.spot.required.CachedIntro
 import org.around.ieuri.tourism.application.spot.required.SpotCachePort
-import org.around.ieuri.tourism.domain.shared.DomainLocale
-import org.around.ieuri.tourism.domain.shared.SpotCategory
+import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.spot.SpotDetail
 import org.around.ieuri.tourism.domain.spot.SpotImage
 import org.around.ieuri.tourism.domain.spot.SpotInfoItem

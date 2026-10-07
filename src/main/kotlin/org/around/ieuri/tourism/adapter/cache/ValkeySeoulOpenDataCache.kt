@@ -1,15 +1,15 @@
 package org.around.ieuri.tourism.adapter.cache
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
-import org.around.ieuri.tourism.application.shared.provided.dto.CulturalEventView
-import org.around.ieuri.tourism.application.shared.required.CachedSeoulOpenData
-import org.around.ieuri.tourism.application.shared.required.SeoulOpenDataCachePort
-import org.around.ieuri.tourism.application.shared.required.SeoulOpenDataSnapshot
-import org.around.ieuri.tourism.domain.shared.CommercialActivityLevel
-import org.around.ieuri.tourism.domain.shared.CommercialStatus
-import org.around.ieuri.tourism.domain.shared.CongestionForecast
-import org.around.ieuri.tourism.domain.shared.CongestionLevel
-import org.around.ieuri.tourism.domain.shared.CongestionSnapshot
+import org.around.ieuri.tourism.application.congestion.provided.dto.CulturalEventView
+import org.around.ieuri.tourism.application.congestion.required.CachedSeoulOpenData
+import org.around.ieuri.tourism.application.congestion.required.SeoulOpenDataCachePort
+import org.around.ieuri.tourism.application.congestion.required.SeoulOpenDataSnapshot
+import org.around.ieuri.tourism.domain.congestion.CommercialActivityLevel
+import org.around.ieuri.tourism.domain.congestion.CommercialStatus
+import org.around.ieuri.tourism.domain.congestion.CongestionForecast
+import org.around.ieuri.tourism.domain.congestion.CongestionLevel
+import org.around.ieuri.tourism.domain.congestion.CongestionSnapshot
 import org.slf4j.LoggerFactory
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Component

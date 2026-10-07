@@ -1,6 +1,6 @@
 package org.around.ieuri.tourism.domain.spot
 
-import org.around.ieuri.tourism.domain.shared.SpotCategory
+import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.junit.jupiter.api.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue

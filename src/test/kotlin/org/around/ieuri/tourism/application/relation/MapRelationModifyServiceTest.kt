@@ -3,11 +3,11 @@ package org.around.ieuri.tourism.application.relation
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import org.around.ieuri.tourism.application.footprint.provided.exception.ShareLinkBlockedException
+import org.around.ieuri.tourism.application.footprint.provided.exception.ShareLinkNotFoundException
 import org.around.ieuri.tourism.application.footprint.required.FootprintQueryPort
+import org.around.ieuri.tourism.application.footprint.required.MapViewerBlockPort
 import org.around.ieuri.tourism.application.relation.required.MapRelationRepository
-import org.around.ieuri.tourism.application.shared.provided.exception.ShareLinkBlockedException
-import org.around.ieuri.tourism.application.shared.provided.exception.ShareLinkNotFoundException
-import org.around.ieuri.tourism.application.shared.required.MapViewerBlockPort
 import org.around.ieuri.tourism.domain.relation.CannotRelateSelfException
 import org.around.ieuri.tourism.domain.relation.MapRelation
 import org.junit.jupiter.api.Test

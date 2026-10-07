@@ -8,8 +8,8 @@ import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.tourism.adapter.graphql.mapper.toCategorySelection
 import org.around.ieuri.tourism.adapter.graphql.mapper.toGql
 import org.around.ieuri.tourism.adapter.graphql.support.domainLocale
-import org.around.ieuri.tourism.application.shared.provided.RecommendedSpotsUseCase
-import org.around.ieuri.tourism.application.shared.provided.dto.RecommendedSpotsQuery
+import org.around.ieuri.tourism.application.recommendation.provided.RecommendedSpotsUseCase
+import org.around.ieuri.tourism.application.recommendation.provided.dto.RecommendedSpotsQuery
 import org.around.ieuri.common.graphql.generated.types.Spot as GqlSpot
 
 /**

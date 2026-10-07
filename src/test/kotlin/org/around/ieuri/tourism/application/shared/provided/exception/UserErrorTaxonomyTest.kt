@@ -14,7 +14,7 @@ import org.around.ieuri.auth.infrastructure.adapter.`in`.graphql.toUserErrorOrNu
 import org.around.ieuri.common.security.UnauthorizedException
 import org.around.ieuri.tourism.adapter.graphql.support.toReactionUserErrorOrNull
 import org.around.ieuri.tourism.application.catalog.provided.exception.SpotNotFoundException
-import org.around.ieuri.tourism.domain.shared.ReactionUserException
+import org.around.ieuri.tourism.domain.catalog.ReactionUserException
 import kotlin.test.Test
 import kotlin.test.assertNull
 import kotlin.test.assertTrue

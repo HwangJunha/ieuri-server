@@ -3,7 +3,7 @@ package org.around.ieuri.tourism.adapter.client.seoulopendata
 import io.mockk.mockk
 import org.around.ieuri.tourism.adapter.client.seoulopendata.mapper.toSnapshotOrNull
 import org.around.ieuri.tourism.adapter.config.SeoulOpenDataProperties
-import org.around.ieuri.tourism.domain.shared.CongestionLevel
+import org.around.ieuri.tourism.domain.congestion.CongestionLevel
 import org.springframework.web.client.RestClient
 import kotlin.test.Test
 import kotlin.test.assertEquals

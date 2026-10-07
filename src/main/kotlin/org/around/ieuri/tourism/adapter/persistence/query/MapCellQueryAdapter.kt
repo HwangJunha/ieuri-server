@@ -12,11 +12,11 @@ import org.around.ieuri.tourism.adapter.persistence.table.MapCellTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotCatalogTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotCatalogTranslationTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotReactionTable
-import org.around.ieuri.tourism.application.shared.provided.dto.CellSpotView
-import org.around.ieuri.tourism.application.shared.required.MapCellQueryPort
+import org.around.ieuri.tourism.application.footprint.provided.dto.CellSpotView
+import org.around.ieuri.tourism.application.footprint.required.MapCellQueryPort
 import org.around.ieuri.tourism.domain.catalog.ReactionType
+import org.around.ieuri.tourism.domain.footprint.MapCellDistrictRow
 import org.around.ieuri.tourism.domain.shared.DomainLocale
-import org.around.ieuri.tourism.domain.shared.MapCellDistrictRow
 import org.jetbrains.exposed.v1.core.JoinType
 import org.jetbrains.exposed.v1.core.Op
 import org.jetbrains.exposed.v1.core.SortOrder

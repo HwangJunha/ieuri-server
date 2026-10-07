@@ -2,9 +2,9 @@ package org.around.ieuri.tourism.adapter.client.tourapi.mapper
 
 import org.around.ieuri.tourism.adapter.client.tourapi.TourApiFestivalResponse
 import org.around.ieuri.tourism.adapter.client.tourapi.TourApiResponse
+import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.CopyrightType
 import org.around.ieuri.tourism.domain.shared.DomainLocale
-import org.around.ieuri.tourism.domain.shared.SpotCategory
 import java.time.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals

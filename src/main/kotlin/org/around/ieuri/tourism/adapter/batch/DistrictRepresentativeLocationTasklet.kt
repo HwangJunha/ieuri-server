@@ -1,6 +1,6 @@
 package org.around.ieuri.tourism.adapter.batch
 
-import org.around.ieuri.tourism.application.shared.provided.DistrictRepresentativeUseCase
+import org.around.ieuri.tourism.application.region.provided.DistrictRepresentativeUseCase
 import org.slf4j.LoggerFactory
 import org.springframework.batch.core.scope.context.ChunkContext
 import org.springframework.batch.core.step.StepContribution

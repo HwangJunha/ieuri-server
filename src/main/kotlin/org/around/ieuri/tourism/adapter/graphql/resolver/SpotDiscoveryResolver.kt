@@ -10,12 +10,12 @@ import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.tourism.adapter.graphql.mapper.toCategorySelection
 import org.around.ieuri.tourism.adapter.graphql.support.domainLocale
-import org.around.ieuri.tourism.application.shared.provided.SpotDiscoveryUseCase
-import org.around.ieuri.tourism.application.shared.provided.dto.FestivalView
-import org.around.ieuri.tourism.application.shared.provided.dto.OngoingFestivalsQuery
-import org.around.ieuri.tourism.application.shared.provided.dto.PopularSpotsQuery
-import org.around.ieuri.tourism.application.shared.provided.dto.SearchSpotsQuery
-import org.around.ieuri.tourism.application.shared.provided.dto.SpotView
+import org.around.ieuri.tourism.application.catalog.provided.SpotDiscoveryUseCase
+import org.around.ieuri.tourism.application.catalog.provided.dto.FestivalView
+import org.around.ieuri.tourism.application.catalog.provided.dto.OngoingFestivalsQuery
+import org.around.ieuri.tourism.application.catalog.provided.dto.PopularSpotsQuery
+import org.around.ieuri.tourism.application.catalog.provided.dto.SearchSpotsQuery
+import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
 import org.around.ieuri.tourism.application.shared.required.TourismEventPublisherPort
 import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
 import org.around.ieuri.common.graphql.generated.types.Festival as GqlFestival

@@ -1,7 +1,7 @@
 package org.around.ieuri.tourism.adapter.graphql.support
 
 import org.around.ieuri.common.graphql.generated.types.UserError
-import org.around.ieuri.tourism.application.shared.provided.dto.MapCellView
+import org.around.ieuri.tourism.application.footprint.provided.dto.MapCellView
 
 /**
  * 방문 뮤테이션의 응답 타입. 코드젠 `RecordVisitsPayload` 대신 읽기 DTO([MapCellView])를 담아 지연 필드를 살린다.

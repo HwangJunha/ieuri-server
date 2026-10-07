@@ -74,16 +74,16 @@ class SpotCatalogQueryAdapter : SpotCatalogQueryPort {
             .where { SpotTable.catalogId.isNotNull() }
             .groupBy(SpotTable.catalogId)
             .having { SpotTable.id.count() greater minOriginCount.toLong() }
-        val a = SpotTable.alias("a")
-        val b = SpotTable.alias("b")
-        val farthest = stDistance(a[SpotTable.location], b[SpotTable.location]).max()
-        return a.join(b, JoinType.INNER, additionalConstraint = { (b[SpotTable.catalogId] eq a[SpotTable.catalogId]) and (b[SpotTable.id] greater a[SpotTable.id]) })
-            .select(a[SpotTable.catalogId])
-            .where { a[SpotTable.catalogId] inSubQuery crowded }
-            .groupBy(a[SpotTable.catalogId])
-            .having { farthest greaterEq minDistanceMeters }
-            .orderBy(a[SpotTable.catalogId], SortOrder.ASC)
-            .map { requireNotNull(it[a[SpotTable.catalogId]]) }
+        val origin = SpotTable.alias("origin")
+        val other = SpotTable.alias("other_origin")
+        val farthestApart = stDistance(origin[SpotTable.location], other[SpotTable.location]).max()
+        return origin.join(other, JoinType.INNER, additionalConstraint = { (other[SpotTable.catalogId] eq origin[SpotTable.catalogId]) and (other[SpotTable.id] greater origin[SpotTable.id]) })
+            .select(origin[SpotTable.catalogId])
+            .where { origin[SpotTable.catalogId] inSubQuery crowded }
+            .groupBy(origin[SpotTable.catalogId])
+            .having { farthestApart greaterEq minDistanceMeters }
+            .orderBy(origin[SpotTable.catalogId], SortOrder.ASC)
+            .map { requireNotNull(it[origin[SpotTable.catalogId]]) }
     }
 
     /** 대표 선정과 군집 결과가 실행마다 같도록 언어 순서(KO→EN→JA→ZH), 같은 언어면 id 순으로 돌려준다. */

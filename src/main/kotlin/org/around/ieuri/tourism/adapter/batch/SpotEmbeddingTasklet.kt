@@ -1,6 +1,6 @@
 package org.around.ieuri.tourism.adapter.batch
 
-import org.around.ieuri.tourism.application.shared.provided.SpotEmbeddingSyncUseCase
+import org.around.ieuri.tourism.application.recommendation.provided.SpotEmbeddingSyncUseCase
 import org.slf4j.LoggerFactory
 import org.springframework.batch.core.scope.context.ChunkContext
 import org.springframework.batch.core.step.StepContribution

@@ -1,7 +1,7 @@
 package org.around.ieuri.tourism.domain.catalog
 
+import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.CopyrightType
-import org.around.ieuri.tourism.domain.shared.SpotCategory
 
 /**
  * 카탈로그의 언어 무관 표준값 — 조회가 카드에 쓰는 값이다.

@@ -1,12 +1,12 @@
 package org.around.ieuri.tourism.adapter.persistence.query
 
-import org.around.ieuri.tourism.application.shared.provided.dto.PopularSpotView
-import org.around.ieuri.tourism.application.shared.provided.dto.SpotView
-import org.around.ieuri.tourism.application.shared.required.PopularSpotQueryPort
-import org.around.ieuri.tourism.application.shared.required.PopularSpotSearch
+import org.around.ieuri.tourism.application.catalog.provided.dto.PopularSpotView
+import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
+import org.around.ieuri.tourism.application.catalog.required.PopularSpotQueryPort
+import org.around.ieuri.tourism.application.catalog.required.PopularSpotSearch
 import org.around.ieuri.tourism.domain.catalog.ReactionType
+import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.CopyrightType
-import org.around.ieuri.tourism.domain.shared.SpotCategory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Component

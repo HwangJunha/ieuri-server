@@ -15,7 +15,7 @@ import org.around.ieuri.tourism.application.spot.required.SpotDetailPart
 import org.around.ieuri.tourism.application.spot.required.SpotDetailQueryPort
 import org.around.ieuri.tourism.application.spot.required.StoredDetail
 import org.around.ieuri.tourism.application.spot.required.StoredIntro
-import org.around.ieuri.tourism.domain.shared.SpotCategory
+import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.spot.SpotImage
 import org.around.ieuri.tourism.domain.spot.SpotInfoItem
 import org.jetbrains.exposed.v1.core.Column

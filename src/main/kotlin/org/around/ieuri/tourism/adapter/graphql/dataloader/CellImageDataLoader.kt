@@ -1,8 +1,8 @@
 package org.around.ieuri.tourism.adapter.graphql.dataloader
 
 import com.netflix.graphql.dgs.DgsDataLoader
-import org.around.ieuri.tourism.application.shared.provided.NationwideMapUseCase
-import org.around.ieuri.tourism.application.shared.provided.dto.CellImageView
+import org.around.ieuri.tourism.application.footprint.provided.FootprintQueryUseCase
+import org.around.ieuri.tourism.application.footprint.provided.dto.CellImageView
 import org.dataloader.MappedBatchLoader
 import org.springframework.stereotype.Component
 import java.util.concurrent.CompletableFuture
@@ -16,7 +16,7 @@ import java.util.concurrent.CompletionStage
 @DgsDataLoader(name = CellImageDataLoader.NAME)
 @Component
 class CellImageDataLoader(
-    private val nationwideMapUseCase: NationwideMapUseCase,
+    private val nationwideMapUseCase: FootprintQueryUseCase,
 ) : MappedBatchLoader<Long, CellImageView> {
 
     override fun load(cellIds: Set<Long>): CompletionStage<Map<Long, CellImageView>> = // 부재 키를 채우지 않는다.

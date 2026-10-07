@@ -3,8 +3,8 @@ package org.around.ieuri.tourism.application.spot
 import io.mockk.mockk
 import io.mockk.verify
 import org.around.ieuri.tourism.application.spot.required.SpotRepository
+import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.CopyrightType
-import org.around.ieuri.tourism.domain.shared.SpotCategory
 import org.around.ieuri.tourism.domain.spot.SpotDetail
 import org.around.ieuri.tourism.domain.spot.SpotImage
 import org.around.ieuri.tourism.domain.spot.SpotInfoItem

@@ -6,9 +6,9 @@ import org.around.ieuri.tourism.adapter.persistence.mapper.toCategoryDisplay
 import org.around.ieuri.tourism.adapter.persistence.table.AppCategoryTable
 import org.around.ieuri.tourism.adapter.persistence.table.CategoryTable
 import org.around.ieuri.tourism.adapter.persistence.table.CategoryTranslationTable
-import org.around.ieuri.tourism.application.shared.provided.dto.AppCategoryView
-import org.around.ieuri.tourism.application.shared.provided.dto.CategoryDisplay
-import org.around.ieuri.tourism.application.shared.required.AppCategoryQueryPort
+import org.around.ieuri.tourism.application.category.provided.dto.AppCategoryView
+import org.around.ieuri.tourism.application.category.provided.dto.CategoryDisplay
+import org.around.ieuri.tourism.application.category.required.AppCategoryQueryPort
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.jetbrains.exposed.v1.core.JoinType
 import org.jetbrains.exposed.v1.core.SortOrder

@@ -2,8 +2,8 @@ package org.around.ieuri.tourism.adapter.client.seoulopendata
 
 import org.around.ieuri.tourism.adapter.client.seoulopendata.mapper.toSnapshotOrNull
 import org.around.ieuri.tourism.adapter.config.SeoulOpenDataProperties
-import org.around.ieuri.tourism.application.shared.required.SeoulOpenDataPort
-import org.around.ieuri.tourism.application.shared.required.SeoulOpenDataSnapshot
+import org.around.ieuri.tourism.application.congestion.required.SeoulOpenDataPort
+import org.around.ieuri.tourism.application.congestion.required.SeoulOpenDataSnapshot
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient

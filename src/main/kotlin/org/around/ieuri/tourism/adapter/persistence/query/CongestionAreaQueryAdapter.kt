@@ -7,8 +7,8 @@ import org.around.ieuri.common.persistence.stAsGeoJson
 import org.around.ieuri.common.persistence.stIntersects
 import org.around.ieuri.tourism.adapter.persistence.mapper.toCongestionAreaName
 import org.around.ieuri.tourism.adapter.persistence.table.CongestionAreaTable
-import org.around.ieuri.tourism.application.shared.provided.dto.CongestionAreaBoundaryView
-import org.around.ieuri.tourism.application.shared.required.CongestionAreaQueryPort
+import org.around.ieuri.tourism.application.congestion.provided.dto.CongestionAreaBoundaryView
+import org.around.ieuri.tourism.application.congestion.required.CongestionAreaQueryPort
 import org.around.ieuri.tourism.domain.shared.AreaName
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.shared.MapBounds

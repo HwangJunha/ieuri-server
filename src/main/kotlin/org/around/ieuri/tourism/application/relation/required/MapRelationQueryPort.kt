@@ -1,7 +1,7 @@
 package org.around.ieuri.tourism.application.relation.required
 
 import org.around.ieuri.tourism.application.relation.provided.dto.MapRelationOverlap
-import org.around.ieuri.tourism.domain.shared.RelationCursor
+import org.around.ieuri.tourism.domain.relation.RelationCursor
 
 /** 지도 관계의 읽기 포트(SPEC-0030). */
 interface MapRelationQueryPort {

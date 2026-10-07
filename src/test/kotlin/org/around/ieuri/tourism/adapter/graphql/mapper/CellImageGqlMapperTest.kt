@@ -1,7 +1,7 @@
 package org.around.ieuri.tourism.adapter.graphql.mapper
 
-import org.around.ieuri.tourism.application.shared.provided.dto.CellImageView
-import org.around.ieuri.tourism.domain.shared.CellImageKind
+import org.around.ieuri.tourism.application.footprint.provided.dto.CellImageView
+import org.around.ieuri.tourism.domain.footprint.CellImageKind
 import org.around.ieuri.tourism.domain.shared.CopyrightType
 import kotlin.test.Test
 import kotlin.test.assertEquals

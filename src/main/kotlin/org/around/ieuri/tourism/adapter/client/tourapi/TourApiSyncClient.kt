@@ -2,12 +2,12 @@ package org.around.ieuri.tourism.adapter.client.tourapi
 
 import org.around.ieuri.tourism.adapter.client.tourapi.mapper.toSpotOrNull
 import org.around.ieuri.tourism.adapter.config.TourApiProperties
-import org.around.ieuri.tourism.application.shared.provided.CategoryMappingQueryUseCase
-import org.around.ieuri.tourism.application.shared.required.CategoryExternalMappingPort
+import org.around.ieuri.tourism.application.category.provided.CategoryMappingQueryUseCase
+import org.around.ieuri.tourism.application.category.required.CategoryExternalMappingPort
 import org.around.ieuri.tourism.application.spot.required.SpotSyncPage
 import org.around.ieuri.tourism.application.spot.required.SpotSyncPort
+import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.DomainLocale
-import org.around.ieuri.tourism.domain.shared.SpotCategory
 import org.around.ieuri.tourism.domain.spot.SpotExclusionRule
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient

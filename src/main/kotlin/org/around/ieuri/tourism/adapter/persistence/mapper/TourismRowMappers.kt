@@ -1,7 +1,8 @@
 package org.around.ieuri.tourism.adapter.persistence.mapper
 
 import org.around.ieuri.tourism.adapter.persistence.table.KtoConcentrationRateTable
-import org.around.ieuri.tourism.adapter.persistence.table.KtoDemandIntensityTable
+import org.around.ieuri.tourism.adapter.persistence.table.KtoSpendingIntensityTable
+import org.around.ieuri.tourism.adapter.persistence.table.KtoStayIntensityTable
 import org.around.ieuri.tourism.adapter.persistence.table.KtoVisitorCountTable
 import org.around.ieuri.tourism.adapter.persistence.table.MapShareLinkTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotCatalogTable
@@ -13,18 +14,18 @@ import org.around.ieuri.tourism.adapter.persistence.table.SpotDetailTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotFestivalTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotReactionTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotTable
-import org.around.ieuri.tourism.application.shared.provided.dto.SyncConcentrationRateCommand
-import org.around.ieuri.tourism.application.shared.provided.dto.SyncDemandIntensityCommand
-import org.around.ieuri.tourism.application.shared.provided.dto.SyncVisitorCountCommand
+import org.around.ieuri.tourism.application.region.provided.dto.SyncConcentrationRateCommand
+import org.around.ieuri.tourism.application.region.provided.dto.SyncDemandIntensityCommand
+import org.around.ieuri.tourism.application.region.provided.dto.SyncVisitorCountCommand
 import org.around.ieuri.tourism.domain.catalog.CatalogStandardValues
 import org.around.ieuri.tourism.domain.catalog.CatalogTranslation
 import org.around.ieuri.tourism.domain.catalog.OriginFestivalPeriod
 import org.around.ieuri.tourism.domain.catalog.SpotReaction
+import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.footprint.ShareLink
 import org.around.ieuri.tourism.domain.shared.CopyrightType
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.shared.FestivalPeriod
-import org.around.ieuri.tourism.domain.shared.SpotCategory
 import org.around.ieuri.tourism.domain.spot.Spot
 import org.around.ieuri.tourism.domain.spot.SpotDetail
 import org.around.ieuri.tourism.domain.spot.SpotFestival
@@ -201,10 +202,16 @@ fun SyncConcentrationRateCommand.writeTo(row: UpdateBuilder<*>) {
     row[KtoConcentrationRateTable.concentrationRate] = concentrationRate
 }
 
-/** 체류·소비 강도 공용. 어느 표인지는 [table]이 정한다. */
-fun SyncDemandIntensityCommand.writeTo(row: UpdateBuilder<*>, table: KtoDemandIntensityTable) {
-    row[table.districtCode] = districtCode
-    row[table.baseMonth] = baseMonth
-    row[table.indicatorCode] = indicatorCode
-    row[table.indicatorValue] = indicatorValue
+fun SyncDemandIntensityCommand.writeStayIntensityTo(row: UpdateBuilder<*>) {
+    row[KtoStayIntensityTable.districtCode] = districtCode
+    row[KtoStayIntensityTable.baseMonth] = baseMonth
+    row[KtoStayIntensityTable.indicatorCode] = indicatorCode
+    row[KtoStayIntensityTable.indicatorValue] = indicatorValue
+}
+
+fun SyncDemandIntensityCommand.writeSpendingIntensityTo(row: UpdateBuilder<*>) {
+    row[KtoSpendingIntensityTable.districtCode] = districtCode
+    row[KtoSpendingIntensityTable.baseMonth] = baseMonth
+    row[KtoSpendingIntensityTable.indicatorCode] = indicatorCode
+    row[KtoSpendingIntensityTable.indicatorValue] = indicatorValue
 }

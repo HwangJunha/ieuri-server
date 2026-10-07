@@ -4,8 +4,8 @@ import org.around.ieuri.common.persistence.cosineDistance
 import org.around.ieuri.common.persistence.vectorAvg
 import org.around.ieuri.tourism.adapter.persistence.table.SpotCatalogTranslationTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotEmbeddingTable
-import org.around.ieuri.tourism.application.shared.required.TasteSimilarity
-import org.around.ieuri.tourism.application.shared.required.TasteSimilarityQueryPort
+import org.around.ieuri.tourism.application.recommendation.required.TasteSimilarity
+import org.around.ieuri.tourism.application.recommendation.required.TasteSimilarityQueryPort
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.jetbrains.exposed.v1.core.Expression
 import org.jetbrains.exposed.v1.core.ExpressionWithColumnType
@@ -42,21 +42,21 @@ class TasteSimilarityQueryAdapter : TasteSimilarityQueryPort {
             .select(listOfNotNull(SpotCatalogTranslationTable.catalogId, like, dislike))
             .where { inScope(candidateCatalogIds, language, model) }
             .associate {
-                it[SpotCatalogTranslationTable.catalogId] to TasteSimilarity(like = like?.let { e -> it[e] }, dislike = dislike?.let { e -> it[e] })
+                it[SpotCatalogTranslationTable.catalogId] to TasteSimilarity(like = like?.let { similarity -> it[similarity] }, dislike = dislike?.let { similarity -> it[similarity] })
             }
     }
 
     /** `1 - (후보 벡터 <=> 반응 장소 벡터 평균)`. 반응 장소가 없으면 식이 없다(null). 평균은 상관 없는 서브쿼리라 한 번만 계산된다. */
     private fun similarityTo(catalogIds: Set<Long>, language: DomainLocale, model: String): ExpressionWithColumnType<Double?>? {
         if (catalogIds.isEmpty()) return null
-        val e = SpotEmbeddingTable.alias("centroid_e")
-        val t = SpotCatalogTranslationTable.alias("centroid_t")
+        val reactedEmbedding = SpotEmbeddingTable.alias("reacted_embedding")
+        val reactedTranslation = SpotCatalogTranslationTable.alias("reacted_translation")
         val centroid: Expression<String?> = wrapAsExpression(
-            e.join(t, JoinType.INNER, e[SpotEmbeddingTable.translationId], t[SpotCatalogTranslationTable.id])
-                .select(vectorAvg(e[SpotEmbeddingTable.embedding]))
+            reactedEmbedding.join(reactedTranslation, JoinType.INNER, reactedEmbedding[SpotEmbeddingTable.translationId], reactedTranslation[SpotCatalogTranslationTable.id])
+                .select(vectorAvg(reactedEmbedding[SpotEmbeddingTable.embedding]))
                 .where {
-                    (e[SpotEmbeddingTable.model] eq model) and (t[SpotCatalogTranslationTable.language] eq language.name) and
-                        (t[SpotCatalogTranslationTable.catalogId] eq anyFrom(catalogIds.toList()))
+                    (reactedEmbedding[SpotEmbeddingTable.model] eq model) and (reactedTranslation[SpotCatalogTranslationTable.language] eq language.name) and
+                        (reactedTranslation[SpotCatalogTranslationTable.catalogId] eq anyFrom(catalogIds.toList()))
                 },
         )
         @Suppress("UNCHECKED_CAST")
