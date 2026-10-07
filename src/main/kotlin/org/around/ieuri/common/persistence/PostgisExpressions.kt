@@ -42,6 +42,9 @@ fun stDWithin(a: Expression<String>, b: Expression<String>, distance: Double): O
 
 fun stIntersects(a: Expression<String>, b: Expression<String>): Op<Boolean> = BooleanFunctionOp("ST_Intersects", a, b)
 
+/** `ST_SnapToGrid(geometry, size)` — 격자 크기의 배수로 좌표를 맞춘 geometry. */
+fun stSnapToGrid(geometry: Expression<String>, size: Double): Expression<String> = CustomFunction("ST_SnapToGrid", GeometryColumnType(), geometry, doubleParam(size))
+
 /** `ST_X(geometry)`. */
 fun stX(geometry: Expression<String>): ExpressionWithColumnType<Double> = CustomFunction("ST_X", DoubleColumnType(), geometry)
 

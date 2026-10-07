@@ -18,9 +18,9 @@ class DistrictRepresentativeServiceTest {
     @Test
     @DisplayName("선정된 시군구만 쓰고, 나머지는 선정된 코드를 빼고 비운다")
     fun `saves the chosen districts and clears the rest`() {
-        every { port.findKoreanSpotPoints() } returns mapOf(
-            "11110" to listOf(Point(1, 127.0, 37.0), Point(2, 127.0001, 37.0)),
-            "26110" to listOf(Point(3, 129.0, 35.0)),
+        every { port.findKoreanSpotPoints(0.01) } returns mapOf(
+            "11110" to listOf(Point(1, 127.0, 37.0, cellRank = 1), Point(2, 127.0001, 37.0, cellRank = 1)),
+            "26110" to listOf(Point(3, 129.0, 35.0, cellRank = 1)),
         )
         every { port.clearRepresentativesExcept(setOf("11110")) } returns 4
 

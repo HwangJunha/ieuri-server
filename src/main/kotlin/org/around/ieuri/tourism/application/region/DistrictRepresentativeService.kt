@@ -16,8 +16,8 @@ class DistrictRepresentativeService(
 ) : DistrictRepresentativeUseCase {
 
     override fun refreshRepresentativeLocations(cellSizeDegrees: Double, minSpotCount: Int): DistrictRepresentativeRefreshResult {
-        val chosen = updatePort.findKoreanSpotPoints().mapNotNull { (code, points) ->
-            RepresentativeLocation.choose(points, cellSizeDegrees, minSpotCount)?.let { code to it }
+        val chosen = updatePort.findKoreanSpotPoints(cellSizeDegrees).mapNotNull { (code, points) ->
+            RepresentativeLocation.choose(points, minSpotCount)?.let { code to it }
         }.toMap()
 
         chosen.forEach { (code, choice) -> updatePort.saveRepresentative(code, choice) }
