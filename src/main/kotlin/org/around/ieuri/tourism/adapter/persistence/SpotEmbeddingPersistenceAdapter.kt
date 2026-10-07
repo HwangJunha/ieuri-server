@@ -9,9 +9,9 @@ import org.around.ieuri.tourism.adapter.persistence.table.SpotCatalogTranslation
 import org.around.ieuri.tourism.adapter.persistence.table.SpotDetailTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotEmbeddingTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotTable
-import org.around.ieuri.tourism.application.recommendation.required.EmbeddingTarget
-import org.around.ieuri.tourism.application.recommendation.required.SpotEmbedding
 import org.around.ieuri.tourism.application.recommendation.required.SpotEmbeddingStorePort
+import org.around.ieuri.tourism.application.recommendation.required.dto.EmbeddingTarget
+import org.around.ieuri.tourism.application.recommendation.required.dto.SpotEmbedding
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.jetbrains.exposed.v1.core.Expression
 import org.jetbrains.exposed.v1.core.ExpressionWithColumnType

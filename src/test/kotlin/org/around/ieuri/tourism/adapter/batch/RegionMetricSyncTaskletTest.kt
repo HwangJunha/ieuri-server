@@ -2,10 +2,10 @@ package org.around.ieuri.tourism.adapter.batch
 
 import io.mockk.every
 import io.mockk.mockk
-import org.around.ieuri.tourism.application.region.provided.RegionMetricDataset
-import org.around.ieuri.tourism.application.region.provided.RegionMetricPageResult
 import org.around.ieuri.tourism.application.region.provided.RegionMetricSyncUseCase
-import org.around.ieuri.tourism.application.region.provided.RegionMetricTarget
+import org.around.ieuri.tourism.application.region.provided.dto.RegionMetricDataset
+import org.around.ieuri.tourism.application.region.provided.dto.RegionMetricPageResult
+import org.around.ieuri.tourism.application.region.provided.dto.RegionMetricTarget
 import org.springframework.batch.core.job.JobExecution
 import org.springframework.batch.core.job.JobInstance
 import org.springframework.batch.core.job.parameters.JobParametersBuilder

@@ -8,14 +8,14 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
 import org.around.ieuri.tourism.application.shared.exception.UpstreamRateLimitedException
-import org.around.ieuri.tourism.application.spot.provided.PrefetchResult
 import org.around.ieuri.tourism.application.spot.provided.SpotCommandUseCase
 import org.around.ieuri.tourism.application.spot.provided.SpotDetailPrefetchUseCase
 import org.around.ieuri.tourism.application.spot.provided.SpotPrefetchQueryUseCase
+import org.around.ieuri.tourism.application.spot.provided.dto.PrefetchResult
 import org.around.ieuri.tourism.application.spot.provided.dto.PrefetchTarget
 import org.around.ieuri.tourism.application.spot.provided.dto.SpotDetailPart
-import org.around.ieuri.tourism.application.spot.required.SpotDetailQuery
 import org.around.ieuri.tourism.application.spot.required.TourInfoPort
+import org.around.ieuri.tourism.application.spot.required.dto.SpotDetailQuery
 import org.around.ieuri.tourism.domain.spot.SpotDetail
 import org.around.ieuri.tourism.domain.spot.SpotImage
 import org.around.ieuri.tourism.domain.spot.SpotInfoItem

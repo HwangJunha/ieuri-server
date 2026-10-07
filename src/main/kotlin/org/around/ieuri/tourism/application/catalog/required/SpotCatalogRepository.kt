@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.application.catalog.required
 
+import org.around.ieuri.tourism.application.catalog.required.dto.VisibilityRefreshResult
 import org.around.ieuri.tourism.domain.catalog.CatalogTranslation
 import org.around.ieuri.tourism.domain.catalog.OriginFestivalPeriod
 import org.around.ieuri.tourism.domain.catalog.SpotCatalog
@@ -54,19 +55,3 @@ interface SpotCatalogRepository {
     /** 귀속되지 않은 채 남은 카탈로그 수. */
     fun countDistrictUnassigned(): Int
 }
-
-/** (카탈로그, 언어) 쌍. 다른 도메인이 자기 사본을 맞추는 근거다. */
-data class CatalogLanguage(
-    val catalogId: Long,
-    val language: DomainLocale,
-)
-
-/**
- * 노출 갱신의 결과. [visible]은 갱신 후 노출 중인 (카탈로그, 언어) 전부 — 구독자가 받는 정본이다.
- * - [hiddenCount]·[shownCount]는 이번 회차에 뒤집힌 행 수로, 로그·관측용이다.
- */
-data class VisibilityRefreshResult(
-    val hiddenCount: Int,
-    val shownCount: Int,
-    val visible: List<CatalogLanguage>,
-)

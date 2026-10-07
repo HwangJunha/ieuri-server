@@ -2,9 +2,9 @@ package org.around.ieuri.tourism.adapter.cache
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import org.around.ieuri.tourism.application.congestion.provided.dto.CulturalEventView
-import org.around.ieuri.tourism.application.congestion.required.CachedSeoulOpenData
 import org.around.ieuri.tourism.application.congestion.required.SeoulOpenDataCachePort
-import org.around.ieuri.tourism.application.congestion.required.SeoulOpenDataSnapshot
+import org.around.ieuri.tourism.application.congestion.required.dto.CachedSeoulOpenData
+import org.around.ieuri.tourism.application.congestion.required.dto.SeoulOpenDataSnapshot
 import org.around.ieuri.tourism.domain.congestion.CommercialActivityLevel
 import org.around.ieuri.tourism.domain.congestion.CommercialStatus
 import org.around.ieuri.tourism.domain.congestion.CongestionForecast

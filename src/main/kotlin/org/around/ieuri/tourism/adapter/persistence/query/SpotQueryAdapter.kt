@@ -11,10 +11,10 @@ import org.around.ieuri.tourism.adapter.persistence.table.SpotCatalogTranslation
 import org.around.ieuri.tourism.adapter.persistence.table.SpotReactionTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotTable
 import org.around.ieuri.tourism.application.catalog.provided.dto.LikedSpotView
-import org.around.ieuri.tourism.application.catalog.required.LikedSpotsSearch
-import org.around.ieuri.tourism.application.catalog.required.SpotBasics
-import org.around.ieuri.tourism.application.catalog.required.SpotIdentity
 import org.around.ieuri.tourism.application.catalog.required.SpotQueryPort
+import org.around.ieuri.tourism.application.catalog.required.dto.LikedSpotsSearch
+import org.around.ieuri.tourism.application.catalog.required.dto.SpotBasics
+import org.around.ieuri.tourism.application.catalog.required.dto.SpotIdentity
 import org.around.ieuri.tourism.domain.catalog.ReactionType
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.jetbrains.exposed.v1.core.JoinType

@@ -2,10 +2,10 @@ package org.around.ieuri.tourism.application.recommendation
 
 import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.category.required.AppCategoryQueryPort
-import org.around.ieuri.tourism.application.recommendation.provided.EmbeddingInput
 import org.around.ieuri.tourism.application.recommendation.provided.SpotEmbeddingStoreUseCase
-import org.around.ieuri.tourism.application.recommendation.required.SpotEmbedding
+import org.around.ieuri.tourism.application.recommendation.provided.dto.EmbeddingInput
 import org.around.ieuri.tourism.application.recommendation.required.SpotEmbeddingStorePort
+import org.around.ieuri.tourism.application.recommendation.required.dto.SpotEmbedding
 import org.around.ieuri.tourism.domain.recommendation.EmbeddingText
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional

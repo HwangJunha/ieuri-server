@@ -2,25 +2,10 @@ package org.around.ieuri.tourism.application.catalog.required
 
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.tourism.application.catalog.provided.dto.PopularSpotView
-import org.around.ieuri.tourism.domain.catalog.CategorySelection
-import org.around.ieuri.tourism.domain.shared.Coordinates
-import org.around.ieuri.tourism.domain.shared.DomainLocale
+import org.around.ieuri.tourism.application.catalog.required.dto.PopularSpotSearch
 
 /** 인기 spot 조회 포트(SPEC-0013). LIKE를 기간 제한 없이 spot 단위로 집계한다. */
 interface PopularSpotQueryPort {
     /** 반경 안에서 좋아요 수 내림차순 + id 오름차순. 최대 `limit`건이며 다음 페이지 판정과 커서는 포트가 채운다. */
     fun findPopular(query: PopularSpotSearch): CursorPage<PopularSpotView>
 }
-
-/** 인기 spot 조회 조건. [minLikeCount]는 집계 후 적용하는 하한이다. */
-data class PopularSpotSearch(
-    val language: DomainLocale,
-    val center: Coordinates,
-    val radiusMeters: Int,
-    /** 카테고리 선택. 비어 있으면 전체. 값이 여럿이면 IN으로 거른다(OR). */
-    val categories: CategorySelection,
-    val minLikeCount: Int,
-    val limit: Int,
-    /** 앞 페이지의 endCursor. 읽지 못하면 INVALID_CURSOR다. */
-    val after: String?,
-)

@@ -9,8 +9,8 @@ import org.around.ieuri.tourism.adapter.config.KtoBigDataProperties
 import org.around.ieuri.tourism.application.region.provided.dto.SyncConcentrationRateCommand
 import org.around.ieuri.tourism.application.region.provided.dto.SyncDemandIntensityCommand
 import org.around.ieuri.tourism.application.region.provided.dto.SyncVisitorCountCommand
-import org.around.ieuri.tourism.application.region.required.RegionMetricSyncPage
 import org.around.ieuri.tourism.application.region.required.RegionMetricSyncPort
+import org.around.ieuri.tourism.application.region.required.dto.RegionMetricSyncPage
 import org.around.ieuri.tourism.application.shared.exception.UpstreamRateLimitedException
 import org.around.ieuri.tourism.application.shared.exception.UpstreamUnavailableException
 import org.slf4j.LoggerFactory

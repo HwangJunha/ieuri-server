@@ -6,10 +6,10 @@ import io.mockk.slot
 import io.mockk.verify
 import org.around.ieuri.tourism.application.catalog.provided.exception.BboxTooLargeException
 import org.around.ieuri.tourism.application.catalog.provided.exception.InvalidBboxException
-import org.around.ieuri.tourism.application.catalog.required.MapCandidateSearch
-import org.around.ieuri.tourism.application.catalog.required.MapCandidateView
 import org.around.ieuri.tourism.application.catalog.required.MapQueryPort
 import org.around.ieuri.tourism.application.catalog.required.SpotQueryPort
+import org.around.ieuri.tourism.application.catalog.required.dto.MapCandidateSearch
+import org.around.ieuri.tourism.application.catalog.required.dto.MapCandidateView
 import org.around.ieuri.tourism.application.recommendation.provided.dto.MapRecommendedSpotsQuery
 import org.around.ieuri.tourism.application.recommendation.required.TasteSimilarityQueryPort
 import org.around.ieuri.tourism.domain.catalog.CategorySelection

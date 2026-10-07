@@ -8,8 +8,8 @@ import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.CursorPageInfo
 import org.around.ieuri.tourism.application.footprint.required.MapOwnerLookupPort
 import org.around.ieuri.tourism.application.relation.provided.dto.MapRelationsQuery
-import org.around.ieuri.tourism.application.relation.required.MapRelationOverlap
 import org.around.ieuri.tourism.application.relation.required.MapRelationQueryPort
+import org.around.ieuri.tourism.application.relation.required.dto.MapRelationOverlap
 import org.junit.jupiter.api.Test
 import java.time.Instant
 import kotlin.test.assertEquals

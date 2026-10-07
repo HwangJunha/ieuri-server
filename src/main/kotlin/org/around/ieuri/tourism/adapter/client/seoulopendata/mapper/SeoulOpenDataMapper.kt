@@ -2,7 +2,7 @@ package org.around.ieuri.tourism.adapter.client.seoulopendata.mapper
 
 import org.around.ieuri.tourism.adapter.client.seoulopendata.SeoulOpenDataResponse
 import org.around.ieuri.tourism.application.congestion.provided.dto.CulturalEventView
-import org.around.ieuri.tourism.application.congestion.required.SeoulOpenDataSnapshot
+import org.around.ieuri.tourism.application.congestion.required.dto.SeoulOpenDataSnapshot
 import org.around.ieuri.tourism.domain.congestion.CommercialActivityLevel
 import org.around.ieuri.tourism.domain.congestion.CommercialStatus
 import org.around.ieuri.tourism.domain.congestion.CongestionForecast

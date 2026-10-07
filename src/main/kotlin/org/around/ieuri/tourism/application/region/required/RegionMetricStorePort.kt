@@ -3,6 +3,7 @@ package org.around.ieuri.tourism.application.region.required
 import org.around.ieuri.tourism.application.region.provided.dto.SyncConcentrationRateCommand
 import org.around.ieuri.tourism.application.region.provided.dto.SyncDemandIntensityCommand
 import org.around.ieuri.tourism.application.region.provided.dto.SyncVisitorCountCommand
+import org.around.ieuri.tourism.application.region.required.dto.DistrictRegion
 
 /**
  * 한국관광공사 관광통계 4종 적재 아웃바운드 포트(SPEC-0015).

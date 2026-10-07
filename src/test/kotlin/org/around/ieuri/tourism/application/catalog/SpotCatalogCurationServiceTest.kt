@@ -6,10 +6,10 @@ import io.mockk.slot
 import io.mockk.verify
 import io.mockk.verifyOrder
 import org.around.ieuri.tourism.application.catalog.required.CatalogEventPublisherPort
-import org.around.ieuri.tourism.application.catalog.required.CatalogLanguage
 import org.around.ieuri.tourism.application.catalog.required.SpotCatalogQueryPort
 import org.around.ieuri.tourism.application.catalog.required.SpotCatalogRepository
-import org.around.ieuri.tourism.application.catalog.required.VisibilityRefreshResult
+import org.around.ieuri.tourism.application.catalog.required.dto.CatalogLanguage
+import org.around.ieuri.tourism.application.catalog.required.dto.VisibilityRefreshResult
 import org.around.ieuri.tourism.domain.catalog.CatalogCandidate
 import org.around.ieuri.tourism.domain.catalog.CatalogOrigin
 import org.around.ieuri.tourism.domain.catalog.CatalogSplit

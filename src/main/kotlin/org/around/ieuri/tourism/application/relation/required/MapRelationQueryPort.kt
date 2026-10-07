@@ -1,7 +1,7 @@
 package org.around.ieuri.tourism.application.relation.required
 
 import org.around.ieuri.common.pagination.CursorPage
-import java.time.Instant
+import org.around.ieuri.tourism.application.relation.required.dto.MapRelationOverlap
 
 /** 지도 관계의 읽기 포트(SPEC-0030). */
 interface MapRelationQueryPort {
@@ -17,11 +17,3 @@ interface MapRelationQueryPort {
         after: String?,
     ): CursorPage<MapRelationOverlap>
 }
-
-/** 한 상대와의 겹침 계산 결과. 닉네임은 auth에 따로 묻는다(`MapOwnerLookupPort`). */
-data class MapRelationOverlap(
-    val counterpartId: Long,
-    val overlappingCellIds: List<Long>,
-    val theirVisitedCount: Int,
-    val createdAt: Instant,
-)

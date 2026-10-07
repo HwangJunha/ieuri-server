@@ -4,7 +4,7 @@ import org.around.ieuri.tourism.adapter.persistence.mapper.toDistrictRegion
 import org.around.ieuri.tourism.adapter.persistence.table.AreaTable
 import org.around.ieuri.tourism.adapter.persistence.table.DistrictTable
 import org.around.ieuri.tourism.application.region.required.DistrictCodeQueryPort
-import org.around.ieuri.tourism.application.region.required.DistrictRegion
+import org.around.ieuri.tourism.application.region.required.dto.DistrictRegion
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.jdbc.select
 import org.springframework.stereotype.Component

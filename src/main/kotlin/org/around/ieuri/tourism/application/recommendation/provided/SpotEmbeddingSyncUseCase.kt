@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.application.recommendation.provided
 
+import org.around.ieuri.tourism.application.recommendation.provided.dto.EmbeddingSyncResult
 /** 장소 임베딩 적재(SPEC-0035 S2). 배치 단계가 키셋 커서로 부른다. */
 interface SpotEmbeddingSyncUseCase {
     /**
@@ -8,11 +9,3 @@ interface SpotEmbeddingSyncUseCase {
      */
     fun syncNext(afterTranslationId: Long, limit: Int): EmbeddingSyncResult
 }
-
-/** [processed]가 0이면 소진이다. [lastTranslationId]는 다음 호출의 커서. */
-data class EmbeddingSyncResult(
-    val processed: Int,
-    val embedded: Int,
-    val failed: Int,
-    val lastTranslationId: Long,
-)

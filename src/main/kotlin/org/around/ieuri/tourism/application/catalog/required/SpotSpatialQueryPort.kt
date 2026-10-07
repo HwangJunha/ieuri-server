@@ -1,6 +1,7 @@
 package org.around.ieuri.tourism.application.catalog.required
 
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
+import org.around.ieuri.tourism.application.catalog.required.dto.NearbySpotSearch
 /**
  * 반경 조회 아웃바운드 포트(PostGIS).
  * - 조회와 카운트는 같은 조건을 써야 한다 — 갈리면 hasNext와 totalCount가 어긋난다.

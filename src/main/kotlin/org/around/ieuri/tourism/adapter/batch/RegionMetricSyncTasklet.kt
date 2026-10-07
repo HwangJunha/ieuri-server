@@ -1,8 +1,8 @@
 package org.around.ieuri.tourism.adapter.batch
 
-import org.around.ieuri.tourism.application.region.provided.RegionMetricDataset
 import org.around.ieuri.tourism.application.region.provided.RegionMetricSyncUseCase
-import org.around.ieuri.tourism.application.region.provided.RegionMetricTarget
+import org.around.ieuri.tourism.application.region.provided.dto.RegionMetricDataset
+import org.around.ieuri.tourism.application.region.provided.dto.RegionMetricTarget
 import org.slf4j.LoggerFactory
 import org.springframework.batch.core.scope.context.ChunkContext
 import org.springframework.batch.core.step.StepContribution

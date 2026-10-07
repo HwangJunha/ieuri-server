@@ -2,11 +2,10 @@ package org.around.ieuri.tourism.application.catalog.required
 
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.tourism.application.catalog.provided.dto.LikedSpotView
-import org.around.ieuri.tourism.domain.catalog.CategorySelection
+import org.around.ieuri.tourism.application.catalog.required.dto.LikedSpotsSearch
+import org.around.ieuri.tourism.application.catalog.required.dto.SpotBasics
+import org.around.ieuri.tourism.application.catalog.required.dto.SpotIdentity
 import org.around.ieuri.tourism.domain.catalog.ReactionType
-import org.around.ieuri.tourism.domain.category.SpotCategory
-import org.around.ieuri.tourism.domain.shared.Coordinates
-import org.around.ieuri.tourism.domain.shared.CopyrightType
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 
 /**
@@ -43,55 +42,3 @@ interface SpotQueryPort {
     /** 회원이 [LikedSpotsSearch.language]에서 좋아요한 spot 한 페이지를 그 언어의 제목으로. DISLIKE는 제외. */
     fun findLikedSpots(query: LikedSpotsSearch): CursorPage<LikedSpotView>
 }
-
-/** `spot` 행이 보유한 상세 표시 값(read DTO). */
-data class SpotBasics(
-    val title: String,
-    val address: String?,
-    val thumbnailImageUrl: String,
-    val category: SpotCategory,
-    val copyright: CopyrightType,
-    /** 경도. */
-    val longitude: Double,
-    /** 위도. */
-    val latitude: Double,
-)
-
-/** 좋아요 목록 조회 입력. [after]는 (likedAt, spotId)에서 파생된 불투명 커서다. */
-data class LikedSpotsSearch(
-    val memberId: Long,
-    val language: DomainLocale,
-    /** 비어 있으면 전체. */
-    val categories: CategorySelection,
-    val first: Int,
-    val after: String?,
-)
-
-/**
- * 반경 조회 입력.
- * - [excludedSpotIds]는 DB 쿼리에서 제외해야 한다. 조회 후 거르면 페이지가 size보다 작아진다.
- */
-data class NearbySpotSearch(
-    val language: DomainLocale,
-    val center: Coordinates,
-    val radiusMeters: Int,
-    /** 비어 있으면 전체, 여럿이면 OR. */
-    val categories: CategorySelection,
-    val excludedSpotIds: Set<Long>,
-    val limit: Int,
-    val offset: Int,
-)
-
-/** `spot.id`가 가리키는 행의 upstream 식별 정보와 카탈로그 좌표. */
-data class SpotIdentity(
-    /**
-     * 원본 `spot.id`. 상세 캐시·`spot_detail` 계열의 키다.
-     * - 카탈로그 id를 대신 쓰면 안 된다. 두 id 공간이 겹쳐 다른 장소의 본문이 적재될 수 있다.
-     */
-    val spotId: Long,
-    val contentId: String,
-    /** 경도. 원본 `spot` 행이 아니라 `spot_catalog`의 값이다. */
-    val mapX: Double,
-    /** 위도. 출처는 [mapX]와 같다. */
-    val mapY: Double,
-)

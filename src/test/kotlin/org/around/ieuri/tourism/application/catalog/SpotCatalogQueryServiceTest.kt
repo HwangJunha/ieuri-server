@@ -21,13 +21,13 @@ import org.around.ieuri.tourism.application.catalog.provided.exception.QueryTooL
 import org.around.ieuri.tourism.application.catalog.provided.exception.RadiusTooLargeException
 import org.around.ieuri.tourism.application.catalog.required.CatalogEventPublisherPort
 import org.around.ieuri.tourism.application.catalog.required.LikedSpotSearchPort
-import org.around.ieuri.tourism.application.catalog.required.LikedSpotsSearch
 import org.around.ieuri.tourism.application.catalog.required.MapQueryPort
-import org.around.ieuri.tourism.application.catalog.required.MapViewportSearch
-import org.around.ieuri.tourism.application.catalog.required.NearbySpotSearch
-import org.around.ieuri.tourism.application.catalog.required.SpotBasics
 import org.around.ieuri.tourism.application.catalog.required.SpotQueryPort
 import org.around.ieuri.tourism.application.catalog.required.SpotSpatialQueryPort
+import org.around.ieuri.tourism.application.catalog.required.dto.LikedSpotsSearch
+import org.around.ieuri.tourism.application.catalog.required.dto.MapViewportSearch
+import org.around.ieuri.tourism.application.catalog.required.dto.NearbySpotSearch
+import org.around.ieuri.tourism.application.catalog.required.dto.SpotBasics
 import org.around.ieuri.tourism.application.congestion.provided.CongestionQueryUseCase
 import org.around.ieuri.tourism.application.congestion.provided.dto.CulturalEventView
 import org.around.ieuri.tourism.domain.catalog.CategorySelection

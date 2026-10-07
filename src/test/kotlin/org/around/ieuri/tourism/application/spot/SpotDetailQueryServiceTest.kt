@@ -4,9 +4,9 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
-import org.around.ieuri.tourism.application.catalog.required.SpotBasics
-import org.around.ieuri.tourism.application.catalog.required.SpotIdentity
 import org.around.ieuri.tourism.application.catalog.required.SpotQueryPort
+import org.around.ieuri.tourism.application.catalog.required.dto.SpotBasics
+import org.around.ieuri.tourism.application.catalog.required.dto.SpotIdentity
 import org.around.ieuri.tourism.application.category.provided.exception.UnknownCategoryException
 import org.around.ieuri.tourism.application.category.required.AppCategoryQueryPort
 import org.around.ieuri.tourism.application.shared.exception.UpstreamUnavailableException
@@ -14,10 +14,10 @@ import org.around.ieuri.tourism.application.spot.provided.dto.KnownIntro
 import org.around.ieuri.tourism.application.spot.provided.exception.SpotDetailNotFoundException
 import org.around.ieuri.tourism.application.spot.provided.exception.SpotNotFoundInLocaleQueryException
 import org.around.ieuri.tourism.application.spot.required.SpotCachePort
-import org.around.ieuri.tourism.application.spot.required.SpotDetailQuery
 import org.around.ieuri.tourism.application.spot.required.SpotDetailQueryPort
 import org.around.ieuri.tourism.application.spot.required.SpotEventPublisherPort
 import org.around.ieuri.tourism.application.spot.required.TourInfoPort
+import org.around.ieuri.tourism.application.spot.required.dto.SpotDetailQuery
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.CopyrightType
 import org.around.ieuri.tourism.domain.shared.DomainLocale

@@ -18,13 +18,13 @@ import org.around.ieuri.tourism.application.catalog.provided.exception.InvalidZo
 import org.around.ieuri.tourism.application.catalog.provided.exception.QueryTooLongException
 import org.around.ieuri.tourism.application.catalog.required.CatalogEventPublisherPort
 import org.around.ieuri.tourism.application.catalog.required.LikedSpotSearchPort
-import org.around.ieuri.tourism.application.catalog.required.LikedSpotsSearch
 import org.around.ieuri.tourism.application.catalog.required.MapQueryPort
-import org.around.ieuri.tourism.application.catalog.required.MapViewportSearch
-import org.around.ieuri.tourism.application.catalog.required.NearbySpotSearch
-import org.around.ieuri.tourism.application.catalog.required.SpotBasics
 import org.around.ieuri.tourism.application.catalog.required.SpotQueryPort
 import org.around.ieuri.tourism.application.catalog.required.SpotSpatialQueryPort
+import org.around.ieuri.tourism.application.catalog.required.dto.LikedSpotsSearch
+import org.around.ieuri.tourism.application.catalog.required.dto.MapViewportSearch
+import org.around.ieuri.tourism.application.catalog.required.dto.NearbySpotSearch
+import org.around.ieuri.tourism.application.catalog.required.dto.SpotBasics
 import org.around.ieuri.tourism.application.congestion.provided.CongestionQueryUseCase
 import org.around.ieuri.tourism.domain.catalog.ReactionType
 import org.around.ieuri.tourism.domain.shared.DomainLocale

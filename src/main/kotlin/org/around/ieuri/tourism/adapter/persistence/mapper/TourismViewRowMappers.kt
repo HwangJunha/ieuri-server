@@ -9,11 +9,11 @@ import org.around.ieuri.tourism.adapter.persistence.table.SpotCatalogTranslation
 import org.around.ieuri.tourism.adapter.persistence.table.SpotReactionTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotTable
 import org.around.ieuri.tourism.application.catalog.provided.dto.LikedSpotView
-import org.around.ieuri.tourism.application.catalog.required.SpotBasics
-import org.around.ieuri.tourism.application.catalog.required.SpotIdentity
+import org.around.ieuri.tourism.application.catalog.required.dto.SpotBasics
+import org.around.ieuri.tourism.application.catalog.required.dto.SpotIdentity
 import org.around.ieuri.tourism.application.category.provided.dto.CategoryDisplay
 import org.around.ieuri.tourism.application.footprint.provided.dto.CellImageView
-import org.around.ieuri.tourism.application.region.required.DistrictRegion
+import org.around.ieuri.tourism.application.region.required.dto.DistrictRegion
 import org.around.ieuri.tourism.application.spot.provided.dto.PrefetchTarget
 import org.around.ieuri.tourism.domain.catalog.CatalogCandidate
 import org.around.ieuri.tourism.domain.catalog.CatalogOrigin

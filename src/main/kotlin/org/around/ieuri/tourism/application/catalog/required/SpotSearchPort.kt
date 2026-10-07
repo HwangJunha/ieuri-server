@@ -4,7 +4,8 @@ import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.tourism.application.catalog.provided.dto.LikedSpotView
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotSuggestionView
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
-import org.around.ieuri.tourism.domain.catalog.CategorySelection
+import org.around.ieuri.tourism.application.catalog.required.dto.LikedSpotsSearch
+import org.around.ieuri.tourism.application.catalog.required.dto.SpotSearchQuery
 import org.around.ieuri.tourism.domain.shared.Coordinates
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 
@@ -34,15 +35,3 @@ interface LikedSpotSearchPort {
     /** 회원의 좋아요 중 [text]에 일치하는 한 페이지. `likedAt DESC, catalogId DESC`이며 검색어는 순서에 영향을 주지 않는다. */
     fun searchLikedSpots(query: LikedSpotsSearch, text: String): CursorPage<LikedSpotView>
 }
-
-/** 검색 조건(오프셋 방식). [limit]·[offset]은 호출자가 이미 상한을 적용한 값이다. */
-data class SpotSearchQuery(
-    val text: String,
-    val language: DomainLocale,
-    val center: Coordinates,
-    val radiusMeters: Int,
-    /** 카테고리 선택. 비어 있으면 전체. 값이 여럿이면 IN으로 거른다(OR). */
-    val categories: CategorySelection,
-    val limit: Int,
-    val offset: Int,
-)

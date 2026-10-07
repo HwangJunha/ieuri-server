@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.application.recommendation.required
 
+import org.around.ieuri.tourism.application.recommendation.required.dto.TasteSimilarity
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 
 /** 취향 유사도 조회 포트(SPEC-0035). 좋아요·싫어요 벡터 평균과 후보 벡터의 코사인 유사도를 DB에서 구한다. */
@@ -16,9 +17,3 @@ interface TasteSimilarityQueryPort {
         model: String,
     ): Map<Long, TasteSimilarity>
 }
-
-/** 후보 하나의 유사도. [dislike]는 싫어요 장소가 없거나 벡터가 없으면 null. */
-data class TasteSimilarity(
-    val like: Double?,
-    val dislike: Double?,
-)

@@ -1,5 +1,7 @@
 package org.around.ieuri.tourism.application.congestion.required
 
+import org.around.ieuri.tourism.application.congestion.required.dto.CachedSeoulOpenData
+import org.around.ieuri.tourism.application.congestion.required.dto.SeoulOpenDataSnapshot
 import java.time.Instant
 
 /**
@@ -13,9 +15,3 @@ interface SeoulOpenDataCachePort {
     /** 구역 1곳을 [storedAt] 기준으로 저장한다. */
     fun put(areaCode: String, snapshot: SeoulOpenDataSnapshot, storedAt: Instant)
 }
-
-/** 캐시된 값과 그 저장 시각. 신선도는 [storedAt]과 최소 재호출 간격으로 판정한다. */
-data class CachedSeoulOpenData(
-    val snapshot: SeoulOpenDataSnapshot,
-    val storedAt: Instant,
-)

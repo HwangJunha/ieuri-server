@@ -5,7 +5,7 @@ import org.around.ieuri.common.pagination.keysetPageOf
 import org.around.ieuri.tourism.application.catalog.provided.dto.PopularSpotView
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
 import org.around.ieuri.tourism.application.catalog.required.PopularSpotQueryPort
-import org.around.ieuri.tourism.application.catalog.required.PopularSpotSearch
+import org.around.ieuri.tourism.application.catalog.required.dto.PopularSpotSearch
 import org.around.ieuri.tourism.domain.catalog.ReactionType
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.CopyrightType

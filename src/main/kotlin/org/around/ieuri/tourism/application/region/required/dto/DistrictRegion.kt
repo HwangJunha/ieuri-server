@@ -1,4 +1,4 @@
-package org.around.ieuri.tourism.application.region.required
+package org.around.ieuri.tourism.application.region.required.dto
 
 /**
  * 시군구 코드(5자리)와 그 시도 코드(2자리). 둘 다 문자열이라 뒤바뀌기 쉽다.

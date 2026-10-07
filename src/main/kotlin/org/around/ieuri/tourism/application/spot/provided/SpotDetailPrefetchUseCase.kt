@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.application.spot.provided
 
+import org.around.ieuri.tourism.application.spot.provided.dto.PrefetchResult
 import org.around.ieuri.tourism.application.spot.provided.dto.SpotDetailPart
 
 /** 관광지 상세의 사전 전량 수집(SPEC-0037). 커서와 진행은 호출자가 들고 있다. */
@@ -11,10 +12,3 @@ interface SpotDetailPrefetchUseCase {
      */
     fun prefetchNext(part: SpotDetailPart, afterSpotId: Long, limit: Int): PrefetchResult
 }
-
-/** 한 묶음의 처리 결과. 소진 판정은 성공 건수가 아니라 [processed]가 0인지로 한다. */
-data class PrefetchResult(
-    val processed: Int,
-    val failed: Int,
-    val lastSpotId: Long,
-)

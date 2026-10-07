@@ -2,9 +2,7 @@ package org.around.ieuri.tourism.application.catalog.required
 
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.tourism.application.catalog.provided.dto.FestivalView
-import org.around.ieuri.tourism.domain.shared.Coordinates
-import org.around.ieuri.tourism.domain.shared.DomainLocale
-import java.time.LocalDate
+import org.around.ieuri.tourism.application.catalog.required.dto.OngoingFestivalSearch
 
 /**
  * 진행 중 축제 조회 아웃바운드 포트(SPEC-0013 R17).
@@ -17,17 +15,3 @@ interface FestivalQueryPort {
      */
     fun findOngoing(query: OngoingFestivalSearch): CursorPage<FestivalView>
 }
-
-/**
- * 진행 중 축제 조회 조건. [asOf]는 서비스가 시계에서 읽어 넘긴 '오늘'이다.
- * - 경계를 포함한다: `event_start_date <= asOf AND event_end_date >= asOf`.
- */
-data class OngoingFestivalSearch(
-    val language: DomainLocale,
-    val center: Coordinates,
-    val radiusMeters: Int,
-    val asOf: LocalDate,
-    val limit: Int,
-    /** 앞 페이지의 endCursor. 읽지 못하면 INVALID_CURSOR다. */
-    val after: String?,
-)

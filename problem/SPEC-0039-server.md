@@ -136,6 +136,7 @@
 | D-97 | S13 | **ktlint `no-unused-imports`를 켠다**(`.editorconfig`). 저장소 전체 위반 20건은 import 줄 삭제뿐이다 | ktlint 1.7부터 이 규칙이 기본 꺼짐이라(ktlint 문서, standard rules) 테스트 분할 때 복사된 import 216줄을 잡지 못했다. 쓰지 않는 import는 패키지 간 의존을 실제보다 넓게 보이게 해 D-84의 목적을 흐린다. 사용자 승인(B-2 A) | **tourism만 스크립트로 정리**: 다음 복사 때 다시 쌓인다 |
 | D-98 | S13 | **외부 I/O를 끼는 조회는 트랜잭션 없는 오케스트레이터와 readOnly 읽기 서비스로 나눈다**(D-83 선례): `SpotDetailQueryService` + `SpotDetailReadService`, `CongestionQueryService` + `CongestionAreaReadService`. 좋아요 수·내 반응은 카탈로그의 반응을 읽으므로 `SpotCatalogQueryUseCase`로 옮겼다. **예외**: `mapViewport`의 캐시된 문화행사(Valkey 읽기)는 catalog 트랜잭션 안에 남는다. 읽기 유스케이스는 `KnownIntro`(provided/dto)·도메인 `SpotDetail`을 돌려주되, `resolve`만 카탈로그 포트의 `SpotIdentity`를 그대로 넘긴다 — 같은 모양을 provided에 한 벌 더 두지 않는다(D-94). 적재 행의 본문 부재 표시(`StoredDetail.bodyAbsent`)는 읽는 곳이 없어 지웠다 | 상세는 본문·하위 필드 미스 때 TourAPI를, 혼잡도는 서울 열린데이터를 DB 조회 뒤에 불러 그동안 연결을 잡았다(CLAUDE.md "외부 I/O는 트랜잭션 밖"). 사용자 승인(B-1 A) | **그대로 두고 기록**: 업스트림이 느릴 때 풀이 마른다. **뷰포트도 분리**: HTTP 없이 Valkey 읽기 하나라 서비스 쌍을 하나 더 늘릴 값이 없다 |
 | D-99 | S13 | **정책값은 쓰는 쪽이 소유한다**: 지도 추천 한도는 `MapRecommendationPolicy`, 관계 페이지 크기는 `MapRelationPolicy`. 설정 키·`*Properties`는 그대로다. 응용 계층 이름은 `Footprint*`(`FootprintPolicy`·`FootprintCommands`), 스키마 루트 `nationwideMap`을 따르는 어댑터 이름(리졸버·GraphQL 매퍼·설정)은 남긴다 | `MapViewportPolicy`가 추천 한도를, `NationwideMapPolicy`가 관계 페이지 크기를 들고 있어 소유자가 보이지 않았다(D-84와 같은 이유) | **설정 키도 개명**: 배포 매니페스트·환경 변수를 함께 바꿔야 한다 — 이 SPEC의 범위(D-56)를 넘는다 |
+| D-100 | S13 | **`provided/`·`required/` 바로 아래에는 포트 인터페이스만 둔다. 포트가 주고받는 데이터 타입은 같은 패키지의 `dto/`에 타입마다 한 파일로 둔다.** tourism의 포트 파일 22개에 섞여 있던 33개 타입을 옮겼다(동작 불변) | 사용자 지시(2026-10-07): dto 패키지를 따로 두는 쪽을 선호한다 — provided뿐 아니라 required도. 포트 파일에 데이터 클래스가 섞이면 포트 목록과 계약 데이터가 한눈에 갈리지 않는다 | **포트 파일 안에 두기(기존)**: 사용자가 원하는 모양이 아니다 |
 
 ## 부족한 정보
 
@@ -305,6 +306,7 @@ grep으로 확인한 수(worktree `82fdd48`):
 
 | 날짜 | 무엇을 | 왜 |
 |---|---|---|
+| 2026-10-07 | D-100(포트 파일에서 데이터 타입을 dto/로 분리) | 사용자 지시 |
 | 2026-10-07 | 리뷰 반영: `StoredDetail` 제거·`KnownIntro`를 provided/dto로, 포트 KDoc·`DistrictRegion` 운영 경고·관계 endCursor 테스트 보강, D-84 표식. `SpotDiscoveryService`의 중복 좌표·반경 검증을 catalog 헬퍼로 대체(동작 동일) | reviewer PASS-with-warnings |
 | 2026-10-07 | D-96(커서는 쿼리 어댑터)·D-97(ktlint 미사용 import)·D-98(외부 I/O 오케스트레이터)·D-99(정책 소유·Footprint 이름), D-93 기준을 tourism 전체에 적용 | 사용자 결정(tourism은 GraphQL 계약만 지키면 지금 다 한다) |
 | 2026-10-07 | D-93(조회 반환의 경계: 도메인 vs 읽기 모델)·D-94(읽기 모델 한 벌)·D-95(`OffsetPage<T>`) | 사용자 결정(경계 표 채택, 읽기 모델 하나로, dto 패키지 유지, 함께 진행) |

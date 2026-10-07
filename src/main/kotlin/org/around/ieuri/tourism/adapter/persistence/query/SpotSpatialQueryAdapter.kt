@@ -7,8 +7,8 @@ import org.around.ieuri.tourism.adapter.persistence.mapper.toSpotView
 import org.around.ieuri.tourism.adapter.persistence.table.SpotCatalogTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotCatalogTranslationTable
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
-import org.around.ieuri.tourism.application.catalog.required.NearbySpotSearch
 import org.around.ieuri.tourism.application.catalog.required.SpotSpatialQueryPort
+import org.around.ieuri.tourism.application.catalog.required.dto.NearbySpotSearch
 import org.jetbrains.exposed.v1.core.JoinType
 import org.jetbrains.exposed.v1.core.Op
 import org.jetbrains.exposed.v1.core.SortOrder

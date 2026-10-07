@@ -5,8 +5,8 @@ import org.around.ieuri.common.pagination.keysetPageOf
 import org.around.ieuri.tourism.adapter.persistence.table.MapCellDistrictTable
 import org.around.ieuri.tourism.adapter.persistence.table.MapRelationTable
 import org.around.ieuri.tourism.adapter.persistence.table.MemberDistrictVisitTable
-import org.around.ieuri.tourism.application.relation.required.MapRelationOverlap
 import org.around.ieuri.tourism.application.relation.required.MapRelationQueryPort
+import org.around.ieuri.tourism.application.relation.required.dto.MapRelationOverlap
 import org.jetbrains.exposed.v1.core.JoinType
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and

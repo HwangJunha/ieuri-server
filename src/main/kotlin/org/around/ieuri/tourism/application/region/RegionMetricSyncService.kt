@@ -1,15 +1,15 @@
 package org.around.ieuri.tourism.application.region
 
 import org.around.ieuri.common.persistence.ExposedConfig
-import org.around.ieuri.tourism.application.region.provided.RegionMetricDataset
-import org.around.ieuri.tourism.application.region.provided.RegionMetricPageResult
 import org.around.ieuri.tourism.application.region.provided.RegionMetricSyncUseCase
-import org.around.ieuri.tourism.application.region.provided.RegionMetricTarget
+import org.around.ieuri.tourism.application.region.provided.dto.RegionMetricDataset
+import org.around.ieuri.tourism.application.region.provided.dto.RegionMetricPageResult
+import org.around.ieuri.tourism.application.region.provided.dto.RegionMetricTarget
 import org.around.ieuri.tourism.application.region.provided.dto.SyncDemandIntensityCommand
 import org.around.ieuri.tourism.application.region.required.DistrictCodeQueryPort
 import org.around.ieuri.tourism.application.region.required.RegionMetricStorePort
-import org.around.ieuri.tourism.application.region.required.RegionMetricSyncPage
 import org.around.ieuri.tourism.application.region.required.RegionMetricSyncPort
+import org.around.ieuri.tourism.application.region.required.dto.RegionMetricSyncPage
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate

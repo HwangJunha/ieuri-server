@@ -5,7 +5,7 @@ import org.around.ieuri.common.pagination.keysetPageOf
 import org.around.ieuri.tourism.application.catalog.provided.dto.FestivalView
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
 import org.around.ieuri.tourism.application.catalog.required.FestivalQueryPort
-import org.around.ieuri.tourism.application.catalog.required.OngoingFestivalSearch
+import org.around.ieuri.tourism.application.catalog.required.dto.OngoingFestivalSearch
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.CopyrightType
 import org.springframework.beans.factory.annotation.Qualifier

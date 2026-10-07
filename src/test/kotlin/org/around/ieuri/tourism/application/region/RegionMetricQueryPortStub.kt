@@ -1,9 +1,9 @@
 package org.around.ieuri.tourism.application.region
 
-import org.around.ieuri.tourism.application.region.required.DistrictRegion
-import org.around.ieuri.tourism.application.region.required.RegionMetric
 import org.around.ieuri.tourism.application.region.required.RegionMetricQueryPort
-import org.around.ieuri.tourism.application.region.required.RegionRow
+import org.around.ieuri.tourism.application.region.required.dto.DistrictRegion
+import org.around.ieuri.tourism.application.region.required.dto.RegionMetric
+import org.around.ieuri.tourism.application.region.required.dto.RegionRow
 import org.around.ieuri.tourism.domain.region.RegionScoreFactor
 import org.around.ieuri.tourism.domain.shared.Coordinates
 

@@ -4,11 +4,11 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import io.mockk.verifyOrder
-import org.around.ieuri.tourism.application.spot.required.FestivalSyncPage
 import org.around.ieuri.tourism.application.spot.required.FestivalSyncPort
 import org.around.ieuri.tourism.application.spot.required.SpotRepository
-import org.around.ieuri.tourism.application.spot.required.SpotSyncPage
 import org.around.ieuri.tourism.application.spot.required.SpotSyncPort
+import org.around.ieuri.tourism.application.spot.required.dto.FestivalSyncPage
+import org.around.ieuri.tourism.application.spot.required.dto.SpotSyncPage
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.Coordinates
 import org.around.ieuri.tourism.domain.shared.CopyrightType

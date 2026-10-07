@@ -7,11 +7,11 @@ import org.around.ieuri.tourism.application.region.provided.dto.RecommendedRegio
 import org.around.ieuri.tourism.application.region.provided.dto.RecommendedRegionQuery
 import org.around.ieuri.tourism.application.region.provided.dto.RecommendedRegionView
 import org.around.ieuri.tourism.application.region.provided.dto.RegionScoreView
-import org.around.ieuri.tourism.application.region.required.DistrictRegion
 import org.around.ieuri.tourism.application.region.required.RegionEventPublisherPort
-import org.around.ieuri.tourism.application.region.required.RegionMetric
 import org.around.ieuri.tourism.application.region.required.RegionMetricQueryPort
-import org.around.ieuri.tourism.application.region.required.RegionRow
+import org.around.ieuri.tourism.application.region.required.dto.DistrictRegion
+import org.around.ieuri.tourism.application.region.required.dto.RegionMetric
+import org.around.ieuri.tourism.application.region.required.dto.RegionRow
 import org.around.ieuri.tourism.domain.region.RegionScore
 import org.around.ieuri.tourism.domain.region.RegionScoreCalculator
 import org.around.ieuri.tourism.domain.region.RegionScoreFactor

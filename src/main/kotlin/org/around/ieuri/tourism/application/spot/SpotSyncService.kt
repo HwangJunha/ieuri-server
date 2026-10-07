@@ -1,9 +1,9 @@
 package org.around.ieuri.tourism.application.spot
 
 import org.around.ieuri.common.persistence.ExposedConfig
-import org.around.ieuri.tourism.application.spot.provided.FestivalSweepResult
-import org.around.ieuri.tourism.application.spot.provided.SpotSyncPageResult
 import org.around.ieuri.tourism.application.spot.provided.SpotSyncUseCase
+import org.around.ieuri.tourism.application.spot.provided.dto.FestivalSweepResult
+import org.around.ieuri.tourism.application.spot.provided.dto.SpotSyncPageResult
 import org.around.ieuri.tourism.application.spot.required.FestivalSyncPort
 import org.around.ieuri.tourism.application.spot.required.SpotRepository
 import org.around.ieuri.tourism.application.spot.required.SpotSyncPort

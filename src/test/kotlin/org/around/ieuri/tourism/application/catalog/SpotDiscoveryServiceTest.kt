@@ -19,11 +19,11 @@ import org.around.ieuri.tourism.application.catalog.provided.exception.InvalidCo
 import org.around.ieuri.tourism.application.catalog.provided.exception.RadiusTooLargeException
 import org.around.ieuri.tourism.application.catalog.required.CatalogEventPublisherPort
 import org.around.ieuri.tourism.application.catalog.required.FestivalQueryPort
-import org.around.ieuri.tourism.application.catalog.required.OngoingFestivalSearch
 import org.around.ieuri.tourism.application.catalog.required.PopularSpotQueryPort
-import org.around.ieuri.tourism.application.catalog.required.PopularSpotSearch
 import org.around.ieuri.tourism.application.catalog.required.SpotSearchPort
-import org.around.ieuri.tourism.application.catalog.required.SpotSearchQuery
+import org.around.ieuri.tourism.application.catalog.required.dto.OngoingFestivalSearch
+import org.around.ieuri.tourism.application.catalog.required.dto.PopularSpotSearch
+import org.around.ieuri.tourism.application.catalog.required.dto.SpotSearchQuery
 import org.around.ieuri.tourism.domain.catalog.CategorySelection
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.CopyrightType

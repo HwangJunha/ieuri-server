@@ -4,8 +4,8 @@ import org.around.ieuri.common.persistence.cosineDistance
 import org.around.ieuri.common.persistence.vectorAvg
 import org.around.ieuri.tourism.adapter.persistence.table.SpotCatalogTranslationTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotEmbeddingTable
-import org.around.ieuri.tourism.application.recommendation.required.TasteSimilarity
 import org.around.ieuri.tourism.application.recommendation.required.TasteSimilarityQueryPort
+import org.around.ieuri.tourism.application.recommendation.required.dto.TasteSimilarity
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.jetbrains.exposed.v1.core.Expression
 import org.jetbrains.exposed.v1.core.ExpressionWithColumnType

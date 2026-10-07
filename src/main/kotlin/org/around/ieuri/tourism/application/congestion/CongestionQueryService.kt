@@ -7,7 +7,7 @@ import org.around.ieuri.tourism.application.congestion.provided.dto.CulturalEven
 import org.around.ieuri.tourism.application.congestion.provided.dto.SeoulCongestionView
 import org.around.ieuri.tourism.application.congestion.required.SeoulOpenDataCachePort
 import org.around.ieuri.tourism.application.congestion.required.SeoulOpenDataPort
-import org.around.ieuri.tourism.application.congestion.required.SeoulOpenDataSnapshot
+import org.around.ieuri.tourism.application.congestion.required.dto.SeoulOpenDataSnapshot
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.shared.MapBounds
 import org.springframework.stereotype.Service

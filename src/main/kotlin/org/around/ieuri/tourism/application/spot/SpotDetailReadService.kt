@@ -1,8 +1,8 @@
 package org.around.ieuri.tourism.application.spot
 
 import org.around.ieuri.common.persistence.ExposedConfig
-import org.around.ieuri.tourism.application.catalog.required.SpotIdentity
 import org.around.ieuri.tourism.application.catalog.required.SpotQueryPort
+import org.around.ieuri.tourism.application.catalog.required.dto.SpotIdentity
 import org.around.ieuri.tourism.application.category.provided.exception.UnknownCategoryException
 import org.around.ieuri.tourism.application.category.required.AppCategoryQueryPort
 import org.around.ieuri.tourism.application.spot.provided.SpotDetailReadUseCase

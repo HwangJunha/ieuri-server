@@ -9,13 +9,13 @@ import org.around.ieuri.tourism.application.catalog.SpotQueryPolicy
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
 import org.around.ieuri.tourism.application.catalog.provided.exception.InvalidCoordinatesException
 import org.around.ieuri.tourism.application.catalog.provided.exception.RadiusTooLargeException
-import org.around.ieuri.tourism.application.catalog.required.NearbySpotSearch
 import org.around.ieuri.tourism.application.catalog.required.SpotQueryPort
 import org.around.ieuri.tourism.application.catalog.required.SpotSpatialQueryPort
+import org.around.ieuri.tourism.application.catalog.required.dto.NearbySpotSearch
 import org.around.ieuri.tourism.application.recommendation.provided.dto.RecommendedSpotsQuery
 import org.around.ieuri.tourism.application.recommendation.required.RecommendationEventPublisherPort
-import org.around.ieuri.tourism.application.recommendation.required.TasteSimilarity
 import org.around.ieuri.tourism.application.recommendation.required.TasteSimilarityQueryPort
+import org.around.ieuri.tourism.application.recommendation.required.dto.TasteSimilarity
 import org.around.ieuri.tourism.domain.catalog.CategorySelection
 import org.around.ieuri.tourism.domain.catalog.ReactionType
 import org.around.ieuri.tourism.domain.category.SpotCategory

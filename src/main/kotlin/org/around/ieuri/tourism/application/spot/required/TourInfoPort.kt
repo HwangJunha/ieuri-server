@@ -1,7 +1,7 @@
 package org.around.ieuri.tourism.application.spot.required
 
+import org.around.ieuri.tourism.application.spot.required.dto.SpotDetailQuery
 import org.around.ieuri.tourism.domain.category.SpotCategory
-import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.spot.SpotDetail
 import org.around.ieuri.tourism.domain.spot.SpotImage
 import org.around.ieuri.tourism.domain.spot.SpotInfoItem
@@ -28,9 +28,3 @@ interface TourInfoPort {
     /** 이용안내 항목. [category]에 해당하는 언어별 코드가 없으면 빈 목록. */
     fun findInfoItems(query: SpotDetailQuery, category: SpotCategory): List<SpotInfoItem>
 }
-
-/** 상세 조회 입력. */
-data class SpotDetailQuery(
-    val contentId: String,
-    val locale: DomainLocale,
-)

@@ -7,11 +7,11 @@ import org.around.ieuri.tourism.application.congestion.provided.dto.CulturalEven
 import org.around.ieuri.tourism.application.congestion.provided.exception.AreaFilterRequiredException
 import org.around.ieuri.tourism.application.congestion.provided.exception.CongestionAreaNotFoundException
 import org.around.ieuri.tourism.application.congestion.provided.exception.TooManyAreaIdsException
-import org.around.ieuri.tourism.application.congestion.required.CachedSeoulOpenData
 import org.around.ieuri.tourism.application.congestion.required.CongestionAreaQueryPort
 import org.around.ieuri.tourism.application.congestion.required.SeoulOpenDataCachePort
 import org.around.ieuri.tourism.application.congestion.required.SeoulOpenDataPort
-import org.around.ieuri.tourism.application.congestion.required.SeoulOpenDataSnapshot
+import org.around.ieuri.tourism.application.congestion.required.dto.CachedSeoulOpenData
+import org.around.ieuri.tourism.application.congestion.required.dto.SeoulOpenDataSnapshot
 import org.around.ieuri.tourism.domain.congestion.CommercialActivityLevel
 import org.around.ieuri.tourism.domain.congestion.CommercialStatus
 import org.around.ieuri.tourism.domain.congestion.CongestionForecast

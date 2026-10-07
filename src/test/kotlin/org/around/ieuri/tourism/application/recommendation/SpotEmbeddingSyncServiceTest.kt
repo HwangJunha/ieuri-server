@@ -6,10 +6,10 @@ import io.mockk.slot
 import io.mockk.verify
 import org.around.ieuri.tourism.application.category.provided.dto.CategoryDisplay
 import org.around.ieuri.tourism.application.category.required.AppCategoryQueryPort
-import org.around.ieuri.tourism.application.recommendation.required.EmbeddingTarget
-import org.around.ieuri.tourism.application.recommendation.required.SpotEmbedding
 import org.around.ieuri.tourism.application.recommendation.required.SpotEmbeddingStorePort
 import org.around.ieuri.tourism.application.recommendation.required.TextEmbeddingPort
+import org.around.ieuri.tourism.application.recommendation.required.dto.EmbeddingTarget
+import org.around.ieuri.tourism.application.recommendation.required.dto.SpotEmbedding
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.recommendation.CategoryDiversity
 import org.around.ieuri.tourism.domain.recommendation.RecommendationScore

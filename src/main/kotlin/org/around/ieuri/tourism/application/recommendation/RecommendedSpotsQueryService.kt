@@ -6,9 +6,9 @@ import org.around.ieuri.tourism.application.catalog.SpotQueryPolicy
 import org.around.ieuri.tourism.application.catalog.coordinatesOf
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
 import org.around.ieuri.tourism.application.catalog.requireRadiusWithin
-import org.around.ieuri.tourism.application.catalog.required.NearbySpotSearch
 import org.around.ieuri.tourism.application.catalog.required.SpotQueryPort
 import org.around.ieuri.tourism.application.catalog.required.SpotSpatialQueryPort
+import org.around.ieuri.tourism.application.catalog.required.dto.NearbySpotSearch
 import org.around.ieuri.tourism.application.recommendation.provided.RecommendedSpotsUseCase
 import org.around.ieuri.tourism.application.recommendation.provided.dto.RecommendedSpotsQuery
 import org.around.ieuri.tourism.application.recommendation.required.RecommendationEventPublisherPort

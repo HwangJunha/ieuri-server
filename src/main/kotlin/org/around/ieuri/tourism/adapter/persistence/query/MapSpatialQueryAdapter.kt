@@ -11,10 +11,10 @@ import org.around.ieuri.tourism.adapter.persistence.mapper.toMapSpotView
 import org.around.ieuri.tourism.adapter.persistence.table.SpotCatalogTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotCatalogTranslationTable
 import org.around.ieuri.tourism.application.catalog.provided.dto.MapSpotView
-import org.around.ieuri.tourism.application.catalog.required.MapCandidateSearch
-import org.around.ieuri.tourism.application.catalog.required.MapCandidateView
 import org.around.ieuri.tourism.application.catalog.required.MapQueryPort
-import org.around.ieuri.tourism.application.catalog.required.MapViewportSearch
+import org.around.ieuri.tourism.application.catalog.required.dto.MapCandidateSearch
+import org.around.ieuri.tourism.application.catalog.required.dto.MapCandidateView
+import org.around.ieuri.tourism.application.catalog.required.dto.MapViewportSearch
 import org.around.ieuri.tourism.domain.catalog.CategorySelection
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.shared.MapBounds

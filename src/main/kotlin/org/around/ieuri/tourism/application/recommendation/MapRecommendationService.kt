@@ -4,10 +4,10 @@ import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.catalog.provided.dto.MapSpotView
 import org.around.ieuri.tourism.application.catalog.provided.exception.BboxTooLargeException
 import org.around.ieuri.tourism.application.catalog.provided.exception.InvalidBboxException
-import org.around.ieuri.tourism.application.catalog.required.MapCandidateSearch
-import org.around.ieuri.tourism.application.catalog.required.MapCandidateView
 import org.around.ieuri.tourism.application.catalog.required.MapQueryPort
 import org.around.ieuri.tourism.application.catalog.required.SpotQueryPort
+import org.around.ieuri.tourism.application.catalog.required.dto.MapCandidateSearch
+import org.around.ieuri.tourism.application.catalog.required.dto.MapCandidateView
 import org.around.ieuri.tourism.application.recommendation.provided.MapRecommendationUseCase
 import org.around.ieuri.tourism.application.recommendation.provided.dto.MapRecommendedSpotsQuery
 import org.around.ieuri.tourism.application.recommendation.required.TasteSimilarityQueryPort

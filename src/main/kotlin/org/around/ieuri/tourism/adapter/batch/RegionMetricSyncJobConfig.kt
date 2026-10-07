@@ -1,7 +1,7 @@
 package org.around.ieuri.tourism.adapter.batch
 
-import org.around.ieuri.tourism.application.region.provided.RegionMetricDataset
 import org.around.ieuri.tourism.application.region.provided.RegionMetricSyncUseCase
+import org.around.ieuri.tourism.application.region.provided.dto.RegionMetricDataset
 import org.springframework.batch.core.job.Job
 import org.springframework.batch.core.job.builder.JobBuilder
 import org.springframework.batch.core.repository.JobRepository

@@ -1,6 +1,6 @@
 package org.around.ieuri.tourism.application.spot.provided
 
-import org.around.ieuri.tourism.application.catalog.required.SpotIdentity
+import org.around.ieuri.tourism.application.catalog.required.dto.SpotIdentity
 import org.around.ieuri.tourism.application.spot.provided.dto.KnownIntro
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.DomainLocale

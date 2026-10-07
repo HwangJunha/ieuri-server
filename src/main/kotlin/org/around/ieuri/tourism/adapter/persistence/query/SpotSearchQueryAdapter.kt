@@ -3,7 +3,7 @@ package org.around.ieuri.tourism.adapter.persistence.query
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotSuggestionView
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
 import org.around.ieuri.tourism.application.catalog.required.SpotSearchPort
-import org.around.ieuri.tourism.application.catalog.required.SpotSearchQuery
+import org.around.ieuri.tourism.application.catalog.required.dto.SpotSearchQuery
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.Coordinates
 import org.around.ieuri.tourism.domain.shared.CopyrightType

@@ -10,8 +10,8 @@ import org.around.ieuri.tourism.application.category.required.CategoryExternalMa
 import org.around.ieuri.tourism.application.shared.exception.UpstreamRateLimitedException
 import org.around.ieuri.tourism.application.shared.exception.UpstreamTooManyRequestsException
 import org.around.ieuri.tourism.application.shared.exception.UpstreamUnavailableException
-import org.around.ieuri.tourism.application.spot.required.SpotDetailQuery
 import org.around.ieuri.tourism.application.spot.required.TourInfoPort
+import org.around.ieuri.tourism.application.spot.required.dto.SpotDetailQuery
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.spot.SpotDetail

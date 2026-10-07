@@ -1,10 +1,10 @@
 package org.around.ieuri.tourism.application.recommendation
 
-import org.around.ieuri.tourism.application.recommendation.provided.EmbeddingSyncResult
 import org.around.ieuri.tourism.application.recommendation.provided.SpotEmbeddingStoreUseCase
 import org.around.ieuri.tourism.application.recommendation.provided.SpotEmbeddingSyncUseCase
-import org.around.ieuri.tourism.application.recommendation.required.SpotEmbedding
+import org.around.ieuri.tourism.application.recommendation.provided.dto.EmbeddingSyncResult
 import org.around.ieuri.tourism.application.recommendation.required.TextEmbeddingPort
+import org.around.ieuri.tourism.application.recommendation.required.dto.SpotEmbedding
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 

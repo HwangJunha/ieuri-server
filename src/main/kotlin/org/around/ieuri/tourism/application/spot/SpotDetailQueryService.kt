@@ -1,13 +1,13 @@
 package org.around.ieuri.tourism.application.spot
 
-import org.around.ieuri.tourism.application.catalog.required.SpotIdentity
+import org.around.ieuri.tourism.application.catalog.required.dto.SpotIdentity
 import org.around.ieuri.tourism.application.spot.provided.SpotDetailQueryUseCase
 import org.around.ieuri.tourism.application.spot.provided.SpotDetailReadUseCase
 import org.around.ieuri.tourism.application.spot.provided.dto.SpotDetailView
 import org.around.ieuri.tourism.application.spot.required.SpotCachePort
-import org.around.ieuri.tourism.application.spot.required.SpotDetailQuery
 import org.around.ieuri.tourism.application.spot.required.SpotEventPublisherPort
 import org.around.ieuri.tourism.application.spot.required.TourInfoPort
+import org.around.ieuri.tourism.application.spot.required.dto.SpotDetailQuery
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.spot.SpotDetail

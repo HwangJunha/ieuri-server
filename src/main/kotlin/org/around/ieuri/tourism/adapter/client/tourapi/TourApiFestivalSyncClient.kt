@@ -2,8 +2,8 @@ package org.around.ieuri.tourism.adapter.client.tourapi
 
 import org.around.ieuri.tourism.adapter.client.tourapi.mapper.toSpotFestivalOrNull
 import org.around.ieuri.tourism.adapter.config.TourApiProperties
-import org.around.ieuri.tourism.application.spot.required.FestivalSyncPage
 import org.around.ieuri.tourism.application.spot.required.FestivalSyncPort
+import org.around.ieuri.tourism.application.spot.required.dto.FestivalSyncPage
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient

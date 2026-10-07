@@ -1,5 +1,8 @@
 package org.around.ieuri.tourism.application.region.provided
 
+import org.around.ieuri.tourism.application.region.provided.dto.RegionMetricDataset
+import org.around.ieuri.tourism.application.region.provided.dto.RegionMetricPageResult
+import org.around.ieuri.tourism.application.region.provided.dto.RegionMetricTarget
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -20,41 +23,3 @@ interface RegionMetricSyncUseCase {
      */
     fun syncPage(dataset: RegionMetricDataset, target: RegionMetricTarget, pageNo: Int, runDate: LocalDate, baseMonth: YearMonth?): RegionMetricPageResult
 }
-
-/** KTO 빅데이터 지표 4종. 갱신 주기가 달라 잡이 따로다. */
-enum class RegionMetricDataset {
-    /** 시군구 일별 방문자수. 지역 순회 없이 날짜 구간으로 전 지역이 온다. */
-    VISITOR_COUNT,
-
-    /** 관광지 집중률 예측. 시군구마다 부른다. */
-    CONCENTRATION_RATE,
-
-    /** 월 체류 강도. 시도마다 부른다. */
-    STAY_INTENSITY,
-
-    /** 월 소비 강도. 시도마다 부른다. */
-    SPENDING_INTENSITY,
-}
-
-/** 순회 대상 하나. 방문자수는 지역이 없고, 강도는 시도만, 집중률은 시도와 시군구가 함께 필요하다. */
-data class RegionMetricTarget(
-    val provinceCode: String?,
-    val districtCode: String?,
-) {
-    companion object {
-        /** 지역 없이 한 번 부르는 대상(방문자수). */
-        val NATIONWIDE = RegionMetricTarget(provinceCode = null, districtCode = null)
-    }
-}
-
-/**
- * 한 페이지의 결과. [baseMonth]는 월 지표에서 이번 호출이 쓴(또는 찾은) 기준월이며, 못 찾았으면 null이다.
- * - [skippedUnknownCode]가 크면 정적 시군구 테이블이, [dropped]가 크면 응답 필드명이 낡았다는 신호다.
- */
-data class RegionMetricPageResult(
-    val written: Int,
-    val skippedUnknownCode: Int,
-    val dropped: Int,
-    val hasMore: Boolean,
-    val baseMonth: YearMonth? = null,
-)

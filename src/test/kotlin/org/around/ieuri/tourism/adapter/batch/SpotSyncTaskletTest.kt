@@ -5,9 +5,9 @@ import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
 import org.around.ieuri.tourism.application.shared.exception.UpstreamUnavailableException
-import org.around.ieuri.tourism.application.spot.provided.FestivalSweepResult
-import org.around.ieuri.tourism.application.spot.provided.SpotSyncPageResult
 import org.around.ieuri.tourism.application.spot.provided.SpotSyncUseCase
+import org.around.ieuri.tourism.application.spot.provided.dto.FestivalSweepResult
+import org.around.ieuri.tourism.application.spot.provided.dto.SpotSyncPageResult
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.spot.SpotHarvest
 import org.around.ieuri.tourism.domain.spot.SweepBlockedException

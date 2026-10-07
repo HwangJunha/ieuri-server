@@ -12,9 +12,9 @@ import org.around.ieuri.tourism.adapter.persistence.table.SpotCatalogTranslation
 import org.around.ieuri.tourism.adapter.persistence.table.SpotFestivalTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotReactionTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotTable
-import org.around.ieuri.tourism.application.catalog.required.CatalogLanguage
 import org.around.ieuri.tourism.application.catalog.required.SpotCatalogRepository
-import org.around.ieuri.tourism.application.catalog.required.VisibilityRefreshResult
+import org.around.ieuri.tourism.application.catalog.required.dto.CatalogLanguage
+import org.around.ieuri.tourism.application.catalog.required.dto.VisibilityRefreshResult
 import org.around.ieuri.tourism.domain.catalog.CatalogTranslation
 import org.around.ieuri.tourism.domain.catalog.OriginFestivalPeriod
 import org.around.ieuri.tourism.domain.catalog.SpotCatalog

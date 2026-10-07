@@ -5,7 +5,7 @@ import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.CursorPageInfo
 import org.around.ieuri.tourism.application.catalog.provided.dto.LikedSpotView
 import org.around.ieuri.tourism.application.catalog.required.LikedSpotSearchPort
-import org.around.ieuri.tourism.application.catalog.required.LikedSpotsSearch
+import org.around.ieuri.tourism.application.catalog.required.dto.LikedSpotsSearch
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.CopyrightType
 import org.springframework.beans.factory.annotation.Qualifier
