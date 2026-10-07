@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.application.region
 
+import org.around.ieuri.common.pagination.OffsetPage
 import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.region.provided.RegionMetricSyncUseCase
 import org.around.ieuri.tourism.application.region.provided.dto.RegionMetricDataset
@@ -10,6 +11,7 @@ import org.around.ieuri.tourism.application.region.required.DistrictCodeQueryPor
 import org.around.ieuri.tourism.application.region.required.RegionMetricStorePort
 import org.around.ieuri.tourism.application.region.required.RegionMetricSyncPort
 import org.around.ieuri.tourism.application.region.required.dto.RegionMetricSyncPage
+import org.around.ieuri.tourism.domain.region.RegisteredDistricts
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
@@ -69,15 +71,15 @@ class RegionMetricSyncService(
         return RegionMetricPageResult(written = 0, skippedUnknownCode = 0, dropped = 0, hasMore = false)
     }
 
-    /** 등록된 시군구의 행만 적재한다(R9). 예외를 던지지 않는다. */
+    /** 등록된 시군구의 행만 적재한다([RegisteredDistricts]). 예외를 던지지 않는다. */
     private fun <T> store(page: RegionMetricSyncPage<T>, pageNo: Int, districtCodeOf: (T) -> String, upsert: (List<T>) -> Int): RegionMetricPageResult {
-        val knownCodes = if (page.records.isEmpty()) emptySet() else districtCodePort.findAllCodes()
-        val (accepted, skipped) = page.records.partition { districtCodeOf(it) in knownCodes }
+        val registered = RegisteredDistricts(if (page.records.isEmpty()) emptySet() else districtCodePort.findAllCodes())
+        val (accepted, skipped) = page.records.partition { registered.accepts(districtCodeOf(it)) }
         return RegionMetricPageResult(
             written = if (accepted.isEmpty()) 0 else upsert(accepted),
             skippedUnknownCode = skipped.size,
             dropped = page.droppedCount,
-            hasMore = page.hasMore(pageNo, policy.pageSize),
+            hasMore = OffsetPage.hasNextPage(pageNo, policy.pageSize, page.totalCount),
         )
     }
 }

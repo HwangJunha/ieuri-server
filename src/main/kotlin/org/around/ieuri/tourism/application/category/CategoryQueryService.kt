@@ -30,7 +30,7 @@ class CategoryQueryService(
     /** 요청한 모든 코드에 값이 있다 — 표시 정보가 없는 코드는 폴백으로 채운다. */
     override fun categoryDisplays(codes: Set<String>, locale: DomainLocale): Map<String, CategoryDisplay> {
         val found = appCategoryQueryPort.findDisplays(codes, locale)
-        return codes.associateWith { found[it] ?: CategoryDisplay.fallback(SpotCategory(it)) }
+        return codes.associateWith { found[it] ?: SpotCategory(it).let { category -> CategoryDisplay(category, category.defaultLabel, iconUrl = null) } }
     }
 
     override fun externalCode(category: SpotCategory, provider: String, codeset: String): String? = mappingPort.externalCode(category, provider, codeset)

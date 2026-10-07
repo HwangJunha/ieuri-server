@@ -44,7 +44,7 @@ interface SpotCatalogRepository {
     fun deleteReactionsByMember(memberId: Long): Int
 
     /**
-     * 그 언어의 원본이 있는가를 번역의 `visible`에 한꺼번에 반영한다(행은 지우지 않는다).
+     * [org.around.ieuri.tourism.domain.catalog.TranslationVisibility]를 모든 번역의 `visible`에 한꺼번에 반영한다(행은 지우지 않는다). 구현은 그 규칙을 SQL로 옮긴 것이다.
      * - 변경분이 아니라 반영 후 노출 중인 것 전부를 돌려준다.
      */
     fun refreshTranslationVisibility(): VisibilityRefreshResult

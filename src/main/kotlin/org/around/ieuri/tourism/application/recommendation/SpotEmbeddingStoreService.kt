@@ -1,7 +1,7 @@
 package org.around.ieuri.tourism.application.recommendation
 
 import org.around.ieuri.common.persistence.ExposedConfig
-import org.around.ieuri.tourism.application.category.required.AppCategoryQueryPort
+import org.around.ieuri.tourism.application.category.provided.CategoryQueryUseCase
 import org.around.ieuri.tourism.application.recommendation.provided.SpotEmbeddingStoreUseCase
 import org.around.ieuri.tourism.application.recommendation.provided.dto.EmbeddingInput
 import org.around.ieuri.tourism.application.recommendation.required.SpotEmbeddingStorePort
@@ -10,12 +10,12 @@ import org.around.ieuri.tourism.domain.recommendation.EmbeddingText
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
-/** 임베딩 대상 읽기와 벡터 저장. 텍스트의 카테고리 라벨은 행의 언어로, 언어별로 한 번씩만 조회한다. */
+/** 임베딩 대상 읽기와 벡터 저장. 텍스트의 카테고리 라벨은 카테고리 조회를 재사용해 행의 언어로, 언어별로 한 번씩만 조회한다. */
 @Service
 @Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
 class SpotEmbeddingStoreService(
     private val storePort: SpotEmbeddingStorePort,
-    private val appCategoryQueryPort: AppCategoryQueryPort,
+    private val categoryQuery: CategoryQueryUseCase,
     private val policy: RecommendationPolicy,
 ) : SpotEmbeddingStoreUseCase {
 
@@ -23,10 +23,11 @@ class SpotEmbeddingStoreService(
         val embedding = policy.embedding
         val targets = storePort.findTargets(afterTranslationId, limit, embedding.model)
         val labels = targets.groupBy { it.language }.mapValues { (language, rows) ->
-            appCategoryQueryPort.findDisplays(rows.map { it.categoryCode }.toSet(), language)
+            categoryQuery.categoryDisplays(rows.map { it.categoryCode }.toSet(), language)
         }
         return targets.map { target ->
-            val label = labels.getValue(target.language)[target.categoryCode]?.label ?: target.categoryCode
+            // categoryDisplays는 요청한 모든 코드에 값이 있다 — 정의가 없으면 코드 그대로가 라벨이다.
+            val label = labels.getValue(target.language).getValue(target.categoryCode).label
             EmbeddingInput(target.translationId, target.sourceHash, EmbeddingText.of(target.title, label, target.address, target.overview, embedding.overviewMaxChars))
         }
     }

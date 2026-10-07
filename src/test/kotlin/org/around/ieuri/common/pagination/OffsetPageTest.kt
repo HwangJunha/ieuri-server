@@ -32,4 +32,11 @@ class OffsetPageTest {
         assertFalse(page.hasNext)
         assertEquals(0, page.totalCount)
     }
+
+    @Test
+    fun `다음 페이지 판정은 페이지 결과와 같은 식이다`() {
+        assertTrue(OffsetPage.hasNextPage(page = 1, size = 1_000, totalCount = 2_500))
+        assertFalse(OffsetPage.hasNextPage(page = 3, size = 1_000, totalCount = 2_500))
+        assertFalse(OffsetPage.hasNextPage(page = 2, size = 1_000, totalCount = 2_000))
+    }
 }

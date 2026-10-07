@@ -15,9 +15,12 @@ data class OffsetPage<T>(
         fun <T> of(items: List<T>, page: Int, size: Int, totalCount: Int): OffsetPage<T> = OffsetPage(
             items = items,
             page = page,
-            hasNext = page.toLong() * size < totalCount.toLong(),
+            hasNext = hasNextPage(page, size, totalCount),
             totalCount = totalCount,
         )
+
+        /** [size]개씩 자른 [page]번째(1부터) 뒤에 남은 건이 있는가. 곱은 Long으로 해 넘치지 않는다. */
+        fun hasNextPage(page: Int, size: Int, totalCount: Int): Boolean = page.toLong() * size < totalCount.toLong()
 
         /** 결과가 없는 [page]번째 페이지. */
         fun <T> empty(page: Int): OffsetPage<T> = OffsetPage(items = emptyList(), page = page, hasNext = false, totalCount = 0)

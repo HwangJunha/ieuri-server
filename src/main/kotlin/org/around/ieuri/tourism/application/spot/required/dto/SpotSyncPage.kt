@@ -13,7 +13,4 @@ data class SpotSyncPage(
     val categoryFallbackCount: Int,
     /** 비관광 키워드에 걸려 적재하지 않은 항목 수. */
     val excludedCount: Int = 0,
-) {
-    /** upstream에 다음 페이지가 남았는지. */
-    fun hasMore(pageNo: Int, numOfRows: Int): Boolean = pageNo.toLong() * numOfRows.toLong() < totalCount.toLong()
-}
+)

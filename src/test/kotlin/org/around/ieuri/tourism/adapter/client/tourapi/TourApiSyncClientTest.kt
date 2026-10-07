@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.adapter.client.tourapi
 
+import org.around.ieuri.common.pagination.OffsetPage
 import org.around.ieuri.tourism.adapter.config.TourApiProperties
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.CopyrightType
@@ -175,10 +176,10 @@ class TourApiSyncClientTest {
     fun `다음 페이지 존재 여부는 totalCount로 판정한다`() {
         val page = client.mapPage(response(listOf(item()), totalCount = 2_500), DomainLocale.KO)
 
-        assertTrue(page.hasMore(pageNo = 1, numOfRows = 1_000))
-        assertTrue(page.hasMore(pageNo = 2, numOfRows = 1_000))
+        assertEquals(2_500, page.totalCount)
+        assertTrue(OffsetPage.hasNextPage(page = 2, size = 1_000, totalCount = page.totalCount))
         // 3페이지까지면 3000 >= 2500이라 소진.
-        assertTrue(!page.hasMore(pageNo = 3, numOfRows = 1_000))
+        assertTrue(!OffsetPage.hasNextPage(page = 3, size = 1_000, totalCount = page.totalCount))
     }
 
     // ---------- 비관광 항목 제외 (SPEC-0018) ----------

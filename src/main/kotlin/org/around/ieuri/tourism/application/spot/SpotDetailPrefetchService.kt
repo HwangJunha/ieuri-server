@@ -10,7 +10,7 @@ import kotlinx.coroutines.runBlocking
 import org.around.ieuri.tourism.application.shared.exception.UpstreamRateLimitedException
 import org.around.ieuri.tourism.application.spot.provided.SpotCommandUseCase
 import org.around.ieuri.tourism.application.spot.provided.SpotDetailPrefetchUseCase
-import org.around.ieuri.tourism.application.spot.provided.SpotPrefetchQueryUseCase
+import org.around.ieuri.tourism.application.spot.provided.SpotDetailReadUseCase
 import org.around.ieuri.tourism.application.spot.provided.dto.PrefetchResult
 import org.around.ieuri.tourism.application.spot.provided.dto.PrefetchTarget
 import org.around.ieuri.tourism.application.spot.provided.dto.SpotDetailPart
@@ -31,7 +31,7 @@ import java.time.Instant
  * - 빈 등록은 `SpotDetailPrefetchConfig`가 한다(batch 프로파일 전용). `@Service`를 붙이지 않는다.
  */
 class SpotDetailPrefetchService(
-    private val prefetchQueryUseCase: SpotPrefetchQueryUseCase,
+    private val detailRead: SpotDetailReadUseCase,
     private val tourInfoPort: TourInfoPort,
     private val spotCommandUseCase: SpotCommandUseCase,
     private val policy: SpotDetailPrefetchPolicy,
@@ -55,7 +55,7 @@ class SpotDetailPrefetchService(
 
     override fun prefetchNext(part: SpotDetailPart, afterSpotId: Long, limit: Int): PrefetchResult {
         val staleBefore = Instant.now().minus(policy.refreshAfter)
-        val targets = prefetchQueryUseCase.findTargets(part, afterSpotId, limit, staleBefore)
+        val targets = detailRead.prefetchTargets(part, afterSpotId, limit, staleBefore)
         if (targets.isEmpty()) return PrefetchResult(processed = 0, failed = 0, lastSpotId = afterSpotId)
 
         val fetched = runBlocking { fetchAll(part, targets) }
@@ -115,7 +115,7 @@ class SpotDetailPrefetchService(
             if (detail.value != null) {
                 spotCommandUseCase.saveDetail(target.spotId, detail.value)
             } else {
-                spotCommandUseCase.saveDetailAbsence(target.spotId, target.absentDetail())
+                spotCommandUseCase.saveDetailAbsence(target.spotId, SpotDetail.absent(target.title, target.category, target.thumbnailImageUrl, target.address, target.copyright))
             }
 
         is Detail.Gallery -> spotCommandUseCase.saveGallery(target.spotId, detail.value)

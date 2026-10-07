@@ -11,6 +11,9 @@ value class SpotCategory(val code: String) {
         require(code.length <= MAX_LENGTH) { "카테고리 코드는 ${MAX_LENGTH}자를 넘을 수 없습니다." }
     }
 
+    /** 표시 정보가 정의되지 않았을 때의 라벨 — 코드 그대로다. */
+    val defaultLabel: String get() = code
+
     override fun toString(): String = code
 
     companion object {

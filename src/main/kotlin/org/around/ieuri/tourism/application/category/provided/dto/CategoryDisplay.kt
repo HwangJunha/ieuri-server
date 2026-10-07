@@ -9,9 +9,4 @@ data class CategoryDisplay(
     val label: String,
     /** 칩·마커 이미지. 설정되지 않았으면 null이다. */
     val iconUrl: String?,
-) {
-    companion object {
-        /** 번역·정의가 없는 코드의 표현. 코드를 그대로 라벨로 쓴다. */
-        fun fallback(category: SpotCategory) = CategoryDisplay(category = category, label = category.code, iconUrl = null)
-    }
-}
+)

@@ -2,6 +2,7 @@ package org.around.ieuri.tourism.application.spot.required
 
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.DomainLocale
+import org.around.ieuri.tourism.domain.shared.FestivalPeriod
 import org.around.ieuri.tourism.domain.spot.Spot
 import org.around.ieuri.tourism.domain.spot.SpotDetail
 import org.around.ieuri.tourism.domain.spot.SpotFestival
@@ -9,7 +10,6 @@ import org.around.ieuri.tourism.domain.spot.SpotImage
 import org.around.ieuri.tourism.domain.spot.SpotInfoItem
 import org.around.ieuri.tourism.domain.spot.SpotIntro
 import java.time.Instant
-import java.time.LocalDate
 
 /**
  * 원본 관광지 저장소. 원본(`spot`)과 그에 딸린 축제·상세를 쓴다. 수집 배치와 상세 적재가 쓴다.
@@ -32,8 +32,8 @@ interface SpotRepository {
     /** 축제 한 페이지를 upsert하고 실제로 쓴 행 수를 돌려준다. 대응하는 원본이 없는 항목은 건너뛴다. */
     fun upsertFestivals(festivals: List<SpotFestival>, syncedAt: Instant): Int
 
-    /** [language]에서 종료일이 [asOf]보다 이전인 축제 원본을 지운다. 종료일 당일은 지우지 않는다(`FestivalPeriod.isEndedAsOf`). */
-    fun deleteEndedFestivals(language: DomainLocale, asOf: LocalDate): Int
+    /** [language]의 원본 중 [contentIds]를 지우고 지운 행 수를 돌려준다. 무엇을 지울지는 호출자가 도메인으로 정한다. */
+    fun deleteSpots(language: DomainLocale, contentIds: Set<String>): Int
 
     /**
      * [language]의 축제 카테고리 원본 중 [survivingContentIds]에 없는 것을 지운다.
@@ -41,8 +41,8 @@ interface SpotRepository {
      */
     fun deleteMissingFestivals(language: DomainLocale, survivingContentIds: Set<String>): Int
 
-    /** [language]에서 종료일이 [asOf]보다 이전인 축제의 contentId. 수집이 이것을 되살리지 않게 거른다. */
-    fun findEndedFestivalContentIds(language: DomainLocale, asOf: LocalDate): Set<String>
+    /** [language]의 축제 원본 contentId → 행사 기간. 끝났는지는 도메인([org.around.ieuri.tourism.domain.spot.EndedFestivals])이 판정한다. */
+    fun findFestivalPeriods(language: DomainLocale): Map<String, FestivalPeriod>
 
     /** 본문을 쓰고 확보 시각을 새로 시작한다. 부재였던 행은 본문 있음으로 돌아간다. */
     fun saveDetail(spotId: Long, detail: SpotDetail)

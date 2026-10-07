@@ -54,7 +54,8 @@ class SpotSyncServiceTest {
     fun `ended festivals are not stored but still reported as seen`() {
         val records = listOf(spot("a"), spot("ended", SpotCategory.FESTIVAL_EVENT))
         every { spotSyncPort.fetchPage(DomainLocale.KO, 1, 100) } returns SpotSyncPage(records, totalCount = 250, droppedCount = 1, categoryFallbackCount = 2, excludedCount = 3)
-        every { repository.findEndedFestivalContentIds(DomainLocale.KO, runDate) } returns setOf("ended")
+        // 끝났는지는 도메인이 기간으로 판정한다 — 종료일이 실행일 전이면 끝났다.
+        every { repository.findFestivalPeriods(DomainLocale.KO) } returns mapOf("ended" to FestivalPeriod(runDate.minusDays(5), runDate.minusDays(1)))
         every { repository.upsertSpots(listOf(spot("a")), syncedAt) } returns 1
 
         val result = service.syncSpotPage(DomainLocale.KO, 1, 100, syncedAt, runDate)
@@ -82,7 +83,7 @@ class SpotSyncServiceTest {
         assertThrows<SweepBlockedException> { service.sweepFestivals(DomainLocale.KO, SpotHarvest(setOf("f"), resumed = true), runDate) }
 
         verify(exactly = 0) { repository.deleteMissingSpots(any(), any()) }
-        verify(exactly = 0) { repository.deleteEndedFestivals(any(), any()) }
+        verify(exactly = 0) { repository.deleteSpots(any(), any()) }
     }
 
     @Test
@@ -91,7 +92,12 @@ class SpotSyncServiceTest {
         val festival = SpotFestival("f1", DomainLocale.KO, FestivalPeriod(runDate, runDate.plusDays(3)), null, null)
         every { festivalSyncPort.fetchPage(DomainLocale.KO, runDate, 1, 100) } returns FestivalSyncPage(listOf(festival), totalCount = 1, droppedCount = 0)
         every { repository.upsertFestivals(listOf(festival), syncedAt) } returns 1
-        every { repository.deleteEndedFestivals(DomainLocale.KO, runDate) } returns 2
+        every { repository.findFestivalPeriods(DomainLocale.KO) } returns mapOf(
+            "old" to FestivalPeriod(runDate.minusDays(9), runDate.minusDays(1)),
+            "today" to FestivalPeriod(runDate.minusDays(2), runDate),
+            "f1" to FestivalPeriod(runDate, runDate.plusDays(3)),
+        )
+        every { repository.deleteSpots(DomainLocale.KO, setOf("old")) } returns 2
         every { repository.deleteMissingFestivals(DomainLocale.KO, setOf("f1")) } returns 3
 
         val page = service.syncFestivalPage(DomainLocale.KO, 1, 100, syncedAt, runDate)
@@ -102,7 +108,7 @@ class SpotSyncServiceTest {
         assertEquals(2, swept.ended)
         assertEquals(3, swept.missing)
         verifyOrder {
-            repository.deleteEndedFestivals(DomainLocale.KO, runDate)
+            repository.deleteSpots(DomainLocale.KO, setOf("old"))
             repository.deleteMissingFestivals(DomainLocale.KO, setOf("f1"))
         }
     }

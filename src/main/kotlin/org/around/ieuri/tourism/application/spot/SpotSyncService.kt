@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.application.spot
 
+import org.around.ieuri.common.pagination.OffsetPage
 import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.spot.provided.SpotSyncUseCase
 import org.around.ieuri.tourism.application.spot.provided.dto.FestivalSweepResult
@@ -8,6 +9,7 @@ import org.around.ieuri.tourism.application.spot.required.FestivalSyncPort
 import org.around.ieuri.tourism.application.spot.required.SpotRepository
 import org.around.ieuri.tourism.application.spot.required.SpotSyncPort
 import org.around.ieuri.tourism.domain.shared.DomainLocale
+import org.around.ieuri.tourism.domain.spot.EndedFestivals
 import org.around.ieuri.tourism.domain.spot.SpotHarvest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -26,13 +28,13 @@ class SpotSyncService(
     override fun syncSpotPage(language: DomainLocale, pageNo: Int, pageSize: Int, syncedAt: Instant, runDate: LocalDate): SpotSyncPageResult {
         val page = spotSyncPort.fetchPage(language, pageNo, pageSize)
 
-        val ended = spotRepository.findEndedFestivalContentIds(language, runDate)
-        val written = spotRepository.upsertSpots(page.records.filterNot { it.contentId in ended }, syncedAt)
+        val ended = EndedFestivals(spotRepository.findFestivalPeriods(language), runDate)
+        val written = spotRepository.upsertSpots(ended.excludeFrom(page.records), syncedAt)
 
         return SpotSyncPageResult(
             written = written,
             contentIds = page.records.map { it.contentId },
-            hasMore = page.hasMore(pageNo, pageSize),
+            hasMore = OffsetPage.hasNextPage(pageNo, pageSize, page.totalCount),
             dropped = page.droppedCount,
             categoryFallback = page.categoryFallbackCount,
             excluded = page.excludedCount,
@@ -49,7 +51,7 @@ class SpotSyncService(
         return SpotSyncPageResult(
             written = written,
             contentIds = page.records.map { it.contentId },
-            hasMore = page.hasMore(pageNo, pageSize),
+            hasMore = OffsetPage.hasNextPage(pageNo, pageSize, page.totalCount),
             dropped = page.droppedCount,
         )
     }
@@ -57,7 +59,8 @@ class SpotSyncService(
     override fun sweepFestivals(language: DomainLocale, harvest: SpotHarvest, runDate: LocalDate): FestivalSweepResult {
         val survivors = harvest.survivors()
 
-        val ended = spotRepository.deleteEndedFestivals(language, runDate)
+        // 끝난 축제를 먼저 지운다 — 그다음 "이번 수집에 없는" 축제를 지운다.
+        val ended = spotRepository.deleteSpots(language, EndedFestivals(spotRepository.findFestivalPeriods(language), runDate).contentIds)
         val missing = spotRepository.deleteMissingFestivals(language, survivors)
         return FestivalSweepResult(ended = ended, missing = missing)
     }

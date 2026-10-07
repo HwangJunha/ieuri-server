@@ -7,7 +7,4 @@ data class FestivalSyncPage(
     val records: List<SpotFestival>,
     val totalCount: Int,
     val droppedCount: Int,
-) {
-    /** upstream에 다음 페이지가 남았는지. */
-    fun hasMore(pageNo: Int, numOfRows: Int): Boolean = pageNo.toLong() * numOfRows.toLong() < totalCount.toLong()
-}
+)

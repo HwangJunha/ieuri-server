@@ -83,8 +83,11 @@ fun ResultRow.toCatalogTranslation(): CatalogTranslation = CatalogTranslation(
 fun ResultRow.toOriginFestivalPeriod(): OriginFestivalPeriod = OriginFestivalPeriod(
     spotId = this[SpotTable.id],
     language = DomainLocale.valueOf(this[SpotTable.language]),
-    period = FestivalPeriod(start = this[SpotFestivalTable.eventStartDate], end = this[SpotFestivalTable.eventEndDate]),
+    period = toFestivalPeriod(),
 )
+
+/** 원본 축제의 행사 기간. 시작일·종료일은 같은 타입이라 뒤바뀌기 쉽다. */
+fun ResultRow.toFestivalPeriod(): FestivalPeriod = FestivalPeriod(start = this[SpotFestivalTable.eventStartDate], end = this[SpotFestivalTable.eventEndDate])
 
 /** 원본 한 행. `last_synced_at`은 호출자가 회차 시각으로 쓴다. 좌표는 (경도=map_x, 위도=map_y)다. */
 fun Spot.writeTo(row: UpdateBuilder<*>) {

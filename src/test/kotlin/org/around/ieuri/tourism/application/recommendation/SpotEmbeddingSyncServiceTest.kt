@@ -4,6 +4,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
+import org.around.ieuri.tourism.application.category.CategoryQueryService
 import org.around.ieuri.tourism.application.category.provided.dto.CategoryDisplay
 import org.around.ieuri.tourism.application.category.required.AppCategoryQueryPort
 import org.around.ieuri.tourism.application.recommendation.required.SpotEmbeddingStorePort
@@ -31,7 +32,7 @@ class SpotEmbeddingSyncServiceTest {
         tasteMinReactions = 5,
         embedding = EmbeddingSpec(model = "voyage-4", dimension = 3, retryCount = 2, overviewMaxChars = 500),
     )
-    private val service = SpotEmbeddingSyncService(SpotEmbeddingStoreService(storePort, categoryPort, policy), embeddingPort, policy)
+    private val service = SpotEmbeddingSyncService(SpotEmbeddingStoreService(storePort, CategoryQueryService(categoryPort, mockk()), policy), embeddingPort, policy)
 
     private val targets = listOf(
         EmbeddingTarget(11L, "hash-11", DomainLocale.KO, "나이키 가산점", "SHOPPING", "서울 금천구", "스포츠 브랜드 매장이다."),

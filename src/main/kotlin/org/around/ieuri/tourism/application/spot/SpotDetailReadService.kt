@@ -7,6 +7,8 @@ import org.around.ieuri.tourism.application.category.provided.exception.UnknownC
 import org.around.ieuri.tourism.application.category.required.AppCategoryQueryPort
 import org.around.ieuri.tourism.application.spot.provided.SpotDetailReadUseCase
 import org.around.ieuri.tourism.application.spot.provided.dto.KnownIntro
+import org.around.ieuri.tourism.application.spot.provided.dto.PrefetchTarget
+import org.around.ieuri.tourism.application.spot.provided.dto.SpotDetailPart
 import org.around.ieuri.tourism.application.spot.provided.exception.SpotDetailNotFoundException
 import org.around.ieuri.tourism.application.spot.provided.exception.SpotNotFoundInLocaleQueryException
 import org.around.ieuri.tourism.application.spot.required.SpotDetailQueryPort
@@ -18,6 +20,7 @@ import org.around.ieuri.tourism.domain.spot.SpotImage
 import org.around.ieuri.tourism.domain.spot.SpotInfoItem
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Instant
 
 /** 상세 조회의 DB 단계 구현. 캐시·업스트림은 모른다. */
 @Service
@@ -43,6 +46,8 @@ class SpotDetailReadService(
     override fun storedIntro(spotId: Long, category: SpotCategory): KnownIntro? = detailQueryPort.findIntro(spotId, category)
 
     override fun storedInfoItems(spotId: Long, category: SpotCategory): List<SpotInfoItem>? = detailQueryPort.findInfoItems(spotId, category)
+
+    override fun prefetchTargets(part: SpotDetailPart, afterSpotId: Long, limit: Int, staleBefore: Instant): List<PrefetchTarget> = detailQueryPort.findPrefetchTargets(part, afterSpotId, limit, staleBefore)
 
     override fun absentDetail(catalogId: Long, locale: DomainLocale): SpotDetail {
         // findSpotBasics는 카탈로그 id로 묻는다.

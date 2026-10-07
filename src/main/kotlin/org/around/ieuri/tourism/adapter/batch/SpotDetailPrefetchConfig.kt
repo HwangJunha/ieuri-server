@@ -4,7 +4,7 @@ import org.around.ieuri.tourism.application.spot.SpotDetailPrefetchPolicy
 import org.around.ieuri.tourism.application.spot.SpotDetailPrefetchService
 import org.around.ieuri.tourism.application.spot.provided.SpotCommandUseCase
 import org.around.ieuri.tourism.application.spot.provided.SpotDetailPrefetchUseCase
-import org.around.ieuri.tourism.application.spot.provided.SpotPrefetchQueryUseCase
+import org.around.ieuri.tourism.application.spot.provided.SpotDetailReadUseCase
 import org.around.ieuri.tourism.application.spot.required.TourInfoPort
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -25,9 +25,9 @@ class SpotDetailPrefetchConfig {
 
     @Bean
     fun spotDetailPrefetchService(
-        prefetchQueryUseCase: SpotPrefetchQueryUseCase,
+        detailRead: SpotDetailReadUseCase,
         tourInfoPort: TourInfoPort,
         spotCommandUseCase: SpotCommandUseCase,
         policy: SpotDetailPrefetchPolicy,
-    ): SpotDetailPrefetchUseCase = SpotDetailPrefetchService(prefetchQueryUseCase, tourInfoPort, spotCommandUseCase, policy)
+    ): SpotDetailPrefetchUseCase = SpotDetailPrefetchService(detailRead, tourInfoPort, spotCommandUseCase, policy)
 }

@@ -87,7 +87,7 @@ fun SpotInfoItem.toGql(): GqlSpotInfoItem = GqlSpotInfoItem(name = name, text = 
  * 코드만 채운 카테고리. label·iconUrl은 요청될 때 CategoryDisplayResolver가 언어에 맞춰 채운다.
  * - 그 전까지 label은 코드와 같다.
  */
-fun SpotCategory.toGqlCodeOnly(): GqlSpotCategory = GqlSpotCategory(code = code, label = code, iconUrl = null)
+fun SpotCategory.toGqlCodeOnly(): GqlSpotCategory = GqlSpotCategory(code = code, label = defaultLabel, iconUrl = null)
 
 /** 앱 구성의 카테고리 1건. 표시 정보가 이미 해석돼 있다. */
 fun CategoryDisplay.toGql(): GqlSpotCategory = GqlSpotCategory(code = category.code, label = label, iconUrl = iconUrl)

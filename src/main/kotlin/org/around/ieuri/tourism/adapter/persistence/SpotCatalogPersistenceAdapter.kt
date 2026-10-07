@@ -19,6 +19,7 @@ import org.around.ieuri.tourism.domain.catalog.CatalogTranslation
 import org.around.ieuri.tourism.domain.catalog.OriginFestivalPeriod
 import org.around.ieuri.tourism.domain.catalog.SpotCatalog
 import org.around.ieuri.tourism.domain.catalog.SpotReaction
+import org.around.ieuri.tourism.domain.catalog.TranslationVisibility
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.shared.FestivalPeriod
 import org.jetbrains.exposed.v1.core.JoinType
@@ -136,9 +137,12 @@ class SpotCatalogPersistenceAdapter : SpotCatalogRepository {
 
     override fun deleteReactionsByMember(memberId: Long): Int = SpotReactionTable.deleteWhere { SpotReactionTable.memberId eq memberId }
 
-    /** 상태가 실제로 바뀐 행만 갱신하고, 반영 후 노출 중인 것 전부를 돌려준다. */
+    /**
+     * [TranslationVisibility.isSatisfiedBy]의 SQL 번역 — 규칙이 바뀌면 둘을 함께 바꾼다.
+     * - 상태가 실제로 바뀐 행만 갱신하고, 반영 후 노출 중인 것 전부를 돌려준다.
+     */
     override fun refreshTranslationVisibility(): VisibilityRefreshResult {
-        // 그 언어의 원본이 있는가 = 노출 여부.
+        // 그 언어의 원본(spot)이 이 카탈로그에 붙어 있는가 = 노출 여부.
         val originExists = exists(
             SpotTable.select(SpotTable.id).where {
                 (SpotTable.catalogId eq SpotCatalogTranslationTable.catalogId) and (SpotTable.language eq SpotCatalogTranslationTable.language)

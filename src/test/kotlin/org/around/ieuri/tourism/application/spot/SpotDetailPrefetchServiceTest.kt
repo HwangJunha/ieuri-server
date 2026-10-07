@@ -6,7 +6,7 @@ import io.mockk.verify
 import org.around.ieuri.tourism.application.shared.exception.UpstreamRateLimitedException
 import org.around.ieuri.tourism.application.shared.exception.UpstreamUnavailableException
 import org.around.ieuri.tourism.application.spot.provided.SpotCommandUseCase
-import org.around.ieuri.tourism.application.spot.provided.SpotPrefetchQueryUseCase
+import org.around.ieuri.tourism.application.spot.provided.SpotDetailReadUseCase
 import org.around.ieuri.tourism.application.spot.provided.dto.PrefetchTarget
 import org.around.ieuri.tourism.application.spot.provided.dto.SpotDetailPart
 import org.around.ieuri.tourism.application.spot.required.TourInfoPort
@@ -28,7 +28,7 @@ import kotlin.test.assertFailsWith
  */
 class SpotDetailPrefetchServiceTest {
 
-    private lateinit var targetQueryPort: SpotPrefetchQueryUseCase
+    private lateinit var targetQueryPort: SpotDetailReadUseCase
     private lateinit var tourInfoPort: TourInfoPort
     private lateinit var upsertPort: SpotCommandUseCase
     private lateinit var service: SpotDetailPrefetchService
@@ -160,7 +160,7 @@ class SpotDetailPrefetchServiceTest {
     }
 
     private fun givenTargets(part: SpotDetailPart, targets: List<PrefetchTarget>) {
-        every { targetQueryPort.findTargets(part, any(), any(), any()) } returns targets
+        every { targetQueryPort.prefetchTargets(part, any(), any(), any()) } returns targets
     }
 
     private fun target(spotId: Long) = PrefetchTarget(

@@ -2,6 +2,7 @@ package org.around.ieuri.tourism.adapter.persistence
 
 import org.around.ieuri.common.persistence.setFromInsert
 import org.around.ieuri.common.persistence.touchedWhenChanged
+import org.around.ieuri.tourism.adapter.persistence.mapper.toFestivalPeriod
 import org.around.ieuri.tourism.adapter.persistence.mapper.writeTo
 import org.around.ieuri.tourism.adapter.persistence.table.SpotDetailImageTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotDetailInfoTable
@@ -12,6 +13,7 @@ import org.around.ieuri.tourism.adapter.persistence.table.SpotTable
 import org.around.ieuri.tourism.application.spot.required.SpotRepository
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.DomainLocale
+import org.around.ieuri.tourism.domain.shared.FestivalPeriod
 import org.around.ieuri.tourism.domain.spot.Spot
 import org.around.ieuri.tourism.domain.spot.SpotDetail
 import org.around.ieuri.tourism.domain.spot.SpotFestival
@@ -22,7 +24,6 @@ import org.jetbrains.exposed.v1.core.JoinType
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.inList
-import org.jetbrains.exposed.v1.core.less
 import org.jetbrains.exposed.v1.core.statements.insertValue
 import org.jetbrains.exposed.v1.javatime.CurrentTimestampWithTimeZone
 import org.jetbrains.exposed.v1.jdbc.batchUpsert
@@ -31,7 +32,6 @@ import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.upsert
 import org.springframework.stereotype.Repository
 import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneOffset
 
 /**
@@ -102,7 +102,7 @@ class SpotPersistenceAdapter : SpotRepository {
         return parented.size
     }
 
-    override fun deleteEndedFestivals(language: DomainLocale, asOf: LocalDate): Int = deleteSpotsInChunks(language, findEndedFestivalContentIds(language, asOf).toList())
+    override fun deleteSpots(language: DomainLocale, contentIds: Set<String>): Int = deleteSpotsInChunks(language, contentIds.toList())
 
     /** 대상은 `spot_festival`이 아니라 축제 카테고리 원본 전체다 — 축제 API는 진행 중인 것만 주므로 "이번 수집에 없다 = 끝났다"다. */
     override fun deleteMissingFestivals(language: DomainLocale, survivingContentIds: Set<String>): Int {
@@ -115,12 +115,11 @@ class SpotPersistenceAdapter : SpotRepository {
         return deleteSpotsInChunks(language, doomed)
     }
 
-    /** `event_end_date < asOf` — 종료일 당일은 유효하다(`FestivalPeriod.isEndedAsOf`와 같은 부등호). */
-    override fun findEndedFestivalContentIds(language: DomainLocale, asOf: LocalDate): Set<String> = SpotFestivalTable
+    override fun findFestivalPeriods(language: DomainLocale): Map<String, FestivalPeriod> = SpotFestivalTable
         .join(SpotTable, JoinType.INNER, SpotFestivalTable.spotId, SpotTable.id)
-        .select(SpotTable.contentId)
-        .where { (SpotTable.language eq language.name) and (SpotFestivalTable.eventEndDate less asOf) }
-        .mapTo(mutableSetOf()) { it[SpotTable.contentId] }
+        .select(SpotTable.contentId, SpotFestivalTable.eventStartDate, SpotFestivalTable.eventEndDate)
+        .where { SpotTable.language eq language.name }
+        .associate { it[SpotTable.contentId] to it.toFestivalPeriod() }
 
     override fun saveDetail(spotId: Long, detail: SpotDetail) = upsertDetail(spotId, detail, bodyAbsent = false)
 
