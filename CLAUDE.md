@@ -164,9 +164,10 @@ Uses the Gradle wrapper (`./gradlew`); Gradle 9.5.1, Java toolchain 25.
 
   Two things this is *not*. Injecting the other domain's inbound `port/in` from an `out/client` adapter is the sanctioned cross-domain path (`SpotLookupAdapter` → `SpotQueryUseCase`). And a port whose implementation is a thin shim over a `common/` utility is fine — `EmailEncryptorPort` resolves to three lines wrapping `common/security/AesGcmCipher`, and the encryption happens *inside* entity↔domain mapping, so hoisting it would push storage format up into the service.
 
-  Two exceptions stand today, both because hoisting makes it worse:
-    - **`TourApiClient`/`TourApiSyncClient` → `CategoryExternalMappingPort`.** The mapping resolves a domain category into TourAPI's `contentTypeId` *while building the request*. The service cannot sequence it without learning TourAPI's wire format.
-    - **`out/event` listeners injecting an outbound port** (`SpotDetailWriteBehindListener`, `VerificationEmailListener`, `NewMessageBroadcastListener`, `PostViewCountListener`). These are one-line event→port bridges with no service between them. The honest fix is to move them to `adapter/in/event/` — where the other domains' listeners already live — not to invent a forwarding use case. Left as a structural decision, not a wiring one.
+  `TourApiClient`/`TourApiSyncClient` resolve a category into TourAPI's `contentTypeId` *while building the request*; they do it through the `CategoryMappingQueryUseCase` inbound port, not the outbound one — the service cannot sequence it without learning TourAPI's wire format.
+
+  One exception stands today, because hoisting makes it worse:
+    - **`out/event` listeners injecting an outbound port** (`VerificationEmailListener`, `NewMessageBroadcastListener`, `PostViewCountListener`). These are one-line event→port bridges with no service between them. The honest fix is to move them to `adapter/in/event/` — where the other domains' listeners already live — not to invent a forwarding use case. Left as a structural decision, not a wiring one.
 
 - **Security is on the request path.** `spring-boot-starter-security` locks endpoints down by default; `auth/infrastructure/config/SecurityConfig.kt` opens GraphQL, and introspection is toggled per profile (`local` only). Per-field authorization is still ours to write.
 
@@ -365,6 +366,11 @@ fixed only within that bound; anything that needs a migration or a schema field 
   comments, answers) are atomic increments in the repository, not aggregate state. An aggregate that
   can be changed concurrently carries a `version` column. External I/O (HTTP, Valkey, R2) runs
   outside the transaction. Reads skip the aggregate and project straight into read DTOs.
+- **Batch tasklets are inbound adapters: they call use cases, never ports or repositories.** A step
+  gets no transaction manager (`StepBuilder.tasklet(tasklet)`); one use-case call is one
+  transaction, so a sync commits per page and the sweep commits on its own. A service whose work
+  wraps upstream calls between DB steps (prefetch, embedding) has no transaction of its own and calls
+  transactional use cases for each DB step (SPEC-0039 D-81·D-83).
 - **Exposed: DSL only, never DAO** (DAO is Active Record — the JPA-as-domain problem again).
   `Table` objects live in `adapter/persistence/table/` and mirror the migration — nothing checks this
   at startup (no library offers it), so a drift surfaces on the first query that touches it. Transactions use Spring
@@ -377,9 +383,15 @@ fixed only within that bound; anything that needs a migration or a schema field 
   query, so nothing is held while they run. Concurrent writes use conditional, column-scoped updates
   (`WHERE col IS NULL OR col < :v` for values that only move forward, atomic `+ 1`/`- 1` for
   counters, `UPDATE … RETURNING` to learn what this call changed) rather than read-modify-write.
-  PostGIS, CTEs, pgvector distance and temp-table SQL stay raw SQL, through `exposedJdbcTemplate` (a
-  `JdbcTemplate` on `exposedDataSource`, injected by parameter name — it joins the Exposed
-  transaction). Declaring a table: identity id → `autoIncrement()`, read the generated
+  **Main-DB queries are DSL, including PostGIS and pgvector** — use the shared expressions in
+  `common/persistence` (`PostgisExpressions.kt`, `PgVectorExpressions.kt`, `UpsertExpressions.kt`)
+  and add a `CustomFunction`/`CustomOperator` there when one is missing. A CTE is written as a
+  subquery (`Query.alias`) or a scalar subquery (`wrapAsExpression`). When the DSL cannot express a
+  statement, change its shape (read the parent id, then upsert; insert-ignore, then re-read) before
+  reaching for `exec()`. Migrated contexts do not use `JdbcTemplate` on the main DB; the search node
+  (paradedb) stays raw SQL through `searchJdbcTemplate` (SPEC-0039 D-82). Two community adapters
+  (`SpotCatalogLanguagePersistenceAdapter`, `PostSpatialQueryAdapter`) still use `exposedJdbcTemplate` —
+  community is frozen after device testing, so they are a recorded follow-up, not a precedent. Declaring a table: identity id → `autoIncrement()`, read the generated
   value with `insertReturning`; `DEFAULT now()` → `databaseGenerated()`; `timestamptz` →
   `timestampWithTimeZone`; FKs → `onUpdate = NO_ACTION` and the DB's constraint name; CHECK, index and
   UNIQUE names exactly as in the migration.
