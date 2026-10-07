@@ -1,8 +1,7 @@
 package org.around.ieuri.tourism.application.spot.provided
 
 import org.around.ieuri.tourism.application.catalog.required.SpotIdentity
-import org.around.ieuri.tourism.application.spot.required.KnownIntro
-import org.around.ieuri.tourism.application.spot.required.StoredDetail
+import org.around.ieuri.tourism.application.spot.provided.dto.KnownIntro
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.spot.SpotDetail
@@ -23,7 +22,7 @@ interface SpotDetailReadUseCase {
     /** 정의되지 않은 카테고리면 UNKNOWN_CATEGORY다. 상세 하위 필드에만 건다. */
     fun requireKnownCategory(category: SpotCategory)
 
-    fun storedDetail(spotId: Long): StoredDetail?
+    fun storedDetail(spotId: Long): SpotDetail?
 
     fun storedGallery(spotId: Long): List<SpotImage>?
 

@@ -7,8 +7,6 @@ import io.mockk.verify
 import org.around.ieuri.common.event.LocationAccessed
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.CursorPageInfo
-import org.around.ieuri.tourism.application.catalog.MapViewportPolicy
-import org.around.ieuri.tourism.application.catalog.SpotQueryPolicy
 import org.around.ieuri.tourism.application.catalog.provided.dto.LikedSpotView
 import org.around.ieuri.tourism.application.catalog.provided.dto.LikedSpotsQuery
 import org.around.ieuri.tourism.application.catalog.provided.dto.MapSpotView

@@ -1,8 +1,5 @@
 package org.around.ieuri.tourism.application.region.required
 
-import org.around.ieuri.tourism.application.region.required.DistrictRegion
-import org.around.ieuri.tourism.application.region.required.RegionMetric
-import org.around.ieuri.tourism.application.region.required.RegionRow
 import org.around.ieuri.tourism.domain.shared.AreaName
 import org.around.ieuri.tourism.domain.shared.Coordinates
 

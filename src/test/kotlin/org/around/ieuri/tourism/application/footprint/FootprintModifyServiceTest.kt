@@ -3,7 +3,6 @@ package org.around.ieuri.tourism.application.footprint
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import org.around.ieuri.tourism.application.footprint.FootprintPolicy
 import org.around.ieuri.tourism.application.footprint.provided.dto.RecordVisitsCommand
 import org.around.ieuri.tourism.application.footprint.provided.dto.RemoveVisitCommand
 import org.around.ieuri.tourism.application.footprint.required.FootprintQueryPort

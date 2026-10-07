@@ -1,4 +1,4 @@
-package org.around.ieuri.tourism.application.spot.required
+package org.around.ieuri.tourism.application.spot.provided.dto
 
 import org.around.ieuri.tourism.domain.spot.SpotIntro
 

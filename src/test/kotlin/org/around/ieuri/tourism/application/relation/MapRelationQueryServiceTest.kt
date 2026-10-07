@@ -84,6 +84,23 @@ class MapRelationQueryServiceTest {
     }
 
     @Test
+    fun `끝자리 탈퇴자가 걸러져도 endCursor는 읽어 온 마지막 행을 가리킨다`() {
+        // 살아남은 마지막 엣지로 커서를 잡으면 다음 페이지가 이미 본 행부터 다시 시작한다.
+        every { relationQueryPort.findRelations(10L, 2, null) } returns page(
+            overlap(counterpartId = 20L, cells = listOf(1L), theirTotal = 1),
+            overlap(counterpartId = 30L, cells = listOf(2L), theirTotal = 1),
+            hasNextPage = true,
+        )
+        every { ownerLookupPort.findNicknames(listOf(20L, 30L)) } returns mapOf(20L to "여울")
+
+        val page = service.mapRelations(MapRelationsQuery(first = 2, after = null), memberId = 10L)
+
+        assertEquals(listOf("c-20"), page.edges.map { it.cursor })
+        assertEquals("c-30", page.pageInfo.endCursor)
+        assertTrue(page.pageInfo.hasNextPage)
+    }
+
+    @Test
     fun `first는 상한으로 잘리고 오류가 아니다`() {
         every { relationQueryPort.findRelations(10L, 50, null) } returns page()
         every { ownerLookupPort.findNicknames(emptyList()) } returns emptyMap()

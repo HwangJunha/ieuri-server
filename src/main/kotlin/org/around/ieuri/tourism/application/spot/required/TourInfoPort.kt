@@ -9,7 +9,7 @@ import org.around.ieuri.tourism.domain.spot.SpotIntro
 
 /**
  * 관광 정보 조회 아웃바운드 포트. TourAPI 세부를 해소한 중립 데이터를 돌려준다.
- * - 거리 계산·정렬·커서·도메인 조립은 application이 한다.
+ * - 상세의 갈래(본문·갤러리·운영 정보·이용안내)마다 따로 부른다 — 선택된 필드만 업스트림을 친다.
  */
 interface TourInfoPort {
     /**

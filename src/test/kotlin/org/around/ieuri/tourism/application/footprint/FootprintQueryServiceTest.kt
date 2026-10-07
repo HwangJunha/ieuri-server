@@ -3,8 +3,6 @@ package org.around.ieuri.tourism.application.footprint
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import org.around.ieuri.tourism.application.footprint.FootprintPolicy
-import org.around.ieuri.tourism.application.footprint.FootprintQueryService
 import org.around.ieuri.tourism.application.footprint.provided.dto.CellSpotView
 import org.around.ieuri.tourism.application.footprint.provided.exception.MapCellNotFoundException
 import org.around.ieuri.tourism.application.footprint.provided.exception.ShareLinkBlockedException

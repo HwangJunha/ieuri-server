@@ -10,16 +10,13 @@ import org.around.ieuri.tourism.application.catalog.required.SpotQueryPort
 import org.around.ieuri.tourism.application.category.provided.exception.UnknownCategoryException
 import org.around.ieuri.tourism.application.category.required.AppCategoryQueryPort
 import org.around.ieuri.tourism.application.shared.exception.UpstreamUnavailableException
-import org.around.ieuri.tourism.application.spot.SpotDetailAbsent
-import org.around.ieuri.tourism.application.spot.SpotDetailFetched
+import org.around.ieuri.tourism.application.spot.provided.dto.KnownIntro
 import org.around.ieuri.tourism.application.spot.provided.exception.SpotDetailNotFoundException
 import org.around.ieuri.tourism.application.spot.provided.exception.SpotNotFoundInLocaleQueryException
-import org.around.ieuri.tourism.application.spot.required.KnownIntro
 import org.around.ieuri.tourism.application.spot.required.SpotCachePort
 import org.around.ieuri.tourism.application.spot.required.SpotDetailQuery
 import org.around.ieuri.tourism.application.spot.required.SpotDetailQueryPort
 import org.around.ieuri.tourism.application.spot.required.SpotEventPublisherPort
-import org.around.ieuri.tourism.application.spot.required.StoredDetail
 import org.around.ieuri.tourism.application.spot.required.TourInfoPort
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.CopyrightType
@@ -98,21 +95,18 @@ class SpotDetailQueryServiceTest {
     )
 
     /** 적재된 본문(존재). */
-    private fun stored(detail: SpotDetail = detail()) = StoredDetail(detail = detail, bodyAbsent = false)
+    private fun stored(detail: SpotDetail = detail()) = detail
 
     /** 적재된 부재 행. */
-    private fun storedAbsence() = StoredDetail(
-        detail = SpotDetail(
-            title = "경복궁",
-            category = SpotCategory.TOURIST_SPOT,
-            thumbnailImageUrl = "https://img/100.jpg",
-            overview = null,
-            address = "서울 종로구",
-            homepage = null,
-            tel = null,
-            copyright = CopyrightType.TYPE1,
-        ),
-        bodyAbsent = true,
+    private fun storedAbsence() = SpotDetail(
+        title = "경복궁",
+        category = SpotCategory.TOURIST_SPOT,
+        thumbnailImageUrl = "https://img/100.jpg",
+        overview = null,
+        address = "서울 종로구",
+        homepage = null,
+        tel = null,
+        copyright = CopyrightType.TYPE1,
     )
 
     private fun image() = SpotImage(
@@ -634,7 +628,7 @@ class SpotDetailQueryServiceTest {
     @Test
     fun `캐시에 부재가 담겨 있으면 DB·upstream을 모두 건너뛴다`() {
         every { spotCachePort.getDetail(spotIdOf(100L)) } returns
-            storedAbsence().detail
+            storedAbsence()
 
         val view = service.spotDetail(100L, DomainLocale.KO)
 
@@ -650,7 +644,7 @@ class SpotDetailQueryServiceTest {
 
         service.spotDetail(100L, DomainLocale.KO)
 
-        verify(exactly = 1) { spotCachePort.putDetail(spotIdOf(100L), storedAbsence().detail) }
+        verify(exactly = 1) { spotCachePort.putDetail(spotIdOf(100L), storedAbsence()) }
     }
 
     @Test

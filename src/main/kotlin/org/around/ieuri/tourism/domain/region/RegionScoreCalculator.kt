@@ -1,9 +1,5 @@
 package org.around.ieuri.tourism.domain.region
 
-import org.around.ieuri.tourism.domain.region.RegionScore
-import org.around.ieuri.tourism.domain.region.RegionScoreWeights
-import org.around.ieuri.tourism.domain.region.RegionTotalScore
-
 /** 항목별 점수를 총점으로 합치는 계산기(SPEC-0015). */
 class RegionScoreCalculator(
     private val weights: RegionScoreWeights,

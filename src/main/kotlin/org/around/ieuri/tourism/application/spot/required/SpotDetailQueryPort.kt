@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.application.spot.required
 
+import org.around.ieuri.tourism.application.spot.provided.dto.KnownIntro
 import org.around.ieuri.tourism.application.spot.provided.dto.PrefetchTarget
 import org.around.ieuri.tourism.application.spot.provided.dto.SpotDetailPart
 import org.around.ieuri.tourism.domain.category.SpotCategory
@@ -13,8 +14,8 @@ import java.time.Instant
  * - 미적재(null)와 "조회했으나 없음"을 구분한다.
  */
 interface SpotDetailQueryPort {
-    /** 상세 본문. 미적재면 null. "본문 없음"은 값의 null 여부가 아니라 [StoredDetail.bodyAbsent]로 판별한다. */
-    fun findDetail(spotId: Long): StoredDetail?
+    /** 상세 본문. 미적재면 null. 본문 부재로 적재된 행은 원본 목록에서 빌려온 값이다(overview·homepage·tel은 null). */
+    fun findDetail(spotId: Long): SpotDetail?
 
     /** 갤러리. 미적재면 null. 빈 갤러리는 미적재와 구분하지 않는다. */
     fun findGallery(spotId: Long): List<SpotImage>?
@@ -31,12 +32,3 @@ interface SpotDetailQueryPort {
      */
     fun findPrefetchTargets(part: SpotDetailPart, afterSpotId: Long, limit: Int, staleBefore: Instant): List<PrefetchTarget>
 }
-
-/**
- * 적재된 상세 본문 1건.
- * - [bodyAbsent]가 true면 [detail]은 원본 목록에서 빌려온 값이다(overview·homepage·tel은 null).
- */
-data class StoredDetail(
-    val detail: SpotDetail,
-    val bodyAbsent: Boolean,
-)

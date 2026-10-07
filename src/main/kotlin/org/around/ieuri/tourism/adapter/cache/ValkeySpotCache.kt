@@ -1,6 +1,6 @@
 package org.around.ieuri.tourism.adapter.cache
 
-import org.around.ieuri.tourism.application.spot.required.KnownIntro
+import org.around.ieuri.tourism.application.spot.provided.dto.KnownIntro
 import org.around.ieuri.tourism.application.spot.required.SpotCachePort
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.spot.SpotDetail

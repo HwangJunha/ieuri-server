@@ -1,6 +1,5 @@
 package org.around.ieuri.tourism.application.congestion.required
 
-import org.around.ieuri.tourism.application.congestion.required.SeoulOpenDataSnapshot
 import java.time.Instant
 
 /**

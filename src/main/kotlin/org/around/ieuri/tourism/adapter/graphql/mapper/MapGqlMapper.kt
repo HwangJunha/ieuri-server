@@ -1,6 +1,5 @@
 package org.around.ieuri.tourism.adapter.graphql.mapper
 
-import org.around.ieuri.tourism.adapter.graphql.mapper.toGql
 import org.around.ieuri.tourism.application.catalog.provided.dto.MapSpotView
 import org.around.ieuri.tourism.application.catalog.provided.dto.MapViewportView
 import org.around.ieuri.tourism.application.catalog.provided.exception.InvalidBboxException

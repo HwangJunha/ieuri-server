@@ -3,7 +3,6 @@ package org.around.ieuri.tourism.application.congestion
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import org.around.ieuri.tourism.application.congestion.SeoulOpenDataPolicy
 import org.around.ieuri.tourism.application.congestion.provided.dto.CulturalEventView
 import org.around.ieuri.tourism.application.congestion.provided.exception.AreaFilterRequiredException
 import org.around.ieuri.tourism.application.congestion.provided.exception.CongestionAreaNotFoundException

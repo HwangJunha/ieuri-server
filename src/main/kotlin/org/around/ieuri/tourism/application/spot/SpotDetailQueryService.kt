@@ -44,8 +44,8 @@ class SpotDetailQueryService(
 
         // DB 히트: Valkey만 충전한다. 부재 행도 그대로 응답한다.
         read.storedDetail(spotId)?.let { stored ->
-            spotCachePort.putDetail(spotId, stored.detail)
-            return stored.detail.toView(catalogId, identity)
+            spotCachePort.putDetail(spotId, stored)
+            return stored.toView(catalogId, identity)
         }
 
         // 양쪽 미스: 여기서 던져지는 예외는 실패이며, 이벤트 발행 전에 전파되므로 부재로 적재되지 않는다.

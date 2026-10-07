@@ -4,7 +4,6 @@ import org.around.ieuri.common.event.LocationAccessed
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.OffsetPage
 import org.around.ieuri.common.persistence.ExposedConfig
-import org.around.ieuri.tourism.application.catalog.SpotQueryPolicy
 import org.around.ieuri.tourism.application.catalog.provided.SpotDiscoveryUseCase
 import org.around.ieuri.tourism.application.catalog.provided.dto.FestivalView
 import org.around.ieuri.tourism.application.catalog.provided.dto.OngoingFestivalsQuery

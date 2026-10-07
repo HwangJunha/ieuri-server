@@ -5,7 +5,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
-/** SPEC-0013 커서 인코딩·디코딩(축제·인기). 순수 함수라 도메인 단위로 직접 검증한다. */
+/** SPEC-0013 커서 인코딩·디코딩(축제·인기). 순수 함수라 어댑터 밖에서 직접 검증한다. */
 class KeysetCursorsTest {
 
     @Test

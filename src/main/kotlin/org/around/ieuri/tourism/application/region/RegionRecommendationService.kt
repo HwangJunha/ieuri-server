@@ -2,7 +2,6 @@ package org.around.ieuri.tourism.application.region
 
 import org.around.ieuri.common.event.LocationAccessed
 import org.around.ieuri.common.persistence.ExposedConfig
-import org.around.ieuri.tourism.application.region.RegionRecommendationPolicy
 import org.around.ieuri.tourism.application.region.provided.RegionRecommendationUseCase
 import org.around.ieuri.tourism.application.region.provided.dto.RecommendedRegionItemView
 import org.around.ieuri.tourism.application.region.provided.dto.RecommendedRegionQuery

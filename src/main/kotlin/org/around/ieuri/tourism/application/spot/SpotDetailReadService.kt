@@ -6,11 +6,10 @@ import org.around.ieuri.tourism.application.catalog.required.SpotQueryPort
 import org.around.ieuri.tourism.application.category.provided.exception.UnknownCategoryException
 import org.around.ieuri.tourism.application.category.required.AppCategoryQueryPort
 import org.around.ieuri.tourism.application.spot.provided.SpotDetailReadUseCase
+import org.around.ieuri.tourism.application.spot.provided.dto.KnownIntro
 import org.around.ieuri.tourism.application.spot.provided.exception.SpotDetailNotFoundException
 import org.around.ieuri.tourism.application.spot.provided.exception.SpotNotFoundInLocaleQueryException
-import org.around.ieuri.tourism.application.spot.required.KnownIntro
 import org.around.ieuri.tourism.application.spot.required.SpotDetailQueryPort
-import org.around.ieuri.tourism.application.spot.required.StoredDetail
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.shared.SpotQueryException
@@ -37,7 +36,7 @@ class SpotDetailReadService(
         }
     }
 
-    override fun storedDetail(spotId: Long): StoredDetail? = detailQueryPort.findDetail(spotId)
+    override fun storedDetail(spotId: Long): SpotDetail? = detailQueryPort.findDetail(spotId)
 
     override fun storedGallery(spotId: Long): List<SpotImage>? = detailQueryPort.findGallery(spotId)
 

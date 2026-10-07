@@ -1,7 +1,6 @@
 package org.around.ieuri.tourism.application.footprint
 
 import org.around.ieuri.common.persistence.ExposedConfig
-import org.around.ieuri.tourism.application.footprint.FootprintPolicy
 import org.around.ieuri.tourism.application.footprint.provided.FootprintQueryUseCase
 import org.around.ieuri.tourism.application.footprint.provided.dto.CellImageView
 import org.around.ieuri.tourism.application.footprint.provided.dto.CellSpotView

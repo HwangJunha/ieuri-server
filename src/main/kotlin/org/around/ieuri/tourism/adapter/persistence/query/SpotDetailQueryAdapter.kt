@@ -10,12 +10,12 @@ import org.around.ieuri.tourism.adapter.persistence.table.SpotDetailInfoTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotDetailIntroTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotDetailTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotTable
+import org.around.ieuri.tourism.application.spot.provided.dto.KnownIntro
 import org.around.ieuri.tourism.application.spot.provided.dto.PrefetchTarget
 import org.around.ieuri.tourism.application.spot.provided.dto.SpotDetailPart
-import org.around.ieuri.tourism.application.spot.required.KnownIntro
 import org.around.ieuri.tourism.application.spot.required.SpotDetailQueryPort
-import org.around.ieuri.tourism.application.spot.required.StoredDetail
 import org.around.ieuri.tourism.domain.category.SpotCategory
+import org.around.ieuri.tourism.domain.spot.SpotDetail
 import org.around.ieuri.tourism.domain.spot.SpotImage
 import org.around.ieuri.tourism.domain.spot.SpotInfoItem
 import org.jetbrains.exposed.v1.core.Column
@@ -38,11 +38,11 @@ import java.time.ZoneOffset
 @Component
 class SpotDetailQueryAdapter : SpotDetailQueryPort {
 
-    /** 행이 없으면 미적재(null), 있으면 `bodyAbsent`가 부재 여부를 가른다. */
-    override fun findDetail(spotId: Long): StoredDetail? = SpotDetailTable.selectAll()
+    /** 행이 없으면 미적재(null)다. 본문 부재 행도 값으로 돌려준다. */
+    override fun findDetail(spotId: Long): SpotDetail? = SpotDetailTable.selectAll()
         .where { SpotDetailTable.spotId eq spotId }
         .limit(1).singleOrNull()
-        ?.let { StoredDetail(detail = it.toSpotDetail(), bodyAbsent = it[SpotDetailTable.bodyAbsent]) }
+        ?.toSpotDetail()
 
     /** 행이 없으면 미적재로 간주해 null이다(이미지 없는 관광지와 구분하지 않는다). */
     override fun findGallery(spotId: Long): List<SpotImage>? = SpotDetailImageTable.selectAll()

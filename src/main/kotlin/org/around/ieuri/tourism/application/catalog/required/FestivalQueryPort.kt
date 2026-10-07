@@ -13,7 +13,7 @@ import java.time.LocalDate
 interface FestivalQueryPort {
     /**
      * 반경 안에서 [asOf]가 행사 기간에 포함된 축제. 거리 오름차순 + id 오름차순.
-     * - `limit + 1`건까지 돌려준다 — 초과분은 다음 페이지 판정용이다.
+     * - 최대 `limit`건이다. 다음 페이지 판정과 커서는 포트가 채운다.
      */
     fun findOngoing(query: OngoingFestivalSearch): CursorPage<FestivalView>
 }
