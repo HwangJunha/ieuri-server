@@ -56,3 +56,37 @@
 - 회원가입 2종(지시), `withdrawMember`(공용 계정 삭제)
 - 외부 발송·비가역 성공 경로(이메일 인증·재설정·변경, SNS 로그인, 관리자 권한 Mutation) — 오류 경로만
 - Subscription 2종(WebSocket)
+
+---
+
+# 재실행 — community·tourism 전체 (2026-10-08)
+
+로컬 = `feature/SPEC-0039-tourism` `8b296f5`(tourism 이전 + community `shared` 정리, PR #170) · dev = `api-dev.ieuri.co.kr`. 배치는 제외했다.
+범위는 community·tourism 스키마의 루트 65개(Query 31 · Mutation 34 · Subscription 2) 전부다. 같은 계정(55), 같은 입력.
+
+| 구분 | 요청 | 같음 | 다름(원인) |
+|---|---|---|---|
+| Query(응답 깊이 4·6 두 번) | 59 | 46 | 13 — dev 결함 12(아래), `post.viewCount` 1(앞서 부른 쪽이 +1) |
+| `spotDetail` 필수 인자 필드 포함(`intro`·`infoItems`·`gallery`, `category` 제외) | 8 | 8 | 0 |
+| Mutation 오류 경로 | 39 | 38 | 1 — dev 결함(`createMapRelation` 잘못된 URL이 dev는 INTERNAL_ERROR) |
+| Mutation 실행 | 46 | 45 | 1 — 실행기가 닉네임에 쪽 이름을 붙임 |
+| 조회 분기(필터·커서 다음 페이지) | 9 | 9 | 0 |
+| Subscription(graphql-transport-ws) | 5 | 5 | 0 |
+
+**코드로 인한 응답 차이는 0건이다.** 다른 항목은 모두 dev에 남은 기존 결함이 로컬에서 고쳐진 것이거나 실행 순서·실행기 탓이다.
+
+- **dev 결함(로컬은 정상)**: dev `spotDetail`은 `category.code` non-null 위반으로 data가 null — 로컬은 정상 응답(6건). 업무 예외가 dev는 `INTERNAL_ERROR` — 로컬은 원래 코드
+  (`SPOT_NOT_FOUND`·`MAP_CELL_NOT_FOUND`·`SHARE_LINK_NOT_FOUND`·`RADIUS_TOO_LARGE`·`INVALID_ZOOM`·`BBOX_TOO_LARGE`)(6건 + Mutation 1건).
+  dev 오류 때문에 비교가 안 되는 `spotDetail`의 나머지 필드는 `category`만 빼고 8곳을 따로 비교해 모두 같았다.
+- **Mutation 뒤 상태 검증**: 40개 중 39개가 양쪽 모두 통과. 남은 1개(`39b` "메시지 1건")는 실행기가 대화를 처음 만든다고 가정한 것 — 대화 37·38은 9월 실행에서 이미 있었다.
+  대신 각 대화의 최신 메시지가 방금 보낸 본문·발신자 55·`ownedByViewer=true`인지, 같은 조회가 로컬·dev에서 같은지 확인했다(둘 다 통과).
+  신고 선행은 9월 실행의 신고가 남아 양쪽 모두 중복 거절 — 일회성 동작이라 정상이다.
+- **Subscription**: 토큰 없는 `connection_init`은 4401로 닫힘, 비참여 대화 구독은 두 종 모두 FORBIDDEN, 참여 대화의 `newMessage`는 HTTP로 보낸 메시지를 같은 id로 전달,
+  자기 `notifyTyping`은 `typingIndicator`에서 걸러져 이벤트가 오지 않는다. 두 서버가 Valkey를 공유하므로 한쪽씩 차례로 돌렸다.
+  상대의 타이핑이 실제로 전달되는지는 상대 계정(101·146, SNS 로그인) 토큰이 없어 확인하지 못했다.
+
+## 이번 실행이 dev에 더 남긴 것
+
+- 대화 37·38에 메시지 각 1건(Mutation 실행), 대화 37에 구독 검증 메시지 2건(로컬·dev 각 1) — 사용자 본인 계정과의 대화
+- 장소 반응(같은 대상, 이미 LIKE라 상태 변화 없음), 소프트 삭제된 글·댓글·질문·답변 행
+
