@@ -4,7 +4,6 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import org.around.ieuri.common.context.AppKey
-import org.around.ieuri.tourism.application.category.provided.dto.AppCategoryView
 import org.around.ieuri.tourism.application.category.provided.dto.CategoryDisplay
 import org.around.ieuri.tourism.application.category.required.AppCategoryQueryPort
 import org.around.ieuri.tourism.domain.category.SpotCategory
@@ -24,8 +23,8 @@ class CategoryQueryServiceTest {
     fun `availableCategories는 앱과 언어로 구성을 조회해 그대로 돌려준다`() {
         val appKey = AppKey("demo-app")
         every { appCategoryQueryPort.findCategories(appKey, DomainLocale.KO) } returns listOf(
-            AppCategoryView(SpotCategory("RESTAURANT"), "음식점", "https://cdn/restaurant.png"),
-            AppCategoryView(SpotCategory("TRAVEL_COURSE"), "여행코스", null),
+            CategoryDisplay(SpotCategory("RESTAURANT"), "음식점", "https://cdn/restaurant.png"),
+            CategoryDisplay(SpotCategory("TRAVEL_COURSE"), "여행코스", null),
         )
 
         val result = service.availableCategories(appKey, DomainLocale.KO)
@@ -59,7 +58,7 @@ class CategoryQueryServiceTest {
     fun `availableCategoryCodes는 문자열 축으로 같은 구성을 돌려준다`() {
         val appKey = AppKey("k-trip-spot")
         every { appCategoryQueryPort.findCategories(appKey, DomainLocale.JA) } returns
-            listOf(AppCategoryView(SpotCategory("TRANSPORT"), "交通", "https://cdn/transport.png"))
+            listOf(CategoryDisplay(SpotCategory("TRANSPORT"), "交通", "https://cdn/transport.png"))
 
         val result = service.availableCategoryCodes(appKey, "JA")
 

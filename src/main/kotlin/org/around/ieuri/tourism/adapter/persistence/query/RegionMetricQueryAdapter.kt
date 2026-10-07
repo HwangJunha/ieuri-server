@@ -12,10 +12,10 @@ import org.around.ieuri.tourism.adapter.persistence.table.KtoConcentrationRateTa
 import org.around.ieuri.tourism.adapter.persistence.table.KtoSpendingIntensityTable
 import org.around.ieuri.tourism.adapter.persistence.table.KtoStayIntensityTable
 import org.around.ieuri.tourism.adapter.persistence.table.KtoVisitorCountTable
-import org.around.ieuri.tourism.application.region.provided.dto.OriginDistrict
-import org.around.ieuri.tourism.application.region.provided.dto.RegionMetric
-import org.around.ieuri.tourism.application.region.provided.dto.RegionRow
+import org.around.ieuri.tourism.application.region.required.DistrictRegion
+import org.around.ieuri.tourism.application.region.required.RegionMetric
 import org.around.ieuri.tourism.application.region.required.RegionMetricQueryPort
+import org.around.ieuri.tourism.application.region.required.RegionRow
 import org.around.ieuri.tourism.domain.shared.Coordinates
 import org.jetbrains.exposed.v1.core.CustomFunction
 import org.jetbrains.exposed.v1.core.CustomOperator
@@ -49,11 +49,11 @@ import java.time.temporal.ChronoUnit
 class RegionMetricQueryAdapter : RegionMetricQueryPort {
 
     /** origin 좌표를 품은 시군구 1건. 경계 안에 없으면(바다·해외) null이다. 경계선 위 좌표는 2건을 낼 수 있어 하나만 고른다. */
-    override fun findDistrictAt(origin: Coordinates): OriginDistrict? = DistrictTable.select(DistrictTable.code, DistrictTable.areaCd)
+    override fun findDistrictAt(origin: Coordinates): DistrictRegion? = DistrictTable.select(DistrictTable.code, DistrictTable.areaCd)
         .where { stIntersects(DistrictTable.boundary, geographyPoint(origin.longitude, origin.latitude)) }
         .limit(1)
         .singleOrNull()
-        ?.let { OriginDistrict(code = it[DistrictTable.code], provinceCode = it[DistrictTable.areaCd]) }
+        ?.let { DistrictRegion(code = it[DistrictTable.code], provinceCode = it[DistrictTable.areaCd]) }
 
     /**
      * 한 시도의 추천 후보 시군구 전건. 좌표는 `center`가 아니라 대표 위치다.

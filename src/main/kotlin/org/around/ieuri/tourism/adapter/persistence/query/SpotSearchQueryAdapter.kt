@@ -1,10 +1,9 @@
 package org.around.ieuri.tourism.adapter.persistence.query
 
+import org.around.ieuri.tourism.application.catalog.provided.dto.SpotSuggestionView
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
-import org.around.ieuri.tourism.application.catalog.required.SpotSearchHit
 import org.around.ieuri.tourism.application.catalog.required.SpotSearchPort
 import org.around.ieuri.tourism.application.catalog.required.SpotSearchQuery
-import org.around.ieuri.tourism.application.catalog.required.SpotSuggestionHit
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.Coordinates
 import org.around.ieuri.tourism.domain.shared.CopyrightType
@@ -27,14 +26,14 @@ class SpotSearchQueryAdapter(
 ) : SpotSearchPort {
 
     /** 관련도(거리 가중) 내림차순 + id 오름차순 한 페이지. 다음 페이지 판정은 호출자가 [count]로 한다. */
-    override fun search(query: SpotSearchQuery): List<SpotSearchHit> {
+    override fun search(query: SpotSearchQuery): List<SpotView> {
         val strict = runSearch(query, fuzzyOnly = false)
         // 첫 페이지의 정확 일치가 0건일 때만 오타 검색으로 폴백한다([matchClause] 참조).
         if (strict.isNotEmpty() || query.offset > 0) return strict
         return runSearch(query, fuzzyOnly = true)
     }
 
-    private fun runSearch(query: SpotSearchQuery, fuzzyOnly: Boolean): List<SpotSearchHit> {
+    private fun runSearch(query: SpotSearchQuery, fuzzyOnly: Boolean): List<SpotView> {
         val (where, whereParams) = whereClause(query, fuzzyOnly)
         // 파라미터는 `?` 등장 순서다 — SELECT의 CENTER 두 개가 WHERE 몫보다 먼저다.
         val params = mutableListOf<Any>(
@@ -68,7 +67,6 @@ class SpotSearchQueryAdapter(
                 mapX = rs.getDouble("map_x"),
                 mapY = rs.getDouble("map_y"),
                 distanceMeters = rs.getDouble("distance_meters"),
-                relevance = rs.getDouble("relevance"),
             )
         }, *params.toTypedArray())
 
@@ -76,20 +74,17 @@ class SpotSearchQueryAdapter(
         // 카드를 못 찾은 행은 뺀다. 1단계 정렬 순서는 유지된다.
         return rows.mapNotNull { row ->
             val card = cards[row.catalogId] ?: return@mapNotNull null
-            SpotSearchHit(
-                spot = SpotView(
-                    // 클라이언트에 나가는 id는 카탈로그 id다(SPEC-0019).
-                    id = row.catalogId,
-                    title = row.title,
-                    address = row.address,
-                    thumbnailImageUrl = card.thumbnailImageUrl.orEmpty(),
-                    mapX = row.mapX,
-                    mapY = row.mapY,
-                    category = card.category,
-                    copyright = card.copyright,
-                    distanceMeters = row.distanceMeters,
-                ),
-                relevance = row.relevance,
+            SpotView(
+                // 클라이언트에 나가는 id는 카탈로그 id다(SPEC-0019).
+                id = row.catalogId,
+                title = row.title,
+                address = row.address,
+                thumbnailImageUrl = card.thumbnailImageUrl.orEmpty(),
+                mapX = row.mapX,
+                mapY = row.mapY,
+                category = card.category,
+                copyright = card.copyright,
+                distanceMeters = row.distanceMeters,
             )
         }
     }
@@ -127,7 +122,6 @@ class SpotSearchQueryAdapter(
         val mapX: Double,
         val mapY: Double,
         val distanceMeters: Double,
-        val relevance: Double,
     )
 
     /** 2단계가 채우는 카탈로그의 카드 값. */
@@ -161,7 +155,7 @@ class SpotSearchQueryAdapter(
         center: Coordinates,
         radiusMeters: Int,
         limit: Int,
-    ): List<SpotSuggestionHit> {
+    ): List<SpotSuggestionView> {
         // 조인을 붙이지 않는다(클래스 주석 참조). 분류는 [loadCards]가 채운다.
         val rows = jdbcTemplate.query(
             """
@@ -186,9 +180,9 @@ class SpotSearchQueryAdapter(
         val cards = loadCards(rows.map { it.first })
         return rows.mapNotNull { (catalogId, title) ->
             val card = cards[catalogId] ?: return@mapNotNull null
-            SpotSuggestionHit(
+            SpotSuggestionView(
                 // 제안이 돌려주는 id도 카탈로그 id다(SPEC-0019).
-                spotId = catalogId,
+                id = catalogId,
                 title = title,
                 category = card.category,
             )

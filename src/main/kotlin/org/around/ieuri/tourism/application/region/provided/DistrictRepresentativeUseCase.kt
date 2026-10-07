@@ -1,6 +1,6 @@
 package org.around.ieuri.tourism.application.region.provided
 
-import org.around.ieuri.tourism.application.region.required.DistrictRepresentativeRefreshResult
+import org.around.ieuri.tourism.application.region.provided.dto.DistrictRepresentativeRefreshResult
 
 /** 시군구 대표 위치를 다시 고른다(SPEC-0015). 원본 동기화가 끝난 뒤 배치가 한 번 부른다. */
 interface DistrictRepresentativeUseCase {

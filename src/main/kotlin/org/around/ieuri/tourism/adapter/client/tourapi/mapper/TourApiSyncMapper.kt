@@ -2,7 +2,6 @@ package org.around.ieuri.tourism.adapter.client.tourapi.mapper
 
 import org.around.ieuri.tourism.adapter.client.tourapi.TourApiFestivalResponse
 import org.around.ieuri.tourism.adapter.client.tourapi.TourApiResponse
-import org.around.ieuri.tourism.application.spot.required.NearbySpotData
 import org.around.ieuri.tourism.domain.catalog.CatalogStandardValues
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.Coordinates
@@ -13,17 +12,6 @@ import org.around.ieuri.tourism.domain.spot.Spot
 import org.around.ieuri.tourism.domain.spot.SpotFestival
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-
-/** locationBasedList2 item → 중립 [NearbySpotData]. 필수 필드가 비면 null로 드랍한다. */
-fun TourApiResponse.Item.toNearbySpotDataOrNull(category: SpotCategory): NearbySpotData? = NearbySpotData(
-    id = contentid ?: return null,
-    title = title ?: return null,
-    address = listOfNotNull(addr1, addr2).joinToString(" ").ifBlank { null },
-    thumbnailImageUrl = (firstimage ?: return null).toHttps(),
-    coordinates = Coordinates(latitude = mapy ?: return null, longitude = mapx ?: return null),
-    category = category,
-    copyright = CopyrightType.fromCode(cpyrhtDivCd),
-)
 
 /**
  * areaBasedSyncList2 item → [Spot]. 필수 필드가 비거나 좌표가 범위를 벗어나면 null로 드랍한다.

@@ -1,9 +1,9 @@
 package org.around.ieuri.tourism.application.region
 
-import org.around.ieuri.tourism.application.region.provided.dto.OriginDistrict
-import org.around.ieuri.tourism.application.region.provided.dto.RegionMetric
-import org.around.ieuri.tourism.application.region.provided.dto.RegionRow
+import org.around.ieuri.tourism.application.region.required.DistrictRegion
+import org.around.ieuri.tourism.application.region.required.RegionMetric
 import org.around.ieuri.tourism.application.region.required.RegionMetricQueryPort
+import org.around.ieuri.tourism.application.region.required.RegionRow
 import org.around.ieuri.tourism.domain.region.RegionScoreFactor
 import org.around.ieuri.tourism.domain.shared.Coordinates
 
@@ -15,12 +15,12 @@ import org.around.ieuri.tourism.domain.shared.Coordinates
  */
 class RegionMetricQueryPortStub(
     private val fixtures: List<RegionFixture>,
-    private val originDistrict: OriginDistrict? = null,
+    private val originDistrict: DistrictRegion? = null,
 ) : RegionMetricQueryPort {
 
     val askedProvinceCodes: MutableList<String> = mutableListOf()
 
-    override fun findDistrictAt(origin: Coordinates): OriginDistrict? = originDistrict
+    override fun findDistrictAt(origin: Coordinates): DistrictRegion? = originDistrict
 
     override fun findRegions(provinceCode: String): List<RegionRow> = inProvince(provinceCode).map { it.region }
 

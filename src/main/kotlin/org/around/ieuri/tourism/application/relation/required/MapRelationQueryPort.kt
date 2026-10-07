@@ -1,7 +1,8 @@
 package org.around.ieuri.tourism.application.relation.required
 
-import org.around.ieuri.tourism.application.relation.provided.dto.MapRelationOverlap
+import org.around.ieuri.tourism.application.relation.required.MapRelationOverlap
 import org.around.ieuri.tourism.domain.relation.RelationCursor
+import java.time.Instant
 
 /** 지도 관계의 읽기 포트(SPEC-0030). */
 interface MapRelationQueryPort {
@@ -17,3 +18,11 @@ interface MapRelationQueryPort {
         after: RelationCursor?,
     ): List<MapRelationOverlap>
 }
+
+/** 한 상대와의 겹침 계산 결과. 닉네임은 auth에 따로 묻는다(`MapOwnerLookupPort`). */
+data class MapRelationOverlap(
+    val counterpartId: Long,
+    val overlappingCellIds: List<Long>,
+    val theirVisitedCount: Int,
+    val createdAt: Instant,
+)

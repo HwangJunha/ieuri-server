@@ -10,11 +10,11 @@ import org.around.ieuri.tourism.adapter.persistence.table.SpotDetailInfoTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotDetailIntroTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotDetailTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotTable
-import org.around.ieuri.tourism.application.spot.required.PrefetchTarget
-import org.around.ieuri.tourism.application.spot.required.SpotDetailPart
+import org.around.ieuri.tourism.application.spot.provided.dto.PrefetchTarget
+import org.around.ieuri.tourism.application.spot.provided.dto.SpotDetailPart
+import org.around.ieuri.tourism.application.spot.required.KnownIntro
 import org.around.ieuri.tourism.application.spot.required.SpotDetailQueryPort
 import org.around.ieuri.tourism.application.spot.required.StoredDetail
-import org.around.ieuri.tourism.application.spot.required.StoredIntro
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.spot.SpotImage
 import org.around.ieuri.tourism.domain.spot.SpotInfoItem
@@ -42,7 +42,7 @@ class SpotDetailQueryAdapter : SpotDetailQueryPort {
     override fun findDetail(spotId: Long): StoredDetail? = SpotDetailTable.selectAll()
         .where { SpotDetailTable.spotId eq spotId }
         .limit(1).singleOrNull()
-        ?.let { StoredDetail(detail = it.toSpotDetail(), bodyAbsent = it[SpotDetailTable.bodyAbsent], fetchedAt = it[SpotDetailTable.fetchedAt].toInstant()) }
+        ?.let { StoredDetail(detail = it.toSpotDetail(), bodyAbsent = it[SpotDetailTable.bodyAbsent]) }
 
     /** 행이 없으면 미적재로 간주해 null이다(이미지 없는 관광지와 구분하지 않는다). */
     override fun findGallery(spotId: Long): List<SpotImage>? = SpotDetailImageTable.selectAll()
@@ -52,10 +52,10 @@ class SpotDetailQueryAdapter : SpotDetailQueryPort {
         .ifEmpty { null }
 
     /** 전 컬럼이 null인 행은 "조회했으나 값 없음"이다 — 래퍼는 non-null, 값만 null로 돌려준다. */
-    override fun findIntro(spotId: Long, category: SpotCategory): StoredIntro? = SpotDetailIntroTable.selectAll()
+    override fun findIntro(spotId: Long, category: SpotCategory): KnownIntro? = SpotDetailIntroTable.selectAll()
         .where { (SpotDetailIntroTable.spotId eq spotId) and (SpotDetailIntroTable.category eq category.code) }
         .limit(1).singleOrNull()
-        ?.let { StoredIntro(it.toSpotIntro().takeUnless { value -> value.isEmpty() }) }
+        ?.let { KnownIntro(it.toSpotIntro().takeUnless { value -> value.isEmpty() }) }
 
     override fun findInfoItems(spotId: Long, category: SpotCategory): List<SpotInfoItem>? = SpotDetailInfoTable.selectAll()
         .where { (SpotDetailInfoTable.spotId eq spotId) and (SpotDetailInfoTable.category eq category.code) }

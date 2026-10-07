@@ -22,8 +22,9 @@ data class CellImageView(
     val caption: String,
     val kind: CellImageKind,
     val copyright: CopyrightType,
-    val attributionText: String,
-)
+) {
+    val attributionText: String get() = copyright.attributionText
+}
 
 /** 칸에 속한 장소 1건. [likeCount]는 정렬 근거이며 활성 언어 기준이다. */
 data class CellSpotView(

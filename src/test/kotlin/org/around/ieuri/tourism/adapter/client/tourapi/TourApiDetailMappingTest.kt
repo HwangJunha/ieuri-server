@@ -51,7 +51,6 @@ class TourApiDetailMappingTest {
         assertEquals("서울 종로구", detail.address)
         assertEquals(SpotCategory.TOURIST_SPOT, detail.category)
         assertEquals(CopyrightType.TYPE1, detail.copyright)
-        assertEquals(0, detail.likeCount) // 어댑터는 likeCount를 채우지 않는다
     }
 
     @Test

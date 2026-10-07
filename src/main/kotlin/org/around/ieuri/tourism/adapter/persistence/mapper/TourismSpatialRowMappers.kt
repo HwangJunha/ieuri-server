@@ -11,7 +11,7 @@ import org.around.ieuri.tourism.application.catalog.provided.dto.MapSpotView
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
 import org.around.ieuri.tourism.application.catalog.required.MapCandidateView
 import org.around.ieuri.tourism.application.footprint.provided.dto.CellSpotView
-import org.around.ieuri.tourism.application.region.provided.dto.RegionRow
+import org.around.ieuri.tourism.application.region.required.RegionRow
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.footprint.MapCellDistrictRow
 import org.around.ieuri.tourism.domain.shared.AreaName

@@ -12,7 +12,6 @@ class SpotDetailTest {
 
     private fun detail(
         copyright: CopyrightType = CopyrightType.TYPE1,
-        likeCount: Long = 0,
     ) = SpotDetail(
         title = "경복궁",
         category = SpotCategory.TOURIST_SPOT,
@@ -22,7 +21,6 @@ class SpotDetailTest {
         homepage = null,
         tel = null,
         copyright = copyright,
-        likeCount = likeCount,
     )
 
     @Test
@@ -31,23 +29,10 @@ class SpotDetailTest {
     }
 
     @Test
-    fun `withLikeCount는 likeCount만 얹은 복제본을 반환한다`() {
-        val base = detail(likeCount = 0)
-        val withLikes = base.withLikeCount(7)
-        assertEquals(7, withLikes.likeCount)
-        assertEquals(0, base.likeCount) // 원본 불변
-    }
-
-    @Test
     fun `썸네일이 https가 아니면 거부한다`() {
         assertFailsWith<IllegalArgumentException> {
             detail().copy(thumbnailImageUrl = "http://img/100.jpg")
         }
-    }
-
-    @Test
-    fun `likeCount는 음수일 수 없다`() {
-        assertFailsWith<IllegalArgumentException> { detail(likeCount = -1) }
     }
 
     @Test

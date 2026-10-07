@@ -5,26 +5,19 @@ import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.common.graphql.tokenPresentation
-import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.tourism.adapter.graphql.mapper.toCategorySelection
+import org.around.ieuri.tourism.adapter.graphql.mapper.toGql
+import org.around.ieuri.tourism.adapter.graphql.mapper.toGqlFestivalConnection
+import org.around.ieuri.tourism.adapter.graphql.mapper.toGqlPopularSpotConnection
 import org.around.ieuri.tourism.adapter.graphql.mapper.toGqlSearchConnection
 import org.around.ieuri.tourism.adapter.graphql.support.domainLocale
 import org.around.ieuri.tourism.application.catalog.provided.SpotDiscoveryUseCase
-import org.around.ieuri.tourism.application.catalog.provided.dto.FestivalView
 import org.around.ieuri.tourism.application.catalog.provided.dto.OngoingFestivalsQuery
 import org.around.ieuri.tourism.application.catalog.provided.dto.PopularSpotsQuery
 import org.around.ieuri.tourism.application.catalog.provided.dto.SearchSpotsQuery
-import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
-import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
-import org.around.ieuri.common.graphql.generated.types.Festival as GqlFestival
 import org.around.ieuri.common.graphql.generated.types.FestivalConnection as GqlFestivalConnection
-import org.around.ieuri.common.graphql.generated.types.FestivalEdge as GqlFestivalEdge
-import org.around.ieuri.common.graphql.generated.types.PageInfo as GqlPageInfo
 import org.around.ieuri.common.graphql.generated.types.PopularSpotConnection as GqlPopularSpotConnection
-import org.around.ieuri.common.graphql.generated.types.PopularSpotEdge as GqlPopularSpotEdge
-import org.around.ieuri.common.graphql.generated.types.Spot as GqlSpot
-import org.around.ieuri.common.graphql.generated.types.SpotCategory as GqlSpotCategory
 import org.around.ieuri.common.graphql.generated.types.SpotSearchPayload as GqlSpotSearchPayload
 import org.around.ieuri.common.graphql.generated.types.SpotSuggestion as GqlSpotSuggestion
 import org.around.ieuri.common.graphql.generated.types.UserError as GqlUserError
@@ -100,13 +93,7 @@ class SpotDiscoveryResolver(
             limit = limit ?: DEFAULT_SUGGESTION_LIMIT,
             locale = dfe.domainLocale(),
             memberId = memberId,
-        ).map {
-            GqlSpotSuggestion(
-                id = it.id,
-                title = it.title,
-                category = GqlSpotCategory(code = it.category.code, label = it.category.code, iconUrl = null),
-            )
-        }
+        ).map { it.toGql() }
     }
 
     @DgsQuery
@@ -130,10 +117,7 @@ class SpotDiscoveryResolver(
             locale = dfe.domainLocale(),
             memberId = memberId,
         )
-        return GqlFestivalConnection(
-            edges = page.edges.map { GqlFestivalEdge(cursor = it.cursor, node = it.node.toGql()) },
-            pageInfo = page.toGqlPageInfo(),
-        )
+        return page.toGqlFestivalConnection()
     }
 
     @DgsQuery
@@ -159,54 +143,8 @@ class SpotDiscoveryResolver(
             locale = dfe.domainLocale(),
             memberId = memberId,
         )
-        return GqlPopularSpotConnection(
-            edges = page.edges.map {
-                GqlPopularSpotEdge(
-                    cursor = it.cursor,
-                    node = it.node.spot.toGql(),
-                    // likeCount는 순위 근거라 엣지의 값이다.
-                    likeCount = it.node.likeCount.toInt(),
-                )
-            },
-            pageInfo = page.toGqlPageInfo(),
-        )
+        return page.toGqlPopularSpotConnection()
     }
-
-    private fun CursorPage<*>.toGqlPageInfo(): GqlPageInfo = GqlPageInfo(
-        hasNextPage = pageInfo.hasNextPage,
-        hasPreviousPage = pageInfo.hasPreviousPage,
-        startCursor = pageInfo.startCursor,
-        endCursor = pageInfo.endCursor,
-    )
-
-    private fun SpotView.toGql(): GqlSpot = GqlSpot(
-        id = id,
-        title = title,
-        address = address,
-        thumbnailImageUrl = thumbnailImageUrl,
-        distanceMeters = distanceMeters,
-        category = GqlSpotCategory(code = category.code, label = category.code, iconUrl = null),
-        copyright = GqlCopyrightType.valueOf(copyright.name),
-        attributionText = attributionText,
-        mapX = mapX,
-        mapY = mapY,
-    )
-
-    /** 날짜는 DATE 컬럼이라 LocalDate.toString()이 곧 YYYY-MM-DD다. */
-    private fun FestivalView.toGql(): GqlFestival = GqlFestival(
-        id = id,
-        title = title,
-        address = address,
-        thumbnailImageUrl = thumbnailImageUrl,
-        distanceMeters = distanceMeters,
-        category = GqlSpotCategory(code = category.code, label = category.code, iconUrl = null),
-        copyright = GqlCopyrightType.valueOf(copyright.name),
-        attributionText = attributionText,
-        mapX = mapX,
-        mapY = mapY,
-        eventStartDate = eventStartDate.toString(),
-        eventEndDate = eventEndDate.toString(),
-    )
 
     private companion object {
         const val DEFAULT_RADIUS_METERS = 20_000

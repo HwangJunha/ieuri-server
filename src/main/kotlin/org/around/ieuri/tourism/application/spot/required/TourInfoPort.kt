@@ -1,8 +1,6 @@
 package org.around.ieuri.tourism.application.spot.required
 
 import org.around.ieuri.tourism.domain.category.SpotCategory
-import org.around.ieuri.tourism.domain.shared.Coordinates
-import org.around.ieuri.tourism.domain.shared.CopyrightType
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.spot.SpotDetail
 import org.around.ieuri.tourism.domain.spot.SpotImage
@@ -14,11 +12,8 @@ import org.around.ieuri.tourism.domain.spot.SpotIntro
  * - 거리 계산·정렬·커서·도메인 조립은 application이 한다.
  */
 interface TourInfoPort {
-    /** 주변 관광지 한 upstream 페이지(upstream 순서). 장애는 UpstreamUnavailableException. */
-    fun findNearby(query: NearbySpotQuery): NearbySpotResult
-
     /**
-     * 상세 본문. 갤러리·운영정보·이용안내·[SpotDetail.likeCount]는 채우지 않는다.
+     * 상세 본문. 갤러리·운영정보·이용안내는 채우지 않는다.
      * - 본문이 없으면 예외가 아니라 null이다(SPEC-0008).
      * - 장애는 예외다: 한도 초과는 UpstreamRateLimitedException, 그 외는 UpstreamUnavailableException.
      */
@@ -38,32 +33,4 @@ interface TourInfoPort {
 data class SpotDetailQuery(
     val contentId: String,
     val locale: DomainLocale,
-)
-
-/** 주변 조회 입력. [category]가 null이면 전체. [pageNo]는 1부터. */
-data class NearbySpotQuery(
-    val locale: DomainLocale,
-    val center: Coordinates,
-    val radiusMeters: Int,
-    val category: SpotCategory?,
-    val pageNo: Int,
-    val numOfRows: Int,
-)
-
-/** 주변 조회 결과. [totalCount]는 필터 이전 upstream 총계(참고용). */
-data class NearbySpotResult(
-    val spots: List<NearbySpotData>,
-    val totalCount: Int?,
-    val hasMoreUpstreamPages: Boolean,
-)
-
-/** 포트 경계의 중립 데이터. 거리는 포함하지 않는다. */
-data class NearbySpotData(
-    val id: String,
-    val title: String,
-    val address: String?,
-    val thumbnailImageUrl: String,
-    val coordinates: Coordinates,
-    val category: SpotCategory,
-    val copyright: CopyrightType,
 )

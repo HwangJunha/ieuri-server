@@ -1,7 +1,6 @@
 package org.around.ieuri.tourism.adapter.cache
 
-import org.around.ieuri.tourism.application.spot.required.CachedDetail
-import org.around.ieuri.tourism.application.spot.required.CachedIntro
+import org.around.ieuri.tourism.application.spot.required.KnownIntro
 import org.around.ieuri.tourism.application.spot.required.SpotCachePort
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.spot.SpotDetail
@@ -17,7 +16,7 @@ import java.time.Duration
 
 /**
  * Valkey 기반 관광지 캐시(SPEC-0003 §4). 오퍼레이션별 키라 부분 히트가 가능하다. TTL 24h(AC-20).
- * - likeCount는 담지 않는다(AC-14). 조회 실패는 캐시하지 않는다.
+ * - 좋아요 수는 담지 않는다(AC-14). 조회 실패는 캐시하지 않는다.
  * - Valkey 장애·역직렬화 실패는 삼킨다(upstream 폴백).
  */
 @Component
@@ -28,15 +27,12 @@ class ValkeySpotCache(
 
     private val log = LoggerFactory.getLogger(javaClass)
 
-    /** 본문 캐시. 부재도 캐시된 값이다(SPEC-0008 R-3) — 래퍼로 "미스"와 "부재 확인"을 구분한다. */
-    override fun getDetail(spotId: Long): CachedDetail? = read(key("detail", spotId)) {
-        val cached = objectMapper.readValue(it, CachedSpotDetail::class.java)
-        CachedDetail(detail = cached.toDomain(), bodyAbsent = cached.bodyAbsent)
+    /** 본문 캐시. 부재로 확인돼 `spot` 행에서 구성한 값도 캐시된 값이다(SPEC-0008 R-3). */
+    override fun getDetail(spotId: Long): SpotDetail? = read(key("detail", spotId)) {
+        objectMapper.readValue(it, CachedSpotDetail::class.java).toDomain()
     }
 
     override fun putDetail(spotId: Long, detail: SpotDetail) = write(key("detail", spotId), CachedSpotDetail.from(detail))
-
-    override fun putDetailAbsence(spotId: Long, fallback: SpotDetail) = write(key("detail", spotId), CachedSpotDetail.from(fallback, bodyAbsent = true))
 
     override fun getGallery(spotId: Long): List<SpotImage>? = read(key("gallery", spotId)) {
         objectMapper.readValue(it, object : TypeReference<List<CachedSpotImage>>() {}).map(CachedSpotImage::toDomain)
@@ -44,9 +40,9 @@ class ValkeySpotCache(
 
     override fun putGallery(spotId: Long, gallery: List<SpotImage>) = write(key("gallery", spotId), gallery.map(CachedSpotImage::from))
 
-    override fun getIntro(spotId: Long, category: SpotCategory): CachedIntro? = read(key("intro", spotId, category)) {
+    override fun getIntro(spotId: Long, category: SpotCategory): KnownIntro? = read(key("intro", spotId, category)) {
         // 저장된 값이 "null"이면 값 없음으로 히트 — 미스와 구분한다.
-        CachedIntro(objectMapper.readValue(it, CachedSpotIntro::class.java)?.toDomain())
+        KnownIntro(objectMapper.readValue(it, CachedSpotIntro::class.java)?.toDomain())
     }
 
     override fun putIntro(spotId: Long, category: SpotCategory, intro: SpotIntro?) = write(key("intro", spotId, category), intro?.let(CachedSpotIntro::from))

@@ -14,6 +14,7 @@ import org.around.ieuri.tourism.application.spot.required.SpotDetailQuery
 import org.around.ieuri.tourism.application.spot.required.SpotDetailQueryPort
 import org.around.ieuri.tourism.application.spot.required.SpotEventPublisherPort
 import org.around.ieuri.tourism.application.spot.required.TourInfoPort
+import org.around.ieuri.tourism.domain.catalog.ReactionType
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.shared.SpotQueryException
@@ -50,15 +51,11 @@ class SpotDetailQueryService(
         val spotId = identity.spotId
 
         // 부재도 캐시된 값이다 — 히트로 취급한다.
-        spotCachePort.getDetail(spotId)?.let { return it.detail.toView(catalogId, identity) }
+        spotCachePort.getDetail(spotId)?.let { return it.toView(catalogId, identity) }
 
         // DB 히트: Valkey만 충전한다. 부재 행도 그대로 응답한다.
         detailQueryPort.findDetail(spotId)?.let { stored ->
-            if (stored.bodyAbsent) {
-                spotCachePort.putDetailAbsence(spotId, stored.detail)
-            } else {
-                spotCachePort.putDetail(spotId, stored.detail)
-            }
+            spotCachePort.putDetail(spotId, stored.detail)
             return stored.detail.toView(catalogId, identity)
         }
 
@@ -68,7 +65,7 @@ class SpotDetailQueryService(
         if (fetched == null) {
             // 부재 확정: `spot` 행의 값으로 응답하고 부재 사실을 적재한다.
             val fallback = bodyAbsentDetail(catalogId, locale)
-            spotCachePort.putDetailAbsence(spotId, fallback)
+            spotCachePort.putDetail(spotId, fallback)
             eventPublisher.publish(SpotDetailAbsent(spotId, fallback))
             return fallback.toView(catalogId, identity)
         }
@@ -150,8 +147,8 @@ class SpotDetailQueryService(
     /** 좋아요 수. 캐시하지 않고 매번 집계한다. */
     override fun spotLikeCount(catalogId: Long, locale: DomainLocale): Long = spotQueryPort.countLikes(catalogId, locale)
 
-    /** 최신 반응 코드. 캐시하지 않는다. */
-    override fun spotViewerReaction(catalogId: Long, memberId: Long, locale: DomainLocale): String? = spotQueryPort.findReaction(catalogId, memberId, locale)?.name
+    /** 최신 반응. 캐시하지 않는다. */
+    override fun spotViewerReaction(catalogId: Long, memberId: Long, locale: DomainLocale): ReactionType? = spotQueryPort.findReaction(catalogId, memberId, locale)
 
     /**
      * 카탈로그 id를 활성 언어의 원본 행으로 해석한다(SPEC-0029).
@@ -188,7 +185,6 @@ class SpotDetailQueryService(
         homepage = homepage,
         tel = tel,
         copyright = copyright,
-        attributionText = attributionText,
         mapX = identity.mapX,
         mapY = identity.mapY,
     )

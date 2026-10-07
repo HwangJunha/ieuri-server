@@ -33,12 +33,3 @@ interface DistrictCodeQueryPort {
     /** 순회 대상 시도 코드 전체(중복 없음, 강도 2종용). 오름차순 고정 — [findAllRegions]와 같은 이유. */
     fun findAllProvinceCodes(): List<String>
 }
-
-/**
- * 순회용 시군구 한 건. [code]는 5자리, [provinceCode]는 2자리.
- * - 집중률 요청은 둘 다 필수다. 하나만 보내면 `NO_MANDATORY_REQUEST_PARAMETERS_ERROR1`이 온다.
- */
-data class DistrictRegion(
-    val code: String,
-    val provinceCode: String,
-)

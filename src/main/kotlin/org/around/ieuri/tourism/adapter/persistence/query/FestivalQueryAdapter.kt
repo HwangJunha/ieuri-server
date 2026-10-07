@@ -1,6 +1,7 @@
 package org.around.ieuri.tourism.adapter.persistence.query
 
 import org.around.ieuri.tourism.application.catalog.provided.dto.FestivalView
+import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
 import org.around.ieuri.tourism.application.catalog.required.FestivalQueryPort
 import org.around.ieuri.tourism.application.catalog.required.OngoingFestivalSearch
 import org.around.ieuri.tourism.domain.category.SpotCategory
@@ -57,17 +58,18 @@ class FestivalQueryAdapter(
             { rs, _ ->
                 val copyright = CopyrightType.valueOf(rs.getString("copyright"))
                 FestivalView(
-                    // 클라이언트에 나가는 id는 카탈로그 id다(SPEC-0019).
-                    id = rs.getLong("id"),
-                    title = rs.getString("title"),
-                    address = rs.getString("address"),
-                    thumbnailImageUrl = rs.getString("thumbnail_image_url"),
-                    distanceMeters = rs.getDouble("distance_meters"),
-                    category = SpotCategory(rs.getString("category")),
-                    copyright = copyright,
-                    attributionText = copyright.attributionText,
-                    mapX = rs.getDouble("map_x"),
-                    mapY = rs.getDouble("map_y"),
+                    spot = SpotView(
+                        // 클라이언트에 나가는 id는 카탈로그 id다(SPEC-0019).
+                        id = rs.getLong("id"),
+                        title = rs.getString("title"),
+                        address = rs.getString("address"),
+                        thumbnailImageUrl = rs.getString("thumbnail_image_url"),
+                        distanceMeters = rs.getDouble("distance_meters"),
+                        category = SpotCategory(rs.getString("category")),
+                        copyright = copyright,
+                        mapX = rs.getDouble("map_x"),
+                        mapY = rs.getDouble("map_y"),
+                    ),
                     eventStartDate = rs.getDate("event_start_date").toLocalDate(),
                     eventEndDate = rs.getDate("event_end_date").toLocalDate(),
                 )

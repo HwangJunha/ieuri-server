@@ -5,8 +5,8 @@ import io.mockk.mockk
 import io.mockk.verify
 import org.around.ieuri.tourism.application.footprint.NationwideMapPolicy
 import org.around.ieuri.tourism.application.footprint.required.MapOwnerLookupPort
-import org.around.ieuri.tourism.application.relation.provided.dto.MapRelationOverlap
 import org.around.ieuri.tourism.application.relation.provided.dto.MapRelationsQuery
+import org.around.ieuri.tourism.application.relation.required.MapRelationOverlap
 import org.around.ieuri.tourism.application.relation.required.MapRelationQueryPort
 import org.around.ieuri.tourism.application.shared.exception.InvalidCursorException
 import org.around.ieuri.tourism.domain.relation.RelationCursor

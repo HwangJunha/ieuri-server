@@ -1,12 +1,12 @@
 package org.around.ieuri.tourism.application.region
 
 import io.mockk.mockk
-import org.around.ieuri.tourism.application.region.provided.dto.OriginDistrict
 import org.around.ieuri.tourism.application.region.provided.dto.RecommendedRegionItemView
 import org.around.ieuri.tourism.application.region.provided.dto.RecommendedRegionQuery
-import org.around.ieuri.tourism.application.region.provided.dto.RegionMetric
-import org.around.ieuri.tourism.application.region.provided.dto.RegionRow
+import org.around.ieuri.tourism.application.region.required.DistrictRegion
 import org.around.ieuri.tourism.application.region.required.RegionEventPublisherPort
+import org.around.ieuri.tourism.application.region.required.RegionMetric
+import org.around.ieuri.tourism.application.region.required.RegionRow
 import org.around.ieuri.tourism.domain.region.DistanceScoring
 import org.around.ieuri.tourism.domain.region.FreshnessDecay
 import org.around.ieuri.tourism.domain.region.RegionScoreFactor
@@ -37,7 +37,7 @@ class RegionScoreFreshnessTest {
     private fun service(vararg fixtures: RegionFixture) = RegionRecommendationService(
         RegionMetricQueryPortStub(
             fixtures.toList(),
-            OriginDistrict(code = "11999", provinceCode = "11"),
+            DistrictRegion(code = "11999", provinceCode = "11"),
         ),
         policy,
         mockk<RegionEventPublisherPort>(relaxed = true),

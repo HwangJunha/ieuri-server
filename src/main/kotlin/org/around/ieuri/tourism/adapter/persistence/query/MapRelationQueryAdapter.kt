@@ -3,7 +3,7 @@ package org.around.ieuri.tourism.adapter.persistence.query
 import org.around.ieuri.tourism.adapter.persistence.table.MapCellDistrictTable
 import org.around.ieuri.tourism.adapter.persistence.table.MapRelationTable
 import org.around.ieuri.tourism.adapter.persistence.table.MemberDistrictVisitTable
-import org.around.ieuri.tourism.application.relation.provided.dto.MapRelationOverlap
+import org.around.ieuri.tourism.application.relation.required.MapRelationOverlap
 import org.around.ieuri.tourism.application.relation.required.MapRelationQueryPort
 import org.around.ieuri.tourism.domain.relation.RelationCursor
 import org.jetbrains.exposed.v1.core.JoinType

@@ -148,10 +148,10 @@ class TourismViewRowMappersTest {
             mapOf(CategoryTable.code to "SHOPPING", CategoryTranslationTable.label to null, CategoryTable.iconUrl to null),
         )
 
-        assertEquals("맛집", translated.toAppCategoryView().label)
-        assertEquals("https://img/icon.png", translated.toAppCategoryView().iconUrl)
+        assertEquals("맛집", translated.toCategoryDisplay().label)
+        assertEquals("https://img/icon.png", translated.toCategoryDisplay().iconUrl)
         assertEquals("RESTAURANT", translated.toCategoryDisplay().category.code)
-        assertEquals("SHOPPING", untranslated.toAppCategoryView().label)
+        assertEquals("SHOPPING", untranslated.toCategoryDisplay().label)
         assertEquals("SHOPPING", untranslated.toCategoryDisplay().label)
         assertNull(untranslated.toCategoryDisplay().iconUrl)
     }

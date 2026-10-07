@@ -14,14 +14,12 @@ import org.around.ieuri.tourism.application.spot.SpotDetailAbsent
 import org.around.ieuri.tourism.application.spot.SpotDetailFetched
 import org.around.ieuri.tourism.application.spot.provided.exception.SpotDetailNotFoundException
 import org.around.ieuri.tourism.application.spot.provided.exception.SpotNotFoundInLocaleQueryException
-import org.around.ieuri.tourism.application.spot.required.CachedDetail
-import org.around.ieuri.tourism.application.spot.required.CachedIntro
+import org.around.ieuri.tourism.application.spot.required.KnownIntro
 import org.around.ieuri.tourism.application.spot.required.SpotCachePort
 import org.around.ieuri.tourism.application.spot.required.SpotDetailQuery
 import org.around.ieuri.tourism.application.spot.required.SpotDetailQueryPort
 import org.around.ieuri.tourism.application.spot.required.SpotEventPublisherPort
 import org.around.ieuri.tourism.application.spot.required.StoredDetail
-import org.around.ieuri.tourism.application.spot.required.StoredIntro
 import org.around.ieuri.tourism.application.spot.required.TourInfoPort
 import org.around.ieuri.tourism.domain.catalog.ReactionType
 import org.around.ieuri.tourism.domain.category.SpotCategory
@@ -31,8 +29,6 @@ import org.around.ieuri.tourism.domain.spot.SpotDetail
 import org.around.ieuri.tourism.domain.spot.SpotImage
 import org.around.ieuri.tourism.domain.spot.SpotInfoItem
 import org.around.ieuri.tourism.domain.spot.SpotIntro
-import java.time.Duration
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -75,7 +71,7 @@ class SpotDetailQueryServiceTest {
         // 기본: 캐시 미스 + 저장 성공. 캐시 히트 검증은 개별 테스트에서 override.
         every { spotCachePort.getDetail(any()) } returns null
         every { spotCachePort.putDetail(any(), any()) } returns Unit
-        every { spotCachePort.putDetailAbsence(any(), any()) } returns Unit
+        every { spotCachePort.putDetail(any(), any()) } returns Unit
         // 부재 응답 구성용 spot 값(R-2).
         every { spotQueryPort.findSpotBasics(any(), any()) } answers { basics() }
         every { spotCachePort.getGallery(any()) } returns null
@@ -103,10 +99,10 @@ class SpotDetailQueryServiceTest {
     )
 
     /** 적재된 본문(존재). */
-    private fun stored(detail: SpotDetail = detail()) = StoredDetail(detail = detail, bodyAbsent = false, fetchedAt = Instant.now())
+    private fun stored(detail: SpotDetail = detail()) = StoredDetail(detail = detail, bodyAbsent = false)
 
-    /** 적재된 부재 행. [age]로 신선도 경과를 만든다. */
-    private fun storedAbsence(age: Duration = Duration.ZERO) = StoredDetail(
+    /** 적재된 부재 행. */
+    private fun storedAbsence() = StoredDetail(
         detail = SpotDetail(
             title = "경복궁",
             category = SpotCategory.TOURIST_SPOT,
@@ -118,7 +114,6 @@ class SpotDetailQueryServiceTest {
             copyright = CopyrightType.TYPE1,
         ),
         bodyAbsent = true,
-        fetchedAt = Instant.now().minus(age),
     )
 
     private fun image() = SpotImage(
@@ -133,7 +128,7 @@ class SpotDetailQueryServiceTest {
     @Test
     fun `Valkey 히트면 DB와 TourAPI를 모두 호출하지 않는다(AC-34)`() {
         // 캐시 키는 카탈로그 id(100)가 아니라 원본 spot.id다.
-        every { spotCachePort.getDetail(spotIdOf(100L)) } returns CachedDetail(detail(), bodyAbsent = false)
+        every { spotCachePort.getDetail(spotIdOf(100L)) } returns detail()
 
         service.spotDetail(100L, DomainLocale.KO)
 
@@ -185,7 +180,7 @@ class SpotDetailQueryServiceTest {
     @Test
     fun `intro는 DB에 적재된 값이 null이어도 미스로 취급하지 않는다`() {
         every { detailRepository.findIntro(spotIdOf(100L), SpotCategory.TOURIST_SPOT) } returns
-            StoredIntro(null)
+            KnownIntro(null)
 
         val result = service.spotIntro(100L, SpotCategory.TOURIST_SPOT, DomainLocale.KO)
 
@@ -240,7 +235,7 @@ class SpotDetailQueryServiceTest {
 
     // ── spotDetail(SPEC-0003) ───────────────────────────────────────
 
-    private fun detail(likeCount: Long = 0) = SpotDetail(
+    private fun detail() = SpotDetail(
         title = "경복궁",
         category = SpotCategory.TOURIST_SPOT,
         thumbnailImageUrl = "https://img/100.jpg",
@@ -249,7 +244,6 @@ class SpotDetailQueryServiceTest {
         homepage = null,
         tel = null,
         copyright = CopyrightType.TYPE1,
-        likeCount = likeCount,
     )
 
     private fun intro() = SpotIntro(
@@ -288,7 +282,7 @@ class SpotDetailQueryServiceTest {
 
     @Test
     fun `AC-19 - 본문 캐시 히트면 upstream을 호출하지 않는다`() {
-        every { spotCachePort.getDetail(spotIdOf(100L)) } returns CachedDetail(detail(), bodyAbsent = false)
+        every { spotCachePort.getDetail(spotIdOf(100L)) } returns detail()
 
         service.spotDetail(100L, DomainLocale.KO)
 
@@ -331,7 +325,7 @@ class SpotDetailQueryServiceTest {
 
     @Test
     fun `R1-2 - 본문이 캐시에서 와도 좌표가 실린다`() {
-        every { spotCachePort.getDetail(spotIdOf(100L)) } returns CachedDetail(detail(), bodyAbsent = false)
+        every { spotCachePort.getDetail(spotIdOf(100L)) } returns detail()
 
         val view = service.spotDetail(100L, DomainLocale.KO)
 
@@ -410,7 +404,7 @@ class SpotDetailQueryServiceTest {
         every { spotQueryPort.findIdentity(777L, DomainLocale.KO) } returns null
         // 카탈로그는 있고 이 언어에만 원본이 없다(AC-12.3).
         every { spotQueryPort.existsCatalog(777L) } returns true
-        every { spotCachePort.getDetail(any()) } returns CachedDetail(detail(), bodyAbsent = false)
+        every { spotCachePort.getDetail(any()) } returns detail()
 
         assertFailsWith<SpotNotFoundInLocaleQueryException> { service.spotDetail(777L, DomainLocale.KO) }
     }
@@ -477,7 +471,7 @@ class SpotDetailQueryServiceTest {
     fun `운영정보가 값 없음으로 캐시돼 있으면 upstream을 다시 부르지 않는다`() {
         every {
             spotCachePort.getIntro(spotIdOf(100L), SpotCategory.TOURIST_SPOT)
-        } returns CachedIntro(null)
+        } returns KnownIntro(null)
 
         assertNull(service.spotIntro(100L, SpotCategory.TOURIST_SPOT, DomainLocale.KO))
         verify(exactly = 0) { tourInfoPort.findIntro(any(), any()) }
@@ -539,7 +533,7 @@ class SpotDetailQueryServiceTest {
         every { spotQueryPort.findReaction(100L, 7L, DomainLocale.EN) } returns ReactionType.LIKE
         every { spotQueryPort.findReaction(100L, 7L, DomainLocale.JA) } returns null
 
-        assertEquals("LIKE", service.spotViewerReaction(100L, 7L, DomainLocale.EN))
+        assertEquals(ReactionType.LIKE, service.spotViewerReaction(100L, 7L, DomainLocale.EN))
         assertNull(service.spotViewerReaction(100L, 7L, DomainLocale.JA))
     }
 
@@ -576,7 +570,7 @@ class SpotDetailQueryServiceTest {
         assertFailsWith<UpstreamUnavailableException> { service.spotDetail(100L, DomainLocale.KO) }
 
         verify(exactly = 0) { eventPublisher.publish(ofType(SpotDetailAbsent::class)) }
-        verify(exactly = 0) { spotCachePort.putDetailAbsence(any(), any()) }
+        verify(exactly = 0) { spotCachePort.putDetail(any(), any()) }
     }
 
     @Test
@@ -655,7 +649,7 @@ class SpotDetailQueryServiceTest {
     @Test
     fun `SPEC-0037 AC-017 - 부재 행은 아무리 오래돼도 조회를 계기로 다시 묻지 않는다`() {
         // 재확보는 30일 주기 배치의 몫이다(SPEC-0037 FR-011).
-        every { detailRepository.findDetail(spotIdOf(100L)) } returns storedAbsence(age = Duration.ofDays(400))
+        every { detailRepository.findDetail(spotIdOf(100L)) } returns storedAbsence()
 
         val view = service.spotDetail(100L, DomainLocale.KO)
 
@@ -665,7 +659,7 @@ class SpotDetailQueryServiceTest {
 
     @Test
     fun `SPEC-0037 - 부재 행을 읽어도 적재 이벤트를 다시 발행하지 않는다`() {
-        every { detailRepository.findDetail(spotIdOf(100L)) } returns storedAbsence(age = Duration.ofDays(40))
+        every { detailRepository.findDetail(spotIdOf(100L)) } returns storedAbsence()
 
         service.spotDetail(100L, DomainLocale.KO)
 
@@ -685,7 +679,7 @@ class SpotDetailQueryServiceTest {
     @Test
     fun `캐시에 부재가 담겨 있으면 DB·upstream을 모두 건너뛴다`() {
         every { spotCachePort.getDetail(spotIdOf(100L)) } returns
-            CachedDetail(storedAbsence().detail, bodyAbsent = true)
+            storedAbsence().detail
 
         val view = service.spotDetail(100L, DomainLocale.KO)
 
@@ -696,13 +690,12 @@ class SpotDetailQueryServiceTest {
     }
 
     @Test
-    fun `DB의 부재 행을 읽으면 캐시도 부재로 충전한다`() {
+    fun `DB의 부재 행을 읽으면 그 값으로 캐시를 충전한다`() {
         every { detailRepository.findDetail(spotIdOf(100L)) } returns storedAbsence()
 
         service.spotDetail(100L, DomainLocale.KO)
 
-        verify(exactly = 1) { spotCachePort.putDetailAbsence(spotIdOf(100L), any()) }
-        verify(exactly = 0) { spotCachePort.putDetail(any(), any()) }
+        verify(exactly = 1) { spotCachePort.putDetail(spotIdOf(100L), storedAbsence().detail) }
     }
 
     @Test

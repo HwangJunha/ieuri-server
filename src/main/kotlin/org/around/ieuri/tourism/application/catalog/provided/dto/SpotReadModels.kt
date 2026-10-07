@@ -52,11 +52,12 @@ data class LikedSpotView(
     val address: String?,
     val category: SpotCategory,
     val copyright: CopyrightType,
-    val attributionText: String,
     val likedAt: Instant,
     /** 소속 카탈로그. 커서의 정렬 키이며 응답에는 나가지 않는다. */
     val catalogId: Long,
-)
+) {
+    val attributionText: String get() = copyright.attributionText
+}
 
 /** spot 검색 입력(SPEC-0013). 오프셋 페이지네이션이며 [page]는 1부터 센다. 언어는 Accept-Language에서 온다. */
 data class SearchSpotsQuery(
@@ -103,16 +104,7 @@ data class OngoingFestivalsQuery(
 
 /** 진행 중 축제 1건. 날짜에는 시각 성분이 없다. */
 data class FestivalView(
-    val id: Long,
-    val title: String,
-    val address: String?,
-    val thumbnailImageUrl: String,
-    val distanceMeters: Double,
-    val category: SpotCategory,
-    val copyright: CopyrightType,
-    val attributionText: String,
-    val mapX: Double,
-    val mapY: Double,
+    val spot: SpotView,
     val eventStartDate: LocalDate,
     val eventEndDate: LocalDate,
 )

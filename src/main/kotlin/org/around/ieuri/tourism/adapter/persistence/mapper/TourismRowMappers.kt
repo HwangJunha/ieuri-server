@@ -151,7 +151,7 @@ fun SpotInfoItem.writeTo(row: UpdateBuilder<*>, spotId: Long, category: SpotCate
     row[SpotDetailInfoTable.text] = text
 }
 
-/** 적재된 본문 → 도메인 [SpotDetail]. `likeCount`는 서비스가 얹으므로 채우지 않는다. */
+/** 적재된 본문 → 도메인 [SpotDetail]. */
 fun ResultRow.toSpotDetail(): SpotDetail = SpotDetail(
     title = this[SpotDetailTable.title],
     category = SpotCategory(this[SpotDetailTable.category]),

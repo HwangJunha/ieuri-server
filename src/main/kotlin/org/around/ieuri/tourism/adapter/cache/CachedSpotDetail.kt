@@ -10,7 +10,7 @@ import org.around.ieuri.tourism.domain.spot.SpotIntro
 
 /**
  * 상세 캐시 직렬화 전용 DTO(어댑터 내부). 미정의 필드는 무시한다.
- * - attributionText(파생값)·likeCount(캐시 비대상)는 담지 않는다. 갤러리 등은 각자 자기 키에 저장된다.
+ * - attributionText(파생값)는 담지 않는다. 옛 항목의 `bodyAbsent`는 무시된다. 갤러리 등은 각자 자기 키에 저장된다.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class CachedSpotDetail(
@@ -23,11 +23,6 @@ data class CachedSpotDetail(
     val homepage: String? = null,
     val tel: String? = null,
     val copyright: CopyrightType = CopyrightType.UNSPECIFIED,
-    /**
-     * 업스트림에 본문이 없음을 확인한 값인지(SPEC-0008 R-3). true면 overview·homepage·tel은 null이다.
-     * - 기본값 false가 이 필드가 없던 옛 항목의 올바른 해석이다.
-     */
-    val bodyAbsent: Boolean = false,
 ) {
     fun toDomain(): SpotDetail = SpotDetail(
         title = title,
@@ -38,11 +33,10 @@ data class CachedSpotDetail(
         homepage = homepage,
         tel = tel,
         copyright = copyright,
-        // likeCount는 캐시 비대상 — 복원 시 0(application이 덮어쓴다).
     )
 
     companion object {
-        fun from(detail: SpotDetail, bodyAbsent: Boolean = false): CachedSpotDetail = CachedSpotDetail(
+        fun from(detail: SpotDetail): CachedSpotDetail = CachedSpotDetail(
             title = detail.title,
             category = detail.category.code,
             thumbnailImageUrl = detail.thumbnailImageUrl,
@@ -51,7 +45,6 @@ data class CachedSpotDetail(
             homepage = detail.homepage,
             tel = detail.tel,
             copyright = detail.copyright,
-            bodyAbsent = bodyAbsent,
         )
     }
 }

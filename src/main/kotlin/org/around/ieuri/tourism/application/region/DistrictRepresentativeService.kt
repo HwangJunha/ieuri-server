@@ -2,7 +2,7 @@ package org.around.ieuri.tourism.application.region
 
 import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.region.provided.DistrictRepresentativeUseCase
-import org.around.ieuri.tourism.application.region.required.DistrictRepresentativeRefreshResult
+import org.around.ieuri.tourism.application.region.provided.dto.DistrictRepresentativeRefreshResult
 import org.around.ieuri.tourism.application.region.required.DistrictRepresentativeUpdatePort
 import org.around.ieuri.tourism.domain.region.RepresentativeLocation
 import org.springframework.stereotype.Service

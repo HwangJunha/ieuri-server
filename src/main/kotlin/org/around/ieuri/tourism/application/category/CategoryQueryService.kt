@@ -5,7 +5,6 @@ import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.category.provided.CategoryMappingQueryUseCase
 import org.around.ieuri.tourism.application.category.provided.CategoryQueryUseCase
 import org.around.ieuri.tourism.application.category.provided.dto.AppCategoryCode
-import org.around.ieuri.tourism.application.category.provided.dto.AppCategoryView
 import org.around.ieuri.tourism.application.category.provided.dto.CategoryDisplay
 import org.around.ieuri.tourism.application.category.required.AppCategoryQueryPort
 import org.around.ieuri.tourism.application.category.required.CategoryExternalMappingPort
@@ -23,7 +22,7 @@ class CategoryQueryService(
 ) : CategoryQueryUseCase,
     CategoryMappingQueryUseCase {
 
-    override fun availableCategories(appKey: AppKey, locale: DomainLocale): List<AppCategoryView> = appCategoryQueryPort.findCategories(appKey, locale)
+    override fun availableCategories(appKey: AppKey, locale: DomainLocale): List<CategoryDisplay> = appCategoryQueryPort.findCategories(appKey, locale)
 
     override fun availableCategoryCodes(appKey: AppKey, languageCode: String): List<AppCategoryCode> = availableCategories(appKey, DomainLocale.fromLanguageTag(languageCode))
         .map { AppCategoryCode(category = it.category.code, label = it.label, iconUrl = it.iconUrl) }

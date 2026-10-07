@@ -1,7 +1,7 @@
 package org.around.ieuri.tourism.adapter.batch
 
 import org.around.ieuri.tourism.application.spot.provided.SpotDetailPrefetchUseCase
-import org.around.ieuri.tourism.application.spot.required.SpotDetailPart
+import org.around.ieuri.tourism.application.spot.provided.dto.SpotDetailPart
 import org.springframework.batch.core.job.Job
 import org.springframework.batch.core.job.builder.FlowBuilder
 import org.springframework.batch.core.job.builder.JobBuilder

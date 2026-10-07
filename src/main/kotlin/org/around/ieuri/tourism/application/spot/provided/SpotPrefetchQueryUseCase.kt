@@ -1,7 +1,7 @@
 package org.around.ieuri.tourism.application.spot.provided
 
-import org.around.ieuri.tourism.application.spot.required.PrefetchTarget
-import org.around.ieuri.tourism.application.spot.required.SpotDetailPart
+import org.around.ieuri.tourism.application.spot.provided.dto.PrefetchTarget
+import org.around.ieuri.tourism.application.spot.provided.dto.SpotDetailPart
 import java.time.Instant
 
 /** 상세 사전 수집의 대상 조회(SPEC-0037). 수집은 상류 호출을 끼고 돌아 트랜잭션 밖이라, 대상만 따로 읽는다. */

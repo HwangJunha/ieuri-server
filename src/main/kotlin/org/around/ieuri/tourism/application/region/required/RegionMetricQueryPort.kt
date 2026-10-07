@@ -1,8 +1,9 @@
 package org.around.ieuri.tourism.application.region.required
 
-import org.around.ieuri.tourism.application.region.provided.dto.OriginDistrict
-import org.around.ieuri.tourism.application.region.provided.dto.RegionMetric
-import org.around.ieuri.tourism.application.region.provided.dto.RegionRow
+import org.around.ieuri.tourism.application.region.required.DistrictRegion
+import org.around.ieuri.tourism.application.region.required.RegionMetric
+import org.around.ieuri.tourism.application.region.required.RegionRow
+import org.around.ieuri.tourism.domain.shared.AreaName
 import org.around.ieuri.tourism.domain.shared.Coordinates
 
 /**
@@ -11,7 +12,7 @@ import org.around.ieuri.tourism.domain.shared.Coordinates
  */
 interface RegionMetricQueryPort {
     /** origin 좌표를 품은 시군구를 경계로만 판정한다. 없으면(바다·해외) 오류가 아니라 null. */
-    fun findDistrictAt(origin: Coordinates): OriginDistrict?
+    fun findDistrictAt(origin: Coordinates): DistrictRegion?
 
     /**
      * 그 시도의 추천 후보 시군구 전건. 대표 위치가 없는 지역은 빠진다.
@@ -31,3 +32,21 @@ interface RegionMetricQueryPort {
     /** 시군구 코드 → 최신 월 소비 강도. 값이 없는 지역은 키가 없다. */
     fun findSpendingIntensities(provinceCode: String): Map<String, RegionMetric>
 }
+
+/** 추천 후보 시군구 1건. [center]는 기하학적 중심이 아니라 배치가 골라 둔 대표 위치다. */
+data class RegionRow(
+    val code: String,
+    val provinceCode: String,
+    val name: AreaName,
+    val provinceName: AreaName,
+    val center: Coordinates,
+)
+
+/**
+ * 한 항목의 정규화 이전 원본 값.
+ * - [ageDays]는 DB가 한국 날짜로 계산한 경과 일수다. 방문자수만 채우며, null이면 감쇠하지 않는다.
+ */
+data class RegionMetric(
+    val rawValue: Double,
+    val ageDays: Long? = null,
+)

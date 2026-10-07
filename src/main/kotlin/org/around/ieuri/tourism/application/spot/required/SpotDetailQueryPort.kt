@@ -1,12 +1,11 @@
 package org.around.ieuri.tourism.application.spot.required
 
+import org.around.ieuri.tourism.application.spot.provided.dto.PrefetchTarget
+import org.around.ieuri.tourism.application.spot.provided.dto.SpotDetailPart
 import org.around.ieuri.tourism.domain.category.SpotCategory
-import org.around.ieuri.tourism.domain.shared.CopyrightType
-import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.spot.SpotDetail
 import org.around.ieuri.tourism.domain.spot.SpotImage
 import org.around.ieuri.tourism.domain.spot.SpotInfoItem
-import org.around.ieuri.tourism.domain.spot.SpotIntro
 import java.time.Instant
 
 /**
@@ -20,8 +19,8 @@ interface SpotDetailQueryPort {
     /** 갤러리. 미적재면 null. 빈 갤러리는 미적재와 구분하지 않는다. */
     fun findGallery(spotId: Long): List<SpotImage>?
 
-    /** 운영 정보. 미적재면 null, 적재됐으나 값이 없으면 `StoredIntro(null)`. */
-    fun findIntro(spotId: Long, category: SpotCategory): StoredIntro?
+    /** 운영 정보. 미적재면 null, 적재됐으나 값이 없으면 `KnownIntro(null)`. */
+    fun findIntro(spotId: Long, category: SpotCategory): KnownIntro?
 
     /** 이용안내. 미적재면 null. 빈 목록은 미적재와 구분하지 않는다. */
     fun findInfoItems(spotId: Long, category: SpotCategory): List<SpotInfoItem>?
@@ -33,9 +32,6 @@ interface SpotDetailQueryPort {
     fun findPrefetchTargets(part: SpotDetailPart, afterSpotId: Long, limit: Int, staleBefore: Instant): List<PrefetchTarget>
 }
 
-/** 적재 여부와 "값이 null임"을 구분하기 위한 래퍼(intro 전용). */
-data class StoredIntro(val value: SpotIntro?)
-
 /**
  * 적재된 상세 본문 1건.
  * - [bodyAbsent]가 true면 [detail]은 원본 목록에서 빌려온 값이다(overview·homepage·tel은 null).
@@ -43,38 +39,4 @@ data class StoredIntro(val value: SpotIntro?)
 data class StoredDetail(
     val detail: SpotDetail,
     val bodyAbsent: Boolean,
-    val fetchedAt: Instant,
 )
-
-/** 상세의 네 갈래. TourAPI 오퍼레이션 하나와 우리 표 하나에 각각 대응한다. */
-enum class SpotDetailPart {
-    /** detailCommon2 → `spot_detail` */
-    BODY,
-
-    /** detailImage2 → `spot_detail_image` */
-    GALLERY,
-
-    /** detailIntro2 → `spot_detail_intro` */
-    INTRO,
-
-    /** detailInfo2 → `spot_detail_info` */
-    INFO,
-}
-
-/**
- * 확보할 원본 1건. [language]가 어느 언어 서비스를 부를지 정한다(AC-004).
- * - [title]·[thumbnailImageUrl]·[copyright]·[address]는 본문 부재 행의 NOT NULL 컬럼을 채운다(SPEC-0008 R-2).
- */
-data class PrefetchTarget(
-    val spotId: Long,
-    val contentId: String,
-    val language: DomainLocale,
-    val category: SpotCategory,
-    val title: String,
-    val thumbnailImageUrl: String,
-    val copyright: CopyrightType,
-    val address: String?,
-) {
-    /** 상류에 본문이 없을 때 남길 상세. */
-    fun absentDetail(): SpotDetail = SpotDetail.absent(title, category, thumbnailImageUrl, address, copyright)
-}

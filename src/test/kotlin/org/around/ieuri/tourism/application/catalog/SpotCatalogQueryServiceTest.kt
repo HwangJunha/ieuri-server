@@ -255,7 +255,6 @@ class SpotCatalogQueryServiceTest {
         address = null,
         category = SpotCategory.TOURIST_SPOT,
         copyright = CopyrightType.TYPE1,
-        attributionText = CopyrightType.TYPE1.attributionText,
         likedAt = likedAt,
         catalogId = id * 10,
     )

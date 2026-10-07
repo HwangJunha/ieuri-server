@@ -54,55 +54,6 @@ class TourApiSyncMapperTest {
         festivaltype = festivaltype,
     )
 
-    // ── toNearbySpotDataOrNull ──────────────────────────────────────
-
-    @Test
-    fun `모든 필드가 채워진 item을 NearbySpotData로 옮긴다`() {
-        val data = assertNotNull(item().toNearbySpotDataOrNull(SpotCategory("SHOPPING")))
-
-        assertEquals("3001", data.id)
-        assertEquals("남산타워", data.title)
-        assertEquals("서울특별시 용산구 남산공원길 105", data.address)
-        assertEquals("https://tong.visitkorea.or.kr/3001.jpg", data.thumbnailImageUrl)
-        assertEquals(37.551169, data.coordinates.latitude)
-        assertEquals(126.988205, data.coordinates.longitude)
-        assertEquals(SpotCategory("SHOPPING"), data.category)
-        assertEquals(CopyrightType.TYPE1, data.copyright)
-    }
-
-    @Test
-    fun `nullable 필드가 모두 null이어도 예외 없이 옮긴다`() {
-        // 주소(addr1·addr2)와 저작권 코드만 없어도 되는 필드다.
-        val data = assertNotNull(
-            item(addr1 = null, addr2 = null, cpyrhtDivCd = null)
-                .toNearbySpotDataOrNull(SpotCategory.TOURIST_SPOT),
-        )
-
-        assertNull(data.address)
-        assertEquals(CopyrightType.UNSPECIFIED, data.copyright)
-        assertEquals("3001", data.id)
-    }
-
-    @Test
-    fun `NearbySpotData는 위경도를 mapy·mapx 순으로 옮긴다`() {
-        // mapy가 위도, mapx가 경도다.
-        val data = assertNotNull(
-            item(mapx = 100.0, mapy = 20.0).toNearbySpotDataOrNull(SpotCategory.TOURIST_SPOT),
-        )
-
-        assertEquals(20.0, data.coordinates.latitude)
-        assertEquals(100.0, data.coordinates.longitude)
-    }
-
-    @Test
-    fun `NearbySpotData는 필수 필드가 없으면 null이다`() {
-        assertNull(item(contentid = null).toNearbySpotDataOrNull(SpotCategory.TOURIST_SPOT))
-        assertNull(item(title = null).toNearbySpotDataOrNull(SpotCategory.TOURIST_SPOT))
-        assertNull(item(firstimage = null).toNearbySpotDataOrNull(SpotCategory.TOURIST_SPOT))
-        assertNull(item(mapx = null).toNearbySpotDataOrNull(SpotCategory.TOURIST_SPOT))
-        assertNull(item(mapy = null).toNearbySpotDataOrNull(SpotCategory.TOURIST_SPOT))
-    }
-
     // ── toSpotOrNull ─────────────────────────────────────
 
     @Test
@@ -185,12 +136,6 @@ class TourApiSyncMapperTest {
         // 경계는 포함이다.
         assertNotNull(item(mapx = 124.0, mapy = 33.0).toSpotOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
         assertNotNull(item(mapx = 132.0, mapy = 39.0).toSpotOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
-    }
-
-    @Test
-    fun `showflag 판정은 조회 경로에 걸리지 않는다`() {
-        // locationBasedList2 응답에는 showflag가 없다 — 조회 매퍼는 이 판정을 하지 않는다.
-        assertNotNull(item(showflag = null).toNearbySpotDataOrNull(SpotCategory.TOURIST_SPOT))
     }
 
     // ── toSpotFestivalOrNull ─────────────────────────────────

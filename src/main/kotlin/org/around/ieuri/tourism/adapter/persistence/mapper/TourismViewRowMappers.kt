@@ -11,11 +11,10 @@ import org.around.ieuri.tourism.adapter.persistence.table.SpotTable
 import org.around.ieuri.tourism.application.catalog.provided.dto.LikedSpotView
 import org.around.ieuri.tourism.application.catalog.required.SpotBasics
 import org.around.ieuri.tourism.application.catalog.required.SpotIdentity
-import org.around.ieuri.tourism.application.category.provided.dto.AppCategoryView
 import org.around.ieuri.tourism.application.category.provided.dto.CategoryDisplay
 import org.around.ieuri.tourism.application.footprint.provided.dto.CellImageView
 import org.around.ieuri.tourism.application.region.required.DistrictRegion
-import org.around.ieuri.tourism.application.spot.required.PrefetchTarget
+import org.around.ieuri.tourism.application.spot.provided.dto.PrefetchTarget
 import org.around.ieuri.tourism.domain.catalog.CatalogCandidate
 import org.around.ieuri.tourism.domain.catalog.CatalogOrigin
 import org.around.ieuri.tourism.domain.category.SpotCategory
@@ -56,7 +55,6 @@ fun ResultRow.toLikedSpotView(): LikedSpotView {
         address = this[SpotCatalogTranslationTable.address],
         category = SpotCategory(this[SpotCatalogTable.category]),
         copyright = copyright,
-        attributionText = copyright.attributionText,
         likedAt = this[SpotReactionTable.updatedAt].toInstant(),
         catalogId = catalogId,
     )
@@ -92,17 +90,7 @@ fun ResultRow.toPrefetchTarget(): PrefetchTarget = PrefetchTarget(
     address = this[SpotTable.address],
 )
 
-/** 앱 카테고리. 라벨은 좌측 조인이라 번역이 없으면 코드가 라벨이다. */
-fun ResultRow.toAppCategoryView(): AppCategoryView {
-    val code = this[CategoryTable.code]
-    return AppCategoryView(
-        category = SpotCategory(code),
-        label = getOrNull(CategoryTranslationTable.label) ?: code,
-        iconUrl = this[CategoryTable.iconUrl],
-    )
-}
-
-/** 카테고리 표시 정보. 라벨 규칙은 [toAppCategoryView]와 같다. */
+/** 카테고리 표시 정보. 라벨은 좌측 조인이라 번역이 없으면 코드가 라벨이다. */
 fun ResultRow.toCategoryDisplay(): CategoryDisplay {
     val code = this[CategoryTable.code]
     return CategoryDisplay(
@@ -124,6 +112,5 @@ fun ResultRow.toCellImageView(): CellImageView {
         caption = this[MapCellImageTable.caption],
         kind = CellImageKind.valueOf(this[MapCellImageTable.kind]),
         copyright = copyright,
-        attributionText = copyright.attributionText,
     )
 }

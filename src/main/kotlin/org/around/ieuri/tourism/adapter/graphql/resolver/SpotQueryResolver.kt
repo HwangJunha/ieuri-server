@@ -12,10 +12,11 @@ import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.tourism.adapter.graphql.dataloader.CategoryDisplayDataLoader
 import org.around.ieuri.tourism.adapter.graphql.mapper.toCategorySelection
 import org.around.ieuri.tourism.adapter.graphql.mapper.toGql
+import org.around.ieuri.tourism.adapter.graphql.mapper.toGqlCodeOnly
+import org.around.ieuri.tourism.adapter.graphql.mapper.toGqlLikedSpotConnection
 import org.around.ieuri.tourism.adapter.graphql.mapper.toGqlSpotPage
 import org.around.ieuri.tourism.adapter.graphql.support.domainLocale
 import org.around.ieuri.tourism.application.catalog.provided.SpotCatalogQueryUseCase
-import org.around.ieuri.tourism.application.catalog.provided.dto.LikedSpotView
 import org.around.ieuri.tourism.application.catalog.provided.dto.LikedSpotsQuery
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotsQuery
 import org.around.ieuri.tourism.application.category.provided.CategoryQueryUseCase
@@ -24,11 +25,7 @@ import org.around.ieuri.tourism.application.spot.provided.SpotDetailQueryUseCase
 import org.around.ieuri.tourism.application.spot.provided.dto.SpotDetailView
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.dataloader.DataLoader
-import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
-import org.around.ieuri.common.graphql.generated.types.LikedSpot as GqlLikedSpot
 import org.around.ieuri.common.graphql.generated.types.LikedSpotConnection as GqlLikedSpotConnection
-import org.around.ieuri.common.graphql.generated.types.LikedSpotEdge as GqlLikedSpotEdge
-import org.around.ieuri.common.graphql.generated.types.PageInfo as GqlPageInfo
 import org.around.ieuri.common.graphql.generated.types.SpotCategory as GqlSpotCategory
 import org.around.ieuri.common.graphql.generated.types.SpotImage as GqlSpotImage
 import org.around.ieuri.common.graphql.generated.types.SpotInfoItem as GqlSpotInfoItem
@@ -84,11 +81,9 @@ class SpotQueryResolver(
         val loader: DataLoader<String, CategoryDisplay> =
             dfe.getDataLoader(CategoryDisplayDataLoader::class.java)
         configured.forEach {
-            loader.prime(it.category.code, CategoryDisplay(it.category, it.label, it.iconUrl))
+            loader.prime(it.category.code, it)
         }
-        return configured.map {
-            GqlSpotCategory(code = it.category.code, label = it.label, iconUrl = it.iconUrl)
-        }
+        return configured.map { it.toGql() }
     }
 
     /**
@@ -106,10 +101,7 @@ class SpotQueryResolver(
      * - `label`·`iconUrl`은 `CategoryDisplayResolver`가 언어에 맞춰 채운다.
      */
     @DgsData(parentType = "SpotDetail", field = "category")
-    fun category(dfe: DgsDataFetchingEnvironment): GqlSpotCategory {
-        val code = requireNotNull(dfe.getSource<SpotDetailView>()).category.code
-        return GqlSpotCategory(code = code, label = code, iconUrl = null)
-    }
+    fun category(dfe: DgsDataFetchingEnvironment): GqlSpotCategory = requireNotNull(dfe.getSource<SpotDetailView>()).category.toGqlCodeOnly()
 
     /**
      * 갤러리(SPEC-0008 R-5). nullable — 조회 실패는 이 필드만 null로 두고 `errors[]`에 싣는다(AC-17).
@@ -152,7 +144,7 @@ class SpotQueryResolver(
     fun viewerReaction(dfe: DgsDataFetchingEnvironment): String? {
         // 만료 토큰이면 null이 아니라 오류다(R1).
         val memberId = dfe.viewerMemberId() ?: return null
-        return detailQueryUseCase.spotViewerReaction(dfe.catalogId(), memberId, dfe.domainLocale())
+        return detailQueryUseCase.spotViewerReaction(dfe.catalogId(), memberId, dfe.domainLocale())?.name
     }
 
     /** 뷰어 신원. 비로그인은 null, 만료 토큰은 오류다(SPEC-0032 R1). */
@@ -178,7 +170,7 @@ class SpotQueryResolver(
             ),
             locale = dfe.domainLocale(),
             memberId = memberId,
-        ).toGql()
+        ).toGqlLikedSpotConnection()
     }
 
     /**
@@ -205,36 +197,8 @@ class SpotQueryResolver(
             text = query,
             locale = dfe.domainLocale(),
             memberId = memberId,
-        ).toGql()
+        ).toGqlLikedSpotConnection()
     }
-
-    /** 좋아요 커넥션 변환. */
-    private fun CursorPage<LikedSpotView>.toGql() = GqlLikedSpotConnection(
-        edges = edges.map {
-            GqlLikedSpotEdge(
-                cursor = it.cursor,
-                node = it.node.toGql(),
-                // likedAt은 노드가 아니라 엣지(회원-spot 관계)의 값이다.
-                likedAt = it.node.likedAt.toString(),
-            )
-        },
-        pageInfo = GqlPageInfo(
-            hasNextPage = pageInfo.hasNextPage,
-            hasPreviousPage = pageInfo.hasPreviousPage,
-            startCursor = pageInfo.startCursor,
-            endCursor = pageInfo.endCursor,
-        ),
-    )
-
-    private fun LikedSpotView.toGql(): GqlLikedSpot = GqlLikedSpot(
-        id = id,
-        title = title,
-        thumbnailImageUrl = thumbnailImageUrl,
-        address = address,
-        category = GqlSpotCategory(code = category.code, label = category.code, iconUrl = null),
-        copyright = GqlCopyrightType.valueOf(copyright.name),
-        attributionText = attributionText,
-    )
 
     private companion object {
         const val DEFAULT_RADIUS_METERS = 20_000

@@ -10,6 +10,7 @@ import org.around.ieuri.tourism.application.catalog.provided.dto.OngoingFestival
 import org.around.ieuri.tourism.application.catalog.provided.dto.PopularSpotView
 import org.around.ieuri.tourism.application.catalog.provided.dto.PopularSpotsQuery
 import org.around.ieuri.tourism.application.catalog.provided.dto.SearchSpotsQuery
+import org.around.ieuri.tourism.application.catalog.provided.dto.SpotSuggestionView
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
 import org.around.ieuri.tourism.application.catalog.provided.exception.InvalidCoordinatesException
 import org.around.ieuri.tourism.application.catalog.provided.exception.RadiusTooLargeException
@@ -18,10 +19,8 @@ import org.around.ieuri.tourism.application.catalog.required.FestivalQueryPort
 import org.around.ieuri.tourism.application.catalog.required.OngoingFestivalSearch
 import org.around.ieuri.tourism.application.catalog.required.PopularSpotQueryPort
 import org.around.ieuri.tourism.application.catalog.required.PopularSpotSearch
-import org.around.ieuri.tourism.application.catalog.required.SpotSearchHit
 import org.around.ieuri.tourism.application.catalog.required.SpotSearchPort
 import org.around.ieuri.tourism.application.catalog.required.SpotSearchQuery
-import org.around.ieuri.tourism.application.catalog.required.SpotSuggestionHit
 import org.around.ieuri.tourism.domain.catalog.CategorySelection
 import org.around.ieuri.tourism.domain.catalog.DistanceCursor
 import org.around.ieuri.tourism.domain.catalog.LikeCountCursor
@@ -87,8 +86,8 @@ class SpotDiscoveryServiceTest {
     @Test
     fun `관련도가 높은 순서로 결과가 나온다`() {
         every { spotSearchPort.search(any()) } returns listOf(
-            hit(spotId = 1L, title = "경복궁", relevance = 0.9),
-            hit(spotId = 2L, title = "경복궁로 카페", relevance = 0.3),
+            hit(spotId = 1L, title = "경복궁"),
+            hit(spotId = 2L, title = "경복궁로 카페"),
         )
 
         val result = service.searchSpots(searchQuery(query = "경복궁"), DomainLocale.KO, memberId = null)
@@ -323,8 +322,8 @@ class SpotDiscoveryServiceTest {
     @Test
     fun `접두사로 시작하는 제목을 반환한다`() {
         every { spotSearchPort.suggest(any(), any(), any(), any(), any()) } returns listOf(
-            SpotSuggestionHit(1L, "경복궁", SpotCategory.TOURIST_SPOT),
-            SpotSuggestionHit(2L, "경복궁 수문장 교대식", SpotCategory.FESTIVAL_EVENT),
+            SpotSuggestionView(1L, "경복궁", SpotCategory.TOURIST_SPOT),
+            SpotSuggestionView(2L, "경복궁 수문장 교대식", SpotCategory.FESTIVAL_EVENT),
         )
 
         val result = service.spotSearchSuggestions("경복", 37.5, 127.0, 20_000, 10, DomainLocale.KO, memberId = null)
@@ -400,7 +399,7 @@ class SpotDiscoveryServiceTest {
 
         val page = service.ongoingFestivals(festivalQuery(), DomainLocale.KO, memberId = null)
 
-        assertEquals(listOf(1L, 2L), page.edges.map { it.node.id })
+        assertEquals(listOf(1L, 2L), page.edges.map { it.node.spot.id })
     }
 
     /** 축제도 한 건 더 읽어 다음 페이지를 판정한다. */
@@ -411,7 +410,7 @@ class SpotDiscoveryServiceTest {
         val page = service.ongoingFestivals(festivalQuery(first = 2), DomainLocale.KO, memberId = null)
 
         assertTrue(page.pageInfo.hasNextPage)
-        assertEquals(listOf(1L, 2L), page.edges.map { it.node.id })
+        assertEquals(listOf(1L, 2L), page.edges.map { it.node.spot.id })
     }
 
     // ── R18 · 인기 ─────────────────────────────────────────────────────────
@@ -626,32 +625,30 @@ class SpotDiscoveryServiceTest {
     /** 단일 카테고리 인자를 다중 선택으로 옮긴다. null이면 필터 없음. */
     private fun selection(category: SpotCategory?) = category?.let { CategorySelection.ofValues(setOf(it)) } ?: CategorySelection.UNFILTERED
 
-    private fun hit(spotId: Long, title: String = "장소$spotId", relevance: Double = 1.0) = SpotSearchHit(
-        spot = SpotView(
-            id = spotId,
-            title = title,
-            address = "서울시 종로구",
-            thumbnailImageUrl = "https://img/$spotId.jpg",
-            mapX = 126.9,
-            mapY = 37.5,
-            category = SpotCategory.TOURIST_SPOT,
-            copyright = CopyrightType.TYPE1,
-            distanceMeters = 100.0,
-        ),
-        relevance = relevance,
+    private fun hit(spotId: Long, title: String = "장소$spotId") = SpotView(
+        id = spotId,
+        title = title,
+        address = "서울시 종로구",
+        thumbnailImageUrl = "https://img/$spotId.jpg",
+        mapX = 126.9,
+        mapY = 37.5,
+        category = SpotCategory.TOURIST_SPOT,
+        copyright = CopyrightType.TYPE1,
+        distanceMeters = 100.0,
     )
 
     private fun festival(id: Long, distanceMeters: Double = 100.0) = FestivalView(
-        id = id,
-        title = "축제$id",
-        address = "서울시 종로구",
-        thumbnailImageUrl = "https://img/$id.jpg",
-        distanceMeters = distanceMeters,
-        category = SpotCategory.FESTIVAL_EVENT,
-        copyright = CopyrightType.TYPE1,
-        attributionText = CopyrightType.TYPE1.attributionText,
-        mapX = 126.9,
-        mapY = 37.5,
+        spot = SpotView(
+            id = id,
+            title = "축제$id",
+            address = "서울시 종로구",
+            thumbnailImageUrl = "https://img/$id.jpg",
+            distanceMeters = distanceMeters,
+            category = SpotCategory.FESTIVAL_EVENT,
+            copyright = CopyrightType.TYPE1,
+            mapX = 126.9,
+            mapY = 37.5,
+        ),
         eventStartDate = today.minusDays(1),
         eventEndDate = today.plusDays(1),
     )

@@ -2,7 +2,6 @@ package org.around.ieuri.tourism.adapter.client.tourapi
 
 import org.around.ieuri.tourism.adapter.client.tourapi.mapper.toGallery
 import org.around.ieuri.tourism.adapter.client.tourapi.mapper.toInfoItems
-import org.around.ieuri.tourism.adapter.client.tourapi.mapper.toNearbySpotDataOrNull
 import org.around.ieuri.tourism.adapter.client.tourapi.mapper.toSpotDetail
 import org.around.ieuri.tourism.adapter.client.tourapi.mapper.toSpotIntroOrNull
 import org.around.ieuri.tourism.adapter.config.TourApiProperties
@@ -11,8 +10,6 @@ import org.around.ieuri.tourism.application.category.required.CategoryExternalMa
 import org.around.ieuri.tourism.application.shared.exception.UpstreamRateLimitedException
 import org.around.ieuri.tourism.application.shared.exception.UpstreamTooManyRequestsException
 import org.around.ieuri.tourism.application.shared.exception.UpstreamUnavailableException
-import org.around.ieuri.tourism.application.spot.required.NearbySpotQuery
-import org.around.ieuri.tourism.application.spot.required.NearbySpotResult
 import org.around.ieuri.tourism.application.spot.required.SpotDetailQuery
 import org.around.ieuri.tourism.application.spot.required.TourInfoPort
 import org.around.ieuri.tourism.domain.category.SpotCategory
@@ -26,7 +23,6 @@ import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientException
 import org.springframework.web.client.RestClientResponseException
-import org.springframework.web.client.requiredBody
 import org.springframework.web.util.UriComponentsBuilder
 import java.net.URI
 
@@ -39,24 +35,6 @@ class TourApiClient(
     private val tourApiRestClient: RestClient,
     private val categoryMapping: CategoryMappingQueryUseCase,
 ) : TourInfoPort {
-
-    override fun findNearby(query: NearbySpotQuery): NearbySpotResult {
-        val uri = UriComponentsBuilder.fromUriString(baseUrl(query.locale))
-            .path("/locationBasedList2")
-            .common()
-            .queryParam("mapX", query.center.longitude)
-            .queryParam("mapY", query.center.latitude)
-            .queryParam("radius", query.radiusMeters)
-            .queryParam("numOfRows", query.numOfRows)
-            .queryParam("pageNo", query.pageNo)
-            .queryParam("arrange", properties.arrange)
-            .apply { categoryCode(query.category, query.locale)?.let { queryParam("contentTypeId", it) } }
-            .build(true)
-            .toUri()
-
-        val response: TourApiResponse = tourApiRestClient.get().uri(uri).retrieve().requiredBody()
-        return mapResponse(response, query.locale)
-    }
 
     /**
      * 상세 본문(detailCommon2 1콜). 본문이 없으면 null이다(SPEC-0008 R-1).
@@ -136,16 +114,6 @@ class TourApiClient(
                 throw UpstreamUnavailableException("TourAPI 오류 응답: $code")
             }
         }
-    }
-
-    /** TourAPI 응답 DTO → 중립 결과. */
-    fun mapResponse(response: TourApiResponse, locale: DomainLocale): NearbySpotResult {
-        val body = response.response.body
-        return NearbySpotResult(
-            spots = body.items.item.mapNotNull { it.toNearbySpotDataOrNull(category(it.contenttypeid, locale)) },
-            totalCount = body.totalCount,
-            hasMoreUpstreamPages = body.pageNo.toLong() * body.numOfRows.toLong() < body.totalCount.toLong(),
-        )
     }
 
     /** detailCommon2 item → 도메인 SpotDetail(본문). */

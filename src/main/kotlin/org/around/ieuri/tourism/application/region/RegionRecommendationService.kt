@@ -4,15 +4,15 @@ import org.around.ieuri.common.event.LocationAccessed
 import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.region.RegionRecommendationPolicy
 import org.around.ieuri.tourism.application.region.provided.RegionRecommendationUseCase
-import org.around.ieuri.tourism.application.region.provided.dto.OriginDistrict
 import org.around.ieuri.tourism.application.region.provided.dto.RecommendedRegionItemView
 import org.around.ieuri.tourism.application.region.provided.dto.RecommendedRegionQuery
 import org.around.ieuri.tourism.application.region.provided.dto.RecommendedRegionView
-import org.around.ieuri.tourism.application.region.provided.dto.RegionMetricRow
 import org.around.ieuri.tourism.application.region.provided.dto.RegionScoreView
-import org.around.ieuri.tourism.application.region.provided.dto.ScoredFactor
+import org.around.ieuri.tourism.application.region.required.DistrictRegion
 import org.around.ieuri.tourism.application.region.required.RegionEventPublisherPort
+import org.around.ieuri.tourism.application.region.required.RegionMetric
 import org.around.ieuri.tourism.application.region.required.RegionMetricQueryPort
+import org.around.ieuri.tourism.application.region.required.RegionRow
 import org.around.ieuri.tourism.domain.region.RegionScore
 import org.around.ieuri.tourism.domain.region.RegionScoreCalculator
 import org.around.ieuri.tourism.domain.region.RegionScoreFactor
@@ -58,7 +58,7 @@ class RegionRecommendationService(
         val scored = rows.mapNotNull { row ->
             val factors = row.normalizedScores(normalizations) + row.distanceScore(query.origin)
             // 항목 수가 최소 개수 미만이면 null — 추천 대상이 아니다(R30).
-            val totalScore = calculator.calculate(factors.map { it.score }) ?: return@mapNotNull null
+            val totalScore = calculator.calculate(factors) ?: return@mapNotNull null
             ScoredRegion(row, factors, totalScore)
         }
 
@@ -79,7 +79,7 @@ class RegionRecommendationService(
      */
     private fun rankByFactor(scored: List<ScoredRegion>): Map<FactorRankKey, Int> = buildMap {
         val byFactor = scored
-            .flatMap { region -> region.factors.map { region.code to it.score } }
+            .flatMap { region -> region.factors.map { region.code to it } }
             .groupBy({ (_, score) -> score.factor }, { (code, score) -> code to score.value })
 
         for ((factor, entries) in byFactor) {
@@ -102,13 +102,13 @@ class RegionRecommendationService(
         ranks: Map<FactorRankKey, Int>,
     ) = RecommendedRegionItemView(
         code = code,
-        name = row.name.resolve(locale),
-        provinceName = row.provinceName.resolve(locale),
-        scores = factors.map { factor ->
+        name = row.region.name.resolve(locale),
+        provinceName = row.region.provinceName.resolve(locale),
+        scores = factors.map { score ->
             RegionScoreView(
-                score = factor.score,
+                score = score,
                 // 점수를 만든 그 집합에서 매긴 순위라 키가 반드시 있다.
-                rank = ranks.getValue(FactorRankKey(code, factor.score.factor)),
+                rank = ranks.getValue(FactorRankKey(code, score.factor)),
             )
         },
         scoreFactorCount = totalScore.scoreFactorCount,
@@ -118,7 +118,7 @@ class RegionRecommendationService(
     /** 추천 후보 선별 — 자기 지역만 뺀다. */
     private fun selectCandidates(
         rows: List<RegionMetricRow>,
-        originDistrict: OriginDistrict,
+        originDistrict: DistrictRegion,
     ): List<RegionMetricRow> = rows.filter { it.code != originDistrict.code }
 
     /** 한 시도의 지역 목록과 지표 4종을 코드로 합친다. 값이 없는 지표는 0으로 채우지 않고 뺀다(POL-043). */
@@ -160,7 +160,7 @@ class RegionRecommendationService(
      */
     private fun RegionMetricRow.normalizedScores(
         normalizations: Map<RegionScoreFactor, ScoreNormalization>,
-    ): List<ScoredFactor> = metrics.entries.mapNotNull { (factor, metric) ->
+    ): List<RegionScore> = metrics.entries.mapNotNull { (factor, metric) ->
         val normalization = normalizations[factor] ?: return@mapNotNull null
         val score = normalization.normalize(factor, metric.rawValue)
         val age = metric.ageDays
@@ -169,19 +169,28 @@ class RegionRecommendationService(
         } else {
             score
         }
-        ScoredFactor(score = decayed)
+        decayed
     }
 
     /** 거리 항목은 origin이 필수라 항상 붙는다(R21). */
-    private fun RegionMetricRow.distanceScore(origin: Coordinates): ScoredFactor = ScoredFactor(policy.distanceScoring.score(origin, center))
+    private fun RegionMetricRow.distanceScore(origin: Coordinates): RegionScore = policy.distanceScoring.score(origin, center)
 
     /** 총점까지 산출된 후보 1건. [totalScore]는 정렬에만 쓰고 응답에는 나가지 않는다. */
     private data class ScoredRegion(
         val row: RegionMetricRow,
-        val factors: List<ScoredFactor>,
+        val factors: List<RegionScore>,
         val totalScore: RegionTotalScore,
     ) {
         val code: String get() = row.code
+    }
+
+    /** 한 시군구와 그 지역에서 실제로 값이 있었던 지표들. 결측 지표는 키가 없다(0으로 채우지 않는다, POL-043). */
+    private data class RegionMetricRow(
+        val region: RegionRow,
+        val metrics: Map<RegionScoreFactor, RegionMetric>,
+    ) {
+        val code: String get() = region.code
+        val center: Coordinates get() = region.center
     }
 
     /** 순위 조회 키 — (지역, 항목) 짝. */

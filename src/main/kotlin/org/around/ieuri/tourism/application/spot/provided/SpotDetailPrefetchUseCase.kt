@@ -1,6 +1,6 @@
 package org.around.ieuri.tourism.application.spot.provided
 
-import org.around.ieuri.tourism.application.spot.required.SpotDetailPart
+import org.around.ieuri.tourism.application.spot.provided.dto.SpotDetailPart
 
 /** 관광지 상세의 사전 전량 수집(SPEC-0037). 커서와 진행은 호출자가 들고 있다. */
 interface SpotDetailPrefetchUseCase {

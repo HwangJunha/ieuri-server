@@ -21,7 +21,6 @@ class CellImageGqlMapperTest {
             caption = "설악산 대청봉",
             kind = CellImageKind.LANDMARK,
             copyright = CopyrightType.TYPE1,
-            attributionText = "한국관광공사",
         )
 
         val gql = view.toGql()
@@ -31,7 +30,7 @@ class CellImageGqlMapperTest {
         assertEquals("설악산 대청봉", gql.caption)
         assertEquals(CellImageKind.LANDMARK.name, gql.kind.name)
         assertEquals(CopyrightType.TYPE1.name, gql.copyright.name)
-        assertEquals("한국관광공사", gql.attributionText)
+        assertEquals(CopyrightType.TYPE1.attributionText, gql.attributionText)
     }
 
     /** 유일한 nullable 필드가 빈 경우. 나머지는 도메인에서 non-null이다. */
@@ -43,7 +42,6 @@ class CellImageGqlMapperTest {
             caption = "본문 없는 칸",
             kind = CellImageKind.LANDMARK,
             copyright = CopyrightType.TYPE1,
-            attributionText = "출처",
         )
 
         val gql = view.toGql()
@@ -51,6 +49,6 @@ class CellImageGqlMapperTest {
         assertEquals("https://cdn.example/only.jpg", gql.imageUrl)
         assertNull(gql.thumbnailUrl)
         assertEquals("본문 없는 칸", gql.caption)
-        assertEquals("출처", gql.attributionText)
+        assertEquals(CopyrightType.TYPE1.attributionText, gql.attributionText)
     }
 }

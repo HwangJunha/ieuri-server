@@ -14,9 +14,10 @@ data class SpotDetailView(
     val homepage: String?,
     val tel: String?,
     val copyright: CopyrightType,
-    val attributionText: String,
     /** 경도. 본문 캐시에 담기지 않고 뷰 조립 시점에 카탈로그에서 얹힌다. */
     val mapX: Double,
     /** 위도. 출처는 [mapX]와 같다. */
     val mapY: Double,
-)
+) {
+    val attributionText: String get() = copyright.attributionText
+}

@@ -101,7 +101,6 @@ class LikedSpotSearchQueryAdapter(
                 category = SpotCategory(rs.getString("category")),
                 copyright = copyright,
                 // copyright에서 도출되는 값이라 적재하지 않는다.
-                attributionText = copyright.attributionText,
                 likedAt = rs.getTimestamp("updated_at").toInstant(),
                 catalogId = catalogId,
             )

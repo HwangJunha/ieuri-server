@@ -2,7 +2,7 @@ package org.around.ieuri.tourism.adapter.batch
 
 import org.around.ieuri.tourism.application.shared.exception.UpstreamRateLimitedException
 import org.around.ieuri.tourism.application.spot.provided.SpotDetailPrefetchUseCase
-import org.around.ieuri.tourism.application.spot.required.SpotDetailPart
+import org.around.ieuri.tourism.application.spot.provided.dto.SpotDetailPart
 import org.slf4j.LoggerFactory
 import org.springframework.batch.core.scope.context.ChunkContext
 import org.springframework.batch.core.step.StepContribution

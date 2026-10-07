@@ -108,7 +108,6 @@ class TourismRowMappersTest {
         assertEquals("https://home", detail.homepage)
         assertEquals("02-000", detail.tel)
         assertEquals(CopyrightType.TYPE1, detail.copyright)
-        assertEquals(0L, detail.likeCount)
     }
 
     @Test

@@ -49,7 +49,6 @@ class TourApiDetailMapperTest {
         assertEquals("https://bulguksa.or.kr", detail.homepage)
         assertEquals("054-746-9913", detail.tel)
         assertEquals(CopyrightType.TYPE3, detail.copyright)
-        assertEquals(0, detail.likeCount)
     }
 
     @Test

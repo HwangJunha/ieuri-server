@@ -4,7 +4,6 @@ import org.around.ieuri.common.event.LocationAccessed
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.OffsetPage
 import org.around.ieuri.common.pagination.keysetPageOf
-import org.around.ieuri.common.pagination.map
 import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.catalog.SpotQueryPolicy
 import org.around.ieuri.tourism.application.catalog.provided.SpotDiscoveryUseCase
@@ -80,7 +79,7 @@ class SpotDiscoveryService(
         val totalCount = spotSearchPort.count(search)
         return SpotSearchResultView(
             userErrors = emptyList(),
-            results = OffsetPage.of(spotSearchPort.search(search).map { it.spot }, page = page, size = size, totalCount = totalCount),
+            results = OffsetPage.of(spotSearchPort.search(search), page = page, size = size, totalCount = totalCount),
         )
     }
 
@@ -111,7 +110,7 @@ class SpotDiscoveryService(
             center = center,
             radiusMeters = radiusMeters,
             limit = limit.coerceIn(1, policy.maxSuggestionCount),
-        ).map { SpotSuggestionView(id = it.spotId, title = it.title, category = it.category) }
+        )
     }
 
     /**
@@ -141,7 +140,7 @@ class SpotDiscoveryService(
             rows = festivalQueryPort.findOngoing(search),
             first = first,
             after = query.after,
-        ) { DistanceCursor(it.distanceMeters, it.id).encode() }
+        ) { DistanceCursor(it.spot.distanceMeters, it.spot.id).encode() }
     }
 
     /** 인기 spot(R18). 좋아요 하한은 정책값이며 클라이언트가 고를 수 없다. */

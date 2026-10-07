@@ -2,9 +2,9 @@ package org.around.ieuri.tourism.application.catalog.required
 
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.tourism.application.catalog.provided.dto.LikedSpotView
+import org.around.ieuri.tourism.application.catalog.provided.dto.SpotSuggestionView
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
 import org.around.ieuri.tourism.domain.catalog.CategorySelection
-import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.Coordinates
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 
@@ -17,13 +17,13 @@ interface SpotSearchPort {
      * 반경 안에서 [SpotSearchQuery.text]에 일치하는 spot 한 페이지.
      * 관련도(거리 가중) 내림차순 + id 오름차순으로 [SpotSearchQuery.limit]건까지. 다음 페이지 여부는 [count]로 판정한다.
      */
-    fun search(query: SpotSearchQuery): List<SpotSearchHit>
+    fun search(query: SpotSearchQuery): List<SpotView>
 
     /** [query]와 같은 조건(페이지 제외)에 걸리는 전체 건수. */
     fun count(query: SpotSearchQuery): Int
 
     /** 반경 안에서 제목이 [prefix]로 시작하는 spot. 제목 오름차순으로 [limit]건까지. */
-    fun suggest(prefix: String, language: DomainLocale, center: Coordinates, radiusMeters: Int, limit: Int): List<SpotSuggestionHit>
+    fun suggest(prefix: String, language: DomainLocale, center: Coordinates, radiusMeters: Int, limit: Int): List<SpotSuggestionView>
 }
 
 /**
@@ -45,17 +45,4 @@ data class SpotSearchQuery(
     val categories: CategorySelection,
     val limit: Int,
     val offset: Int,
-)
-
-/** 검색 결과 1건. [relevance]는 BM25 원점수가 아니라 거리 가중까지 끝난 최종 정렬 점수다. */
-data class SpotSearchHit(
-    val spot: SpotView,
-    val relevance: Double,
-)
-
-/** 자동완성 결과 1건. */
-data class SpotSuggestionHit(
-    val spotId: Long,
-    val title: String,
-    val category: SpotCategory,
 )

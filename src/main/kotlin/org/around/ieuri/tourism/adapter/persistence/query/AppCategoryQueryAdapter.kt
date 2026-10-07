@@ -1,12 +1,10 @@
 package org.around.ieuri.tourism.adapter.persistence.query
 
 import org.around.ieuri.common.context.AppKey
-import org.around.ieuri.tourism.adapter.persistence.mapper.toAppCategoryView
 import org.around.ieuri.tourism.adapter.persistence.mapper.toCategoryDisplay
 import org.around.ieuri.tourism.adapter.persistence.table.AppCategoryTable
 import org.around.ieuri.tourism.adapter.persistence.table.CategoryTable
 import org.around.ieuri.tourism.adapter.persistence.table.CategoryTranslationTable
-import org.around.ieuri.tourism.application.category.provided.dto.AppCategoryView
 import org.around.ieuri.tourism.application.category.provided.dto.CategoryDisplay
 import org.around.ieuri.tourism.application.category.required.AppCategoryQueryPort
 import org.around.ieuri.tourism.domain.shared.DomainLocale
@@ -26,7 +24,7 @@ import org.springframework.stereotype.Component
 class AppCategoryQueryAdapter : AppCategoryQueryPort {
 
     /** 이 앱·이 언어에 켜진 카테고리. 배열 순서는 보장하지 않는다(V59) — 코드 오름차순으로만 고정한다. */
-    override fun findCategories(appKey: AppKey, language: DomainLocale): List<AppCategoryView> = AppCategoryTable
+    override fun findCategories(appKey: AppKey, language: DomainLocale): List<CategoryDisplay> = AppCategoryTable
         .join(CategoryTable, JoinType.INNER, AppCategoryTable.categoryId, CategoryTable.id)
         .withTranslation(language)
         .select(CategoryTable.code, CategoryTranslationTable.label, CategoryTable.iconUrl)
@@ -36,7 +34,7 @@ class AppCategoryQueryAdapter : AppCategoryQueryPort {
                 (AppCategoryTable.active eq true)
         }
         .orderBy(CategoryTable.code, SortOrder.ASC)
-        .map { it.toAppCategoryView() }
+        .map { it.toCategoryDisplay() }
 
     /** 코드별 표시 정보를 한 번에. 정의가 없는 코드는 결과에 키가 없다. */
     override fun findDisplays(codes: Set<String>, language: DomainLocale): Map<String, CategoryDisplay> {

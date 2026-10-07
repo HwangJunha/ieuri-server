@@ -3,11 +3,11 @@ package org.around.ieuri.tourism.application.region
 import io.mockk.mockk
 import io.mockk.verify
 import org.around.ieuri.common.event.LocationAccessed
-import org.around.ieuri.tourism.application.region.provided.dto.OriginDistrict
 import org.around.ieuri.tourism.application.region.provided.dto.RecommendedRegionQuery
-import org.around.ieuri.tourism.application.region.provided.dto.RegionMetric
-import org.around.ieuri.tourism.application.region.provided.dto.RegionRow
+import org.around.ieuri.tourism.application.region.required.DistrictRegion
 import org.around.ieuri.tourism.application.region.required.RegionEventPublisherPort
+import org.around.ieuri.tourism.application.region.required.RegionMetric
+import org.around.ieuri.tourism.application.region.required.RegionRow
 import org.around.ieuri.tourism.domain.region.DistanceScoring
 import org.around.ieuri.tourism.domain.region.FreshnessDecay
 import org.around.ieuri.tourism.domain.region.RegionScoreFactor
@@ -37,11 +37,11 @@ class RegionCandidateSelectionTest {
         maxLimit = 50,
     )
 
-    private fun stub(fixtures: List<RegionFixture>, originDistrict: OriginDistrict?) = RegionMetricQueryPortStub(fixtures, originDistrict)
+    private fun stub(fixtures: List<RegionFixture>, originDistrict: DistrictRegion?) = RegionMetricQueryPortStub(fixtures, originDistrict)
 
     private fun service(
         fixtures: List<RegionFixture>,
-        originDistrict: OriginDistrict? = null,
+        originDistrict: DistrictRegion? = null,
         policy: RegionRecommendationPolicy = policy(),
     ) = RegionRecommendationService(stub(fixtures, originDistrict), policy, mockk<RegionEventPublisherPort>(relaxed = true))
 
@@ -71,7 +71,7 @@ class RegionCandidateSelectionTest {
         val service = service(
             fixtures = listOf(fixture("11680"), fixture("11110"), fixture("11170")),
             // 강남 좌표가 강남구(11680)에 걸린 상태.
-            originDistrict = OriginDistrict(code = "11680", provinceCode = "11"),
+            originDistrict = DistrictRegion(code = "11680", provinceCode = "11"),
         )
 
         val codes = service.codes()
@@ -92,7 +92,7 @@ class RegionCandidateSelectionTest {
                 fixture("41130"),
                 fixture("41190"),
             ),
-            originDistrict = OriginDistrict(code = "11680", provinceCode = "11"),
+            originDistrict = DistrictRegion(code = "11680", provinceCode = "11"),
         )
 
         val codes = service.codes()
@@ -112,7 +112,7 @@ class RegionCandidateSelectionTest {
                 fixture("41130"),
                 fixture("41190"),
             ),
-            originDistrict = OriginDistrict(code = "11680", provinceCode = "11"),
+            originDistrict = DistrictRegion(code = "11680", provinceCode = "11"),
         )
 
         RegionRecommendationService(stub, policy(), mockk<RegionEventPublisherPort>(relaxed = true)).recommendedRegions(query(), DomainLocale.KO, memberId = null)
@@ -160,7 +160,7 @@ class RegionCandidateSelectionTest {
                 fixture("50110"),
                 fixture("50130"),
             ),
-            originDistrict = OriginDistrict(code = "50110", provinceCode = "50"),
+            originDistrict = DistrictRegion(code = "50110", provinceCode = "50"),
         )
 
         val codes = service.codes(origin = Coordinates(latitude = 33.5, longitude = 126.53))
@@ -173,7 +173,7 @@ class RegionCandidateSelectionTest {
         // 자기 지역을 뺀 수가 아니라 시도 전체 수로 판정한다.
         val service = service(
             fixtures = listOf(fixture("50110"), fixture("50130"), fixture("50150")),
-            originDistrict = OriginDistrict(code = "50110", provinceCode = "50"),
+            originDistrict = DistrictRegion(code = "50110", provinceCode = "50"),
         )
 
         val codes = service.codes(origin = Coordinates(latitude = 33.5, longitude = 126.53))
@@ -191,7 +191,7 @@ class RegionCandidateSelectionTest {
                 fixture("41130"),
                 fixture("41190"),
             ),
-            originDistrict = OriginDistrict(code = "41210", provinceCode = "41"),
+            originDistrict = DistrictRegion(code = "41210", provinceCode = "41"),
         )
 
         val codes = service.codes()
@@ -210,7 +210,7 @@ class RegionCandidateSelectionTest {
                 fixture("41130"),
                 fixture("41190"),
             ),
-            originDistrict = OriginDistrict(code = "41210", provinceCode = "41"),
+            originDistrict = DistrictRegion(code = "41210", provinceCode = "41"),
             policy = policy(minFactorCount = 4),
         )
 
@@ -229,7 +229,7 @@ class RegionCandidateSelectionTest {
                 fixture("41130"),
                 fixture("41190"),
             ),
-            originDistrict = OriginDistrict(code = "11680", provinceCode = "11"),
+            originDistrict = DistrictRegion(code = "11680", provinceCode = "11"),
         )
 
         val regions = service.recommendedRegions(query(), DomainLocale.KO, memberId = null).regions

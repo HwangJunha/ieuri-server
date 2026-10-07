@@ -7,8 +7,8 @@ import org.around.ieuri.tourism.application.shared.exception.UpstreamRateLimited
 import org.around.ieuri.tourism.application.shared.exception.UpstreamUnavailableException
 import org.around.ieuri.tourism.application.spot.provided.SpotCommandUseCase
 import org.around.ieuri.tourism.application.spot.provided.SpotPrefetchQueryUseCase
-import org.around.ieuri.tourism.application.spot.required.PrefetchTarget
-import org.around.ieuri.tourism.application.spot.required.SpotDetailPart
+import org.around.ieuri.tourism.application.spot.provided.dto.PrefetchTarget
+import org.around.ieuri.tourism.application.spot.provided.dto.SpotDetailPart
 import org.around.ieuri.tourism.application.spot.required.TourInfoPort
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.CopyrightType

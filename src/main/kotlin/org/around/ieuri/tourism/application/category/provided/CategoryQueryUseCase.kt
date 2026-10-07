@@ -2,7 +2,6 @@ package org.around.ieuri.tourism.application.category.provided
 
 import org.around.ieuri.common.context.AppKey
 import org.around.ieuri.tourism.application.category.provided.dto.AppCategoryCode
-import org.around.ieuri.tourism.application.category.provided.dto.AppCategoryView
 import org.around.ieuri.tourism.application.category.provided.dto.CategoryDisplay
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 
@@ -12,7 +11,7 @@ interface CategoryQueryUseCase {
      * 이 앱·이 언어에 노출되는 카테고리를 구성된 순서대로. 출처는 `app_category`.
      * - 구성이 없으면 오류가 아니라 빈 목록이다.
      */
-    fun availableCategories(appKey: AppKey, locale: DomainLocale): List<AppCategoryView>
+    fun availableCategories(appKey: AppKey, locale: DomainLocale): List<CategoryDisplay>
 
     /** 위와 같은 구성을 문자열 축으로. 다른 도메인이 쓰는 진입점이며, 모르는 언어 코드는 폴백 언어로 읽는다. */
     fun availableCategoryCodes(appKey: AppKey, languageCode: String): List<AppCategoryCode>
