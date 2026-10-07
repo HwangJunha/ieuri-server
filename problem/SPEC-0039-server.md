@@ -129,6 +129,9 @@
 | D-90 | S13 | **임베딩 원문 해시는 이름 붙인 DSL 함수로 쓴다**(`md5(concat("|", title, category, address.orEmpty(), overview.orEmpty().leftChars(max)))`, `common/persistence/TextExpressions`) — 사용자 선택 B | 중첩된 `CustomFunction` 호출이 읽히지 않았다(사용자 지적). 식 자체는 재편 전과 같은 값을 낸다(불일치 288건이 양쪽 동일) | **A: `exec`로 raw SQL**: D-82(tourism 메인 DB에 raw SQL 없음)를 되돌린다 |
 | D-91 | S13 | **`shared`에는 포트(`provided`·`required`)를 두지 않는다. 여러 패키지가 함께 쓰는 예외·VO·DTO만 둔다.** tourism `application/shared`는 `exception/`(`InvalidCursor`·`Upstream*` 3개)만 남는다. 이벤트 발행 포트는 애그리게이트마다 자기 `required`에(`SpotEventPublisherPort`·`CatalogEventPublisherPort`·`RecommendationEventPublisherPort`·`RegionEventPublisherPort`, 구현은 어댑터 하나). community 진입점은 소유자에게: 요약은 `SpotCatalogQueryUseCase`, 카테고리 코드는 `CategoryQueryUseCase`. `InvalidCoordinates`는 catalog 소유. D-84·D-87을 바꾼다 | 사용자 지시(2026-10-07): shared에 포트가 있는 것은 말이 안 된다 — 포트로 가져오면 되는 것을 공통으로 빼지 않는다. splearn은 `application/shared`가 없고, 범용으로 보이는 `EmailSender`도 `member/required`에 둔다. community는 import 줄과 주입 타입만 바뀐다(동작 불변, 사용자 승인) | **community 정리 때까지 shared에 남김(D-87)**: 원칙에 어긋난 채 머지된다. **tourism 공통 발행 포트 하나를 남김**: 소유자가 없는 포트다 |
 | D-92 | S13 | **좌표 조회 감사 이벤트(`LocationAccessed`)는 서비스가 발행한다.** 리졸버는 회원 id만 넘긴다(`memberId: Long?`, null = 비로그인). 발행은 메서드 첫 줄이라 입력 검증 실패에도 남는다 — 리졸버가 호출 전에 발행하던 순서와 같다. 대상: `spots`, 발견 조회 4종, `recommendedRegions` | D-91로 발행 포트가 애그리게이트 소유가 되면 리졸버가 outbound 포트를 주입받는 모양이 된다(어댑터 → outbound 포트). `recommendedSpots`는 이미 서비스가 발행했다. 리스너는 `@EventListener` + `@Async`라 트랜잭션과 무관하게 발행 즉시 동작한다 — 위치를 옮겨도 기록 시점이 같다 | **리졸버 전용 포트 유지**: 둘 곳(소유자)이 없다. **검증 뒤 발행**: 지금까지 남던 실패 요청의 기록이 사라진다 |
+| D-93 | S13 | **조회가 무엇을 돌려주는지의 경계: 답이 도메인 객체 자체면 도메인을, 아니면 읽기 모델을 돌려준다.** 셋 다 "예"일 때 도메인이다 — ① 도메인 모델이 답의 모든 필드를 갖는가 ② 누가 물어도 같은 답인가 ③ 페이지·정렬처럼 조회 방식이 만든 값이 없는가. 기존 코드는 차근차근 맞춘다 | 사용자 결정(2026-10-07). splearn은 `MemberFinder.find(): Member`처럼 도메인을 돌려주지만, 조회가 "id로 하나"뿐이라 답이 곧 도메인이다. 요청 좌표로부터의 거리·집계·번역 조인·페이지는 도메인이 가질 수 없는 값이라 읽기 모델이 필요하다 | **읽기는 늘 DTO**: 도메인과 필드가 같은 뷰를 한 벌 더 만들고 서비스가 손으로 복사하게 된다(D-94의 원인). **늘 도메인**: 거리·관련도를 도메인이 품게 된다 |
+| D-94 | S13 | **같은 질문에 답하는 읽기 모델은 한 벌만 둔다. 소유는 질문의 주인이다.** `SpotSearchResult`(required)를 지우고 `SpotView`(catalog `provided/dto`, 주변·검색·추천 카드)를 읽기 포트가 직접 돌려준다 — `attributionText`는 `copyright`에서 도출하는 속성이다. 상세 하위 필드는 D-93에 따라 도메인(`SpotImage`·`SpotIntro`·`SpotInfoItem`)을 돌려주고 같은 모양의 뷰 3개를 지웠다. `SpotDetailView`는 카탈로그 id·좌표를 합치므로 읽기 모델로 남긴다. GraphQL 변환은 리졸버에서 `SpotGqlMapper`로 옮겼다(중복 `SpotView.toGql` 제거) | `SpotSearchResult` → `SpotView` 복사가 서비스 3곳(catalog 2·recommendation 1)에 똑같이 있었다. 추천도 같은 카드를 돌려주므로 catalog가 소유하고 추천이 가져다 쓴다 | **유지**: `MapCandidateView`(점수용 거리 포함) → `MapSpotView`(뷰포트 마커, 거리 없음), `SpotBasics`(부재 응답 재료) → `SpotSummaryView`(다른 도메인용 요약)는 묻는 것이 달라 두 벌이 맞다 |
+| D-95 | S13 | **오프셋 페이지는 `common/pagination/OffsetPage<T>` 하나다**(`CursorPage<T>`와 나란히). `hasNext`는 `OffsetPage.of(items, page, size, totalCount)`가 전체 건수에서 도출한다. `SpotPageView`를 지우고 `spots`는 `OffsetPage<SpotView>`, 검색은 `userErrors` + `results: OffsetPage<SpotView>`다. `dto` 패키지는 유지한다(사용자 선호) | 커서 페이지는 공통 제네릭인데 오프셋 페이지만 응답마다 선언했고, 필드가 GraphQL `SpotPage`를 그대로 베꼈다. `hasNext` 계산식이 `spots`·검색 두 곳에 같았다. 순수 값 모양이라 공통에 둘 대상이다(D-91의 "공통 VO·DTO") | **Spring Data `Page`·`Slice`**: application이 영속 라이브러리에 묶이고 Exposed 이전으로 사라질 의존이다. **`dto` 패키지 폐지**: 사용자가 따로 두는 쪽을 선호 |
 
 ## 부족한 정보
 
@@ -205,6 +208,8 @@ grep으로 확인한 수(worktree `82fdd48`):
 
 **3차(2026-10-07, D-91·D-92)** — `SpotLookupServiceTest`를 catalog·category 테스트로 옮기고, `UserErrorTaxonomyTest`를 대상인 `adapter/graphql/support`로 옮겼다. 감사 이벤트 테스트(회원은 연산 이름으로 발행, 비로그인은 없음, 입력 오류에도 먼저 발행)를 catalog·발견·지역 추천 서비스에 더했다. 실패 확인: 발행 제거 2건·비로그인 발행·연산 이름 혼동·요약 경위도 교환·카테고리 라벨 교체 6건 모두 빨개졌다. 재측정 조회 46/54·오류 38/39·쓰기 45/46(이전과 같음), 감사 기록 테이블에 옮긴 6개 연산이 모두 적재됐다.
 
+**4차(2026-10-07, D-93~D-95)** — `OffsetPageTest`(다음 페이지 판정·경계·오버플로·빈 페이지), `SpotGqlMapperTest`에 오프셋 페이지·이미지·운영 정보·이용안내 변환(필드별, 선택 필드 null)을 더했다. 실패 확인 6건(경계 `<=`, Int 곱 오버플로, 이미지·운영 정보·이용안내 필드 교환, 항목 순서 뒤집기) 모두 빨개졌다. 재측정 조회 46/54·오류 38/39·쓰기 45/46(이전과 같음), 갤러리·운영 정보·이용안내 필드 응답 정상.
+
 ### S12에서 생긴 응답 차이 (VC-001에 의도한 차이로 기록)
 
 - `createPost` 태그 6개: `INVALID_INPUT` → `TOO_MANY_TAGS`(메시지는 같다). 판정을 도메인 한 곳으로 모으면서 생성·수정 경로의 비대칭(D-05)이 없어졌다. **클라이언트 무영향 확인 후 확정(2026-10-04)**: 클라이언트는 입력 단계에서 태그를 5개로 막아(`maxPostTags = 5`) 6개를 보내지 않고, 글 작성 화면은 이미 `TOO_MANY_TAGS` 전용 문구를 둔다(서버가 그 코드를 낸다고 가정한 주석까지 있다). D-05를 뒤집는다.
@@ -256,6 +261,9 @@ grep으로 확인한 수(worktree `82fdd48`):
 - 다른 패키지 값을 든 정책 객체(`MapViewportPolicy`의 추천 한도, `NationwideMapPolicy`의 관계 페이지 크기)와 `SpotDiscoveryService`의 중복 좌표·반경 검증 — 이번 재편 전부터 있던 묶음이라 따로
 - `CongestionQueryService.seoulCongestion`이 readOnly 트랜잭션 안에서 DB 조회 뒤 HTTP를 부르는 것 — 옛 `MapQueryService` 구조 그대로이며, 동작 불변 범위에서 별도로 다룬다
 - ktlint가 쓰지 않는 import를 잡지 못하는 원인 조사 — 이번에는 변경 파일을 직접 정리했다
+- D-93 경계를 기존 조회 전체에 적용 — 이번에는 두 벌이던 곳(`SpotSearchResult`·상세 하위 필드 뷰)만. 나머지는 차근차근
+- `SpotQueryResolver`에 남은 좋아요 목록 변환(`LikedSpotView`·`CursorPage`)의 mapper 이동 — 이번에 바뀐 변환만 옮겼다
+- `ConsistencyConventionTest`에 `org.springframework.data..` 금지 추가 — 결정 대기
 - community `spotAnswers(없는 질문)`의 `INTERNAL_ERROR` — community 조회 예외라 S13 범위 밖
 
 ## 설계
@@ -295,6 +303,7 @@ grep으로 확인한 수(worktree `82fdd48`):
 
 | 날짜 | 무엇을 | 왜 |
 |---|---|---|
+| 2026-10-07 | D-93(조회 반환의 경계: 도메인 vs 읽기 모델)·D-94(읽기 모델 한 벌)·D-95(`OffsetPage<T>`) | 사용자 결정(경계 표 채택, 읽기 모델 하나로, dto 패키지 유지, 함께 진행) |
 | 2026-10-07 | D-91(shared에 포트 없음, D-84 일부·D-87 뒤집음)·D-92(감사 이벤트는 서비스가 발행) | 사용자 지시(shared에는 공통 exception·VO·DTO만, splearn 기준) |
 | 2026-10-07 | D-84~D-90(shared 최소화·패키지 1:1·조회 서비스 애그리게이트별 분할·community 진입점·지역 지표 배치 단순화·강도 테이블 명시·지문 DSL), D-78·D-82·D-83 일부 바꿈 | 사용자 지시(shared에 다 넣으면 DDD 의미가 없다, 배치 복잡, 테이블 추상화 금지) |
 | 2026-10-07 | D-79~D-83(애그리게이트 재편·규칙 도메인화·배치 유스케이스화·raw SQL DSL 전환·외부 I/O 오케스트레이터), D-71·D-74·D-76 뒤집음, D-75·D-77 일부 뒤집음 | 사용자 지시(DDD 원칙, 서비스 단순화, CTE 불필요) |
