@@ -6,12 +6,12 @@ import com.netflix.graphql.dgs.DgsMutation
 import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.tourism.adapter.graphql.mapper.toCommand
+import org.around.ieuri.tourism.adapter.graphql.mapper.toGql
 import org.around.ieuri.tourism.adapter.graphql.support.RecordVisitsResponse
 import org.around.ieuri.tourism.adapter.graphql.support.RemoveVisitResponse
 import org.around.ieuri.tourism.adapter.graphql.support.domainLocale
 import org.around.ieuri.tourism.application.footprint.provided.FootprintCommandUseCase
 import org.around.ieuri.common.graphql.generated.types.CreateMapShareLinkPayload as GqlCreateMapShareLinkPayload
-import org.around.ieuri.common.graphql.generated.types.MapShareLink as GqlMapShareLink
 import org.around.ieuri.common.graphql.generated.types.RecordVisitsInput as GqlRecordVisitsInput
 import org.around.ieuri.common.graphql.generated.types.RemoveVisitInput as GqlRemoveVisitInput
 import org.around.ieuri.common.graphql.generated.types.RevokeMapShareLinkInput as GqlRevokeMapShareLinkInput
@@ -89,7 +89,7 @@ class NationwideMapMutationResolver(
         return GqlCreateMapShareLinkPayload(
             success = true,
             userErrors = emptyList(),
-            shareLink = GqlMapShareLink(shareUrl = link.shareUrl, createdAt = link.createdAt.toString()),
+            shareLink = link.toGql(),
         )
     }
 

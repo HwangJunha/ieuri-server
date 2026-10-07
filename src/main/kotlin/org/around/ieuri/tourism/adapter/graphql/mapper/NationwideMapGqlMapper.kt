@@ -1,7 +1,9 @@
 package org.around.ieuri.tourism.adapter.graphql.mapper
 
+import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.tourism.application.footprint.provided.dto.CellImageView
 import org.around.ieuri.tourism.application.footprint.provided.dto.CellSpotView
+import org.around.ieuri.tourism.application.footprint.provided.dto.MapShareLinkView
 import org.around.ieuri.tourism.application.footprint.provided.dto.RecordVisitsCommand
 import org.around.ieuri.tourism.application.footprint.provided.dto.RemoveVisitCommand
 import org.around.ieuri.tourism.application.relation.provided.dto.MapRelationView
@@ -12,6 +14,9 @@ import org.around.ieuri.common.graphql.generated.types.CellSpot as GqlCellSpot
 import org.around.ieuri.common.graphql.generated.types.Coordinates as GqlCoordinates
 import org.around.ieuri.common.graphql.generated.types.CopyrightType as GqlCopyrightType
 import org.around.ieuri.common.graphql.generated.types.MapRelation as GqlMapRelation
+import org.around.ieuri.common.graphql.generated.types.MapRelationConnection as GqlMapRelationConnection
+import org.around.ieuri.common.graphql.generated.types.MapRelationEdge as GqlMapRelationEdge
+import org.around.ieuri.common.graphql.generated.types.MapShareLink as GqlMapShareLink
 import org.around.ieuri.common.graphql.generated.types.RecordVisitsInput as GqlRecordVisitsInput
 import org.around.ieuri.common.graphql.generated.types.RemoveVisitInput as GqlRemoveVisitInput
 import org.around.ieuri.common.graphql.generated.types.SpotCategory as GqlSpotCategory
@@ -65,3 +70,10 @@ fun CellImageView.toGql(): GqlCellImage = GqlCellImage(
     copyright = GqlCopyrightType.valueOf(copyright.name),
     attributionText = attributionText,
 )
+
+fun CursorPage<MapRelationView>.toGqlMapRelationConnection(): GqlMapRelationConnection = GqlMapRelationConnection(
+    edges = edges.map { GqlMapRelationEdge(node = it.node.toGql(), cursor = it.cursor) },
+    pageInfo = toGqlPageInfo(),
+)
+
+fun MapShareLinkView.toGql(): GqlMapShareLink = GqlMapShareLink(shareUrl = shareUrl, createdAt = createdAt.toString())

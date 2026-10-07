@@ -56,6 +56,13 @@ class KeysetCursorsTest {
         assertFailsWith<InvalidCursorException> { RelationCursor.decode(like) }
     }
 
+    /** 접두사 없이 값만 맞는 문자열은 정렬 키로 해석되면 안 된다 — 엉뚱한 위치로 뛴다. */
+    @Test
+    fun `접두사가 없는 커서는 값이 맞아도 거부된다`() {
+        assertFailsWith<InvalidCursorException> { DistanceCursor.decode(wrap("5|1")) }
+        assertFailsWith<InvalidCursorException> { LikeCountCursor.decode(wrap("5|1")) }
+    }
+
     /** 클라이언트가 들고 있는 커서가 계속 통해야 한다 — 바이트 형식을 고정한다. */
     @Test
     fun `커서 바이트 형식은 이전과 같다`() {

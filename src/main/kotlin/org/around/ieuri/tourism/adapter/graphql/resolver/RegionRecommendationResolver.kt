@@ -6,22 +6,15 @@ import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.common.graphql.tokenPresentation
 import org.around.ieuri.common.security.CurrentMemberProvider
+import org.around.ieuri.tourism.adapter.graphql.mapper.toDomain
+import org.around.ieuri.tourism.adapter.graphql.mapper.toGql
 import org.around.ieuri.tourism.adapter.graphql.support.domainLocale
-import org.around.ieuri.tourism.application.catalog.provided.exception.InvalidCoordinatesException
 import org.around.ieuri.tourism.application.region.RegionRecommendationPolicy
 import org.around.ieuri.tourism.application.region.provided.RegionRecommendationUseCase
-import org.around.ieuri.tourism.application.region.provided.dto.RecommendedRegionItemView
 import org.around.ieuri.tourism.application.region.provided.dto.RecommendedRegionQuery
-import org.around.ieuri.tourism.application.region.provided.dto.RecommendedRegionView
-import org.around.ieuri.tourism.application.region.provided.dto.RegionScoreView
 import org.around.ieuri.tourism.application.region.provided.exception.InvalidLimitException
-import org.around.ieuri.tourism.domain.shared.Coordinates
-import org.around.ieuri.common.graphql.generated.types.Coordinates as GqlCoordinates
 import org.around.ieuri.common.graphql.generated.types.CoordinatesInput as GqlCoordinatesInput
-import org.around.ieuri.common.graphql.generated.types.RecommendedRegion as GqlRecommendedRegion
 import org.around.ieuri.common.graphql.generated.types.RecommendedRegionResult as GqlRecommendedRegionResult
-import org.around.ieuri.common.graphql.generated.types.RegionScore as GqlRegionScore
-import org.around.ieuri.common.graphql.generated.types.RegionScoreFactor as GqlRegionScoreFactor
 
 /**
  * 지역 추천 GraphQL 리졸버(CQRS 읽기, SPEC-0015). 언어는 Accept-Language 헤더에서 온다.
@@ -61,29 +54,4 @@ class RegionRecommendationResolver(
         }
         return policy.resolveLimit(requested)
     }
-
-    /** 좌표 범위 위반은 `INVALID_COORDINATES`다(R29). 예외 메시지에 좌표를 담지 않는다(POL-013). */
-    private fun GqlCoordinatesInput.toDomain(): Coordinates = runCatching { Coordinates(latitude = lat, longitude = lng) }
-        .getOrElse { throw InvalidCoordinatesException("좌표가 올바르지 않습니다.") }
-
-    private fun RecommendedRegionView.toGql() = GqlRecommendedRegionResult(
-        regions = regions.map { it.toGql() },
-    )
-
-    private fun RecommendedRegionItemView.toGql() = GqlRecommendedRegion(
-        code = code,
-        name = name,
-        provinceName = provinceName,
-        scores = scores.map { it.toGql() },
-        scoreFactorCount = scoreFactorCount,
-        center = center.toGql(),
-    )
-
-    private fun RegionScoreView.toGql() = GqlRegionScore(
-        factor = GqlRegionScoreFactor.valueOf(score.factor.name),
-        value = score.value,
-        rank = rank,
-    )
-
-    private fun Coordinates.toGql() = GqlCoordinates(lat = latitude, lng = longitude)
 }

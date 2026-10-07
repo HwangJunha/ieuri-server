@@ -2,7 +2,11 @@ package org.around.ieuri.tourism.adapter.graphql.mapper
 
 import org.around.ieuri.common.graphql.generated.types.RecordVisitsInput
 import org.around.ieuri.common.graphql.generated.types.RemoveVisitInput
+import org.around.ieuri.common.pagination.CursorEdge
+import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.common.pagination.CursorPageInfo
 import org.around.ieuri.tourism.application.footprint.provided.dto.CellSpotView
+import org.around.ieuri.tourism.application.footprint.provided.dto.MapShareLinkView
 import org.around.ieuri.tourism.application.relation.provided.dto.MapRelationView
 import org.around.ieuri.tourism.domain.shared.Coordinates
 import java.time.Instant
@@ -99,5 +103,39 @@ class NationwideMapGqlMapperTest {
 
         assertEquals(0, gql.overlappingCount)
         assertEquals(emptyList(), gql.overlappingCellIds)
+    }
+
+    @Test
+    fun `관계 커넥션은 엣지 커서와 경계 정보를 그대로 옮긴다`() {
+        val view = MapRelationView(
+            memberId = 11L,
+            nickname = "여울",
+            overlappingCount = 0,
+            overlappingCellIds = emptyList(),
+            theirVisitedCount = 0,
+            createdAt = Instant.parse("2026-08-20T00:00:00Z"),
+        )
+        val page = CursorPage(
+            edges = listOf(CursorEdge("c-11", view)),
+            pageInfo = CursorPageInfo(hasNextPage = true, hasPreviousPage = false, startCursor = "c-11", endCursor = "c-99"),
+            totalCount = null,
+        )
+
+        val gql = page.toGqlMapRelationConnection()
+
+        assertEquals(listOf("c-11"), gql.edges.map { it.cursor })
+        assertEquals(listOf(11L), gql.edges.map { it.node.memberId })
+        assertEquals(true, gql.pageInfo.hasNextPage)
+        assertEquals(false, gql.pageInfo.hasPreviousPage)
+        assertEquals("c-11", gql.pageInfo.startCursor)
+        assertEquals("c-99", gql.pageInfo.endCursor)
+    }
+
+    @Test
+    fun `공유 링크는 주소와 생성 시각을 옮긴다`() {
+        val gql = MapShareLinkView(shareUrl = "https://www.ieuri.co.kr/tour/korea-map/abc", createdAt = Instant.parse("2026-08-21T02:03:04Z")).toGql()
+
+        assertEquals("https://www.ieuri.co.kr/tour/korea-map/abc", gql.shareUrl)
+        assertEquals("2026-08-21T02:03:04Z", gql.createdAt)
     }
 }

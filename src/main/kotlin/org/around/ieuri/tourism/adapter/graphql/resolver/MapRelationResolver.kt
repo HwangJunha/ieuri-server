@@ -5,16 +5,13 @@ import com.netflix.graphql.dgs.DgsMutation
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.common.security.CurrentMemberProvider
-import org.around.ieuri.tourism.adapter.graphql.mapper.toGql
-import org.around.ieuri.tourism.adapter.graphql.mapper.toGqlPageInfo
+import org.around.ieuri.tourism.adapter.graphql.mapper.toGqlMapRelationConnection
 import org.around.ieuri.tourism.application.relation.provided.MapRelationCommandUseCase
 import org.around.ieuri.tourism.application.relation.provided.MapRelationQueryUseCase
 import org.around.ieuri.tourism.application.relation.provided.dto.MapRelationsQuery
 import org.around.ieuri.common.graphql.generated.types.CreateMapRelationInput as GqlCreateMapRelationInput
 import org.around.ieuri.common.graphql.generated.types.CreateMapRelationPayload as GqlCreateMapRelationPayload
-import org.around.ieuri.common.graphql.generated.types.MapRelation as GqlMapRelation
 import org.around.ieuri.common.graphql.generated.types.MapRelationConnection as GqlMapRelationConnection
-import org.around.ieuri.common.graphql.generated.types.MapRelationEdge as GqlMapRelationEdge
 import org.around.ieuri.common.graphql.generated.types.RemoveMapRelationInput as GqlRemoveMapRelationInput
 import org.around.ieuri.common.graphql.generated.types.RemoveMapRelationPayload as GqlRemoveMapRelationPayload
 
@@ -39,10 +36,7 @@ class MapRelationResolver(
             MapRelationsQuery(first = first ?: DEFAULT_PAGE_SIZE, after = after),
             memberId = memberId,
         )
-        return GqlMapRelationConnection(
-            edges = page.edges.map { GqlMapRelationEdge(node = it.node.toGql(), cursor = it.cursor) },
-            pageInfo = page.toGqlPageInfo(),
-        )
+        return page.toGqlMapRelationConnection()
     }
 
     @DgsMutation
