@@ -1,10 +1,7 @@
 package org.around.ieuri.tourism.adapter.batch
 
-import org.around.ieuri.tourism.application.shared.provided.dto.SyncDemandIntensityCommand
-import org.around.ieuri.tourism.application.shared.required.RegionMetricSyncPage
+import org.around.ieuri.tourism.application.shared.provided.RegionMetricPageResult
 import org.springframework.batch.infrastructure.item.ExecutionContext
-import java.math.BigDecimal
-import java.time.LocalDate
 import java.time.YearMonth
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -19,13 +16,6 @@ class RegionMetricMonthResolverTest {
     /** 호출 기록. (areaCd, 월, 페이지) 순서까지 봐야 탐색 방향을 알 수 있다. */
     private val calls = mutableListOf<Triple<String, YearMonth, Int>>()
 
-    private fun row(code: String) = SyncDemandIntensityCommand(
-        districtCode = code,
-        baseMonth = LocalDate.of(2026, 6, 1),
-        indicatorCode = "1",
-        indicatorValue = BigDecimal.ONE,
-    )
-
     /** [dataMonths]에만 데이터가 있는 업스트림. 그 외 월은 totalCount 0이다. */
     private fun resolver(
         lookbackMonths: Int = 6,
@@ -34,12 +24,12 @@ class RegionMetricMonthResolverTest {
     ) = RegionMetricMonthResolver(
         datasetName = "stayIntensity",
         lookbackMonths = lookbackMonths,
-        fetch = { areaCd, month, pageNo ->
+        sync = { areaCd, month, pageNo ->
             calls += Triple(areaCd, month, pageNo)
             if (month in dataMonths && areaCd !in emptyAreas) {
-                RegionMetricSyncPage(records = listOf(row("11110")), totalCount = 1, droppedCount = 0)
+                RegionMetricPageResult(written = 1, skippedUnknownCode = 0, dropped = 0, totalCount = 1)
             } else {
-                RegionMetricSyncPage(records = emptyList(), totalCount = 0, droppedCount = 0)
+                RegionMetricPageResult(written = 0, skippedUnknownCode = 0, dropped = 0, totalCount = 0)
             }
         },
     )
@@ -50,7 +40,7 @@ class RegionMetricMonthResolverTest {
         val context = ExecutionContext()
         val resolver = resolver(dataMonths = setOf(YearMonth.of(2026, 6)))
 
-        val page = resolver.fetchPage(context, runMonth, "11", 1)
+        val page = resolver.syncPage(context, runMonth, "11", 1)
 
         assertEquals(1, page.totalCount)
         assertEquals(
@@ -62,7 +52,7 @@ class RegionMetricMonthResolverTest {
     @Test
     fun `확정된 달은 ExecutionContext에 남는다`() {
         val context = ExecutionContext()
-        resolver(dataMonths = setOf(YearMonth.of(2026, 6))).fetchPage(context, runMonth, "11", 1)
+        resolver(dataMonths = setOf(YearMonth.of(2026, 6))).syncPage(context, runMonth, "11", 1)
 
         assertEquals("2026-06", context.getString(RegionMetricMonthResolver.KEY_BASE_MONTH))
     }
@@ -73,7 +63,7 @@ class RegionMetricMonthResolverTest {
         val context = ExecutionContext()
         val resolver = resolver(dataMonths = setOf(YearMonth.of(2026, 8)))
 
-        val page = resolver.fetchPage(context, runMonth, "11", 1)
+        val page = resolver.syncPage(context, runMonth, "11", 1)
 
         assertEquals(1, page.totalCount)
         assertEquals(listOf(Triple("11", YearMonth.of(2026, 8), 1)), calls)
@@ -85,10 +75,10 @@ class RegionMetricMonthResolverTest {
         val context = ExecutionContext()
         val resolver = resolver(dataMonths = setOf(YearMonth.of(2026, 6)))
 
-        resolver.fetchPage(context, runMonth, "11", 1) // 8 → 7 → 6 (3 호출)
+        resolver.syncPage(context, runMonth, "11", 1) // 8 → 7 → 6 (3 호출)
         calls.clear()
-        resolver.fetchPage(context, runMonth, "26", 1)
-        resolver.fetchPage(context, runMonth, "50", 1)
+        resolver.syncPage(context, runMonth, "26", 1)
+        resolver.syncPage(context, runMonth, "50", 1)
 
         assertEquals(
             listOf(
@@ -105,7 +95,7 @@ class RegionMetricMonthResolverTest {
         val context = ExecutionContext()
         context.putString(RegionMetricMonthResolver.KEY_BASE_MONTH, "2026-06")
 
-        resolver(dataMonths = setOf(YearMonth.of(2026, 6))).fetchPage(context, runMonth, "11", 1)
+        resolver(dataMonths = setOf(YearMonth.of(2026, 6))).syncPage(context, runMonth, "11", 1)
 
         assertEquals(listOf(Triple("11", YearMonth.of(2026, 6), 1)), calls)
     }
@@ -116,13 +106,13 @@ class RegionMetricMonthResolverTest {
         val context = ExecutionContext()
         val resolver = resolver(dataMonths = setOf(YearMonth.of(2026, 6)), emptyAreas = setOf("11"))
 
-        val first = resolver.fetchPage(context, runMonth, "11", 1)
+        val first = resolver.syncPage(context, runMonth, "11", 1)
 
         assertEquals(0, first.totalCount)
         assertTrue(context.getString(RegionMetricMonthResolver.KEY_BASE_MONTH, "").isEmpty())
 
         calls.clear()
-        val second = resolver.fetchPage(context, runMonth, "26", 1)
+        val second = resolver.syncPage(context, runMonth, "26", 1)
 
         assertEquals(1, second.totalCount)
         assertEquals(YearMonth.of(2026, 6), calls.last().second)
@@ -135,17 +125,17 @@ class RegionMetricMonthResolverTest {
         val context = ExecutionContext()
         val resolver = resolver(lookbackMonths = 3, dataMonths = emptySet())
 
-        val page = resolver.fetchPage(context, runMonth, "11", 1)
+        val page = resolver.syncPage(context, runMonth, "11", 1)
 
         assertEquals(0, page.totalCount)
-        assertEquals(emptyList(), page.records)
-        assertEquals(0, page.droppedCount)
+        assertEquals(0, page.written)
+        assertEquals(0, page.dropped)
     }
 
     @Test
     fun `탐색은 lookback 개월을 넘지 않는다`() {
         val context = ExecutionContext()
-        resolver(lookbackMonths = 3, dataMonths = emptySet()).fetchPage(context, runMonth, "11", 1)
+        resolver(lookbackMonths = 3, dataMonths = emptySet()).syncPage(context, runMonth, "11", 1)
 
         assertEquals(
             listOf(YearMonth.of(2026, 8), YearMonth.of(2026, 7), YearMonth.of(2026, 6)),
@@ -159,7 +149,7 @@ class RegionMetricMonthResolverTest {
         val context = ExecutionContext()
         context.putString(RegionMetricMonthResolver.KEY_BASE_MONTH, "2026-06")
 
-        resolver(dataMonths = setOf(YearMonth.of(2026, 6))).fetchPage(context, runMonth, "11", 3)
+        resolver(dataMonths = setOf(YearMonth.of(2026, 6))).syncPage(context, runMonth, "11", 3)
 
         assertEquals(listOf(Triple("11", YearMonth.of(2026, 6), 3)), calls)
     }
@@ -168,7 +158,7 @@ class RegionMetricMonthResolverTest {
     fun `확정 전이면 탐색도 요청한 페이지 번호로 한다`() {
         // 재시작 직후 2페이지에서 이어지는 경우.
         val context = ExecutionContext()
-        resolver(dataMonths = setOf(YearMonth.of(2026, 7))).fetchPage(context, runMonth, "11", 2)
+        resolver(dataMonths = setOf(YearMonth.of(2026, 7))).syncPage(context, runMonth, "11", 2)
 
         assertEquals(listOf(2, 2), calls.map { it.third })
         assertNull(calls.firstOrNull { it.third != 2 })

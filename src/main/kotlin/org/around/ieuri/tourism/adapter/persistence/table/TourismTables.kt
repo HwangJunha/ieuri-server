@@ -16,7 +16,7 @@ import org.jetbrains.exposed.v1.javatime.date
 import org.jetbrains.exposed.v1.javatime.timestampWithTimeZone
 
 // tour 스키마. 원본은 마이그레이션이다 — 컬럼·제약·인덱스 이름을 마이그레이션과 같게 둔다.
-// raw SQL로만 쓰는 테이블(congestion_area·spot_embedding·kto_*)은 선언하지 않는다.
+// 지역 지표·혼잡 영역·임베딩 테이블은 `MetricTables.kt`에 있다.
 
 private val LANGUAGES = listOf("EN", "KO", "JA", "ZH")
 
@@ -29,7 +29,7 @@ object AreaTable : Table("tour.area") {
     override val primaryKey = PrimaryKey(areaCd)
 }
 
-/** 경계·중심은 적재 데이터다. 대표 위치는 배치가 raw SQL로 쓴다. */
+/** 경계·중심은 적재 데이터다. 대표 위치는 배치가 쓴다. */
 object DistrictTable : Table("tour.district") {
     val code = varchar("code", 5)
     val areaCd = varchar("area_cd", 2)

@@ -1,22 +1,17 @@
 package org.around.ieuri.tourism.adapter.batch
 
-import org.around.ieuri.common.persistence.ExposedConfig
-import org.around.ieuri.tourism.application.catalog.provided.SpotCatalogCommandUseCase
-import org.around.ieuri.tourism.application.spot.required.FestivalSyncPort
-import org.around.ieuri.tourism.application.spot.required.SpotRepository
-import org.around.ieuri.tourism.application.spot.required.SpotSyncPort
+import org.around.ieuri.tourism.application.catalog.provided.SpotCatalogCurationUseCase
+import org.around.ieuri.tourism.application.spot.provided.SpotSyncUseCase
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.springframework.batch.core.job.Job
 import org.springframework.batch.core.job.builder.JobBuilder
 import org.springframework.batch.core.repository.JobRepository
 import org.springframework.batch.core.step.Step
 import org.springframework.batch.core.step.builder.StepBuilder
-import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.batch.core.step.tasklet.Tasklet
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Profile
-import org.springframework.transaction.PlatformTransactionManager
-import tools.jackson.databind.ObjectMapper
 
 /**
  * 관광지·축제 동기화 잡 구성.
@@ -36,64 +31,31 @@ import tools.jackson.databind.ObjectMapper
 @Profile(BATCH_PROFILE)
 class SpotSyncJobConfig(
     private val jobRepository: JobRepository,
-    @Qualifier(ExposedConfig.EXPOSED_TX) private val transactionManager: PlatformTransactionManager,
-    private val syncPort: SpotSyncPort,
-    private val spotRepository: SpotRepository,
+    private val syncUseCase: SpotSyncUseCase,
+    private val curationUseCase: SpotCatalogCurationUseCase,
     private val properties: SpotSyncProperties,
-    private val festivalSyncPort: FestivalSyncPort,
     private val festivalProperties: FestivalSyncProperties,
-    private val catalogUseCase: SpotCatalogCommandUseCase,
-    private val objectMapper: ObjectMapper,
 ) {
 
     @Bean
     fun spotSyncJob(): Job {
         val order = listOf(DomainLocale.KO, DomainLocale.EN, DomainLocale.JA, DomainLocale.ZH)
-        // 관광지 → 축제(부모 행이 먼저) → 카탈로그 배정(SPEC-0019 R-7).
-        val steps = order.map(::syncStep) +
-            order.map(::festivalStep) +
-            listOf(catalogAssignmentStep(), catalogSplitStep())
+        val steps = order.map { syncStep("syncLanguageStep-${it.name}", it, SpotSyncTasklet.Target.SPOT, properties.pageSize) } +
+            order.map { syncStep("festivalSyncStep-${it.name}", it, SpotSyncTasklet.Target.FESTIVAL, festivalProperties.pageSize) } +
+            listOf(
+                step("catalogAssignmentStep", SpotCatalogAssignmentTasklet(curationUseCase)),
+                step("catalogSplitStep", SpotCatalogSplitTasklet(curationUseCase)),
+            )
         return steps.drop(1)
             .fold(JobBuilder(JOB_NAME, jobRepository).start(steps.first())) { acc, step -> acc.next(step) }
             .build()
     }
 
-    /** 미배정 spot을 카탈로그에 배정한다. 대상이 소진될 때까지 회차를 반복한다. */
-    private fun catalogAssignmentStep(): Step = StepBuilder("catalogAssignmentStep", jobRepository)
-        .tasklet(SpotCatalogAssignmentTasklet(catalogUseCase), transactionManager)
-        .build()
-
-    /** 서로 다른 장소가 접힌 카탈로그를 가른다(SPEC-0029). 배정 뒤여야 한다. */
-    private fun catalogSplitStep(): Step = StepBuilder("catalogSplitStep", jobRepository)
-        .tasklet(SpotCatalogSplitTasklet(catalogUseCase), transactionManager)
-        .build()
-
     /** 언어 1개를 전량 수집하는 Step. 재실행 시 완료된 언어는 건너뛰고 실패한 언어부터 재개한다. */
-    private fun syncStep(language: DomainLocale): Step = StepBuilder("syncLanguageStep-${language.name}", jobRepository)
-        .tasklet(
-            SpotSyncTasklet(
-                language = language,
-                syncPort = syncPort,
-                spotRepository = spotRepository,
-                pageSize = properties.pageSize,
-                // 조회를 Step 실행 시점으로 미룬다 — 부팅 때 잡은 집합이면 종료 축제가 되살아난다.
-                endedFestivalIds = { runDate -> spotRepository.findEndedFestivalContentIds(language, runDate) },
-            ),
-            transactionManager,
-        )
-        .build()
+    private fun syncStep(name: String, language: DomainLocale, target: SpotSyncTasklet.Target, pageSize: Int): Step = step(name, SpotSyncTasklet(language, target, syncUseCase, pageSize))
 
-    /** 언어 1개의 축제 정보를 수집·적재하고 정리하는 Step. */
-    private fun festivalStep(language: DomainLocale): Step = StepBuilder("festivalSyncStep-${language.name}", jobRepository)
-        .tasklet(
-            FestivalSyncTasklet(
-                language = language,
-                syncPort = festivalSyncPort,
-                spotRepository = spotRepository,
-                pageSize = festivalProperties.pageSize,
-            ),
-            transactionManager,
-        )
+    private fun step(name: String, tasklet: Tasklet): Step = StepBuilder(name, jobRepository)
+        .tasklet(tasklet)
         .build()
 
     companion object {

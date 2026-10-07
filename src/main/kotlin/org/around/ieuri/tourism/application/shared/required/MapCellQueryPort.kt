@@ -4,7 +4,7 @@ import org.around.ieuri.tourism.application.shared.provided.dto.CellSpotView
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.shared.MapCellDistrictRow
 
-/** 전국 지도 칸의 읽기 포트(SPEC-0030). 공간 컬럼을 읽어 구현은 생 SQL이다. */
+/** 전국 지도 칸의 읽기 포트(SPEC-0030). */
 interface MapCellQueryPort {
 
     /**

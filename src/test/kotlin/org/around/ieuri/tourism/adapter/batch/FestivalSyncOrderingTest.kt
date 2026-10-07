@@ -1,15 +1,11 @@
 package org.around.ieuri.tourism.adapter.batch
 
 import io.mockk.mockk
-import org.around.ieuri.tourism.application.catalog.provided.SpotCatalogCommandUseCase
-import org.around.ieuri.tourism.application.spot.required.FestivalSyncPort
-import org.around.ieuri.tourism.application.spot.required.SpotRepository
-import org.around.ieuri.tourism.application.spot.required.SpotSyncPort
+import org.around.ieuri.tourism.application.catalog.provided.SpotCatalogCurationUseCase
+import org.around.ieuri.tourism.application.spot.provided.SpotSyncUseCase
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.springframework.batch.core.job.SimpleJob
 import org.springframework.batch.core.repository.JobRepository
-import org.springframework.transaction.PlatformTransactionManager
-import tools.jackson.databind.ObjectMapper
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -22,14 +18,10 @@ class FestivalSyncOrderingTest {
 
     private val config = SpotSyncJobConfig(
         jobRepository = mockk<JobRepository>(relaxed = true),
-        transactionManager = mockk<PlatformTransactionManager>(relaxed = true),
-        syncPort = mockk<SpotSyncPort>(),
-        spotRepository = mockk<SpotRepository>(),
+        syncUseCase = mockk<SpotSyncUseCase>(),
+        curationUseCase = mockk<SpotCatalogCurationUseCase>(),
         properties = SpotSyncProperties(),
-        festivalSyncPort = mockk<FestivalSyncPort>(),
         festivalProperties = FestivalSyncProperties(),
-        catalogUseCase = mockk<SpotCatalogCommandUseCase>(),
-        objectMapper = mockk<ObjectMapper>(),
     )
 
     private val stepNames: List<String>

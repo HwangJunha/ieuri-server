@@ -2,10 +2,9 @@ package org.around.ieuri.tourism.adapter.event.listener
 
 import org.around.ieuri.auth.domain.event.MemberWithdrawn
 import org.around.ieuri.tourism.adapter.config.TourismAsyncConfig
-import org.around.ieuri.tourism.application.reaction.provided.SpotReactionCommandUseCase
+import org.around.ieuri.tourism.application.catalog.provided.SpotCatalogCommandUseCase
+import org.around.ieuri.tourism.application.footprint.provided.FootprintCommandUseCase
 import org.around.ieuri.tourism.application.relation.provided.MapRelationCommandUseCase
-import org.around.ieuri.tourism.application.sharelink.provided.MapShareLinkCommandUseCase
-import org.around.ieuri.tourism.application.visit.provided.DistrictVisitCommandUseCase
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Component
@@ -20,23 +19,18 @@ import org.springframework.transaction.event.TransactionalEventListener
  */
 @Component
 class TourismMemberWithdrawnListener(
-    private val reactionCommandUseCase: SpotReactionCommandUseCase,
-    private val visitCommandUseCase: DistrictVisitCommandUseCase,
-    private val shareLinkCommandUseCase: MapShareLinkCommandUseCase,
+    private val catalogCommandUseCase: SpotCatalogCommandUseCase,
+    private val footprintCommandUseCase: FootprintCommandUseCase,
     private val relationCommandUseCase: MapRelationCommandUseCase,
 ) {
     @Async(TourismAsyncConfig.WITHDRAWAL_EXECUTOR)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    fun eraseReactions(event: MemberWithdrawn) = erase(event, "reactions") { reactionCommandUseCase.eraseMemberContent(event.memberId) }
+    fun eraseReactions(event: MemberWithdrawn) = erase(event, "reactions") { catalogCommandUseCase.eraseMemberContent(event.memberId) }
 
-    /** 개인정보 성격이 짙은 방문 기록이다. */
+    /** 방문 기록은 개인정보 성격이 짙다. 공유 링크는 폐기가 아니라 삭제한다. */
     @Async(TourismAsyncConfig.WITHDRAWAL_EXECUTOR)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    fun eraseVisits(event: MemberWithdrawn) = erase(event, "visits") { visitCommandUseCase.eraseMemberContent(event.memberId) }
-
-    @Async(TourismAsyncConfig.WITHDRAWAL_EXECUTOR)
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    fun eraseShareLinks(event: MemberWithdrawn) = erase(event, "shareLinks") { shareLinkCommandUseCase.eraseMemberContent(event.memberId) }
+    fun eraseFootprint(event: MemberWithdrawn) = erase(event, "footprint") { footprintCommandUseCase.eraseMemberContent(event.memberId) }
 
     /** 관계는 양방향이라 상대 목록의 이 회원까지 지운다. */
     @Async(TourismAsyncConfig.WITHDRAWAL_EXECUTOR)

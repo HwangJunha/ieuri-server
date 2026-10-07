@@ -1,11 +1,11 @@
 package org.around.ieuri.tourism.adapter.batch
 
-import org.around.ieuri.tourism.application.detail.SpotDetailPrefetchPolicy
-import org.around.ieuri.tourism.application.detail.SpotDetailPrefetchService
-import org.around.ieuri.tourism.application.detail.provided.SpotDetailPrefetchUseCase
-import org.around.ieuri.tourism.application.detail.required.SpotDetailPrefetchTargetQueryPort
-import org.around.ieuri.tourism.application.detail.required.SpotDetailRepository
 import org.around.ieuri.tourism.application.shared.required.TourInfoPort
+import org.around.ieuri.tourism.application.spot.SpotDetailPrefetchPolicy
+import org.around.ieuri.tourism.application.spot.SpotDetailPrefetchService
+import org.around.ieuri.tourism.application.spot.provided.SpotCommandUseCase
+import org.around.ieuri.tourism.application.spot.provided.SpotDetailPrefetchUseCase
+import org.around.ieuri.tourism.application.spot.provided.SpotPrefetchQueryUseCase
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -25,9 +25,9 @@ class SpotDetailPrefetchConfig {
 
     @Bean
     fun spotDetailPrefetchService(
-        targetQueryPort: SpotDetailPrefetchTargetQueryPort,
+        prefetchQueryUseCase: SpotPrefetchQueryUseCase,
         tourInfoPort: TourInfoPort,
-        detailRepository: SpotDetailRepository,
+        spotCommandUseCase: SpotCommandUseCase,
         policy: SpotDetailPrefetchPolicy,
-    ): SpotDetailPrefetchUseCase = SpotDetailPrefetchService(targetQueryPort, tourInfoPort, detailRepository, policy)
+    ): SpotDetailPrefetchUseCase = SpotDetailPrefetchService(prefetchQueryUseCase, tourInfoPort, spotCommandUseCase, policy)
 }

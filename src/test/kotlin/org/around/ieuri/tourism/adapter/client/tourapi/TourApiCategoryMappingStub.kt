@@ -1,6 +1,7 @@
 package org.around.ieuri.tourism.adapter.client.tourapi
 
 import org.around.ieuri.tourism.adapter.config.TourApiProperties
+import org.around.ieuri.tourism.application.shared.provided.CategoryMappingQueryUseCase
 import org.around.ieuri.tourism.application.shared.required.CategoryExternalMappingPort
 import org.around.ieuri.tourism.domain.shared.SpotCategory
 
@@ -8,7 +9,7 @@ import org.around.ieuri.tourism.domain.shared.SpotCategory
  * TourAPI contentTypeId 매핑의 테스트 대역(SPEC-0020, V59). `category_external_mapping` 표를 DB 없이 고정한다.
  * - 코드셋마다 빠진 칸(여행코스는 외국어, 교통은 국문)을 표에서 빼지 말 것 — "코드 없으면 호출 생략"의 근거다.
  */
-class TourApiCategoryMappingStub : CategoryExternalMappingPort {
+class TourApiCategoryMappingStub : CategoryMappingQueryUseCase {
 
     private val codes: Map<String, Map<String, String>> = mapOf(
         TourApiProperties.CODESET_KO to mapOf(

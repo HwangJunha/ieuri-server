@@ -103,12 +103,12 @@ class TourApiSyncMapperTest {
         assertNull(item(mapy = null).toNearbySpotDataOrNull(SpotCategory.TOURIST_SPOT))
     }
 
-    // ── toSyncSpotCommandOrNull ─────────────────────────────────────
+    // ── toSpotOrNull ─────────────────────────────────────
 
     @Test
     fun `모든 필드가 채워진 item을 SyncSpotCommand로 옮긴다`() {
         val command = assertNotNull(
-            item().toSyncSpotCommandOrNull(DomainLocale.JA, SpotCategory("SHOPPING")),
+            item().toSpotOrNull(DomainLocale.JA, SpotCategory("SHOPPING")),
         )
 
         assertEquals("3001", command.contentId)
@@ -127,7 +127,7 @@ class TourApiSyncMapperTest {
     fun `SyncSpotCommand는 nullable 필드가 모두 null이어도 예외 없이 옮긴다`() {
         val command = assertNotNull(
             item(addr1 = null, addr2 = null, cpyrhtDivCd = null)
-                .toSyncSpotCommandOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT),
+                .toSpotOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT),
         )
 
         assertNull(command.address)
@@ -140,7 +140,7 @@ class TourApiSyncMapperTest {
         // 한국 범위 안의 값을 쓰되 경도·위도의 자릿수를 달리 둔다 — 범위 필터가 아니라 순서를 검증한다.
         val command = assertNotNull(
             item(mapx = 128.5, mapy = 35.25)
-                .toSyncSpotCommandOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT),
+                .toSpotOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT),
         )
 
         assertEquals(35.25, command.coordinates.latitude)
@@ -149,42 +149,42 @@ class TourApiSyncMapperTest {
 
     @Test
     fun `SyncSpotCommand는 필수 필드가 공백뿐이면 null이다`() {
-        assertNull(item(contentid = "  ").toSyncSpotCommandOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
-        assertNull(item(title = "  ").toSyncSpotCommandOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
-        assertNull(item(firstimage = "  ").toSyncSpotCommandOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
+        assertNull(item(contentid = "  ").toSpotOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
+        assertNull(item(title = "  ").toSpotOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
+        assertNull(item(firstimage = "  ").toSpotOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
     }
 
     @Test
     fun `showflag가 1이 아닌 항목은 적재하지 않는다`() {
         // AC-2.2. 요청의 showflag=1에만 기대지 않는다.
-        assertNull(item(showflag = "0").toSyncSpotCommandOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
+        assertNull(item(showflag = "0").toSpotOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
     }
 
     @Test
     fun `showflag가 없는 항목은 적재하지 않는다`() {
         // AC-2.3. 결측을 `"1"`로 간주하면 안 된다.
-        assertNull(item(showflag = null).toSyncSpotCommandOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
-        assertNull(item(showflag = "  ").toSyncSpotCommandOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
+        assertNull(item(showflag = null).toSpotOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
+        assertNull(item(showflag = "  ").toSpotOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
     }
 
     @Test
     fun `한국 범위를 벗어난 좌표는 적재하지 않는다`() {
         // `Coordinates`는 지구 전체를 유효로 보므로 (0,0)과 상류 플레이스홀더를 여기서 막는다.
-        assertNull(item(mapx = 0.0, mapy = 0.0).toSyncSpotCommandOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
+        assertNull(item(mapx = 0.0, mapy = 0.0).toSpotOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
         // 상류가 좌표를 모를 때 넣는 값 — 남중국해다.
         assertNull(
             item(mapx = 117.9925662504, mapy = 19.69442748)
-                .toSyncSpotCommandOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT),
+                .toSpotOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT),
         )
         // 경도만 벗어나도, 위도만 벗어나도 드랍이다.
-        assertNull(item(mapx = 139.7, mapy = 35.6).toSyncSpotCommandOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
+        assertNull(item(mapx = 139.7, mapy = 35.6).toSpotOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
     }
 
     @Test
     fun `한국 범위 경계값은 적재한다`() {
         // 경계는 포함이다.
-        assertNotNull(item(mapx = 124.0, mapy = 33.0).toSyncSpotCommandOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
-        assertNotNull(item(mapx = 132.0, mapy = 39.0).toSyncSpotCommandOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
+        assertNotNull(item(mapx = 124.0, mapy = 33.0).toSpotOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
+        assertNotNull(item(mapx = 132.0, mapy = 39.0).toSpotOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
     }
 
     @Test
@@ -193,11 +193,11 @@ class TourApiSyncMapperTest {
         assertNotNull(item(showflag = null).toNearbySpotDataOrNull(SpotCategory.TOURIST_SPOT))
     }
 
-    // ── toSyncFestivalCommandOrNull ─────────────────────────────────
+    // ── toSpotFestivalOrNull ─────────────────────────────────
 
     @Test
     fun `모든 필드가 채워진 축제 item을 SyncFestivalCommand로 옮긴다`() {
-        val command = assertNotNull(festivalItem().toSyncFestivalCommandOrNull(DomainLocale.ZH, asOf))
+        val command = assertNotNull(festivalItem().toSpotFestivalOrNull(DomainLocale.ZH, asOf))
 
         assertEquals("4001", command.contentId)
         assertEquals(DomainLocale.ZH, command.language)
@@ -211,7 +211,7 @@ class TourApiSyncMapperTest {
     fun `축제의 nullable 필드가 모두 null이어도 예외 없이 옮긴다`() {
         val command = assertNotNull(
             festivalItem(progresstype = null, festivaltype = null)
-                .toSyncFestivalCommandOrNull(DomainLocale.KO, asOf),
+                .toSpotFestivalOrNull(DomainLocale.KO, asOf),
         )
 
         assertNull(command.progressType)
@@ -224,7 +224,7 @@ class TourApiSyncMapperTest {
     fun `축제 기간은 시작일과 종료일이 뒤바뀌지 않고 옮겨진다`() {
         val command = assertNotNull(
             festivalItem(eventstartdate = "20260201", eventenddate = "20261231")
-                .toSyncFestivalCommandOrNull(DomainLocale.KO, asOf),
+                .toSpotFestivalOrNull(DomainLocale.KO, asOf),
         )
 
         assertEquals(LocalDate.of(2026, 2, 1), command.period.start)

@@ -9,8 +9,7 @@ import org.around.ieuri.tourism.adapter.graphql.mapper.toCommand
 import org.around.ieuri.tourism.adapter.graphql.support.RecordVisitsResponse
 import org.around.ieuri.tourism.adapter.graphql.support.RemoveVisitResponse
 import org.around.ieuri.tourism.adapter.graphql.support.domainLocale
-import org.around.ieuri.tourism.application.sharelink.provided.MapShareLinkCommandUseCase
-import org.around.ieuri.tourism.application.visit.provided.DistrictVisitCommandUseCase
+import org.around.ieuri.tourism.application.footprint.provided.FootprintCommandUseCase
 import org.around.ieuri.common.graphql.generated.types.CreateMapShareLinkPayload as GqlCreateMapShareLinkPayload
 import org.around.ieuri.common.graphql.generated.types.MapShareLink as GqlMapShareLink
 import org.around.ieuri.common.graphql.generated.types.RecordVisitsInput as GqlRecordVisitsInput
@@ -26,8 +25,7 @@ import org.around.ieuri.common.graphql.generated.types.UserError as GqlUserError
  */
 @DgsComponent
 class NationwideMapMutationResolver(
-    private val visitCommandUseCase: DistrictVisitCommandUseCase,
-    private val shareLinkCommandUseCase: MapShareLinkCommandUseCase,
+    private val footprintCommandUseCase: FootprintCommandUseCase,
     private val currentMemberProvider: CurrentMemberProvider,
 ) {
 
@@ -37,7 +35,7 @@ class NationwideMapMutationResolver(
         @InputArgument input: GqlRecordVisitsInput,
     ): RecordVisitsResponse {
         val memberId = currentMemberProvider.requireMemberId()
-        val result = visitCommandUseCase.recordVisits(input.toCommand(memberId), dfe.domainLocale())
+        val result = footprintCommandUseCase.recordVisits(input.toCommand(memberId), dfe.domainLocale())
 
         // 없는 코드가 섞여 있어도 나머지는 기록된다.
         // 오류는 하나로 묶고 어떤 코드였는지 밝힌다(공개 행정코드라 개인정보가 아니다).
@@ -64,7 +62,7 @@ class NationwideMapMutationResolver(
         @InputArgument input: GqlRemoveVisitInput,
     ): RemoveVisitResponse {
         val memberId = currentMemberProvider.requireMemberId()
-        val result = visitCommandUseCase.removeVisit(input.toCommand(memberId), dfe.domainLocale())
+        val result = footprintCommandUseCase.removeVisit(input.toCommand(memberId), dfe.domainLocale())
 
         return RemoveVisitResponse(
             success = result.updatedCell != null,
@@ -86,7 +84,7 @@ class NationwideMapMutationResolver(
     @DgsMutation
     fun createMapShareLink(): GqlCreateMapShareLinkPayload {
         val memberId = currentMemberProvider.requireMemberId()
-        val link = shareLinkCommandUseCase.createShareLink(memberId)
+        val link = footprintCommandUseCase.createShareLink(memberId)
 
         return GqlCreateMapShareLinkPayload(
             success = true,
@@ -100,7 +98,7 @@ class NationwideMapMutationResolver(
         @InputArgument input: GqlRevokeMapShareLinkInput,
     ): GqlRevokeMapShareLinkPayload {
         val memberId = currentMemberProvider.requireMemberId()
-        val revoked = shareLinkCommandUseCase.revokeShareLink(memberId, input.shareUrl)
+        val revoked = footprintCommandUseCase.revokeShareLink(memberId, input.shareUrl)
 
         // 남의 토큰과 이미 폐기된 토큰을 구분하지 않는다 — 구분하면 남의 링크 유효성을 떠볼 수 있다.
         return GqlRevokeMapShareLinkPayload(

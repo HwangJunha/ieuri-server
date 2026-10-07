@@ -3,14 +3,6 @@ package org.around.ieuri.tourism.application.shared
 import org.around.ieuri.common.context.AppKey
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.persistence.ExposedConfig
-import org.around.ieuri.tourism.application.detail.SpotDetailAbsent
-import org.around.ieuri.tourism.application.detail.SpotDetailFetched
-import org.around.ieuri.tourism.application.detail.SpotGalleryFetched
-import org.around.ieuri.tourism.application.detail.SpotInfoItemsFetched
-import org.around.ieuri.tourism.application.detail.SpotIntroFetched
-import org.around.ieuri.tourism.application.detail.required.SpotCachePort
-import org.around.ieuri.tourism.application.detail.required.SpotDetailRepository
-import org.around.ieuri.tourism.application.detail.required.StoredDetail
 import org.around.ieuri.tourism.application.shared.SpotQueryPolicy
 import org.around.ieuri.tourism.application.shared.provided.SpotQueryUseCase
 import org.around.ieuri.tourism.application.shared.provided.dto.AppCategoryCode
@@ -44,13 +36,21 @@ import org.around.ieuri.tourism.application.shared.required.SpotSearchResult
 import org.around.ieuri.tourism.application.shared.required.SpotSpatialQueryPort
 import org.around.ieuri.tourism.application.shared.required.TourInfoPort
 import org.around.ieuri.tourism.application.shared.required.TourismEventPublisherPort
-import org.around.ieuri.tourism.domain.detail.SpotDetail
-import org.around.ieuri.tourism.domain.detail.SpotImage
-import org.around.ieuri.tourism.domain.detail.SpotIntro
+import org.around.ieuri.tourism.application.spot.SpotDetailAbsent
+import org.around.ieuri.tourism.application.spot.SpotDetailFetched
+import org.around.ieuri.tourism.application.spot.SpotGalleryFetched
+import org.around.ieuri.tourism.application.spot.SpotInfoItemsFetched
+import org.around.ieuri.tourism.application.spot.SpotIntroFetched
+import org.around.ieuri.tourism.application.spot.required.SpotCachePort
+import org.around.ieuri.tourism.application.spot.required.SpotDetailQueryPort
+import org.around.ieuri.tourism.application.spot.required.StoredDetail
 import org.around.ieuri.tourism.domain.shared.Coordinates
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.shared.SpotCategory
 import org.around.ieuri.tourism.domain.shared.SpotQueryException
+import org.around.ieuri.tourism.domain.spot.SpotDetail
+import org.around.ieuri.tourism.domain.spot.SpotImage
+import org.around.ieuri.tourism.domain.spot.SpotIntro
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
@@ -67,7 +67,7 @@ class SpotQueryService(
     private val spotSpatialQueryPort: SpotSpatialQueryPort,
     private val likedSpotSearchPort: LikedSpotSearchPort,
     private val spotCachePort: SpotCachePort,
-    private val detailRepository: SpotDetailRepository,
+    private val detailQueryPort: SpotDetailQueryPort,
     private val eventPublisher: TourismEventPublisherPort,
     private val appCategoryQueryPort: AppCategoryQueryPort,
     private val policy: SpotQueryPolicy,
@@ -137,7 +137,7 @@ class SpotQueryService(
         spotCachePort.getDetail(spotId)?.let { return it.detail.toView(catalogId, identity) }
 
         // DB 히트: Valkey만 충전한다. 부재 행도 그대로 응답한다.
-        detailRepository.findDetail(spotId)?.let { stored ->
+        detailQueryPort.findDetail(spotId)?.let { stored ->
             if (stored.bodyAbsent) {
                 spotCachePort.putDetailAbsence(spotId, stored.detail)
             } else {
@@ -170,16 +170,7 @@ class SpotQueryService(
     private fun bodyAbsentDetail(catalogId: Long, language: DomainLocale): SpotDetail {
         // findSpotBasics는 카탈로그 id로 묻는다.
         val basics = spotQueryPort.findSpotBasics(catalogId, language) ?: throw spotAbsenceFor(catalogId)
-        return SpotDetail(
-            title = basics.title,
-            category = basics.category,
-            thumbnailImageUrl = basics.thumbnailImageUrl,
-            overview = null,
-            address = basics.address,
-            homepage = null,
-            tel = null,
-            copyright = basics.copyright,
-        )
+        return SpotDetail.absent(basics.title, basics.category, basics.thumbnailImageUrl, basics.address, basics.copyright)
     }
 
     override fun spotGallery(catalogId: Long, locale: DomainLocale): List<SpotImageView> {
@@ -187,7 +178,7 @@ class SpotQueryService(
         val spotId = identity.spotId
         spotCachePort.getGallery(spotId)?.let { return it.map { image -> image.toView() } }
 
-        detailRepository.findGallery(spotId)?.let { stored ->
+        detailQueryPort.findGallery(spotId)?.let { stored ->
             spotCachePort.putGallery(spotId, stored)
             return stored.map { it.toView() }
         }
@@ -206,7 +197,7 @@ class SpotQueryService(
         val cached = spotCachePort.getIntro(spotId, category)
         if (cached != null) return cached.value?.toView()
 
-        val stored = detailRepository.findIntro(spotId, category)
+        val stored = detailQueryPort.findIntro(spotId, category)
         if (stored != null) {
             spotCachePort.putIntro(spotId, category, stored.value)
             return stored.value?.toView()
@@ -229,7 +220,7 @@ class SpotQueryService(
         spotCachePort.getInfoItems(spotId, category)
             ?.let { return it.map { item -> SpotInfoItemView(item.name, item.text) } }
 
-        detailRepository.findInfoItems(spotId, category)?.let { stored ->
+        detailQueryPort.findInfoItems(spotId, category)?.let { stored ->
             spotCachePort.putInfoItems(spotId, category, stored)
             return stored.map { SpotInfoItemView(it.name, it.text) }
         }

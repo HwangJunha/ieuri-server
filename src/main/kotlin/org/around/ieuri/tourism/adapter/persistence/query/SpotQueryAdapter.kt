@@ -16,7 +16,7 @@ import org.around.ieuri.tourism.application.shared.required.LikedSpotsSearch
 import org.around.ieuri.tourism.application.shared.required.SpotBasics
 import org.around.ieuri.tourism.application.shared.required.SpotIdentity
 import org.around.ieuri.tourism.application.shared.required.SpotQueryPort
-import org.around.ieuri.tourism.domain.reaction.ReactionType
+import org.around.ieuri.tourism.domain.catalog.ReactionType
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.shared.LikedSpotCursor
 import org.jetbrains.exposed.v1.core.JoinType

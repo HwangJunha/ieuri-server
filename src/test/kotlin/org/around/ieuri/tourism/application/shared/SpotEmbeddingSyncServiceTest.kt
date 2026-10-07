@@ -18,7 +18,7 @@ import org.around.ieuri.tourism.domain.spot.TaxRefundTitleRule
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/** SPEC-0035 S2 — 임베딩 적재: 대상 → 텍스트 → 제공자(재시도) → 저장. 포트는 전부 스텁이다. */
+/** SPEC-0035 S2 — 임베딩 적재: 대상 → 텍스트 → 제공자(재시도) → 저장. 포트는 전부 스텁이고, DB 쪽 절반은 실제 `SpotEmbeddingStoreService`다. */
 class SpotEmbeddingSyncServiceTest {
 
     private val storePort = mockk<SpotEmbeddingStorePort>(relaxed = true)
@@ -31,11 +31,11 @@ class SpotEmbeddingSyncServiceTest {
         tasteMinReactions = 5,
         embedding = EmbeddingSpec(model = "voyage-4", dimension = 3, retryCount = 2, overviewMaxChars = 500),
     )
-    private val service = SpotEmbeddingSyncService(storePort, embeddingPort, categoryPort, policy)
+    private val service = SpotEmbeddingSyncService(SpotEmbeddingStoreService(storePort, categoryPort, policy), embeddingPort, policy)
 
     private val targets = listOf(
-        EmbeddingTarget(11L, DomainLocale.KO, "나이키 가산점", "SHOPPING", "서울 금천구", "스포츠 브랜드 매장이다."),
-        EmbeddingTarget(12L, DomainLocale.KO, "가산 칼국수", "RESTAURANT", null, null),
+        EmbeddingTarget(11L, "hash-11", DomainLocale.KO, "나이키 가산점", "SHOPPING", "서울 금천구", "스포츠 브랜드 매장이다."),
+        EmbeddingTarget(12L, "hash-12", DomainLocale.KO, "가산 칼국수", "RESTAURANT", null, null),
     )
 
     @Test
@@ -61,6 +61,8 @@ class SpotEmbeddingSyncServiceTest {
         // 라벨이 없는 카테고리는 코드가 라벨이다. 주소가 없으면 빈 칸.
         assertEquals(listOf("나이키 가산점 | 쇼핑 | 서울 금천구 | 스포츠 브랜드 매장이다.", "가산 칼국수 | RESTAURANT |  |"), texts.captured)
         assertEquals(listOf(11L, 12L), saved.captured.map { it.translationId })
+        // 읽을 때의 원문 지문을 벡터와 함께 저장한다 — 바뀌면 다음 실행의 대상이 된다.
+        assertEquals(listOf("hash-11", "hash-12"), saved.captured.map { it.sourceHash })
         assertEquals(listOf(1f, 0f, 0f), saved.captured[0].vector.toList())
         assertEquals(2, result.processed)
         assertEquals(2, result.embedded)

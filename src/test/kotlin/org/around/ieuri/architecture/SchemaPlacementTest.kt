@@ -58,13 +58,6 @@ class SchemaPlacementTest {
 
     /** JPA 엔티티도 Exposed 테이블 선언도 없는 테이블 — raw SQL로만 접근하거나, 쓰는 코드가 없다. */
     private val tablesWithoutEntity = setOf(
-        "congestion_area",
-        // vector 타입은 JPA가 표현하지 못한다(SPEC-0035).
-        "spot_embedding",
-        "kto_visitor_count",
-        "kto_concentration_rate",
-        "kto_stay_intensity",
-        "kto_spending_intensity",
         // 고아 사진 판정을 지우며 테이블만 남겼다(SPEC-0039 D-45). 쓰는 코드가 없다.
         "community_orphan_photo_object",
     )

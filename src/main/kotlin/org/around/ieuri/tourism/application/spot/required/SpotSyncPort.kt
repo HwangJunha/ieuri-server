@@ -1,7 +1,7 @@
 package org.around.ieuri.tourism.application.spot.required
 
-import org.around.ieuri.tourism.application.spot.provided.dto.SyncSpotCommand
 import org.around.ieuri.tourism.domain.shared.DomainLocale
+import org.around.ieuri.tourism.domain.spot.Spot
 
 /** 관광지 전량 동기화 포트(SPEC-0004). 배치가 좌표와 무관하게 언어당 전 페이지를 수집한다. */
 interface SpotSyncPort {
@@ -17,7 +17,7 @@ interface SpotSyncPort {
  * - 건수 필드는 관측용이다. [droppedCount]는 필수 필드 결손, [excludedCount]는 비관광이라 뺀 항목이다.
  */
 data class SpotSyncPage(
-    val records: List<SyncSpotCommand>,
+    val records: List<Spot>,
     val totalCount: Int,
     val droppedCount: Int,
     val categoryFallbackCount: Int,

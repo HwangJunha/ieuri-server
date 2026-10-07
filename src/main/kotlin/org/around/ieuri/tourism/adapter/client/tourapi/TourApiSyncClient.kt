@@ -1,7 +1,8 @@
 package org.around.ieuri.tourism.adapter.client.tourapi
 
-import org.around.ieuri.tourism.adapter.client.tourapi.mapper.toSyncSpotCommandOrNull
+import org.around.ieuri.tourism.adapter.client.tourapi.mapper.toSpotOrNull
 import org.around.ieuri.tourism.adapter.config.TourApiProperties
+import org.around.ieuri.tourism.application.shared.provided.CategoryMappingQueryUseCase
 import org.around.ieuri.tourism.application.shared.required.CategoryExternalMappingPort
 import org.around.ieuri.tourism.application.spot.required.SpotSyncPage
 import org.around.ieuri.tourism.application.spot.required.SpotSyncPort
@@ -22,7 +23,7 @@ class TourApiSyncClient(
     private val properties: TourApiProperties,
     private val tourApiRestClient: RestClient,
     private val exclusionRule: SpotExclusionRule,
-    private val categoryMapping: CategoryExternalMappingPort,
+    private val categoryMapping: CategoryMappingQueryUseCase,
 ) : SpotSyncPort {
 
     override fun fetchPage(language: DomainLocale, pageNo: Int, numOfRows: Int): SpotSyncPage {
@@ -61,7 +62,7 @@ class TourApiSyncClient(
                 excluded++
                 return@mapNotNull null
             }
-            item.toSyncSpotCommandOrNull(language, resolved.category)
+            item.toSpotOrNull(language, resolved.category)
         }
 
         return SpotSyncPage(

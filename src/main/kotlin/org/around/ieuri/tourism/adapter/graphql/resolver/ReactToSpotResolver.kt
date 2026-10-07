@@ -10,9 +10,9 @@ import org.around.ieuri.common.graphql.generated.types.UserError
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.tourism.adapter.graphql.support.domainLocale
 import org.around.ieuri.tourism.adapter.graphql.support.withReactionUserErrors
-import org.around.ieuri.tourism.application.reaction.provided.SpotReactionCommandUseCase
-import org.around.ieuri.tourism.application.reaction.provided.dto.ReactToSpotCommand
-import org.around.ieuri.tourism.domain.reaction.ReactionType
+import org.around.ieuri.tourism.application.catalog.provided.SpotCatalogCommandUseCase
+import org.around.ieuri.tourism.application.catalog.provided.dto.ReactToSpotCommand
+import org.around.ieuri.tourism.domain.catalog.ReactionType
 
 /**
  * 좋아요/싫어요 기록 뮤테이션 리졸버. 언어는 Accept-Language 헤더에서, memberId는 SecurityContext에서 온다.
@@ -21,7 +21,7 @@ import org.around.ieuri.tourism.domain.reaction.ReactionType
  */
 @DgsComponent
 class ReactToSpotResolver(
-    private val reactionCommandUseCase: SpotReactionCommandUseCase,
+    private val catalogCommandUseCase: SpotCatalogCommandUseCase,
     private val currentMemberProvider: CurrentMemberProvider,
 ) {
     @DgsMutation
@@ -34,7 +34,7 @@ class ReactToSpotResolver(
         // 비로그인 → UnauthorizedException → 최상위 errors[].
         val memberId = currentMemberProvider.requireMemberId()
 
-        reactionCommandUseCase.react(
+        catalogCommandUseCase.react(
             command = ReactToSpotCommand(
                 catalogId = input.catalogId,
                 // GraphQL enum → 도메인 enum. 이름이 어긋나면 valueOf가 즉시 실패한다.

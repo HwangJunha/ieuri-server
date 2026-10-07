@@ -1,6 +1,7 @@
 package org.around.ieuri.tourism.application.shared
 
 import org.around.ieuri.common.persistence.ExposedConfig
+import org.around.ieuri.tourism.application.footprint.required.FootprintQueryPort
 import org.around.ieuri.tourism.application.shared.NationwideMapPolicy
 import org.around.ieuri.tourism.application.shared.provided.NationwideMapUseCase
 import org.around.ieuri.tourism.application.shared.provided.dto.CellImageView
@@ -16,8 +17,6 @@ import org.around.ieuri.tourism.application.shared.required.MapCellDistrictQuery
 import org.around.ieuri.tourism.application.shared.required.MapCellQueryPort
 import org.around.ieuri.tourism.application.shared.required.MapOwnerLookupPort
 import org.around.ieuri.tourism.application.shared.required.MapViewerBlockPort
-import org.around.ieuri.tourism.application.sharelink.required.MapShareLinkRepository
-import org.around.ieuri.tourism.application.visit.required.DistrictVisitQueryPort
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.shared.MapCellGrouping
 import org.springframework.stereotype.Service
@@ -29,9 +28,8 @@ import org.springframework.transaction.annotation.Transactional
 class NationwideMapService(
     private val mapCellQueryPort: MapCellQueryPort,
     private val mapCellDistrictQueryPort: MapCellDistrictQueryPort,
-    private val districtVisitQueryPort: DistrictVisitQueryPort,
+    private val footprintQueryPort: FootprintQueryPort,
     private val cellImageQueryPort: CellImageQueryPort,
-    private val shareLinkRepository: MapShareLinkRepository,
     private val mapOwnerLookupPort: MapOwnerLookupPort,
     private val mapViewerBlockPort: MapViewerBlockPort,
     private val policy: NationwideMapPolicy,
@@ -74,20 +72,20 @@ class NationwideMapService(
         )
 
     override fun sharedMap(token: String, viewerMemberId: Long?): SharedMapView {
-        val link = shareLinkRepository.findActiveByToken(token) ?: throw ShareLinkNotFoundException()
+        val ownerId = footprintQueryPort.findSharerId(token) ?: throw ShareLinkNotFoundException()
 
         // 차단은 양방향이라 누가 걸었는지는 묻지 않는다(POL-041).
         if (viewerMemberId != null &&
-            viewerMemberId != link.memberId &&
-            mapViewerBlockPort.isBlockedBetween(viewerMemberId, link.memberId)
+            viewerMemberId != ownerId &&
+            mapViewerBlockPort.isBlockedBetween(viewerMemberId, ownerId)
         ) {
             throw ShareLinkBlockedException()
         }
 
-        val ownerNickname = mapOwnerLookupPort.findNickname(link.memberId)
+        val ownerNickname = mapOwnerLookupPort.findNickname(ownerId)
             ?: throw ShareLinkNotFoundException()
 
-        val ownerCells = visitedCellIds(link.memberId)
+        val ownerCells = visitedCellIds(ownerId)
         val overlapping = viewerMemberId?.let { viewer ->
             val viewerCells = visitedCellIds(viewer)
             ownerCells.filter { it in viewerCells }
@@ -102,11 +100,11 @@ class NationwideMapService(
     }
 
     /** 비인증이면 빈 집합이다 — 모든 칸이 미방문으로 나온다. */
-    private fun visitedDistrictCodes(memberId: Long?): Set<String> = memberId?.let { districtVisitQueryPort.findVisitedDistrictCodes(it) } ?: emptySet()
+    private fun visitedDistrictCodes(memberId: Long?): Set<String> = memberId?.let { footprintQueryPort.findVisitedDistrictCodes(it) } ?: emptySet()
 
     /** 회원이 방문한 칸 id(오름차순). 시군구 하나만 방문해도 그 칸은 방문이다. */
     private fun visitedCellIds(memberId: Long): List<Long> {
-        val visited = districtVisitQueryPort.findVisitedDistrictCodes(memberId)
+        val visited = footprintQueryPort.findVisitedDistrictCodes(memberId)
         if (visited.isEmpty()) return emptyList()
         return mapCellDistrictQueryPort.findCellIdsByDistrictCodes(visited)
     }

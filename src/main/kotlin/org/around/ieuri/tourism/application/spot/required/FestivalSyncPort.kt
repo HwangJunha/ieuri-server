@@ -1,7 +1,7 @@
 package org.around.ieuri.tourism.application.spot.required
 
-import org.around.ieuri.tourism.application.spot.provided.dto.SyncFestivalCommand
 import org.around.ieuri.tourism.domain.shared.DomainLocale
+import org.around.ieuri.tourism.domain.spot.SpotFestival
 import java.time.LocalDate
 
 /** 축제 전용 정보 수집 포트(SPEC-0007). */
@@ -21,7 +21,7 @@ interface FestivalSyncPort {
 
 /** 수집된 한 페이지. [droppedCount]는 날짜 해석 실패 등으로 드랍한 관측용 건수다. */
 data class FestivalSyncPage(
-    val records: List<SyncFestivalCommand>,
+    val records: List<SpotFestival>,
     val totalCount: Int,
     val droppedCount: Int,
 ) {

@@ -15,7 +15,7 @@ import org.around.ieuri.tourism.application.shared.required.SpotSpatialQueryPort
 import org.around.ieuri.tourism.application.shared.required.TasteSimilarity
 import org.around.ieuri.tourism.application.shared.required.TasteSimilarityQueryPort
 import org.around.ieuri.tourism.application.shared.required.TourismEventPublisherPort
-import org.around.ieuri.tourism.domain.reaction.ReactionType
+import org.around.ieuri.tourism.domain.catalog.ReactionType
 import org.around.ieuri.tourism.domain.shared.CategoryDiversity
 import org.around.ieuri.tourism.domain.shared.CategorySelection
 import org.around.ieuri.tourism.domain.shared.CopyrightType

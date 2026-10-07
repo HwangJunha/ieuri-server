@@ -4,14 +4,14 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
-import org.around.ieuri.tourism.application.spot.provided.dto.SyncSpotCommand
-import org.around.ieuri.tourism.application.spot.required.SpotRepository
-import org.around.ieuri.tourism.application.spot.required.SpotSyncPage
-import org.around.ieuri.tourism.application.spot.required.SpotSyncPort
-import org.around.ieuri.tourism.domain.shared.Coordinates
-import org.around.ieuri.tourism.domain.shared.CopyrightType
+import org.around.ieuri.tourism.application.shared.provided.exception.UpstreamUnavailableException
+import org.around.ieuri.tourism.application.spot.provided.FestivalSweepResult
+import org.around.ieuri.tourism.application.spot.provided.SpotSyncPageResult
+import org.around.ieuri.tourism.application.spot.provided.SpotSyncUseCase
 import org.around.ieuri.tourism.domain.shared.DomainLocale
-import org.around.ieuri.tourism.domain.shared.SpotCategory
+import org.around.ieuri.tourism.domain.spot.SpotHarvest
+import org.around.ieuri.tourism.domain.spot.SweepBlockedException
+import org.junit.jupiter.api.assertThrows
 import org.springframework.batch.core.job.JobExecution
 import org.springframework.batch.core.job.JobInstance
 import org.springframework.batch.core.job.parameters.JobParametersBuilder
@@ -24,280 +24,114 @@ import java.time.Instant
 import java.time.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotEquals
-import kotlin.test.assertTrue
 
-/** 동기화 Tasklet의 페이지 진행·재개 동작(SPEC-0004 R-3·R-4). StepExecution만 직접 만든다. */
+/** 동기화 Tasklet의 페이지 진행·재개·정리 호출(SPEC-0004 R-3·R-4, SPEC-0007). 정리 판정은 도메인(`SpotHarvest`)이 한다. */
 class SpotSyncTaskletTest {
 
-    private val syncPort = mockk<SpotSyncPort>()
-    private val spotRepository = mockk<SpotRepository>(relaxed = true)
+    private val useCase = mockk<SpotSyncUseCase>()
 
-    private fun record(id: String) = SyncSpotCommand(
-        contentId = id,
-        language = DomainLocale.KO,
-        title = "경복궁",
-        address = "서울",
-        thumbnailImageUrl = "https://img/$id.jpg",
-        coordinates = Coordinates(latitude = 37.56, longitude = 126.98),
-        category = SpotCategory.TOURIST_SPOT,
-        contentTypeId = 12,
-        copyright = CopyrightType.UNSPECIFIED,
-    )
+    private fun page(vararg ids: String, hasMore: Boolean, written: Int = ids.size, dropped: Int = 0, fallback: Int = 0) = SpotSyncPageResult(written = written, contentIds = ids.toList(), hasMore = hasMore, dropped = dropped, categoryFallback = fallback)
 
-    private fun page(records: List<SyncSpotCommand>, totalCount: Int) = SpotSyncPage(records = records, totalCount = totalCount, droppedCount = 0, categoryFallbackCount = 0)
-
-    /** 실제 StepExecution. `runDate`는 종료 축제 제외 집합 조회 기준일이다(SPEC-0007). */
     private fun stepExecution(): StepExecution {
-        val parameters = JobParametersBuilder()
-            .addString(RUN_DATE_PARAMETER, RUN_DATE.toString())
-            .toJobParameters()
+        val parameters = JobParametersBuilder().addString(RUN_DATE_PARAMETER, RUN_DATE.toString()).toJobParameters()
         return StepExecution(1L, "syncLanguageStep-KO", JobExecution(1L, JobInstance(1L, "spotSyncJob"), parameters))
     }
 
-    private fun run(tasklet: SpotSyncTasklet, stepExecution: StepExecution): RepeatStatus? {
-        val contribution = StepContribution(stepExecution)
-        val chunkContext = ChunkContext(StepContext(stepExecution))
-        return tasklet.execute(contribution, chunkContext)
-    }
+    private fun run(tasklet: SpotSyncTasklet, stepExecution: StepExecution): RepeatStatus? = tasklet.execute(StepContribution(stepExecution), ChunkContext(StepContext(stepExecution)))
 
-    private fun tasklet(
-        pageSize: Int = 1_000,
-        endedFestivalIds: Set<String> = emptySet(),
-    ) = SpotSyncTasklet(
-        language = DomainLocale.KO,
-        syncPort = syncPort,
-        spotRepository = spotRepository,
-        pageSize = pageSize,
-        endedFestivalIds = { endedFestivalIds },
-    )
+    private fun tasklet(target: SpotSyncTasklet.Target = SpotSyncTasklet.Target.SPOT) = SpotSyncTasklet(DomainLocale.KO, target, useCase, PAGE_SIZE)
 
     @Test
-    fun `다음 페이지가 남으면 CONTINUABLE을 반환하고 페이지 번호를 올린다`() {
-        every { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) } returns page(listOf(record("1")), totalCount = 2_500)
-        every { spotRepository.upsertSpots(any(), any()) } returns 1
+    fun `다음 페이지가 남으면 CONTINUABLE이고 페이지 번호를 올린다`() {
+        every { useCase.syncSpotPage(DomainLocale.KO, 1, PAGE_SIZE, any(), RUN_DATE) } returns page("a", hasMore = true)
+        val step = stepExecution()
 
-        val execution = stepExecution()
-        val status = run(tasklet(), execution)
-
-        assertEquals(RepeatStatus.CONTINUABLE, status)
-        assertEquals(2, execution.executionContext.getInt(SpotSyncTasklet.KEY_NEXT_PAGE))
+        assertEquals(RepeatStatus.CONTINUABLE, run(tasklet(), step))
+        assertEquals(2, step.executionContext.getInt(SpotSyncTasklet.KEY_NEXT_PAGE))
+        verify(exactly = 0) { useCase.sweepSpots(any(), any()) }
     }
 
     @Test
-    fun `마지막 페이지면 FINISHED를 반환한다`() {
-        every { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) } returns page(listOf(record("1")), totalCount = 1)
-        every { spotRepository.upsertSpots(any(), any()) } returns 1
+    fun `마지막 페이지에서 본 contentId 전부로 정리하고 FINISHED다`() {
+        every { useCase.syncSpotPage(DomainLocale.KO, 1, PAGE_SIZE, any(), RUN_DATE) } returns page("a", "b", hasMore = true)
+        every { useCase.syncSpotPage(DomainLocale.KO, 2, PAGE_SIZE, any(), RUN_DATE) } returns page("c", hasMore = false)
+        val harvest = slot<SpotHarvest>()
+        every { useCase.sweepSpots(DomainLocale.KO, capture(harvest)) } returns 5
+        val tasklet = tasklet()
+        val step = stepExecution()
 
-        val status = run(tasklet(), stepExecution())
+        run(tasklet, step)
+        val status = run(tasklet, step)
 
         assertEquals(RepeatStatus.FINISHED, status)
+        assertEquals(SpotHarvest(setOf("a", "b", "c"), resumed = false), harvest.captured)
+        assertEquals(5, step.executionContext.getInt(SpotSyncTasklet.KEY_DELETED))
+        assertEquals(3, step.executionContext.getInt(SpotSyncTasklet.KEY_COLLECTED))
     }
 
     @Test
-    fun `ExecutionContext에 남은 페이지 번호부터 재개한다`() {
-        // AC-8: 3페이지에서 실패한 실행을 재실행하면 1페이지가 아니라 3페이지부터 처리한다.
-        every { syncPort.fetchPage(DomainLocale.KO, 3, 1_000) } returns page(listOf(record("1")), totalCount = 3_000)
-        every { spotRepository.upsertSpots(any(), any()) } returns 1
+    fun `남은 페이지 번호부터 재개하고, 재개 실행이라고 정리에 알린다`() {
+        every { useCase.syncSpotPage(DomainLocale.KO, 3, PAGE_SIZE, any(), RUN_DATE) } returns page("z", hasMore = false)
+        val harvest = slot<SpotHarvest>()
+        every { useCase.sweepSpots(DomainLocale.KO, capture(harvest)) } throws SweepBlockedException("resumed run (incomplete id set)")
+        val step = stepExecution()
+        step.executionContext.putInt(SpotSyncTasklet.KEY_NEXT_PAGE, 3)
 
-        val execution = stepExecution()
-        execution.executionContext.putInt(SpotSyncTasklet.KEY_NEXT_PAGE, 3)
-        run(tasklet(), execution)
-
-        verify(exactly = 1) { syncPort.fetchPage(DomainLocale.KO, 3, 1_000) }
-        verify(exactly = 0) { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) }
+        assertEquals(RepeatStatus.FINISHED, run(tasklet(), step))
+        assertEquals(true, harvest.captured.resumed)
+        assertEquals("resumed run (incomplete id set)", step.executionContext.getString(SpotSyncTasklet.KEY_CLEANUP_SKIPPED))
     }
 
     @Test
-    fun `실행 시각은 첫 페이지에서 고정되어 이후 페이지에서 바뀌지 않는다`() {
-        // 정리 단계(R-5)의 기준 시각이 페이지별로 어긋나면 안 된다.
-        every { syncPort.fetchPage(DomainLocale.KO, any(), 1_000) } returns
-            page(listOf(record("1")), totalCount = 3_000)
-        val syncedAt = slot<Instant>()
-        every { spotRepository.upsertSpots(any(), capture(syncedAt)) } returns 1
+    fun `실행 시각은 첫 페이지에서 고정된다`() {
+        val syncedAt = mutableListOf<Instant>()
+        every { useCase.syncSpotPage(DomainLocale.KO, any(), PAGE_SIZE, capture(syncedAt), RUN_DATE) } returnsMany
+            listOf(page("a", hasMore = true), page("b", hasMore = true))
+        val tasklet = tasklet()
+        val step = stepExecution()
 
-        val execution = stepExecution()
-        run(tasklet(), execution)
-        val first = syncedAt.captured
+        run(tasklet, step)
+        run(tasklet, step)
 
-        run(tasklet(), execution)
-        val second = syncedAt.captured
-
-        assertEquals(first, second)
+        assertEquals(syncedAt[0], syncedAt[1])
     }
 
     @Test
-    fun `언어별 처리 건수를 페이지에 걸쳐 누적한다`() {
-        // AC-18: 실행 이력에서 언어별 처리 건수를 확인할 수 있어야 한다.
-        every { syncPort.fetchPage(DomainLocale.KO, any(), 1_000) } returns
-            page(listOf(record("1"), record("2")), totalCount = 3_000)
-        every { spotRepository.upsertSpots(any(), any()) } returns 2
+    fun `적재·드랍·폴백 건수를 페이지에 걸쳐 누적한다`() {
+        every { useCase.syncSpotPage(DomainLocale.KO, 1, PAGE_SIZE, any(), RUN_DATE) } returns page("a", hasMore = true, written = 4, dropped = 1, fallback = 2)
+        every { useCase.syncSpotPage(DomainLocale.KO, 2, PAGE_SIZE, any(), RUN_DATE) } returns page("b", hasMore = true, written = 3, dropped = 5, fallback = 1)
+        val tasklet = tasklet()
+        val step = stepExecution()
 
-        val execution = stepExecution()
-        run(tasklet(), execution)
-        run(tasklet(), execution)
+        run(tasklet, step)
+        run(tasklet, step)
 
-        assertEquals(4, execution.executionContext.getInt(SpotSyncTasklet.KEY_WRITTEN))
+        assertEquals(7, step.executionContext.getInt(SpotSyncTasklet.KEY_WRITTEN))
+        assertEquals(6, step.executionContext.getInt(SpotSyncTasklet.KEY_DROPPED))
+        assertEquals(3, step.executionContext.getInt(SpotSyncTasklet.KEY_CATEGORY_FALLBACK))
     }
 
     @Test
-    fun `카테고리 폴백 건수를 누적해 설정 오류를 관측 가능하게 한다`() {
-        every { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) } returns SpotSyncPage(
-            records = listOf(record("1")),
-            totalCount = 1,
-            droppedCount = 2,
-            categoryFallbackCount = 5,
-        )
-        every { spotRepository.upsertSpots(any(), any()) } returns 1
+    fun `upstream 예외는 삼키지 않고 전파한다`() {
+        every { useCase.syncSpotPage(any(), any(), any(), any(), any()) } throws UpstreamUnavailableException("upstream down")
 
-        val execution = stepExecution()
-        run(tasklet(), execution)
-
-        assertEquals(5, execution.executionContext.getInt(SpotSyncTasklet.KEY_CATEGORY_FALLBACK))
-        assertEquals(2, execution.executionContext.getInt(SpotSyncTasklet.KEY_DROPPED))
+        assertThrows<UpstreamUnavailableException> { run(tasklet(), stepExecution()) }
     }
 
     @Test
-    fun `upstream 예외는 삼키지 않고 전파해 해당 페이지를 실패로 남긴다`() {
-        // AC-7·AC-9: 페이지 실패가 앞 페이지 커밋을 되돌리지 않고, 무한 대기하지 않는다.
-        every { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) } throws IllegalStateException("upstream down")
+    fun `축제 Step은 실행일로 축제 페이지를 받고 끝난 축제와 사라진 축제를 정리한다`() {
+        every { useCase.syncFestivalPage(DomainLocale.KO, 1, PAGE_SIZE, any(), RUN_DATE) } returns page("f1", hasMore = false)
+        every { useCase.sweepFestivals(DomainLocale.KO, SpotHarvest(setOf("f1"), resumed = false), RUN_DATE) } returns FestivalSweepResult(ended = 2, missing = 3)
+        val step = stepExecution()
 
-        val execution = stepExecution()
-        val thrown = runCatching { run(tasklet(), execution) }.exceptionOrNull()
-
-        assertNotEquals(null, thrown)
-    }
-
-    // ---------- 사라진 항목 정리 (R-5) ----------
-
-    @Test
-    fun `수집 집합에 없는 행을 삭제한다`() {
-        every { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) } returns
-            page(listOf(record("a"), record("b")), totalCount = 2)
-        every { spotRepository.upsertSpots(any(), any()) } returns 2
-        every { spotRepository.deleteMissingSpots(any(), any()) } returns 1
-
-        run(tasklet(), stepExecution())
-
-        // 수집한 것(a, b)만 살리고 나머지는 지운다 — 시각이 아니라 집합 기준이다.
-        verify(exactly = 1) { spotRepository.deleteMissingSpots(DomainLocale.KO, setOf("a", "b")) }
-    }
-
-    @Test
-    fun `수집이 0건이면 정리를 건너뛴다(AC-14)`() {
-        // 업스트림 일시 오류로 빈 목록을 받았을 때 전량 삭제되면 안 된다.
-        every { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) } returns page(emptyList(), totalCount = 0)
-        every { spotRepository.upsertSpots(any(), any()) } returns 0
-
-        val execution = stepExecution()
-        run(tasklet(), execution)
-
-        verify(exactly = 0) { spotRepository.deleteMissingSpots(any(), any()) }
-        assertEquals("collected 0 items", execution.executionContext.getString(SpotSyncTasklet.KEY_CLEANUP_SKIPPED))
-    }
-
-    @Test
-    fun `재개 실행이면 집합이 불완전하므로 정리를 건너뛴다`() {
-        // 3페이지부터 재개하면 1·2페이지 항목이 집합에 없어, 그대로 지우면 대량 오삭제가 된다.
-        every { syncPort.fetchPage(DomainLocale.KO, 3, 1_000) } returns
-            page(listOf(record("c")), totalCount = 3_000)
-        every { spotRepository.upsertSpots(any(), any()) } returns 1
-
-        val execution = stepExecution()
-        execution.executionContext.putInt(SpotSyncTasklet.KEY_NEXT_PAGE, 3)
-        // totalCount를 넘겨 마지막 페이지로 만든다.
-        every { syncPort.fetchPage(DomainLocale.KO, 3, 1_000) } returns
-            page(listOf(record("c")), totalCount = 3)
-        run(tasklet(), execution)
-
-        verify(exactly = 0) { spotRepository.deleteMissingSpots(any(), any()) }
-        assertTrue(
-            execution.executionContext.getString(SpotSyncTasklet.KEY_CLEANUP_SKIPPED).contains("resumed"),
-        )
-    }
-
-    @Test
-    fun `정리는 마지막 페이지에서 한 번만 수행된다`() {
-        every { syncPort.fetchPage(DomainLocale.KO, any(), 1_000) } returns
-            page(listOf(record("a")), totalCount = 3_000)
-        every { spotRepository.upsertSpots(any(), any()) } returns 1
-        every { spotRepository.deleteMissingSpots(any(), any()) } returns 0
-
-        val execution = stepExecution()
-        run(tasklet(), execution) // 아직 페이지가 남음
-        verify(exactly = 0) { spotRepository.deleteMissingSpots(any(), any()) }
-    }
-
-    // ---------- 종료 축제 재삽입 방지 (SPEC-0007 R-9) ----------
-
-    @Test
-    fun `종료된 축제는 적재 대상에서 제외한다`() {
-        // AC-31·AC-32. 축제도 이 경로로 오므로 제외하지 않으면 축제 정리가 지운 행사를 되살린다.
-        every { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) } returns
-            page(listOf(record("ended"), record("alive")), totalCount = 2)
-        every { spotRepository.upsertSpots(any(), any()) } returns 1
-        every { spotRepository.deleteMissingSpots(any(), any()) } returns 0
-
-        run(tasklet(endedFestivalIds = setOf("ended")), stepExecution())
-
-        verify(exactly = 1) { spotRepository.upsertSpots(match { it.map(SyncSpotCommand::contentId) == listOf("alive") }, any()) }
-    }
-
-    @Test
-    fun `축제가 아닌 항목은 종료 판정의 영향을 받지 않는다`() {
-        // AC-33. 판정은 contentId 집합 멤버십뿐이다.
-        every { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) } returns
-            page(listOf(record("spot-1"), record("spot-2")), totalCount = 2)
-        every { spotRepository.upsertSpots(any(), any()) } returns 2
-        every { spotRepository.deleteMissingSpots(any(), any()) } returns 0
-
-        run(tasklet(endedFestivalIds = setOf("ended-festival")), stepExecution())
-
-        verify(exactly = 1) { spotRepository.upsertSpots(match { it.size == 2 }, any()) }
-    }
-
-    @Test
-    fun `제외된 항목도 수집 집합에는 포함되어 이중 삭제되지 않는다`() {
-        // AC-34. 제외분도 생존 집합에 들어가야 "사라진 항목"으로 삭제되지 않는다.
-        every { syncPort.fetchPage(DomainLocale.KO, 1, 1_000) } returns
-            page(listOf(record("ended"), record("alive")), totalCount = 2)
-        every { spotRepository.upsertSpots(any(), any()) } returns 1
-        every { spotRepository.deleteMissingSpots(any(), any()) } returns 0
-
-        val execution = stepExecution()
-        run(tasklet(endedFestivalIds = setOf("ended")), execution)
-
-        verify(exactly = 1) { spotRepository.deleteMissingSpots(DomainLocale.KO, setOf("ended", "alive")) }
-        assertEquals(2, execution.executionContext.getInt(SpotSyncTasklet.KEY_COLLECTED))
-    }
-
-    @Test
-    fun `제외 집합은 Step당 한 번만 조회한다`() {
-        // 부팅 시점이 아니라 실행 시점에, 한 번만 조회한다.
-        every { syncPort.fetchPage(DomainLocale.KO, any(), 1_000) } returns
-            page(listOf(record("a")), totalCount = 3_000)
-        every { spotRepository.upsertSpots(any(), any()) } returns 1
-
-        var lookups = 0
-        val tasklet = SpotSyncTasklet(
-            language = DomainLocale.KO,
-            syncPort = syncPort,
-            spotRepository = spotRepository,
-            pageSize = 1_000,
-            endedFestivalIds = {
-                lookups++
-                emptySet()
-            },
-        )
-
-        val execution = stepExecution()
-        run(tasklet, execution)
-        run(tasklet, execution)
-
-        assertEquals(1, lookups)
+        assertEquals(RepeatStatus.FINISHED, run(tasklet(SpotSyncTasklet.Target.FESTIVAL), step))
+        assertEquals(5, step.executionContext.getInt(SpotSyncTasklet.KEY_DELETED))
+        assertEquals(2, step.executionContext.getInt(SpotSyncTasklet.KEY_DELETED_ENDED))
+        verify(exactly = 0) { useCase.syncSpotPage(any(), any(), any(), any(), any()) }
     }
 
     private companion object {
-        val RUN_DATE: LocalDate = LocalDate.of(2026, 8, 3)
+        const val PAGE_SIZE = 100
+        val RUN_DATE: LocalDate = LocalDate.of(2026, 8, 1)
     }
 }

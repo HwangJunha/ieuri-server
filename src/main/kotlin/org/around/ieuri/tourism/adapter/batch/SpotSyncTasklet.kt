@@ -1,8 +1,9 @@
 package org.around.ieuri.tourism.adapter.batch
 
-import org.around.ieuri.tourism.application.spot.required.SpotRepository
-import org.around.ieuri.tourism.application.spot.required.SpotSyncPort
+import org.around.ieuri.tourism.application.spot.provided.SpotSyncUseCase
 import org.around.ieuri.tourism.domain.shared.DomainLocale
+import org.around.ieuri.tourism.domain.spot.SpotHarvest
+import org.around.ieuri.tourism.domain.spot.SweepBlockedException
 import org.slf4j.LoggerFactory
 import org.springframework.batch.core.scope.context.ChunkContext
 import org.springframework.batch.core.step.StepContribution
@@ -13,117 +14,95 @@ import java.time.Instant
 import java.time.LocalDate
 
 /**
- * 한 언어의 관광지 목록을 전량 수집·적재하고 사라진 항목을 정리하는 Step 본체.
- * - 페이지마다 CONTINUABLE로 커밋하므로 실패 후 재실행이 그 페이지에서 이어진다.
- *
- * @param endedFestivalIds 적재에서 뺄 종료 축제 contentId 조회. 실행 시점에 조회하도록 함수로 받는다.
+ * 한 언어의 관광지 또는 축제 목록을 전량 수집·적재하고, 끝나면 사라진 항목을 정리하는 Step 본체.
+ * - 페이지 하나가 유스케이스 호출 하나(= 트랜잭션 하나)다. 실패 후 재실행은 그 페이지에서 이어진다.
+ * - 정리 여부는 도메인([SpotHarvest])이 정한다. 막히면 지우지 않고 사유를 실행 이력에 남긴다.
+ * - 실행일은 잡 파라미터(`runDate`)에서 읽는다 — `now()`를 부르면 자정을 걸친 실행에서 방금 적재한 축제를 지운다.
  */
 class SpotSyncTasklet(
     private val language: DomainLocale,
-    private val syncPort: SpotSyncPort,
-    private val spotRepository: SpotRepository,
-    // 생 SQL(upsert) 경로의 포트.
+    private val target: Target,
+    private val useCase: SpotSyncUseCase,
     private val pageSize: Int,
-    private val endedFestivalIds: (LocalDate) -> Set<String> = { emptySet() },
 ) : Tasklet {
+
+    /** 원본 관광지(`areaBasedList2`)인가 축제(`searchFestival2`)인가. */
+    enum class Target { SPOT, FESTIVAL }
 
     private val log = LoggerFactory.getLogger(javaClass)
 
-    /** 이번 실행에서 수집한 contentId 전체(정리의 생존 집합). 재시작하면 비어 있고 정리를 건너뛴다. */
+    /** 이번 실행에서 본 contentId 전체(정리의 생존 집합). 재시작하면 비어 있고, 그래서 재개 실행은 정리하지 않는다. */
     private val collectedIds = HashSet<String>()
 
-    /** 종료 축제 제외 집합의 스냅샷. Step이 시작할 때 한 번만 잡는다. */
-    private var endedFestivalSnapshot: Set<String>? = null
-
     override fun execute(contribution: StepContribution, chunkContext: ChunkContext): RepeatStatus {
-        val executionContext = chunkContext.stepContext.stepExecution.executionContext
-        val pageNo = executionContext.getInt(KEY_NEXT_PAGE, 1)
-        // 시작 페이지를 한 번만 기록한다. 1보다 크면 재개 실행이라 정리를 건너뛴다.
-        if (!executionContext.containsKey(KEY_RESUMED_FROM)) {
-            executionContext.putInt(KEY_RESUMED_FROM, pageNo)
-        }
+        val runDate = chunkContext.runDate()
+        val context = chunkContext.stepContext.stepExecution.executionContext
+        val pageNo = context.getInt(KEY_NEXT_PAGE, 1)
+        // 시작 페이지를 한 번만 기록한다. 1보다 크면 재개 실행이다.
+        if (!context.containsKey(KEY_RESUMED_FROM)) context.putInt(KEY_RESUMED_FROM, pageNo)
         // 실행 시각은 첫 페이지에서 한 번 고정한다.
-        val syncedAt = executionContext.getString(KEY_SYNCED_AT, Instant.now().toString()).let(Instant::parse)
+        val syncedAt = context.getString(KEY_SYNCED_AT, Instant.now().toString()).let(Instant::parse)
 
-        val page = syncPort.fetchPage(language, pageNo, pageSize)
-
-        // 종료된 축제는 여기서 뺀다 — 어댑터에서 빼면 collectedIds에도 빠져 삭제된다.
-        val excluded = endedFestivalSnapshot
-            ?: endedFestivalIds(chunkContext.runDate()).also { endedFestivalSnapshot = it }
-        val toStore = if (excluded.isEmpty()) page.records else page.records.filterNot { it.contentId in excluded }
-        val written = spotRepository.upsertSpots(toStore, syncedAt)
-
-        // toStore가 아니라 page.records다 — 종료 축제도 생존 집합에 넣어야 삭제되지 않는다.
-        // 비관광 제외분(SPEC-0018)은 어댑터가 이미 빼서 여기 없고, 그래서 정리 단계에서 지워진다.
-        page.records.forEach { collectedIds += it.contentId }
-
-        val totalWritten = executionContext.getInt(KEY_WRITTEN, 0) + written
-        val totalDropped = executionContext.getInt(KEY_DROPPED, 0) + page.droppedCount
-        val totalFallback = executionContext.getInt(KEY_CATEGORY_FALLBACK, 0) + page.categoryFallbackCount
-        val totalExcluded = executionContext.getInt(KEY_EXCLUDED, 0) + page.excludedCount
-
-        executionContext.putString(KEY_SYNCED_AT, syncedAt.toString())
-        executionContext.putInt(KEY_WRITTEN, totalWritten)
-        executionContext.putInt(KEY_DROPPED, totalDropped)
-        executionContext.putInt(KEY_CATEGORY_FALLBACK, totalFallback)
-        executionContext.putInt(KEY_EXCLUDED, totalExcluded)
-        contribution.incrementWriteCount(written.toLong())
-
-        val hasMore = page.hasMore(pageNo, pageSize)
-        executionContext.putInt(KEY_NEXT_PAGE, if (hasMore) pageNo + 1 else pageNo)
-
-        if (!hasMore) {
-            // 폴백 건수가 크면 category_external_mapping 행 누락, 제외 건수가 크면 키워드 설정 오류의 신호다(SPEC-0018).
-            log.info(
-                "spot sync completed: language={} written={} dropped={} categoryFallback={} excluded={}",
-                language,
-                totalWritten,
-                totalDropped,
-                totalFallback,
-                totalExcluded,
-            )
-            executionContext.putInt(KEY_COLLECTED, collectedIds.size)
-            cleanup(executionContext, pageNo)
+        val page = when (target) {
+            Target.SPOT -> useCase.syncSpotPage(language, pageNo, pageSize, syncedAt, runDate)
+            Target.FESTIVAL -> useCase.syncFestivalPage(language, pageNo, pageSize, syncedAt, runDate)
         }
+        collectedIds += page.contentIds
 
-        return if (hasMore) RepeatStatus.CONTINUABLE else RepeatStatus.FINISHED
+        context.putString(KEY_SYNCED_AT, syncedAt.toString())
+        context.add(KEY_WRITTEN, page.written)
+        context.add(KEY_DROPPED, page.dropped)
+        context.add(KEY_CATEGORY_FALLBACK, page.categoryFallback)
+        context.add(KEY_EXCLUDED, page.excluded)
+        contribution.incrementWriteCount(page.written.toLong())
+        context.putInt(KEY_NEXT_PAGE, if (page.hasMore) pageNo + 1 else pageNo)
+        if (page.hasMore) return RepeatStatus.CONTINUABLE
+
+        // 폴백 건수가 크면 category_external_mapping 행 누락, 제외 건수가 크면 키워드 설정 오류의 신호다(SPEC-0018).
+        log.info(
+            "{} sync completed: language={} written={} dropped={} categoryFallback={} excluded={}",
+            target,
+            language,
+            context.getInt(KEY_WRITTEN),
+            context.getInt(KEY_DROPPED),
+            context.getInt(KEY_CATEGORY_FALLBACK),
+            context.getInt(KEY_EXCLUDED),
+        )
+        context.putInt(KEY_COLLECTED, collectedIds.size)
+        sweep(context, SpotHarvest(collectedIds.toSet(), resumed = context.getInt(KEY_RESUMED_FROM, 1) > 1), runDate)
+        return RepeatStatus.FINISHED
     }
 
-    /**
-     * 사라진 항목 정리 — 수집 집합의 여집합을 지운다. 두 게이트 중 하나라도 빼면 대량 오삭제가 된다:
-     *  1. 재개 실행이 아니다 — 재시작하면 집합이 불완전하다.
-     *  2. 0건이 아니다 — 업스트림 일시 오류로 빈 목록을 받으면 전량 삭제된다.
-     * 게이트에 걸리면 삭제를 건너뛰고 사유를 실행 이력에 남긴다.
-     */
-    private fun cleanup(executionContext: ExecutionContext, lastPageNo: Int) {
-        val collected = collectedIds.size
+    private fun sweep(context: ExecutionContext, harvest: SpotHarvest, runDate: LocalDate) {
+        try {
+            when (target) {
+                Target.SPOT -> {
+                    val deleted = useCase.sweepSpots(language, harvest)
+                    log.info("spot cleanup: language={} deleted={} surviving={}", language, deleted, harvest.contentIds.size)
+                    context.putInt(KEY_DELETED, deleted)
+                }
 
-        val skipReason = when {
-            // 1페이지부터 시작하지 않았다면 재개 실행이다.
-            executionContext.getInt(KEY_RESUMED_FROM, 1) > 1 ->
-                "resumed run (incomplete id set)"
-
-            collected == 0 -> "collected 0 items"
-
-            else -> null
+                Target.FESTIVAL -> {
+                    val result = useCase.sweepFestivals(language, harvest, runDate)
+                    log.info("festival cleanup: language={} ended={} missing={} surviving={}", language, result.ended, result.missing, harvest.contentIds.size)
+                    context.putInt(KEY_DELETED, result.ended + result.missing)
+                    context.putInt(KEY_DELETED_ENDED, result.ended)
+                }
+            }
+        } catch (e: SweepBlockedException) {
+            log.warn("{} cleanup skipped: language={} reason={}", target, language, e.reason)
+            context.putString(KEY_CLEANUP_SKIPPED, e.reason)
         }
-
-        if (skipReason != null) {
-            log.warn("spot cleanup skipped: language={} reason={}", language, skipReason)
-            executionContext.putString(KEY_CLEANUP_SKIPPED, skipReason)
-            return
-        }
-
-        val deleted = spotRepository.deleteMissingSpots(language, collectedIds)
-        log.info("spot cleanup: language={} deleted={} surviving={}", language, deleted, collected)
-        executionContext.putInt(KEY_DELETED, deleted)
     }
+
+    private fun ExecutionContext.add(key: String, value: Int) = putInt(key, getInt(key, 0) + value)
 
     companion object {
         const val KEY_NEXT_PAGE = "nextPage"
         const val KEY_RESUMED_FROM = "resumedFrom"
         const val KEY_CLEANUP_SKIPPED = "cleanupSkipped"
         const val KEY_DELETED = "deleted"
+        const val KEY_DELETED_ENDED = "deletedEnded"
         const val KEY_SYNCED_AT = "syncedAt"
         const val KEY_WRITTEN = "written"
         const val KEY_DROPPED = "dropped"

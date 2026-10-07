@@ -1,8 +1,7 @@
 package org.around.ieuri.tourism.adapter.batch
 
-import org.around.ieuri.common.persistence.ExposedConfig
-import org.around.ieuri.tourism.application.detail.provided.SpotDetailPrefetchUseCase
-import org.around.ieuri.tourism.application.detail.required.SpotDetailPart
+import org.around.ieuri.tourism.application.spot.provided.SpotDetailPrefetchUseCase
+import org.around.ieuri.tourism.application.spot.required.SpotDetailPart
 import org.springframework.batch.core.job.Job
 import org.springframework.batch.core.job.builder.FlowBuilder
 import org.springframework.batch.core.job.builder.JobBuilder
@@ -10,12 +9,10 @@ import org.springframework.batch.core.job.flow.Flow
 import org.springframework.batch.core.repository.JobRepository
 import org.springframework.batch.core.step.Step
 import org.springframework.batch.core.step.builder.StepBuilder
-import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Profile
 import org.springframework.core.task.SimpleAsyncTaskExecutor
-import org.springframework.transaction.PlatformTransactionManager
 
 /**
  * 관광지 상세 사전 수집 잡(SPEC-0037). `spotSyncJob`과 별개 잡이며, 목록 수집 뒤로 CronJob 시각을 벌려 둔다.
@@ -25,7 +22,6 @@ import org.springframework.transaction.PlatformTransactionManager
 @Profile(BATCH_PROFILE)
 class SpotDetailPrefetchJobConfig(
     private val jobRepository: JobRepository,
-    @Qualifier(ExposedConfig.EXPOSED_TX) private val transactionManager: PlatformTransactionManager,
     private val useCase: SpotDetailPrefetchUseCase,
     private val properties: SpotDetailPrefetchProperties,
 ) {
@@ -48,10 +44,7 @@ class SpotDetailPrefetchJobConfig(
 
     /** 한 갈래의 수집 Step. 재실행 시 완료된 갈래는 건너뛰고 중단된 갈래부터 재개한다. */
     private fun prefetchStep(part: SpotDetailPart): Step = StepBuilder("${JOB_NAME}Step-$part", jobRepository)
-        .tasklet(
-            SpotDetailPrefetchTasklet(useCase, part, properties.batchSize, properties.dailyLimit),
-            transactionManager,
-        )
+        .tasklet(SpotDetailPrefetchTasklet(useCase, part, properties.batchSize, properties.dailyLimit))
         .build()
 
     companion object {

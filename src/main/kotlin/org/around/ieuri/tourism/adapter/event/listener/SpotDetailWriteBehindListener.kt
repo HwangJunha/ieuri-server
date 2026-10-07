@@ -1,12 +1,12 @@
 package org.around.ieuri.tourism.adapter.event.listener
 
 import org.around.ieuri.tourism.adapter.config.TourismAsyncConfig
-import org.around.ieuri.tourism.application.detail.SpotDetailAbsent
-import org.around.ieuri.tourism.application.detail.SpotDetailFetched
-import org.around.ieuri.tourism.application.detail.SpotGalleryFetched
-import org.around.ieuri.tourism.application.detail.SpotInfoItemsFetched
-import org.around.ieuri.tourism.application.detail.SpotIntroFetched
-import org.around.ieuri.tourism.application.detail.provided.SpotDetailCommandUseCase
+import org.around.ieuri.tourism.application.spot.SpotDetailAbsent
+import org.around.ieuri.tourism.application.spot.SpotDetailFetched
+import org.around.ieuri.tourism.application.spot.SpotGalleryFetched
+import org.around.ieuri.tourism.application.spot.SpotInfoItemsFetched
+import org.around.ieuri.tourism.application.spot.SpotIntroFetched
+import org.around.ieuri.tourism.application.spot.provided.SpotCommandUseCase
 import org.slf4j.LoggerFactory
 import org.springframework.context.event.EventListener
 import org.springframework.scheduling.annotation.Async
@@ -20,39 +20,39 @@ import org.springframework.stereotype.Component
  */
 @Component
 class SpotDetailWriteBehindListener(
-    private val detailCommandUseCase: SpotDetailCommandUseCase,
+    private val spotCommandUseCase: SpotCommandUseCase,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
     @Async(TourismAsyncConfig.WRITE_BEHIND_EXECUTOR)
     @EventListener
     fun on(event: SpotDetailFetched) = runSafely("detail:${event.spotId}") {
-        detailCommandUseCase.saveDetail(event.spotId, event.detail)
+        spotCommandUseCase.saveDetail(event.spotId, event.detail)
     }
 
     /** 본문 부재의 적재(SPEC-0008 R-3). "없음을 확인했다"일 때만 발행되며 실패는 오지 않는다(AC-4·AC-16). */
     @Async(TourismAsyncConfig.WRITE_BEHIND_EXECUTOR)
     @EventListener
     fun on(event: SpotDetailAbsent) = runSafely("detail-absent:${event.spotId}") {
-        detailCommandUseCase.saveDetailAbsence(event.spotId, event.fallback)
+        spotCommandUseCase.saveDetailAbsence(event.spotId, event.fallback)
     }
 
     @Async(TourismAsyncConfig.WRITE_BEHIND_EXECUTOR)
     @EventListener
     fun on(event: SpotGalleryFetched) = runSafely("gallery:${event.spotId}") {
-        detailCommandUseCase.saveGallery(event.spotId, event.gallery)
+        spotCommandUseCase.saveGallery(event.spotId, event.gallery)
     }
 
     @Async(TourismAsyncConfig.WRITE_BEHIND_EXECUTOR)
     @EventListener
     fun on(event: SpotIntroFetched) = runSafely("intro:${event.spotId}") {
-        detailCommandUseCase.saveIntro(event.spotId, event.category, event.intro)
+        spotCommandUseCase.saveIntro(event.spotId, event.category, event.intro)
     }
 
     @Async(TourismAsyncConfig.WRITE_BEHIND_EXECUTOR)
     @EventListener
     fun on(event: SpotInfoItemsFetched) = runSafely("info:${event.spotId}") {
-        detailCommandUseCase.saveInfoItems(event.spotId, event.category, event.items)
+        spotCommandUseCase.saveInfoItems(event.spotId, event.category, event.items)
     }
 
     private fun runSafely(label: String, task: () -> Unit) {

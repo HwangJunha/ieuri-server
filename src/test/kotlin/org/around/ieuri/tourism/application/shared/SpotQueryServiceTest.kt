@@ -7,15 +7,6 @@ import io.mockk.verify
 import org.around.ieuri.common.context.AppKey
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.CursorPageInfo
-import org.around.ieuri.tourism.application.detail.SpotDetailAbsent
-import org.around.ieuri.tourism.application.detail.SpotDetailFetched
-import org.around.ieuri.tourism.application.detail.SpotGalleryFetched
-import org.around.ieuri.tourism.application.detail.required.CachedDetail
-import org.around.ieuri.tourism.application.detail.required.CachedIntro
-import org.around.ieuri.tourism.application.detail.required.SpotCachePort
-import org.around.ieuri.tourism.application.detail.required.SpotDetailRepository
-import org.around.ieuri.tourism.application.detail.required.StoredDetail
-import org.around.ieuri.tourism.application.detail.required.StoredIntro
 import org.around.ieuri.tourism.application.shared.provided.dto.AppCategoryView
 import org.around.ieuri.tourism.application.shared.provided.dto.CategoryDisplay
 import org.around.ieuri.tourism.application.shared.provided.dto.LikedSpotView
@@ -41,16 +32,25 @@ import org.around.ieuri.tourism.application.shared.required.SpotSearchResult
 import org.around.ieuri.tourism.application.shared.required.SpotSpatialQueryPort
 import org.around.ieuri.tourism.application.shared.required.TourInfoPort
 import org.around.ieuri.tourism.application.shared.required.TourismEventPublisherPort
-import org.around.ieuri.tourism.domain.detail.SpotDetail
-import org.around.ieuri.tourism.domain.detail.SpotImage
-import org.around.ieuri.tourism.domain.detail.SpotInfoItem
-import org.around.ieuri.tourism.domain.detail.SpotIntro
-import org.around.ieuri.tourism.domain.reaction.ReactionType
+import org.around.ieuri.tourism.application.spot.SpotDetailAbsent
+import org.around.ieuri.tourism.application.spot.SpotDetailFetched
+import org.around.ieuri.tourism.application.spot.SpotGalleryFetched
+import org.around.ieuri.tourism.application.spot.required.CachedDetail
+import org.around.ieuri.tourism.application.spot.required.CachedIntro
+import org.around.ieuri.tourism.application.spot.required.SpotCachePort
+import org.around.ieuri.tourism.application.spot.required.SpotDetailQueryPort
+import org.around.ieuri.tourism.application.spot.required.StoredDetail
+import org.around.ieuri.tourism.application.spot.required.StoredIntro
+import org.around.ieuri.tourism.domain.catalog.ReactionType
 import org.around.ieuri.tourism.domain.shared.CategorySelection
 import org.around.ieuri.tourism.domain.shared.Coordinates
 import org.around.ieuri.tourism.domain.shared.CopyrightType
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.shared.SpotCategory
+import org.around.ieuri.tourism.domain.spot.SpotDetail
+import org.around.ieuri.tourism.domain.spot.SpotImage
+import org.around.ieuri.tourism.domain.spot.SpotInfoItem
+import org.around.ieuri.tourism.domain.spot.SpotIntro
 import java.time.Duration
 import java.time.Instant
 import kotlin.test.Test
@@ -68,7 +68,7 @@ class SpotQueryServiceTest {
     private val spotSpatialQueryPort = mockk<SpotSpatialQueryPort>()
     private val likedSpotSearchPort = mockk<LikedSpotSearchPort>()
     private val spotCachePort = mockk<SpotCachePort>()
-    private val detailRepository = mockk<SpotDetailRepository>()
+    private val detailRepository = mockk<SpotDetailQueryPort>()
     private val eventPublisher = mockk<TourismEventPublisherPort>(relaxed = true)
     private val policy = SpotQueryPolicy(
         maxRadiusMeters = 100_000,

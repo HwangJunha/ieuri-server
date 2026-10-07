@@ -93,8 +93,8 @@ class TourismViewRowMappersTest {
     }
 
     @Test
-    fun `배정 대상 spot은 원본 좌표·제목·주소를 바꾸지 않는다`() {
-        val spot = ResultRow.createAndFillValues(spotRow).toUnassignedSpot()
+    fun `배정 대상 원본은 좌표·제목·주소를 바꾸지 않는다`() {
+        val spot = ResultRow.createAndFillValues(spotRow).toCatalogOrigin()
 
         assertEquals(21L, spot.spotId)
         assertEquals(DomainLocale.EN, spot.language)
@@ -135,7 +135,7 @@ class TourismViewRowMappersTest {
     fun `주소 없는 spot은 배정 대상과 사전 수집 대상의 주소가 null이다`() {
         val row = ResultRow.createAndFillValues(spotRow + (SpotTable.address to null))
 
-        assertNull(row.toUnassignedSpot().address)
+        assertNull(row.toCatalogOrigin().address)
         assertNull(row.toPrefetchTarget().address)
     }
 

@@ -11,8 +11,8 @@ import org.around.ieuri.tourism.adapter.persistence.table.SpotDetailTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotReactionTable
 import org.around.ieuri.tourism.domain.catalog.CatalogStandardValues
 import org.around.ieuri.tourism.domain.catalog.CatalogTranslation
-import org.around.ieuri.tourism.domain.reaction.ReactionType
-import org.around.ieuri.tourism.domain.reaction.SpotReaction
+import org.around.ieuri.tourism.domain.catalog.ReactionType
+import org.around.ieuri.tourism.domain.catalog.SpotReaction
 import org.around.ieuri.tourism.domain.shared.CellImageKind
 import org.around.ieuri.tourism.domain.shared.CopyrightType
 import org.around.ieuri.tourism.domain.shared.DomainLocale
@@ -61,9 +61,9 @@ class TourismRowMappersTest {
     }
 
     @Test
-    fun `번역 쓰기는 카탈로그의 좌표·분류를 사본으로 심고 보이는 상태로 쓴다`() {
+    fun `번역 쓰기는 카탈로그의 좌표·분류를 사본으로 심고 노출 여부를 그대로 쓴다`() {
         val row = row(SpotCatalogTranslationTable)
-        CatalogTranslation(title = "경복궁", address = "종로구").writeTo(row, catalogId = 9L, language = DomainLocale.KO, standard = standard())
+        CatalogTranslation(language = DomainLocale.KO, title = "경복궁", address = "종로구", visible = true).writeTo(row, catalogId = 9L, standard = standard())
 
         assertEquals(9L, row.values[SpotCatalogTranslationTable.catalogId])
         assertEquals("KO", row.values[SpotCatalogTranslationTable.language])
@@ -78,9 +78,11 @@ class TourismRowMappersTest {
     @Test
     fun `주소가 없는 번역은 주소 열이 null이다`() {
         val row = row(SpotCatalogTranslationTable)
-        CatalogTranslation(title = "경복궁", address = null).writeTo(row, catalogId = 9L, language = DomainLocale.KO, standard = standard())
+        CatalogTranslation(language = DomainLocale.JA, title = "景福宮", address = null, visible = false).writeTo(row, catalogId = 9L, standard = standard())
 
         assertNull(row.values[SpotCatalogTranslationTable.address])
+        assertEquals("JA", row.values[SpotCatalogTranslationTable.language])
+        assertEquals(false, row.values[SpotCatalogTranslationTable.visible])
     }
 
     @Test
@@ -196,14 +198,13 @@ class TourismRowMappersTest {
     }
 
     @Test
-    fun `공유 링크 행은 회원·토큰·발급 시각을 옮긴다`() {
-        val record = ResultRow.createAndFillValues(
+    fun `공유 링크 행은 토큰과 발급 시각을 옮긴다`() {
+        val link = ResultRow.createAndFillValues(
             mapOf(MapShareLinkTable.memberId to 7L, MapShareLinkTable.token to "tok", MapShareLinkTable.createdAt to at),
-        ).toMapShareLinkRecord()
+        ).toShareLink()
 
-        assertEquals(7L, record.memberId)
-        assertEquals("tok", record.token)
-        assertEquals(Instant.parse("2026-10-06T01:02:03Z"), record.createdAt)
+        assertEquals("tok", link.token)
+        assertEquals(Instant.parse("2026-10-06T01:02:03Z"), link.issuedAt)
     }
 
     @Test

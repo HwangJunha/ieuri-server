@@ -8,9 +8,6 @@ import org.around.ieuri.tourism.adapter.persistence.table.SpotCatalogTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotCatalogTranslationTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotReactionTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotTable
-import org.around.ieuri.tourism.application.catalog.required.CatalogCandidate
-import org.around.ieuri.tourism.application.catalog.required.UnassignedSpot
-import org.around.ieuri.tourism.application.detail.required.PrefetchTarget
 import org.around.ieuri.tourism.application.shared.provided.dto.AppCategoryView
 import org.around.ieuri.tourism.application.shared.provided.dto.CategoryDisplay
 import org.around.ieuri.tourism.application.shared.provided.dto.CellImageView
@@ -18,6 +15,9 @@ import org.around.ieuri.tourism.application.shared.provided.dto.LikedSpotView
 import org.around.ieuri.tourism.application.shared.required.DistrictRegion
 import org.around.ieuri.tourism.application.shared.required.SpotBasics
 import org.around.ieuri.tourism.application.shared.required.SpotIdentity
+import org.around.ieuri.tourism.application.spot.required.PrefetchTarget
+import org.around.ieuri.tourism.domain.catalog.CatalogCandidate
+import org.around.ieuri.tourism.domain.catalog.CatalogOrigin
 import org.around.ieuri.tourism.domain.shared.CellImageKind
 import org.around.ieuri.tourism.domain.shared.CopyrightType
 import org.around.ieuri.tourism.domain.shared.DomainLocale
@@ -62,7 +62,7 @@ fun ResultRow.toLikedSpotView(): LikedSpotView {
     )
 }
 
-fun ResultRow.toUnassignedSpot(): UnassignedSpot = UnassignedSpot(
+fun ResultRow.toCatalogOrigin(): CatalogOrigin = CatalogOrigin(
     spotId = this[SpotTable.id],
     language = DomainLocale.valueOf(this[SpotTable.language]),
     title = this[SpotTable.title],

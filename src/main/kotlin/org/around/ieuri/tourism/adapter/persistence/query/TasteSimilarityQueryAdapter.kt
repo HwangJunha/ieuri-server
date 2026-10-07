@@ -1,20 +1,32 @@
 package org.around.ieuri.tourism.adapter.persistence.query
 
+import org.around.ieuri.common.persistence.cosineDistance
+import org.around.ieuri.common.persistence.vectorAvg
+import org.around.ieuri.tourism.adapter.persistence.table.SpotCatalogTranslationTable
+import org.around.ieuri.tourism.adapter.persistence.table.SpotEmbeddingTable
 import org.around.ieuri.tourism.application.shared.required.TasteSimilarity
 import org.around.ieuri.tourism.application.shared.required.TasteSimilarityQueryPort
 import org.around.ieuri.tourism.domain.shared.DomainLocale
-import org.springframework.jdbc.core.JdbcTemplate
+import org.jetbrains.exposed.v1.core.Expression
+import org.jetbrains.exposed.v1.core.ExpressionWithColumnType
+import org.jetbrains.exposed.v1.core.JoinType
+import org.jetbrains.exposed.v1.core.alias
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.anyFrom
+import org.jetbrains.exposed.v1.core.doubleLiteral
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.minus
+import org.jetbrains.exposed.v1.core.wrapAsExpression
+import org.jetbrains.exposed.v1.jdbc.select
 import org.springframework.stereotype.Component
 
 /**
- * 취향 유사도 조회 어댑터(SPEC-0035). pgvector의 `avg(vector)`·`<=>` 때문에 생 SQL이다.
- * - 회원 반응 장소 벡터 평균과 후보의 코사인 유사도만 돌려준다 — 벡터는 DB 밖으로 나오지 않는다.
- * - 빈 id 집합이면 유사도가 NULL이다. id 목록은 배열 한 개로 바인딩한다.
+ * 취향 유사도 조회 어댑터(SPEC-0035). 회원이 반응한 장소 벡터의 평균과 후보의 코사인 유사도만 돌려준다 — 벡터는 DB 밖으로 나오지 않는다.
+ * - 반응한 장소가 없으면(또는 임베딩이 없으면) 그 유사도는 null이다.
  */
 @Component
-class TasteSimilarityQueryAdapter(
-    private val exposedJdbcTemplate: JdbcTemplate,
-) : TasteSimilarityQueryPort {
+class TasteSimilarityQueryAdapter : TasteSimilarityQueryPort {
+
     override fun findSimilarities(
         likedCatalogIds: Set<Long>,
         dislikedCatalogIds: Set<Long>,
@@ -23,51 +35,36 @@ class TasteSimilarityQueryAdapter(
         model: String,
     ): Map<Long, TasteSimilarity> {
         if (candidateCatalogIds.isEmpty()) return emptyMap()
-        val params = mutableListOf<Any>()
-        val liked = centroidClause(likedCatalogIds, language, model, params)
-        val disliked = centroidClause(dislikedCatalogIds, language, model, params)
-        params += model
-        params += language.name
-        params += candidateCatalogIds.toLongArray()
+        val like = similarityTo(likedCatalogIds, language, model)
+        val dislike = similarityTo(dislikedCatalogIds, language, model)
 
-        val sql = """
-            WITH liked AS ($liked), disliked AS ($disliked)
-            SELECT t.catalog_id,
-                   CASE WHEN liked.v IS NULL THEN NULL ELSE 1 - (e.embedding <=> liked.v) END AS like_similarity,
-                   CASE WHEN disliked.v IS NULL THEN NULL ELSE 1 - (e.embedding <=> disliked.v) END AS dislike_similarity
-            FROM spot_embedding e
-            JOIN spot_catalog_translation t ON t.id = e.translation_id
-            CROSS JOIN liked
-            CROSS JOIN disliked
-            WHERE e.model = ? AND t.language = ? AND t.catalog_id = ANY (?)
-        """.trimIndent()
-
-        return exposedJdbcTemplate.query(
-            sql,
-            { rs, _ ->
-                rs.getLong("catalog_id") to TasteSimilarity(
-                    like = rs.getDouble("like_similarity").takeUnless { rs.wasNull() },
-                    dislike = rs.getDouble("dislike_similarity").takeUnless { rs.wasNull() },
-                )
-            },
-            *params.toTypedArray(),
-        ).toMap()
+        return embeddings()
+            .select(listOfNotNull(SpotCatalogTranslationTable.catalogId, like, dislike))
+            .where { inScope(candidateCatalogIds, language, model) }
+            .associate {
+                it[SpotCatalogTranslationTable.catalogId] to TasteSimilarity(like = like?.let { e -> it[e] }, dislike = dislike?.let { e -> it[e] })
+            }
     }
 
-    /** 반응 장소들의 벡터 평균. 집합이 비면 조건을 `false`로 두어 NULL 한 행이 나온다. */
-    private fun centroidClause(ids: Set<Long>, language: DomainLocale, model: String, params: MutableList<Any>): String {
-        params += model
-        params += language.name
-        val filter = if (ids.isEmpty()) {
-            "false"
-        } else {
-            params += ids.toLongArray()
-            "t.catalog_id = ANY (?)"
-        }
-        return """
-            SELECT avg(e.embedding) AS v
-            FROM spot_embedding e JOIN spot_catalog_translation t ON t.id = e.translation_id
-            WHERE e.model = ? AND t.language = ? AND $filter
-        """.trimIndent()
+    /** `1 - (후보 벡터 <=> 반응 장소 벡터 평균)`. 반응 장소가 없으면 식이 없다(null). 평균은 상관 없는 서브쿼리라 한 번만 계산된다. */
+    private fun similarityTo(catalogIds: Set<Long>, language: DomainLocale, model: String): ExpressionWithColumnType<Double?>? {
+        if (catalogIds.isEmpty()) return null
+        val e = SpotEmbeddingTable.alias("centroid_e")
+        val t = SpotCatalogTranslationTable.alias("centroid_t")
+        val centroid: Expression<String?> = wrapAsExpression(
+            e.join(t, JoinType.INNER, e[SpotEmbeddingTable.translationId], t[SpotCatalogTranslationTable.id])
+                .select(vectorAvg(e[SpotEmbeddingTable.embedding]))
+                .where {
+                    (e[SpotEmbeddingTable.model] eq model) and (t[SpotCatalogTranslationTable.language] eq language.name) and
+                        (t[SpotCatalogTranslationTable.catalogId] eq anyFrom(catalogIds.toList()))
+                },
+        )
+        @Suppress("UNCHECKED_CAST")
+        return (doubleLiteral(1.0) - (SpotEmbeddingTable.embedding cosineDistance (centroid as Expression<String>))) as ExpressionWithColumnType<Double?>
     }
+
+    private fun embeddings() = SpotEmbeddingTable.join(SpotCatalogTranslationTable, JoinType.INNER, SpotEmbeddingTable.translationId, SpotCatalogTranslationTable.id)
+
+    private fun inScope(catalogIds: Collection<Long>, language: DomainLocale, model: String) = (SpotEmbeddingTable.model eq model) and
+        (SpotCatalogTranslationTable.language eq language.name) and (SpotCatalogTranslationTable.catalogId eq anyFrom(catalogIds.toList()))
 }

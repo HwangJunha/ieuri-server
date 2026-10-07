@@ -3,6 +3,7 @@ package org.around.ieuri.tourism.application.shared
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import org.around.ieuri.tourism.application.footprint.required.FootprintQueryPort
 import org.around.ieuri.tourism.application.shared.provided.dto.CellSpotView
 import org.around.ieuri.tourism.application.shared.provided.exception.MapCellNotFoundException
 import org.around.ieuri.tourism.application.shared.provided.exception.ShareLinkBlockedException
@@ -12,14 +13,10 @@ import org.around.ieuri.tourism.application.shared.required.MapCellDistrictQuery
 import org.around.ieuri.tourism.application.shared.required.MapCellQueryPort
 import org.around.ieuri.tourism.application.shared.required.MapOwnerLookupPort
 import org.around.ieuri.tourism.application.shared.required.MapViewerBlockPort
-import org.around.ieuri.tourism.application.sharelink.required.MapShareLinkRecord
-import org.around.ieuri.tourism.application.sharelink.required.MapShareLinkRepository
-import org.around.ieuri.tourism.application.visit.required.DistrictVisitQueryPort
 import org.around.ieuri.tourism.domain.shared.AreaName
 import org.around.ieuri.tourism.domain.shared.Coordinates
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.shared.MapCellDistrictRow
-import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -31,18 +28,16 @@ class NationwideMapServiceTest {
 
     private val mapCellQueryPort = mockk<MapCellQueryPort>()
     private val mapCellDistrictQueryPort = mockk<MapCellDistrictQueryPort>()
-    private val districtVisitQueryPort = mockk<DistrictVisitQueryPort>()
+    private val footprintQueryPort = mockk<FootprintQueryPort>()
     private val cellImageQueryPort = mockk<CellImageQueryPort>(relaxed = true)
-    private val shareLinkRepository = mockk<MapShareLinkRepository>()
     private val mapOwnerLookupPort = mockk<MapOwnerLookupPort>()
     private val mapViewerBlockPort = mockk<MapViewerBlockPort>()
 
     private val service = NationwideMapService(
         mapCellQueryPort = mapCellQueryPort,
         mapCellDistrictQueryPort = mapCellDistrictQueryPort,
-        districtVisitQueryPort = districtVisitQueryPort,
+        footprintQueryPort = footprintQueryPort,
         cellImageQueryPort = cellImageQueryPort,
-        shareLinkRepository = shareLinkRepository,
         mapOwnerLookupPort = mapOwnerLookupPort,
         mapViewerBlockPort = mapViewerBlockPort,
         policy = NationwideMapPolicy(
@@ -61,7 +56,7 @@ class NationwideMapServiceTest {
             row(2L, "41111"),
             row(3L, "41210"),
         )
-        every { districtVisitQueryPort.findVisitedDistrictCodes(7L) } returns setOf("11110")
+        every { footprintQueryPort.findVisitedDistrictCodes(7L) } returns setOf("11110")
 
         val cells = service.mapCells(DomainLocale.KO, memberId = 7L)
 
@@ -75,12 +70,12 @@ class NationwideMapServiceTest {
         val cells = service.mapCells(DomainLocale.KO, memberId = null)
 
         assertTrue(cells.none { it.viewerVisited })
-        verify(exactly = 0) { districtVisitQueryPort.findVisitedDistrictCodes(any()) }
+        verify(exactly = 0) { footprintQueryPort.findVisitedDistrictCodes(any()) }
     }
 
     @Test
     fun `활성 언어가 없으면 EN, EN도 없으면 KO로 폴백한다`() {
-        every { districtVisitQueryPort.findVisitedDistrictCodes(any()) } returns emptySet()
+        every { footprintQueryPort.findVisitedDistrictCodes(any()) } returns emptySet()
         every { mapCellQueryPort.findAllCellDistricts() } returns listOf(
             row(1L, "11110", name = AreaName(ko = "서울", en = "Seoul", ja = null, zh = null)),
         )
@@ -138,14 +133,14 @@ class NationwideMapServiceTest {
 
     @Test
     fun `폐기되거나 없는 토큰은 SHARE_LINK_NOT_FOUND다`() {
-        every { shareLinkRepository.findActiveByToken("gone") } returns null
+        every { footprintQueryPort.findSharerId("gone") } returns null
 
         assertFailsWith<ShareLinkNotFoundException> { service.sharedMap("gone", viewerMemberId = null) }
     }
 
     @Test
     fun `차단 관계면 SHARE_LINK_BLOCKED다`() {
-        every { shareLinkRepository.findActiveByToken("t") } returns link(ownerId = 1L)
+        every { footprintQueryPort.findSharerId("t") } returns 1L
         every { mapViewerBlockPort.isBlockedBetween(2L, 1L) } returns true
 
         assertFailsWith<ShareLinkBlockedException> { service.sharedMap("t", viewerMemberId = 2L) }
@@ -153,9 +148,9 @@ class NationwideMapServiceTest {
 
     @Test
     fun `비인증 조회는 겹침이 null이고 차단을 묻지 않는다`() {
-        every { shareLinkRepository.findActiveByToken("t") } returns link(ownerId = 1L)
+        every { footprintQueryPort.findSharerId("t") } returns 1L
         every { mapOwnerLookupPort.findNickname(1L) } returns "여행자"
-        every { districtVisitQueryPort.findVisitedDistrictCodes(1L) } returns setOf("11110")
+        every { footprintQueryPort.findVisitedDistrictCodes(1L) } returns setOf("11110")
         every { mapCellDistrictQueryPort.findCellIdsByDistrictCodes(setOf("11110")) } returns listOf(1L)
 
         val view = service.sharedMap("t", viewerMemberId = null)
@@ -170,11 +165,11 @@ class NationwideMapServiceTest {
 
     @Test
     fun `인증 조회는 겹치는 칸을 함께 준다`() {
-        every { shareLinkRepository.findActiveByToken("t") } returns link(ownerId = 1L)
+        every { footprintQueryPort.findSharerId("t") } returns 1L
         every { mapViewerBlockPort.isBlockedBetween(2L, 1L) } returns false
         every { mapOwnerLookupPort.findNickname(1L) } returns "여행자"
-        every { districtVisitQueryPort.findVisitedDistrictCodes(1L) } returns setOf("11110", "41111", "26110")
-        every { districtVisitQueryPort.findVisitedDistrictCodes(2L) } returns setOf("11110", "50110")
+        every { footprintQueryPort.findVisitedDistrictCodes(1L) } returns setOf("11110", "41111", "26110")
+        every { footprintQueryPort.findVisitedDistrictCodes(2L) } returns setOf("11110", "50110")
         // 포트가 중복 제거·정렬을 보장한다(계약) — 스텁도 그 형태로 준다.
         every { mapCellDistrictQueryPort.findCellIdsByDistrictCodes(setOf("11110", "41111", "26110")) } returns listOf(1L, 3L, 2L)
         every { mapCellDistrictQueryPort.findCellIdsByDistrictCodes(setOf("11110", "50110")) } returns listOf(1L, 9L)
@@ -187,9 +182,9 @@ class NationwideMapServiceTest {
 
     @Test
     fun `본인 링크는 차단을 묻지 않는다`() {
-        every { shareLinkRepository.findActiveByToken("t") } returns link(ownerId = 1L)
+        every { footprintQueryPort.findSharerId("t") } returns 1L
         every { mapOwnerLookupPort.findNickname(1L) } returns "나"
-        every { districtVisitQueryPort.findVisitedDistrictCodes(1L) } returns emptySet()
+        every { footprintQueryPort.findVisitedDistrictCodes(1L) } returns emptySet()
 
         val view = service.sharedMap("t", viewerMemberId = 1L)
 
@@ -219,6 +214,4 @@ class NationwideMapServiceTest {
         coordinates = Coordinates(37.5, 127.0),
         likeCount = likeCount,
     )
-
-    private fun link(ownerId: Long) = MapShareLinkRecord(memberId = ownerId, token = "t", createdAt = Instant.parse("2026-08-21T00:00:00Z"))
 }

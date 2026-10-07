@@ -15,7 +15,7 @@ import org.around.ieuri.tourism.application.shared.required.SpotSearchResult
 import org.around.ieuri.tourism.application.shared.required.SpotSpatialQueryPort
 import org.around.ieuri.tourism.application.shared.required.TasteSimilarityQueryPort
 import org.around.ieuri.tourism.application.shared.required.TourismEventPublisherPort
-import org.around.ieuri.tourism.domain.reaction.ReactionType
+import org.around.ieuri.tourism.domain.catalog.ReactionType
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.shared.RankedSpot
 import org.around.ieuri.tourism.domain.shared.TasteNormalization
@@ -32,9 +32,7 @@ import org.springframework.transaction.annotation.Transactional
 @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, readOnly = true)
 class RecommendedSpotsQueryService(
     private val spotQueryPort: SpotQueryPort,
-    // 반경 조회는 PostGIS 생 SQL 포트다.
     private val spotSpatialQueryPort: SpotSpatialQueryPort,
-    // 취향 유사도는 pgvector 생 SQL 포트다.
     private val tasteSimilarityQueryPort: TasteSimilarityQueryPort,
     private val eventPublisher: TourismEventPublisherPort,
     private val spotQueryPolicy: SpotQueryPolicy,

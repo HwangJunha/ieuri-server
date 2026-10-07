@@ -1,14 +1,14 @@
 package org.around.ieuri.tourism.adapter.cache
 
-import org.around.ieuri.tourism.application.detail.required.CachedDetail
-import org.around.ieuri.tourism.application.detail.required.CachedIntro
-import org.around.ieuri.tourism.application.detail.required.SpotCachePort
-import org.around.ieuri.tourism.domain.detail.SpotDetail
-import org.around.ieuri.tourism.domain.detail.SpotImage
-import org.around.ieuri.tourism.domain.detail.SpotInfoItem
-import org.around.ieuri.tourism.domain.detail.SpotIntro
+import org.around.ieuri.tourism.application.spot.required.CachedDetail
+import org.around.ieuri.tourism.application.spot.required.CachedIntro
+import org.around.ieuri.tourism.application.spot.required.SpotCachePort
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.shared.SpotCategory
+import org.around.ieuri.tourism.domain.spot.SpotDetail
+import org.around.ieuri.tourism.domain.spot.SpotImage
+import org.around.ieuri.tourism.domain.spot.SpotInfoItem
+import org.around.ieuri.tourism.domain.spot.SpotIntro
 import org.slf4j.LoggerFactory
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Component

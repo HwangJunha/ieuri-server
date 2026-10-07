@@ -4,12 +4,12 @@ import org.around.ieuri.tourism.adapter.client.tourapi.TourApiDetailCommonRespon
 import org.around.ieuri.tourism.adapter.client.tourapi.TourApiDetailImageResponse
 import org.around.ieuri.tourism.adapter.client.tourapi.TourApiDetailInfoResponse
 import org.around.ieuri.tourism.adapter.client.tourapi.TourApiDetailIntroResponse
-import org.around.ieuri.tourism.domain.detail.SpotDetail
-import org.around.ieuri.tourism.domain.detail.SpotImage
-import org.around.ieuri.tourism.domain.detail.SpotInfoItem
-import org.around.ieuri.tourism.domain.detail.SpotIntro
 import org.around.ieuri.tourism.domain.shared.CopyrightType
 import org.around.ieuri.tourism.domain.shared.SpotCategory
+import org.around.ieuri.tourism.domain.spot.SpotDetail
+import org.around.ieuri.tourism.domain.spot.SpotImage
+import org.around.ieuri.tourism.domain.spot.SpotInfoItem
+import org.around.ieuri.tourism.domain.spot.SpotIntro
 
 /** detailCommon2 item → 도메인 [SpotDetail] 본문. [category]는 호출자가 언어별 코드표로 해석해 넘긴다. */
 fun TourApiDetailCommonResponse.Item.toSpotDetail(category: SpotCategory): SpotDetail = SpotDetail(

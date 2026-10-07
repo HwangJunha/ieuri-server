@@ -1,12 +1,12 @@
 package org.around.ieuri.tourism.adapter.cache
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
-import org.around.ieuri.tourism.domain.detail.SpotDetail
-import org.around.ieuri.tourism.domain.detail.SpotImage
-import org.around.ieuri.tourism.domain.detail.SpotInfoItem
-import org.around.ieuri.tourism.domain.detail.SpotIntro
 import org.around.ieuri.tourism.domain.shared.CopyrightType
 import org.around.ieuri.tourism.domain.shared.SpotCategory
+import org.around.ieuri.tourism.domain.spot.SpotDetail
+import org.around.ieuri.tourism.domain.spot.SpotImage
+import org.around.ieuri.tourism.domain.spot.SpotInfoItem
+import org.around.ieuri.tourism.domain.spot.SpotIntro
 
 /**
  * 상세 캐시 직렬화 전용 DTO(어댑터 내부). 미정의 필드는 무시한다.

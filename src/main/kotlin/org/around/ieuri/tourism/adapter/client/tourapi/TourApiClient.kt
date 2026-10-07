@@ -6,6 +6,7 @@ import org.around.ieuri.tourism.adapter.client.tourapi.mapper.toNearbySpotDataOr
 import org.around.ieuri.tourism.adapter.client.tourapi.mapper.toSpotDetail
 import org.around.ieuri.tourism.adapter.client.tourapi.mapper.toSpotIntroOrNull
 import org.around.ieuri.tourism.adapter.config.TourApiProperties
+import org.around.ieuri.tourism.application.shared.provided.CategoryMappingQueryUseCase
 import org.around.ieuri.tourism.application.shared.provided.exception.UpstreamRateLimitedException
 import org.around.ieuri.tourism.application.shared.provided.exception.UpstreamTooManyRequestsException
 import org.around.ieuri.tourism.application.shared.provided.exception.UpstreamUnavailableException
@@ -14,12 +15,12 @@ import org.around.ieuri.tourism.application.shared.required.NearbySpotQuery
 import org.around.ieuri.tourism.application.shared.required.NearbySpotResult
 import org.around.ieuri.tourism.application.shared.required.SpotDetailQuery
 import org.around.ieuri.tourism.application.shared.required.TourInfoPort
-import org.around.ieuri.tourism.domain.detail.SpotDetail
-import org.around.ieuri.tourism.domain.detail.SpotImage
-import org.around.ieuri.tourism.domain.detail.SpotInfoItem
-import org.around.ieuri.tourism.domain.detail.SpotIntro
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.shared.SpotCategory
+import org.around.ieuri.tourism.domain.spot.SpotDetail
+import org.around.ieuri.tourism.domain.spot.SpotImage
+import org.around.ieuri.tourism.domain.spot.SpotInfoItem
+import org.around.ieuri.tourism.domain.spot.SpotIntro
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
@@ -36,7 +37,7 @@ import java.net.URI
 class TourApiClient(
     private val properties: TourApiProperties,
     private val tourApiRestClient: RestClient,
-    private val categoryMapping: CategoryExternalMappingPort,
+    private val categoryMapping: CategoryMappingQueryUseCase,
 ) : TourInfoPort {
 
     override fun findNearby(query: NearbySpotQuery): NearbySpotResult {

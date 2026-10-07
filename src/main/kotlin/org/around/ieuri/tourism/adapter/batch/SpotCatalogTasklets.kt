@@ -1,6 +1,6 @@
 package org.around.ieuri.tourism.adapter.batch
 
-import org.around.ieuri.tourism.application.catalog.provided.SpotCatalogCommandUseCase
+import org.around.ieuri.tourism.application.catalog.provided.SpotCatalogCurationUseCase
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.slf4j.LoggerFactory
 import org.springframework.batch.core.scope.context.ChunkContext
@@ -13,7 +13,7 @@ import org.springframework.batch.infrastructure.repeat.RepeatStatus
  * - KO를 전량 소진한 뒤 EN·JA·ZH로 넘어간다 — 뒤집히면 같은 장소가 두 카탈로그로 갈린다.
  */
 class SpotCatalogAssignmentTasklet(
-    private val useCase: SpotCatalogCommandUseCase,
+    private val useCase: SpotCatalogCurationUseCase,
 ) : Tasklet {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -79,7 +79,7 @@ class SpotCatalogAssignmentTasklet(
  * - 가른 것이 있으면 노출 갱신을 다시 부른다 — 안 부르면 구독자의 사본이 낡는다.
  */
 class SpotCatalogSplitTasklet(
-    private val useCase: SpotCatalogCommandUseCase,
+    private val useCase: SpotCatalogCurationUseCase,
 ) : Tasklet {
 
     private val log = LoggerFactory.getLogger(javaClass)

@@ -1,23 +1,17 @@
 package org.around.ieuri.tourism.adapter.batch
 
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.adapter.config.KtoBigDataProperties
-import org.around.ieuri.tourism.application.shared.provided.dto.SyncDemandIntensityCommand
-import org.around.ieuri.tourism.application.shared.required.DistrictCodeQueryPort
-import org.around.ieuri.tourism.application.shared.required.RegionMetricStorePort
-import org.around.ieuri.tourism.application.shared.required.RegionMetricSyncPage
-import org.around.ieuri.tourism.application.shared.required.RegionMetricSyncPort
+import org.around.ieuri.tourism.application.shared.provided.RegionMetricPageResult
+import org.around.ieuri.tourism.application.shared.provided.RegionMetricSyncUseCase
 import org.springframework.batch.core.job.Job
 import org.springframework.batch.core.job.builder.JobBuilder
 import org.springframework.batch.core.repository.JobRepository
 import org.springframework.batch.core.step.Step
 import org.springframework.batch.core.step.builder.StepBuilder
 import org.springframework.batch.core.step.tasklet.Tasklet
-import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Profile
-import org.springframework.transaction.PlatformTransactionManager
 import java.time.YearMonth
 
 /**
@@ -38,105 +32,61 @@ import java.time.YearMonth
 @Profile(BATCH_PROFILE)
 class RegionMetricSyncJobConfig(
     private val jobRepository: JobRepository,
-    @Qualifier(ExposedConfig.EXPOSED_TX) private val transactionManager: PlatformTransactionManager,
-    private val syncPort: RegionMetricSyncPort,
-    private val storePort: RegionMetricStorePort,
-    private val districtCodePort: DistrictCodeQueryPort,
+    private val useCase: RegionMetricSyncUseCase,
     private val properties: KtoBigDataProperties,
     private val syncProperties: RegionMetricSyncProperties,
 ) {
 
+    /** 최근 구간을 매번 통째로 다시 받는다 — upsert라 행이 늘지 않고(R7) 실패한 날은 다음 실행이 메운다. 지역 순회는 없다. */
     @Bean
     fun tourStatsVisitorCountSyncJob(): Job = singleStepJob(
         JOB_VISITOR_COUNT,
         RegionMetricSyncTasklet(
             datasetName = "visitorCount",
             pageSize = properties.pageSize,
-            districtCodePort = districtCodePort,
-            // 지역 순회 없음 — 이 API만 지역 필터가 없다.
-            fetchPage = { context, _, pageNo ->
-                // 최근 구간을 매번 통째로 다시 받는다 — upsert라 행이 늘지 않고(R7) 실패한 날은 다음 실행이 메운다.
-                syncPort.fetchVisitorCounts(
-                    context.runDate.minusDays(syncProperties.visitorBackfillDays - 1L),
-                    context.runDate,
-                    pageNo,
-                    properties.pageSize,
-                )
+            targets = { RegionMetricSyncTasklet.NO_REGION },
+            syncPage = { context, _, pageNo ->
+                useCase.syncVisitorCounts(context.runDate.minusDays(syncProperties.visitorBackfillDays - 1L), context.runDate, pageNo, properties.pageSize)
             },
-            districtCodeOf = { it.districtCode },
-            upsert = storePort::upsertVisitorCounts,
-            targetsOf = { RegionMetricSyncTasklet.NO_REGION },
         ),
     )
 
-    /**
-     * 집중률. 날짜를 보내지 않으며 시군구 하나에 향후 예측일이 전부 온다(R5).
-     * - 4종 중 유일하게 시군구 252개를 순회한다 — `signguCd`가 필수다.
-     */
+    /** 집중률. 날짜를 보내지 않으며 시군구 하나에 향후 예측일이 전부 온다(R5). 4종 중 유일하게 시군구 252개를 순회한다. */
     @Bean
     fun tourStatsConcentrationRateSyncJob(): Job = singleStepJob(
         JOB_CONCENTRATION_RATE,
         RegionMetricSyncTasklet(
             datasetName = "concentrationRate",
             pageSize = properties.pageSize,
-            districtCodePort = districtCodePort,
-            fetchPage = { _, region, pageNo ->
-                syncPort.fetchConcentrationRates(
-                    region.provinceCode,
-                    region.code,
-                    pageNo,
-                    properties.pageSize,
-                )
-            },
-            districtCodeOf = { it.districtCode },
-            upsert = storePort::upsertConcentrationRates,
-            targetsOf = DistrictCodeQueryPort::findAllRegions,
+            targets = useCase::districts,
+            syncPage = { _, district, pageNo -> useCase.syncConcentrationRates(district, pageNo, properties.pageSize) },
         ),
     )
 
     @Bean
-    fun tourStatsStayIntensitySyncJob(): Job = intensityJob(JOB_STAY_INTENSITY, "stayIntensity", storePort::upsertStayIntensities, syncPort::fetchStayIntensities)
+    fun tourStatsStayIntensitySyncJob(): Job = intensityJob(JOB_STAY_INTENSITY, "stayIntensity", useCase::syncStayIntensities)
 
     @Bean
-    fun tourStatsSpendingIntensitySyncJob(): Job = intensityJob(
-        JOB_SPENDING_INTENSITY,
-        "spendingIntensity",
-        storePort::upsertSpendingIntensities,
-        syncPort::fetchSpendingIntensities,
-    )
+    fun tourStatsSpendingIntensitySyncJob(): Job = intensityJob(JOB_SPENDING_INTENSITY, "spendingIntensity", useCase::syncSpendingIntensities)
 
-    /**
-     * 강도 2종. 시도 17개만 순회한다 — `areaCd`만 주면 그 시도의 시군구 전체가 온다.
-     * - 기준월은 [RegionMetricMonthResolver]가 실행당 한 번 정한다.
-     */
+    /** 강도 2종. 시도 17개만 순회한다. 기준월은 [RegionMetricMonthResolver]가 실행당 한 번 정한다. */
     private fun intensityJob(
         jobName: String,
         datasetName: String,
-        upsert: (List<SyncDemandIntensityCommand>) -> Int,
-        fetch: (String, YearMonth, Int, Int) -> RegionMetricSyncPage<SyncDemandIntensityCommand>,
+        sync: (String, YearMonth, Int, Int) -> RegionMetricPageResult,
     ): Job {
         val resolver = RegionMetricMonthResolver(
             datasetName = datasetName,
             lookbackMonths = syncProperties.monthlyLookbackMonths,
-            fetch = { areaCd, month, pageNo -> fetch(areaCd, month, pageNo, properties.pageSize) },
+            sync = { areaCd, month, pageNo -> sync(areaCd, month, pageNo, properties.pageSize) },
         )
         return singleStepJob(
             jobName,
             RegionMetricSyncTasklet(
                 datasetName = datasetName,
                 pageSize = properties.pageSize,
-                districtCodePort = districtCodePort,
-                fetchPage = { context, areaCd, pageNo ->
-                    resolver.fetchPage(
-                        context.executionContext,
-                        YearMonth.from(context.runDate),
-                        areaCd,
-                        pageNo,
-                    )
-                },
-                districtCodeOf = { it.districtCode },
-                upsert = upsert,
-                targetsOf = DistrictCodeQueryPort::findAllProvinceCodes,
+                targets = useCase::provinces,
+                syncPage = { context, areaCd, pageNo -> resolver.syncPage(context.executionContext, YearMonth.from(context.runDate), areaCd, pageNo) },
             ),
         )
     }
@@ -144,7 +94,7 @@ class RegionMetricSyncJobConfig(
     /** 종마다 Step 하나뿐이다 — 지역 순회는 Step 안의 루프다. */
     private fun singleStepJob(name: String, tasklet: Tasklet): Job {
         val step: Step = StepBuilder("${name}Step", jobRepository)
-            .tasklet(tasklet, transactionManager)
+            .tasklet(tasklet)
             .build()
         return JobBuilder(name, jobRepository).start(step).build()
     }

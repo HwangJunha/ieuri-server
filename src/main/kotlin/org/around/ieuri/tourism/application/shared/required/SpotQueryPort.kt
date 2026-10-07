@@ -2,7 +2,7 @@ package org.around.ieuri.tourism.application.shared.required
 
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.tourism.application.shared.provided.dto.LikedSpotView
-import org.around.ieuri.tourism.domain.reaction.ReactionType
+import org.around.ieuri.tourism.domain.catalog.ReactionType
 import org.around.ieuri.tourism.domain.shared.CategorySelection
 import org.around.ieuri.tourism.domain.shared.Coordinates
 import org.around.ieuri.tourism.domain.shared.CopyrightType
