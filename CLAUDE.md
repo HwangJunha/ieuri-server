@@ -401,8 +401,10 @@ refactor.
   (`WHERE col IS NULL OR col < :v` for values that only move forward, atomic `+ 1`/`- 1` for
   counters, `UPDATE … RETURNING` to learn what this call changed) rather than read-modify-write.
   **Main-DB queries are DSL, including PostGIS and pgvector** — use the shared expressions in
-  `common/persistence` (`PostgisExpressions.kt`, `PgVectorExpressions.kt`, `UpsertExpressions.kt`)
-  and add a `CustomFunction`/`CustomOperator` there when one is missing. A CTE is written as a
+  `common/persistence` (`PostgisExpressions.kt`, `PgVectorExpressions.kt`) for extension functions
+  Exposed lacks, and add a `CustomFunction`/`CustomOperator` there when one is missing. Upsert is
+  Exposed's own `upsert`/`batchUpsert` — `onUpdate` with `insertValue(col)`, `onUpdateExclude`, `where`;
+  write no wrapper for what it already does (SPEC-0039 D-114). A CTE is written as a
   subquery (`Query.alias`) or a scalar subquery (`wrapAsExpression`). When the DSL cannot express a
   statement, change its shape (read the parent id, then upsert; insert-ignore, then re-read) before
   reaching for `exec()`. Migrated contexts do not use `JdbcTemplate` on the main DB; the search node

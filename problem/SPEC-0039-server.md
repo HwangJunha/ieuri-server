@@ -150,6 +150,7 @@
 | D-111 | S12b | **장소·회원 조회는 `lookup` 패키지(application·domain)다.** `SpotLookupUseCase`·`MemberLookupUseCase`를 글·질문·대화·차단·신고 서비스와 리졸버·DataLoader가 함께 쓰고, 포트(`SpotLookupPort`·`MemberLookupPort`)는 `lookup/required`에만 있다. 조회 결과 `SpotSummary`·`MemberSummary`(옛 `PostSpotView`·`PostAuthorView`)는 `domain/lookup`에 둔다 — community가 다른 context의 장소·회원을 보는 값이며, 글 작성이 장소 좌표를 글에 복사하는 등 쓰기 판정의 재료다. 승인 목록의 "결정 2(애그리게이트마다 조회 포트, 어댑터 하나)"를 바꾼다 | 결정 2를 적용하려다 반증이 나왔다: DataLoader는 네 애그리게이트가 함께 써서 주인이 없고, 서비스 쪽만 나누면 시그니처가 같은 포트가 6개 생긴다. D-106(`photo`)과 같은 모양을 골랐다(사용자 결정 2026-10-08). D-93(조회는 도메인 모델이 답의 모든 필드를 가질 때만 도메인을 돌려준다)은 community 자기 애그리게이트의 읽기에 대한 것이라 그대로다 — 이 둘은 읽기 모델이 아니라 다른 context가 준 값이다 | **결정 2 그대로**: 위 반증. **`shared` 유지**: DataLoader가 포트를 직접 부르는 것이 남는다. **결과를 `lookup/provided/dto`에**: application·domain 1:1(D-66)이 깨지고 `domain/lookup`이 빈다 |
 | D-112 | S13 | **응답은 dev와 같아야 한다 — 결함이라도 응답을 바꾸는 수정은 되돌린다.** `SpotDetail.category` 필드 리졸버를 지워 dev처럼 `category.code` null 오류가 나게 하고, tourism 오류 처리기는 원인 사슬을 풀지 않고 겉 예외만 본다(업무 예외가 dev처럼 INTERNAL_ERROR), 거리순·인기순 커서는 읽지 못하면 dev처럼 `IllegalArgumentException`이다(INVALID_CURSOR 아님). 응답에 드러나지 않는 D-43 수정(lost update·경합·카운터)은 그대로다 | 사용자 지시(2026-10-08): "dev와 응답이 다르면 안 된다, 서버 내부 작업이 클라이언트에게까지 영향이 가서는 안 된다". 응답 변경은 클라이언트에게 곧 장애다. D-43의 "알려진 결함은 이 스펙에서 고친다"를 응답이 바뀌는 항목에 한해 뒤집는다. 되돌린 뒤 재검증: 조회 76/77(조회수 부수 효과 1)·오류 39/39·쓰기 46/46·구독 5/5 | **고친 채로 두고 차이로 기록**: 클라이언트가 받는 응답이 배포만으로 바뀐다 |
 | D-113 | S13 | **대표 위치의 격자 나누기와 순서는 PostgreSQL이 정한다.** 어댑터가 `ST_SnapToGrid` 격자를 geometry 순서로 `dense_rank`해 원본과 함께 읽고, 도메인(`RepresentativeLocation`)은 그 순위로 묶어 원본 수가 같으면 순위가 앞선 격자를 고른다 | 배치 DB 검증(2026-10-08): 도메인이 동률 격자를 경도·위도 순으로 골라, dev SQL(`ORDER BY spot_count DESC, cell` — geometry 정렬)과 5개 시군구의 대표 위치가 달랐다. 대표 위치는 `recommendedRegions`의 `center`·거리 점수라 응답이 바뀐다(D-112). 고친 뒤 252개 시군구 모두 dev SQL과 같다 | **geometry 정렬 순서를 코드로 옮기기**: PostGIS 내부 비교 규칙을 다시 적는 것이라 어긋나기 쉽다. **선정 전체를 SQL로 되돌리기**: 도메인 규칙(문턱·무게중심·스냅)이 다시 SQL에 숨는다 |
+| D-114 | S13 | **upsert는 Exposed 기본 기능으로 쓴다 — `UpsertExpressions`를 지운다.** 이미지·이용안내는 기본 갱신(입력 열 = 키·값), 지표 4종은 값과 `updated_at = now()` + `where`(값이 바뀔 때만), 상세·운영 정보와 장소·축제는 `onUpdate`에 열마다 `insertValue`. 장소·축제는 `last_synced_at`을 매번, `updated_at`을 값이 바뀔 때만 갱신해야 해 그 CASE 식만 장소 어댑터의 private 함수로 둔다 | 사용자 지적(2026-10-09): upsert는 Exposed가 지원한다. 확인 결과 `setFromInsert`는 전부 대체되고, `onUpdate`와 기본 갱신은 섞을 수 없어 장소·축제의 조건부 `updated_at`만 Exposed에 대응 기능이 없다. DB 결과는 그대로다 — 지표는 같은 값이면 행을 다시 쓰지 않게 됐을 뿐 값·`updated_at`이 같다(`where` 형태는 PostgreSQL `EXPLAIN`으로 확인) | **장소·축제도 `where`로**: 같은 값이면 `last_synced_at`이 멈춰 DB 결과가 dev와 달라진다 |
 
 ## 부족한 정보
 
@@ -320,6 +321,7 @@ grep으로 확인한 수(worktree `82fdd48`):
 
 | 날짜 | 무엇을 | 왜 |
 |---|---|---|
+| 2026-10-09 | D-114 — upsert를 Exposed 기본 기능으로, `UpsertExpressions` 삭제 | 사용자 지적 |
 | 2026-10-08 | D-113 — 대표 위치 동률 격자를 dev처럼 고른다(배치 DB 검증에서 발견) | 검증 |
 | 2026-10-08 | D-112 — 응답을 바꾼 결함 수정 3건을 dev 응답으로 되돌림(D-43 일부 반전), CLAUDE.md에 "응답은 dev와 같다" | 사용자 지시 |
 | 2026-10-08 | reviewer 반영: D-110(차단 회원·발신자 조회는 리졸버가 lookup 유스케이스로, 빈 카테고리 감사 예외), D-111 근거, D-107 쿼리 수, 슬라이스 S12b, D-92 예외 표시 | reviewer |
