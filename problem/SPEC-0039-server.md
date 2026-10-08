@@ -151,6 +151,11 @@
 | D-112 | S13 | **응답은 dev와 같아야 한다 — 결함이라도 응답을 바꾸는 수정은 되돌린다.** `SpotDetail.category` 필드 리졸버를 지워 dev처럼 `category.code` null 오류가 나게 하고, tourism 오류 처리기는 원인 사슬을 풀지 않고 겉 예외만 본다(업무 예외가 dev처럼 INTERNAL_ERROR), 거리순·인기순 커서는 읽지 못하면 dev처럼 `IllegalArgumentException`이다(INVALID_CURSOR 아님). 응답에 드러나지 않는 D-43 수정(lost update·경합·카운터)은 그대로다 | 사용자 지시(2026-10-08): "dev와 응답이 다르면 안 된다, 서버 내부 작업이 클라이언트에게까지 영향이 가서는 안 된다". 응답 변경은 클라이언트에게 곧 장애다. D-43의 "알려진 결함은 이 스펙에서 고친다"를 응답이 바뀌는 항목에 한해 뒤집는다. 되돌린 뒤 재검증: 조회 76/77(조회수 부수 효과 1)·오류 39/39·쓰기 46/46·구독 5/5 | **고친 채로 두고 차이로 기록**: 클라이언트가 받는 응답이 배포만으로 바뀐다 |
 | D-113 | S13 | **대표 위치의 격자 나누기와 순서는 PostgreSQL이 정한다.** 어댑터가 `ST_SnapToGrid` 격자를 geometry 순서로 `dense_rank`해 원본과 함께 읽고, 도메인(`RepresentativeLocation`)은 그 순위로 묶어 원본 수가 같으면 순위가 앞선 격자를 고른다 | 배치 DB 검증(2026-10-08): 도메인이 동률 격자를 경도·위도 순으로 골라, dev SQL(`ORDER BY spot_count DESC, cell` — geometry 정렬)과 5개 시군구의 대표 위치가 달랐다. 대표 위치는 `recommendedRegions`의 `center`·거리 점수라 응답이 바뀐다(D-112). 고친 뒤 252개 시군구 모두 dev SQL과 같다 | **geometry 정렬 순서를 코드로 옮기기**: PostGIS 내부 비교 규칙을 다시 적는 것이라 어긋나기 쉽다. **선정 전체를 SQL로 되돌리기**: 도메인 규칙(문턱·무게중심·스냅)이 다시 SQL에 숨는다 |
 | D-114 | S13 | **upsert는 Exposed 기본 기능으로 쓴다 — `UpsertExpressions`를 지운다.** 이미지·이용안내는 기본 갱신(입력 열 = 키·값), 지표 4종은 값과 `updated_at = now()` + `where`(값이 바뀔 때만), 상세·운영 정보와 장소·축제는 `onUpdate`에 열마다 `insertValue`. 장소·축제는 `last_synced_at`을 매번, `updated_at`을 값이 바뀔 때만 갱신해야 해 그 CASE 식만 장소 어댑터의 private 함수로 둔다 | 사용자 지적(2026-10-09): upsert는 Exposed가 지원한다. 확인 결과 `setFromInsert`는 전부 대체되고, `onUpdate`와 기본 갱신은 섞을 수 없어 장소·축제의 조건부 `updated_at`만 Exposed에 대응 기능이 없다. DB 결과는 그대로다 — 지표는 같은 값이면 행을 다시 쓰지 않게 됐을 뿐 값·`updated_at`이 같다(`where` 형태는 PostgreSQL `EXPLAIN`으로 확인) | **장소·축제도 `where`로**: 같은 값이면 `last_synced_at`이 멈춰 DB 결과가 dev와 달라진다 |
+| D-115 | S15 | **alarm은 `device`·`preference`·`push` 세 패키지다(application·domain 1:1).** `DeviceToken`·`NotificationPreference`가 루트이고, 발송은 주인이 없는 기능이라 `push`다(D-106 `photo`와 같은 모양). 여러 곳이 쓰는 값은 `shared`를 두지 않고 주인에게 둔다 — `NotificationCategory`는 preference, `AlarmLocale`은 device | 사용자 설계 승인(2026-10-09). `shared`를 두면 domain에만 있는 패키지가 생긴다(D-66) | **발송을 device 밑에**: 토큰·설정·문구를 함께 쓰는 일이라 한 애그리게이트의 것이 아니다. **`shared`에 공용 값**: application 쪽이 비어 1:1이 깨진다 |
+| D-116 | S15 | **`PushDispatchStore`를 지운다 — 발송 오케스트레이터(트랜잭션 없음)가 애그리게이트별 유스케이스를 부른다.** 설정 판정(`NotificationPreferenceQueryUseCase.isEnabled`)·대상 기기(`DeviceTokenQueryUseCase.tokensOf`)·문구(`NotificationMessageQueryUseCase`)·무효 토큰 제거(`DeviceTokenCommandUseCase.removeInvalid`). 발송 경로에서 불리는 메서드는 전처럼 REQUIRES_NEW다 | D-98·D-103 선례. 판정 순서(자기 행위 → 카테고리 → 차단 → 토큰 → 문구 → 발송 → 무효 제거)와 로그는 그대로다 | **Store 유지**: 세 애그리게이트의 DB 접근이 한 클래스에 섞인다 |
+| D-117 | S15 | **탈퇴 정리는 리스너 하나에 애그리게이트마다 메서드 하나(D-65).** 기기 토큰·수신 설정을 각자 REQUIRES_NEW로 지우고 각자 실패를 삼킨다. 로그는 두 줄로 나뉜다 | 한 서비스가 두 애그리게이트를 한 트랜잭션에서 지우던 것을 D-65 규칙에 맞췄다. 결과는 같고, 한쪽 실패가 다른 쪽을 막지 않게 됐다 | **erase 서비스 유지**: 한 트랜잭션에서 두 애그리게이트를 바꾼다(애그리게이트 규칙 위반) |
+| D-118 | S15 | **수정은 값이 바뀔 때만 행을 고친다(`updated_at` 포함).** 기기 토큰은 회원·토큰·언어·플랫폼 중 하나, 수신 설정은 `enabled`가 다를 때만 UPDATE한다. 토큰 등록은 조회 → 도메인 → 저장 순서를 유지한다 | JPA dirty-checking은 값이 같으면 UPDATE를 내지 않아 `updated_at`이 그대로였다 — DB 결과를 dev와 같게 둔다(D-112). upsert로 바꾸면 동시 등록 동작까지 달라질 수 있다 | **항상 UPDATE**: 같은 값 재등록마다 `updated_at`이 움직인다. **`ON CONFLICT` upsert**: 위 이유 |
+| D-119 | S15 | **검증 메시지와 순서는 그대로다.** `DeviceToken.register`는 deviceId → memberId → fcmToken 순으로 검사하고 메시지 문자열도 같다 — `INVALID_INPUT` 응답의 `message`가 이 문자열이다. 수신 설정의 기본값 조립(`NotificationPreference.effective`)은 도메인으로 옮겼다 | 응답은 dev와 같아야 한다(D-112). 기본값(행 없음 = 켜짐)은 조회와 변경 응답이 함께 쓰는 규칙이라 도메인 몫이다(D-102) | — |
 
 ## 부족한 정보
 
@@ -198,7 +203,7 @@ grep으로 확인한 수(worktree `82fdd48`):
 | S13 | B2 | 같음 | tourism (배치 트랜잭션 매니저 포함) | 완료(`feature/SPEC-0039-tourism`). A: 테이블 22개 선언, JPA·QueryDSL → Exposed, 배치 스텝 Exposed 매니저(D-71~D-73). 결함: 업무 예외 코드·`spotDetail.category`(D-43). B: 애그리게이트 패키지·불변 루트·저장소 통합·서비스 트랜잭션(D-74~D-78). 조회 46/54·오류 38/39·쓰기 45/46 dev와 같음 — 차이는 의도한 결함 수정 8건과 이전과 같은 조회수·닉네임. 배치는 실측하지 않음(D-76) |
 | S12b | B2 | 같음 | community `shared` 정리(S12 후속, tourism 브랜치에서): 포트·읽기 모델을 주인에게, `photo`·`lookup` 패키지, 정책·시계·이벤트 포트, 리졸버의 포트 호출 제거(D-105~D-111) | 완료. 커밋 메시지의 "S14"는 이 행이다(슬라이스 표의 S14는 auth). GraphQL 계약·오류 코드·커서 바이트 불변 |
 | S14 | B2 | 같음 | auth (트랜잭션 안 외부 I/O 분리) | |
-| S15 | B2 | 같음 | alarm | |
+| S15 | B2 | 같음 | alarm — `feature/SPEC-0039-alarm`(tourism 브랜치에서 땀) | 구현(D-115~D-119). Exposed 테이블 3개, JPA 엔티티·리포지토리 삭제. 응답·FCM 페이로드·검증 메시지 불변 |
 | S16 | B2 | FR-010 · FR-011 | JPA·QueryDSL·kapt 제거, `@Transactional(transactionManager = EXPOSED_TX)`의 매니저 지정 제거(D-54), JPA 전제 센서·CLAUDE.md 규칙 정리, 새 구조 센서(애그리거트 순환·교차 호출·`copy` 제한) | |
 | C1 | B1.5 | D-30 | 주석 정리(컨텍스트별), 주석 제외 토큰 비교 | 완료. Kotlin 주석 16,248 → 7,376줄, 15줄 이상 블록 67 → 0. 771파일 주석 외 차이 0건, 마이그레이션·스키마 변경 0 |
 | C2 | B1.5 | D-31 · FR-010 | 주석 길이 센서 | 완료. 16줄 탐침으로 실패·제거 후 통과 확인, 문자열 안 주석 기호 오탐 없음 |
@@ -321,6 +326,7 @@ grep으로 확인한 수(worktree `82fdd48`):
 
 | 날짜 | 무엇을 | 왜 |
 |---|---|---|
+| 2026-10-09 | D-115~D-119 — alarm 이전(S15) | 사용자 설계 승인 |
 | 2026-10-09 | D-114 — upsert를 Exposed 기본 기능으로, `UpsertExpressions` 삭제 | 사용자 지적 |
 | 2026-10-08 | D-113 — 대표 위치 동률 격자를 dev처럼 고른다(배치 DB 검증에서 발견) | 검증 |
 | 2026-10-08 | D-112 — 응답을 바꾼 결함 수정 3건을 dev 응답으로 되돌림(D-43 일부 반전), CLAUDE.md에 "응답은 dev와 같다" | 사용자 지시 |
