@@ -1,7 +1,5 @@
 package org.around.ieuri.tourism.adapter.persistence
 
-import org.around.ieuri.common.persistence.setFromInsert
-import org.around.ieuri.common.persistence.touchedWhenChanged
 import org.around.ieuri.tourism.adapter.persistence.mapper.toFestivalPeriod
 import org.around.ieuri.tourism.adapter.persistence.mapper.writeTo
 import org.around.ieuri.tourism.adapter.persistence.table.SpotDetailImageTable
@@ -20,8 +18,13 @@ import org.around.ieuri.tourism.domain.spot.SpotFestival
 import org.around.ieuri.tourism.domain.spot.SpotImage
 import org.around.ieuri.tourism.domain.spot.SpotInfoItem
 import org.around.ieuri.tourism.domain.spot.SpotIntro
+import org.jetbrains.exposed.v1.core.Column
+import org.jetbrains.exposed.v1.core.Expression
+import org.jetbrains.exposed.v1.core.IsDistinctFromOp
 import org.jetbrains.exposed.v1.core.JoinType
 import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.case
+import org.jetbrains.exposed.v1.core.compoundOr
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.core.statements.insertValue
@@ -32,6 +35,7 @@ import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.upsert
 import org.springframework.stereotype.Repository
 import java.time.Instant
+import java.time.OffsetDateTime
 import java.time.ZoneOffset
 
 /**
@@ -52,7 +56,14 @@ class SpotPersistenceAdapter : SpotRepository {
             SpotTable.language,
             shouldReturnGeneratedValues = false,
             onUpdate = {
-                SPOT_VALUE_COLUMNS.forEach { column -> it.setFromInsert(column) }
+                it[SpotTable.title] = insertValue(SpotTable.title)
+                it[SpotTable.address] = insertValue(SpotTable.address)
+                it[SpotTable.thumbnailImageUrl] = insertValue(SpotTable.thumbnailImageUrl)
+                it[SpotTable.mapX] = insertValue(SpotTable.mapX)
+                it[SpotTable.mapY] = insertValue(SpotTable.mapY)
+                it[SpotTable.category] = insertValue(SpotTable.category)
+                it[SpotTable.contentTypeId] = insertValue(SpotTable.contentTypeId)
+                it[SpotTable.copyright] = insertValue(SpotTable.copyright)
                 it[SpotTable.lastSyncedAt] = insertValue(SpotTable.lastSyncedAt)
                 it[SpotTable.updatedAt] = touchedWhenChanged(SpotTable.updatedAt, SPOT_VALUE_COLUMNS)
             },
@@ -91,7 +102,10 @@ class SpotPersistenceAdapter : SpotRepository {
             SpotFestivalTable.spotId,
             shouldReturnGeneratedValues = false,
             onUpdate = {
-                FESTIVAL_VALUE_COLUMNS.forEach { column -> it.setFromInsert(column) }
+                it[SpotFestivalTable.eventStartDate] = insertValue(SpotFestivalTable.eventStartDate)
+                it[SpotFestivalTable.eventEndDate] = insertValue(SpotFestivalTable.eventEndDate)
+                it[SpotFestivalTable.progressType] = insertValue(SpotFestivalTable.progressType)
+                it[SpotFestivalTable.festivalType] = insertValue(SpotFestivalTable.festivalType)
                 it[SpotFestivalTable.lastSyncedAt] = insertValue(SpotFestivalTable.lastSyncedAt)
                 it[SpotFestivalTable.updatedAt] = touchedWhenChanged(SpotFestivalTable.updatedAt, FESTIVAL_VALUE_COLUMNS)
             },
@@ -133,7 +147,6 @@ class SpotPersistenceAdapter : SpotRepository {
             SpotDetailImageTable.spotId,
             SpotDetailImageTable.displayOrder,
             shouldReturnGeneratedValues = false,
-            onUpdate = { IMAGE_VALUE_COLUMNS.forEach { column -> it.setFromInsert(column) } },
         ) { (order, image) -> image.writeTo(this, spotId, order) }
     }
 
@@ -143,7 +156,13 @@ class SpotPersistenceAdapter : SpotRepository {
             SpotDetailIntroTable.spotId,
             SpotDetailIntroTable.category,
             onUpdate = {
-                INTRO_VALUE_COLUMNS.forEach { column -> it.setFromInsert(column) }
+                it[SpotDetailIntroTable.businessHours] = insertValue(SpotDetailIntroTable.businessHours)
+                it[SpotDetailIntroTable.closedDays] = insertValue(SpotDetailIntroTable.closedDays)
+                it[SpotDetailIntroTable.parking] = insertValue(SpotDetailIntroTable.parking)
+                it[SpotDetailIntroTable.inquiryPhone] = insertValue(SpotDetailIntroTable.inquiryPhone)
+                it[SpotDetailIntroTable.fee] = insertValue(SpotDetailIntroTable.fee)
+                it[SpotDetailIntroTable.petAllowed] = insertValue(SpotDetailIntroTable.petAllowed)
+                it[SpotDetailIntroTable.creditCardAccepted] = insertValue(SpotDetailIntroTable.creditCardAccepted)
                 it[SpotDetailIntroTable.fetchedAt] = CurrentTimestampWithTimeZone
                 it[SpotDetailIntroTable.updatedAt] = CurrentTimestampWithTimeZone
             },
@@ -159,7 +178,6 @@ class SpotPersistenceAdapter : SpotRepository {
             SpotDetailInfoTable.category,
             SpotDetailInfoTable.displayOrder,
             shouldReturnGeneratedValues = false,
-            onUpdate = { INFO_VALUE_COLUMNS.forEach { column -> it.setFromInsert(column) } },
         ) { (order, item) -> item.writeTo(this, spotId, category, order) }
     }
 
@@ -168,7 +186,15 @@ class SpotPersistenceAdapter : SpotRepository {
         SpotDetailTable.upsert(
             SpotDetailTable.spotId,
             onUpdate = {
-                DETAIL_VALUE_COLUMNS.forEach { column -> it.setFromInsert(column) }
+                it[SpotDetailTable.title] = insertValue(SpotDetailTable.title)
+                it[SpotDetailTable.category] = insertValue(SpotDetailTable.category)
+                it[SpotDetailTable.thumbnailImageUrl] = insertValue(SpotDetailTable.thumbnailImageUrl)
+                it[SpotDetailTable.overview] = insertValue(SpotDetailTable.overview)
+                it[SpotDetailTable.address] = insertValue(SpotDetailTable.address)
+                it[SpotDetailTable.homepage] = insertValue(SpotDetailTable.homepage)
+                it[SpotDetailTable.tel] = insertValue(SpotDetailTable.tel)
+                it[SpotDetailTable.copyright] = insertValue(SpotDetailTable.copyright)
+                it[SpotDetailTable.bodyAbsent] = insertValue(SpotDetailTable.bodyAbsent)
                 it[SpotDetailTable.fetchedAt] = CurrentTimestampWithTimeZone
                 it[SpotDetailTable.updatedAt] = CurrentTimestampWithTimeZone
             },
@@ -205,29 +231,10 @@ class SpotPersistenceAdapter : SpotRepository {
             SpotFestivalTable.progressType,
             SpotFestivalTable.festivalType,
         )
-
-        val DETAIL_VALUE_COLUMNS = listOf(
-            SpotDetailTable.title, SpotDetailTable.category, SpotDetailTable.thumbnailImageUrl, SpotDetailTable.overview,
-            SpotDetailTable.address, SpotDetailTable.homepage, SpotDetailTable.tel, SpotDetailTable.copyright, SpotDetailTable.bodyAbsent,
-        )
-
-        val IMAGE_VALUE_COLUMNS = listOf(
-            SpotDetailImageTable.imageUrl,
-            SpotDetailImageTable.thumbnailUrl,
-            SpotDetailImageTable.caption,
-            SpotDetailImageTable.copyright,
-        )
-
-        val INFO_VALUE_COLUMNS = listOf(SpotDetailInfoTable.name, SpotDetailInfoTable.text)
-
-        val INTRO_VALUE_COLUMNS = listOf(
-            SpotDetailIntroTable.businessHours,
-            SpotDetailIntroTable.closedDays,
-            SpotDetailIntroTable.parking,
-            SpotDetailIntroTable.inquiryPhone,
-            SpotDetailIntroTable.fee,
-            SpotDetailIntroTable.petAllowed,
-            SpotDetailIntroTable.creditCardAccepted,
-        )
     }
 }
+
+/** upsert의 `DO UPDATE`에서 [columns] 중 하나라도 바뀔 때만 `now()`, 아니면 기존 [updatedAt] — 같은 값으로 다시 적재해도 "바뀐 시각"이 움직이지 않는다. */
+private fun touchedWhenChanged(updatedAt: Column<OffsetDateTime>, columns: List<Column<*>>): Expression<OffsetDateTime> = case()
+    .When(columns.map { IsDistinctFromOp(it, insertValue(it)) }.compoundOr(), CurrentTimestampWithTimeZone)
+    .Else(updatedAt)

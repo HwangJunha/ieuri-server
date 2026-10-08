@@ -1,7 +1,5 @@
 package org.around.ieuri.tourism.adapter.persistence
 
-import org.around.ieuri.common.persistence.setFromInsert
-import org.around.ieuri.common.persistence.touchedWhenChanged
 import org.around.ieuri.tourism.adapter.persistence.mapper.writeSpendingIntensityTo
 import org.around.ieuri.tourism.adapter.persistence.mapper.writeStayIntensityTo
 import org.around.ieuri.tourism.adapter.persistence.mapper.writeTo
@@ -13,6 +11,9 @@ import org.around.ieuri.tourism.application.region.provided.dto.SyncConcentratio
 import org.around.ieuri.tourism.application.region.provided.dto.SyncDemandIntensityCommand
 import org.around.ieuri.tourism.application.region.provided.dto.SyncVisitorCountCommand
 import org.around.ieuri.tourism.application.region.required.RegionMetricStorePort
+import org.jetbrains.exposed.v1.core.isDistinctFrom
+import org.jetbrains.exposed.v1.core.statements.insertValue
+import org.jetbrains.exposed.v1.javatime.CurrentTimestampWithTimeZone
 import org.jetbrains.exposed.v1.jdbc.batchUpsert
 import org.springframework.stereotype.Component
 
@@ -31,9 +32,10 @@ class RegionMetricPersistenceAdapter : RegionMetricStorePort {
             KtoVisitorCountTable.visitorType,
             shouldReturnGeneratedValues = false,
             onUpdate = {
-                it.setFromInsert(KtoVisitorCountTable.touristCount)
-                it[KtoVisitorCountTable.updatedAt] = touchedWhenChanged(KtoVisitorCountTable.updatedAt, listOf(KtoVisitorCountTable.touristCount))
+                it[KtoVisitorCountTable.touristCount] = insertValue(KtoVisitorCountTable.touristCount)
+                it[KtoVisitorCountTable.updatedAt] = CurrentTimestampWithTimeZone
             },
+            where = { KtoVisitorCountTable.touristCount isDistinctFrom insertValue(KtoVisitorCountTable.touristCount) },
         ) { it.writeTo(this) }
         return records.size
     }
@@ -46,10 +48,10 @@ class RegionMetricPersistenceAdapter : RegionMetricStorePort {
             KtoConcentrationRateTable.targetDate,
             shouldReturnGeneratedValues = false,
             onUpdate = {
-                it.setFromInsert(KtoConcentrationRateTable.concentrationRate)
-                it[KtoConcentrationRateTable.updatedAt] =
-                    touchedWhenChanged(KtoConcentrationRateTable.updatedAt, listOf(KtoConcentrationRateTable.concentrationRate))
+                it[KtoConcentrationRateTable.concentrationRate] = insertValue(KtoConcentrationRateTable.concentrationRate)
+                it[KtoConcentrationRateTable.updatedAt] = CurrentTimestampWithTimeZone
             },
+            where = { KtoConcentrationRateTable.concentrationRate isDistinctFrom insertValue(KtoConcentrationRateTable.concentrationRate) },
         ) { it.writeTo(this) }
         return records.size
     }
@@ -62,9 +64,10 @@ class RegionMetricPersistenceAdapter : RegionMetricStorePort {
             KtoStayIntensityTable.indicatorCode,
             shouldReturnGeneratedValues = false,
             onUpdate = {
-                it.setFromInsert(KtoStayIntensityTable.indicatorValue)
-                it[KtoStayIntensityTable.updatedAt] = touchedWhenChanged(KtoStayIntensityTable.updatedAt, listOf(KtoStayIntensityTable.indicatorValue))
+                it[KtoStayIntensityTable.indicatorValue] = insertValue(KtoStayIntensityTable.indicatorValue)
+                it[KtoStayIntensityTable.updatedAt] = CurrentTimestampWithTimeZone
             },
+            where = { KtoStayIntensityTable.indicatorValue isDistinctFrom insertValue(KtoStayIntensityTable.indicatorValue) },
         ) { it.writeStayIntensityTo(this) }
         return records.size
     }
@@ -77,10 +80,10 @@ class RegionMetricPersistenceAdapter : RegionMetricStorePort {
             KtoSpendingIntensityTable.indicatorCode,
             shouldReturnGeneratedValues = false,
             onUpdate = {
-                it.setFromInsert(KtoSpendingIntensityTable.indicatorValue)
-                it[KtoSpendingIntensityTable.updatedAt] =
-                    touchedWhenChanged(KtoSpendingIntensityTable.updatedAt, listOf(KtoSpendingIntensityTable.indicatorValue))
+                it[KtoSpendingIntensityTable.indicatorValue] = insertValue(KtoSpendingIntensityTable.indicatorValue)
+                it[KtoSpendingIntensityTable.updatedAt] = CurrentTimestampWithTimeZone
             },
+            where = { KtoSpendingIntensityTable.indicatorValue isDistinctFrom insertValue(KtoSpendingIntensityTable.indicatorValue) },
         ) { it.writeSpendingIntensityTo(this) }
         return records.size
     }
