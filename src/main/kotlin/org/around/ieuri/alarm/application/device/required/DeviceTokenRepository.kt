@@ -9,8 +9,8 @@ interface DeviceTokenRepository {
     /** 회원의 기기 전부(AC5.3). 토큰이 없으면 빈 목록이다. */
     fun findByMemberId(memberId: Long): List<DeviceToken>
 
-    /** id가 없으면 넣고 id를 채워 돌려준다. 있으면 값이 바뀐 경우에만 고친다(`updated_at` 포함). */
-    fun save(deviceToken: DeviceToken): DeviceToken
+    /** id가 없으면 넣는다. 있으면 값이 바뀐 경우에만 고친다(`updated_at` 포함). */
+    fun save(deviceToken: DeviceToken)
 
     /** 지운 건수. 없어도 예외가 아니다(AC2.2). */
     fun deleteByDeviceId(deviceId: String): Long

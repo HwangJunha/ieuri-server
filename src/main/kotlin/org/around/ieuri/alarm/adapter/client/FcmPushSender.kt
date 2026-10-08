@@ -1,4 +1,4 @@
-package org.around.ieuri.alarm.adapter.fcm
+package org.around.ieuri.alarm.adapter.client
 
 import com.google.firebase.messaging.ApnsConfig
 import com.google.firebase.messaging.Aps

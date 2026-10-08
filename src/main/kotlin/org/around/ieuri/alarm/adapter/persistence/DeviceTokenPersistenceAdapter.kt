@@ -12,7 +12,7 @@ import org.jetbrains.exposed.v1.core.neq
 import org.jetbrains.exposed.v1.core.or
 import org.jetbrains.exposed.v1.javatime.CurrentTimestampWithTimeZone
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
-import org.jetbrains.exposed.v1.jdbc.insertReturning
+import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.update
 import org.springframework.stereotype.Repository
@@ -30,9 +30,12 @@ class DeviceTokenPersistenceAdapter : DeviceTokenRepository {
         .map { it.toDeviceToken() }
 
     /** 값이 같으면 행을 고치지 않는다 — `updated_at`이 "바뀐 시각"으로 남는다. */
-    override fun save(deviceToken: DeviceToken): DeviceToken {
+    override fun save(deviceToken: DeviceToken) {
         val id = deviceToken.id
-            ?: return deviceToken.copy(id = DeviceTokenTable.insertReturning(listOf(DeviceTokenTable.id)) { deviceToken.writeTo(it) }.single()[DeviceTokenTable.id])
+        if (id == null) {
+            DeviceTokenTable.insert { deviceToken.writeTo(it) }
+            return
+        }
         DeviceTokenTable.update({
             (DeviceTokenTable.id eq id) and (
                 (DeviceTokenTable.memberId neq deviceToken.memberId) or
@@ -44,7 +47,6 @@ class DeviceTokenPersistenceAdapter : DeviceTokenRepository {
             deviceToken.writeTo(it)
             it[DeviceTokenTable.updatedAt] = CurrentTimestampWithTimeZone
         }
-        return deviceToken
     }
 
     override fun deleteByDeviceId(deviceId: String): Long = DeviceTokenTable.deleteWhere { DeviceTokenTable.deviceId eq deviceId }.toLong()
