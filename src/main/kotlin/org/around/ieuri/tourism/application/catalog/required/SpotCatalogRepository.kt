@@ -4,17 +4,16 @@ import org.around.ieuri.tourism.application.catalog.required.dto.VisibilityRefre
 import org.around.ieuri.tourism.domain.catalog.CatalogFestival
 import org.around.ieuri.tourism.domain.catalog.CatalogMembership
 import org.around.ieuri.tourism.domain.catalog.CatalogTranslation
-import org.around.ieuri.tourism.domain.catalog.DistrictAssignmentSweep
 import org.around.ieuri.tourism.domain.catalog.OriginFestivalPeriod
 import org.around.ieuri.tourism.domain.catalog.SpotCatalog
 import org.around.ieuri.tourism.domain.catalog.SpotReaction
-import org.around.ieuri.tourism.domain.catalog.TranslationVisibilitySweep
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 
 /**
  * 카탈로그 애그리게이트 저장소. 루트는 카탈로그 행과 그 번역(언어 수만큼)을 함께 읽는다.
  * - 원본 소속(`spot.catalog_id`)은 이 애그리게이트의 일부다 — 루트가 만든 [CatalogMembership]으로 쓴다.
- * - 반응·축제 기간도 루트가 정한 것을 의도별 메서드로 쓴다. 노출·시군구 일괄 반영은 도메인 명세를 담은 명령으로 받는다.
+ * - 반응·축제 기간도 루트가 정한 것을 의도별 메서드로 쓴다.
+ * - 노출·시군구 일괄 반영은 규칙이 SQL에만 있다 — 수만 행을 한 문장으로 바꿔야 하는데 도메인 명세를 SQL로 옮길 수단이 없다(D-125).
  */
 interface SpotCatalogRepository {
 
@@ -45,13 +44,13 @@ interface SpotCatalogRepository {
     fun deleteReactionsByMember(memberId: Long): Int
 
     /**
-     * 번역의 `visible`을 [sweep]의 규칙에 한꺼번에 맞춘다(행은 지우지 않는다). 상태가 바뀌는 행만 갱신한다.
+     * 그 언어의 원본이 있는가를 번역의 `visible`에 한꺼번에 반영한다(행은 지우지 않는다). 상태가 바뀌는 행만 갱신한다.
      * - 변경분이 아니라 반영 후 노출 중인 것 전부를 돌려준다.
      */
-    fun sweepVisibility(sweep: TranslationVisibilitySweep): VisibilityRefreshResult
+    fun refreshTranslationVisibility(): VisibilityRefreshResult
 
-    /** [sweep]의 대상 카탈로그를 좌표가 들어가는 시군구에 붙이고 붙인 수를 돌려준다. */
-    fun sweepDistricts(sweep: DistrictAssignmentSweep): Int
+    /** 시군구에 귀속되지 않은 카탈로그를 좌표가 들어가는 시군구에 붙이고 붙인 수를 돌려준다. */
+    fun assignUnassignedDistricts(): Int
 
     /** 귀속되지 않은 채 남은 카탈로그 수. */
     fun countDistrictUnassigned(): Int

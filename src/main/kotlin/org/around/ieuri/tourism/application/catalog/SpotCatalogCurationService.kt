@@ -13,9 +13,7 @@ import org.around.ieuri.tourism.domain.catalog.CatalogCandidates
 import org.around.ieuri.tourism.domain.catalog.CatalogMembership
 import org.around.ieuri.tourism.domain.catalog.CatalogOrigin
 import org.around.ieuri.tourism.domain.catalog.CatalogSplit
-import org.around.ieuri.tourism.domain.catalog.DistrictAssignmentSweep
 import org.around.ieuri.tourism.domain.catalog.SpotCatalog
-import org.around.ieuri.tourism.domain.catalog.TranslationVisibilitySweep
 import org.around.ieuri.tourism.domain.catalog.event.CatalogLanguageRef
 import org.around.ieuri.tourism.domain.catalog.event.SpotCatalogLanguagesChanged
 import org.around.ieuri.tourism.domain.shared.DomainLocale
@@ -92,7 +90,7 @@ class SpotCatalogCurationService(
 
     /** 변경이 없어도 발행한다 — 델타가 아니라 정본이라, 빈 사본도 이 회차에 채워진다(SPEC-0029 R-15·R-23). */
     override fun refreshCatalogVisibility() {
-        val changes = catalogRepository.sweepVisibility(TranslationVisibilitySweep())
+        val changes = catalogRepository.refreshTranslationVisibility()
 
         log.info("catalog visibility refreshed: hidden={} shown={} visible={}", changes.hiddenCount, changes.shownCount, changes.visible.size)
         // 이벤트는 도메인 간 계약이라 언어를 문자열로 싣는다 — 구독자가 `DomainLocale`을 알지 않게.
@@ -100,7 +98,7 @@ class SpotCatalogCurationService(
     }
 
     override fun assignDistricts(): DistrictAssignmentResult = DistrictAssignmentResult(
-        assigned = catalogRepository.sweepDistricts(DistrictAssignmentSweep()),
+        assigned = catalogRepository.assignUnassignedDistricts(),
         unassigned = catalogRepository.countDistrictUnassigned(),
     )
 

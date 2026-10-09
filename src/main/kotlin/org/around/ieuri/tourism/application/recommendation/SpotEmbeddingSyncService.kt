@@ -4,8 +4,8 @@ import org.around.ieuri.tourism.application.recommendation.provided.SpotEmbeddin
 import org.around.ieuri.tourism.application.recommendation.provided.SpotEmbeddingSyncUseCase
 import org.around.ieuri.tourism.application.recommendation.provided.dto.EmbeddingSyncResult
 import org.around.ieuri.tourism.application.recommendation.required.TextEmbeddingPort
+import org.around.ieuri.tourism.domain.recommendation.EmbeddingDimensionMismatchException
 import org.around.ieuri.tourism.domain.recommendation.SpotEmbedding
-import org.around.ieuri.tourism.domain.recommendation.spec.MatchesEmbeddingDimension
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
@@ -32,12 +32,17 @@ class SpotEmbeddingSyncService(
             ?: return EmbeddingSyncResult(inputs.size, 0, inputs.size, inputs.last().translationId)
 
         val embedding = policy.embedding
-        val matchesDimension = MatchesEmbeddingDimension(embedding.dimension)
-        val valid = inputs.zip(vectors).filter { (_, vector) -> matchesDimension.isSatisfiedBy(vector) }
+        val valid = inputs.zip(vectors).mapNotNull { (input, vector) ->
+            try {
+                SpotEmbedding.of(input.translationId, embedding.model, embedding.dimension, input.sourceHash, vector)
+            } catch (e: EmbeddingDimensionMismatchException) {
+                null
+            }
+        }
         if (valid.size < inputs.size) {
             log.warn("임베딩 차원 불일치로 {}건을 건너뜀(기대 {})", inputs.size - valid.size, embedding.dimension)
         }
-        storeUseCase.save(valid.map { (input, vector) -> SpotEmbedding(input.translationId, embedding.model, input.sourceHash, vector) })
+        storeUseCase.save(valid)
         return EmbeddingSyncResult(
             processed = inputs.size,
             embedded = valid.size,

@@ -1,6 +1,5 @@
 package org.around.ieuri.tourism.domain.catalog
 
-import org.around.ieuri.tourism.domain.catalog.spec.TranslationVisible
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.shared.FestivalPeriod
 
@@ -27,8 +26,7 @@ data class SpotCatalog(
      */
     fun attach(origin: CatalogOrigin): CatalogTranslation? {
         val existing = translationIn(origin.language) ?: return origin.toTranslation()
-        val visibleNow = TranslationVisible.isSatisfiedBy(TranslationPresence(existing.language, setOf(origin.language)))
-        return if (existing.visible || !visibleNow) null else existing.copy(visible = true)
+        return if (existing.visible) null else existing.copy(visible = true)
     }
 
     /** 미배정 원본 하나를 이 카탈로그에 붙인다. 저장된 카탈로그에만 붙는다. */

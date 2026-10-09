@@ -17,10 +17,8 @@ import org.around.ieuri.tourism.domain.catalog.CatalogOrigin
 import org.around.ieuri.tourism.domain.catalog.CatalogSplit
 import org.around.ieuri.tourism.domain.catalog.CatalogStandardValues
 import org.around.ieuri.tourism.domain.catalog.CatalogTranslation
-import org.around.ieuri.tourism.domain.catalog.DistrictAssignmentSweep
 import org.around.ieuri.tourism.domain.catalog.OriginFestivalPeriod
 import org.around.ieuri.tourism.domain.catalog.SpotCatalog
-import org.around.ieuri.tourism.domain.catalog.TranslationVisibilitySweep
 import org.around.ieuri.tourism.domain.catalog.event.CatalogLanguageRef
 import org.around.ieuri.tourism.domain.catalog.event.SpotCatalogLanguagesChanged
 import org.around.ieuri.tourism.domain.category.SpotCategory
@@ -183,7 +181,7 @@ class SpotCatalogCurationServiceTest {
     @Test
     @DisplayName("노출 갱신 뒤 노출 중인 전부를 언어 코드 문자열로 알린다")
     fun `visibility refresh publishes the full visible set`() {
-        every { repository.sweepVisibility(TranslationVisibilitySweep()) } returns VisibilityRefreshResult(
+        every { repository.refreshTranslationVisibility() } returns VisibilityRefreshResult(
             hiddenCount = 0,
             shownCount = 0,
             visible = listOf(CatalogLanguage(900, DomainLocale.KO), CatalogLanguage(901, DomainLocale.EN)),
@@ -199,7 +197,7 @@ class SpotCatalogCurationServiceTest {
     @Test
     @DisplayName("시군구 귀속은 붙인 수와 남은 수를 함께 돌려준다")
     fun `district assignment reports assigned and remaining`() {
-        every { repository.sweepDistricts(DistrictAssignmentSweep()) } returns 3
+        every { repository.assignUnassignedDistricts() } returns 3
         every { repository.countDistrictUnassigned() } returns 40
 
         val result = service.assignDistricts()

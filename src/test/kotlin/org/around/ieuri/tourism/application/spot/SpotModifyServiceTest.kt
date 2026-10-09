@@ -85,7 +85,25 @@ class SpotModifyServiceTest {
         every { repository.findById(9L) } returns null
 
         assertFailsWith<SpotOriginNotFoundException> { service.saveDetail(9L, detail) }
+        assertFailsWith<SpotOriginNotFoundException> { service.saveDetailAbsence(9L, detail) }
+        assertFailsWith<SpotOriginNotFoundException> { service.saveIntro(9L, SpotCategory("TOURIST_SPOT"), null) }
+        assertFailsWith<SpotOriginNotFoundException> { service.saveGallery(9L, listOf(SpotImage("https://img/1.jpg", null, null, CopyrightType.TYPE3))) }
+        assertFailsWith<SpotOriginNotFoundException> { service.saveInfoItems(9L, SpotCategory("TOURIST_SPOT"), listOf(SpotInfoItem("입장료", "무료"))) }
 
         verify(exactly = 0) { repository.saveBody(any()) }
+        verify(exactly = 0) { repository.saveIntro(any()) }
+        verify(exactly = 0) { repository.saveGallery(any()) }
+        verify(exactly = 0) { repository.saveInfoItems(any()) }
+    }
+
+    @Test
+    fun `원본이 없어도 빈 갤러리·빈 이용안내는 조용히 끝난다`() {
+        every { repository.findById(9L) } returns null
+
+        service.saveGallery(9L, emptyList())
+        service.saveInfoItems(9L, SpotCategory("TOURIST_SPOT"), emptyList())
+
+        verify(exactly = 0) { repository.saveGallery(any()) }
+        verify(exactly = 0) { repository.saveInfoItems(any()) }
     }
 }
