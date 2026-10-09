@@ -4,9 +4,10 @@ import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.category.provided.CategoryQueryUseCase
 import org.around.ieuri.tourism.application.recommendation.provided.SpotEmbeddingStoreUseCase
 import org.around.ieuri.tourism.application.recommendation.provided.dto.EmbeddingInput
-import org.around.ieuri.tourism.application.recommendation.required.SpotEmbeddingStorePort
-import org.around.ieuri.tourism.application.recommendation.required.dto.SpotEmbedding
+import org.around.ieuri.tourism.application.recommendation.required.EmbeddingTargetQueryPort
+import org.around.ieuri.tourism.application.recommendation.required.SpotEmbeddingRepository
 import org.around.ieuri.tourism.domain.recommendation.EmbeddingText
+import org.around.ieuri.tourism.domain.recommendation.SpotEmbedding
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -14,14 +15,15 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 @Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
 class SpotEmbeddingStoreService(
-    private val storePort: SpotEmbeddingStorePort,
+    private val targetQueryPort: EmbeddingTargetQueryPort,
+    private val embeddingRepository: SpotEmbeddingRepository,
     private val categoryQuery: CategoryQueryUseCase,
     private val policy: RecommendationPolicy,
 ) : SpotEmbeddingStoreUseCase {
 
     override fun findInputs(afterTranslationId: Long, limit: Int): List<EmbeddingInput> {
         val embedding = policy.embedding
-        val targets = storePort.findTargets(afterTranslationId, limit, embedding.model)
+        val targets = targetQueryPort.findTargets(afterTranslationId, limit, embedding.model)
         val labels = targets.groupBy { it.language }.mapValues { (language, rows) ->
             categoryQuery.categoryDisplays(rows.map { it.categoryCode }.toSet(), language)
         }
@@ -32,5 +34,5 @@ class SpotEmbeddingStoreService(
         }
     }
 
-    override fun save(embeddings: List<SpotEmbedding>) = storePort.saveAll(embeddings, policy.embedding.model)
+    override fun save(embeddings: List<SpotEmbedding>) = embeddingRepository.saveAll(embeddings)
 }

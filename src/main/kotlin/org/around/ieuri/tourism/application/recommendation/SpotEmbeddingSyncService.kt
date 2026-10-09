@@ -4,7 +4,8 @@ import org.around.ieuri.tourism.application.recommendation.provided.SpotEmbeddin
 import org.around.ieuri.tourism.application.recommendation.provided.SpotEmbeddingSyncUseCase
 import org.around.ieuri.tourism.application.recommendation.provided.dto.EmbeddingSyncResult
 import org.around.ieuri.tourism.application.recommendation.required.TextEmbeddingPort
-import org.around.ieuri.tourism.application.recommendation.required.dto.SpotEmbedding
+import org.around.ieuri.tourism.domain.recommendation.SpotEmbedding
+import org.around.ieuri.tourism.domain.recommendation.spec.MatchesEmbeddingDimension
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
@@ -30,12 +31,13 @@ class SpotEmbeddingSyncService(
         val vectors = embedWithRetry(inputs.map { it.text })
             ?: return EmbeddingSyncResult(inputs.size, 0, inputs.size, inputs.last().translationId)
 
-        val dimension = policy.embedding.dimension
-        val valid = inputs.zip(vectors).filter { (_, vector) -> vector.size == dimension }
+        val embedding = policy.embedding
+        val matchesDimension = MatchesEmbeddingDimension(embedding.dimension)
+        val valid = inputs.zip(vectors).filter { (_, vector) -> matchesDimension.isSatisfiedBy(vector) }
         if (valid.size < inputs.size) {
-            log.warn("임베딩 차원 불일치로 {}건을 건너뜀(기대 {})", inputs.size - valid.size, dimension)
+            log.warn("임베딩 차원 불일치로 {}건을 건너뜀(기대 {})", inputs.size - valid.size, embedding.dimension)
         }
-        storeUseCase.save(valid.map { (input, vector) -> SpotEmbedding(input.translationId, input.sourceHash, vector) })
+        storeUseCase.save(valid.map { (input, vector) -> SpotEmbedding(input.translationId, embedding.model, input.sourceHash, vector) })
         return EmbeddingSyncResult(
             processed = inputs.size,
             embedded = valid.size,
