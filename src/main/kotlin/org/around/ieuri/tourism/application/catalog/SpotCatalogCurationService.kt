@@ -10,9 +10,12 @@ import org.around.ieuri.tourism.application.catalog.required.SpotCatalogQueryPor
 import org.around.ieuri.tourism.application.catalog.required.SpotCatalogRepository
 import org.around.ieuri.tourism.domain.catalog.CatalogAssignment
 import org.around.ieuri.tourism.domain.catalog.CatalogCandidates
+import org.around.ieuri.tourism.domain.catalog.CatalogMembership
 import org.around.ieuri.tourism.domain.catalog.CatalogOrigin
 import org.around.ieuri.tourism.domain.catalog.CatalogSplit
+import org.around.ieuri.tourism.domain.catalog.DistrictAssignmentSweep
 import org.around.ieuri.tourism.domain.catalog.SpotCatalog
+import org.around.ieuri.tourism.domain.catalog.TranslationVisibilitySweep
 import org.around.ieuri.tourism.domain.catalog.event.CatalogLanguageRef
 import org.around.ieuri.tourism.domain.catalog.event.SpotCatalogLanguagesChanged
 import org.around.ieuri.tourism.domain.shared.DomainLocale
@@ -55,7 +58,7 @@ class SpotCatalogCurationService(
                 }
 
                 is CatalogAssignment.Found -> {
-                    candidates = candidates.withFounded(origin, found(assignment.catalog) { catalogId -> catalogRepository.assign(origin.spotId, catalogId) })
+                    candidates = candidates.withFounded(origin, found(assignment.catalog) { saved -> saved.admit(origin) })
                     created++
                 }
 
@@ -76,7 +79,7 @@ class SpotCatalogCurationService(
 
             val result = catalog.split(catalogQueryPort.findOrigins(catalogId)) ?: return@forEach
 
-            result.departures.forEach { departure -> found(departure.catalog) { catalogId -> catalogRepository.reassign(departure.spotIds, catalogId) } }
+            result.departures.forEach { departure -> found(departure.catalog) { saved -> saved.admitAll(departure.spotIds) } }
             catalogRepository.deleteTranslations(catalogId, result.removedLanguages)
             split++
             created += result.departures.size
@@ -89,7 +92,7 @@ class SpotCatalogCurationService(
 
     /** 변경이 없어도 발행한다 — 델타가 아니라 정본이라, 빈 사본도 이 회차에 채워진다(SPEC-0029 R-15·R-23). */
     override fun refreshCatalogVisibility() {
-        val changes = catalogRepository.refreshTranslationVisibility()
+        val changes = catalogRepository.sweepVisibility(TranslationVisibilitySweep())
 
         log.info("catalog visibility refreshed: hidden={} shown={} visible={}", changes.hiddenCount, changes.shownCount, changes.visible.size)
         // 이벤트는 도메인 간 계약이라 언어를 문자열로 싣는다 — 구독자가 `DomainLocale`을 알지 않게.
@@ -97,7 +100,7 @@ class SpotCatalogCurationService(
     }
 
     override fun assignDistricts(): DistrictAssignmentResult = DistrictAssignmentResult(
-        assigned = catalogRepository.assignUnassignedDistricts(),
+        assigned = catalogRepository.sweepDistricts(DistrictAssignmentSweep()),
         unassigned = catalogRepository.countDistrictUnassigned(),
     )
 
@@ -107,17 +110,18 @@ class SpotCatalogCurationService(
 
         catalog.attach(origin)?.let { catalogRepository.saveTranslation(catalog, it) }
 
-        catalogRepository.assign(origin.spotId, catalogId)
+        catalogRepository.saveMembership(catalog.admit(origin))
     }
 
     /**
-     * 새 카탈로그를 저장하고 원본을 붙인 뒤 축제 기간을 정한다 — 원본이 붙은 뒤라야 기간을 고를 수 있다.
-     * - 배정은 미배정 원본만 붙이고(`assign`), 분할은 기존 배정을 옮긴다(`reassign`).
+     * 새 카탈로그를 저장하고, 저장된 루트가 원본 소속을 만든 뒤 축제 기간을 정한다 — 원본이 붙은 뒤라야 기간을 고를 수 있다.
+     * - 배정은 미배정 원본만 붙이고([SpotCatalog.admit]), 분할은 기존 소속을 옮긴다([SpotCatalog.admitAll]).
      */
-    private fun found(catalog: SpotCatalog, attachOrigins: (Long) -> Unit): Long {
+    private fun found(catalog: SpotCatalog, membershipOf: (SpotCatalog) -> CatalogMembership): Long {
         val catalogId = catalogRepository.insert(catalog)
-        attachOrigins(catalogId)
-        catalogRepository.saveFestivalPeriod(catalogId, SpotCatalog.festivalPeriodOf(catalogRepository.findOriginFestivalPeriods(catalogId)))
+        val saved = requireNotNull(catalogRepository.findById(catalogId)) { "방금 넣은 카탈로그가 없다: $catalogId" }
+        catalogRepository.saveMembership(membershipOf(saved))
+        catalogRepository.saveFestival(saved.festivalFrom(catalogRepository.findOriginFestivalPeriods(catalogId)))
         return catalogId
     }
 
