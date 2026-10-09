@@ -1,12 +1,20 @@
-package org.around.ieuri.tourism.domain.recommendation.policy
+package org.around.ieuri.tourism.domain.recommendation
 
 import org.around.ieuri.tourism.domain.category.SpotCategory
-import org.around.ieuri.tourism.domain.recommendation.RankedSpot
+import org.around.ieuri.tourism.domain.spot.spec.TaxRefundTitleRule
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /** SPEC-0035 — 카테고리 반복 감점. 행을 숨기지 않고 순서만 바꾼다. */
-class CategoryDiversityTest {
+class SpotRankingOrderTest {
+
+    private fun ranking(penalty: Double) = SpotRanking(
+        distanceHalfLifeMeters = 5_000.0,
+        taxRefundMultiplier = 1.0,
+        taxRefundTitleRule = TaxRefundTitleRule(emptyList()),
+        tasteWeight = 0.0,
+        categoryRepeatPenalty = penalty,
+    )
 
     private val shopping = SpotCategory("SHOPPING")
     private val restaurant = SpotCategory("RESTAURANT")
@@ -22,25 +30,25 @@ class CategoryDiversityTest {
             RankedSpot(4, restaurant, 0.85),
             RankedSpot(5, park, 0.84),
         )
-        assertEquals(listOf(1L, 4L, 5L, 2L, 3L), CategoryDiversity(penalty = 0.1).order(items))
+        assertEquals(listOf(1L, 4L, 5L, 2L, 3L), ranking(0.1).order(items))
     }
 
     @Test
     fun `감점이 0이면 순수 점수순이다`() {
         val items = listOf(RankedSpot(1, shopping, 0.5), RankedSpot(2, shopping, 0.9), RankedSpot(3, park, 0.7))
-        assertEquals(listOf(2L, 3L, 1L), CategoryDiversity(penalty = 0.0).order(items))
+        assertEquals(listOf(2L, 3L, 1L), ranking(0.0).order(items))
     }
 
     @Test
     fun `점수 차가 감점보다 크면 같은 카테고리도 연달아 나온다`() {
         val items = listOf(RankedSpot(1, shopping, 0.9), RankedSpot(2, shopping, 0.85), RankedSpot(3, park, 0.3))
-        assertEquals(listOf(1L, 2L, 3L), CategoryDiversity(penalty = 0.1).order(items))
+        assertEquals(listOf(1L, 2L, 3L), ranking(0.1).order(items))
     }
 
     @Test
     fun `입력 전부가 출력에 있고 동점은 id 오름차순이다`() {
         val items = (1L..6L).map { RankedSpot(it, if (it % 2 == 0L) shopping else park, 0.5) }
-        val ordered = CategoryDiversity(penalty = 0.1).order(items)
+        val ordered = ranking(0.1).order(items)
         assertEquals(items.map { it.id }.toSet(), ordered.toSet())
         assertEquals(listOf(1L, 2L, 3L, 4L, 5L, 6L), ordered)
     }
@@ -48,6 +56,6 @@ class CategoryDiversityTest {
     @Test
     fun `입력 순서와 무관하게 같은 결과다`() {
         val items = listOf(RankedSpot(1, shopping, 0.9), RankedSpot(2, shopping, 0.89), RankedSpot(3, park, 0.85))
-        assertEquals(CategoryDiversity(0.1).order(items), CategoryDiversity(0.1).order(items.reversed()))
+        assertEquals(ranking(0.1).order(items), ranking(0.1).order(items.reversed()))
     }
 }

@@ -12,8 +12,7 @@ import org.around.ieuri.tourism.application.recommendation.required.TextEmbeddin
 import org.around.ieuri.tourism.application.recommendation.required.dto.EmbeddingTarget
 import org.around.ieuri.tourism.application.recommendation.required.dto.SpotEmbedding
 import org.around.ieuri.tourism.domain.category.SpotCategory
-import org.around.ieuri.tourism.domain.recommendation.policy.CategoryDiversity
-import org.around.ieuri.tourism.domain.recommendation.policy.RecommendationScore
+import org.around.ieuri.tourism.domain.recommendation.SpotRanking
 import org.around.ieuri.tourism.domain.recommendation.spec.TasteThreshold
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.spot.spec.TaxRefundTitleRule
@@ -27,8 +26,7 @@ class SpotEmbeddingSyncServiceTest {
     private val embeddingPort = mockk<TextEmbeddingPort>()
     private val categoryPort = mockk<AppCategoryQueryPort>()
     private val policy = RecommendationPolicy(
-        score = RecommendationScore(5_000.0, 0.8, TaxRefundTitleRule(emptyList()), tasteWeight = 0.5),
-        diversity = CategoryDiversity(0.1),
+        ranking = SpotRanking(5_000.0, 0.8, TaxRefundTitleRule(emptyList()), tasteWeight = 0.5, categoryRepeatPenalty = 0.1),
         candidateCap = 300,
         tasteThreshold = TasteThreshold(5),
         embedding = EmbeddingSpec(model = "voyage-4", dimension = 3, retryCount = 2, overviewMaxChars = 500),

@@ -1,6 +1,4 @@
-package org.around.ieuri.tourism.domain.region.policy
-
-import org.around.ieuri.tourism.domain.region.RegionScoreFactor
+package org.around.ieuri.tourism.domain.region
 
 /**
  * 항목별 가중치(SPEC-0015 R12).

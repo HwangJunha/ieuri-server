@@ -1,7 +1,4 @@
-package org.around.ieuri.tourism.domain.region.policy
-
-import org.around.ieuri.tourism.domain.region.RegionScore
-import org.around.ieuri.tourism.domain.region.RegionScoreFactor
+package org.around.ieuri.tourism.domain.region
 
 /** 한 항목의 정규화 기준 구간(SPEC-0015 R11). 모집단 선택은 호출자가 한다. */
 data class ScoreNormalization(

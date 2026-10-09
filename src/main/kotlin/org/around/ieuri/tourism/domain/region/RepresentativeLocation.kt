@@ -1,4 +1,4 @@
-package org.around.ieuri.tourism.domain.region.policy
+package org.around.ieuri.tourism.domain.region
 
 /**
  * 시군구 대표 위치 선정(SPEC-0015). 원본이 가장 밀집한 격자를 찾아, 그 격자의 무게중심에 가장 가까운 **실제 원본**을 고른다.

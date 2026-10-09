@@ -5,12 +5,13 @@ import org.around.ieuri.tourism.application.region.provided.dto.RecommendedRegio
 import org.around.ieuri.tourism.application.region.provided.dto.RecommendedRegionQuery
 import org.around.ieuri.tourism.application.region.required.RegionEventPublisherPort
 import org.around.ieuri.tourism.application.region.required.dto.DistrictRegion
-import org.around.ieuri.tourism.application.region.required.dto.RegionMetric
 import org.around.ieuri.tourism.application.region.required.dto.RegionRow
+import org.around.ieuri.tourism.domain.region.DistanceScoring
+import org.around.ieuri.tourism.domain.region.FreshnessDecay
+import org.around.ieuri.tourism.domain.region.RegionMetric
 import org.around.ieuri.tourism.domain.region.RegionScoreFactor
-import org.around.ieuri.tourism.domain.region.policy.DistanceScoring
-import org.around.ieuri.tourism.domain.region.policy.FreshnessDecay
-import org.around.ieuri.tourism.domain.region.policy.RegionScoreWeights
+import org.around.ieuri.tourism.domain.region.RegionScoreWeights
+import org.around.ieuri.tourism.domain.region.RegionScoring
 import org.around.ieuri.tourism.domain.region.spec.ProvinceEligibility
 import org.around.ieuri.tourism.domain.shared.AreaName
 import org.around.ieuri.tourism.domain.shared.Coordinates
@@ -24,10 +25,7 @@ import kotlin.test.assertTrue
 class RegionScoreFreshnessTest {
 
     private val policy = RegionRecommendationPolicy(
-        weights = RegionScoreWeights.uniform(),
-        distanceScoring = DistanceScoring(30_000.0),
-        freshnessDecay = FreshnessDecay(plateauDays = 7, halfLifeDays = 23.0),
-        minFactorCount = 2,
+        scoring = RegionScoring(RegionScoreWeights.uniform(), DistanceScoring(30_000.0), FreshnessDecay(plateauDays = 7, halfLifeDays = 23.0), 2),
         // 시도 규모 필터를 무력화한다(선별은 RegionCandidateSelectionTest가 본다).
         provinceEligibility = ProvinceEligibility(1),
         defaultLimit = 10,

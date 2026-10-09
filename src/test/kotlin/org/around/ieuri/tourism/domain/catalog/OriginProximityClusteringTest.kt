@@ -1,4 +1,4 @@
-package org.around.ieuri.tourism.domain.catalog.policy
+package org.around.ieuri.tourism.domain.catalog
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue

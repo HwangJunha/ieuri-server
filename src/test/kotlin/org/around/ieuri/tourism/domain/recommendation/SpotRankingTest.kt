@@ -1,19 +1,18 @@
-package org.around.ieuri.tourism.domain.recommendation.policy
+package org.around.ieuri.tourism.domain.recommendation
 
-import org.around.ieuri.tourism.domain.recommendation.TasteSimilarity
 import org.around.ieuri.tourism.domain.spot.spec.TaxRefundTitleRule
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /** SPEC-0035 — 거리 감쇠·취향 섞기·면세 배율. */
-class RecommendationScoreTest {
+class SpotRankingTest {
 
     private fun score(
         multiplier: Double = 0.8,
         patterns: List<String> = listOf("[Tax Refund Shop]"),
         tasteWeight: Double = 0.5,
-    ) = RecommendationScore(
+    ) = SpotRanking(
         distanceHalfLifeMeters = 5_000.0,
         taxRefundMultiplier = multiplier,
         taxRefundTitleRule = TaxRefundTitleRule(patterns),

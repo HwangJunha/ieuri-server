@@ -1,4 +1,4 @@
-package org.around.ieuri.tourism.domain.recommendation.policy
+package org.around.ieuri.tourism.domain.recommendation
 
 /**
  * 취향 요인을 후보 집단 안에서 0~1로 펼친다(SPEC-0036 후속, min-max).

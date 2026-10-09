@@ -1,18 +1,15 @@
-package org.around.ieuri.tourism.domain.recommendation.policy
+package org.around.ieuri.tourism.domain.recommendation
 
-import org.around.ieuri.tourism.domain.recommendation.ScoreReaction
-import org.around.ieuri.tourism.domain.recommendation.TasteSimilarity
 import org.around.ieuri.tourism.domain.spot.spec.TaxRefundTitleRule
 
 /**
- * 추천 점수(SPEC-0035). 가까울수록 높고, 취향이 있으면 섞이고, 면세 태그 장소는 배율만큼 깎인다.
- *
- * - `거리 요인 = 1 / (1 + 거리 ÷ 반감거리)` — 거리 0이면 1, 반감 거리에서 0.5.
- * - `취향 요인 = ((cos좋아요 − cos싫어요) + 1) ÷ 2` — 싫어요 평균이 없으면 cos싫어요 = 0.
- * - 취향이 있으면 `(1 − w)·거리 + w·취향`, 없으면 거리만(POL-043 — 없는 요인은 분모에서도 뺀다).
+ * 장소 추천 순위 모델(SPEC-0035·0036). 설정값을 품고 후보의 점수와 최종 순서를 낸다.
+ * - `거리 요인 = 1 / (1 + 거리 ÷ 반감거리)`, `취향 요인 = ((cos좋아요 − cos싫어요) + 1) ÷ 2`(싫어요가 없으면 0).
+ * - 취향이 있으면 `(1 − w)·거리 + w·취향`, 없으면 거리만(POL-043). 면세 태그 장소는 배율만큼 깎는다.
  * - 이미 반응한 장소는 배율로 올리고 내린다 — **숨기지 않는다**(SPEC-0036 D-13).
+ * - [order]: 같은 카테고리의 n번째 장소에서 `감점 × (n − 1)`을 뺀 순서. 행을 숨기지 않고, 동점은 id 오름차순.
  */
-class RecommendationScore(
+class SpotRanking(
     /** 거리 요인이 0.5가 되는 거리(m). */
     private val distanceHalfLifeMeters: Double,
     private val taxRefundMultiplier: Double,
@@ -23,6 +20,8 @@ class RecommendationScore(
     private val likedMultiplier: Double = 1.0,
     /** 싫어요한 장소의 점수 배율. 1보다 작으면 뒤로 민다. 0이어도 결과에서 빠지지는 않는다. */
     private val dislikedMultiplier: Double = 1.0,
+    /** 같은 카테고리 반복 감점. */
+    private val categoryRepeatPenalty: Double = 0.0,
 ) {
     init {
         require(distanceHalfLifeMeters > 0) { "거리 반감 거리는 양수여야 합니다." }
@@ -30,6 +29,7 @@ class RecommendationScore(
         require(tasteWeight in 0.0..1.0) { "취향 비중은 0~1이어야 합니다." }
         require(likedMultiplier >= 0) { "좋아요 배율은 음수일 수 없습니다." }
         require(dislikedMultiplier >= 0) { "싫어요 배율은 음수일 수 없습니다." }
+        require(categoryRepeatPenalty >= 0) { "반복 감점은 음수일 수 없습니다." }
     }
 
     fun distanceFactor(distanceMeters: Double): Double = 1.0 / (1.0 + distanceMeters / distanceHalfLifeMeters)
@@ -51,6 +51,19 @@ class RecommendationScore(
         val base = if (taste == null) distance else (1.0 - tasteWeight) * distance + tasteWeight * taste
         val taxed = if (taxRefundTitleRule.isSatisfiedBy(title)) base * taxRefundMultiplier else base
         return taxed * reactionMultiplier(reaction)
+    }
+
+    /** 점수가 매겨진 후보의 최종 순서(id). 입력 전부가 출력에 있다. */
+    fun order(items: List<RankedSpot>): List<Long> {
+        val rankInCategory = HashMap<Long, Int>()
+        items.groupBy { it.category }.values.forEach { group ->
+            group.sortedWith(compareByDescending<RankedSpot> { it.score }.thenBy { it.id })
+                .forEachIndexed { index, item -> rankInCategory[item.id] = index }
+        }
+        return items
+            .map { it to (it.score - categoryRepeatPenalty * rankInCategory.getValue(it.id)) }
+            .sortedWith(compareByDescending<Pair<RankedSpot, Double>> { it.second }.thenBy { it.first.id })
+            .map { it.first.id }
     }
 
     private fun reactionMultiplier(reaction: ScoreReaction): Double = when (reaction) {

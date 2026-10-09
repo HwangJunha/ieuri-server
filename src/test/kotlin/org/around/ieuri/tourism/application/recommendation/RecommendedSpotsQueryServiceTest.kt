@@ -18,9 +18,8 @@ import org.around.ieuri.tourism.application.recommendation.required.TasteSimilar
 import org.around.ieuri.tourism.domain.catalog.CategorySelection
 import org.around.ieuri.tourism.domain.catalog.ReactionType
 import org.around.ieuri.tourism.domain.category.SpotCategory
+import org.around.ieuri.tourism.domain.recommendation.SpotRanking
 import org.around.ieuri.tourism.domain.recommendation.TasteSimilarity
-import org.around.ieuri.tourism.domain.recommendation.policy.CategoryDiversity
-import org.around.ieuri.tourism.domain.recommendation.policy.RecommendationScore
 import org.around.ieuri.tourism.domain.recommendation.spec.TasteThreshold
 import org.around.ieuri.tourism.domain.shared.CopyrightType
 import org.around.ieuri.tourism.domain.shared.DomainLocale
@@ -47,8 +46,7 @@ class RecommendedSpotsQueryServiceTest {
         minPopularLikeCount = 5,
     )
     private val policy = RecommendationPolicy(
-        score = RecommendationScore(5_000.0, 0.8, TaxRefundTitleRule(listOf("[Tax Refund Shop]")), tasteWeight = 0.5),
-        diversity = CategoryDiversity(penalty = 0.1),
+        ranking = SpotRanking(5_000.0, 0.8, TaxRefundTitleRule(listOf("[Tax Refund Shop]")), tasteWeight = 0.5, categoryRepeatPenalty = 0.1),
         candidateCap = 300,
         tasteThreshold = TasteThreshold(3),
         embedding = EmbeddingSpec(model = "voyage-4", dimension = 4, retryCount = 1, overviewMaxChars = 500),

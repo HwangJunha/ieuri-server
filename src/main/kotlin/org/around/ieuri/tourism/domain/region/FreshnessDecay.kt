@@ -1,6 +1,5 @@
-package org.around.ieuri.tourism.domain.region.policy
+package org.around.ieuri.tourism.domain.region
 
-import org.around.ieuri.tourism.domain.region.RegionScore
 import kotlin.math.pow
 
 /**

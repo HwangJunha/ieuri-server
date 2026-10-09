@@ -1,4 +1,4 @@
-package org.around.ieuri.tourism.application.region.required.dto
+package org.around.ieuri.tourism.domain.region
 
 /**
  * 한 항목의 정규화 이전 원본 값.

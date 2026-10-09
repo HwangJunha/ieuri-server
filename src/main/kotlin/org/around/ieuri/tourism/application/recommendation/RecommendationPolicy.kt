@@ -1,7 +1,6 @@
 package org.around.ieuri.tourism.application.recommendation
 
-import org.around.ieuri.tourism.domain.recommendation.policy.CategoryDiversity
-import org.around.ieuri.tourism.domain.recommendation.policy.RecommendationScore
+import org.around.ieuri.tourism.domain.recommendation.SpotRanking
 import org.around.ieuri.tourism.domain.recommendation.spec.TasteThreshold
 
 /**
@@ -11,8 +10,7 @@ import org.around.ieuri.tourism.domain.recommendation.spec.TasteThreshold
  * @param tasteThreshold 취향 요인이 성립하는 최소 반응 수. 미만이면 요인 없음.
  */
 data class RecommendationPolicy(
-    val score: RecommendationScore,
-    val diversity: CategoryDiversity,
+    val ranking: SpotRanking,
     val candidateCap: Int,
     val tasteThreshold: TasteThreshold,
     val embedding: EmbeddingSpec,

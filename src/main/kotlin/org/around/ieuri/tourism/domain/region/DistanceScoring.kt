@@ -1,8 +1,5 @@
-package org.around.ieuri.tourism.domain.region.policy
+package org.around.ieuri.tourism.domain.region
 
-import org.around.ieuri.tourism.domain.region.Distance
-import org.around.ieuri.tourism.domain.region.RegionScore
-import org.around.ieuri.tourism.domain.region.RegionScoreFactor
 import org.around.ieuri.tourism.domain.shared.Coordinates
 
 /** 거리 점수 산출(SPEC-0015). 필터가 아니라 점수라, 멀어도 0에 수렴할 뿐 후보에서 빠지지 않는다. */

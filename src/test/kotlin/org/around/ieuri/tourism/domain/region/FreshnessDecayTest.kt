@@ -1,7 +1,5 @@
-package org.around.ieuri.tourism.domain.region.policy
+package org.around.ieuri.tourism.domain.region
 
-import org.around.ieuri.tourism.domain.region.RegionScore
-import org.around.ieuri.tourism.domain.region.RegionScoreFactor
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

@@ -68,7 +68,7 @@ class MapRecommendationService(
         )
         val taste = tasteOf(liked, disliked, candidates, locale)
         val scored = candidates.map {
-            it to recommendationPolicy.score.score(
+            it to recommendationPolicy.ranking.score(
                 it.distanceMeters,
                 it.title,
                 taste[it.id],
@@ -80,7 +80,7 @@ class MapRecommendationService(
         val ranked = representatives.map { (candidate, score) ->
             RankedSpot(candidate.id, candidate.category, score)
         }
-        return recommendationPolicy.diversity.order(ranked).take(first).map { byId.getValue(it).toView() }
+        return recommendationPolicy.ranking.order(ranked).take(first).map { byId.getValue(it).toView() }
     }
 
     /**
@@ -106,7 +106,7 @@ class MapRecommendationService(
             log.warn("취향 유사도 조회 실패, 취향 없이 진행: {}", e.javaClass.simpleName)
             return emptyMap()
         }
-        return recommendationPolicy.score.tasteFactors(similarities)
+        return recommendationPolicy.ranking.tasteFactors(similarities)
     }
 
     /** 좌표가 정확히 같은 후보를 점수 최고 1건으로 접는다(D-14). 동점이면 id 오름차순이다. */

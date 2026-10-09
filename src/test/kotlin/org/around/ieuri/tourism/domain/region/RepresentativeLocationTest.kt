@@ -1,6 +1,6 @@
-package org.around.ieuri.tourism.domain.region.policy
+package org.around.ieuri.tourism.domain.region
 
-import org.around.ieuri.tourism.domain.region.policy.RepresentativeLocation.Point
+import org.around.ieuri.tourism.domain.region.RepresentativeLocation.Point
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.DisplayName

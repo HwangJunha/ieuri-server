@@ -1,4 +1,4 @@
-package org.around.ieuri.tourism.domain.catalog.policy
+package org.around.ieuri.tourism.domain.catalog
 
 import kotlin.math.abs
 import kotlin.math.atan2

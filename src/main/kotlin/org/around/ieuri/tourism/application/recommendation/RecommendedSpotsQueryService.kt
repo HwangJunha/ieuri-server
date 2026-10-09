@@ -64,9 +64,9 @@ class RecommendedSpotsQueryService(
         val taste = tasteOf(liked, disliked, candidates, locale)
         val byId = candidates.associateBy { it.id }
         val ranked = candidates.map {
-            RankedSpot(it.id, it.category, policy.score.score(it.distanceMeters, it.title, taste[it.id]))
+            RankedSpot(it.id, it.category, policy.ranking.score(it.distanceMeters, it.title, taste[it.id]))
         }
-        return policy.diversity.order(ranked).take(first).map { byId.getValue(it) }
+        return policy.ranking.order(ranked).take(first).map { byId.getValue(it) }
     }
 
     /** 후보별 취향 요인. 반응이 최소량 미만이거나 좋아요 평균 벡터가 없으면 비어 있다. */
@@ -89,6 +89,6 @@ class RecommendedSpotsQueryService(
             log.warn("취향 유사도 조회 실패, 취향 없이 진행: {}", e.javaClass.simpleName)
             return emptyMap()
         }
-        return policy.score.tasteFactors(similarities)
+        return policy.ranking.tasteFactors(similarities)
     }
 }
