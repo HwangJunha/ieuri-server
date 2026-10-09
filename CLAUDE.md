@@ -309,6 +309,9 @@ refactor.
 
 - **Packages: context → layer → aggregate.** `domain/<aggregate>/` holds the root with its own
   entities, VOs, exceptions and events; `domain/shared/` holds VOs several aggregates use.
+  Rules sit apart from them in the aggregate's `spec/` (answers true/false about a candidate:
+  `ProvinceEligibility`, `SpotExclusionRule`) and `policy/` (a decision rule or values that could be
+  swapped: `RegionScoreWeights`, `CatalogIndex`) (SPEC-0039 D-120).
   `application/<aggregate>/provided/` (inbound ports, `dto/`, `exception/`) and `required/`
   (outbound ports, `dto/`). No `infrastructure/adapter/in|out`.
   - **`provided/` and `required/` hold port interfaces only.** Every data type a port takes or
