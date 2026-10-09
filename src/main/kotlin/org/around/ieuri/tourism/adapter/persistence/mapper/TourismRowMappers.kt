@@ -14,15 +14,15 @@ import org.around.ieuri.tourism.adapter.persistence.table.SpotDetailTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotFestivalTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotReactionTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotTable
-import org.around.ieuri.tourism.application.region.provided.dto.SyncConcentrationRateCommand
-import org.around.ieuri.tourism.application.region.provided.dto.SyncDemandIntensityCommand
-import org.around.ieuri.tourism.application.region.provided.dto.SyncVisitorCountCommand
 import org.around.ieuri.tourism.domain.catalog.CatalogStandardValues
 import org.around.ieuri.tourism.domain.catalog.CatalogTranslation
 import org.around.ieuri.tourism.domain.catalog.OriginFestivalPeriod
 import org.around.ieuri.tourism.domain.catalog.SpotReaction
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.footprint.ShareLink
+import org.around.ieuri.tourism.domain.region.ConcentrationRate
+import org.around.ieuri.tourism.domain.region.DemandIntensity
+import org.around.ieuri.tourism.domain.region.VisitorCount
 import org.around.ieuri.tourism.domain.shared.CopyrightType
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.shared.FestivalPeriod
@@ -191,28 +191,28 @@ fun ResultRow.toShareLink(): ShareLink = ShareLink(
     issuedAt = this[MapShareLinkTable.createdAt].toInstant(),
 )
 
-fun SyncVisitorCountCommand.writeTo(row: UpdateBuilder<*>) {
+fun VisitorCount.writeTo(row: UpdateBuilder<*>) {
     row[KtoVisitorCountTable.districtCode] = districtCode
     row[KtoVisitorCountTable.baseDate] = baseDate
     row[KtoVisitorCountTable.visitorType] = visitorType
     row[KtoVisitorCountTable.touristCount] = touristCount
 }
 
-fun SyncConcentrationRateCommand.writeTo(row: UpdateBuilder<*>) {
+fun ConcentrationRate.writeTo(row: UpdateBuilder<*>) {
     row[KtoConcentrationRateTable.districtCode] = districtCode
     row[KtoConcentrationRateTable.touristSpotName] = touristSpotName
     row[KtoConcentrationRateTable.targetDate] = targetDate
     row[KtoConcentrationRateTable.concentrationRate] = concentrationRate
 }
 
-fun SyncDemandIntensityCommand.writeStayIntensityTo(row: UpdateBuilder<*>) {
+fun DemandIntensity.writeStayIntensityTo(row: UpdateBuilder<*>) {
     row[KtoStayIntensityTable.districtCode] = districtCode
     row[KtoStayIntensityTable.baseMonth] = baseMonth
     row[KtoStayIntensityTable.indicatorCode] = indicatorCode
     row[KtoStayIntensityTable.indicatorValue] = indicatorValue
 }
 
-fun SyncDemandIntensityCommand.writeSpendingIntensityTo(row: UpdateBuilder<*>) {
+fun DemandIntensity.writeSpendingIntensityTo(row: UpdateBuilder<*>) {
     row[KtoSpendingIntensityTable.districtCode] = districtCode
     row[KtoSpendingIntensityTable.baseMonth] = baseMonth
     row[KtoSpendingIntensityTable.indicatorCode] = indicatorCode

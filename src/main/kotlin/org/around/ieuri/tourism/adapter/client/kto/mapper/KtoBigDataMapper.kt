@@ -3,9 +3,9 @@ package org.around.ieuri.tourism.adapter.client.kto.mapper
 import org.around.ieuri.tourism.adapter.client.kto.dto.KtoConcentrationRateItem
 import org.around.ieuri.tourism.adapter.client.kto.dto.KtoDemandIntensityItem
 import org.around.ieuri.tourism.adapter.client.kto.dto.KtoVisitorCountItem
-import org.around.ieuri.tourism.application.region.provided.dto.SyncConcentrationRateCommand
-import org.around.ieuri.tourism.application.region.provided.dto.SyncDemandIntensityCommand
-import org.around.ieuri.tourism.application.region.provided.dto.SyncVisitorCountCommand
+import org.around.ieuri.tourism.application.region.required.dto.ConcentrationRateRecord
+import org.around.ieuri.tourism.application.region.required.dto.DemandIntensityRecord
+import org.around.ieuri.tourism.application.region.required.dto.VisitorCountRecord
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -22,7 +22,7 @@ private val DATE_FORMAT = DateTimeFormatter.ofPattern("uuuuMMdd")
 /** `yyyyMM`. */
 private val MONTH_FORMAT = DateTimeFormatter.ofPattern("uuuuMM")
 
-fun KtoVisitorCountItem.toSyncCommandOrNull(): SyncVisitorCountCommand? {
+fun KtoVisitorCountItem.toSyncCommandOrNull(): VisitorCountRecord? {
     val code = signguCode?.trim()?.takeIf { it.isNotEmpty() } ?: return null
     val baseDate = baseYmd.toLocalDateOrNull() ?: return null
     // 구분 코드가 있으면 코드를, 없으면 명칭을 쓴다.
@@ -30,7 +30,7 @@ fun KtoVisitorCountItem.toSyncCommandOrNull(): SyncVisitorCountCommand? {
     // 소수 문자열이다("176473.5"). Int로 좁히면 조용히 반올림된다(R4).
     val count = touNum.toBigDecimalOrNull() ?: return null
 
-    return SyncVisitorCountCommand(
+    return VisitorCountRecord(
         districtCode = code,
         baseDate = baseDate,
         visitorType = type,
@@ -38,14 +38,14 @@ fun KtoVisitorCountItem.toSyncCommandOrNull(): SyncVisitorCountCommand? {
     )
 }
 
-fun KtoConcentrationRateItem.toSyncCommandOrNull(): SyncConcentrationRateCommand? {
+fun KtoConcentrationRateItem.toSyncCommandOrNull(): ConcentrationRateRecord? {
     val code = signguCd?.trim()?.takeIf { it.isNotEmpty() } ?: return null
     val spotName = tAtsNm?.trim()?.takeIf { it.isNotEmpty() } ?: return null
     // 예측 대상일이다. 행마다 다르며 그대로 보존한다(R5).
     val targetDate = baseYmd.toLocalDateOrNull() ?: return null
     val rate = cnctrRate.toBigDecimalOrNull() ?: return null
 
-    return SyncConcentrationRateCommand(
+    return ConcentrationRateRecord(
         districtCode = code,
         touristSpotName = spotName,
         targetDate = targetDate,
@@ -54,13 +54,13 @@ fun KtoConcentrationRateItem.toSyncCommandOrNull(): SyncConcentrationRateCommand
 }
 
 /** 체류·소비 강도 공용. 적재 테이블은 호출자가 고른다. */
-fun KtoDemandIntensityItem.toSyncCommandOrNull(): SyncDemandIntensityCommand? {
+fun KtoDemandIntensityItem.toSyncCommandOrNull(): DemandIntensityRecord? {
     val code = signguCd?.trim()?.takeIf { it.isNotEmpty() } ?: return null
     val month = baseYm.toBaseMonthOrNull() ?: return null
     val indicator = indicatorCode?.trim()?.takeIf { it.isNotEmpty() } ?: return null
     val value = indicatorValue.toBigDecimalOrNull() ?: return null
 
-    return SyncDemandIntensityCommand(
+    return DemandIntensityRecord(
         districtCode = code,
         baseMonth = month,
         indicatorCode = indicator,

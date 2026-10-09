@@ -12,10 +12,10 @@ import org.around.ieuri.tourism.adapter.persistence.table.SpotDetailIntroTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotDetailTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotFestivalTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotTable
-import org.around.ieuri.tourism.application.region.provided.dto.SyncConcentrationRateCommand
-import org.around.ieuri.tourism.application.region.provided.dto.SyncDemandIntensityCommand
-import org.around.ieuri.tourism.application.region.provided.dto.SyncVisitorCountCommand
 import org.around.ieuri.tourism.domain.category.SpotCategory
+import org.around.ieuri.tourism.domain.region.ConcentrationRate
+import org.around.ieuri.tourism.domain.region.DemandIntensity
+import org.around.ieuri.tourism.domain.region.VisitorCount
 import org.around.ieuri.tourism.domain.shared.Coordinates
 import org.around.ieuri.tourism.domain.shared.CopyrightType
 import org.around.ieuri.tourism.domain.shared.DomainLocale
@@ -235,7 +235,7 @@ class TourismAggregateRowMappersTest {
     @Test
     fun `방문자수 쓰기는 시군구·기준일·구분·수를 바꾸지 않는다`() {
         val row = row(KtoVisitorCountTable)
-        SyncVisitorCountCommand("11110", LocalDate.of(2026, 8, 1), "2", BigDecimal("123.5")).writeTo(row)
+        VisitorCount("11110", LocalDate.of(2026, 8, 1), "2", BigDecimal("123.5")).writeTo(row)
 
         assertEquals("11110", row.values[KtoVisitorCountTable.districtCode])
         assertEquals(LocalDate.of(2026, 8, 1), row.values[KtoVisitorCountTable.baseDate])
@@ -246,7 +246,7 @@ class TourismAggregateRowMappersTest {
     @Test
     fun `집중률 쓰기는 관광지명과 대상일을 바꾸지 않는다`() {
         val row = row(KtoConcentrationRateTable)
-        SyncConcentrationRateCommand("26110", "해운대", LocalDate.of(2026, 8, 3), BigDecimal("0.42")).writeTo(row)
+        ConcentrationRate("26110", "해운대", LocalDate.of(2026, 8, 3), BigDecimal("0.42")).writeTo(row)
 
         assertEquals("26110", row.values[KtoConcentrationRateTable.districtCode])
         assertEquals("해운대", row.values[KtoConcentrationRateTable.touristSpotName])
@@ -257,7 +257,7 @@ class TourismAggregateRowMappersTest {
     @Test
     fun `체류 강도 쓰기는 시군구·기준월·지표·값을 바꾸지 않는다`() {
         val row = row(KtoStayIntensityTable)
-        SyncDemandIntensityCommand("11110", LocalDate.of(2026, 6, 1), "21", BigDecimal("7.25")).writeStayIntensityTo(row)
+        DemandIntensity("11110", LocalDate.of(2026, 6, 1), "21", BigDecimal("7.25")).writeStayIntensityTo(row)
 
         assertEquals("11110", row.values[KtoStayIntensityTable.districtCode])
         assertEquals(LocalDate.of(2026, 6, 1), row.values[KtoStayIntensityTable.baseMonth])
@@ -268,7 +268,7 @@ class TourismAggregateRowMappersTest {
     @Test
     fun `소비 강도 쓰기는 시군구·기준월·지표·값을 바꾸지 않는다`() {
         val row = row(KtoSpendingIntensityTable)
-        SyncDemandIntensityCommand("26110", LocalDate.of(2026, 5, 1), "22", BigDecimal("3.5")).writeSpendingIntensityTo(row)
+        DemandIntensity("26110", LocalDate.of(2026, 5, 1), "22", BigDecimal("3.5")).writeSpendingIntensityTo(row)
 
         assertEquals("26110", row.values[KtoSpendingIntensityTable.districtCode])
         assertEquals(LocalDate.of(2026, 5, 1), row.values[KtoSpendingIntensityTable.baseMonth])

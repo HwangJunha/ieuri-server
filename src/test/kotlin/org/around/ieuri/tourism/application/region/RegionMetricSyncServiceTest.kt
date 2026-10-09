@@ -5,13 +5,14 @@ import io.mockk.mockk
 import io.mockk.verify
 import org.around.ieuri.tourism.application.region.provided.dto.RegionMetricDataset
 import org.around.ieuri.tourism.application.region.provided.dto.RegionMetricTarget
-import org.around.ieuri.tourism.application.region.provided.dto.SyncDemandIntensityCommand
-import org.around.ieuri.tourism.application.region.provided.dto.SyncVisitorCountCommand
 import org.around.ieuri.tourism.application.region.required.DistrictCodeQueryPort
-import org.around.ieuri.tourism.application.region.required.RegionMetricStorePort
+import org.around.ieuri.tourism.application.region.required.DistrictRepository
 import org.around.ieuri.tourism.application.region.required.RegionMetricSyncPort
+import org.around.ieuri.tourism.application.region.required.dto.DemandIntensityRecord
 import org.around.ieuri.tourism.application.region.required.dto.DistrictRegion
 import org.around.ieuri.tourism.application.region.required.dto.RegionMetricSyncPage
+import org.around.ieuri.tourism.application.region.required.dto.VisitorCountRecord
+import org.around.ieuri.tourism.domain.region.District
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.YearMonth
@@ -25,23 +26,23 @@ import kotlin.test.assertTrue
 class RegionMetricSyncServiceTest {
 
     private val syncPort = mockk<RegionMetricSyncPort>()
-    private val storePort = mockk<RegionMetricStorePort>()
+    private val districtRepository = mockk<DistrictRepository>()
     private val districtCodePort = mockk<DistrictCodeQueryPort>()
     private val policy = RegionMetricSyncPolicy(pageSize = 2, visitorBackfillDays = 3, monthlyLookbackMonths = 3)
-    private val service = RegionMetricSyncService(syncPort, storePort, districtCodePort, policy)
+    private val service = RegionMetricSyncService(syncPort, districtRepository, districtCodePort, policy)
 
     private val province = RegionMetricTarget(provinceCode = "11", districtCode = null)
 
     init {
-        every { districtCodePort.findAllCodes() } returns setOf("11110", "11140")
-        every { storePort.upsertVisitorCounts(any()) } answers { firstArg<List<*>>().size }
-        every { storePort.upsertStayIntensities(any()) } answers { firstArg<List<*>>().size }
-        every { storePort.upsertSpendingIntensities(any()) } answers { firstArg<List<*>>().size }
+        every { districtRepository.findAll() } returns listOf(District("11110", hasRepresentative = false), District("11140", hasRepresentative = true))
+        every { districtRepository.upsertVisitorCounts(any()) } answers { firstArg<List<*>>().size }
+        every { districtRepository.upsertStayIntensities(any()) } answers { firstArg<List<*>>().size }
+        every { districtRepository.upsertSpendingIntensities(any()) } answers { firstArg<List<*>>().size }
     }
 
-    private fun visitor(districtCode: String) = SyncVisitorCountCommand(districtCode, RUN_DATE, "1", BigDecimal.TEN)
+    private fun visitor(districtCode: String) = VisitorCountRecord(districtCode, RUN_DATE, "1", BigDecimal.TEN)
 
-    private fun intensity(districtCode: String, month: YearMonth) = SyncDemandIntensityCommand(districtCode, month.atDay(1), "A", BigDecimal.ONE)
+    private fun intensity(districtCode: String, month: YearMonth) = DemandIntensityRecord(districtCode, month.atDay(1), "A", BigDecimal.ONE)
 
     @Test
     fun `순회 대상은 종마다 다르다 - 방문자수는 전국 1회, 집중률은 시군구, 강도는 시도`() {
@@ -72,7 +73,7 @@ class RegionMetricSyncServiceTest {
 
         val result = service.syncPage(RegionMetricDataset.VISITOR_COUNT, RegionMetricTarget.NATIONWIDE, 1, RUN_DATE, null)
 
-        verify { storePort.upsertVisitorCounts(listOf(visitor("11110"))) }
+        verify { districtRepository.upsertVisitorCounts(listOf(District("11110", hasRepresentative = false).visitorCount(RUN_DATE, "1", BigDecimal.TEN))) }
         assertEquals(1, result.written)
         assertEquals(1, result.skippedUnknownCode)
         assertEquals(4, result.dropped)
@@ -88,8 +89,8 @@ class RegionMetricSyncServiceTest {
 
         assertEquals(0, result.written)
         assertFalse(result.hasMore)
-        verify(exactly = 0) { districtCodePort.findAllCodes() }
-        verify(exactly = 0) { storePort.upsertVisitorCounts(any()) }
+        verify(exactly = 0) { districtRepository.findAll() }
+        verify(exactly = 0) { districtRepository.upsertVisitorCounts(any()) }
     }
 
     @Test

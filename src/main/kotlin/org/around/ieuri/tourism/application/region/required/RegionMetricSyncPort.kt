@@ -1,9 +1,9 @@
 package org.around.ieuri.tourism.application.region.required
 
-import org.around.ieuri.tourism.application.region.provided.dto.SyncConcentrationRateCommand
-import org.around.ieuri.tourism.application.region.provided.dto.SyncDemandIntensityCommand
-import org.around.ieuri.tourism.application.region.provided.dto.SyncVisitorCountCommand
+import org.around.ieuri.tourism.application.region.required.dto.ConcentrationRateRecord
+import org.around.ieuri.tourism.application.region.required.dto.DemandIntensityRecord
 import org.around.ieuri.tourism.application.region.required.dto.RegionMetricSyncPage
+import org.around.ieuri.tourism.application.region.required.dto.VisitorCountRecord
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -24,7 +24,7 @@ interface RegionMetricSyncPort {
         endDate: LocalDate,
         pageNo: Int,
         numOfRows: Int,
-    ): RegionMetricSyncPage<SyncVisitorCountCommand>
+    ): RegionMetricSyncPage<VisitorCountRecord>
 
     /**
      * [areaCd] 시도 · [signguCd] 시군구의 집중률 예측(R5). `signguCd`가 필수다.
@@ -35,7 +35,7 @@ interface RegionMetricSyncPort {
         signguCd: String,
         pageNo: Int,
         numOfRows: Int,
-    ): RegionMetricSyncPage<SyncConcentrationRateCommand>
+    ): RegionMetricSyncPage<ConcentrationRateRecord>
 
     /**
      * [areaCd] 시도의 [baseMonth] 체류 강도.
@@ -46,7 +46,7 @@ interface RegionMetricSyncPort {
         baseMonth: YearMonth,
         pageNo: Int,
         numOfRows: Int,
-    ): RegionMetricSyncPage<SyncDemandIntensityCommand>
+    ): RegionMetricSyncPage<DemandIntensityRecord>
 
     /**
      * [areaCd] 시도의 [baseMonth] 소비 강도(외지인 소비. 외국인 소비 지표는 없다).
@@ -57,5 +57,5 @@ interface RegionMetricSyncPort {
         baseMonth: YearMonth,
         pageNo: Int,
         numOfRows: Int,
-    ): RegionMetricSyncPage<SyncDemandIntensityCommand>
+    ): RegionMetricSyncPage<DemandIntensityRecord>
 }
