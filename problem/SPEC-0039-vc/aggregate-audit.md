@@ -9,7 +9,7 @@
 |---|---|---|---|
 | footprint | `Footprint` | 루트 경유 | — |
 | relation | `MapRelation` | 루트 경유. `removeFromMyList`만 id로 지우지만 판정할 규칙이 없다 | — |
-| catalog | `SpotCatalog` | 우회 4건: `assign`·`reassign`(catalog 저장소가 spot 테이블을 씀), `saveFestivalPeriod`(루트를 읽지 않음), `refreshTranslationVisibility`·`assignUnassignedDistricts`(규칙이 SQL에만 있음). `deleteTranslations`는 루트가 판정한 뒤라 예외 범위 | 루트 경유·Specification+Command(D-124) |
+| catalog | `SpotCatalog` | 우회 4건: `assign`·`reassign`(catalog 저장소가 spot 테이블을 씀), `saveFestivalPeriod`(루트를 읽지 않음), `refreshTranslationVisibility`·`assignUnassignedDistricts`(규칙이 SQL에만 있음). `deleteTranslations`는 루트가 판정한 뒤라 예외 범위 | 소속·축제 기간은 루트 경유(D-124). 노출·시군구 일괄 반영은 SQL에만 규칙이 있는 한계로 기록(D-125) |
 | spot | `Spot`(자연키 contentId+language, 행동 없음) | 상세(본문·갤러리·운영정보·안내사항)를 `spotId`로 바로 씀 | 루트를 읽어 자식을 만든다(D-123) |
 | region | 없었음 | KTO 지표·대표 위치를 명령 DTO·코드로 바로 씀 | `District` 루트(D-122, 9ca01a6d) |
 | recommendation | 없었음 | 임베딩을 application DTO로 바로 저장 | `SpotEmbedding` 루트(D-122, 438dd3c1) |

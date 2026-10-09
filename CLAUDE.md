@@ -379,9 +379,11 @@ refactor.
   every rule in one place; its only cost is round trips. Move to Specification + Command (one
   definition producing both the in-memory check and the bulk SQL — Khorikov, *DDD and bulk
   operations*) only when the volume is shown to need a single statement **and** the rule is
-  non-trivial and reused by the single-item path. The spec lives in `domain/<aggregate>/spec`, the
-  command that carries it at the aggregate root (`TranslationVisibilitySweep`), and the adapter only
-  translates the spec into a SQL condition in `adapter/persistence/mapper` (SPEC-0039 D-124). Plain bulk SQL that re-states a domain rule is the
+  non-trivial and reused by the single-item path. **Not available in this stack yet**: one definition
+  producing both needs a spec → SQL translation layer (C# gets it from expression trees; our domain
+  cannot see Exposed). A spec with a hand-written SQL twin is the rule twice under a pattern's name —
+  don't build it. Until that layer exists, a bulk change that must be one statement stays plain SQL
+  in the adapter and is recorded as a known limit (SPEC-0039 D-125). Plain bulk SQL that re-states a domain rule is the
   option to avoid: the rule then lives twice and drifts. Rows with no domain rule at all (likes,
   hides, blocks — repository operations) may be bulk-deleted.
 - **Load the minimum, write only what changed.** A write loads only the row its decision needs
