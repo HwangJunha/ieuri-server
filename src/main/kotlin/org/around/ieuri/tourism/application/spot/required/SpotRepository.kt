@@ -1,14 +1,13 @@
 package org.around.ieuri.tourism.application.spot.required
 
-import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.shared.FestivalPeriod
 import org.around.ieuri.tourism.domain.spot.Spot
-import org.around.ieuri.tourism.domain.spot.SpotDetail
+import org.around.ieuri.tourism.domain.spot.SpotBody
 import org.around.ieuri.tourism.domain.spot.SpotFestival
-import org.around.ieuri.tourism.domain.spot.SpotImage
-import org.around.ieuri.tourism.domain.spot.SpotInfoItem
-import org.around.ieuri.tourism.domain.spot.SpotIntro
+import org.around.ieuri.tourism.domain.spot.SpotGallery
+import org.around.ieuri.tourism.domain.spot.SpotInformation
+import org.around.ieuri.tourism.domain.spot.SpotIntroduction
 import java.time.Instant
 
 /**
@@ -16,6 +15,12 @@ import java.time.Instant
  * - 원본 삭제는 축제·상세를 FK CASCADE로 함께 지운다.
  */
 interface SpotRepository {
+
+    /** 저장된 원본 하나. 없으면 null이다. */
+    fun findById(spotId: Long): Spot?
+
+    /** [language]의 저장된 원본 중 [contentIds]에 든 것. 없는 contentId는 결과에 없다. */
+    fun findByContentIds(language: DomainLocale, contentIds: Collection<String>): List<Spot>
 
     /**
      * 한 페이지를 자연키 (contentId, language)로 upsert하고 실제로 쓴 행 수를 돌려준다.
@@ -29,7 +34,7 @@ interface SpotRepository {
      */
     fun deleteMissingSpots(language: DomainLocale, survivingContentIds: Set<String>): Int
 
-    /** 축제 한 페이지를 upsert하고 실제로 쓴 행 수를 돌려준다. 대응하는 원본이 없는 항목은 건너뛴다. */
+    /** 축제 한 페이지를 원본 id로 upsert하고 쓴 행 수를 돌려준다. `updated_at`은 값이 바뀐 행만 올린다. */
     fun upsertFestivals(festivals: List<SpotFestival>, syncedAt: Instant): Int
 
     /** [language]의 원본 중 [contentIds]를 지우고 지운 행 수를 돌려준다. 무엇을 지울지는 호출자가 도메인으로 정한다. */
@@ -44,18 +49,15 @@ interface SpotRepository {
     /** [language]의 축제 원본 contentId → 행사 기간. 끝났는지는 도메인([org.around.ieuri.tourism.domain.spot.spec.EndedFestival])이 판정한다. */
     fun findFestivalPeriods(language: DomainLocale): Map<String, FestivalPeriod>
 
-    /** 본문을 쓰고 확보 시각을 새로 시작한다. 부재였던 행은 본문 있음으로 돌아간다. */
-    fun saveDetail(spotId: Long, detail: SpotDetail)
-
-    /** 본문 부재를 쓴다(SPEC-0008 R-3). [absent]는 원본 값으로 채운 상세다. */
-    fun saveDetailAbsence(spotId: Long, absent: SpotDetail)
+    /** 본문(또는 부재, SPEC-0008 R-3)을 쓰고 확보 시각을 새로 시작한다. 부재였던 행에 본문이 오면 본문 있음으로 돌아간다. */
+    fun saveBody(body: SpotBody)
 
     /** 갤러리 전량 교체. */
-    fun saveGallery(spotId: Long, gallery: List<SpotImage>)
+    fun saveGallery(gallery: SpotGallery)
 
     /** 운영 정보. 값이 하나도 없어도 행을 남긴다 — 미적재와 구분한다. */
-    fun saveIntro(spotId: Long, category: SpotCategory, intro: SpotIntro?)
+    fun saveIntro(introduction: SpotIntroduction)
 
     /** 이용안내 전량 교체. */
-    fun saveInfoItems(spotId: Long, category: SpotCategory, items: List<SpotInfoItem>)
+    fun saveInfoItems(information: SpotInformation)
 }

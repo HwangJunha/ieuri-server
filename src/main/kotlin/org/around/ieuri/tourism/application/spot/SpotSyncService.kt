@@ -46,7 +46,10 @@ class SpotSyncService(
     override fun syncFestivalPage(language: DomainLocale, pageNo: Int, pageSize: Int, syncedAt: Instant, runDate: LocalDate): SpotSyncPageResult {
         val page = festivalSyncPort.fetchPage(language, runDate, pageNo, pageSize)
 
-        val written = spotRepository.upsertFestivals(page.records, syncedAt)
+        // 축제는 그 원본이 만든다 — 원본이 없는 행은 건너뛴다.
+        val origins = spotRepository.findByContentIds(language, page.records.map { it.contentId }).associateBy { it.contentId }
+        val festivals = page.records.mapNotNull { record -> origins[record.contentId]?.hold(record.period, record.progressType, record.festivalType) }
+        val written = spotRepository.upsertFestivals(festivals, syncedAt)
 
         return SpotSyncPageResult(
             written = written,

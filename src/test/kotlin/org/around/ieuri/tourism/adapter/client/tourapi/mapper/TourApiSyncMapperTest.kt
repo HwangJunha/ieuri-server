@@ -138,11 +138,11 @@ class TourApiSyncMapperTest {
         assertNotNull(item(mapx = 132.0, mapy = 39.0).toSpotOrNull(DomainLocale.KO, SpotCategory.TOURIST_SPOT))
     }
 
-    // ── toSpotFestivalOrNull ─────────────────────────────────
+    // ── toFestivalRecordOrNull ─────────────────────────────────
 
     @Test
-    fun `모든 필드가 채워진 축제 item을 SyncFestivalCommand로 옮긴다`() {
-        val command = assertNotNull(festivalItem().toSpotFestivalOrNull(DomainLocale.ZH, asOf))
+    fun `모든 필드가 채워진 축제 item을 FestivalRecord로 옮긴다`() {
+        val command = assertNotNull(festivalItem().toFestivalRecordOrNull(DomainLocale.ZH, asOf))
 
         assertEquals("4001", command.contentId)
         assertEquals(DomainLocale.ZH, command.language)
@@ -156,7 +156,7 @@ class TourApiSyncMapperTest {
     fun `축제의 nullable 필드가 모두 null이어도 예외 없이 옮긴다`() {
         val command = assertNotNull(
             festivalItem(progresstype = null, festivaltype = null)
-                .toSpotFestivalOrNull(DomainLocale.KO, asOf),
+                .toFestivalRecordOrNull(DomainLocale.KO, asOf),
         )
 
         assertNull(command.progressType)
@@ -169,7 +169,7 @@ class TourApiSyncMapperTest {
     fun `축제 기간은 시작일과 종료일이 뒤바뀌지 않고 옮겨진다`() {
         val command = assertNotNull(
             festivalItem(eventstartdate = "20260201", eventenddate = "20261231")
-                .toSpotFestivalOrNull(DomainLocale.KO, asOf),
+                .toFestivalRecordOrNull(DomainLocale.KO, asOf),
         )
 
         assertEquals(LocalDate.of(2026, 2, 1), command.period.start)

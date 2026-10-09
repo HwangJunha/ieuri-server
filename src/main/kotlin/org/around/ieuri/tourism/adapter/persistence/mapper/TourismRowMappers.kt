@@ -23,6 +23,7 @@ import org.around.ieuri.tourism.domain.footprint.ShareLink
 import org.around.ieuri.tourism.domain.region.ConcentrationRate
 import org.around.ieuri.tourism.domain.region.DemandIntensity
 import org.around.ieuri.tourism.domain.region.VisitorCount
+import org.around.ieuri.tourism.domain.shared.Coordinates
 import org.around.ieuri.tourism.domain.shared.CopyrightType
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.shared.FestivalPeriod
@@ -103,7 +104,21 @@ fun Spot.writeTo(row: UpdateBuilder<*>) {
     row[SpotTable.copyright] = copyright.name
 }
 
-fun SpotFestival.writeTo(row: UpdateBuilder<*>, spotId: Long) {
+/** 저장된 원본 행 → 도메인 [Spot]. 좌표는 `map_x`가 경도, `map_y`가 위도다. */
+fun ResultRow.toSpot(): Spot = Spot(
+    contentId = this[SpotTable.contentId],
+    language = DomainLocale.valueOf(this[SpotTable.language]),
+    title = this[SpotTable.title],
+    address = this[SpotTable.address],
+    thumbnailImageUrl = this[SpotTable.thumbnailImageUrl],
+    coordinates = Coordinates(latitude = this[SpotTable.mapY], longitude = this[SpotTable.mapX]),
+    category = SpotCategory(this[SpotTable.category]),
+    contentTypeId = this[SpotTable.contentTypeId],
+    copyright = CopyrightType.valueOf(this[SpotTable.copyright]),
+    id = this[SpotTable.id],
+)
+
+fun SpotFestival.writeTo(row: UpdateBuilder<*>) {
     row[SpotFestivalTable.spotId] = spotId
     row[SpotFestivalTable.eventStartDate] = period.start
     row[SpotFestivalTable.eventEndDate] = period.end

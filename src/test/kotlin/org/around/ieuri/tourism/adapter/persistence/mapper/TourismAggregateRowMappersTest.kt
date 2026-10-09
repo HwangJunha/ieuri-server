@@ -73,7 +73,7 @@ class TourismAggregateRowMappersTest {
     @Test
     fun `축제 쓰기는 시작일과 종료일을 바꾸지 않는다`() {
         val row = row(SpotFestivalTable)
-        SpotFestival("C-1", DomainLocale.KO, FestivalPeriod(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 9)), "진행", "문화").writeTo(row, spotId = 5)
+        SpotFestival(5L, FestivalPeriod(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 9)), "진행", "문화").writeTo(row)
 
         assertEquals(5L, row.values[SpotFestivalTable.spotId])
         assertEquals(LocalDate.of(2026, 10, 1), row.values[SpotFestivalTable.eventStartDate])
@@ -85,7 +85,7 @@ class TourismAggregateRowMappersTest {
     @Test
     fun `축제 구분 값이 없으면 null이다`() {
         val row = row(SpotFestivalTable)
-        SpotFestival("C-1", DomainLocale.KO, FestivalPeriod(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 1)), null, null).writeTo(row, spotId = 5)
+        SpotFestival(5L, FestivalPeriod(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 1)), null, null).writeTo(row)
 
         assertNull(row.values[SpotFestivalTable.progressType])
         assertNull(row.values[SpotFestivalTable.festivalType])
@@ -274,5 +274,43 @@ class TourismAggregateRowMappersTest {
         assertEquals(LocalDate.of(2026, 5, 1), row.values[KtoSpendingIntensityTable.baseMonth])
         assertEquals("22", row.values[KtoSpendingIntensityTable.indicatorCode])
         assertEquals(BigDecimal("3.5"), row.values[KtoSpendingIntensityTable.indicatorValue])
+    }
+
+    private fun spotRow(address: String?) = ResultRow.createAndFillValues(
+        mapOf<Expression<*>, Any?>(
+            SpotTable.id to 41L,
+            SpotTable.contentId to "C-77",
+            SpotTable.language to "JA",
+            SpotTable.title to "景福宮",
+            SpotTable.address to address,
+            SpotTable.thumbnailImageUrl to "https://img/s.jpg",
+            SpotTable.mapX to 126.97,
+            SpotTable.mapY to 37.58,
+            SpotTable.category to "CULTURAL_FACILITY",
+            SpotTable.contentTypeId to 78,
+            SpotTable.copyright to "TYPE3",
+        ),
+    )
+
+    @Test
+    fun `원본 행은 map_x를 경도로, map_y를 위도로 읽고 나머지 필드를 바꾸지 않는다`() {
+        val spot = spotRow(address = "서울 종로구").toSpot()
+
+        assertEquals(41L, spot.id)
+        assertEquals("C-77", spot.contentId)
+        assertEquals(DomainLocale.JA, spot.language)
+        assertEquals("景福宮", spot.title)
+        assertEquals("서울 종로구", spot.address)
+        assertEquals("https://img/s.jpg", spot.thumbnailImageUrl)
+        assertEquals(126.97, spot.coordinates.longitude)
+        assertEquals(37.58, spot.coordinates.latitude)
+        assertEquals("CULTURAL_FACILITY", spot.category.code)
+        assertEquals(78, spot.contentTypeId)
+        assertEquals(CopyrightType.TYPE3, spot.copyright)
+    }
+
+    @Test
+    fun `원본 행의 주소가 없으면 null이다`() {
+        assertNull(spotRow(address = null).toSpot().address)
     }
 }

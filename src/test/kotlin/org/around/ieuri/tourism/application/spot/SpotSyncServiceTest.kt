@@ -7,6 +7,7 @@ import io.mockk.verifyOrder
 import org.around.ieuri.tourism.application.spot.required.FestivalSyncPort
 import org.around.ieuri.tourism.application.spot.required.SpotRepository
 import org.around.ieuri.tourism.application.spot.required.SpotSyncPort
+import org.around.ieuri.tourism.application.spot.required.dto.FestivalRecord
 import org.around.ieuri.tourism.application.spot.required.dto.FestivalSyncPage
 import org.around.ieuri.tourism.application.spot.required.dto.SpotSyncPage
 import org.around.ieuri.tourism.domain.category.SpotCategory
@@ -87,11 +88,28 @@ class SpotSyncServiceTest {
     }
 
     @Test
+    @DisplayName("원본이 없는 축제 행은 쓰지 않는다")
+    fun `festival rows without an origin are skipped`() {
+        val kept = FestivalRecord("f1", DomainLocale.KO, FestivalPeriod(runDate, runDate.plusDays(3)), "진행", "문화")
+        val orphan = FestivalRecord("f2", DomainLocale.KO, FestivalPeriod(runDate, runDate.plusDays(1)), null, null)
+        every { festivalSyncPort.fetchPage(DomainLocale.KO, runDate, 1, 100) } returns FestivalSyncPage(listOf(kept, orphan), totalCount = 2, droppedCount = 0)
+        every { repository.findByContentIds(DomainLocale.KO, listOf("f1", "f2")) } returns listOf(spot("f1").copy(id = 41L))
+        every { repository.upsertFestivals(any(), syncedAt) } answers { firstArg<List<*>>().size }
+
+        val page = service.syncFestivalPage(DomainLocale.KO, 1, 100, syncedAt, runDate)
+
+        verify { repository.upsertFestivals(listOf(SpotFestival(41L, kept.period, "진행", "문화")), syncedAt) }
+        assertEquals(1, page.written)
+        assertEquals(listOf("f1", "f2"), page.contentIds)
+    }
+
+    @Test
     @DisplayName("축제는 실행일 기준으로 받고, 정리는 끝난 축제 → 사라진 축제 순이다")
     fun `festival page uses the run date and sweep removes ended first`() {
-        val festival = SpotFestival("f1", DomainLocale.KO, FestivalPeriod(runDate, runDate.plusDays(3)), null, null)
-        every { festivalSyncPort.fetchPage(DomainLocale.KO, runDate, 1, 100) } returns FestivalSyncPage(listOf(festival), totalCount = 1, droppedCount = 0)
-        every { repository.upsertFestivals(listOf(festival), syncedAt) } returns 1
+        val record = FestivalRecord("f1", DomainLocale.KO, FestivalPeriod(runDate, runDate.plusDays(3)), null, null)
+        every { festivalSyncPort.fetchPage(DomainLocale.KO, runDate, 1, 100) } returns FestivalSyncPage(listOf(record), totalCount = 1, droppedCount = 0)
+        every { repository.findByContentIds(DomainLocale.KO, listOf("f1")) } returns listOf(spot("f1").copy(id = 41L))
+        every { repository.upsertFestivals(listOf(SpotFestival(41L, record.period, null, null)), syncedAt) } returns 1
         every { repository.findFestivalPeriods(DomainLocale.KO) } returns mapOf(
             "old" to FestivalPeriod(runDate.minusDays(9), runDate.minusDays(1)),
             "today" to FestivalPeriod(runDate.minusDays(2), runDate),
