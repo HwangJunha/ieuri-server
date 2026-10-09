@@ -49,7 +49,7 @@ class RecommendationScore(
     ): Double {
         val distance = distanceFactor(distanceMeters)
         val base = if (taste == null) distance else (1.0 - tasteWeight) * distance + tasteWeight * taste
-        val taxed = if (taxRefundTitleRule.matches(title)) base * taxRefundMultiplier else base
+        val taxed = if (taxRefundTitleRule.isSatisfiedBy(title)) base * taxRefundMultiplier else base
         return taxed * reactionMultiplier(reaction)
     }
 

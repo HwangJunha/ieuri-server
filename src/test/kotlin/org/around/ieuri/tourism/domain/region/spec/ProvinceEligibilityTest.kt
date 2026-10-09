@@ -11,11 +11,11 @@ class ProvinceEligibilityTest {
 
     @Test
     fun `시군구 수가 최소와 같으면 후보가 된다`() {
-        assertTrue(eligibility.isMetBy(3))
+        assertTrue(eligibility.isSatisfiedBy(3))
     }
 
     @Test
     fun `최소보다 하나 적으면 후보가 아니다`() {
-        assertFalse(eligibility.isMetBy(2))
+        assertFalse(eligibility.isSatisfiedBy(2))
     }
 }

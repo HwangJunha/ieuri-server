@@ -15,6 +15,7 @@ import org.around.ieuri.tourism.application.recommendation.required.Recommendati
 import org.around.ieuri.tourism.application.recommendation.required.TasteSimilarityQueryPort
 import org.around.ieuri.tourism.domain.catalog.ReactionType
 import org.around.ieuri.tourism.domain.recommendation.RankedSpot
+import org.around.ieuri.tourism.domain.recommendation.ReactionHistory
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -75,7 +76,7 @@ class RecommendedSpotsQueryService(
         candidates: List<SpotView>,
         locale: DomainLocale,
     ): Map<Long, Double> {
-        if (candidates.isEmpty() || !policy.tasteThreshold.isMetBy(liked, disliked)) return emptyMap()
+        if (candidates.isEmpty() || !policy.tasteThreshold.isSatisfiedBy(ReactionHistory(liked, disliked))) return emptyMap()
         val similarities = try {
             tasteSimilarityQueryPort.findSimilarities(
                 likedCatalogIds = liked,

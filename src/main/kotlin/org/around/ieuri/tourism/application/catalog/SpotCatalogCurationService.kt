@@ -9,12 +9,12 @@ import org.around.ieuri.tourism.application.catalog.required.CatalogEventPublish
 import org.around.ieuri.tourism.application.catalog.required.SpotCatalogQueryPort
 import org.around.ieuri.tourism.application.catalog.required.SpotCatalogRepository
 import org.around.ieuri.tourism.domain.catalog.CatalogAssignment
+import org.around.ieuri.tourism.domain.catalog.CatalogCandidates
 import org.around.ieuri.tourism.domain.catalog.CatalogOrigin
 import org.around.ieuri.tourism.domain.catalog.CatalogSplit
 import org.around.ieuri.tourism.domain.catalog.SpotCatalog
 import org.around.ieuri.tourism.domain.catalog.event.CatalogLanguageRef
 import org.around.ieuri.tourism.domain.catalog.event.SpotCatalogLanguagesChanged
-import org.around.ieuri.tourism.domain.catalog.policy.CatalogIndex
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -39,7 +39,7 @@ class SpotCatalogCurationService(
         if (origins.isEmpty()) return CatalogAssignmentResult(joined = 0, catalogsCreated = 0, lastSpotId = afterSpotId)
 
         // 썸네일 폴백은 비한국어 전용이다.
-        var index = CatalogIndex(
+        var candidates = CatalogCandidates(
             titleCandidates = catalogQueryPort.loadKoreanTitleIndex(),
             thumbnailCatalogIds = if (language.isKorean) emptyMap() else catalogQueryPort.loadKoreanThumbnailIndex(),
         )
@@ -48,14 +48,14 @@ class SpotCatalogCurationService(
         var created = 0
         var skipped = 0
         origins.forEach { origin ->
-            when (val assignment = index.assign(origin)) {
+            when (val assignment = candidates.assign(origin)) {
                 is CatalogAssignment.Join -> {
                     join(assignment.catalogId, origin)
                     joined++
                 }
 
                 is CatalogAssignment.Found -> {
-                    index = index.withFounded(origin, found(assignment.catalog) { catalogId -> catalogRepository.assign(origin.spotId, catalogId) })
+                    candidates = candidates.withFounded(origin, found(assignment.catalog) { catalogId -> catalogRepository.assign(origin.spotId, catalogId) })
                     created++
                 }
 

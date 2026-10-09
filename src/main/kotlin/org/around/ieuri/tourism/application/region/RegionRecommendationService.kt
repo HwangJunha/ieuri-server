@@ -47,7 +47,7 @@ class RegionRecommendationService(
 
         val loaded = loadMetricRows(originDistrict.provinceCode)
         // 자기 지역을 포함한 시도 전체를 센다.
-        if (!policy.provinceEligibility.isMetBy(loaded.size)) {
+        if (!policy.provinceEligibility.isSatisfiedBy(loaded.size)) {
             return RecommendedRegionView(regions = emptyList())
         }
         val rows = selectCandidates(loaded, originDistrict)

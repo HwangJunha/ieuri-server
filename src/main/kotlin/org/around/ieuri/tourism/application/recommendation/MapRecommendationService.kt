@@ -13,6 +13,7 @@ import org.around.ieuri.tourism.application.recommendation.provided.dto.MapRecom
 import org.around.ieuri.tourism.application.recommendation.required.TasteSimilarityQueryPort
 import org.around.ieuri.tourism.domain.catalog.ReactionType
 import org.around.ieuri.tourism.domain.recommendation.RankedSpot
+import org.around.ieuri.tourism.domain.recommendation.ReactionHistory
 import org.around.ieuri.tourism.domain.recommendation.ScoreReaction
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.shared.MapBounds
@@ -92,7 +93,7 @@ class MapRecommendationService(
         candidates: List<MapCandidateView>,
         locale: DomainLocale,
     ): Map<Long, Double> {
-        if (candidates.isEmpty() || !recommendationPolicy.tasteThreshold.isMetBy(liked, disliked)) return emptyMap()
+        if (candidates.isEmpty() || !recommendationPolicy.tasteThreshold.isSatisfiedBy(ReactionHistory(liked, disliked))) return emptyMap()
         val similarities = try {
             tasteSimilarityQueryPort.findSimilarities(
                 likedCatalogIds = liked,

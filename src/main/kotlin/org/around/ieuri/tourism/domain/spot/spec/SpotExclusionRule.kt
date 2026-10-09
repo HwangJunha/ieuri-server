@@ -1,10 +1,12 @@
 package org.around.ieuri.tourism.domain.spot.spec
 
 import org.around.ieuri.tourism.domain.category.SpotCategory
+import org.around.ieuri.tourism.domain.shared.Specification
 
 /**
- * 비관광 spot 제외 판정(SPEC-0018). 제목과 카테고리만 보는 순수 함수다.
- * - 판정 순서가 곧 우선순위다: 카테고리 보호 → 지점명 보호 → 키워드 일치.
+ * 비관광 spot 제외 판정(SPEC-0018). 제목과 카테고리만 보는 순수 판정이다.
+ * - 보호 카테고리가 아니고 ∧ 지점명 보호에 걸리지 않고 ∧ 키워드에 일치하면 제외한다.
+ * - 키워드 목록이 비면 항상 false다(R12).
  */
 class SpotExclusionRule(
     /** 제외 키워드. 영문(ASCII 문자로 시작·끝)은 단어 경계로, 한글은 부분 일치로 본다. */
@@ -13,7 +15,7 @@ class SpotExclusionRule(
     branchNamePatterns: List<String>,
     /** 키워드에 걸려도 제외하지 않는 카테고리. */
     private val protectedCategories: Set<SpotCategory> = PROTECTED_CATEGORIES,
-) {
+) : Specification<SpotExclusionCandidate> {
 
     /** 빈 문자열·공백만인 항목은 버린다 — 남기면 모든 제목에 일치한다. */
     private val matchers: List<Regex> = keywords
@@ -25,16 +27,17 @@ class SpotExclusionRule(
         .map { it.trim() }
         .filter { it.isNotEmpty() }
 
-    /**
-     * 이 제목·카테고리가 제외 대상인가.
-     * - 키워드 목록이 비면 항상 false다(R12).
-     */
-    fun isExcluded(title: String, category: SpotCategory): Boolean {
-        if (matchers.isEmpty()) return false
-        if (category in protectedCategories) return false
-        if (protections.any { title.contains(it, ignoreCase = true) }) return false
-        return matchers.any { it.containsMatchIn(title) }
+    private val protectedCategory = Specification<SpotExclusionCandidate> { it.category in protectedCategories }
+
+    private val branchName = Specification<SpotExclusionCandidate> { candidate ->
+        protections.any { candidate.title.contains(it, ignoreCase = true) }
     }
+
+    private val keywordHit = Specification<SpotExclusionCandidate> { candidate -> matchers.any { it.containsMatchIn(candidate.title) } }
+
+    private val rule = !protectedCategory and !branchName and keywordHit
+
+    override fun isSatisfiedBy(candidate: SpotExclusionCandidate): Boolean = rule.isSatisfiedBy(candidate)
 
     private companion object {
         /** 관광 카테고리는 키워드에 걸려도 보호한다(R5). */

@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.domain.recommendation.spec
 
+import org.around.ieuri.tourism.domain.recommendation.ReactionHistory
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
@@ -12,12 +13,12 @@ class TasteThresholdTest {
 
     @Test
     fun `좋아요와 싫어요의 합이 최소와 같으면 성립한다`() {
-        assertTrue(threshold.isMetBy(liked = setOf(1L, 2L), disliked = setOf(3L)))
+        assertTrue(threshold.isSatisfiedBy(ReactionHistory(liked = setOf(1L, 2L), disliked = setOf(3L))))
     }
 
     @Test
     fun `합이 최소보다 하나 적으면 성립하지 않는다`() {
-        assertFalse(threshold.isMetBy(liked = setOf(1L), disliked = setOf(2L)))
+        assertFalse(threshold.isSatisfiedBy(ReactionHistory(liked = setOf(1L), disliked = setOf(2L))))
     }
 
     @Test

@@ -31,7 +31,7 @@ class SpotExclusionRuleTest {
     )
 
     /** SHOPPING은 보호 카테고리가 아니라 판정이 그대로 걸린다. */
-    private fun excluded(title: String, category: SpotCategory = SpotCategory("SHOPPING")) = rule.isExcluded(title, category)
+    private fun excluded(title: String, category: SpotCategory = SpotCategory("SHOPPING")) = rule.isSatisfiedBy(SpotExclusionCandidate(title, category))
 
     // ── R4: 키워드 일치 ──────────────────────────────────────────────────────
 
@@ -128,8 +128,8 @@ class SpotExclusionRuleTest {
     fun `키워드 목록이 비면 아무것도 제외하지 않는다`() {
         val empty = SpotExclusionRule(keywords = emptyList(), branchNamePatterns = emptyList())
 
-        assertFalse(empty.isExcluded("명동명약국", SpotCategory("SHOPPING")))
-        assertFalse(empty.isExcluded("CU 종로점", SpotCategory("SHOPPING")))
+        assertFalse(empty.isSatisfiedBy(SpotExclusionCandidate("명동명약국", SpotCategory("SHOPPING"))))
+        assertFalse(empty.isSatisfiedBy(SpotExclusionCandidate("CU 종로점", SpotCategory("SHOPPING"))))
     }
 
     @Test
@@ -137,15 +137,15 @@ class SpotExclusionRuleTest {
         // 남겨 두면 모든 제목에 일치해 전량 비활성이 된다.
         val blanks = SpotExclusionRule(keywords = listOf("", "  "), branchNamePatterns = emptyList())
 
-        assertFalse(blanks.isExcluded("경복궁", SpotCategory("SHOPPING")))
+        assertFalse(blanks.isSatisfiedBy(SpotExclusionCandidate("경복궁", SpotCategory("SHOPPING"))))
     }
 
     @Test
     fun `빈 문자열이 섞여 있어도 나머지 키워드는 살아 있다`() {
         val mixed = SpotExclusionRule(keywords = listOf("", "약국"), branchNamePatterns = emptyList())
 
-        assertTrue(mixed.isExcluded("명동명약국", SpotCategory("SHOPPING")))
-        assertFalse(mixed.isExcluded("경복궁", SpotCategory("SHOPPING")))
+        assertTrue(mixed.isSatisfiedBy(SpotExclusionCandidate("명동명약국", SpotCategory("SHOPPING"))))
+        assertFalse(mixed.isSatisfiedBy(SpotExclusionCandidate("경복궁", SpotCategory("SHOPPING"))))
     }
 
     // ── 정상 관광지가 걸리지 않는다 ─────────────────────────────────────────

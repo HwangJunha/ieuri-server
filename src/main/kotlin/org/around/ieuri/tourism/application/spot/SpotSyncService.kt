@@ -10,7 +10,7 @@ import org.around.ieuri.tourism.application.spot.required.SpotRepository
 import org.around.ieuri.tourism.application.spot.required.SpotSyncPort
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.spot.SpotHarvest
-import org.around.ieuri.tourism.domain.spot.spec.EndedFestivals
+import org.around.ieuri.tourism.domain.spot.spec.EndedFestival
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
@@ -28,8 +28,8 @@ class SpotSyncService(
     override fun syncSpotPage(language: DomainLocale, pageNo: Int, pageSize: Int, syncedAt: Instant, runDate: LocalDate): SpotSyncPageResult {
         val page = spotSyncPort.fetchPage(language, pageNo, pageSize)
 
-        val ended = EndedFestivals(spotRepository.findFestivalPeriods(language), runDate)
-        val written = spotRepository.upsertSpots(ended.excludeFrom(page.records), syncedAt)
+        val ended = EndedFestival(spotRepository.findFestivalPeriods(language), runDate)
+        val written = spotRepository.upsertSpots(page.records.filterNot { ended.isSatisfiedBy(it.contentId) }, syncedAt)
 
         return SpotSyncPageResult(
             written = written,
@@ -60,7 +60,9 @@ class SpotSyncService(
         val survivors = harvest.survivors()
 
         // 끝난 축제를 먼저 지운다 — 그다음 "이번 수집에 없는" 축제를 지운다.
-        val ended = spotRepository.deleteSpots(language, EndedFestivals(spotRepository.findFestivalPeriods(language), runDate).contentIds)
+        val periods = spotRepository.findFestivalPeriods(language)
+        val endedFestival = EndedFestival(periods, runDate)
+        val ended = spotRepository.deleteSpots(language, periods.keys.filter(endedFestival::isSatisfiedBy).toSet())
         val missing = spotRepository.deleteMissingFestivals(language, survivors)
         return FestivalSweepResult(ended = ended, missing = missing)
     }

@@ -74,7 +74,7 @@ class RegionMetricSyncService(
     /** 등록된 시군구의 행만 적재한다([RegisteredDistricts]). 예외를 던지지 않는다. */
     private fun <T> store(page: RegionMetricSyncPage<T>, pageNo: Int, districtCodeOf: (T) -> String, upsert: (List<T>) -> Int): RegionMetricPageResult {
         val registered = RegisteredDistricts(if (page.records.isEmpty()) emptySet() else districtCodePort.findAllCodes())
-        val (accepted, skipped) = page.records.partition { registered.accepts(districtCodeOf(it)) }
+        val (accepted, skipped) = page.records.partition { registered.isSatisfiedBy(districtCodeOf(it)) }
         return RegionMetricPageResult(
             written = if (accepted.isEmpty()) 0 else upsert(accepted),
             skippedUnknownCode = skipped.size,

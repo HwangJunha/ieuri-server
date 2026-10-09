@@ -41,7 +41,7 @@ interface SpotRepository {
      */
     fun deleteMissingFestivals(language: DomainLocale, survivingContentIds: Set<String>): Int
 
-    /** [language]의 축제 원본 contentId → 행사 기간. 끝났는지는 도메인([org.around.ieuri.tourism.domain.spot.EndedFestivals])이 판정한다. */
+    /** [language]의 축제 원본 contentId → 행사 기간. 끝났는지는 도메인([org.around.ieuri.tourism.domain.spot.spec.EndedFestival])이 판정한다. */
     fun findFestivalPeriods(language: DomainLocale): Map<String, FestivalPeriod>
 
     /** 본문을 쓰고 확보 시각을 새로 시작한다. 부재였던 행은 본문 있음으로 돌아간다. */
