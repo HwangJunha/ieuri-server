@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.adapter.persistence.mapper
 
+import org.around.ieuri.tourism.adapter.persistence.table.DistrictTable
 import org.around.ieuri.tourism.adapter.persistence.table.KtoConcentrationRateTable
 import org.around.ieuri.tourism.adapter.persistence.table.KtoSpendingIntensityTable
 import org.around.ieuri.tourism.adapter.persistence.table.KtoStayIntensityTable
@@ -312,5 +313,16 @@ class TourismAggregateRowMappersTest {
     @Test
     fun `원본 행의 주소가 없으면 null이다`() {
         assertNull(spotRow(address = null).toSpot().address)
+    }
+
+    @Test
+    fun `시군구 행은 코드와 대표 위치 유무를 바꾸지 않는다`() {
+        val with = ResultRow.createAndFillValues(mapOf<Expression<*>, Any?>(DistrictTable.code to "11110", DistrictTable.representativeLocation to "POINT(127 37)")).toDistrict()
+        val without = ResultRow.createAndFillValues(mapOf<Expression<*>, Any?>(DistrictTable.code to "26110", DistrictTable.representativeLocation to null)).toDistrict()
+
+        assertEquals("11110", with.code)
+        assertEquals(true, with.hasRepresentative)
+        assertEquals("26110", without.code)
+        assertEquals(false, without.hasRepresentative)
     }
 }

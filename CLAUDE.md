@@ -353,7 +353,8 @@ refactor.
 - **Every persisted domain datum belongs to an aggregate, and every write goes through its root.**
   Load the root → a root method decides → save. This holds for batch-synced and derived data too
   (KTO metrics, embeddings, a district's representative location) — a thin root is still a root.
-  A repository exists per root and writes only that aggregate's tables. Exceptions, and only these:
+  A repository exists per root and writes only what that aggregate owns — its tables, or a column it
+  owns in another table (`spot.catalog_id` is catalog membership, D-124). Exceptions, and only these:
   reads skip the aggregate (D-40); rows with no domain rule may be bulk-deleted; after the root
   decides, the service writes only what changed. Findings: a package that writes with no root, a
   root with no identity or no behaviour, a repository writing another aggregate's table, a rule that

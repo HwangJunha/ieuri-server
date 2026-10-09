@@ -88,7 +88,6 @@ class SpotPersistenceAdapter : SpotRepository {
         return deleteSpotsInChunks(language, doomed)
     }
 
-    /** 부모 원본의 id를 자연키로 먼저 찾는다. 부모가 없는 항목은 건너뛴다(FK 위반 대신). */
     override fun findById(spotId: Long): Spot? = SpotTable.selectAll().where { SpotTable.id eq spotId }.singleOrNull()?.toSpot()
 
     override fun findByContentIds(language: DomainLocale, contentIds: Collection<String>): List<Spot> {

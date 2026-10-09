@@ -22,7 +22,7 @@ private val DATE_FORMAT = DateTimeFormatter.ofPattern("uuuuMMdd")
 /** `yyyyMM`. */
 private val MONTH_FORMAT = DateTimeFormatter.ofPattern("uuuuMM")
 
-fun KtoVisitorCountItem.toSyncCommandOrNull(): VisitorCountRecord? {
+fun KtoVisitorCountItem.toRecordOrNull(): VisitorCountRecord? {
     val code = signguCode?.trim()?.takeIf { it.isNotEmpty() } ?: return null
     val baseDate = baseYmd.toLocalDateOrNull() ?: return null
     // 구분 코드가 있으면 코드를, 없으면 명칭을 쓴다.
@@ -38,7 +38,7 @@ fun KtoVisitorCountItem.toSyncCommandOrNull(): VisitorCountRecord? {
     )
 }
 
-fun KtoConcentrationRateItem.toSyncCommandOrNull(): ConcentrationRateRecord? {
+fun KtoConcentrationRateItem.toRecordOrNull(): ConcentrationRateRecord? {
     val code = signguCd?.trim()?.takeIf { it.isNotEmpty() } ?: return null
     val spotName = tAtsNm?.trim()?.takeIf { it.isNotEmpty() } ?: return null
     // 예측 대상일이다. 행마다 다르며 그대로 보존한다(R5).
@@ -54,7 +54,7 @@ fun KtoConcentrationRateItem.toSyncCommandOrNull(): ConcentrationRateRecord? {
 }
 
 /** 체류·소비 강도 공용. 적재 테이블은 호출자가 고른다. */
-fun KtoDemandIntensityItem.toSyncCommandOrNull(): DemandIntensityRecord? {
+fun KtoDemandIntensityItem.toRecordOrNull(): DemandIntensityRecord? {
     val code = signguCd?.trim()?.takeIf { it.isNotEmpty() } ?: return null
     val month = baseYm.toBaseMonthOrNull() ?: return null
     val indicator = indicatorCode?.trim()?.takeIf { it.isNotEmpty() } ?: return null

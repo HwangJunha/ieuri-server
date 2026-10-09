@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.adapter.persistence.mapper
 
+import org.around.ieuri.tourism.adapter.persistence.table.DistrictTable
 import org.around.ieuri.tourism.adapter.persistence.table.KtoConcentrationRateTable
 import org.around.ieuri.tourism.adapter.persistence.table.KtoSpendingIntensityTable
 import org.around.ieuri.tourism.adapter.persistence.table.KtoStayIntensityTable
@@ -22,6 +23,7 @@ import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.footprint.ShareLink
 import org.around.ieuri.tourism.domain.region.ConcentrationRate
 import org.around.ieuri.tourism.domain.region.DemandIntensity
+import org.around.ieuri.tourism.domain.region.District
 import org.around.ieuri.tourism.domain.region.VisitorCount
 import org.around.ieuri.tourism.domain.shared.Coordinates
 import org.around.ieuri.tourism.domain.shared.CopyrightType
@@ -204,6 +206,12 @@ fun ResultRow.toSpotInfoItem(): SpotInfoItem = SpotInfoItem(name = this[SpotDeta
 fun ResultRow.toShareLink(): ShareLink = ShareLink(
     token = this[MapShareLinkTable.token],
     issuedAt = this[MapShareLinkTable.createdAt].toInstant(),
+)
+
+/** 시군구 행 → 도메인 [District]. 대표 위치는 값이 아니라 있는가만 본다. */
+fun ResultRow.toDistrict(): District = District(
+    code = this[DistrictTable.code],
+    hasRepresentative = this[DistrictTable.representativeLocation] != null,
 )
 
 fun VisitorCount.writeTo(row: UpdateBuilder<*>) {

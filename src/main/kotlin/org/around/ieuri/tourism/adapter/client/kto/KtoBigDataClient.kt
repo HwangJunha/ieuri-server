@@ -4,7 +4,7 @@ import org.around.ieuri.tourism.adapter.client.kto.dto.KtoBigDataResponse
 import org.around.ieuri.tourism.adapter.client.kto.dto.KtoConcentrationRateItem
 import org.around.ieuri.tourism.adapter.client.kto.dto.KtoDemandIntensityItem
 import org.around.ieuri.tourism.adapter.client.kto.dto.KtoVisitorCountItem
-import org.around.ieuri.tourism.adapter.client.kto.mapper.toSyncCommandOrNull
+import org.around.ieuri.tourism.adapter.client.kto.mapper.toRecordOrNull
 import org.around.ieuri.tourism.adapter.config.KtoBigDataProperties
 import org.around.ieuri.tourism.application.region.required.RegionMetricSyncPort
 import org.around.ieuri.tourism.application.region.required.dto.ConcentrationRateRecord
@@ -50,7 +50,7 @@ class KtoBigDataClient(
             queryParam("startYmd", startDate.format(DATE_FORMAT))
             queryParam("endYmd", endDate.format(DATE_FORMAT))
         }
-        return fetchPage(uri, VISITOR_COUNT_TYPE) { it.toSyncCommandOrNull() }
+        return fetchPage(uri, VISITOR_COUNT_TYPE) { it.toRecordOrNull() }
     }
 
     /**
@@ -67,7 +67,7 @@ class KtoBigDataClient(
             queryParam("areaCd", areaCd)
             queryParam("signguCd", signguCd)
         }
-        return fetchPage(uri, CONCENTRATION_RATE_TYPE) { it.toSyncCommandOrNull() }
+        return fetchPage(uri, CONCENTRATION_RATE_TYPE) { it.toRecordOrNull() }
     }
 
     override fun fetchStayIntensities(
@@ -119,7 +119,7 @@ class KtoBigDataClient(
             queryParam("baseYm", baseMonth.format(MONTH_FORMAT))
             queryParam(indexParamName, indexCode)
         }
-        return fetchPage(uri, DEMAND_INTENSITY_TYPE) { it.toSyncCommandOrNull() }
+        return fetchPage(uri, DEMAND_INTENSITY_TYPE) { it.toRecordOrNull() }
     }
 
     /**

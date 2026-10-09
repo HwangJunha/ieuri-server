@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.adapter.persistence
 
+import org.around.ieuri.tourism.adapter.persistence.mapper.toDistrict
 import org.around.ieuri.tourism.adapter.persistence.mapper.writeSpendingIntensityTo
 import org.around.ieuri.tourism.adapter.persistence.mapper.writeStayIntensityTo
 import org.around.ieuri.tourism.adapter.persistence.mapper.writeTo
@@ -34,8 +35,7 @@ import org.springframework.stereotype.Component
 @Component
 class DistrictPersistenceAdapter : DistrictRepository {
 
-    override fun findAll(): List<District> = DistrictTable.select(DistrictTable.code, DistrictTable.representativeLocation)
-        .map { District(code = it[DistrictTable.code], hasRepresentative = it[DistrictTable.representativeLocation] != null) }
+    override fun findAll(): List<District> = DistrictTable.select(DistrictTable.code, DistrictTable.representativeLocation).map { it.toDistrict() }
 
     override fun saveRepresentative(districtCode: String, choice: RepresentativeLocation.Choice) {
         DistrictTable.update({ DistrictTable.code eq districtCode }) {
