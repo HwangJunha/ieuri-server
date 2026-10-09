@@ -1,6 +1,6 @@
 package org.around.ieuri.tourism.application.region.required
 
-import org.around.ieuri.tourism.domain.region.RepresentativeLocation
+import org.around.ieuri.tourism.domain.region.policy.RepresentativeLocation
 
 /** 시군구 대표 위치 저장(SPEC-0015). 고르는 규칙은 도메인([RepresentativeLocation])에 있다. */
 interface DistrictRepresentativeUpdatePort {

@@ -13,10 +13,10 @@ import org.around.ieuri.tourism.application.region.required.dto.DistrictRegion
 import org.around.ieuri.tourism.application.region.required.dto.RegionMetric
 import org.around.ieuri.tourism.application.region.required.dto.RegionRow
 import org.around.ieuri.tourism.domain.region.RegionScore
-import org.around.ieuri.tourism.domain.region.RegionScoreCalculator
 import org.around.ieuri.tourism.domain.region.RegionScoreFactor
 import org.around.ieuri.tourism.domain.region.RegionTotalScore
-import org.around.ieuri.tourism.domain.region.ScoreNormalization
+import org.around.ieuri.tourism.domain.region.policy.RegionScoreCalculator
+import org.around.ieuri.tourism.domain.region.policy.ScoreNormalization
 import org.around.ieuri.tourism.domain.shared.Coordinates
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.springframework.stereotype.Service

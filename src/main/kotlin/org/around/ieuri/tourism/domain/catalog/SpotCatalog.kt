@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.domain.catalog
 
+import org.around.ieuri.tourism.domain.catalog.policy.OriginProximityClustering
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.shared.FestivalPeriod
 

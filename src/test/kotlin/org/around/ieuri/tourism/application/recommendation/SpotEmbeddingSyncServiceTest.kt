@@ -12,11 +12,11 @@ import org.around.ieuri.tourism.application.recommendation.required.TextEmbeddin
 import org.around.ieuri.tourism.application.recommendation.required.dto.EmbeddingTarget
 import org.around.ieuri.tourism.application.recommendation.required.dto.SpotEmbedding
 import org.around.ieuri.tourism.domain.category.SpotCategory
-import org.around.ieuri.tourism.domain.recommendation.CategoryDiversity
-import org.around.ieuri.tourism.domain.recommendation.RecommendationScore
-import org.around.ieuri.tourism.domain.recommendation.TasteThreshold
+import org.around.ieuri.tourism.domain.recommendation.policy.CategoryDiversity
+import org.around.ieuri.tourism.domain.recommendation.policy.RecommendationScore
+import org.around.ieuri.tourism.domain.recommendation.spec.TasteThreshold
 import org.around.ieuri.tourism.domain.shared.DomainLocale
-import org.around.ieuri.tourism.domain.spot.TaxRefundTitleRule
+import org.around.ieuri.tourism.domain.spot.spec.TaxRefundTitleRule
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

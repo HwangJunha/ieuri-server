@@ -11,7 +11,7 @@ import org.around.ieuri.tourism.application.region.required.DistrictCodeQueryPor
 import org.around.ieuri.tourism.application.region.required.RegionMetricStorePort
 import org.around.ieuri.tourism.application.region.required.RegionMetricSyncPort
 import org.around.ieuri.tourism.application.region.required.dto.RegionMetricSyncPage
-import org.around.ieuri.tourism.domain.region.RegisteredDistricts
+import org.around.ieuri.tourism.domain.region.spec.RegisteredDistricts
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate

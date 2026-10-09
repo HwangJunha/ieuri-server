@@ -1,9 +1,9 @@
 package org.around.ieuri.tourism.application.region
 
-import org.around.ieuri.tourism.domain.region.DistanceScoring
-import org.around.ieuri.tourism.domain.region.FreshnessDecay
-import org.around.ieuri.tourism.domain.region.ProvinceEligibility
-import org.around.ieuri.tourism.domain.region.RegionScoreWeights
+import org.around.ieuri.tourism.domain.region.policy.DistanceScoring
+import org.around.ieuri.tourism.domain.region.policy.FreshnessDecay
+import org.around.ieuri.tourism.domain.region.policy.RegionScoreWeights
+import org.around.ieuri.tourism.domain.region.spec.ProvinceEligibility
 
 /**
  * 지역 추천 정책값(SPEC-0015 R19·R30, 설정에서 주입).

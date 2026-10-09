@@ -8,7 +8,7 @@ import org.around.ieuri.tourism.application.spot.required.SpotSyncPort
 import org.around.ieuri.tourism.application.spot.required.dto.SpotSyncPage
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.DomainLocale
-import org.around.ieuri.tourism.domain.spot.SpotExclusionRule
+import org.around.ieuri.tourism.domain.spot.spec.SpotExclusionRule
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.requiredBody

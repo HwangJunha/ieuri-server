@@ -9,12 +9,12 @@ import org.around.ieuri.tourism.application.catalog.required.CatalogEventPublish
 import org.around.ieuri.tourism.application.catalog.required.SpotCatalogQueryPort
 import org.around.ieuri.tourism.application.catalog.required.SpotCatalogRepository
 import org.around.ieuri.tourism.domain.catalog.CatalogAssignment
-import org.around.ieuri.tourism.domain.catalog.CatalogIndex
 import org.around.ieuri.tourism.domain.catalog.CatalogOrigin
 import org.around.ieuri.tourism.domain.catalog.CatalogSplit
 import org.around.ieuri.tourism.domain.catalog.SpotCatalog
 import org.around.ieuri.tourism.domain.catalog.event.CatalogLanguageRef
 import org.around.ieuri.tourism.domain.catalog.event.SpotCatalogLanguagesChanged
+import org.around.ieuri.tourism.domain.catalog.policy.CatalogIndex
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service

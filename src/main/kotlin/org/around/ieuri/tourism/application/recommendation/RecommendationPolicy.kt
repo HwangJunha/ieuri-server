@@ -1,8 +1,8 @@
 package org.around.ieuri.tourism.application.recommendation
 
-import org.around.ieuri.tourism.domain.recommendation.CategoryDiversity
-import org.around.ieuri.tourism.domain.recommendation.RecommendationScore
-import org.around.ieuri.tourism.domain.recommendation.TasteThreshold
+import org.around.ieuri.tourism.domain.recommendation.policy.CategoryDiversity
+import org.around.ieuri.tourism.domain.recommendation.policy.RecommendationScore
+import org.around.ieuri.tourism.domain.recommendation.spec.TasteThreshold
 
 /**
  * 추천 정책(SPEC-0035 §9, POL-044). 계수는 전부 설정에서 오며 여기 숫자를 적지 않는다.

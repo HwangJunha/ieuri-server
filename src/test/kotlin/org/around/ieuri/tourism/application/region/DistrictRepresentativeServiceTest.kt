@@ -4,8 +4,8 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import org.around.ieuri.tourism.application.region.required.DistrictRepresentativeUpdatePort
-import org.around.ieuri.tourism.domain.region.RepresentativeLocation
-import org.around.ieuri.tourism.domain.region.RepresentativeLocation.Point
+import org.around.ieuri.tourism.domain.region.policy.RepresentativeLocation
+import org.around.ieuri.tourism.domain.region.policy.RepresentativeLocation.Point
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test

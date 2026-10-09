@@ -6,7 +6,7 @@ import org.around.ieuri.common.persistence.stSnapToGrid
 import org.around.ieuri.tourism.adapter.persistence.table.DistrictTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotTable
 import org.around.ieuri.tourism.application.region.required.DistrictRepresentativeUpdatePort
-import org.around.ieuri.tourism.domain.region.RepresentativeLocation
+import org.around.ieuri.tourism.domain.region.policy.RepresentativeLocation
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.jetbrains.exposed.v1.core.JoinType
 import org.jetbrains.exposed.v1.core.and

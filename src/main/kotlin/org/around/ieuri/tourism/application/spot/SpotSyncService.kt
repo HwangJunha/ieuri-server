@@ -9,8 +9,8 @@ import org.around.ieuri.tourism.application.spot.required.FestivalSyncPort
 import org.around.ieuri.tourism.application.spot.required.SpotRepository
 import org.around.ieuri.tourism.application.spot.required.SpotSyncPort
 import org.around.ieuri.tourism.domain.shared.DomainLocale
-import org.around.ieuri.tourism.domain.spot.EndedFestivals
 import org.around.ieuri.tourism.domain.spot.SpotHarvest
+import org.around.ieuri.tourism.domain.spot.spec.EndedFestivals
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
