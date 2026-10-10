@@ -14,7 +14,6 @@ import org.around.ieuri.auth.application.member.provided.dto.VerifyEmailCommand
 import org.around.ieuri.auth.application.member.provided.dto.VerifyEmailResult
 import org.around.ieuri.auth.application.member.provided.exception.MemberAlreadyRegisteredException
 import org.around.ieuri.auth.application.member.provided.exception.MemberNotFoundException
-import org.around.ieuri.auth.application.member.provided.exception.VerificationNotFoundException
 import org.around.ieuri.auth.application.member.required.LoginIdentifierProtectorPort
 import org.around.ieuri.auth.application.member.required.MemberEventPublisherPort
 import org.around.ieuri.auth.application.member.required.MemberRepository
@@ -35,6 +34,7 @@ import org.around.ieuri.auth.domain.member.Provider
 import org.around.ieuri.auth.domain.member.ProviderUserId
 import org.around.ieuri.auth.domain.member.Role
 import org.around.ieuri.auth.domain.member.VerificationCode
+import org.around.ieuri.auth.domain.member.VerificationNotFoundException
 import org.around.ieuri.auth.domain.member.VerificationPolicy
 import org.around.ieuri.auth.domain.member.VerificationPurpose
 import org.around.ieuri.auth.domain.member.VerificationResult
@@ -144,11 +144,11 @@ class MemberRegistrationService(
 
     override fun verifyEmail(command: VerifyEmailCommand): VerifyEmailResult {
         val now = clock.instant()
-        val verification = loadRegistrationChallenge(command.verificationPublicId, forUpdate = true)
+        val verification = loadChallenge(command.verificationPublicId, forUpdate = true)
         val member = memberRepository.findById(verification.memberId)
             ?: throw MemberNotFoundException("회원을 찾을 수 없습니다.")
 
-        val attempt = member.verifyEmail(verification, codeGenerator.hash(command.code), now)
+        val attempt = member.verifyRegistrationEmail(verification, codeGenerator.hash(command.code), now)
         // 성패와 무관하게 시도 횟수·소진을 남긴다.
         memberRepository.saveEmailVerification(attempt.verification)
 
@@ -164,7 +164,7 @@ class MemberRegistrationService(
 
     override fun resendVerification(command: ResendVerificationCommand): ResendVerificationResult {
         val now = clock.instant()
-        val previous = loadRegistrationChallenge(command.verificationPublicId)
+        val previous = loadChallenge(command.verificationPublicId)
         val member = memberRepository.findById(previous.memberId)
             ?: throw VerificationNotFoundException("회원 정보를 찾을 수 없습니다.")
 
@@ -232,7 +232,7 @@ class MemberRegistrationService(
     }
 
     private fun store(issue: EmailVerificationIssue) {
-        issue.consumed.forEach(memberRepository::saveEmailVerification)
+        issue.consumed.forEach(memberRepository::consumeEmailVerification)
         memberRepository.insertEmailVerification(issue.issued)
     }
 
@@ -252,13 +252,9 @@ class MemberRegistrationService(
         .firstOrNull()
         ?: nicknameGenerator.generate()
 
-    /**
-     * 핸들을 가입 인증 코드로만 읽는다. 이메일 변경 핸들이면 없는 것과 같이 답한다.
-     * - 목적을 반드시 걸러야 한다. 이 경로는 인증이 없어, 거르지 않으면 남의 이메일 변경이 여기서 확정된다.
-     */
-    private fun loadRegistrationChallenge(publicId: UUID, forUpdate: Boolean = false): EmailVerification = memberRepository.findEmailVerification(publicId, forUpdate)
-        ?.takeIf { it.purpose == VerificationPurpose.REGISTRATION }
-        ?: throw VerificationNotFoundException("유효하지 않은 검증 요청입니다.")
+    /** 핸들로 코드를 읽는다. 가입 인증 코드가 맞는지는 루트가 판정한다. */
+    private fun loadChallenge(publicId: UUID, forUpdate: Boolean = false): EmailVerification = memberRepository.findEmailVerification(publicId, forUpdate)
+        ?: throw VerificationNotFoundException()
 
     private companion object {
         val log = LoggerFactory.getLogger(MemberRegistrationService::class.java)

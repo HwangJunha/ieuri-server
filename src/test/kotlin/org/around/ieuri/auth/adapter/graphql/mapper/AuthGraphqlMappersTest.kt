@@ -8,8 +8,11 @@ import org.around.ieuri.auth.application.token.provided.dto.TokenPairResult
 import org.around.ieuri.auth.domain.member.MemberStatus
 import org.around.ieuri.auth.domain.member.Provider
 import org.around.ieuri.common.graphql.generated.types.AgreementInput
+import org.around.ieuri.common.graphql.generated.types.LoginEmailInput
+import org.around.ieuri.common.graphql.generated.types.LoginSnsInput
 import org.around.ieuri.common.graphql.generated.types.RegisterEmailMemberInput
 import org.around.ieuri.common.graphql.generated.types.RegisterSnsMemberInput
+import org.around.ieuri.common.graphql.generated.types.ResetPasswordInput
 import org.around.ieuri.common.graphql.generated.types.TermsCode
 import org.around.ieuri.common.pagination.CursorEdge
 import org.around.ieuri.common.pagination.CursorPage
@@ -94,6 +97,64 @@ class AuthGraphqlMappersTest {
         assertEquals(true, command.ageVerified)
         assertEquals(listOf("SERVICE", "MARKETING"), command.agreements.map { it.termsCode })
         assertEquals(listOf(true, false), command.agreements.map { it.agreed })
+    }
+
+    @Test
+    fun `SNS 로그인 입력이 Command로 옮겨진다 - 토큰과 인가 코드와 접속지가 섞이지 않는다`() {
+        val command = LoginSnsInput(
+            provider = GqlProvider.GOOGLE,
+            idToken = "id-token-값",
+            authorizationCode = "auth-code-값",
+        ).toCommand(ipAddress = "203.0.113.7")
+
+        assertEquals(Provider.GOOGLE, command.provider)
+        assertEquals("id-token-값", command.idToken)
+        assertEquals("auth-code-값", command.authorizationCode)
+        assertEquals("203.0.113.7", command.ipAddress)
+    }
+
+    @Test
+    fun `SNS 로그인 입력의 인가 코드와 접속지가 없으면 null로 옮겨진다`() {
+        val command = LoginSnsInput(provider = GqlProvider.APPLE, idToken = "id-token-값", authorizationCode = null).toCommand(ipAddress = null)
+
+        assertEquals(Provider.APPLE, command.provider)
+        assertEquals("id-token-값", command.idToken)
+        assertNull(command.authorizationCode)
+        assertNull(command.ipAddress)
+    }
+
+    @Test
+    fun `SNS 로그인의 provider는 네 값 모두 같은 이름으로 옮겨진다`() {
+        GqlProvider.entries.forEach { provider ->
+            assertEquals(provider.name, LoginSnsInput(provider = provider, idToken = "t").toCommand(ipAddress = null).provider.name)
+        }
+    }
+
+    @Test
+    fun `자체 로그인 입력이 Command로 옮겨진다 - 이메일과 비밀번호와 접속지가 섞이지 않는다`() {
+        val command = LoginEmailInput(email = "login@example.com", password = "비밀번호-값").toCommand(ipAddress = "198.51.100.9")
+
+        assertEquals("login@example.com", command.email)
+        assertEquals("비밀번호-값", command.password)
+        assertEquals("198.51.100.9", command.ipAddress)
+    }
+
+    @Test
+    fun `자체 로그인 입력의 접속지가 없으면 null로 옮겨진다`() {
+        val command = LoginEmailInput(email = "login@example.com", password = "비밀번호-값").toCommand(ipAddress = null)
+
+        assertEquals("login@example.com", command.email)
+        assertEquals("비밀번호-값", command.password)
+        assertNull(command.ipAddress)
+    }
+
+    @Test
+    fun `비밀번호 재설정 입력이 Command로 옮겨진다 - 이메일과 코드와 새 비밀번호가 섞이지 않는다`() {
+        val command = ResetPasswordInput(email = "reset@example.com", code = "481516", newPassword = "NewPassw0rd!-distinct").toCommand()
+
+        assertEquals("reset@example.com", command.email)
+        assertEquals("481516", command.code)
+        assertEquals("NewPassw0rd!-distinct", command.newPassword)
     }
 
     // ── 토큰 ──

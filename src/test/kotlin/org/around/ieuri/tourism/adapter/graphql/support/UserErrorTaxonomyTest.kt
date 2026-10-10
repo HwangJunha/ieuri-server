@@ -6,9 +6,9 @@ import org.around.ieuri.auth.application.member.provided.exception.MemberAlready
 import org.around.ieuri.auth.application.member.provided.exception.MemberNotFoundException
 import org.around.ieuri.auth.application.member.provided.exception.RoleNotFoundException
 import org.around.ieuri.auth.application.member.provided.exception.SnsVerificationFailedException
-import org.around.ieuri.auth.application.member.provided.exception.VerificationNotFoundException
 import org.around.ieuri.auth.domain.member.InactiveMemberException
 import org.around.ieuri.auth.domain.member.SelfDemotionException
+import org.around.ieuri.auth.domain.member.VerificationNotFoundException
 import org.around.ieuri.auth.domain.member.VerificationRateLimitedException
 import org.around.ieuri.auth.domain.shared.UserFacingException
 import org.around.ieuri.common.security.UnauthorizedException

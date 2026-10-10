@@ -167,6 +167,10 @@ class MemberPersistenceAdapter(
         EmailVerificationTable.update({ EmailVerificationTable.publicId eq verification.publicId }) { verification.writeProgressTo(it) }
     }
 
+    override fun consumeEmailVerification(verification: EmailVerification) {
+        EmailVerificationTable.update({ EmailVerificationTable.publicId eq verification.publicId }) { it[EmailVerificationTable.consumed] = true }
+    }
+
     override fun findEmailVerification(publicId: UUID, forUpdate: Boolean): EmailVerification? = EmailVerificationTable.selectAll()
         .where { EmailVerificationTable.publicId eq publicId }
         .let { if (forUpdate) it.forUpdate() else it }
@@ -184,6 +188,10 @@ class MemberPersistenceAdapter(
 
     override fun savePasswordReset(reset: PasswordReset) {
         PasswordResetTable.update({ PasswordResetTable.publicId eq reset.publicId }) { reset.writeProgressTo(it) }
+    }
+
+    override fun consumePasswordReset(reset: PasswordReset) {
+        PasswordResetTable.update({ PasswordResetTable.publicId eq reset.publicId }) { it[PasswordResetTable.consumed] = true }
     }
 
     override fun findPasswordResets(memberId: Long, forUpdate: Boolean): List<PasswordReset> = PasswordResetTable.selectAll()

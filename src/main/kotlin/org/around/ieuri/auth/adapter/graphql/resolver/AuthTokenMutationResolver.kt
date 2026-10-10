@@ -3,14 +3,12 @@ import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsMutation
 import com.netflix.graphql.dgs.InputArgument
 import graphql.schema.DataFetchingEnvironment
+import org.around.ieuri.auth.adapter.graphql.mapper.toCommand
 import org.around.ieuri.auth.adapter.graphql.mapper.toPayload
 import org.around.ieuri.auth.adapter.graphql.support.withUserErrors
 import org.around.ieuri.auth.application.token.provided.AuthTokenUseCase
-import org.around.ieuri.auth.application.token.provided.dto.LoginCommand
-import org.around.ieuri.auth.application.token.provided.dto.LoginEmailCommand
 import org.around.ieuri.auth.application.token.provided.dto.LogoutCommand
 import org.around.ieuri.auth.application.token.provided.dto.RefreshTokenCommand
-import org.around.ieuri.auth.domain.member.Provider
 import org.around.ieuri.common.graphql.clientIp
 import org.around.ieuri.common.graphql.generated.types.AuthTokenPayload
 import org.around.ieuri.common.graphql.generated.types.LoginEmailInput
@@ -32,14 +30,7 @@ class AuthTokenMutationResolver(
     ): AuthTokenPayload = withUserErrors(
         onError = { authTokenErrorPayload(it) },
     ) {
-        authTokenUseCase.loginBySns(
-            LoginCommand(
-                provider = Provider.valueOf(input.provider.name),
-                idToken = input.idToken,
-                authorizationCode = input.authorizationCode,
-                ipAddress = dfe.clientIp(),
-            ),
-        ).toPayload()
+        authTokenUseCase.loginBySns(input.toCommand(dfe.clientIp())).toPayload()
     }
 
     @DgsMutation
@@ -49,13 +40,7 @@ class AuthTokenMutationResolver(
     ): AuthTokenPayload = withUserErrors(
         onError = { authTokenErrorPayload(it) },
     ) {
-        authTokenUseCase.loginByEmail(
-            LoginEmailCommand(
-                email = input.email,
-                password = input.password,
-                ipAddress = dfe.clientIp(),
-            ),
-        ).toPayload()
+        authTokenUseCase.loginByEmail(input.toCommand(dfe.clientIp())).toPayload()
     }
 
     @DgsMutation

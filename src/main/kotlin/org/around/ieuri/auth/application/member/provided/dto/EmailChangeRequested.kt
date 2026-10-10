@@ -1,7 +1,4 @@
 package org.around.ieuri.auth.application.member.provided.dto
-import org.around.ieuri.auth.application.member.provided.dto.ChangeEmailCommand
-import org.around.ieuri.auth.application.member.provided.dto.ConfirmEmailChangeCommand
-import org.around.ieuri.auth.application.member.provided.dto.ResendEmailChangeCommand
 import java.time.Instant
 import java.util.UUID
 

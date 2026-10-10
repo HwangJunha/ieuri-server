@@ -55,7 +55,7 @@ class PasswordResetService(
             policy = verificationPolicy,
             now = now,
         )
-        issue.consumed.forEach(memberRepository::savePasswordReset)
+        issue.consumed.forEach(memberRepository::consumePasswordReset)
         memberRepository.insertPasswordReset(issue.issued)
         eventPublisher.publish(PasswordResetRequested(memberId, email, plainCode))
     }

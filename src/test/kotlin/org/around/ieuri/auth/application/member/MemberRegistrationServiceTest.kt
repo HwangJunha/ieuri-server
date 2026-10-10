@@ -18,7 +18,6 @@ import org.around.ieuri.auth.application.member.provided.exception.EmailAlreadyI
 import org.around.ieuri.auth.application.member.provided.exception.MemberAlreadyRegisteredException
 import org.around.ieuri.auth.application.member.provided.exception.MemberNotFoundException
 import org.around.ieuri.auth.application.member.provided.exception.PasswordPolicyViolationException
-import org.around.ieuri.auth.application.member.provided.exception.VerificationNotFoundException
 import org.around.ieuri.auth.application.member.required.MemberEventPublisherPort
 import org.around.ieuri.auth.application.member.required.MemberRepository
 import org.around.ieuri.auth.application.member.required.PasswordEncoderPort
@@ -39,6 +38,7 @@ import org.around.ieuri.auth.domain.member.ResendCooldownActiveException
 import org.around.ieuri.auth.domain.member.Role
 import org.around.ieuri.auth.domain.member.Terms
 import org.around.ieuri.auth.domain.member.UnderageRegistrationException
+import org.around.ieuri.auth.domain.member.VerificationNotFoundException
 import org.around.ieuri.auth.domain.member.VerificationPolicy
 import org.around.ieuri.auth.domain.member.VerificationPurpose
 import org.around.ieuri.auth.domain.member.VerificationRateLimitedException
@@ -478,9 +478,24 @@ class MemberRegistrationServiceTest {
         val ex = assertFailsWith<VerificationNotFoundException> { service.verifyEmail(VerifyEmailCommand(publicId, "123456")) }
 
         assertEquals("유효하지 않은 검증 요청입니다.", ex.message)
+        assertEquals("VERIFICATION_NOT_FOUND", ex.code)
         verify(exactly = 0) { memberRepository.saveEmailVerification(any()) }
+        verify(exactly = 0) { memberRepository.consumeEmailVerification(any()) }
         verify(exactly = 0) { memberRepository.saveEmail(any()) }
         verify(exactly = 0) { memberRepository.saveEmailVerified(any()) }
+        assertTrue(events.isEmpty())
+    }
+
+    /** 틀린 코드로 두드려도 남의 변경 코드에 시도 횟수가 쌓이지 않는다. */
+    @Test
+    fun `이메일 변경 핸들은 틀린 코드를 넣어도 시도를 남기지 않는다`() {
+        givenChallenge(challenge(purpose = VerificationPurpose.EMAIL_CHANGE, targetEmail = "victim@example.com"))
+        givenMember(memberFixture(emailVerified = false))
+
+        assertFailsWith<VerificationNotFoundException> { service.verifyEmail(VerifyEmailCommand(publicId, "000000")) }
+
+        verify(exactly = 0) { memberRepository.saveEmailVerification(any()) }
+        assertTrue(events.isEmpty())
     }
 
     @Test
@@ -570,10 +585,11 @@ class MemberRegistrationServiceTest {
         assertEquals("hashed:123456", issued.codeHash)
         assertEquals(VerificationPurpose.REGISTRATION, issued.purpose)
         assertNull(issued.targetEmail)
-        // 살아 있던 코드만 폐기로 저장한다. 이미 소진된 것은 다시 쓰지 않는다.
-        verify(exactly = 1) { memberRepository.saveEmailVerification(any()) }
+        // 살아 있던 코드만 폐기한다. 이미 소진된 것은 다시 쓰지 않는다. 폐기는 consumed 한 열만 쓰는 연산이다.
+        verify(exactly = 1) { memberRepository.consumeEmailVerification(any()) }
+        verify(exactly = 0) { memberRepository.saveEmailVerification(any()) }
         verifyOrder {
-            memberRepository.saveEmailVerification(previous.copy(consumed = true))
+            memberRepository.consumeEmailVerification(previous.copy(consumed = true))
             memberRepository.insertEmailVerification(issued)
         }
         assertEquals(listOf<Any>(VerificationEmailRequested("user@example.com", "123456")), events)
@@ -602,21 +618,27 @@ class MemberRegistrationServiceTest {
 
         assertEquals("VERIFICATION_RATE_LIMITED", ex.code)
         assertEquals("잠시 후 다시 시도해 주세요.", ex.message)
+        verify(exactly = 0) { memberRepository.consumeEmailVerification(any()) }
         verify(exactly = 0) { memberRepository.saveEmailVerification(any()) }
         verify(exactly = 0) { memberRepository.insertEmailVerification(any()) }
         assertTrue(events.isEmpty())
     }
 
-    /** 거르지 않으면 변경 대상 주소로 가입 인증 코드를 보내게 된다. */
+    /** 거르지 않으면 변경 대상 주소로 가입 인증 코드를 보내게 된다. 쿨다운 안이어도 같은 답이다. */
     @Test
     fun `이메일 변경 핸들이나 없는 핸들로는 재발송할 수 없다`() {
+        givenMember(memberFixture(emailVerified = false))
+        every { memberRepository.findEmailVerifications(100L, VerificationPurpose.REGISTRATION) } returns listOf(challenge().copy(createdAt = now.minusSeconds(30)))
         givenResendChallenge(challenge(purpose = VerificationPurpose.EMAIL_CHANGE, targetEmail = "victim@example.com"))
         val wrongPurpose = assertFailsWith<VerificationNotFoundException> { service.resendVerification(ResendVerificationCommand(publicId)) }
         givenResendChallenge(null)
         val missing = assertFailsWith<VerificationNotFoundException> { service.resendVerification(ResendVerificationCommand(publicId)) }
 
         assertEquals("유효하지 않은 검증 요청입니다.", wrongPurpose.message)
+        assertEquals("VERIFICATION_NOT_FOUND", wrongPurpose.code)
         assertEquals("유효하지 않은 검증 요청입니다.", missing.message)
+        verify(exactly = 0) { memberRepository.consumeEmailVerification(any()) }
+        verify(exactly = 0) { memberRepository.saveEmailVerification(any()) }
         verify(exactly = 0) { memberRepository.insertEmailVerification(any()) }
         assertTrue(events.isEmpty())
     }
@@ -651,7 +673,11 @@ class MemberRegistrationServiceTest {
         assertEquals(Email("right@example.com"), issued.targetEmail)
         assertEquals(VerificationPurpose.REGISTRATION, issued.purpose)
         assertEquals("hashed:123456", issued.codeHash)
-        verify { memberRepository.saveEmailVerification(previous.copy(consumed = true)) }
+        verifyOrder {
+            memberRepository.consumeEmailVerification(previous.copy(consumed = true))
+            memberRepository.insertEmailVerification(issued)
+        }
+        verify(exactly = 0) { memberRepository.saveEmailVerification(any()) }
         verify(exactly = 0) { memberRepository.saveEmail(any()) }
         verify(exactly = 0) { memberRepository.findEmailVerifications(any(), VerificationPurpose.EMAIL_CHANGE) }
         verify { memberRepository.existsByEmailIdentifier(Provider.KAKAO, "protected:right@example.com", 100L) }
@@ -702,6 +728,7 @@ class MemberRegistrationServiceTest {
 
         assertEquals("RESEND_COOLDOWN_ACTIVE", ex.code)
         assertEquals("잠시 후 다시 시도해 주세요.", ex.message)
+        verify(exactly = 0) { memberRepository.consumeEmailVerification(any()) }
         verify(exactly = 0) { memberRepository.saveEmailVerification(any()) }
         verify(exactly = 0) { memberRepository.insertEmailVerification(any()) }
         assertTrue(events.isEmpty())

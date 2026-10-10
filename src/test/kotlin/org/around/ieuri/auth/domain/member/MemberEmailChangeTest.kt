@@ -3,6 +3,7 @@ package org.around.ieuri.auth.domain.member
 import org.around.ieuri.auth.domain.member.MemberFixtures.CODE
 import org.around.ieuri.auth.domain.member.MemberFixtures.MEMBER_ID
 import org.around.ieuri.auth.domain.member.MemberFixtures.NOW
+import org.around.ieuri.auth.domain.member.MemberFixtures.OTHER_MEMBER_ID
 import org.around.ieuri.auth.domain.member.MemberFixtures.POLICY
 import org.around.ieuri.auth.domain.member.MemberFixtures.member
 import org.around.ieuri.auth.domain.member.MemberFixtures.verification
@@ -12,14 +13,25 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 /** 이메일 변경(SPEC-0011 R7·R8): 요청·재발송·확정. */
 class MemberEmailChangeTest {
 
     private val next = Email("next@example.com")
 
-    private fun change(n: Int = 1, consumed: Boolean = false, createdAt: Instant? = NOW.minusSeconds(3600), target: Email = next) = verification(
+    private fun change(
+        n: Int = 1,
+        consumed: Boolean = false,
+        createdAt: Instant? = NOW.minusSeconds(3600),
+        target: Email = next,
+        memberId: Long = MEMBER_ID,
+        codeHash: String = "해시-$n",
+    ) = verification(
         n = n,
+        memberId = memberId,
+        codeHash = codeHash,
         consumed = consumed,
         createdAt = createdAt,
         purpose = VerificationPurpose.EMAIL_CHANGE,
@@ -109,11 +121,88 @@ class MemberEmailChangeTest {
         assertEquals(CODE.publicId, member().reissueEmailChange(exactly, listOf(exactly), CODE, POLICY, NOW).issued.publicId)
     }
 
+    /** 대상 주소가 없는 코드는 가입 인증 코드뿐이고, 그것은 용도 판정에서 먼저 걸린다. */
     @Test
-    fun `대상 주소가 없는 코드로는 변경 코드를 재발송할 수 없다`() {
-        val registration = verification(purpose = VerificationPurpose.REGISTRATION, targetEmail = null)
+    fun `가입 인증 코드로는 변경 코드를 재발송할 수 없다 - 대상 주소가 있든 없든`() {
+        val registration = verification(n = 1, purpose = VerificationPurpose.REGISTRATION, targetEmail = null)
+        val retargeted = verification(n = 2, purpose = VerificationPurpose.REGISTRATION, targetEmail = Email("fixed@example.com"))
 
-        assertFailsWith<IllegalArgumentException> { member().reissueEmailChange(registration, listOf(registration), CODE, POLICY, NOW) }
+        val e = assertFailsWith<VerificationNotFoundException> { member().reissueEmailChange(registration, listOf(registration), CODE, POLICY, NOW) }
+
+        assertEquals("유효하지 않은 검증 요청입니다.", e.message)
+        assertEquals("VERIFICATION_NOT_FOUND", e.code)
+        assertFailsWith<VerificationNotFoundException> { member().reissueEmailChange(retargeted, emptyList(), CODE, POLICY, NOW) }
+    }
+
+    /** 쿨다운도 함께 걸린 상태에서 없는 요청이 이긴다 — 쿨다운으로 답하면 남의 핸들이 있다는 것이 드러난다. */
+    @Test
+    fun `남의 코드와 가입 인증 코드로는 쿨다운 안이어도 없는 요청으로 답하며 재발송하지 않는다`() {
+        val foreign = change(n = 1, memberId = OTHER_MEMBER_ID)
+        val registration = verification(n = 2, purpose = VerificationPurpose.REGISTRATION, targetEmail = Email("fixed@example.com"))
+        val justIssued = change(n = 3, createdAt = NOW.minusSeconds(10))
+
+        val e = assertFailsWith<VerificationNotFoundException> { member().reissueEmailChange(foreign, listOf(justIssued), CODE, POLICY, NOW) }
+
+        assertEquals("유효하지 않은 검증 요청입니다.", e.message)
+        assertEquals("VERIFICATION_NOT_FOUND", e.code)
+        assertFailsWith<VerificationNotFoundException> { member().reissueEmailChange(registration, listOf(justIssued), CODE, POLICY, NOW) }
+        // 같은 상태에서 자기 변경 코드면 쿨다운에 걸린다 — 위 판정이 쿨다운보다 먼저였다는 뜻이다.
+        assertFailsWith<ResendCooldownActiveException> { member().reissueEmailChange(justIssued, listOf(justIssued), CODE, POLICY, NOW) }
+    }
+
+    // ── 확인 ──
+
+    /** 주소는 [Member.replaceEmail]이 바꾼다. 확인은 코드만 소진한다. */
+    @Test
+    fun `변경 코드가 맞으면 코드만 통과로 소진되고 회원은 그대로다`() {
+        val member = member(emailVerified = false, email = "current@example.com")
+        val code = change(codeHash = "맞는-해시")
+
+        val attempt = member.confirmEmailChange(code, "맞는-해시", NOW)
+
+        assertEquals(VerificationResult.Success, attempt.result)
+        assertEquals(NOW, attempt.verification.verifiedAt)
+        assertTrue(attempt.verification.consumed)
+        assertEquals(0, attempt.verification.attempts)
+        assertSame(member, attempt.member)
+        assertFalse(attempt.member.emailVerified)
+        assertEquals("current@example.com", attempt.member.email.value)
+    }
+
+    @Test
+    fun `변경 코드가 틀리면 시도 횟수가 늘고 회원은 그대로다`() {
+        val member = member()
+
+        val attempt = member.confirmEmailChange(change(codeHash = "맞는-해시"), "틀린-해시", NOW)
+
+        assertEquals(VerificationResult.Failure(VerificationFailureReason.CODE_MISMATCH), attempt.result)
+        assertEquals(1, attempt.verification.attempts)
+        assertFalse(attempt.verification.consumed)
+        assertNull(attempt.verification.verifiedAt)
+        assertSame(member, attempt.member)
+    }
+
+    @Test
+    fun `남의 변경 코드는 해시가 맞아도 없는 요청으로 답한다`() {
+        val foreign = change(memberId = OTHER_MEMBER_ID, codeHash = "맞는-해시")
+
+        val e = assertFailsWith<VerificationNotFoundException> { member().confirmEmailChange(foreign, "맞는-해시", NOW) }
+
+        assertEquals("유효하지 않은 검증 요청입니다.", e.message)
+        assertEquals("VERIFICATION_NOT_FOUND", e.code)
+    }
+
+    /** 정정한 주소를 실은 가입 인증 코드도 대상 주소가 있다 — 용도로 걸러야 인증 없이 주소가 바뀌지 않는다. */
+    @Test
+    fun `가입 인증 코드는 해시가 맞아도 이메일 변경 확인에서 없는 요청으로 답한다`() {
+        val plain = verification(n = 1, codeHash = "맞는-해시", purpose = VerificationPurpose.REGISTRATION, targetEmail = null)
+        val retargeted = verification(n = 2, codeHash = "맞는-해시", purpose = VerificationPurpose.REGISTRATION, targetEmail = Email("fixed@example.com"))
+
+        val e = assertFailsWith<VerificationNotFoundException> { member().confirmEmailChange(plain, "맞는-해시", NOW) }
+
+        assertEquals("유효하지 않은 검증 요청입니다.", e.message)
+        assertEquals("VERIFICATION_NOT_FOUND", e.code)
+        assertFailsWith<VerificationNotFoundException> { member().confirmEmailChange(retargeted, "맞는-해시", NOW) }
     }
 
     @Test

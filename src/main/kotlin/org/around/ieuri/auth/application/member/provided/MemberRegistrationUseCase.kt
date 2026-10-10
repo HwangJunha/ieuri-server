@@ -13,7 +13,7 @@ import org.around.ieuri.auth.application.member.provided.dto.VerifyEmailResult
 
 /** 가입과 가입 이메일 인증. 호출 하나가 트랜잭션 하나다. */
 interface MemberRegistrationUseCase {
-    /** 검증을 마친 SNS 신원으로 가입한다. 가입은 이메일 인증을 기다리지 않고 성공한다. */
+    /** 검증을 마친 SNS 신원으로 가입한다. 신원을 그대로 믿으므로 리졸버가 부르지 않는다 — [SnsRegistrationUseCase]만 쓴다. */
     fun registerBySnsIdentity(command: RegisterSnsIdentityCommand): SnsRegistrationResult
 
     /** 자체(EMAIL) 가입. 미인증으로 시작하며 인증 코드를 발급한다. */

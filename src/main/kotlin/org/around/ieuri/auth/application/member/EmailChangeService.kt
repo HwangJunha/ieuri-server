@@ -8,7 +8,6 @@ import org.around.ieuri.auth.application.member.provided.dto.EmailChangeRequeste
 import org.around.ieuri.auth.application.member.provided.dto.ResendEmailChangeCommand
 import org.around.ieuri.auth.application.member.provided.exception.InvalidEmailFormatException
 import org.around.ieuri.auth.application.member.provided.exception.MemberNotFoundException
-import org.around.ieuri.auth.application.member.provided.exception.VerificationNotFoundException
 import org.around.ieuri.auth.application.member.required.LoginIdentifierProtectorPort
 import org.around.ieuri.auth.application.member.required.MemberEventPublisherPort
 import org.around.ieuri.auth.application.member.required.MemberRepository
@@ -20,6 +19,7 @@ import org.around.ieuri.auth.domain.member.Member
 import org.around.ieuri.auth.domain.member.Provider
 import org.around.ieuri.auth.domain.member.ProviderUserId
 import org.around.ieuri.auth.domain.member.VerificationCode
+import org.around.ieuri.auth.domain.member.VerificationNotFoundException
 import org.around.ieuri.auth.domain.member.VerificationPolicy
 import org.around.ieuri.auth.domain.member.VerificationPurpose
 import org.around.ieuri.auth.domain.member.VerificationResult
@@ -67,10 +67,10 @@ class EmailChangeService(
 
     /** 남의 핸들이면 없는 것과 같은 오류로 답한다. 성패와 무관하게 시도 횟수·소진을 남긴다. */
     override fun confirmEmailChange(command: ConfirmEmailChangeCommand): ConfirmEmailChangeResult {
-        val verification = loadOwnedChallenge(command.verificationPublicId, command.memberId, forUpdate = true)
+        val verification = loadChallenge(command.verificationPublicId, forUpdate = true)
         val member = loadMember(command.memberId)
 
-        val attempt = member.verifyEmail(verification, codeGenerator.hash(command.code), clock.instant())
+        val attempt = member.confirmEmailChange(verification, codeGenerator.hash(command.code), clock.instant())
         memberRepository.saveEmailVerification(attempt.verification)
 
         val result = attempt.result
@@ -89,7 +89,7 @@ class EmailChangeService(
 
     /** 쿨다운은 이메일 변경 용도로만 센다. 대상 주소는 이전 코드에서 이어받는다. */
     override fun resendEmailChange(command: ResendEmailChangeCommand): EmailChangeRequested {
-        val previous = loadOwnedChallenge(command.verificationPublicId, command.memberId)
+        val previous = loadChallenge(command.verificationPublicId)
         val member = loadMember(command.memberId)
 
         val plainCode = codeGenerator.generate()
@@ -98,7 +98,7 @@ class EmailChangeService(
     }
 
     private fun send(issue: EmailVerificationIssue, toEmail: Email, plainCode: String): EmailChangeRequested {
-        issue.consumed.forEach(memberRepository::saveEmailVerification)
+        issue.consumed.forEach(memberRepository::consumeEmailVerification)
         memberRepository.insertEmailVerification(issue.issued)
         eventPublisher.publish(VerificationEmailRequested(toEmail.value, plainCode))
         return EmailChangeRequested(issue.issued.publicId, issue.issued.expiresAt)
@@ -111,8 +111,7 @@ class EmailChangeService(
 
     private fun newCode(plainCode: String) = VerificationCode(UUID.randomUUID(), codeGenerator.hash(plainCode))
 
-    /** 핸들을 호출자 소유의 이메일 변경 코드로만 읽는다. 아니면 없는 것과 같이 답한다(핸들 존재 비노출). */
-    private fun loadOwnedChallenge(publicId: UUID, memberId: Long, forUpdate: Boolean = false): EmailVerification = memberRepository.findEmailVerification(publicId, forUpdate)
-        ?.takeIf { it.memberId == memberId && it.purpose == VerificationPurpose.EMAIL_CHANGE }
-        ?: throw VerificationNotFoundException("유효하지 않은 검증 요청입니다.")
+    /** 핸들로 코드를 읽는다. 호출자의 이메일 변경 코드가 맞는지는 루트가 판정한다. */
+    private fun loadChallenge(publicId: UUID, forUpdate: Boolean = false): EmailVerification = memberRepository.findEmailVerification(publicId, forUpdate)
+        ?: throw VerificationNotFoundException()
 }

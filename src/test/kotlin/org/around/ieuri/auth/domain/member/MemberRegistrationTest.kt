@@ -174,12 +174,6 @@ class MemberRegistrationTest {
     }
 
     @Test
-    fun `닉네임 변경은 닉네임 규칙으로 판정한다`() {
-        assertEquals("새이름", member().changeNickname("  새이름 ").value)
-        assertFailsWith<InvalidNicknameException> { member().changeNickname("가") }
-    }
-
-    @Test
     fun `자기에게 발급된 임시 키는 확정 키가 된다`() {
         val uuid = UUID.fromString("11111111-2222-3333-4444-555555555555")
 

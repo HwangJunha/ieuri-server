@@ -6,13 +6,19 @@ import org.around.ieuri.auth.application.member.provided.dto.MemberDetailView
 import org.around.ieuri.auth.application.member.provided.dto.MemberSummaryView
 import org.around.ieuri.auth.application.member.provided.dto.RegisterEmailMemberCommand
 import org.around.ieuri.auth.application.member.provided.dto.RegisterMemberCommand
+import org.around.ieuri.auth.application.member.provided.dto.ResetPasswordCommand
 import org.around.ieuri.auth.application.member.provided.dto.RoleInfoView
+import org.around.ieuri.auth.application.token.provided.dto.LoginCommand
+import org.around.ieuri.auth.application.token.provided.dto.LoginEmailCommand
 import org.around.ieuri.auth.application.token.provided.dto.TokenPairResult
 import org.around.ieuri.auth.domain.member.Provider
 import org.around.ieuri.common.graphql.generated.types.AgreementStatus
 import org.around.ieuri.common.graphql.generated.types.AuthTokenPayload
+import org.around.ieuri.common.graphql.generated.types.LoginEmailInput
+import org.around.ieuri.common.graphql.generated.types.LoginSnsInput
 import org.around.ieuri.common.graphql.generated.types.RegisterEmailMemberInput
 import org.around.ieuri.common.graphql.generated.types.RegisterSnsMemberInput
+import org.around.ieuri.common.graphql.generated.types.ResetPasswordInput
 import org.around.ieuri.common.graphql.generated.types.TermsCode
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.graphql.generated.types.MemberConnection as GqlMemberConnection
@@ -42,6 +48,28 @@ fun RegisterEmailMemberInput.toCommand(): RegisterEmailMemberCommand = RegisterE
     password = password,
     ageVerified = ageVerified,
     agreements = agreements.map { AgreementInput(it.termsCode.name, it.agreed) },
+)
+
+/** SNS 로그인 입력 → Command. 접속지는 리졸버가 요청에서 읽어 넘긴다. */
+fun LoginSnsInput.toCommand(ipAddress: String?): LoginCommand = LoginCommand(
+    provider = Provider.valueOf(provider.name),
+    idToken = idToken,
+    authorizationCode = authorizationCode,
+    ipAddress = ipAddress,
+)
+
+/** 자체(EMAIL) 로그인 입력 → Command. */
+fun LoginEmailInput.toCommand(ipAddress: String?): LoginEmailCommand = LoginEmailCommand(
+    email = email,
+    password = password,
+    ipAddress = ipAddress,
+)
+
+/** 비밀번호 재설정 입력 → Command. */
+fun ResetPasswordInput.toCommand(): ResetPasswordCommand = ResetPasswordCommand(
+    email = email,
+    code = code,
+    newPassword = newPassword,
 )
 
 /** 발급된 토큰 쌍 → 성공 payload. */

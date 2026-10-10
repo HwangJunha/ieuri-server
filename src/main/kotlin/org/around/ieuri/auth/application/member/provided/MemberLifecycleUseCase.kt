@@ -12,7 +12,7 @@ interface MemberLifecycleUseCase {
 
     fun reactivate(command: ReactivateMemberCommand): LifecycleResult
 
-    /** 탈퇴할 회원의 provider 정보. 없는 회원이면 MEMBER_NOT_FOUND다. */
+    /** 탈퇴할 회원의 provider 정보. 없는 회원이면 MEMBER_NOT_FOUND다. 복호화한 토큰을 내보내므로 리졸버가 부르지 않는다. */
     fun withdrawalTarget(memberId: Long): WithdrawalTargetView
 
     /** 회원과 소유 데이터를 지운다. */

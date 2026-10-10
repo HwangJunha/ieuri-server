@@ -1,5 +1,4 @@
 package org.around.ieuri.auth.domain.member
-import org.around.ieuri.auth.domain.member.Nickname
 import kotlin.random.Random
 
 /**

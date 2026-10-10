@@ -3,7 +3,7 @@ package org.around.ieuri.auth.application.member.provided
 import org.around.ieuri.auth.application.member.provided.dto.EmailCredentialView
 import org.around.ieuri.auth.domain.member.Provider
 
-/** 로그인의 DB 단계. 호출 하나가 트랜잭션 하나다. */
+/** 로그인의 DB 단계. 호출 하나가 트랜잭션 하나다. 비밀번호 해시를 내보내므로 리졸버가 부르지 않는다 — [MemberLoginUseCase]만 쓴다. */
 interface MemberAuthenticationUseCase {
     /**
      * SNS 신원의 회원을 로그인시킨다. 미가입은 MEMBER_NOT_FOUND, 유효한 정지는 ACCOUNT_INACTIVE다.

@@ -3,6 +3,7 @@ package org.around.ieuri.auth.domain.member
 import org.around.ieuri.auth.domain.member.MemberFixtures.CODE
 import org.around.ieuri.auth.domain.member.MemberFixtures.MEMBER_ID
 import org.around.ieuri.auth.domain.member.MemberFixtures.NOW
+import org.around.ieuri.auth.domain.member.MemberFixtures.OTHER_MEMBER_ID
 import org.around.ieuri.auth.domain.member.MemberFixtures.POLICY
 import org.around.ieuri.auth.domain.member.MemberFixtures.member
 import org.around.ieuri.auth.domain.member.MemberFixtures.verification
@@ -92,6 +93,38 @@ class MemberEmailVerificationTest {
         }
     }
 
+    /** 쿨다운도 함께 걸린 상태에서 없는 요청이 이긴다 — 쿨다운으로 답하면 남의 핸들이 있다는 것이 드러난다. */
+    @Test
+    fun `남의 코드로는 쿨다운 안이어도 없는 요청으로 답하며 재발송하지 않는다`() {
+        val foreign = verification(n = 1, memberId = OTHER_MEMBER_ID)
+        val justIssued = verification(n = 2, createdAt = NOW.minusSeconds(10))
+
+        val e = assertFailsWith<VerificationNotFoundException> {
+            member().reissueEmailVerification(foreign, listOf(justIssued), CODE, POLICY, NOW)
+        }
+
+        assertEquals("유효하지 않은 검증 요청입니다.", e.message)
+        assertEquals("VERIFICATION_NOT_FOUND", e.code)
+        // 같은 상태에서 자기 코드면 쿨다운에 걸린다 — 위 판정이 쿨다운보다 먼저였다는 뜻이다.
+        assertFailsWith<VerificationRateLimitedException> {
+            member().reissueEmailVerification(justIssued, listOf(justIssued), CODE, POLICY, NOW)
+        }
+    }
+
+    @Test
+    fun `이메일 변경 코드로는 쿨다운 안이어도 없는 요청으로 답하며 가입 인증을 재발송하지 않는다`() {
+        val change = verification(n = 1, purpose = VerificationPurpose.EMAIL_CHANGE, targetEmail = Email("next@example.com"))
+        val justIssued = verification(n = 2, createdAt = NOW.minusSeconds(10))
+
+        val e = assertFailsWith<VerificationNotFoundException> {
+            member().reissueEmailVerification(change, listOf(justIssued), CODE, POLICY, NOW)
+        }
+
+        assertEquals("유효하지 않은 검증 요청입니다.", e.message)
+        // 쿨다운이 지난 상태에서도 거부한다.
+        assertFailsWith<VerificationNotFoundException> { member().reissueEmailVerification(change, emptyList(), CODE, POLICY, NOW) }
+    }
+
     // ── 주소 정정 ──
 
     @Test
@@ -142,7 +175,7 @@ class MemberEmailVerificationTest {
         val member = member(emailVerified = false)
         val verification = verification(codeHash = "맞는-해시", attempts = 1)
 
-        val attempt = member.verifyEmail(verification, "맞는-해시", NOW)
+        val attempt = member.verifyRegistrationEmail(verification, "맞는-해시", NOW)
 
         assertEquals(VerificationResult.Success, attempt.result)
         assertEquals(NOW, attempt.verification.verifiedAt)
@@ -153,24 +186,42 @@ class MemberEmailVerificationTest {
         assertEquals(member.copy(emailVerified = true), attempt.member)
     }
 
+    /** 이 경로는 인증이 없다. 변경 코드가 통과하면 남의 이메일 변경이 여기서 확정된다. */
     @Test
-    fun `이메일 변경 코드는 통과해도 회원의 인증 여부를 바꾸지 않는다`() {
-        val member = member(emailVerified = false)
+    fun `이메일 변경 코드는 해시가 맞아도 가입 인증에서 없는 요청으로 답한다`() {
         val change = verification(codeHash = "맞는-해시", purpose = VerificationPurpose.EMAIL_CHANGE, targetEmail = Email("next@example.com"))
 
-        val attempt = member.verifyEmail(change, "맞는-해시", NOW)
+        val e = assertFailsWith<VerificationNotFoundException> { member(emailVerified = false).verifyRegistrationEmail(change, "맞는-해시", NOW) }
 
-        assertEquals(VerificationResult.Success, attempt.result)
-        assertEquals(NOW, attempt.verification.verifiedAt)
-        assertSame(member, attempt.member)
-        assertFalse(attempt.member.emailVerified)
+        assertEquals("유효하지 않은 검증 요청입니다.", e.message)
+        assertEquals("VERIFICATION_NOT_FOUND", e.code)
+    }
+
+    @Test
+    fun `남의 가입 인증 코드는 해시가 맞아도 없는 요청으로 답한다`() {
+        val foreign = verification(memberId = OTHER_MEMBER_ID, codeHash = "맞는-해시")
+
+        val e = assertFailsWith<VerificationNotFoundException> { member(emailVerified = false).verifyRegistrationEmail(foreign, "맞는-해시", NOW) }
+
+        assertEquals("유효하지 않은 검증 요청입니다.", e.message)
+        assertEquals("VERIFICATION_NOT_FOUND", e.code)
+    }
+
+    /** 소유·용도 판정이 코드 상태보다 먼저다 — 소진·만료 사유로 답하면 핸들이 있다는 것이 드러난다. */
+    @Test
+    fun `남의 코드와 변경 코드는 소진됐거나 만료됐어도 실패 사유가 아니라 없는 요청으로 답한다`() {
+        val foreignConsumed = verification(n = 1, memberId = OTHER_MEMBER_ID, consumed = true)
+        val changeExpired = verification(n = 2, purpose = VerificationPurpose.EMAIL_CHANGE, targetEmail = Email("next@example.com"), expiresAt = NOW.minusSeconds(1))
+
+        assertFailsWith<VerificationNotFoundException> { member().verifyRegistrationEmail(foreignConsumed, "틀린-해시", NOW) }
+        assertFailsWith<VerificationNotFoundException> { member().verifyRegistrationEmail(changeExpired, "틀린-해시", NOW) }
     }
 
     @Test
     fun `코드가 틀리면 시도 횟수가 늘고 회원은 그대로다`() {
         val member = member(emailVerified = false)
 
-        val attempt = member.verifyEmail(verification(codeHash = "맞는-해시", attempts = 0, maxAttempts = 3), "틀린-해시", NOW)
+        val attempt = member.verifyRegistrationEmail(verification(codeHash = "맞는-해시", attempts = 0, maxAttempts = 3), "틀린-해시", NOW)
 
         assertEquals(failure(VerificationFailureReason.CODE_MISMATCH), attempt.result)
         assertEquals(1, attempt.verification.attempts)
@@ -181,8 +232,8 @@ class MemberEmailVerificationTest {
 
     @Test
     fun `틀린 시도가 한도에 닿으면 코드가 소진된다`() {
-        val oneLeft = member().verifyEmail(verification(codeHash = "맞는-해시", attempts = 1, maxAttempts = 3), "틀린-해시", NOW)
-        val last = member().verifyEmail(verification(codeHash = "맞는-해시", attempts = 2, maxAttempts = 3), "틀린-해시", NOW)
+        val oneLeft = member().verifyRegistrationEmail(verification(codeHash = "맞는-해시", attempts = 1, maxAttempts = 3), "틀린-해시", NOW)
+        val last = member().verifyRegistrationEmail(verification(codeHash = "맞는-해시", attempts = 2, maxAttempts = 3), "틀린-해시", NOW)
 
         assertEquals(2, oneLeft.verification.attempts)
         assertFalse(oneLeft.verification.consumed)
@@ -195,7 +246,7 @@ class MemberEmailVerificationTest {
     fun `시도를 다 쓴 코드는 맞는 코드를 넣어도 거부하고 소진한다`() {
         val member = member(emailVerified = false)
 
-        val attempt = member.verifyEmail(verification(codeHash = "맞는-해시", attempts = 3, maxAttempts = 3), "맞는-해시", NOW)
+        val attempt = member.verifyRegistrationEmail(verification(codeHash = "맞는-해시", attempts = 3, maxAttempts = 3), "맞는-해시", NOW)
 
         assertEquals(failure(VerificationFailureReason.MAX_ATTEMPTS_EXCEEDED), attempt.result)
         assertTrue(attempt.verification.consumed)
@@ -209,8 +260,8 @@ class MemberEmailVerificationTest {
         val member = member(emailVerified = false)
         val verification = verification(codeHash = "맞는-해시", expiresAt = NOW)
 
-        val atExpiry = member.verifyEmail(verification, "맞는-해시", NOW)
-        val after = member.verifyEmail(verification, "맞는-해시", NOW.plusMillis(1))
+        val atExpiry = member.verifyRegistrationEmail(verification, "맞는-해시", NOW)
+        val after = member.verifyRegistrationEmail(verification, "맞는-해시", NOW.plusMillis(1))
 
         assertEquals(VerificationResult.Success, atExpiry.result)
         assertEquals(failure(VerificationFailureReason.EXPIRED), after.result)
@@ -223,8 +274,8 @@ class MemberEmailVerificationTest {
         val consumed = verification(n = 1, codeHash = "맞는-해시", consumed = true)
         val verified = verification(n = 2, codeHash = "맞는-해시", verifiedAt = NOW.minusSeconds(5))
 
-        val first = member().verifyEmail(consumed, "맞는-해시", NOW)
-        val second = member().verifyEmail(verified, "맞는-해시", NOW)
+        val first = member().verifyRegistrationEmail(consumed, "맞는-해시", NOW)
+        val second = member().verifyRegistrationEmail(verified, "맞는-해시", NOW)
 
         assertEquals(failure(VerificationFailureReason.CONSUMED), first.result)
         assertEquals(consumed, first.verification)
@@ -241,10 +292,10 @@ class MemberEmailVerificationTest {
         val expiredAndExhausted = verification(codeHash = "맞는-해시", expiresAt = expired, attempts = 3, maxAttempts = 3)
         val exhaustedAndWrong = verification(codeHash = "맞는-해시", attempts = 3, maxAttempts = 3)
 
-        val expiredAttempt = member().verifyEmail(expiredAndExhausted, "틀린-해시", NOW)
-        val exhaustedAttempt = member().verifyEmail(exhaustedAndWrong, "틀린-해시", NOW)
+        val expiredAttempt = member().verifyRegistrationEmail(expiredAndExhausted, "틀린-해시", NOW)
+        val exhaustedAttempt = member().verifyRegistrationEmail(exhaustedAndWrong, "틀린-해시", NOW)
 
-        assertEquals(failure(VerificationFailureReason.CONSUMED), member().verifyEmail(everything, "틀린-해시", NOW).result)
+        assertEquals(failure(VerificationFailureReason.CONSUMED), member().verifyRegistrationEmail(everything, "틀린-해시", NOW).result)
         assertEquals(failure(VerificationFailureReason.EXPIRED), expiredAttempt.result)
         assertFalse(expiredAttempt.verification.consumed)
         assertEquals(failure(VerificationFailureReason.MAX_ATTEMPTS_EXCEEDED), exhaustedAttempt.result)

@@ -70,6 +70,9 @@ interface MemberRepository {
     /** 시도 횟수·소진·통과 시각만 쓴다. */
     fun saveEmailVerification(verification: EmailVerification)
 
+    /** 폐기 — `consumed` 한 열만 쓴다. 그 사이 통과한 코드의 통과 시각을 덮어쓰지 않는다. */
+    fun consumeEmailVerification(verification: EmailVerification)
+
     /** [forUpdate]면 행을 잠근다 — 같은 코드의 동시 확인이 시도 횟수를 덮어쓰지 않게 한다. */
     fun findEmailVerification(publicId: UUID, forUpdate: Boolean = false): EmailVerification?
 
@@ -80,6 +83,9 @@ interface MemberRepository {
 
     /** 시도 횟수·소진만 쓴다. */
     fun savePasswordReset(reset: PasswordReset)
+
+    /** 폐기 — `consumed` 한 열만 쓴다. */
+    fun consumePasswordReset(reset: PasswordReset)
 
     /** 재설정 코드 전부(소진된 것 포함). [forUpdate]면 행을 잠근다. */
     fun findPasswordResets(memberId: Long, forUpdate: Boolean = false): List<PasswordReset>

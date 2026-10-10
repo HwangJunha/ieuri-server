@@ -102,9 +102,11 @@ class PasswordResetServiceTest {
         // 정규화(trim+lowercase) → 보호 변환 순서라 표기가 달라도 같은 회원을 찾는다.
         service.requestPasswordReset(RequestPasswordResetCommand("  USER@Example.COM "))
 
-        verify(exactly = 1) { memberRepository.savePasswordReset(any()) }
+        // 폐기는 consumed 한 열만 쓰는 연산으로 한다. 이미 소진된 코드는 다시 쓰지 않는다.
+        verify(exactly = 1) { memberRepository.consumePasswordReset(any()) }
+        verify(exactly = 0) { memberRepository.savePasswordReset(any()) }
         verifyOrder {
-            memberRepository.savePasswordReset(active.copy(consumed = true))
+            memberRepository.consumePasswordReset(active.copy(consumed = true))
             memberRepository.insertPasswordReset(any())
         }
         assertNull(issued.captured.id)
@@ -147,6 +149,7 @@ class PasswordResetServiceTest {
         val ex = assertFailsWith<ResendCooldownActiveException> { service.requestPasswordReset(RequestPasswordResetCommand("user@example.com")) }
 
         assertEquals("잠시 후 다시 시도해 주세요.", ex.message)
+        verify(exactly = 0) { memberRepository.consumePasswordReset(any()) }
         verify(exactly = 0) { memberRepository.savePasswordReset(any()) }
         verify(exactly = 0) { memberRepository.insertPasswordReset(any()) }
         assertTrue(events.isEmpty())
@@ -158,6 +161,7 @@ class PasswordResetServiceTest {
 
     private fun verifyNothingWritten() {
         verify(exactly = 0) { memberRepository.savePasswordReset(any()) }
+        verify(exactly = 0) { memberRepository.consumePasswordReset(any()) }
         verify(exactly = 0) { memberRepository.savePassword(any()) }
         verify(exactly = 0) { sessions.revokeAll(any()) }
         assertTrue(events.isEmpty())

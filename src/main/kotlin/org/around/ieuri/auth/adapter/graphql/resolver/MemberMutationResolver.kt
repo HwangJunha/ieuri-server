@@ -10,7 +10,6 @@ import org.around.ieuri.auth.application.member.provided.PasswordResetUseCase
 import org.around.ieuri.auth.application.member.provided.SnsRegistrationUseCase
 import org.around.ieuri.auth.application.member.provided.dto.RequestPasswordResetCommand
 import org.around.ieuri.auth.application.member.provided.dto.ResendVerificationCommand
-import org.around.ieuri.auth.application.member.provided.dto.ResetPasswordCommand
 import org.around.ieuri.auth.application.member.provided.dto.RetargetEmailVerificationCommand
 import org.around.ieuri.auth.application.member.provided.dto.VerifyEmailCommand
 import org.around.ieuri.common.graphql.generated.types.RegisterEmailMemberInput
@@ -134,9 +133,7 @@ class MemberMutationResolver(
     fun resetPassword(@InputArgument input: ResetPasswordInput): ResetPasswordPayload = withUserErrors(
         onError = { ResetPasswordPayload(success = false, userErrors = it, failureReason = null) },
     ) {
-        val result = passwordResetUseCase.resetPassword(
-            ResetPasswordCommand(email = input.email, code = input.code, newPassword = input.newPassword),
-        )
+        val result = passwordResetUseCase.resetPassword(input.toCommand())
         ResetPasswordPayload(success = result.success, userErrors = emptyList(), failureReason = result.failureReason)
     }
 }

@@ -29,9 +29,6 @@ data class Member(
     /** 가입 때 만드는 프로필. */
     fun createProfile(nickname: Nickname, profileImageUrl: String?): Profile = Profile(nickname, profileImageUrl)
 
-    /** 닉네임 변경(SPEC-0011 R5). 길이 규칙은 [Nickname]이 판정한다. */
-    fun changeNickname(raw: String): Nickname = Nickname(raw)
-
     /** 확인이 끝난 프로필 이미지 키. 이 회원에게 발급된 키만 받는다. */
     fun attachProfileImage(key: ProfileImageObjectKey): ProfileImageObjectKey {
         if (!key.ownedBy(savedId())) throw ObjectKeyNotFoundException()
@@ -54,6 +51,7 @@ data class Member(
         policy: VerificationPolicy,
         now: Instant,
     ): EmailVerificationIssue {
+        ensureOwn(previous, VerificationPurpose.REGISTRATION)
         if (!policy.cooldownPassed(lastIssuedAt(existing), now)) throw VerificationRateLimitedException()
         return EmailVerificationIssue(
             consumed = existing.filter { it.active }.map { it.consume() },
@@ -85,11 +83,14 @@ data class Member(
         )
     }
 
-    /** 인증 코드 확인. 통과하면 회원이 인증된 상태가 된다. 주소 확정은 [replaceEmail]로 따로 한다. */
-    fun verifyEmail(verification: EmailVerification, inputCodeHash: String, now: Instant): EmailVerificationAttempt {
+    /**
+     * 가입 인증 코드 확인. 통과하면 회원이 인증된 상태가 된다. 주소 확정은 [replaceEmail]로 따로 한다.
+     * - 이 회원의 가입 인증 코드만 받는다. 이메일 변경 코드가 여기서 통과하면 인증 없이 남의 변경이 확정된다.
+     */
+    fun verifyRegistrationEmail(verification: EmailVerification, inputCodeHash: String, now: Instant): EmailVerificationAttempt {
+        ensureOwn(verification, VerificationPurpose.REGISTRATION)
         val (attempted, result) = verification.verify(inputCodeHash, now)
-        val member = if (result is VerificationResult.Success && verification.purpose == VerificationPurpose.REGISTRATION) copy(emailVerified = true) else this
-        return EmailVerificationAttempt(member, attempted, result)
+        return EmailVerificationAttempt(if (result is VerificationResult.Success) copy(emailVerified = true) else this, attempted, result)
     }
 
     // ── 이메일 변경 ──
@@ -120,9 +121,17 @@ data class Member(
         policy: VerificationPolicy,
         now: Instant,
     ): EmailVerificationIssue {
+        ensureOwn(previous, VerificationPurpose.EMAIL_CHANGE)
         if (!policy.cooldownPassed(lastIssuedAt(existing), now)) throw ResendCooldownActiveException()
         val target = requireNotNull(previous.targetEmail) { "이메일 변경 챌린지에 대상 주소가 없습니다." }
         return emailChangeIssue(target, existing, code, policy, now)
+    }
+
+    /** 이메일 변경 코드 확인. 이 회원의 이메일 변경 코드만 받는다. 통과해도 회원은 그대로다 — 주소는 [replaceEmail]이 바꾼다. */
+    fun confirmEmailChange(verification: EmailVerification, inputCodeHash: String, now: Instant): EmailVerificationAttempt {
+        ensureOwn(verification, VerificationPurpose.EMAIL_CHANGE)
+        val (attempted, result) = verification.verify(inputCodeHash, now)
+        return EmailVerificationAttempt(this, attempted, result)
     }
 
     /**
@@ -240,6 +249,11 @@ data class Member(
         val until = suspendedUntil
         if (until != null && !now.isBefore(until)) return reactivate()
         throw InactiveMemberException("정지된 계정입니다." + (suspensionReason?.let { " 사유: $it" } ?: ""))
+    }
+
+    /** 남의 코드나 다른 용도의 코드는 없는 것과 같이 답한다(핸들 존재 비노출). */
+    private fun ensureOwn(verification: EmailVerification, purpose: VerificationPurpose) {
+        if (verification.memberId != id || verification.purpose != purpose) throw VerificationNotFoundException()
     }
 
     private fun savedId(): Long = checkNotNull(id) { "저장되지 않은 회원입니다." }

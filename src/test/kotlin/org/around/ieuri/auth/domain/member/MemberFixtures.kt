@@ -9,6 +9,9 @@ internal object MemberFixtures {
 
     const val MEMBER_ID = 7L
 
+    /** 남의 코드를 만들 때 쓰는 다른 회원. */
+    const val OTHER_MEMBER_ID = 8L
+
     val NOW: Instant = Instant.parse("2026-10-05T03:00:00Z")
 
     /** 만료 10분, 시도 3회, 재발송 쿨다운 60초. */
@@ -44,6 +47,7 @@ internal object MemberFixtures {
     /** 저장된 인증 코드. [n]으로 id·핸들·해시를 서로 다르게 만든다. */
     fun verification(
         n: Int = 1,
+        memberId: Long = MEMBER_ID,
         codeHash: String = "해시-$n",
         expiresAt: Instant = NOW.plusSeconds(600),
         attempts: Int = 0,
@@ -56,7 +60,7 @@ internal object MemberFixtures {
     ) = EmailVerification(
         id = 100L + n,
         publicId = UUID(0L, n.toLong()),
-        memberId = MEMBER_ID,
+        memberId = memberId,
         codeHash = codeHash,
         expiresAt = expiresAt,
         attempts = attempts,
