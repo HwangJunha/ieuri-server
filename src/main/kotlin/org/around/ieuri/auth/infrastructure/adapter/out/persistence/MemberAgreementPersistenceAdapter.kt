@@ -3,7 +3,7 @@ package org.around.ieuri.auth.infrastructure.adapter.out.persistence
 import org.around.ieuri.auth.application.port.out.persistence.AgreementRecord
 import org.around.ieuri.auth.application.port.out.persistence.MemberAgreementRepositoryPort
 import org.around.ieuri.auth.application.port.out.persistence.TermsKey
-import org.around.ieuri.auth.domain.vo.Agreement
+import org.around.ieuri.auth.domain.member.Agreement
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.mapper.toNewEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.MemberTermsAgreementJpaRepository
 import org.springframework.stereotype.Component

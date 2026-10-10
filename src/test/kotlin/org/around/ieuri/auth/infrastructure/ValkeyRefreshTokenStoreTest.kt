@@ -3,7 +3,7 @@ package org.around.ieuri.auth.infrastructure
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import org.around.ieuri.auth.application.exception.AuthStoreUnavailableException
+import org.around.ieuri.auth.application.token.provided.exception.AuthStoreUnavailableException
 import org.around.ieuri.auth.infrastructure.adapter.out.token.ValkeyRefreshTokenStore
 import org.springframework.data.redis.RedisConnectionFailureException
 import org.springframework.data.redis.core.SetOperations

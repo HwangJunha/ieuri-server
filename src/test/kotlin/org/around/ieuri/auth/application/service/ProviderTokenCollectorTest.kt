@@ -3,9 +3,10 @@ package org.around.ieuri.auth.application.service
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import org.around.ieuri.auth.application.port.out.client.SnsTokenExchangerPort
+import org.around.ieuri.auth.application.member.ProviderTokenCollector
+import org.around.ieuri.auth.application.member.required.SnsTokenExchangerPort
 import org.around.ieuri.auth.application.port.out.persistence.MemberRepositoryPort
-import org.around.ieuri.auth.domain.vo.Provider
+import org.around.ieuri.auth.domain.member.Provider
 import kotlin.test.Test
 
 /**

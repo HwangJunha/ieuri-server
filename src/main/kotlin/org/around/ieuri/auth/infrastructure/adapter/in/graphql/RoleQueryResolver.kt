@@ -2,8 +2,8 @@ package org.around.ieuri.auth.infrastructure.adapter.`in`.graphql
 
 import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsQuery
-import org.around.ieuri.auth.application.port.`in`.query.RoleQueryUseCase
-import org.around.ieuri.auth.domain.vo.Permission
+import org.around.ieuri.auth.application.member.provided.RoleQueryUseCase
+import org.around.ieuri.auth.domain.member.Permission
 import org.around.ieuri.auth.infrastructure.security.RequiresPermission
 import org.around.ieuri.common.graphql.generated.types.RoleInfo as GqlRoleInfo
 

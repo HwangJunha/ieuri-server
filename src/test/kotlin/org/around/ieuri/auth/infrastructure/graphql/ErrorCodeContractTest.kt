@@ -2,7 +2,7 @@ package org.around.ieuri.auth.infrastructure.graphql
 
 import com.tngtech.archunit.core.importer.ClassFileImporter
 import com.tngtech.archunit.core.importer.ImportOption
-import org.around.ieuri.auth.application.exception.UserFacingException
+import org.around.ieuri.auth.domain.shared.UserFacingException
 import org.around.ieuri.auth.infrastructure.adapter.`in`.graphql.toUserErrorOrNull
 import org.around.ieuri.common.graphql.generated.types.ErrorCode
 import kotlin.test.Test
@@ -18,7 +18,7 @@ class ErrorCodeContractTest {
     private fun declaredCodes(): Set<String> {
         val classes = ClassFileImporter()
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-            .importPackages("org.around.ieuri.auth.application.exception")
+            .importPackages("org.around.ieuri.auth.application.member.provided.exception")
 
         return classes
             .filter { it.isAssignableTo(UserFacingException::class.java) && it != classes.get(UserFacingException::class.java) }
@@ -60,7 +60,7 @@ class ErrorCodeContractTest {
 
     @Test
     fun `UserFacingException은 code와 codeValue를 함께 채운다`() {
-        val error = assertNotNull(toUserErrorOrNull(org.around.ieuri.auth.application.exception.NotEmailMemberException("m")))
+        val error = assertNotNull(toUserErrorOrNull(org.around.ieuri.auth.application.member.provided.exception.NotEmailMemberException("m")))
 
         assertEquals("NOT_EMAIL_MEMBER", error.code)
         assertEquals(ErrorCode.NOT_EMAIL_MEMBER, error.codeValue)
@@ -79,7 +79,7 @@ class ErrorCodeContractTest {
     @Test
     fun `인증류 예외는 userErrors로 변환되지 않는다`() {
         assertNull(toUserErrorOrNull(org.around.ieuri.common.security.UnauthorizedException("m")))
-        assertNull(toUserErrorOrNull(org.around.ieuri.auth.application.exception.InvalidTokenException("m")))
-        assertNull(toUserErrorOrNull(org.around.ieuri.auth.application.exception.TokenReuseDetectedException("m")))
+        assertNull(toUserErrorOrNull(org.around.ieuri.auth.application.token.provided.exception.InvalidTokenException("m")))
+        assertNull(toUserErrorOrNull(org.around.ieuri.auth.application.token.provided.exception.TokenReuseDetectedException("m")))
     }
 }

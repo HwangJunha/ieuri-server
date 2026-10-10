@@ -2,7 +2,7 @@ package org.around.ieuri.auth.infrastructure.adapter.out.persistence
 
 import com.querydsl.jpa.impl.JPAQueryFactory
 import org.around.ieuri.auth.application.port.out.persistence.PasswordResetRepositoryPort
-import org.around.ieuri.auth.domain.aggregate.PasswordReset
+import org.around.ieuri.auth.domain.member.PasswordReset
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.QPasswordResetEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.mapper.toDomain
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.mapper.toNewEntity

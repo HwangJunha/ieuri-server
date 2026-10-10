@@ -1,7 +1,7 @@
 package org.around.ieuri.auth.domain
 
-import org.around.ieuri.auth.domain.strategy.NicknameGenerator
-import org.around.ieuri.auth.domain.vo.Nickname
+import org.around.ieuri.auth.domain.member.Nickname
+import org.around.ieuri.auth.domain.member.NicknameGenerator
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

@@ -1,7 +1,7 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository
 
-import org.around.ieuri.auth.domain.vo.Provider
-import org.around.ieuri.auth.domain.vo.VerificationPurpose
+import org.around.ieuri.auth.domain.member.Provider
+import org.around.ieuri.auth.domain.member.VerificationPurpose
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.EmailVerificationEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberAccessLogEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberAuditLogEntity

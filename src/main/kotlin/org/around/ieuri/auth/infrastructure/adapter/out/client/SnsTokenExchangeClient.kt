@@ -2,8 +2,8 @@ package org.around.ieuri.auth.infrastructure.adapter.out.client
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
-import org.around.ieuri.auth.application.port.out.client.SnsTokenExchangerPort
-import org.around.ieuri.auth.domain.vo.Provider
+import org.around.ieuri.auth.application.member.required.SnsTokenExchangerPort
+import org.around.ieuri.auth.domain.member.Provider
 import org.around.ieuri.auth.infrastructure.config.SnsRevokeProperties
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier

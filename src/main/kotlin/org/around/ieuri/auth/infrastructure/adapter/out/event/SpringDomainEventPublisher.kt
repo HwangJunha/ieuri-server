@@ -1,6 +1,6 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.event
 
-import org.around.ieuri.auth.application.port.out.event.DomainEventPublisherPort
+import org.around.ieuri.auth.application.member.required.DomainEventPublisherPort
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Component
 

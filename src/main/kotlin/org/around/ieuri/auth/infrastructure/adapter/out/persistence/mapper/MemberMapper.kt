@@ -1,10 +1,10 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.persistence.mapper
 
-import org.around.ieuri.auth.domain.aggregate.Member
-import org.around.ieuri.auth.domain.vo.Agreement
-import org.around.ieuri.auth.domain.vo.Email
-import org.around.ieuri.auth.domain.vo.Nickname
-import org.around.ieuri.auth.domain.vo.ProviderUserId
+import org.around.ieuri.auth.domain.member.Agreement
+import org.around.ieuri.auth.domain.member.Email
+import org.around.ieuri.auth.domain.member.Member
+import org.around.ieuri.auth.domain.member.Nickname
+import org.around.ieuri.auth.domain.member.ProviderUserId
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberProfileEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberTermsAgreementEntity

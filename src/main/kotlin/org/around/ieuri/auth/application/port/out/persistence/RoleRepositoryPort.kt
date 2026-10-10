@@ -1,7 +1,6 @@
 package org.around.ieuri.auth.application.port.out.persistence
 
-import org.around.ieuri.auth.domain.aggregate.Role
-
+import org.around.ieuri.auth.domain.member.Role
 /** 역할/권한 쓰기 포트. 회원의 역할 매핑을 갱신하고 역할 애그리거트를 로드한다. 화면용 조회는 port/out/query가 맡는다. */
 interface RoleRepositoryPort {
     /** 코드로 역할(+권한)을 로드. 없으면 null. */

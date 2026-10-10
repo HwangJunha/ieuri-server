@@ -1,7 +1,7 @@
 package org.around.ieuri.auth.infrastructure.security
 
-import org.around.ieuri.auth.application.exception.InvalidTokenException
-import org.around.ieuri.auth.application.port.out.token.TokenProviderPort
+import org.around.ieuri.auth.application.token.provided.exception.InvalidTokenException
+import org.around.ieuri.auth.application.token.required.TokenProviderPort
 import org.around.ieuri.common.security.UnauthorizedException
 import org.springframework.graphql.server.WebGraphQlInterceptor
 import org.springframework.graphql.server.WebGraphQlRequest

@@ -2,7 +2,7 @@ package org.around.ieuri.auth.infrastructure.adapter.out.persistence
 
 import com.querydsl.jpa.impl.JPAQueryFactory
 import org.around.ieuri.auth.application.port.out.persistence.RoleRepositoryPort
-import org.around.ieuri.auth.domain.aggregate.Role
+import org.around.ieuri.auth.domain.member.Role
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberRoleEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.MemberRoleId
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.QPermissionEntity

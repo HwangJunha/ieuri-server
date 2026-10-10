@@ -1,6 +1,6 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.client
 
-import org.around.ieuri.auth.application.port.out.client.EmailSenderPort
+import org.around.ieuri.auth.application.member.required.EmailSenderPort
 import org.around.ieuri.common.logging.maskEmail
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value

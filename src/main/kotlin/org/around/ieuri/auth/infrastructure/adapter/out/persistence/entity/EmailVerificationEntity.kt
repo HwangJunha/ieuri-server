@@ -9,7 +9,7 @@ import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.PrePersist
 import jakarta.persistence.Table
-import org.around.ieuri.auth.domain.vo.VerificationPurpose
+import org.around.ieuri.auth.domain.member.VerificationPurpose
 import org.around.ieuri.common.persistence.DbSchema
 import java.time.Instant
 import java.util.UUID

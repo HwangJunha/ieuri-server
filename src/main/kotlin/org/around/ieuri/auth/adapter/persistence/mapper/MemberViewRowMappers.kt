@@ -3,13 +3,13 @@ package org.around.ieuri.auth.adapter.persistence.mapper
 import org.around.ieuri.auth.adapter.persistence.table.MemberProfileTable
 import org.around.ieuri.auth.adapter.persistence.table.MemberTable
 import org.around.ieuri.auth.adapter.persistence.table.RoleTable
-import org.around.ieuri.auth.application.query.MeView
-import org.around.ieuri.auth.application.query.MemberDetailView
-import org.around.ieuri.auth.application.query.MemberPublicProfileView
-import org.around.ieuri.auth.application.query.MemberSummaryView
-import org.around.ieuri.auth.application.query.RoleInfoView
-import org.around.ieuri.auth.domain.vo.MemberStatus
-import org.around.ieuri.auth.domain.vo.Provider
+import org.around.ieuri.auth.application.member.provided.dto.MeView
+import org.around.ieuri.auth.application.member.provided.dto.MemberDetailView
+import org.around.ieuri.auth.application.member.provided.dto.MemberPublicProfileView
+import org.around.ieuri.auth.application.member.provided.dto.MemberSummaryView
+import org.around.ieuri.auth.application.member.provided.dto.RoleInfoView
+import org.around.ieuri.auth.domain.member.MemberStatus
+import org.around.ieuri.auth.domain.member.Provider
 import org.jetbrains.exposed.v1.core.ResultRow
 
 /** 프로필 행이 없는 회원에게 보이는 닉네임. */

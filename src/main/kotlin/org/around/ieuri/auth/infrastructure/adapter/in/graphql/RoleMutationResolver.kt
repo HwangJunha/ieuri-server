@@ -3,10 +3,10 @@ package org.around.ieuri.auth.infrastructure.adapter.`in`.graphql
 import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsMutation
 import com.netflix.graphql.dgs.InputArgument
-import org.around.ieuri.auth.application.command.AssignRoleCommand
-import org.around.ieuri.auth.application.command.RevokeRoleCommand
-import org.around.ieuri.auth.application.port.`in`.command.RoleUseCase
-import org.around.ieuri.auth.domain.vo.Permission
+import org.around.ieuri.auth.application.member.provided.RoleUseCase
+import org.around.ieuri.auth.application.member.provided.dto.AssignRoleCommand
+import org.around.ieuri.auth.application.member.provided.dto.RevokeRoleCommand
+import org.around.ieuri.auth.domain.member.Permission
 import org.around.ieuri.auth.infrastructure.security.RequiresPermission
 import org.around.ieuri.common.graphql.generated.types.AssignRoleInput
 import org.around.ieuri.common.graphql.generated.types.RevokeRoleInput

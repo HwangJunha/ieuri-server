@@ -1,6 +1,6 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.security
 
-import org.around.ieuri.auth.application.port.out.security.EmailEncryptorPort
+import org.around.ieuri.auth.application.member.required.EmailEncryptorPort
 import org.around.ieuri.auth.infrastructure.config.EncryptionProperties
 import org.around.ieuri.common.security.AesGcmCipher
 import org.springframework.stereotype.Component

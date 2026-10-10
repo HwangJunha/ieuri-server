@@ -10,8 +10,8 @@ import jakarta.persistence.Id
 import jakarta.persistence.PrePersist
 import jakarta.persistence.PreUpdate
 import jakarta.persistence.Table
-import org.around.ieuri.auth.domain.vo.MemberStatus
-import org.around.ieuri.auth.domain.vo.Provider
+import org.around.ieuri.auth.domain.member.MemberStatus
+import org.around.ieuri.auth.domain.member.Provider
 import org.around.ieuri.common.persistence.DbSchema
 import java.time.Instant
 

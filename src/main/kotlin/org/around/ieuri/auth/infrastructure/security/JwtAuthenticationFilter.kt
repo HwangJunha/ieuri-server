@@ -3,8 +3,8 @@ package org.around.ieuri.auth.infrastructure.security
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
-import org.around.ieuri.auth.application.exception.InvalidTokenException
-import org.around.ieuri.auth.application.port.out.token.TokenProviderPort
+import org.around.ieuri.auth.application.token.provided.exception.InvalidTokenException
+import org.around.ieuri.auth.application.token.required.TokenProviderPort
 import org.around.ieuri.common.security.TOKEN_PRESENTATION_ATTRIBUTE
 import org.around.ieuri.common.security.TokenPresentation
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken

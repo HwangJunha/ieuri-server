@@ -3,11 +3,11 @@ package org.around.ieuri.auth.infrastructure.adapter.`in`.graphql
 import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsMutation
 import com.netflix.graphql.dgs.InputArgument
-import org.around.ieuri.auth.application.command.ChangeNicknameCommand
-import org.around.ieuri.auth.application.command.ConfirmProfileImageUploadCommand
-import org.around.ieuri.auth.application.command.IssueProfileImageUploadUrlCommand
-import org.around.ieuri.auth.application.command.RemoveProfileImageCommand
-import org.around.ieuri.auth.application.port.`in`.command.MemberProfileUseCase
+import org.around.ieuri.auth.application.member.provided.MemberProfileUseCase
+import org.around.ieuri.auth.application.member.provided.dto.ChangeNicknameCommand
+import org.around.ieuri.auth.application.member.provided.dto.ConfirmProfileImageUploadCommand
+import org.around.ieuri.auth.application.member.provided.dto.IssueProfileImageUploadUrlCommand
+import org.around.ieuri.auth.application.member.provided.dto.RemoveProfileImageCommand
 import org.around.ieuri.common.graphql.generated.types.ChangeNicknameInput
 import org.around.ieuri.common.graphql.generated.types.ChangeNicknamePayload
 import org.around.ieuri.common.graphql.generated.types.ConfirmProfileImageUploadInput

@@ -1,8 +1,8 @@
 package org.around.ieuri.auth.infrastructure.security
 
 import graphql.schema.DataFetchingEnvironment
-import org.around.ieuri.auth.application.port.out.token.RefreshTokenStorePort
-import org.around.ieuri.auth.domain.specification.SubscriptionIdentity
+import org.around.ieuri.auth.application.token.required.RefreshTokenStorePort
+import org.around.ieuri.auth.domain.token.SubscriptionIdentity
 import org.around.ieuri.auth.infrastructure.config.JwtProperties
 import org.around.ieuri.common.security.SubscriptionAuthorizer
 import org.around.ieuri.common.security.SubscriptionUnauthenticatedException

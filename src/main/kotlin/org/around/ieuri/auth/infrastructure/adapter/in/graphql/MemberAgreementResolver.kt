@@ -4,10 +4,10 @@ import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsMutation
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
-import org.around.ieuri.auth.application.command.AgreeToRequiredTermsCommand
-import org.around.ieuri.auth.application.command.UpdateAgreementCommand
-import org.around.ieuri.auth.application.port.`in`.command.MemberAgreementUseCase
-import org.around.ieuri.auth.application.query.AgreementStatusView
+import org.around.ieuri.auth.application.member.provided.MemberAgreementUseCase
+import org.around.ieuri.auth.application.member.provided.dto.AgreeToRequiredTermsCommand
+import org.around.ieuri.auth.application.member.provided.dto.AgreementStatusView
+import org.around.ieuri.auth.application.member.provided.dto.UpdateAgreementCommand
 import org.around.ieuri.common.graphql.generated.types.AgreeToRequiredTermsInput
 import org.around.ieuri.common.graphql.generated.types.AgreeToRequiredTermsPayload
 import org.around.ieuri.common.graphql.generated.types.AgreementStatus

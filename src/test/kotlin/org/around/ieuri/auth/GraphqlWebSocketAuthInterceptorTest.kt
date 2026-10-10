@@ -1,7 +1,7 @@
 package org.around.ieuri.auth
 
 import io.mockk.mockk
-import org.around.ieuri.auth.application.port.out.token.TokenProviderPort
+import org.around.ieuri.auth.application.token.required.TokenProviderPort
 import org.around.ieuri.auth.infrastructure.security.GraphqlWebSocketAuthInterceptor
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test

@@ -4,11 +4,11 @@ import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsMutation
 import com.netflix.graphql.dgs.InputArgument
 import graphql.schema.DataFetchingEnvironment
-import org.around.ieuri.auth.application.command.ChangeEmailCommand
-import org.around.ieuri.auth.application.command.ConfirmEmailChangeCommand
-import org.around.ieuri.auth.application.command.ResendEmailChangeCommand
-import org.around.ieuri.auth.application.port.`in`.command.EmailChangeUseCase
-import org.around.ieuri.auth.application.port.out.event.DomainEventPublisherPort
+import org.around.ieuri.auth.application.member.provided.EmailChangeUseCase
+import org.around.ieuri.auth.application.member.provided.dto.ChangeEmailCommand
+import org.around.ieuri.auth.application.member.provided.dto.ConfirmEmailChangeCommand
+import org.around.ieuri.auth.application.member.provided.dto.ResendEmailChangeCommand
+import org.around.ieuri.auth.application.member.required.DomainEventPublisherPort
 import org.around.ieuri.common.event.AccessType
 import org.around.ieuri.common.event.MemberAccessed
 import org.around.ieuri.common.graphql.clientIp

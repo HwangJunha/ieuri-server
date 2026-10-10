@@ -9,7 +9,7 @@ import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.proc.ConfigurableJWTProcessor
 import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier
 import com.nimbusds.jwt.proc.DefaultJWTProcessor
-import org.around.ieuri.auth.application.exception.SnsVerificationFailedException
+import org.around.ieuri.auth.application.member.provided.exception.SnsVerificationFailedException
 import java.net.URI
 
 /**

@@ -1,6 +1,6 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.security
 
-import org.around.ieuri.auth.application.port.out.security.LoginIdentifierProtectorPort
+import org.around.ieuri.auth.application.member.required.LoginIdentifierProtectorPort
 import org.around.ieuri.auth.infrastructure.config.EncryptionProperties
 import org.springframework.stereotype.Component
 import javax.crypto.Mac

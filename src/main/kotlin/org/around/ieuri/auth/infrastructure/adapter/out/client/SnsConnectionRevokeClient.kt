@@ -1,9 +1,9 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.client
 
-import org.around.ieuri.auth.application.port.out.client.RevokeSnsConnectionCommand
-import org.around.ieuri.auth.application.port.out.client.SnsRevokeResult
-import org.around.ieuri.auth.application.port.out.client.SnsTokenRevokerPort
-import org.around.ieuri.auth.domain.vo.Provider
+import org.around.ieuri.auth.application.member.required.SnsTokenRevokerPort
+import org.around.ieuri.auth.application.member.required.dto.RevokeSnsConnectionCommand
+import org.around.ieuri.auth.application.member.required.dto.SnsRevokeResult
+import org.around.ieuri.auth.domain.member.Provider
 import org.around.ieuri.auth.infrastructure.config.SnsRevokeProperties
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier

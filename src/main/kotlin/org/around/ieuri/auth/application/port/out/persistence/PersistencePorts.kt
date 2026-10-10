@@ -1,13 +1,13 @@
 package org.around.ieuri.auth.application.port.out.persistence
 
-import org.around.ieuri.auth.domain.aggregate.EmailVerification
-import org.around.ieuri.auth.domain.aggregate.Member
-import org.around.ieuri.auth.domain.aggregate.PasswordReset
-import org.around.ieuri.auth.domain.vo.Email
-import org.around.ieuri.auth.domain.vo.MemberStatus
-import org.around.ieuri.auth.domain.vo.Provider
-import org.around.ieuri.auth.domain.vo.ProviderUserId
-import org.around.ieuri.auth.domain.vo.VerificationPurpose
+import org.around.ieuri.auth.domain.member.Email
+import org.around.ieuri.auth.domain.member.EmailVerification
+import org.around.ieuri.auth.domain.member.Member
+import org.around.ieuri.auth.domain.member.MemberStatus
+import org.around.ieuri.auth.domain.member.PasswordReset
+import org.around.ieuri.auth.domain.member.Provider
+import org.around.ieuri.auth.domain.member.ProviderUserId
+import org.around.ieuri.auth.domain.member.VerificationPurpose
 import java.time.Instant
 import java.util.UUID
 

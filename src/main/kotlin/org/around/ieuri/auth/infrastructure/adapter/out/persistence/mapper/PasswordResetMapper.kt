@@ -1,6 +1,6 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.persistence.mapper
 
-import org.around.ieuri.auth.domain.aggregate.PasswordReset
+import org.around.ieuri.auth.domain.member.PasswordReset
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.PasswordResetEntity
 
 /** 비밀번호 재설정 챌린지 엔티티를 도메인 모델로 옮긴다. */

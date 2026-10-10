@@ -1,6 +1,6 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.storage
 
-import org.around.ieuri.auth.application.port.out.client.ProfileImageStoragePort
+import org.around.ieuri.auth.application.member.required.ProfileImageStoragePort
 import org.around.ieuri.auth.infrastructure.config.ProfileImageProperties
 import org.springframework.stereotype.Component
 import software.amazon.awssdk.services.s3.S3Client

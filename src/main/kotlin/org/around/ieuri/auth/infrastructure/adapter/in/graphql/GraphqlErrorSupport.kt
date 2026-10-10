@@ -1,6 +1,6 @@
 package org.around.ieuri.auth.infrastructure.adapter.`in`.graphql
 
-import org.around.ieuri.auth.application.exception.UserFacingException
+import org.around.ieuri.auth.domain.shared.UserFacingException
 import org.around.ieuri.common.graphql.generated.types.ErrorCode
 import org.around.ieuri.common.graphql.generated.types.UserError
 

@@ -3,7 +3,7 @@ package org.around.ieuri.auth.infrastructure
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import org.around.ieuri.auth.domain.vo.Permission
+import org.around.ieuri.auth.domain.member.Permission
 import org.around.ieuri.auth.infrastructure.security.Authorizer
 import org.around.ieuri.auth.infrastructure.security.RequiresPermission
 import org.around.ieuri.auth.infrastructure.security.RequiresPermissionAspect

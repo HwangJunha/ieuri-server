@@ -1,6 +1,6 @@
 package org.around.ieuri.tourism.adapter.event.listener
 
-import org.around.ieuri.auth.domain.event.MemberWithdrawn
+import org.around.ieuri.auth.domain.member.event.MemberWithdrawn
 import org.around.ieuri.tourism.adapter.config.TourismAsyncConfig
 import org.around.ieuri.tourism.application.catalog.provided.SpotCatalogCommandUseCase
 import org.around.ieuri.tourism.application.footprint.provided.FootprintCommandUseCase

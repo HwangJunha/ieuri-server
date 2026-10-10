@@ -1,6 +1,6 @@
 package org.around.ieuri.auth.adapter.security
 
-import org.around.ieuri.auth.application.port.`in`.query.MemberQueryUseCase
+import org.around.ieuri.auth.application.member.provided.MemberQueryUseCase
 import org.around.ieuri.common.security.EmailVerificationStatusPort
 import org.springframework.stereotype.Component
 

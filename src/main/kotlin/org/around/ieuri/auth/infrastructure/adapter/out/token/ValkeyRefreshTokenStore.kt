@@ -1,7 +1,7 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.token
 
-import org.around.ieuri.auth.application.exception.AuthStoreUnavailableException
-import org.around.ieuri.auth.application.port.out.token.RefreshTokenStorePort
+import org.around.ieuri.auth.application.token.provided.exception.AuthStoreUnavailableException
+import org.around.ieuri.auth.application.token.required.RefreshTokenStorePort
 import org.springframework.dao.DataAccessException
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Component

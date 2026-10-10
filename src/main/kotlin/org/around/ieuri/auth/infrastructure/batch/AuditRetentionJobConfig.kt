@@ -1,6 +1,6 @@
 package org.around.ieuri.auth.infrastructure.batch
 
-import org.around.ieuri.auth.application.port.`in`.command.AuditRetentionUseCase
+import org.around.ieuri.auth.application.audit.provided.AuditRetentionUseCase
 import org.around.ieuri.auth.infrastructure.config.AuditRetentionProperties
 import org.slf4j.LoggerFactory
 import org.springframework.batch.core.job.Job

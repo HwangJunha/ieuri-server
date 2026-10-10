@@ -1,6 +1,6 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.persistence
 
-import org.around.ieuri.auth.application.exception.MemberNotFoundException
+import org.around.ieuri.auth.application.member.provided.exception.MemberNotFoundException
 import org.around.ieuri.auth.application.port.out.persistence.MemberProfileRepositoryPort
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.MemberProfileJpaRepository
 import org.springframework.stereotype.Component

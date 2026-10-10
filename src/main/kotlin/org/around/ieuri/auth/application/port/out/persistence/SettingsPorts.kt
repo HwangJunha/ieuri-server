@@ -1,6 +1,6 @@
 package org.around.ieuri.auth.application.port.out.persistence
 
-import org.around.ieuri.auth.domain.vo.Agreement
+import org.around.ieuri.auth.domain.member.Agreement
 import java.time.Instant
 
 /**

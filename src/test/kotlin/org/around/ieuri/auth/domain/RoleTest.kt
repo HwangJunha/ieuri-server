@@ -1,7 +1,7 @@
 package org.around.ieuri.auth.domain
 
-import org.around.ieuri.auth.domain.aggregate.Role
-import org.around.ieuri.auth.domain.vo.Permission
+import org.around.ieuri.auth.domain.member.Permission
+import org.around.ieuri.auth.domain.member.Role
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue

@@ -1,8 +1,8 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.event
 
-import org.around.ieuri.auth.application.event.PasswordResetRequested
-import org.around.ieuri.auth.application.event.VerificationEmailRequested
-import org.around.ieuri.auth.application.port.out.client.EmailSenderPort
+import org.around.ieuri.auth.application.member.PasswordResetRequested
+import org.around.ieuri.auth.application.member.VerificationEmailRequested
+import org.around.ieuri.auth.application.member.required.EmailSenderPort
 import org.springframework.stereotype.Component
 import org.springframework.transaction.event.TransactionPhase
 import org.springframework.transaction.event.TransactionalEventListener

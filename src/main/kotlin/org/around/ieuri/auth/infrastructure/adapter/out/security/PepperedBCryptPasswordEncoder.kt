@@ -1,6 +1,6 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.security
 
-import org.around.ieuri.auth.application.port.out.security.PasswordEncoderPort
+import org.around.ieuri.auth.application.member.required.PasswordEncoderPort
 import org.around.ieuri.auth.infrastructure.config.PasswordProperties
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.stereotype.Component

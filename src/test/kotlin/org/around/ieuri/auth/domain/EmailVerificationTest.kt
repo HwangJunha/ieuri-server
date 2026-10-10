@@ -1,8 +1,8 @@
 package org.around.ieuri.auth.domain
 
-import org.around.ieuri.auth.domain.aggregate.EmailVerification
-import org.around.ieuri.auth.domain.aggregate.VerificationFailureReason
-import org.around.ieuri.auth.domain.aggregate.VerificationResult
+import org.around.ieuri.auth.domain.member.EmailVerification
+import org.around.ieuri.auth.domain.member.VerificationFailureReason
+import org.around.ieuri.auth.domain.member.VerificationResult
 import java.time.Duration
 import java.time.Instant
 import java.util.UUID

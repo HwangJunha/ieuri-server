@@ -2,9 +2,9 @@ package org.around.ieuri.auth.infrastructure
 
 import io.mockk.every
 import io.mockk.mockk
-import org.around.ieuri.auth.application.exception.InvalidTokenException
-import org.around.ieuri.auth.application.port.out.token.AccessTokenClaims
-import org.around.ieuri.auth.application.port.out.token.TokenProviderPort
+import org.around.ieuri.auth.application.token.provided.exception.InvalidTokenException
+import org.around.ieuri.auth.application.token.required.TokenProviderPort
+import org.around.ieuri.auth.application.token.required.dto.AccessTokenClaims
 import org.around.ieuri.auth.infrastructure.security.GraphqlWebSocketAuthInterceptor
 import org.around.ieuri.common.security.UnauthorizedException
 import org.springframework.graphql.server.WebSocketSessionInfo

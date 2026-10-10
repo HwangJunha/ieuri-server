@@ -1,9 +1,9 @@
 package org.around.ieuri.architecture
 
 import com.tngtech.archunit.core.domain.JavaModifier
-import org.around.ieuri.auth.application.exception.AuthStoreUnavailableException
-import org.around.ieuri.auth.application.exception.InvalidTokenException
-import org.around.ieuri.auth.application.exception.TokenReuseDetectedException
+import org.around.ieuri.auth.application.token.provided.exception.AuthStoreUnavailableException
+import org.around.ieuri.auth.application.token.provided.exception.InvalidTokenException
+import org.around.ieuri.auth.application.token.provided.exception.TokenReuseDetectedException
 import org.around.ieuri.auth.infrastructure.adapter.`in`.graphql.toUserErrorOrNull
 import org.around.ieuri.common.security.ForbiddenException
 import org.around.ieuri.common.security.StaleTokenException

@@ -1,6 +1,6 @@
 package org.around.ieuri.auth.infrastructure
 
-import org.around.ieuri.auth.application.exception.InvalidTokenException
+import org.around.ieuri.auth.application.token.provided.exception.InvalidTokenException
 import org.around.ieuri.auth.infrastructure.adapter.out.token.JjwtTokenProvider
 import org.around.ieuri.auth.infrastructure.config.JwtProperties
 import java.time.Clock

@@ -1,15 +1,15 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.persistence
 
-import org.around.ieuri.auth.application.exception.MemberNotFoundException
+import org.around.ieuri.auth.application.member.provided.exception.MemberNotFoundException
+import org.around.ieuri.auth.application.member.required.EmailEncryptorPort
+import org.around.ieuri.auth.application.member.required.LoginIdentifierProtectorPort
 import org.around.ieuri.auth.application.port.out.persistence.EmailAuthentication
 import org.around.ieuri.auth.application.port.out.persistence.MemberAuthentication
 import org.around.ieuri.auth.application.port.out.persistence.MemberRepositoryPort
-import org.around.ieuri.auth.application.port.out.security.EmailEncryptorPort
-import org.around.ieuri.auth.application.port.out.security.LoginIdentifierProtectorPort
-import org.around.ieuri.auth.domain.aggregate.Member
-import org.around.ieuri.auth.domain.vo.Email
-import org.around.ieuri.auth.domain.vo.Provider
-import org.around.ieuri.auth.domain.vo.ProviderUserId
+import org.around.ieuri.auth.domain.member.Email
+import org.around.ieuri.auth.domain.member.Member
+import org.around.ieuri.auth.domain.member.Provider
+import org.around.ieuri.auth.domain.member.ProviderUserId
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.mapper.toDomain
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.mapper.toNewEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.mapper.toNewProfileEntity

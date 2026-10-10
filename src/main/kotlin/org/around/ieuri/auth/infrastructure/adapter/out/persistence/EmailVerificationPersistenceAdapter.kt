@@ -2,8 +2,8 @@ package org.around.ieuri.auth.infrastructure.adapter.out.persistence
 
 import com.querydsl.jpa.impl.JPAQueryFactory
 import org.around.ieuri.auth.application.port.out.persistence.EmailVerificationRepositoryPort
-import org.around.ieuri.auth.domain.aggregate.EmailVerification
-import org.around.ieuri.auth.domain.vo.VerificationPurpose
+import org.around.ieuri.auth.domain.member.EmailVerification
+import org.around.ieuri.auth.domain.member.VerificationPurpose
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.QEmailVerificationEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.mapper.toDomain
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.mapper.toNewEntity

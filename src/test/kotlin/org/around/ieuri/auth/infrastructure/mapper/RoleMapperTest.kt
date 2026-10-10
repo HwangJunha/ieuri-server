@@ -1,6 +1,6 @@
 package org.around.ieuri.auth.infrastructure.mapper
 
-import org.around.ieuri.auth.domain.vo.Permission
+import org.around.ieuri.auth.domain.member.Permission
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.RoleEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.mapper.toDomain
 import java.time.Instant

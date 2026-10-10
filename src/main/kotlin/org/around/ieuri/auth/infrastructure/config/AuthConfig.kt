@@ -1,8 +1,8 @@
 package org.around.ieuri.auth.infrastructure.config
 
-import org.around.ieuri.auth.application.policy.ProfileImagePolicy
-import org.around.ieuri.auth.application.policy.VerificationPolicy
-import org.around.ieuri.auth.domain.strategy.NicknameGenerator
+import org.around.ieuri.auth.application.member.ProfileImagePolicy
+import org.around.ieuri.auth.domain.member.NicknameGenerator
+import org.around.ieuri.auth.domain.member.VerificationPolicy
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration

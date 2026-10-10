@@ -1,6 +1,6 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.security
 
-import org.around.ieuri.auth.application.port.out.security.VerificationCodeGeneratorPort
+import org.around.ieuri.auth.application.member.required.VerificationCodeGeneratorPort
 import org.around.ieuri.auth.infrastructure.config.EncryptionProperties
 import org.springframework.stereotype.Component
 import java.security.MessageDigest

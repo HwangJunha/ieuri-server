@@ -1,6 +1,6 @@
 package org.around.ieuri.auth.infrastructure.mapper
 
-import org.around.ieuri.auth.domain.aggregate.PasswordReset
+import org.around.ieuri.auth.domain.member.PasswordReset
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.PasswordResetEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.mapper.toDomain
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.mapper.toNewEntity

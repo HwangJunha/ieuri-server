@@ -1,11 +1,11 @@
 package org.around.ieuri.auth.domain
 
-import org.around.ieuri.auth.domain.aggregate.Member
-import org.around.ieuri.auth.domain.vo.Email
-import org.around.ieuri.auth.domain.vo.MemberStatus
-import org.around.ieuri.auth.domain.vo.Nickname
-import org.around.ieuri.auth.domain.vo.Provider
-import org.around.ieuri.auth.domain.vo.ProviderUserId
+import org.around.ieuri.auth.domain.member.Email
+import org.around.ieuri.auth.domain.member.Member
+import org.around.ieuri.auth.domain.member.MemberStatus
+import org.around.ieuri.auth.domain.member.Nickname
+import org.around.ieuri.auth.domain.member.Provider
+import org.around.ieuri.auth.domain.member.ProviderUserId
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals

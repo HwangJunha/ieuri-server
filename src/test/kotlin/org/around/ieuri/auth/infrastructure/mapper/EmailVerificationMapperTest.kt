@@ -1,7 +1,7 @@
 package org.around.ieuri.auth.infrastructure.mapper
 
-import org.around.ieuri.auth.domain.aggregate.EmailVerification
-import org.around.ieuri.auth.domain.vo.VerificationPurpose
+import org.around.ieuri.auth.domain.member.EmailVerification
+import org.around.ieuri.auth.domain.member.VerificationPurpose
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.entity.EmailVerificationEntity
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.mapper.toDomain
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.mapper.toNewEntity

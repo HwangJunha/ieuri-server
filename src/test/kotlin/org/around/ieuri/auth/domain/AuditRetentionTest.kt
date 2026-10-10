@@ -1,6 +1,6 @@
 package org.around.ieuri.auth.domain
 
-import org.around.ieuri.auth.domain.specification.AuditRetention
+import org.around.ieuri.auth.domain.audit.AuditRetention
 import java.time.Duration
 import java.time.Instant
 import java.time.Period

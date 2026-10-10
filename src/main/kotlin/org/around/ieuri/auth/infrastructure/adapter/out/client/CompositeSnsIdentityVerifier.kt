@@ -1,10 +1,10 @@
 package org.around.ieuri.auth.infrastructure.adapter.out.client
 
 import com.nimbusds.jwt.JWTClaimsSet
-import org.around.ieuri.auth.application.exception.SnsVerificationFailedException
-import org.around.ieuri.auth.application.port.out.client.SnsIdentity
-import org.around.ieuri.auth.application.port.out.client.SnsIdentityVerifierPort
-import org.around.ieuri.auth.domain.vo.Provider
+import org.around.ieuri.auth.application.member.provided.exception.SnsVerificationFailedException
+import org.around.ieuri.auth.application.member.required.SnsIdentityVerifierPort
+import org.around.ieuri.auth.application.member.required.dto.SnsIdentity
+import org.around.ieuri.auth.domain.member.Provider
 import org.around.ieuri.auth.infrastructure.config.SnsProperties
 import org.springframework.stereotype.Component
 

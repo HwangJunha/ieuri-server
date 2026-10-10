@@ -1,6 +1,6 @@
 package org.around.ieuri.auth.domain
 
-import org.around.ieuri.auth.domain.vo.ProfileImageObjectKey
+import org.around.ieuri.auth.domain.member.ProfileImageObjectKey
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals

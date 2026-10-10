@@ -1,6 +1,6 @@
 package org.around.ieuri.auth.domain
 
-import org.around.ieuri.auth.domain.vo.Nickname
+import org.around.ieuri.auth.domain.member.Nickname
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
