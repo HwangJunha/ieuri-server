@@ -19,7 +19,6 @@ import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.M
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.MemberRoleJpaRepository
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.MemberTermsAgreementJpaRepository
 import org.around.ieuri.auth.infrastructure.adapter.out.persistence.repository.PasswordResetJpaRepository
-import org.around.ieuri.common.security.EmailVerificationStatusPort
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
@@ -35,11 +34,7 @@ class MemberPersistenceAdapter(
     private val passwordResetRepository: PasswordResetJpaRepository,
     private val encryptor: EmailEncryptorPort,
     private val identifierProtector: LoginIdentifierProtectorPort,
-) : MemberRepositoryPort,
-    EmailVerificationStatusPort {
-
-    /** 미인증 게이트(SPEC-0024 R9)가 매 요청 부른다. 없는 회원은 거짓이다. */
-    override fun isEmailVerified(memberId: Long): Boolean = memberRepository.findById(memberId).orElse(null)?.emailVerified ?: false
+) : MemberRepositoryPort {
 
     override fun existsByProviderAndProviderUserId(provider: Provider, providerUserId: ProviderUserId): Boolean = memberRepository.existsByProviderAndProviderUserId(provider, providerUserId.value)
 

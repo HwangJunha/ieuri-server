@@ -12,6 +12,9 @@ interface MemberQueryUseCase {
     /** 본인 정보 조회(인증만 필요). */
     fun me(memberId: Long): MeView
 
+    /** 미인증 게이트가 요청마다 부른다. 없는 회원은 거짓이다. */
+    fun isEmailVerified(memberId: Long): Boolean
+
     /** 관리자 회원 단건 상세(member:read). */
     fun member(memberId: Long): MemberDetailView
 

@@ -11,6 +11,9 @@ import org.around.ieuri.common.pagination.CursorPage
 interface MemberQueryPort {
     fun findMe(memberId: Long): MeView?
 
+    /** 없는 회원은 거짓이다. */
+    fun isEmailVerified(memberId: Long): Boolean
+
     fun findMemberDetail(memberId: Long): MemberDetailView?
 
     fun findMembers(query: MembersQuery): CursorPage<MemberSummaryView>

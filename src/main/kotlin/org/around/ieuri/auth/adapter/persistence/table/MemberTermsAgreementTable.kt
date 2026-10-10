@@ -11,7 +11,7 @@ object MemberTermsAgreementTable : Table("auth.member_terms_agreement") {
     val termsCode = varchar("terms_code", 50)
     val termsVersion = varchar("terms_version", 20)
     val agreed = bool("agreed")
-    val agreedAt = timestampWithTimeZone("agreed_at").databaseGenerated()
+    val agreedAt = timestampWithTimeZone("agreed_at")
     override val primaryKey = PrimaryKey(id)
 
     init {
