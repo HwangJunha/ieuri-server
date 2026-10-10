@@ -1,7 +1,7 @@
 package org.around.ieuri.tourism.application.recommendation.provided
 
 import org.around.ieuri.tourism.application.recommendation.provided.dto.EmbeddingInput
-import org.around.ieuri.tourism.application.recommendation.required.dto.SpotEmbedding
+import org.around.ieuri.tourism.domain.recommendation.SpotEmbedding
 
 /** 장소 임베딩의 DB 쪽 절반(SPEC-0035). 제공자 호출은 트랜잭션 밖이라 읽기와 저장을 따로 연다. */
 interface SpotEmbeddingStoreUseCase {

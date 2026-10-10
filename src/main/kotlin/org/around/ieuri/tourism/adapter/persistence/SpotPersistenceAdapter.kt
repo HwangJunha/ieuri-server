@@ -1,6 +1,7 @@
 package org.around.ieuri.tourism.adapter.persistence
 
 import org.around.ieuri.tourism.adapter.persistence.mapper.toFestivalPeriod
+import org.around.ieuri.tourism.adapter.persistence.mapper.toSpot
 import org.around.ieuri.tourism.adapter.persistence.mapper.writeTo
 import org.around.ieuri.tourism.adapter.persistence.table.SpotDetailImageTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotDetailInfoTable
@@ -13,11 +14,12 @@ import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.shared.FestivalPeriod
 import org.around.ieuri.tourism.domain.spot.Spot
+import org.around.ieuri.tourism.domain.spot.SpotBody
 import org.around.ieuri.tourism.domain.spot.SpotDetail
 import org.around.ieuri.tourism.domain.spot.SpotFestival
-import org.around.ieuri.tourism.domain.spot.SpotImage
-import org.around.ieuri.tourism.domain.spot.SpotInfoItem
-import org.around.ieuri.tourism.domain.spot.SpotIntro
+import org.around.ieuri.tourism.domain.spot.SpotGallery
+import org.around.ieuri.tourism.domain.spot.SpotInformation
+import org.around.ieuri.tourism.domain.spot.SpotIntroduction
 import org.jetbrains.exposed.v1.core.Column
 import org.jetbrains.exposed.v1.core.Expression
 import org.jetbrains.exposed.v1.core.IsDistinctFromOp
@@ -32,6 +34,7 @@ import org.jetbrains.exposed.v1.javatime.CurrentTimestampWithTimeZone
 import org.jetbrains.exposed.v1.jdbc.batchUpsert
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.select
+import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.upsert
 import org.springframework.stereotype.Repository
 import java.time.Instant
@@ -85,20 +88,21 @@ class SpotPersistenceAdapter : SpotRepository {
         return deleteSpotsInChunks(language, doomed)
     }
 
-    /** 부모 원본의 id를 자연키로 먼저 찾는다. 부모가 없는 항목은 건너뛴다(FK 위반 대신). */
+    override fun findById(spotId: Long): Spot? = SpotTable.selectAll().where { SpotTable.id eq spotId }.singleOrNull()?.toSpot()
+
+    override fun findByContentIds(language: DomainLocale, contentIds: Collection<String>): List<Spot> {
+        if (contentIds.isEmpty()) return emptyList()
+        return SpotTable.selectAll()
+            .where { (SpotTable.language eq language.name) and (SpotTable.contentId inList contentIds) }
+            .map { it.toSpot() }
+    }
+
     override fun upsertFestivals(festivals: List<SpotFestival>, syncedAt: Instant): Int {
         if (festivals.isEmpty()) return 0
-        val spotIds = festivals.groupBy { it.language }.flatMap { (language, group) ->
-            SpotTable.select(SpotTable.id, SpotTable.contentId)
-                .where { (SpotTable.language eq language.name) and (SpotTable.contentId inList group.map { it.contentId }) }
-                .map { (it[SpotTable.contentId] to language) to it[SpotTable.id] }
-        }.toMap()
-        val parented = festivals.mapNotNull { festival -> spotIds[festival.contentId to festival.language]?.let { it to festival } }
-        if (parented.isEmpty()) return 0
 
         val syncedTimestamp = syncedAt.atOffset(ZoneOffset.UTC)
         SpotFestivalTable.batchUpsert(
-            parented,
+            festivals,
             SpotFestivalTable.spotId,
             shouldReturnGeneratedValues = false,
             onUpdate = {
@@ -109,11 +113,11 @@ class SpotPersistenceAdapter : SpotRepository {
                 it[SpotFestivalTable.lastSyncedAt] = insertValue(SpotFestivalTable.lastSyncedAt)
                 it[SpotFestivalTable.updatedAt] = touchedWhenChanged(SpotFestivalTable.updatedAt, FESTIVAL_VALUE_COLUMNS)
             },
-        ) { (spotId, festival) ->
-            festival.writeTo(this, spotId)
+        ) { festival ->
+            festival.writeTo(this)
             this[SpotFestivalTable.lastSyncedAt] = syncedTimestamp
         }
-        return parented.size
+        return festivals.size
     }
 
     override fun deleteSpots(language: DomainLocale, contentIds: Set<String>): Int = deleteSpotsInChunks(language, contentIds.toList())
@@ -135,15 +139,14 @@ class SpotPersistenceAdapter : SpotRepository {
         .where { SpotTable.language eq language.name }
         .associate { it[SpotTable.contentId] to it.toFestivalPeriod() }
 
-    override fun saveDetail(spotId: Long, detail: SpotDetail) = upsertDetail(spotId, detail, bodyAbsent = false)
-
-    override fun saveDetailAbsence(spotId: Long, absent: SpotDetail) = upsertDetail(spotId, absent, bodyAbsent = true)
+    override fun saveBody(body: SpotBody) = upsertDetail(body.spotId, body.detail, bodyAbsent = body.absent)
 
     /** 갤러리 전량 교체. 넣기는 키 upsert다 — 같은 원본의 교체가 동시에 오면 유일 제약 위반 대신 덮어쓴다. */
-    override fun saveGallery(spotId: Long, gallery: List<SpotImage>) {
+    override fun saveGallery(gallery: SpotGallery) {
+        val spotId = gallery.spotId
         SpotDetailImageTable.deleteWhere { SpotDetailImageTable.spotId eq spotId }
         SpotDetailImageTable.batchUpsert(
-            gallery.withIndex(),
+            gallery.images.withIndex(),
             SpotDetailImageTable.spotId,
             SpotDetailImageTable.displayOrder,
             shouldReturnGeneratedValues = false,
@@ -151,7 +154,7 @@ class SpotPersistenceAdapter : SpotRepository {
     }
 
     /** 값이 하나도 없어도 행을 남겨 미적재와 구분한다. 확보 시각을 새로 시작한다. */
-    override fun saveIntro(spotId: Long, category: SpotCategory, intro: SpotIntro?) {
+    override fun saveIntro(introduction: SpotIntroduction) {
         SpotDetailIntroTable.upsert(
             SpotDetailIntroTable.spotId,
             SpotDetailIntroTable.category,
@@ -166,14 +169,16 @@ class SpotPersistenceAdapter : SpotRepository {
                 it[SpotDetailIntroTable.fetchedAt] = CurrentTimestampWithTimeZone
                 it[SpotDetailIntroTable.updatedAt] = CurrentTimestampWithTimeZone
             },
-        ) { intro.writeTo(it, spotId, category) }
+        ) { introduction.intro.writeTo(it, introduction.spotId, introduction.category) }
     }
 
     /** 이용안내 전량 교체. 넣기는 키 upsert다(갤러리와 같은 이유). */
-    override fun saveInfoItems(spotId: Long, category: SpotCategory, items: List<SpotInfoItem>) {
+    override fun saveInfoItems(information: SpotInformation) {
+        val spotId = information.spotId
+        val category = information.category
         SpotDetailInfoTable.deleteWhere { (SpotDetailInfoTable.spotId eq spotId) and (SpotDetailInfoTable.category eq category.code) }
         SpotDetailInfoTable.batchUpsert(
-            items.withIndex(),
+            information.items.withIndex(),
             SpotDetailInfoTable.spotId,
             SpotDetailInfoTable.category,
             SpotDetailInfoTable.displayOrder,

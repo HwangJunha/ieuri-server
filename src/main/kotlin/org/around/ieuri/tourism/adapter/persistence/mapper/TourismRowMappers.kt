@@ -1,5 +1,6 @@
 package org.around.ieuri.tourism.adapter.persistence.mapper
 
+import org.around.ieuri.tourism.adapter.persistence.table.DistrictTable
 import org.around.ieuri.tourism.adapter.persistence.table.KtoConcentrationRateTable
 import org.around.ieuri.tourism.adapter.persistence.table.KtoSpendingIntensityTable
 import org.around.ieuri.tourism.adapter.persistence.table.KtoStayIntensityTable
@@ -14,15 +15,17 @@ import org.around.ieuri.tourism.adapter.persistence.table.SpotDetailTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotFestivalTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotReactionTable
 import org.around.ieuri.tourism.adapter.persistence.table.SpotTable
-import org.around.ieuri.tourism.application.region.provided.dto.SyncConcentrationRateCommand
-import org.around.ieuri.tourism.application.region.provided.dto.SyncDemandIntensityCommand
-import org.around.ieuri.tourism.application.region.provided.dto.SyncVisitorCountCommand
 import org.around.ieuri.tourism.domain.catalog.CatalogStandardValues
 import org.around.ieuri.tourism.domain.catalog.CatalogTranslation
 import org.around.ieuri.tourism.domain.catalog.OriginFestivalPeriod
 import org.around.ieuri.tourism.domain.catalog.SpotReaction
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.footprint.ShareLink
+import org.around.ieuri.tourism.domain.region.ConcentrationRate
+import org.around.ieuri.tourism.domain.region.DemandIntensity
+import org.around.ieuri.tourism.domain.region.District
+import org.around.ieuri.tourism.domain.region.VisitorCount
+import org.around.ieuri.tourism.domain.shared.Coordinates
 import org.around.ieuri.tourism.domain.shared.CopyrightType
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.shared.FestivalPeriod
@@ -103,7 +106,21 @@ fun Spot.writeTo(row: UpdateBuilder<*>) {
     row[SpotTable.copyright] = copyright.name
 }
 
-fun SpotFestival.writeTo(row: UpdateBuilder<*>, spotId: Long) {
+/** 저장된 원본 행 → 도메인 [Spot]. 좌표는 `map_x`가 경도, `map_y`가 위도다. */
+fun ResultRow.toSpot(): Spot = Spot(
+    contentId = this[SpotTable.contentId],
+    language = DomainLocale.valueOf(this[SpotTable.language]),
+    title = this[SpotTable.title],
+    address = this[SpotTable.address],
+    thumbnailImageUrl = this[SpotTable.thumbnailImageUrl],
+    coordinates = Coordinates(latitude = this[SpotTable.mapY], longitude = this[SpotTable.mapX]),
+    category = SpotCategory(this[SpotTable.category]),
+    contentTypeId = this[SpotTable.contentTypeId],
+    copyright = CopyrightType.valueOf(this[SpotTable.copyright]),
+    id = this[SpotTable.id],
+)
+
+fun SpotFestival.writeTo(row: UpdateBuilder<*>) {
     row[SpotFestivalTable.spotId] = spotId
     row[SpotFestivalTable.eventStartDate] = period.start
     row[SpotFestivalTable.eventEndDate] = period.end
@@ -191,28 +208,34 @@ fun ResultRow.toShareLink(): ShareLink = ShareLink(
     issuedAt = this[MapShareLinkTable.createdAt].toInstant(),
 )
 
-fun SyncVisitorCountCommand.writeTo(row: UpdateBuilder<*>) {
+/** 시군구 행 → 도메인 [District]. 대표 위치는 값이 아니라 있는가만 본다. */
+fun ResultRow.toDistrict(): District = District(
+    code = this[DistrictTable.code],
+    hasRepresentative = this[DistrictTable.representativeLocation] != null,
+)
+
+fun VisitorCount.writeTo(row: UpdateBuilder<*>) {
     row[KtoVisitorCountTable.districtCode] = districtCode
     row[KtoVisitorCountTable.baseDate] = baseDate
     row[KtoVisitorCountTable.visitorType] = visitorType
     row[KtoVisitorCountTable.touristCount] = touristCount
 }
 
-fun SyncConcentrationRateCommand.writeTo(row: UpdateBuilder<*>) {
+fun ConcentrationRate.writeTo(row: UpdateBuilder<*>) {
     row[KtoConcentrationRateTable.districtCode] = districtCode
     row[KtoConcentrationRateTable.touristSpotName] = touristSpotName
     row[KtoConcentrationRateTable.targetDate] = targetDate
     row[KtoConcentrationRateTable.concentrationRate] = concentrationRate
 }
 
-fun SyncDemandIntensityCommand.writeStayIntensityTo(row: UpdateBuilder<*>) {
+fun DemandIntensity.writeStayIntensityTo(row: UpdateBuilder<*>) {
     row[KtoStayIntensityTable.districtCode] = districtCode
     row[KtoStayIntensityTable.baseMonth] = baseMonth
     row[KtoStayIntensityTable.indicatorCode] = indicatorCode
     row[KtoStayIntensityTable.indicatorValue] = indicatorValue
 }
 
-fun SyncDemandIntensityCommand.writeSpendingIntensityTo(row: UpdateBuilder<*>) {
+fun DemandIntensity.writeSpendingIntensityTo(row: UpdateBuilder<*>) {
     row[KtoSpendingIntensityTable.districtCode] = districtCode
     row[KtoSpendingIntensityTable.baseMonth] = baseMonth
     row[KtoSpendingIntensityTable.indicatorCode] = indicatorCode

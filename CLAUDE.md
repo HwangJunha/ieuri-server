@@ -309,6 +309,12 @@ refactor.
 
 - **Packages: context → layer → aggregate.** `domain/<aggregate>/` holds the root with its own
   entities, VOs, exceptions and events; `domain/shared/` holds VOs several aggregates use.
+  Predicates sit apart in the aggregate's `spec/`, and only as implementations of the context's
+  `Specification<T>` (`isSatisfiedBy` plus `and`/`or`/`not`, in `domain/shared`): `ProvinceEligibility`,
+  `SpotExclusionRule`. A value that carries settings and computes with them (weights, decay, a
+  scoring model) is a VO at the aggregate root, not a policy. There is no `policy/` until a decision
+  has two real implementations behind one interface (Strategy), and no domain `service/` package —
+  the word stays with application services (SPEC-0039 D-121).
   `application/<aggregate>/provided/` (inbound ports, `dto/`, `exception/`) and `required/`
   (outbound ports, `dto/`). No `infrastructure/adapter/in|out`.
   - **`provided/` and `required/` hold port interfaces only.** Every data type a port takes or
@@ -319,8 +325,8 @@ refactor.
     `Table` groups sharing a constant, keyset cursors sharing the codec, deserializers sharing
     `readItems`) and a `private` type only its file uses.
     A file named `XxxReadModels.kt` holding ten views is the shape to avoid.
-  - **`application/` and `domain/` list the same packages, one to one.** Each name is an aggregate,
-    or a value group with its own use cases (`catalog`). A capability several aggregates use but
+  - **`application/` and `domain/` list the same packages, one to one.** Each name is an aggregate
+    (see the persisted-data bullet below — a package that writes has a root). A capability several aggregates use but
     none owns gets its own package on both sides, named for the capability (`photo`: upload URL,
     verification, deletion; `lookup`: another context's spots and members); other aggregates and
     DataLoaders reach it through its `provided/` use case, never its port. `shared` keeps only what
@@ -344,6 +350,15 @@ refactor.
   `XxxQueryService` per aggregate. An update still calls `save` — Exposed has no dirty-checking.
   Query services are per aggregate too; the outbound **read** port may be shared between them
   (reads skip the aggregate, so splitting the port only scatters one moderation filter).
+- **Every persisted domain datum belongs to an aggregate, and every write goes through its root.**
+  Load the root → a root method decides → save. This holds for batch-synced and derived data too
+  (KTO metrics, embeddings, a district's representative location) — a thin root is still a root.
+  A repository exists per root and writes only what that aggregate owns — its tables, or a column it
+  owns in another table (`spot.catalog_id` is catalog membership, D-124). Exceptions, and only these:
+  reads skip the aggregate (D-40); rows with no domain rule may be bulk-deleted; after the root
+  decides, the service writes only what changed. Findings: a package that writes with no root, a
+  root with no identity or no behaviour, a repository writing another aggregate's table, a rule that
+  lives only in SQL, an application DTO persisted in place of a domain object (SPEC-0039 D-122).
 - **The root is the only door to its children.** A child is created and removed through a root
   method (`question.answer(...)`, `question.removeAnswer(...)`, `conversation.send(...)`), never by a
   `write` of its own. A value that classifies an entity and never varies per instance is a body
@@ -364,7 +379,11 @@ refactor.
   every rule in one place; its only cost is round trips. Move to Specification + Command (one
   definition producing both the in-memory check and the bulk SQL — Khorikov, *DDD and bulk
   operations*) only when the volume is shown to need a single statement **and** the rule is
-  non-trivial and reused by the single-item path. Plain bulk SQL that re-states a domain rule is the
+  non-trivial and reused by the single-item path. **Not available in this stack yet**: one definition
+  producing both needs a spec → SQL translation layer (C# gets it from expression trees; our domain
+  cannot see Exposed). A spec with a hand-written SQL twin is the rule twice under a pattern's name —
+  don't build it. Until that layer exists, a bulk change that must be one statement stays plain SQL
+  in the adapter and is recorded as a known limit (SPEC-0039 D-125). Plain bulk SQL that re-states a domain rule is the
   option to avoid: the rule then lives twice and drifts. Rows with no domain rule at all (likes,
   hides, blocks — repository operations) may be bulk-deleted.
 - **Load the minimum, write only what changed.** A write loads only the row its decision needs

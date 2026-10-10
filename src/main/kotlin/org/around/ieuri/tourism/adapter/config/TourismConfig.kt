@@ -18,15 +18,15 @@ import org.around.ieuri.tourism.application.recommendation.RecommendationPolicy
 import org.around.ieuri.tourism.application.region.RegionMetricSyncPolicy
 import org.around.ieuri.tourism.application.region.RegionRecommendationPolicy
 import org.around.ieuri.tourism.application.relation.MapRelationPolicy
-import org.around.ieuri.tourism.domain.recommendation.CategoryDiversity
-import org.around.ieuri.tourism.domain.recommendation.RecommendationScore
-import org.around.ieuri.tourism.domain.recommendation.TasteThreshold
+import org.around.ieuri.tourism.domain.recommendation.SpotRanking
+import org.around.ieuri.tourism.domain.recommendation.spec.TasteThreshold
 import org.around.ieuri.tourism.domain.region.DistanceScoring
 import org.around.ieuri.tourism.domain.region.FreshnessDecay
-import org.around.ieuri.tourism.domain.region.ProvinceEligibility
 import org.around.ieuri.tourism.domain.region.RegionScoreWeights
-import org.around.ieuri.tourism.domain.spot.SpotExclusionRule
-import org.around.ieuri.tourism.domain.spot.TaxRefundTitleRule
+import org.around.ieuri.tourism.domain.region.RegionScoring
+import org.around.ieuri.tourism.domain.region.spec.ProvinceEligibility
+import org.around.ieuri.tourism.domain.spot.spec.SpotExclusionRule
+import org.around.ieuri.tourism.domain.spot.spec.TaxRefundTitleRule
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -62,15 +62,15 @@ class TourismConfig {
     /** 추천 정책(SPEC-0035). 도메인 순수 함수에 설정값을 꽂아 조립한다. */
     @Bean
     fun recommendationPolicy(properties: RecommendationProperties): RecommendationPolicy = RecommendationPolicy(
-        score = RecommendationScore(
+        ranking = SpotRanking(
             distanceHalfLifeMeters = properties.distanceHalfLifeMeters,
             taxRefundMultiplier = properties.taxRefundMultiplier,
             taxRefundTitleRule = TaxRefundTitleRule(properties.taxRefundTitlePatterns),
             tasteWeight = properties.tasteWeight,
             likedMultiplier = properties.likedMultiplier,
             dislikedMultiplier = properties.dislikedMultiplier,
+            categoryRepeatPenalty = properties.categoryRepeatPenalty,
         ),
-        diversity = CategoryDiversity(properties.categoryRepeatPenalty),
         candidateCap = properties.candidateCap,
         tasteThreshold = TasteThreshold(properties.tasteMinReactions),
         embedding = EmbeddingSpec(
@@ -186,17 +186,19 @@ class TourismConfig {
      */
     @Bean
     fun regionRecommendationPolicy(properties: KtoBigDataProperties): RegionRecommendationPolicy = RegionRecommendationPolicy(
-        weights = if (properties.scoreWeights.isEmpty()) {
-            RegionScoreWeights.uniform()
-        } else {
-            RegionScoreWeights(properties.scoreWeights)
-        },
-        distanceScoring = DistanceScoring(properties.distanceHalfLifeMeters),
-        freshnessDecay = FreshnessDecay(
-            plateauDays = properties.freshnessPlateauDays,
-            halfLifeDays = properties.freshnessHalfLifeDays,
+        scoring = RegionScoring(
+            weights = if (properties.scoreWeights.isEmpty()) {
+                RegionScoreWeights.uniform()
+            } else {
+                RegionScoreWeights(properties.scoreWeights)
+            },
+            distanceScoring = DistanceScoring(properties.distanceHalfLifeMeters),
+            freshnessDecay = FreshnessDecay(
+                plateauDays = properties.freshnessPlateauDays,
+                halfLifeDays = properties.freshnessHalfLifeDays,
+            ),
+            minFactorCount = properties.minFactorCount,
         ),
-        minFactorCount = properties.minFactorCount,
         provinceEligibility = ProvinceEligibility(properties.minDistrictsPerProvince),
         defaultLimit = properties.defaultLimit,
         maxLimit = properties.maxLimit,

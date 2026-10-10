@@ -15,12 +15,11 @@ import org.around.ieuri.tourism.application.recommendation.required.TasteSimilar
 import org.around.ieuri.tourism.domain.catalog.CategorySelection
 import org.around.ieuri.tourism.domain.catalog.ReactionType
 import org.around.ieuri.tourism.domain.category.SpotCategory
-import org.around.ieuri.tourism.domain.recommendation.CategoryDiversity
-import org.around.ieuri.tourism.domain.recommendation.RecommendationScore
-import org.around.ieuri.tourism.domain.recommendation.TasteThreshold
+import org.around.ieuri.tourism.domain.recommendation.SpotRanking
+import org.around.ieuri.tourism.domain.recommendation.spec.TasteThreshold
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.around.ieuri.tourism.domain.shared.MapBounds
-import org.around.ieuri.tourism.domain.spot.TaxRefundTitleRule
+import org.around.ieuri.tourism.domain.spot.spec.TaxRefundTitleRule
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -39,15 +38,15 @@ class MapRecommendationServiceTest {
         maxSize = 100,
     )
     private val recommendationPolicy = RecommendationPolicy(
-        score = RecommendationScore(
+        ranking = SpotRanking(
             distanceHalfLifeMeters = 5_000.0,
             taxRefundMultiplier = 0.8,
             taxRefundTitleRule = TaxRefundTitleRule(listOf("[Tax Refund Shop]")),
             tasteWeight = 0.5,
             likedMultiplier = 1.1,
             dislikedMultiplier = 0.4,
+            categoryRepeatPenalty = 0.1,
         ),
-        diversity = CategoryDiversity(penalty = 0.1),
         candidateCap = 300,
         tasteThreshold = TasteThreshold(3),
         embedding = EmbeddingSpec(model = "voyage-4", dimension = 4, retryCount = 1, overviewMaxChars = 500),

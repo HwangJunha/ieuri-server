@@ -15,6 +15,7 @@ import org.around.ieuri.tourism.application.recommendation.required.Recommendati
 import org.around.ieuri.tourism.application.recommendation.required.TasteSimilarityQueryPort
 import org.around.ieuri.tourism.domain.catalog.ReactionType
 import org.around.ieuri.tourism.domain.recommendation.RankedSpot
+import org.around.ieuri.tourism.domain.recommendation.ReactionHistory
 import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -63,9 +64,9 @@ class RecommendedSpotsQueryService(
         val taste = tasteOf(liked, disliked, candidates, locale)
         val byId = candidates.associateBy { it.id }
         val ranked = candidates.map {
-            RankedSpot(it.id, it.category, policy.score.score(it.distanceMeters, it.title, taste[it.id]))
+            RankedSpot(it.id, it.category, policy.ranking.score(it.distanceMeters, it.title, taste[it.id]))
         }
-        return policy.diversity.order(ranked).take(first).map { byId.getValue(it) }
+        return policy.ranking.order(ranked).take(first).map { byId.getValue(it) }
     }
 
     /** 후보별 취향 요인. 반응이 최소량 미만이거나 좋아요 평균 벡터가 없으면 비어 있다. */
@@ -75,7 +76,7 @@ class RecommendedSpotsQueryService(
         candidates: List<SpotView>,
         locale: DomainLocale,
     ): Map<Long, Double> {
-        if (candidates.isEmpty() || !policy.tasteThreshold.isMetBy(liked, disliked)) return emptyMap()
+        if (candidates.isEmpty() || !policy.tasteThreshold.isSatisfiedBy(ReactionHistory(liked, disliked))) return emptyMap()
         val similarities = try {
             tasteSimilarityQueryPort.findSimilarities(
                 likedCatalogIds = liked,
@@ -88,6 +89,6 @@ class RecommendedSpotsQueryService(
             log.warn("취향 유사도 조회 실패, 취향 없이 진행: {}", e.javaClass.simpleName)
             return emptyMap()
         }
-        return policy.score.tasteFactors(similarities)
+        return policy.ranking.tasteFactors(similarities)
     }
 }

@@ -15,8 +15,6 @@ import org.springframework.stereotype.Component
  */
 @Component
 class DistrictCodeQueryAdapter : DistrictCodeQueryPort {
-    override fun findAllCodes(): Set<String> = DistrictTable.select(DistrictTable.code).mapTo(mutableSetOf()) { it[DistrictTable.code] }
-
     /** 코드 오름차순 — 배치가 인덱스로 진행 위치를 기억하므로 순서가 안정적이어야 한다. */
     override fun findAllRegions(): List<DistrictRegion> = DistrictTable.select(DistrictTable.code, DistrictTable.areaCd)
         .orderBy(DistrictTable.code, SortOrder.ASC)

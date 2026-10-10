@@ -1,6 +1,6 @@
 package org.around.ieuri.tourism.adapter.client.tourapi
 
-import org.around.ieuri.tourism.adapter.client.tourapi.mapper.toSpotFestivalOrNull
+import org.around.ieuri.tourism.adapter.client.tourapi.mapper.toFestivalRecordOrNull
 import org.around.ieuri.tourism.adapter.config.TourApiProperties
 import org.around.ieuri.tourism.application.spot.required.FestivalSyncPort
 import org.around.ieuri.tourism.application.spot.required.dto.FestivalSyncPage
@@ -57,7 +57,7 @@ class TourApiFestivalSyncClient(
         asOf: LocalDate,
     ): FestivalSyncPage {
         val body = response.response.body
-        val records = body.items.item.mapNotNull { it.toSpotFestivalOrNull(language, asOf) }
+        val records = body.items.item.mapNotNull { it.toFestivalRecordOrNull(language, asOf) }
 
         return FestivalSyncPage(
             records = records,

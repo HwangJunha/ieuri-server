@@ -15,12 +15,13 @@ import org.around.ieuri.tourism.adapter.persistence.table.SpotTable
 import org.around.ieuri.tourism.application.catalog.required.SpotCatalogRepository
 import org.around.ieuri.tourism.application.catalog.required.dto.CatalogLanguage
 import org.around.ieuri.tourism.application.catalog.required.dto.VisibilityRefreshResult
+import org.around.ieuri.tourism.domain.catalog.CatalogFestival
+import org.around.ieuri.tourism.domain.catalog.CatalogMembership
 import org.around.ieuri.tourism.domain.catalog.CatalogTranslation
 import org.around.ieuri.tourism.domain.catalog.OriginFestivalPeriod
 import org.around.ieuri.tourism.domain.catalog.SpotCatalog
 import org.around.ieuri.tourism.domain.catalog.SpotReaction
 import org.around.ieuri.tourism.domain.shared.DomainLocale
-import org.around.ieuri.tourism.domain.shared.FestivalPeriod
 import org.jetbrains.exposed.v1.core.JoinType
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
@@ -86,13 +87,16 @@ class SpotCatalogPersistenceAdapter : SpotCatalogRepository {
         }
     }
 
-    override fun assign(spotId: Long, catalogId: Long) {
-        SpotTable.update({ (SpotTable.id eq spotId) and SpotTable.catalogId.isNull() }) { it[SpotTable.catalogId] = catalogId }
-    }
+    override fun saveMembership(membership: CatalogMembership) {
+        when (membership) {
+            is CatalogMembership.Join ->
+                SpotTable.update({ (SpotTable.id eq membership.spotId) and SpotTable.catalogId.isNull() }) { it[SpotTable.catalogId] = membership.catalogId }
 
-    override fun reassign(spotIds: List<Long>, catalogId: Long) {
-        if (spotIds.isEmpty()) return
-        SpotTable.update({ SpotTable.id inList spotIds }) { it[SpotTable.catalogId] = catalogId }
+            is CatalogMembership.Move -> {
+                if (membership.spotIds.isEmpty()) return
+                SpotTable.update({ SpotTable.id inList membership.spotIds }) { it[SpotTable.catalogId] = membership.catalogId }
+            }
+        }
     }
 
     override fun findOriginFestivalPeriods(catalogId: Long): List<OriginFestivalPeriod> = SpotTable
@@ -101,7 +105,9 @@ class SpotCatalogPersistenceAdapter : SpotCatalogRepository {
         .where { SpotTable.catalogId eq catalogId }
         .map { it.toOriginFestivalPeriod() }
 
-    override fun saveFestivalPeriod(catalogId: Long, period: FestivalPeriod?) {
+    override fun saveFestival(festival: CatalogFestival) {
+        val catalogId = festival.catalogId
+        val period = festival.period
         if (period == null) {
             SpotCatalogFestivalTable.deleteWhere { SpotCatalogFestivalTable.catalogId eq catalogId }
             return

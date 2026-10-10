@@ -14,8 +14,8 @@ import org.around.ieuri.tourism.adapter.persistence.table.KtoStayIntensityTable
 import org.around.ieuri.tourism.adapter.persistence.table.KtoVisitorCountTable
 import org.around.ieuri.tourism.application.region.required.RegionMetricQueryPort
 import org.around.ieuri.tourism.application.region.required.dto.DistrictRegion
-import org.around.ieuri.tourism.application.region.required.dto.RegionMetric
 import org.around.ieuri.tourism.application.region.required.dto.RegionRow
+import org.around.ieuri.tourism.domain.region.RegionMetric
 import org.around.ieuri.tourism.domain.shared.Coordinates
 import org.jetbrains.exposed.v1.core.CustomFunction
 import org.jetbrains.exposed.v1.core.CustomOperator

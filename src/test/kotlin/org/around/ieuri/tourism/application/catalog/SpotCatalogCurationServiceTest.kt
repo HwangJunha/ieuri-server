@@ -11,6 +11,8 @@ import org.around.ieuri.tourism.application.catalog.required.SpotCatalogReposito
 import org.around.ieuri.tourism.application.catalog.required.dto.CatalogLanguage
 import org.around.ieuri.tourism.application.catalog.required.dto.VisibilityRefreshResult
 import org.around.ieuri.tourism.domain.catalog.CatalogCandidate
+import org.around.ieuri.tourism.domain.catalog.CatalogFestival
+import org.around.ieuri.tourism.domain.catalog.CatalogMembership
 import org.around.ieuri.tourism.domain.catalog.CatalogOrigin
 import org.around.ieuri.tourism.domain.catalog.CatalogSplit
 import org.around.ieuri.tourism.domain.catalog.CatalogStandardValues
@@ -65,7 +67,7 @@ class SpotCatalogCurationServiceTest {
         val result = service.assignCatalogs(DomainLocale.EN, afterSpotId = 0)
 
         verify { repository.saveTranslation(koreanCatalog, CatalogTranslation(DomainLocale.EN, "Marine City", null, visible = true)) }
-        verify { repository.assign(11, 900) }
+        verify { repository.saveMembership(CatalogMembership.Join(900, 11)) }
         verify(exactly = 0) { repository.insert(any()) }
         assertEquals(1, result.joined)
         assertEquals(11L, result.lastSpotId)
@@ -81,7 +83,7 @@ class SpotCatalogCurationServiceTest {
         service.assignCatalogs(DomainLocale.KO, afterSpotId = 0)
 
         verify(exactly = 0) { repository.saveTranslation(any(), any()) }
-        verify { repository.assign(12, 900) }
+        verify { repository.saveMembership(CatalogMembership.Join(900, 12)) }
     }
 
     @Test
@@ -91,15 +93,16 @@ class SpotCatalogCurationServiceTest {
         every { queryPort.findUnassigned(DomainLocale.KO, 5, any()) } returns listOf(origin(12, DomainLocale.KO, "부산불꽃축제"))
         every { queryPort.loadKoreanTitleIndex() } returns emptyMap()
         every { repository.insert(any()) } returns 500
+        every { repository.findById(500) } returns koreanCatalog.copy(id = 500)
         every { repository.findOriginFestivalPeriods(500) } returns listOf(OriginFestivalPeriod(12, DomainLocale.KO, period))
 
         val result = service.assignCatalogs(DomainLocale.KO, afterSpotId = 5)
 
         verifyOrder {
             repository.insert(match { it.translations.single().title == "부산불꽃축제" })
-            repository.assign(12, 500)
+            repository.saveMembership(CatalogMembership.Join(500, 12))
             repository.findOriginFestivalPeriods(500)
-            repository.saveFestivalPeriod(500, period)
+            repository.saveFestival(CatalogFestival(500, period))
         }
         assertEquals(1, result.catalogsCreated)
     }
@@ -127,12 +130,13 @@ class SpotCatalogCurationServiceTest {
         every { queryPort.findUnassigned(DomainLocale.KO, 0, any()) } returns listOf(origin(12, DomainLocale.KO, "부산타워"))
         every { queryPort.loadKoreanTitleIndex() } returns emptyMap()
         every { repository.insert(any()) } returns 500
+        every { repository.findById(500) } returns koreanCatalog.copy(id = 500)
         every { repository.findOriginFestivalPeriods(500) } returns emptyList()
 
         service.assignCatalogs(DomainLocale.KO, afterSpotId = 0)
 
         verify(exactly = 0) { queryPort.loadKoreanThumbnailIndex() }
-        verify { repository.saveFestivalPeriod(500, null) }
+        verify { repository.saveFestival(CatalogFestival(500, null)) }
     }
 
     @Test
@@ -148,11 +152,12 @@ class SpotCatalogCurationServiceTest {
             origin(3, DomainLocale.JA, "マリンシティ", mapX = far),
         )
         every { repository.insert(any()) } returns 501
+        every { repository.findById(501) } returns koreanCatalog.copy(id = 501)
         every { repository.findOriginFestivalPeriods(501) } returns emptyList()
 
         val result = service.splitMismatchedCatalogs()
 
-        verify { repository.reassign(listOf(3L), 501) }
+        verify { repository.saveMembership(CatalogMembership.Move(501, listOf(3L))) }
         verify { repository.deleteTranslations(900, listOf(DomainLocale.JA)) }
         assertEquals(1, result.catalogsSplit)
         assertEquals(1, result.catalogsCreated)

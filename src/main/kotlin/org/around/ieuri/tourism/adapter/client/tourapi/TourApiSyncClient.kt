@@ -8,7 +8,8 @@ import org.around.ieuri.tourism.application.spot.required.SpotSyncPort
 import org.around.ieuri.tourism.application.spot.required.dto.SpotSyncPage
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.DomainLocale
-import org.around.ieuri.tourism.domain.spot.SpotExclusionRule
+import org.around.ieuri.tourism.domain.spot.spec.SpotExclusionCandidate
+import org.around.ieuri.tourism.domain.spot.spec.SpotExclusionRule
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.requiredBody
@@ -58,7 +59,7 @@ class TourApiSyncClient(
             // 비관광 항목 제외(lclsSystm2). 설정이 빈 목록이면 아무것도 거르지 않는다.
             if (item.lclsSystm2 != null && item.lclsSystm2 in properties.excludeLclssystm2) return@mapNotNull null
             // 제목 키워드 기반 제외(SPEC-0018). 규칙이 관광 카테고리를 보호하므로 카테고리 해석 뒤에 판정한다.
-            if (item.title != null && exclusionRule.isExcluded(item.title, resolved.category)) {
+            if (item.title != null && exclusionRule.isSatisfiedBy(SpotExclusionCandidate(item.title, resolved.category))) {
                 excluded++
                 return@mapNotNull null
             }

@@ -151,4 +151,37 @@ class SpotCatalogTest {
         assertEquals(day.plusDays(3), SpotCatalog.festivalPeriodOf(periods)?.end)
         assertNull(SpotCatalog.festivalPeriodOf(emptyList()))
     }
+
+    @Test
+    @DisplayName("저장된 카탈로그는 미배정 원본을 붙이고, 분할로 떠난 원본은 옮긴다")
+    fun `admit joins one origin and admitAll moves departures`() {
+        val saved = catalog(id = 900)
+
+        assertEquals(CatalogMembership.Join(catalogId = 900, spotId = 12), saved.admit(koreanOrigin(spotId = 12)))
+        assertEquals(CatalogMembership.Move(catalogId = 900, spotIds = listOf(3L, 4L)), saved.admitAll(listOf(3L, 4L)))
+    }
+
+    @Test
+    @DisplayName("저장되지 않은 카탈로그는 원본을 붙이지 않는다")
+    fun `an unsaved catalog admits nothing`() {
+        val unsaved = catalog(id = null)
+
+        assertThrows<IllegalArgumentException> { unsaved.admit(koreanOrigin(spotId = 12)) }
+        assertThrows<IllegalArgumentException> { unsaved.admitAll(listOf(3L)) }
+        assertThrows<IllegalArgumentException> { unsaved.festivalFrom(emptyList()) }
+    }
+
+    @Test
+    @DisplayName("축제 기간은 붙은 원본에서 고르고, 없으면 지울 기간이다")
+    fun `festivalFrom picks by language priority and clears when none`() {
+        val day = LocalDate.of(2026, 10, 1)
+        val saved = catalog(id = 900)
+        val periods = listOf(
+            OriginFestivalPeriod(spotId = 9, language = DomainLocale.EN, period = FestivalPeriod(day, day.plusDays(1))),
+            OriginFestivalPeriod(spotId = 8, language = DomainLocale.KO, period = FestivalPeriod(day, day.plusDays(2))),
+        )
+
+        assertEquals(CatalogFestival(900, FestivalPeriod(day, day.plusDays(2))), saved.festivalFrom(periods))
+        assertEquals(CatalogFestival(900, null), saved.festivalFrom(emptyList()))
+    }
 }

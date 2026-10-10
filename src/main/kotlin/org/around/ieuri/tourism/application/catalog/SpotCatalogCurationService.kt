@@ -9,7 +9,8 @@ import org.around.ieuri.tourism.application.catalog.required.CatalogEventPublish
 import org.around.ieuri.tourism.application.catalog.required.SpotCatalogQueryPort
 import org.around.ieuri.tourism.application.catalog.required.SpotCatalogRepository
 import org.around.ieuri.tourism.domain.catalog.CatalogAssignment
-import org.around.ieuri.tourism.domain.catalog.CatalogIndex
+import org.around.ieuri.tourism.domain.catalog.CatalogCandidates
+import org.around.ieuri.tourism.domain.catalog.CatalogMembership
 import org.around.ieuri.tourism.domain.catalog.CatalogOrigin
 import org.around.ieuri.tourism.domain.catalog.CatalogSplit
 import org.around.ieuri.tourism.domain.catalog.SpotCatalog
@@ -39,7 +40,7 @@ class SpotCatalogCurationService(
         if (origins.isEmpty()) return CatalogAssignmentResult(joined = 0, catalogsCreated = 0, lastSpotId = afterSpotId)
 
         // 썸네일 폴백은 비한국어 전용이다.
-        var index = CatalogIndex(
+        var candidates = CatalogCandidates(
             titleCandidates = catalogQueryPort.loadKoreanTitleIndex(),
             thumbnailCatalogIds = if (language.isKorean) emptyMap() else catalogQueryPort.loadKoreanThumbnailIndex(),
         )
@@ -48,14 +49,14 @@ class SpotCatalogCurationService(
         var created = 0
         var skipped = 0
         origins.forEach { origin ->
-            when (val assignment = index.assign(origin)) {
+            when (val assignment = candidates.assign(origin)) {
                 is CatalogAssignment.Join -> {
                     join(assignment.catalogId, origin)
                     joined++
                 }
 
                 is CatalogAssignment.Found -> {
-                    index = index.withFounded(origin, found(assignment.catalog) { catalogId -> catalogRepository.assign(origin.spotId, catalogId) })
+                    candidates = candidates.withFounded(origin, found(assignment.catalog) { saved -> saved.admit(origin) })
                     created++
                 }
 
@@ -76,7 +77,7 @@ class SpotCatalogCurationService(
 
             val result = catalog.split(catalogQueryPort.findOrigins(catalogId)) ?: return@forEach
 
-            result.departures.forEach { departure -> found(departure.catalog) { catalogId -> catalogRepository.reassign(departure.spotIds, catalogId) } }
+            result.departures.forEach { departure -> found(departure.catalog) { saved -> saved.admitAll(departure.spotIds) } }
             catalogRepository.deleteTranslations(catalogId, result.removedLanguages)
             split++
             created += result.departures.size
@@ -107,17 +108,18 @@ class SpotCatalogCurationService(
 
         catalog.attach(origin)?.let { catalogRepository.saveTranslation(catalog, it) }
 
-        catalogRepository.assign(origin.spotId, catalogId)
+        catalogRepository.saveMembership(catalog.admit(origin))
     }
 
     /**
-     * 새 카탈로그를 저장하고 원본을 붙인 뒤 축제 기간을 정한다 — 원본이 붙은 뒤라야 기간을 고를 수 있다.
-     * - 배정은 미배정 원본만 붙이고(`assign`), 분할은 기존 배정을 옮긴다(`reassign`).
+     * 새 카탈로그를 저장하고, 저장된 루트가 원본 소속을 만든 뒤 축제 기간을 정한다 — 원본이 붙은 뒤라야 기간을 고를 수 있다.
+     * - 배정은 미배정 원본만 붙이고([SpotCatalog.admit]), 분할은 기존 소속을 옮긴다([SpotCatalog.admitAll]).
      */
-    private fun found(catalog: SpotCatalog, attachOrigins: (Long) -> Unit): Long {
+    private fun found(catalog: SpotCatalog, membershipOf: (SpotCatalog) -> CatalogMembership): Long {
         val catalogId = catalogRepository.insert(catalog)
-        attachOrigins(catalogId)
-        catalogRepository.saveFestivalPeriod(catalogId, SpotCatalog.festivalPeriodOf(catalogRepository.findOriginFestivalPeriods(catalogId)))
+        val saved = requireNotNull(catalogRepository.findById(catalogId)) { "방금 넣은 카탈로그가 없다: $catalogId" }
+        catalogRepository.saveMembership(membershipOf(saved))
+        catalogRepository.saveFestival(saved.festivalFrom(catalogRepository.findOriginFestivalPeriods(catalogId)))
         return catalogId
     }
 

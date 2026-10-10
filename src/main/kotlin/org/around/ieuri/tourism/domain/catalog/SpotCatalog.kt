@@ -29,11 +29,22 @@ data class SpotCatalog(
         return if (existing.visible) null else existing.copy(visible = true)
     }
 
+    /** 미배정 원본 하나를 이 카탈로그에 붙인다. 저장된 카탈로그에만 붙는다. */
+    fun admit(origin: CatalogOrigin): CatalogMembership.Join = CatalogMembership.Join(savedId(), origin.spotId)
+
+    /** 분할로 갈라져 나온 원본들을 이 카탈로그로 옮긴다. 저장된 카탈로그에만 옮긴다. */
+    fun admitAll(spotIds: List<Long>): CatalogMembership.Move = CatalogMembership.Move(savedId(), spotIds)
+
+    /** 붙은 원본들의 축제 기간 중 이 카탈로그가 쓸 하나([festivalPeriodOf]). 없으면 기간을 지운다. */
+    fun festivalFrom(originPeriods: List<OriginFestivalPeriod>): CatalogFestival = CatalogFestival(savedId(), festivalPeriodOf(originPeriods))
+
     /** 좋아요/싫어요. 이 언어에 보이는 번역이 없으면 그 언어에서는 볼 수 없는 장소다(SPEC-0029 R-12). */
     fun react(memberId: Long, language: DomainLocale, reaction: ReactionType): SpotReaction {
         if (translationIn(language)?.visible != true) throw SpotNotFoundInLocaleException()
         return SpotReaction(memberId = memberId, catalogId = requireNotNull(id) { "적재된 카탈로그에만 반응한다." }, language = language, reaction = reaction)
     }
+
+    private fun savedId(): Long = requireNotNull(id) { "적재된 카탈로그에만 원본을 붙인다." }
 
     /**
      * 서로 다른 장소가 접혔으면 가른다(SPEC-0029). 원본이 한 군집이면 null이다.

@@ -4,13 +4,13 @@ import org.around.ieuri.tourism.adapter.client.kto.dto.KtoBigDataResponse
 import org.around.ieuri.tourism.adapter.client.kto.dto.KtoConcentrationRateItem
 import org.around.ieuri.tourism.adapter.client.kto.dto.KtoDemandIntensityItem
 import org.around.ieuri.tourism.adapter.client.kto.dto.KtoVisitorCountItem
-import org.around.ieuri.tourism.adapter.client.kto.mapper.toSyncCommandOrNull
+import org.around.ieuri.tourism.adapter.client.kto.mapper.toRecordOrNull
 import org.around.ieuri.tourism.adapter.config.KtoBigDataProperties
-import org.around.ieuri.tourism.application.region.provided.dto.SyncConcentrationRateCommand
-import org.around.ieuri.tourism.application.region.provided.dto.SyncDemandIntensityCommand
-import org.around.ieuri.tourism.application.region.provided.dto.SyncVisitorCountCommand
 import org.around.ieuri.tourism.application.region.required.RegionMetricSyncPort
+import org.around.ieuri.tourism.application.region.required.dto.ConcentrationRateRecord
+import org.around.ieuri.tourism.application.region.required.dto.DemandIntensityRecord
 import org.around.ieuri.tourism.application.region.required.dto.RegionMetricSyncPage
+import org.around.ieuri.tourism.application.region.required.dto.VisitorCountRecord
 import org.around.ieuri.tourism.application.shared.exception.UpstreamRateLimitedException
 import org.around.ieuri.tourism.application.shared.exception.UpstreamUnavailableException
 import org.slf4j.LoggerFactory
@@ -44,13 +44,13 @@ class KtoBigDataClient(
         endDate: LocalDate,
         pageNo: Int,
         numOfRows: Int,
-    ): RegionMetricSyncPage<SyncVisitorCountCommand> {
+    ): RegionMetricSyncPage<VisitorCountRecord> {
         val uri = uriFor(KtoBigDataProperties.SERVICE_DATA_LAB, OP_VISITOR_COUNT, pageNo, numOfRows) {
             // 지역 필터가 없어 날짜 구간만 주면 전 지역이 온다(§4.3).
             queryParam("startYmd", startDate.format(DATE_FORMAT))
             queryParam("endYmd", endDate.format(DATE_FORMAT))
         }
-        return fetchPage(uri, VISITOR_COUNT_TYPE) { it.toSyncCommandOrNull() }
+        return fetchPage(uri, VISITOR_COUNT_TYPE) { it.toRecordOrNull() }
     }
 
     /**
@@ -62,12 +62,12 @@ class KtoBigDataClient(
         signguCd: String,
         pageNo: Int,
         numOfRows: Int,
-    ): RegionMetricSyncPage<SyncConcentrationRateCommand> {
+    ): RegionMetricSyncPage<ConcentrationRateRecord> {
         val uri = uriFor(KtoBigDataProperties.SERVICE_TATS_CNCTR_RATE, OP_CONCENTRATION_RATE, pageNo, numOfRows) {
             queryParam("areaCd", areaCd)
             queryParam("signguCd", signguCd)
         }
-        return fetchPage(uri, CONCENTRATION_RATE_TYPE) { it.toSyncCommandOrNull() }
+        return fetchPage(uri, CONCENTRATION_RATE_TYPE) { it.toRecordOrNull() }
     }
 
     override fun fetchStayIntensities(
@@ -75,7 +75,7 @@ class KtoBigDataClient(
         baseMonth: YearMonth,
         pageNo: Int,
         numOfRows: Int,
-    ): RegionMetricSyncPage<SyncDemandIntensityCommand> = fetchDemandIntensity(
+    ): RegionMetricSyncPage<DemandIntensityRecord> = fetchDemandIntensity(
         OP_STAY_INTENSITY,
         PARAM_STAY_INDEX_CODE,
         properties.stayIndexCode,
@@ -90,7 +90,7 @@ class KtoBigDataClient(
         baseMonth: YearMonth,
         pageNo: Int,
         numOfRows: Int,
-    ): RegionMetricSyncPage<SyncDemandIntensityCommand> = fetchDemandIntensity(
+    ): RegionMetricSyncPage<DemandIntensityRecord> = fetchDemandIntensity(
         OP_SPENDING_INTENSITY,
         PARAM_SPENDING_INDEX_CODE,
         properties.spendingIndexCode,
@@ -113,13 +113,13 @@ class KtoBigDataClient(
         baseMonth: YearMonth,
         pageNo: Int,
         numOfRows: Int,
-    ): RegionMetricSyncPage<SyncDemandIntensityCommand> {
+    ): RegionMetricSyncPage<DemandIntensityRecord> {
         val uri = uriFor(KtoBigDataProperties.SERVICE_AREA_TAR_DEM_DS, operation, pageNo, numOfRows) {
             queryParam("areaCd", areaCd)
             queryParam("baseYm", baseMonth.format(MONTH_FORMAT))
             queryParam(indexParamName, indexCode)
         }
-        return fetchPage(uri, DEMAND_INTENSITY_TYPE) { it.toSyncCommandOrNull() }
+        return fetchPage(uri, DEMAND_INTENSITY_TYPE) { it.toRecordOrNull() }
     }
 
     /**

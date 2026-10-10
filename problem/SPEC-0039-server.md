@@ -288,6 +288,7 @@ grep으로 확인한 수(worktree `82fdd48`):
 - 어댑터의 `NationwideMap*` 이름(리졸버·GraphQL 매퍼·설정) — 스키마 루트 `nationwideMap`을 따른다. 응용 계층은 `Footprint*`로 바꿨다(D-99)
 - `ConsistencyConventionTest`에 `org.springframework.data..` 금지 추가 — 하지 않기로 했다(사용자 결정 2026-10-07)
 - community `spotAnswers(없는 질문)`의 `INTERNAL_ERROR` — community 조회 예외라 S13 범위 밖
+- community·alarm 도메인의 spec/policy 정리(`CatalogIndex` 쪼개기는 D-121에서 했다)
 
 ## 설계
 
