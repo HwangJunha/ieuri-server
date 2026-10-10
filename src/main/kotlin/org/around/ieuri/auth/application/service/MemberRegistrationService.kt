@@ -43,7 +43,6 @@ import org.around.ieuri.auth.domain.aggregate.PasswordReset
 import org.around.ieuri.auth.domain.aggregate.Role
 import org.around.ieuri.auth.domain.aggregate.VerificationResult
 import org.around.ieuri.auth.domain.event.EmailVerified
-import org.around.ieuri.auth.domain.event.MemberRegistered
 import org.around.ieuri.auth.domain.strategy.NicknameGenerator
 import org.around.ieuri.auth.domain.vo.Agreement
 import org.around.ieuri.auth.domain.vo.Email

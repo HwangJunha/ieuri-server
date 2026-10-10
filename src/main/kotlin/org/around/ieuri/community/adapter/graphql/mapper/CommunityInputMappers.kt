@@ -9,17 +9,17 @@ import org.around.ieuri.common.graphql.generated.types.PostImageUploadFailure
 import org.around.ieuri.common.graphql.generated.types.PostImageUploadUrl
 import org.around.ieuri.common.graphql.generated.types.ReportContentInput
 import org.around.ieuri.community.application.comment.provided.dto.CreateCommentCommand
+import org.around.ieuri.community.application.photo.provided.dto.ConfirmPostImageUploadsCommand
+import org.around.ieuri.community.application.photo.provided.dto.IssuePostImageUploadUrlsCommand
+import org.around.ieuri.community.application.photo.provided.dto.PostImageConfirmFailure
+import org.around.ieuri.community.application.photo.provided.dto.PostImageUploadRequest
+import org.around.ieuri.community.application.photo.provided.dto.PostImageUploadUrlView
 import org.around.ieuri.community.application.post.provided.dto.CreatePostCommand
 import org.around.ieuri.community.application.post.provided.dto.EditPostCommand
 import org.around.ieuri.community.application.report.provided.dto.ReportContentCommand
-import org.around.ieuri.community.application.shared.dto.PostImageConfirmFailure
-import org.around.ieuri.community.application.shared.dto.PostImageUploadUrlView
-import org.around.ieuri.community.application.shared.provided.dto.ConfirmPostImageUploadsCommand
-import org.around.ieuri.community.application.shared.provided.dto.IssuePostImageUploadUrlsCommand
-import org.around.ieuri.community.application.shared.provided.dto.PostImageUploadRequest
+import org.around.ieuri.community.domain.post.TargetCategory
 import org.around.ieuri.community.domain.report.ReportTargetType
 import org.around.ieuri.community.domain.shared.ReportReason
-import org.around.ieuri.community.domain.shared.TargetCategory
 
 // GraphQL 입력 → 커맨드, 읽기 모델 → GraphQL 타입. 모양만 옮긴다.
 

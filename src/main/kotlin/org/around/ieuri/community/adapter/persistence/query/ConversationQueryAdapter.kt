@@ -11,9 +11,9 @@ import org.around.ieuri.community.adapter.persistence.table.MessageTable
 import org.around.ieuri.community.application.conversation.provided.dto.ConversationSpotQaOriginView
 import org.around.ieuri.community.application.conversation.provided.dto.ConversationView
 import org.around.ieuri.community.application.conversation.provided.dto.MessageView
-import org.around.ieuri.community.application.conversation.required.ConversationMessagesSearch
 import org.around.ieuri.community.application.conversation.required.ConversationQueryPort
-import org.around.ieuri.community.application.conversation.required.ConversationsSearch
+import org.around.ieuri.community.application.conversation.required.dto.ConversationMessagesSearch
+import org.around.ieuri.community.application.conversation.required.dto.ConversationsSearch
 import org.jetbrains.exposed.v1.core.Column
 import org.jetbrains.exposed.v1.core.JoinType
 import org.jetbrains.exposed.v1.core.Op

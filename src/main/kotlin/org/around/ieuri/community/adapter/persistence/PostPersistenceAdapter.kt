@@ -12,11 +12,11 @@ import org.around.ieuri.community.adapter.persistence.table.PostSpotTable
 import org.around.ieuri.community.adapter.persistence.table.PostTable
 import org.around.ieuri.community.adapter.persistence.table.PostTagTable
 import org.around.ieuri.community.application.post.required.PostRepository
+import org.around.ieuri.community.domain.photo.AttachedPhotos
 import org.around.ieuri.community.domain.post.Post
 import org.around.ieuri.community.domain.post.PostSpot
 import org.around.ieuri.community.domain.post.PostTags
-import org.around.ieuri.community.domain.shared.AttachedPhotos
-import org.around.ieuri.community.domain.shared.TargetCategory
+import org.around.ieuri.community.domain.post.TargetCategory
 import org.jetbrains.exposed.v1.core.Column
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq

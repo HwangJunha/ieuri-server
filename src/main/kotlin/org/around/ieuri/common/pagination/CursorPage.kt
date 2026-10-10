@@ -32,12 +32,6 @@ data class CursorPageInfo(
     val endCursor: String?,
 )
 
-/** 커서 조회 입력. [after]가 null이면 처음부터. */
-data class CursorQuery(
-    val first: Int,
-    val after: String?,
-)
-
 /**
  * 엣지 목록으로 한 페이지를 조립한다. startCursor·endCursor는 엣지에서 도출한다.
  * - [hasPreviousPage]는 "앞 페이지가 실재하는가"가 아니라 호출자가 커서를 넘겼는가다.

@@ -1,27 +1,27 @@
 package org.around.ieuri.community.application.post
 
 import org.around.ieuri.common.persistence.ExposedConfig
+import org.around.ieuri.community.application.lookup.provided.SpotLookupUseCase
+import org.around.ieuri.community.application.photo.provided.UploadedPhotoUseCase
 import org.around.ieuri.community.application.post.provided.PostCommandUseCase
 import org.around.ieuri.community.application.post.provided.dto.CreatePostCommand
 import org.around.ieuri.community.application.post.provided.dto.EditPostCommand
 import org.around.ieuri.community.application.post.provided.dto.PostTargetCommand
 import org.around.ieuri.community.application.post.provided.exception.PostNotFoundException
 import org.around.ieuri.community.application.post.required.PostRepository
-import org.around.ieuri.community.application.shared.UploadedPhotoVerifier
 import org.around.ieuri.community.application.shared.exception.SpotNotFoundInLocaleException
-import org.around.ieuri.community.application.shared.required.ClockPort
-import org.around.ieuri.community.application.shared.required.SpotLookupPort
+import org.around.ieuri.community.domain.photo.AttachedPhotos
 import org.around.ieuri.community.domain.post.HiddenPostNotEditableException
 import org.around.ieuri.community.domain.post.Post
 import org.around.ieuri.community.domain.post.PostSpot
 import org.around.ieuri.community.domain.post.PostTag
 import org.around.ieuri.community.domain.post.PostTags
 import org.around.ieuri.community.domain.post.SpotPoint
-import org.around.ieuri.community.domain.shared.AttachedPhotos
 import org.around.ieuri.community.domain.shared.ContentLanguage
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
 import java.time.Instant
 
 /**
@@ -33,17 +33,17 @@ import java.time.Instant
 @Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
 class PostModifyService(
     private val postRepository: PostRepository,
-    private val spotLookupPort: SpotLookupPort,
-    private val photoVerifier: UploadedPhotoVerifier,
-    private val clockPort: ClockPort,
+    private val spotLookup: SpotLookupUseCase,
+    private val uploadedPhotos: UploadedPhotoUseCase,
+    private val clock: Clock,
 ) : PostCommandUseCase {
 
     override fun createPost(command: CreatePostCommand, memberId: Long, language: ContentLanguage): Long {
         val spot = command.catalogId?.let { findSpot(it, language) }
         val post = Post.write(memberId, command.title, command.body)
         val tags = PostTags.of(command.tags.map(PostTag::parse))
-        val photos = AttachedPhotos.of(photoVerifier.parse(command.photoKeys), memberId)
-        photoVerifier.requireUploaded(photos.keys)
+        val photos = AttachedPhotos.of(uploadedPhotos.parse(command.photoKeys), memberId)
+        uploadedPhotos.requireUploaded(photos.keys)
 
         return postRepository.insert(post, command.category, spot, tags, photos)
     }
@@ -52,10 +52,10 @@ class PostModifyService(
     override fun editPost(command: EditPostCommand, memberId: Long, language: ContentLanguage) {
         // 개수·소유·확정을 먼저 판정하고 R2 확인은 그 뒤에 한다 — 남의 키 존재를 응답으로 드러내지 않는다.
         // 소유자는 수정자다(작성자만 수정할 수 있다).
-        val photos = command.photoKeys?.let { AttachedPhotos.of(photoVerifier.parse(it), memberId) }
+        val photos = command.photoKeys?.let { AttachedPhotos.of(uploadedPhotos.parse(it), memberId) }
         val tags = command.tags?.map(PostTag::parse)?.let(PostTags::of)
         val spot = if (command.changeSpot) command.catalogId?.let { findSpot(it, language) } else null
-        photos?.let { photoVerifier.requireUploaded(it.keys) }
+        photos?.let { uploadedPhotos.requireUploaded(it.keys) }
 
         val post = postRepository.findById(command.postId) ?: throw PostNotFoundException()
 
@@ -73,7 +73,7 @@ class PostModifyService(
         // 이미 삭제된 글은 조회되지 않으므로 재삭제는 POST_NOT_FOUND다.
         val post = postRepository.findById(command.postId) ?: throw PostNotFoundException()
 
-        val deleted = post.delete(memberId, clockPort.now())
+        val deleted = post.delete(memberId, Instant.now(clock))
 
         postRepository.markDeleted(command.postId, requireNotNull(deleted.deletedAt))
     }
@@ -114,7 +114,7 @@ class PostModifyService(
 
     /** 장소는 활성 언어에서 해소되는 것만 붙일 수 있다. 좌표를 글에 복사한다. */
     private fun findSpot(catalogId: Long, language: ContentLanguage): PostSpot {
-        val summary = spotLookupPort.findSummary(catalogId, language) ?: throw SpotNotFoundInLocaleException()
+        val summary = spotLookup.spot(catalogId, language) ?: throw SpotNotFoundInLocaleException()
         return PostSpot(catalogId, SpotPoint(longitude = summary.longitude, latitude = summary.latitude))
     }
 

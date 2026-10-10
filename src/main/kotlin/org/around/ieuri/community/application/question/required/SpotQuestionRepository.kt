@@ -1,9 +1,9 @@
 package org.around.ieuri.community.application.question.required
 
+import org.around.ieuri.community.domain.photo.AttachedPhotos
 import org.around.ieuri.community.domain.question.SpotAnswer
 import org.around.ieuri.community.domain.question.SpotAnswerReply
 import org.around.ieuri.community.domain.question.SpotQuestion
-import org.around.ieuri.community.domain.shared.AttachedPhotos
 import java.time.Instant
 
 /**

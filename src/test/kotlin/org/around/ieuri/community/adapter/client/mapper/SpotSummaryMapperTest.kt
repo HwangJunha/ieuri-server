@@ -1,7 +1,7 @@
 package org.around.ieuri.community.adapter.client.mapper
 
-import org.around.ieuri.community.domain.shared.TargetCategory
-import org.around.ieuri.tourism.application.query.SpotSummaryView
+import org.around.ieuri.community.domain.post.TargetCategory
+import org.around.ieuri.tourism.application.catalog.provided.dto.SpotSummaryView
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -19,7 +19,7 @@ class SpotSummaryMapperTest {
             categoryCode = "TOURIST_SPOT",
             longitude = 126.9770,
             latitude = 37.5796,
-        ).toPostSpotView()
+        ).toSpotSummary()
 
         assertEquals(11094L, view.id)
         assertEquals("경복궁", view.title)
@@ -34,11 +34,11 @@ class SpotSummaryMapperTest {
     fun `언어 전용 카테고리도 옮겨진다`() {
         assertEquals(
             TargetCategory.TRAVEL_COURSE,
-            summary(categoryCode = "TRAVEL_COURSE").toPostSpotView().category,
+            summary(categoryCode = "TRAVEL_COURSE").toSpotSummary().category,
         )
         assertEquals(
             TargetCategory.TRANSPORT,
-            summary(categoryCode = "TRANSPORT").toPostSpotView().category,
+            summary(categoryCode = "TRANSPORT").toSpotSummary().category,
         )
     }
 
@@ -47,7 +47,7 @@ class SpotSummaryMapperTest {
         TargetCategory.entries.forEach { category ->
             assertEquals(
                 category,
-                summary(categoryCode = category.name).toPostSpotView().category,
+                summary(categoryCode = category.name).toSpotSummary().category,
                 "${category.name}이 옮겨지지 않는다",
             )
         }
@@ -55,8 +55,8 @@ class SpotSummaryMapperTest {
 
     @Test
     fun `모르는 카테고리 코드는 null이다 - 칩으로 걸러지지 않을 뿐 조회는 성공한다`() {
-        assertNull(summary(categoryCode = "UNKNOWN_CODE").toPostSpotView().category)
-        assertNull(summary(categoryCode = "").toPostSpotView().category)
+        assertNull(summary(categoryCode = "UNKNOWN_CODE").toSpotSummary().category)
+        assertNull(summary(categoryCode = "").toSpotSummary().category)
     }
 
     private fun summary(categoryCode: String) = SpotSummaryView(

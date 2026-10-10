@@ -1,0 +1,155 @@
+package org.around.ieuri.tourism.adapter.graphql.resolver
+
+import com.netflix.graphql.dgs.DgsComponent
+import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
+import com.netflix.graphql.dgs.DgsQuery
+import com.netflix.graphql.dgs.InputArgument
+import org.around.ieuri.common.graphql.tokenPresentation
+import org.around.ieuri.common.security.CurrentMemberProvider
+import org.around.ieuri.tourism.adapter.graphql.mapper.toCategorySelection
+import org.around.ieuri.tourism.adapter.graphql.mapper.toGql
+import org.around.ieuri.tourism.adapter.graphql.mapper.toGqlFestivalConnection
+import org.around.ieuri.tourism.adapter.graphql.mapper.toGqlPopularSpotConnection
+import org.around.ieuri.tourism.adapter.graphql.mapper.toGqlSearchConnection
+import org.around.ieuri.tourism.adapter.graphql.support.domainLocale
+import org.around.ieuri.tourism.application.catalog.provided.SpotDiscoveryUseCase
+import org.around.ieuri.tourism.application.catalog.provided.dto.OngoingFestivalsQuery
+import org.around.ieuri.tourism.application.catalog.provided.dto.PopularSpotsQuery
+import org.around.ieuri.tourism.application.catalog.provided.dto.SearchSpotsQuery
+import org.around.ieuri.common.graphql.generated.types.FestivalConnection as GqlFestivalConnection
+import org.around.ieuri.common.graphql.generated.types.PopularSpotConnection as GqlPopularSpotConnection
+import org.around.ieuri.common.graphql.generated.types.SpotSearchPayload as GqlSpotSearchPayload
+import org.around.ieuri.common.graphql.generated.types.SpotSuggestion as GqlSpotSuggestion
+import org.around.ieuri.common.graphql.generated.types.UserError as GqlUserError
+
+/**
+ * spot 발견 조회 리졸버(SPEC-0013). 언어는 Accept-Language 헤더에서 읽는다. 네 쿼리 모두 비로그인 허용이다.
+ * - 좌표·반경·카테고리 오류는 최상위 errors[]로, 검색어 오류만 payload의 userErrors로 나간다.
+ * - 커넥션 타입 이름은 `Connection`으로 끝나야 한다.
+ */
+@DgsComponent
+class SpotDiscoveryResolver(
+    private val spotDiscoveryUseCase: SpotDiscoveryUseCase,
+    private val currentMemberProvider: CurrentMemberProvider,
+) {
+
+    /**
+     * 조회 사실을 남길 회원 id. 비로그인은 null이다(SPEC-0032 R19).
+     * - 만료 토큰은 비로그인으로 흘리지 않고 오류다 — 기록 없이 지나가지 않게 한다(POL-057).
+     */
+    private fun DgsDataFetchingEnvironment.viewerMemberId(): Long? = currentMemberProvider.optionalMemberId(tokenPresentation())
+
+    @DgsQuery
+    fun searchSpots(
+        dfe: DgsDataFetchingEnvironment,
+        @InputArgument query: String,
+        @InputArgument latitude: Double,
+        @InputArgument longitude: Double,
+        @InputArgument radiusMeters: Int?,
+        @InputArgument categories: List<String>?,
+        @InputArgument page: Int?,
+        @InputArgument size: Int?,
+    ): GqlSpotSearchPayload {
+        val memberId = dfe.viewerMemberId()
+        val result = spotDiscoveryUseCase.searchSpots(
+            SearchSpotsQuery(
+                query = query,
+                latitude = latitude,
+                longitude = longitude,
+                radiusMeters = radiusMeters ?: DEFAULT_RADIUS_METERS,
+                categories = toCategorySelection(categories),
+                page = page ?: DEFAULT_PAGE,
+                size = size ?: DEFAULT_PAGE_SIZE,
+            ),
+            locale = dfe.domainLocale(),
+            memberId = memberId,
+        )
+
+        return GqlSpotSearchPayload(
+            success = result.success,
+            userErrors = result.userErrors.map {
+                GqlUserError(code = it.code, message = it.message, field = it.field)
+            },
+            // 검증 실패에도 connection은 존재하며 비어 있다.
+            connection = result.results.toGqlSearchConnection(),
+        )
+    }
+
+    @DgsQuery
+    fun spotSearchSuggestions(
+        dfe: DgsDataFetchingEnvironment,
+        @InputArgument query: String,
+        @InputArgument latitude: Double,
+        @InputArgument longitude: Double,
+        @InputArgument radiusMeters: Int?,
+        @InputArgument limit: Int?,
+    ): List<GqlSpotSuggestion> {
+        val memberId = dfe.viewerMemberId()
+        return spotDiscoveryUseCase.spotSearchSuggestions(
+            query = query,
+            latitude = latitude,
+            longitude = longitude,
+            radiusMeters = radiusMeters ?: DEFAULT_RADIUS_METERS,
+            limit = limit ?: DEFAULT_SUGGESTION_LIMIT,
+            locale = dfe.domainLocale(),
+            memberId = memberId,
+        ).map { it.toGql() }
+    }
+
+    @DgsQuery
+    fun ongoingFestivals(
+        dfe: DgsDataFetchingEnvironment,
+        @InputArgument latitude: Double,
+        @InputArgument longitude: Double,
+        @InputArgument radiusMeters: Int?,
+        @InputArgument first: Int?,
+        @InputArgument after: String?,
+    ): GqlFestivalConnection {
+        val memberId = dfe.viewerMemberId()
+        val page = spotDiscoveryUseCase.ongoingFestivals(
+            OngoingFestivalsQuery(
+                latitude = latitude,
+                longitude = longitude,
+                radiusMeters = radiusMeters ?: DEFAULT_RADIUS_METERS,
+                first = first ?: DEFAULT_PAGE_SIZE,
+                after = after,
+            ),
+            locale = dfe.domainLocale(),
+            memberId = memberId,
+        )
+        return page.toGqlFestivalConnection()
+    }
+
+    @DgsQuery
+    fun popularSpots(
+        dfe: DgsDataFetchingEnvironment,
+        @InputArgument latitude: Double,
+        @InputArgument longitude: Double,
+        @InputArgument radiusMeters: Int?,
+        @InputArgument categories: List<String>?,
+        @InputArgument first: Int?,
+        @InputArgument after: String?,
+    ): GqlPopularSpotConnection {
+        val memberId = dfe.viewerMemberId()
+        val page = spotDiscoveryUseCase.popularSpots(
+            PopularSpotsQuery(
+                latitude = latitude,
+                longitude = longitude,
+                radiusMeters = radiusMeters ?: DEFAULT_RADIUS_METERS,
+                categories = toCategorySelection(categories),
+                first = first ?: DEFAULT_PAGE_SIZE,
+                after = after,
+            ),
+            locale = dfe.domainLocale(),
+            memberId = memberId,
+        )
+        return page.toGqlPopularSpotConnection()
+    }
+
+    private companion object {
+        const val DEFAULT_RADIUS_METERS = 20_000
+        const val DEFAULT_PAGE = 1
+        const val DEFAULT_PAGE_SIZE = 20
+        const val DEFAULT_SUGGESTION_LIMIT = 10
+    }
+}

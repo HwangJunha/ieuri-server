@@ -1,6 +1,9 @@
 package org.around.ieuri.community.adapter.config
 
-import org.around.ieuri.community.application.shared.CommunityPolicy
+import org.around.ieuri.community.application.comment.CommentPolicy
+import org.around.ieuri.community.application.photo.PhotoPolicy
+import org.around.ieuri.community.application.post.PostPolicy
+import org.around.ieuri.community.application.shared.PagePolicy
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -45,13 +48,16 @@ class CommunityConfig {
     )
 
     @Bean
-    fun communityPolicy(
-        r2: R2Properties,
-        community: CommunityProperties,
-    ): CommunityPolicy = CommunityPolicy(
-        maxPageSize = community.maxPageSize,
-        commentPreviewSize = community.commentPreviewSize,
-        maxRadiusMeters = community.maxRadiusMeters,
+    fun pagePolicy(community: CommunityProperties): PagePolicy = PagePolicy(maxPageSize = community.maxPageSize)
+
+    @Bean
+    fun postPolicy(community: CommunityProperties): PostPolicy = PostPolicy(maxRadiusMeters = community.maxRadiusMeters)
+
+    @Bean
+    fun commentPolicy(community: CommunityProperties): CommentPolicy = CommentPolicy(previewSize = community.commentPreviewSize)
+
+    @Bean
+    fun photoPolicy(r2: R2Properties): PhotoPolicy = PhotoPolicy(
         uploadUrlTtl = r2.uploadUrlTtl,
         maxUploadBytes = r2.maxUploadBytes,
         allowedContentTypes = r2.allowedContentTypes.map { it.trim().lowercase() }.toSet(),

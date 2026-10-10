@@ -3,6 +3,8 @@ package org.around.ieuri.community.application.conversation.required
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.community.application.conversation.provided.dto.ConversationView
 import org.around.ieuri.community.application.conversation.provided.dto.MessageView
+import org.around.ieuri.community.application.conversation.required.dto.ConversationMessagesSearch
+import org.around.ieuri.community.application.conversation.required.dto.ConversationsSearch
 
 /** 대화·메시지 읽기 포트(R8). 참여자 판정은 여기서 하지 않고 서비스가 한다. */
 interface ConversationQueryPort {
@@ -22,16 +24,3 @@ interface ConversationQueryPort {
      */
     fun findMessage(conversationId: Long, messageId: Long, memberId: Long): MessageView?
 }
-
-data class ConversationsSearch(
-    val memberId: Long,
-    val first: Int,
-    val after: String?,
-)
-
-data class ConversationMessagesSearch(
-    val conversationId: Long,
-    val memberId: Long,
-    val first: Int,
-    val after: String?,
-)

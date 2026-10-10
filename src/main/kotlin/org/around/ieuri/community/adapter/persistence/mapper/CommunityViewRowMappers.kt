@@ -7,14 +7,14 @@ import org.around.ieuri.community.adapter.persistence.table.PostTable
 import org.around.ieuri.community.adapter.persistence.table.SpotAnswerReplyTable
 import org.around.ieuri.community.adapter.persistence.table.SpotAnswerTable
 import org.around.ieuri.community.adapter.persistence.table.SpotQuestionTable
+import org.around.ieuri.community.application.comment.provided.dto.CommentView
 import org.around.ieuri.community.application.conversation.provided.dto.ConversationSpotQaOriginView
 import org.around.ieuri.community.application.conversation.provided.dto.MessageView
+import org.around.ieuri.community.application.post.provided.dto.PostView
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswerReplyView
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswerView
 import org.around.ieuri.community.application.question.provided.dto.SpotQuestionView
-import org.around.ieuri.community.application.shared.dto.CommentView
-import org.around.ieuri.community.application.shared.dto.PostAuthorView
-import org.around.ieuri.community.application.shared.dto.PostView
+import org.around.ieuri.community.domain.lookup.MemberSummary
 import org.jetbrains.exposed.v1.core.ResultRow
 
 // 읽기 행 → read DTO. 한 행이 가진 것만 옮기고 나머지(작성자 표시 정보·사진 등)는 필드 리졸버가 채운다.
@@ -38,7 +38,7 @@ fun ResultRow.toCommentView(viewerId: Long): CommentView = CommentView(
     id = this[CommentTable.id],
     parentCommentId = this[CommentTable.parentCommentId],
     body = this[CommentTable.body],
-    author = PostAuthorView(id = this[CommentTable.authorId], nickname = "", profileImageUrl = null),
+    author = MemberSummary(id = this[CommentTable.authorId], nickname = "", profileImageUrl = null),
     ownedByViewer = this[CommentTable.authorId] == viewerId,
     hidden = this[CommentTable.hidden],
     createdAt = this[CommentTable.createdAt].toInstant(),

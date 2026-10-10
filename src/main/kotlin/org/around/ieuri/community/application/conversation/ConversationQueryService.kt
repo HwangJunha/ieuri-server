@@ -8,10 +8,10 @@ import org.around.ieuri.community.application.conversation.provided.dto.Conversa
 import org.around.ieuri.community.application.conversation.provided.dto.MessageView
 import org.around.ieuri.community.application.conversation.provided.dto.TypingEventView
 import org.around.ieuri.community.application.conversation.required.ConversationEventPort
-import org.around.ieuri.community.application.conversation.required.ConversationMessagesSearch
 import org.around.ieuri.community.application.conversation.required.ConversationQueryPort
-import org.around.ieuri.community.application.conversation.required.ConversationsSearch
-import org.around.ieuri.community.application.shared.CommunityPolicy
+import org.around.ieuri.community.application.conversation.required.dto.ConversationMessagesSearch
+import org.around.ieuri.community.application.conversation.required.dto.ConversationsSearch
+import org.around.ieuri.community.application.shared.PagePolicy
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import reactor.core.publisher.Flux
@@ -25,7 +25,7 @@ import reactor.core.publisher.Flux
 class ConversationQueryService(
     private val conversationQueryPort: ConversationQueryPort,
     private val conversationEventPort: ConversationEventPort,
-    private val policy: CommunityPolicy,
+    private val pagePolicy: PagePolicy,
 ) : ConversationQueryUseCase {
 
     override fun conversations(
@@ -80,7 +80,7 @@ class ConversationQueryService(
     }
 
     /** 상한 초과는 오류가 아니라 절삭이다(POL-018). null이면 계약의 기본값이다. */
-    private fun clampPageSize(first: Int?, default: Int): Int = (first ?: default).coerceIn(1, policy.maxPageSize)
+    private fun clampPageSize(first: Int?, default: Int): Int = pagePolicy.clamp(first ?: default)
 
     private companion object {
         const val DEFAULT_CONVERSATIONS_PAGE_SIZE = 20

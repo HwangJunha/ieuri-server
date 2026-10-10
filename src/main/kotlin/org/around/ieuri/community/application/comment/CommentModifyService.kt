@@ -7,11 +7,11 @@ import org.around.ieuri.community.application.comment.provided.exception.Comment
 import org.around.ieuri.community.application.comment.required.CommentRepository
 import org.around.ieuri.community.application.post.provided.exception.PostNotFoundException
 import org.around.ieuri.community.application.post.required.PostRepository
-import org.around.ieuri.community.application.shared.required.ClockPort
 import org.around.ieuri.community.domain.comment.Comment
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
 import java.time.Instant
 
 /** 댓글 생성·삭제. 대댓글도 글의 댓글 수에 포함된다. */
@@ -20,7 +20,7 @@ import java.time.Instant
 class CommentModifyService(
     private val commentRepository: CommentRepository,
     private val postRepository: PostRepository,
-    private val clockPort: ClockPort,
+    private val clock: Clock,
 ) : CommentCommandUseCase {
 
     override fun createComment(command: CreateCommentCommand, memberId: Long): Long {
@@ -42,7 +42,7 @@ class CommentModifyService(
         require(commentId > 0) { "commentId는 양수여야 합니다." }
         val comment = commentRepository.findById(commentId) ?: throw CommentNotFoundException()
 
-        val deleted = comment.delete(memberId, clockPort.now())
+        val deleted = comment.delete(memberId, Instant.now(clock))
 
         if (commentRepository.markDeletedWasCounted(commentId, requireNotNull(deleted.deletedAt))) {
             postRepository.decreaseCommentCount(comment.postId)

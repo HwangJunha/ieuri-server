@@ -56,3 +56,40 @@
 - 회원가입 2종(지시), `withdrawMember`(공용 계정 삭제)
 - 외부 발송·비가역 성공 경로(이메일 인증·재설정·변경, SNS 로그인, 관리자 권한 Mutation) — 오류 경로만
 - Subscription 2종(WebSocket)
+
+---
+
+# 재실행 — community·tourism 전체 (2026-10-08, D-112 반영 후)
+
+로컬 = `feature/SPEC-0039-tourism`(tourism 이전 + community `shared` 정리 + D-112) · dev = `api-dev.ieuri.co.kr`. 배치는 제외했다.
+범위는 community·tourism 스키마의 루트 65개(Query 31 · Mutation 34 · Subscription 2) 전부다. 같은 계정(55), 같은 입력.
+
+| 구분 | 요청 | 같음 | 다름(원인) |
+|---|---|---|---|
+| Query(응답 깊이 4·6 두 번, 깨진 커서 18건 포함) | 77 | 76 | 1 — `post.viewCount`(먼저 부른 쪽 조회가 +1) |
+| `spotDetail` 필수 인자 필드(`intro`·`infoItems`·`gallery`, dev 오류를 피하려 `category` 제외) | 8 | 8 | 0 |
+| Mutation 오류 경로 | 39 | 39 | 0 |
+| Mutation 실행 | 46 | 46 | 0 |
+| 조회 분기(필터·커서 다음 페이지) | 9 | 9 | 0 |
+| Subscription(graphql-transport-ws) | 5 | 5 | 0 |
+
+**dev와 응답이 다른 것은 조회수 부수 효과 1건뿐이다.**
+
+- 처음 실행(같은 날, D-112 전)에는 Query 13건·Mutation 오류 1건이 달랐다 — 로컬이 dev의 결함(`category.code` null, 업무 예외의 INTERNAL_ERROR)을 고친 응답을 냈다.
+  응답 변경은 클라이언트에게 장애라 D-112로 dev 응답으로 되돌렸다. 결함은 dev·로컬 모두 남아 있다(아래).
+- **Mutation 뒤 상태 검증 40개**: 양쪽 모두 통과. 실행기의 두 가정을 고쳤다 — 닉네임 입력에 쪽 이름을 붙이던 것, 대화가 처음 생긴다고 보고 "메시지 1건"을 보던 것(이제 "최신 메시지가 보낸 것").
+  신고 선행은 9월 실행의 신고가 남아 양쪽 모두 같은 중복 응답이다 — 일회성 동작이라 정상이다.
+- **Subscription**: 토큰 없는 `connection_init`은 4401로 닫힘, 비참여 대화 구독은 두 종 모두 FORBIDDEN, 참여 대화의 `newMessage`는 HTTP로 보낸 메시지를 같은 id로 전달,
+  자기 `notifyTyping`은 `typingIndicator`에서 걸러져 이벤트가 오지 않는다. 두 서버가 Valkey를 공유하므로 한쪽씩 차례로 돌렸다.
+  상대의 타이핑이 실제로 전달되는지는 상대 계정(101·146, SNS 로그인) 토큰이 없어 확인하지 못했다.
+
+## dev와 로컬 모두에 남아 있는 응답 결함 (고치려면 클라이언트와 합의한 별도 SPEC)
+
+- `spotDetail`의 `category`를 고르면 `category.code` non-null 위반으로 `spotDetail` 전체가 null이다.
+- 업무 예외가 INTERNAL_ERROR로 나간다: 없는 `spotDetail`·`mapCell`, 잘못된 `sharedMap` 토큰, `spots` 반경 초과, `mapViewport` 줌·bbox, `createMapRelation` 잘못된 URL, `spotAnswers` 없는 질문.
+- 거리순·인기순(`ongoingFestivals`·`popularSpots`) 깨진 커서는 INVALID_CURSOR가 아니다.
+
+## 이번 실행이 dev에 더 남긴 것
+
+- 대화 37·38에 Mutation 실행 메시지, 대화 37에 구독 검증 메시지 — 사용자 본인 계정과의 대화
+- 소프트 삭제된 글·댓글·질문·답변 행

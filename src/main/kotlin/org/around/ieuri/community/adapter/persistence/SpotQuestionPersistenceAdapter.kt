@@ -10,11 +10,11 @@ import org.around.ieuri.community.adapter.persistence.table.SpotAnswerTable
 import org.around.ieuri.community.adapter.persistence.table.SpotQaPhotoTable
 import org.around.ieuri.community.adapter.persistence.table.SpotQuestionTable
 import org.around.ieuri.community.application.question.required.SpotQuestionRepository
+import org.around.ieuri.community.domain.photo.AttachedPhotos
 import org.around.ieuri.community.domain.question.SpotAnswer
 import org.around.ieuri.community.domain.question.SpotAnswerReply
 import org.around.ieuri.community.domain.question.SpotQaKind
 import org.around.ieuri.community.domain.question.SpotQuestion
-import org.around.ieuri.community.domain.shared.AttachedPhotos
 import org.jetbrains.exposed.v1.core.JoinType
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq

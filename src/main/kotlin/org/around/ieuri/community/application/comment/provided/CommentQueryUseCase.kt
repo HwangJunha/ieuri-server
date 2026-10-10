@@ -1,8 +1,8 @@
 package org.around.ieuri.community.application.comment.provided
 
 import org.around.ieuri.common.pagination.CursorPage
-import org.around.ieuri.community.application.shared.dto.CommentView
-import org.around.ieuri.community.application.shared.dto.PostCommentsQuery
+import org.around.ieuri.community.application.comment.provided.dto.CommentView
+import org.around.ieuri.community.application.comment.provided.dto.PostCommentsQuery
 
 /** 댓글 조회. 글과 같은 모더레이션 필터를 거친다. */
 interface CommentQueryUseCase {

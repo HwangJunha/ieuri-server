@@ -2,7 +2,7 @@ package org.around.ieuri.community.adapter.graphql.mapper
 
 import org.around.ieuri.common.pagination.CursorPageInfo
 import org.around.ieuri.community.application.conversation.provided.dto.ConversationSpotQaOriginView
-import org.around.ieuri.community.application.shared.dto.PostAuthorView
+import org.around.ieuri.community.domain.lookup.MemberSummary
 import org.around.ieuri.common.graphql.generated.types.ConversationSpotQaOrigin as GqlConversationSpotQaOrigin
 import org.around.ieuri.common.graphql.generated.types.PageInfo as GqlPageInfo
 import org.around.ieuri.common.graphql.generated.types.PostAuthor as GqlPostAuthor
@@ -15,7 +15,7 @@ import org.around.ieuri.common.graphql.generated.types.PostAuthor as GqlPostAuth
 const val WITHDRAWN_NICKNAME = "알 수 없음"
 
 /** 작성자. 회원 조회가 비면 대체 표기로 채우되 id는 원래 작성자 id를 둔다(차단·신고 식별용). */
-fun PostAuthorView?.toGqlOrPlaceholder(memberId: Long): GqlPostAuthor = GqlPostAuthor(
+fun MemberSummary?.toGqlOrPlaceholder(memberId: Long): GqlPostAuthor = GqlPostAuthor(
     id = this?.id ?: memberId,
     nickname = this?.nickname ?: WITHDRAWN_NICKNAME,
     profileImageUrl = this?.profileImageUrl,

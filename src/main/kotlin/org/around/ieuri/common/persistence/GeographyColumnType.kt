@@ -5,12 +5,18 @@ import org.jetbrains.exposed.v1.core.ColumnType
 import org.jetbrains.exposed.v1.core.Table
 
 /**
- * PostGIS `geography` 컬럼을 테이블 선언이 마이그레이션과 같아지도록 선언만 한다. 값은 읽고 쓰지 않는다.
- * - 공간 조회는 raw SQL(`JdbcTemplate`)로 한다 — Exposed DSL은 `ST_*`를 표현하지 않는다.
- * - 값을 채우는 쪽은 DB 트리거라 `databaseGenerated()`와 함께 선언한다.
+ * PostGIS `geography` 컬럼. 값은 Kotlin으로 읽고 쓰지 않는다 — 공간 연산은 `PostgisExpressions.kt`의 식으로만 다룬다.
+ * - 값을 채우는 쪽은 대개 DB 트리거라 `databaseGenerated()`와 함께 선언한다.
  */
 class GeographyColumnType : ColumnType<String>() {
     override fun sqlType(): String = "geography"
+
+    override fun valueFromDB(value: Any): String = value.toString()
+}
+
+/** PostGIS `geometry` 값의 식 타입. 컬럼으로는 쓰지 않고 `::geometry` 캐스트의 대상으로만 쓴다. */
+class GeometryColumnType : ColumnType<String>() {
+    override fun sqlType(): String = "geometry"
 
     override fun valueFromDB(value: Any): String = value.toString()
 }

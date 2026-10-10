@@ -3,6 +3,7 @@ package org.around.ieuri.community.application.report
 import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.community.application.comment.provided.exception.CommentNotFoundException
 import org.around.ieuri.community.application.comment.required.CommentRepository
+import org.around.ieuri.community.application.lookup.provided.MemberLookupUseCase
 import org.around.ieuri.community.application.post.provided.exception.PostNotFoundException
 import org.around.ieuri.community.application.post.required.PostRepository
 import org.around.ieuri.community.application.question.provided.exception.AnswerNotFoundException
@@ -12,10 +13,9 @@ import org.around.ieuri.community.application.question.required.SpotQuestionRepo
 import org.around.ieuri.community.application.report.provided.ReportAutoHideUseCase
 import org.around.ieuri.community.application.report.provided.ReportCommandUseCase
 import org.around.ieuri.community.application.report.provided.dto.ReportContentCommand
+import org.around.ieuri.community.application.report.required.ReportEventPublisherPort
 import org.around.ieuri.community.application.report.required.ReportRepository
 import org.around.ieuri.community.application.shared.exception.MemberNotFoundException
-import org.around.ieuri.community.application.shared.required.CommunityEventPublisherPort
-import org.around.ieuri.community.application.shared.required.MemberLookupPort
 import org.around.ieuri.community.domain.report.Report
 import org.around.ieuri.community.domain.report.ReportTargetType
 import org.around.ieuri.community.domain.report.event.ReportFiled
@@ -35,8 +35,8 @@ class ReportModifyService(
     private val postRepository: PostRepository,
     private val commentRepository: CommentRepository,
     private val questionRepository: SpotQuestionRepository,
-    private val memberLookupPort: MemberLookupPort,
-    private val eventPublisherPort: CommunityEventPublisherPort,
+    private val memberLookup: MemberLookupUseCase,
+    private val eventPublisherPort: ReportEventPublisherPort,
 ) : ReportCommandUseCase,
     ReportAutoHideUseCase {
 
@@ -72,7 +72,7 @@ class ReportModifyService(
         val exists = when (targetType) {
             ReportTargetType.POST -> postRepository.exists(targetId)
             ReportTargetType.COMMENT -> commentRepository.findById(targetId) != null
-            ReportTargetType.MEMBER -> memberLookupPort.findAuthor(targetId) != null
+            ReportTargetType.MEMBER -> memberLookup.member(targetId) != null
             ReportTargetType.SPOT_QUESTION -> questionRepository.exists(targetId)
             ReportTargetType.SPOT_ANSWER -> questionRepository.answerExists(targetId)
             ReportTargetType.SPOT_ANSWER_REPLY -> questionRepository.replyExists(targetId)

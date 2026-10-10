@@ -6,7 +6,7 @@ import org.around.ieuri.community.adapter.persistence.table.MessageTable
 import org.around.ieuri.community.domain.conversation.Conversation
 import org.around.ieuri.community.domain.conversation.Message
 import org.around.ieuri.community.domain.conversation.SpotQaOrigin
-import org.around.ieuri.community.domain.shared.PhotoObjectKey
+import org.around.ieuri.community.domain.photo.PhotoObjectKey
 import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.statements.UpdateBuilder
 

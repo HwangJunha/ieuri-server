@@ -6,7 +6,6 @@ import org.around.ieuri.auth.infrastructure.security.GraphqlWebSocketAuthInterce
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.springframework.graphql.server.WebGraphQlInterceptor
-import org.springframework.graphql.server.WebGraphQlRequest
 import org.springframework.graphql.server.WebGraphQlResponse
 import org.springframework.graphql.server.WebSocketGraphQlRequest
 import org.springframework.graphql.server.WebSocketSessionInfo

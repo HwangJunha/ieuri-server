@@ -2,12 +2,12 @@ package org.around.ieuri.community.application.post.provided
 
 import org.around.ieuri.common.context.AppKey
 import org.around.ieuri.common.pagination.CursorPage
-import org.around.ieuri.community.application.shared.dto.CommunityChipView
-import org.around.ieuri.community.application.shared.dto.MyPostsQuery
-import org.around.ieuri.community.application.shared.dto.PostView
-import org.around.ieuri.community.application.shared.dto.PostsQuery
+import org.around.ieuri.community.application.post.provided.dto.CommunityChipView
+import org.around.ieuri.community.application.post.provided.dto.MyPostsQuery
+import org.around.ieuri.community.application.post.provided.dto.PostView
+import org.around.ieuri.community.application.post.provided.dto.PostsQuery
+import org.around.ieuri.community.domain.post.TargetCategory
 import org.around.ieuri.community.domain.shared.ContentLanguage
-import org.around.ieuri.community.domain.shared.TargetCategory
 
 /** 글 조회. 피드와 단건이 같은 모더레이션 필터를 거친다. 모든 조회가 인증을 전제한다. */
 interface PostQueryUseCase {
@@ -35,4 +35,7 @@ interface PostQueryUseCase {
 
     /** 앱·언어별 상단 카테고리 칩. 구성이 없는 앱이면 오류가 아니라 빈 목록이다. */
     fun communityChips(appKey: AppKey, language: ContentLanguage): List<CommunityChipView>
+
+    /** 글을 볼 수 있는가. 피드·단건과 같은 차단·숨김 필터를 거치며 조회수는 오르지 않는다. */
+    fun isVisible(postId: Long, memberId: Long): Boolean
 }

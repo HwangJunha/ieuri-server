@@ -1,6 +1,6 @@
 package org.around.ieuri.architecture
 
-import org.around.ieuri.tourism.infrastructure.batch.BatchInfrastructureConfig
+import org.around.ieuri.tourism.adapter.batch.BatchInfrastructureConfig
 import org.springframework.batch.core.configuration.annotation.EnableJdbcJobRepository
 import kotlin.test.Test
 import kotlin.test.assertEquals

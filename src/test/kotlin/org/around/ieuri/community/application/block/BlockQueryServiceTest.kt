@@ -2,17 +2,17 @@ package org.around.ieuri.community.application.block
 
 import io.mockk.every
 import io.mockk.mockk
-import org.around.ieuri.community.application.shared.CommunityPolicy
-import org.around.ieuri.community.application.shared.required.CommunityQueryPort
-import java.time.Duration
+import org.around.ieuri.community.application.block.required.BlockQueryPort
+import org.around.ieuri.community.application.shared.PagePolicy
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class BlockQueryServiceTest {
 
-    private val queries = mockk<CommunityQueryPort>()
-    private val service = BlockQueryService(queries, CommunityPolicy(50, 3, 100_000, Duration.ofMinutes(30), 10, setOf("image/jpeg")))
+    private val queries = mockk<BlockQueryPort>()
+    private val service = BlockQueryService(queries, PagePolicy(maxPageSize = 50))
 
     @Test
     fun `차단 판정은 어느 방향이든 참이다`() {
@@ -21,5 +21,6 @@ class BlockQueryServiceTest {
 
         assertTrue(service.isBlockedBetween(7, 9))
         assertFalse(service.isBlockedBetween(7, 8))
+        assertEquals(setOf(9L), service.blockedMemberIds(7))
     }
 }

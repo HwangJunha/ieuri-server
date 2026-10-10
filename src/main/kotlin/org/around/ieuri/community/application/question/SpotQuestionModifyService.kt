@@ -1,6 +1,8 @@
 package org.around.ieuri.community.application.question
 
 import org.around.ieuri.common.persistence.ExposedConfig
+import org.around.ieuri.community.application.lookup.provided.SpotLookupUseCase
+import org.around.ieuri.community.application.photo.provided.UploadedPhotoUseCase
 import org.around.ieuri.community.application.question.provided.SpotQuestionCommandUseCase
 import org.around.ieuri.community.application.question.provided.dto.CreateSpotAnswerCommand
 import org.around.ieuri.community.application.question.provided.dto.CreateSpotAnswerReplyCommand
@@ -9,15 +11,13 @@ import org.around.ieuri.community.application.question.provided.exception.Answer
 import org.around.ieuri.community.application.question.provided.exception.QuestionNotFoundException
 import org.around.ieuri.community.application.question.provided.exception.ReplyNotFoundException
 import org.around.ieuri.community.application.question.provided.exception.ReplyToReplyNotAllowedException
+import org.around.ieuri.community.application.question.required.SpotQuestionEventPublisherPort
 import org.around.ieuri.community.application.question.required.SpotQuestionRepository
-import org.around.ieuri.community.application.shared.UploadedPhotoVerifier
 import org.around.ieuri.community.application.shared.exception.SpotNotFoundInLocaleException
-import org.around.ieuri.community.application.shared.required.CommunityEventPublisherPort
-import org.around.ieuri.community.application.shared.required.SpotLookupPort
+import org.around.ieuri.community.domain.photo.AttachedPhotos
 import org.around.ieuri.community.domain.question.SpotQuestion
 import org.around.ieuri.community.domain.question.event.SpotAnswerWritten
 import org.around.ieuri.community.domain.question.event.SpotReplyWritten
-import org.around.ieuri.community.domain.shared.AttachedPhotos
 import org.around.ieuri.community.domain.shared.ContentLanguage
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
@@ -29,16 +29,16 @@ import java.time.Instant
 @Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
 class SpotQuestionModifyService(
     private val questionRepository: SpotQuestionRepository,
-    private val spotLookupPort: SpotLookupPort,
-    private val photoVerifier: UploadedPhotoVerifier,
-    private val eventPublisher: CommunityEventPublisherPort,
+    private val spotLookup: SpotLookupUseCase,
+    private val uploadedPhotos: UploadedPhotoUseCase,
+    private val eventPublisher: SpotQuestionEventPublisherPort,
 ) : SpotQuestionCommandUseCase {
 
     override fun createQuestion(command: CreateSpotQuestionCommand, memberId: Long, language: ContentLanguage): Long {
-        if (spotLookupPort.findSummary(command.catalogId, language) == null) throw SpotNotFoundInLocaleException()
+        if (spotLookup.spot(command.catalogId, language) == null) throw SpotNotFoundInLocaleException()
         val question = SpotQuestion.write(command.catalogId, memberId, command.body)
-        val photos = AttachedPhotos.of(photoVerifier.parse(command.photoKeys), memberId)
-        photoVerifier.requireUploaded(photos.keys)
+        val photos = AttachedPhotos.of(uploadedPhotos.parse(command.photoKeys), memberId)
+        uploadedPhotos.requireUploaded(photos.keys)
 
         return questionRepository.insert(question, photos)
     }
@@ -63,8 +63,8 @@ class SpotQuestionModifyService(
 
     override fun createAnswer(command: CreateSpotAnswerCommand, memberId: Long): Long {
         // 개수·소유·확정을 먼저 판정하고 R2 확인은 그 뒤에 한다 — 남의 키 존재를 응답으로 드러내지 않는다.
-        val photos = AttachedPhotos.of(photoVerifier.parse(command.photoKeys), memberId)
-        photoVerifier.requireUploaded(photos.keys)
+        val photos = AttachedPhotos.of(uploadedPhotos.parse(command.photoKeys), memberId)
+        uploadedPhotos.requireUploaded(photos.keys)
 
         val question = questionRepository.findById(command.questionId) ?: throw QuestionNotFoundException()
 
@@ -99,8 +99,8 @@ class SpotQuestionModifyService(
 
     override fun createReply(command: CreateSpotAnswerReplyCommand, memberId: Long): Long {
         // 개수·소유·확정을 먼저 판정하고 R2 확인은 그 뒤에 한다 — 남의 키 존재를 응답으로 드러내지 않는다.
-        val photos = AttachedPhotos.of(photoVerifier.parse(command.photoKeys), memberId)
-        photoVerifier.requireUploaded(photos.keys)
+        val photos = AttachedPhotos.of(uploadedPhotos.parse(command.photoKeys), memberId)
+        uploadedPhotos.requireUploaded(photos.keys)
 
         // 답변과 답글은 id 공간이 달라, 답변이 없을 때만 같은 번호의 답글이 있는지로 오류를 고른다.
         val answer = questionRepository.findAnswer(command.parentAnswerId)

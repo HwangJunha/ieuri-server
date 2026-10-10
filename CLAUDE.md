@@ -162,11 +162,12 @@ Uses the Gradle wrapper (`./gradlew`); Gradle 9.5.1, Java toolchain 25.
 
 - **An outbound adapter never injects another adapter — including through a port whose only implementation is one.** The wrapper reads as "the application doesn't need to know about the split", but that is exactly the cost: which writes take raw SQL, and in what order two stores are touched, stop being visible where those decisions are made. **The application service injects both ports** and sequences them itself. A one-line `override` that forwards to another adapter is the tell.
 
-  Two things this is *not*. Injecting the other domain's inbound `port/in` from an `out/client` adapter is the sanctioned cross-domain path (`SpotLookupAdapter` → `SpotQueryUseCase`). And a port whose implementation is a thin shim over a `common/` utility is fine — `EmailEncryptorPort` resolves to three lines wrapping `common/security/AesGcmCipher`, and the encryption happens *inside* entity↔domain mapping, so hoisting it would push storage format up into the service.
+  Two things this is *not*. Injecting the other domain's inbound `port/in` from an `out/client` adapter is the sanctioned cross-domain path (`SpotLookupAdapter` → `SpotCatalogQueryUseCase`). And a port whose implementation is a thin shim over a `common/` utility is fine — `EmailEncryptorPort` resolves to three lines wrapping `common/security/AesGcmCipher`, and the encryption happens *inside* entity↔domain mapping, so hoisting it would push storage format up into the service.
 
-  Two exceptions stand today, both because hoisting makes it worse:
-    - **`TourApiClient`/`TourApiSyncClient` → `CategoryExternalMappingPort`.** The mapping resolves a domain category into TourAPI's `contentTypeId` *while building the request*. The service cannot sequence it without learning TourAPI's wire format.
-    - **`out/event` listeners injecting an outbound port** (`SpotDetailWriteBehindListener`, `VerificationEmailListener`, `NewMessageBroadcastListener`, `PostViewCountListener`). These are one-line event→port bridges with no service between them. The honest fix is to move them to `adapter/in/event/` — where the other domains' listeners already live — not to invent a forwarding use case. Left as a structural decision, not a wiring one.
+  `TourApiClient`/`TourApiSyncClient` resolve a category into TourAPI's `contentTypeId` *while building the request*; they do it through the `CategoryMappingQueryUseCase` inbound port, not the outbound one — the service cannot sequence it without learning TourAPI's wire format.
+
+  One exception stands today, because hoisting makes it worse:
+    - **`out/event` listeners injecting an outbound port** (`VerificationEmailListener`, `NewMessageBroadcastListener`, `PostViewCountListener`). These are one-line event→port bridges with no service between them. The honest fix is to move them to `adapter/in/event/` — where the other domains' listeners already live — not to invent a forwarding use case. Left as a structural decision, not a wiring one.
 
 - **Security is on the request path.** `spring-boot-starter-security` locks endpoints down by default; `auth/infrastructure/config/SecurityConfig.kt` opens GraphQL, and introspection is toggled per profile (`local` only). Per-field authorization is still ours to write.
 
@@ -297,19 +298,42 @@ tourism → auth → alarm (decisions D-32~D-67 in `problem/SPEC-0039-server.md`
 been moved follows this section; one that has not still follows Layout and the JPA rules below.**
 Those rules are deleted in the final slice, not piecemeal.
 
-**A migration changes neither the GraphQL schema nor the DB schema.** Defects found on the way are
-fixed only within that bound; anything that needs a migration or a schema field is a separate SPEC
-(SPEC-0039 D-56). Work that follows from a refactor is still a refactor.
+**A migration changes neither the GraphQL schema nor the DB schema — nor any response.** The deployed
+dev server (`api-dev.ieuri.co.kr`) is the answer key: every query, error and subscription returns
+exactly what dev returns, **defects included**. A changed response is a production incident for the
+client, not a fix. A defect that shows in a response is recorded and left alone; fixing it is a
+separate SPEC agreed with the client (SPEC-0039 D-112). Mutations may differ only in generated
+values (ids, times, tokens); what a query reads back after them must match. Anything that needs a
+migration or a schema field is a separate SPEC (D-56). Work that follows from a refactor is still a
+refactor.
 
 - **Packages: context → layer → aggregate.** `domain/<aggregate>/` holds the root with its own
   entities, VOs, exceptions and events; `domain/shared/` holds VOs several aggregates use.
+  Predicates sit apart in the aggregate's `spec/`, and only as implementations of the context's
+  `Specification<T>` (`isSatisfiedBy` plus `and`/`or`/`not`, in `domain/shared`): `ProvinceEligibility`,
+  `SpotExclusionRule`. A value that carries settings and computes with them (weights, decay, a
+  scoring model) is a VO at the aggregate root, not a policy. There is no `policy/` until a decision
+  has two real implementations behind one interface (Strategy), and no domain `service/` package —
+  the word stays with application services (SPEC-0039 D-121).
   `application/<aggregate>/provided/` (inbound ports, `dto/`, `exception/`) and `required/`
-  (outbound ports). No `infrastructure/adapter/in|out`.
-  - **`application/` and `domain/` list the same packages, one to one.** Each name is an aggregate,
-    or a value group with its own use cases (`catalog`). A capability with no aggregate (photo
-    upload) goes in `shared` on both sides. **A process that spans aggregates (member withdrawal)
-    gets no package at all** — see the cross-aggregate bullet below. A package on one side only is
-    a finding.
+  (outbound ports, `dto/`). No `infrastructure/adapter/in|out`.
+  - **`provided/` and `required/` hold port interfaces only.** Every data type a port takes or
+    returns goes in that side's `dto/` — never declared next to the interface
+    (SpotSearchPort's `SpotSearchQuery` lives in `required/dto/`) (SPEC-0039 D-100).
+  - **One top-level type per file, named after it** — interfaces, DTOs, events, policies alike, in every
+    layer. The only files that keep several are sets bound by a `private` member they share (Exposed
+    `Table` groups sharing a constant, keyset cursors sharing the codec, deserializers sharing
+    `readItems`) and a `private` type only its file uses.
+    A file named `XxxReadModels.kt` holding ten views is the shape to avoid.
+  - **`application/` and `domain/` list the same packages, one to one.** Each name is an aggregate
+    (see the persisted-data bullet below — a package that writes has a root). A capability several aggregates use but
+    none owns gets its own package on both sides, named for the capability (`photo`: upload URL,
+    verification, deletion; `lookup`: another context's spots and members); other aggregates and
+    DataLoaders reach it through its `provided/` use case, never its port. `shared` keeps only what
+    several aggregates use as-is: values, exceptions, a policy every list shares (`PagePolicy`) and
+    the read-port condition object (`ViewerContext`). **A process that spans aggregates (member
+    withdrawal) gets no package at all** — see the cross-aggregate bullet below. A package on one
+    side only is a finding.
   - **`adapter/<technology>/<role>/`.** Technology first, then role, so one directory never mixes
     directions: `event/listener` (inbound) and `event/publisher` (Spring events out); `messaging`
     (Valkey pub/sub — it publishes *and* subscribes, so it is not a publisher); `graphql/resolver`,
@@ -326,6 +350,15 @@ fixed only within that bound; anything that needs a migration or a schema field 
   `XxxQueryService` per aggregate. An update still calls `save` — Exposed has no dirty-checking.
   Query services are per aggregate too; the outbound **read** port may be shared between them
   (reads skip the aggregate, so splitting the port only scatters one moderation filter).
+- **Every persisted domain datum belongs to an aggregate, and every write goes through its root.**
+  Load the root → a root method decides → save. This holds for batch-synced and derived data too
+  (KTO metrics, embeddings, a district's representative location) — a thin root is still a root.
+  A repository exists per root and writes only what that aggregate owns — its tables, or a column it
+  owns in another table (`spot.catalog_id` is catalog membership, D-124). Exceptions, and only these:
+  reads skip the aggregate (D-40); rows with no domain rule may be bulk-deleted; after the root
+  decides, the service writes only what changed. Findings: a package that writes with no root, a
+  root with no identity or no behaviour, a repository writing another aggregate's table, a rule that
+  lives only in SQL, an application DTO persisted in place of a domain object (SPEC-0039 D-122).
 - **The root is the only door to its children.** A child is created and removed through a root
   method (`question.answer(...)`, `question.removeAnswer(...)`, `conversation.send(...)`), never by a
   `write` of its own. A value that classifies an entity and never varies per instance is a body
@@ -346,7 +379,11 @@ fixed only within that bound; anything that needs a migration or a schema field 
   every rule in one place; its only cost is round trips. Move to Specification + Command (one
   definition producing both the in-memory check and the bulk SQL — Khorikov, *DDD and bulk
   operations*) only when the volume is shown to need a single statement **and** the rule is
-  non-trivial and reused by the single-item path. Plain bulk SQL that re-states a domain rule is the
+  non-trivial and reused by the single-item path. **Not available in this stack yet**: one definition
+  producing both needs a spec → SQL translation layer (C# gets it from expression trees; our domain
+  cannot see Exposed). A spec with a hand-written SQL twin is the rule twice under a pattern's name —
+  don't build it. Until that layer exists, a bulk change that must be one statement stays plain SQL
+  in the adapter and is recorded as a known limit (SPEC-0039 D-125). Plain bulk SQL that re-states a domain rule is the
   option to avoid: the rule then lives twice and drifts. Rows with no domain rule at all (likes,
   hides, blocks — repository operations) may be bulk-deleted.
 - **Load the minimum, write only what changed.** A write loads only the row its decision needs
@@ -365,6 +402,11 @@ fixed only within that bound; anything that needs a migration or a schema field 
   comments, answers) are atomic increments in the repository, not aggregate state. An aggregate that
   can be changed concurrently carries a `version` column. External I/O (HTTP, Valkey, R2) runs
   outside the transaction. Reads skip the aggregate and project straight into read DTOs.
+- **Batch tasklets are inbound adapters: they call use cases, never ports or repositories.** A step
+  gets no transaction manager (`StepBuilder.tasklet(tasklet)`); one use-case call is one
+  transaction, so a sync commits per page and the sweep commits on its own. A service whose work
+  wraps upstream calls between DB steps (prefetch, embedding) has no transaction of its own and calls
+  transactional use cases for each DB step (SPEC-0039 D-81·D-83).
 - **Exposed: DSL only, never DAO** (DAO is Active Record — the JPA-as-domain problem again).
   `Table` objects live in `adapter/persistence/table/` and mirror the migration — nothing checks this
   at startup (no library offers it), so a drift surfaces on the first query that touches it. Transactions use Spring
@@ -377,9 +419,17 @@ fixed only within that bound; anything that needs a migration or a schema field 
   query, so nothing is held while they run. Concurrent writes use conditional, column-scoped updates
   (`WHERE col IS NULL OR col < :v` for values that only move forward, atomic `+ 1`/`- 1` for
   counters, `UPDATE … RETURNING` to learn what this call changed) rather than read-modify-write.
-  PostGIS, CTEs, pgvector distance and temp-table SQL stay raw SQL, through `exposedJdbcTemplate` (a
-  `JdbcTemplate` on `exposedDataSource`, injected by parameter name — it joins the Exposed
-  transaction). Declaring a table: identity id → `autoIncrement()`, read the generated
+  **Main-DB queries are DSL, including PostGIS and pgvector** — use the shared expressions in
+  `common/persistence` (`PostgisExpressions.kt`, `PgVectorExpressions.kt`) for extension functions
+  Exposed lacks, and add a `CustomFunction`/`CustomOperator` there when one is missing. Upsert is
+  Exposed's own `upsert`/`batchUpsert` — `onUpdate` with `insertValue(col)`, `onUpdateExclude`, `where`;
+  write no wrapper for what it already does (SPEC-0039 D-114). A CTE is written as a
+  subquery (`Query.alias`) or a scalar subquery (`wrapAsExpression`). When the DSL cannot express a
+  statement, change its shape (read the parent id, then upsert; insert-ignore, then re-read) before
+  reaching for `exec()`. Migrated contexts do not use `JdbcTemplate` on the main DB; the search node
+  (paradedb) stays raw SQL through `searchJdbcTemplate` (SPEC-0039 D-82). Two community adapters
+  (`SpotCatalogLanguagePersistenceAdapter`, `PostSpatialQueryAdapter`) still use `exposedJdbcTemplate` —
+  community is frozen after device testing, so they are a recorded follow-up, not a precedent. Declaring a table: identity id → `autoIncrement()`, read the generated
   value with `insertReturning`; `DEFAULT now()` → `databaseGenerated()`; `timestamptz` →
   `timestampWithTimeZone`; FKs → `onUpdate = NO_ACTION` and the DB's constraint name; CHECK, index and
   UNIQUE names exactly as in the migration.

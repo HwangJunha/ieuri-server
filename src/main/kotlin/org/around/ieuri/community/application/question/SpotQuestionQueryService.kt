@@ -3,6 +3,8 @@ package org.around.ieuri.community.application.question
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.cursorPageOf
 import org.around.ieuri.common.persistence.ExposedConfig
+import org.around.ieuri.community.application.block.provided.BlockQueryUseCase
+import org.around.ieuri.community.application.lookup.provided.SpotLookupUseCase
 import org.around.ieuri.community.application.question.provided.SpotQuestionQueryUseCase
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswerReplyView
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswerView
@@ -10,14 +12,12 @@ import org.around.ieuri.community.application.question.provided.dto.SpotAnswersQ
 import org.around.ieuri.community.application.question.provided.dto.SpotQuestionView
 import org.around.ieuri.community.application.question.provided.dto.SpotQuestionsQuery
 import org.around.ieuri.community.application.question.provided.exception.QuestionNotFoundException
-import org.around.ieuri.community.application.question.required.SpotAnswersSearch
 import org.around.ieuri.community.application.question.required.SpotQaQueryPort
-import org.around.ieuri.community.application.question.required.SpotQuestionsSearch
-import org.around.ieuri.community.application.shared.CommunityPolicy
+import org.around.ieuri.community.application.question.required.dto.SpotAnswersSearch
+import org.around.ieuri.community.application.question.required.dto.SpotQuestionsSearch
+import org.around.ieuri.community.application.shared.PagePolicy
 import org.around.ieuri.community.application.shared.exception.SpotNotFoundInLocaleException
-import org.around.ieuri.community.application.shared.required.CommunityQueryPort
-import org.around.ieuri.community.application.shared.required.SpotLookupPort
-import org.around.ieuri.community.application.shared.required.ViewerContext
+import org.around.ieuri.community.application.shared.required.dto.ViewerContext
 import org.around.ieuri.community.domain.shared.ContentLanguage
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -31,9 +31,9 @@ import org.springframework.transaction.annotation.Transactional
 @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, readOnly = true)
 class SpotQuestionQueryService(
     private val spotQaQueryPort: SpotQaQueryPort,
-    private val communityQueryPort: CommunityQueryPort,
-    private val spotLookupPort: SpotLookupPort,
-    private val policy: CommunityPolicy,
+    private val blockQueryUseCase: BlockQueryUseCase,
+    private val spotLookup: SpotLookupUseCase,
+    private val pagePolicy: PagePolicy,
 ) : SpotQuestionQueryUseCase {
 
     /**
@@ -47,7 +47,7 @@ class SpotQuestionQueryService(
         language: ContentLanguage,
     ): CursorPage<SpotQuestionView> {
         query.catalogId?.let {
-            if (spotLookupPort.findSummary(it, language) == null) {
+            if (spotLookup.spot(it, language) == null) {
                 throw SpotNotFoundInLocaleException()
             }
         }
@@ -58,7 +58,7 @@ class SpotQuestionQueryService(
                 ids = query.ids,
                 // 활성 언어에서 해소되지 않는 장소의 질문을 뺀다.
                 language = language,
-                first = clampPageSize(query.first),
+                first = pagePolicy.clamp(query.first),
                 after = query.after,
                 viewer = viewerContext(memberId),
             ),
@@ -78,7 +78,7 @@ class SpotQuestionQueryService(
         return spotQaQueryPort.findAnswers(
             SpotAnswersSearch(
                 questionId = query.questionId,
-                first = clampPageSize(query.first),
+                first = pagePolicy.clamp(query.first),
                 after = query.after,
                 viewer = viewer,
             ),
@@ -100,10 +100,8 @@ class SpotQuestionQueryService(
     private fun viewerContext(memberId: Long): ViewerContext = ViewerContext(
         memberId = memberId,
         blockedMemberIds =
-        if (memberId > 0) communityQueryPort.findBlockedMemberIds(memberId) else emptySet(),
+        if (memberId > 0) blockQueryUseCase.blockedMemberIds(memberId) else emptySet(),
     )
 
     private fun <T> emptyPage(): CursorPage<T> = cursorPageOf(edges = emptyList(), hasNextPage = false, hasPreviousPage = false)
-
-    private fun clampPageSize(first: Int): Int = first.coerceIn(1, policy.maxPageSize)
 }

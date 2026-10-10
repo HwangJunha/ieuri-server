@@ -2,7 +2,7 @@ package org.around.ieuri.community.adapter.graphql.mapper
 
 import org.around.ieuri.common.pagination.CursorPageInfo
 import org.around.ieuri.community.application.conversation.provided.dto.ConversationSpotQaOriginView
-import org.around.ieuri.community.application.shared.dto.PostAuthorView
+import org.around.ieuri.community.domain.lookup.MemberSummary
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -11,7 +11,7 @@ class CommunityResponseMappersTest {
 
     @Test
     fun `작성자가 있으면 id·닉네임·프로필을 그대로 옮긴다`() {
-        val author = PostAuthorView(id = 1L, nickname = "여행자", profileImageUrl = "https://cdn/p.png").toGqlOrPlaceholder(memberId = 2L)
+        val author = MemberSummary(id = 1L, nickname = "여행자", profileImageUrl = "https://cdn/p.png").toGqlOrPlaceholder(memberId = 2L)
 
         assertEquals(1L, author.id)
         assertEquals("여행자", author.nickname)
@@ -20,7 +20,7 @@ class CommunityResponseMappersTest {
 
     @Test
     fun `작성자 조회가 비면 원래 작성자 id에 대체 닉네임을 두고 프로필은 null이다`() {
-        val author = (null as PostAuthorView?).toGqlOrPlaceholder(memberId = 2L)
+        val author = (null as MemberSummary?).toGqlOrPlaceholder(memberId = 2L)
 
         assertEquals(2L, author.id)
         assertEquals(WITHDRAWN_NICKNAME, author.nickname)
