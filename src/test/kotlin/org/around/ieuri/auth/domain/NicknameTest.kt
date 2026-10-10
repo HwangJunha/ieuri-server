@@ -38,6 +38,17 @@ class NicknameTest {
         assertFailsWith<InvalidNicknameException> { Nickname("가".repeat(21)) }
     }
 
+    /** 메시지와 코드는 응답에 그대로 나간다. 짧은 쪽과 긴 쪽의 문구가 다르다. */
+    @Test
+    fun `길이 위반은 방향마다 다른 메시지로 답한다`() {
+        val short = assertFailsWith<InvalidNicknameException> { Nickname("가") }
+        val long = assertFailsWith<InvalidNicknameException> { Nickname("가".repeat(21)) }
+
+        assertEquals("닉네임은 2자 이상이어야 합니다.", short.message)
+        assertEquals("닉네임은 20자를 넘을 수 없습니다.", long.message)
+        assertEquals("INVALID_NICKNAME", short.code)
+    }
+
     @Test
     fun `공백을 제거하면 길이 안에 드는 값은 받아들인다`() {
         assertEquals(20, Nickname("  " + "가".repeat(20) + "  ").value.length)

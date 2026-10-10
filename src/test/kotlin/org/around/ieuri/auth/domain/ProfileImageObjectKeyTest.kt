@@ -1,9 +1,11 @@
 package org.around.ieuri.auth.domain
 
+import org.around.ieuri.auth.domain.member.ObjectKeyNotFoundException
 import org.around.ieuri.auth.domain.member.ProfileImageObjectKey
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -73,9 +75,38 @@ class ProfileImageObjectKeyTest {
     }
 
     @Test
+    fun `자기에게 발급된 임시 키는 그대로 읽힌다`() {
+        val key = ProfileImageObjectKey.pendingOf("pending/profile/7/$uuid", memberId)
+
+        assertEquals("pending/profile/7/$uuid", key.value)
+        assertEquals(memberId, key.memberId)
+        assertFalse(key.confirmed)
+    }
+
+    @Test
+    fun `남에게 발급된 임시 키는 없는 키로 답한다`() {
+        val e = assertFailsWith<ObjectKeyNotFoundException> { ProfileImageObjectKey.pendingOf("pending/profile/8/$uuid", memberId) }
+
+        assertEquals("발급된 적 없는 오브젝트 키입니다.", e.message)
+        assertEquals("OBJECT_KEY_NOT_FOUND", e.code)
+    }
+
+    @Test
+    fun `이미 확정된 키는 자기 것이어도 임시 키가 아니다`() {
+        assertFailsWith<ObjectKeyNotFoundException> { ProfileImageObjectKey.pendingOf("images/profile/7/$uuid", memberId) }
+    }
+
+    @Test
+    fun `형식이 어긋난 키는 소유권 실패와 같은 예외다`() {
+        listOf("pending/community/7/$uuid", "pending/profile/7", "pending/profile/7/not-a-uuid", "").forEach { raw ->
+            assertFailsWith<ObjectKeyNotFoundException> { ProfileImageObjectKey.pendingOf(raw, memberId) }
+        }
+    }
+
+    @Test
     fun `memberId가 양수가 아니면 발급하지 않는다`() {
         listOf(0L, -1L).forEach {
-            kotlin.test.assertFailsWith<IllegalArgumentException> { ProfileImageObjectKey.issue(it, uuid) }
+            assertFailsWith<IllegalArgumentException> { ProfileImageObjectKey.issue(it, uuid) }
         }
     }
 }
