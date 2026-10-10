@@ -38,6 +38,8 @@ dependencies {
     implementation("org.jetbrains.exposed:exposed-core:${property("exposedVersion")}")
     implementation("org.jetbrains.exposed:exposed-jdbc:${property("exposedVersion")}")
     implementation("org.jetbrains.exposed:exposed-java-time:${property("exposedVersion")}")
+    // jsonb 컬럼(auth 감사 로그 payload).
+    implementation("org.jetbrains.exposed:exposed-json:${property("exposedVersion")}")
     implementation("org.jetbrains.exposed:spring7-transaction:${property("exposedVersion")}")
     // k8s 프로브용 health와 메트릭 노출. 노출 범위는 application.yaml의 management 블록이 정한다.
     implementation("org.springframework.boot:spring-boot-starter-actuator")
