@@ -4,22 +4,17 @@ import com.netflix.graphql.dgs.DgsData
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
+import org.around.ieuri.auth.adapter.graphql.mapper.toGql
 import org.around.ieuri.auth.adapter.security.RequiresPermission
 import org.around.ieuri.auth.application.member.provided.MemberQueryUseCase
 import org.around.ieuri.auth.application.member.provided.dto.MeView
-import org.around.ieuri.auth.application.member.provided.dto.MemberDetailView
-import org.around.ieuri.auth.application.member.provided.dto.MemberSummaryView
 import org.around.ieuri.auth.application.member.provided.dto.MembersQuery
 import org.around.ieuri.auth.domain.member.MemberStatus
 import org.around.ieuri.auth.domain.member.Permission
-import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.common.graphql.generated.types.MemberConnection as GqlMemberConnection
 import org.around.ieuri.common.graphql.generated.types.MemberDetail as GqlMemberDetail
-import org.around.ieuri.common.graphql.generated.types.MemberEdge as GqlMemberEdge
 import org.around.ieuri.common.graphql.generated.types.MemberStatus as GqlMemberStatus
-import org.around.ieuri.common.graphql.generated.types.MemberSummary as GqlMemberSummary
-import org.around.ieuri.common.graphql.generated.types.PageInfo as GqlPageInfo
 
 /** 회원 조회 쿼리 리졸버. `me`는 인증만, `member`/`members`는 member:read 권한을 요구한다. */
 @DgsComponent
@@ -70,39 +65,6 @@ class MemberQueryResolver(
         )
         return result.toGql()
     }
-
-    private fun MemberDetailView.toGql(): GqlMemberDetail = GqlMemberDetail(
-        id = memberId,
-        email = email,
-        nickname = nickname,
-        profileImageUrl = profileImageUrl,
-        status = GqlMemberStatus.valueOf(status.name),
-        emailVerified = emailVerified,
-        suspendedAt = suspendedAt?.toString(),
-        suspendedUntil = suspendedUntil?.toString(),
-        suspensionReason = suspensionReason,
-        roles = roles,
-        createdAt = createdAt.toString(),
-    )
-
-    private fun CursorPage<MemberSummaryView>.toGql(): GqlMemberConnection = GqlMemberConnection(
-        edges = edges.map { GqlMemberEdge(cursor = it.cursor, node = it.node.toGql()) },
-        pageInfo = GqlPageInfo(
-            hasNextPage = pageInfo.hasNextPage,
-            hasPreviousPage = pageInfo.hasPreviousPage,
-            startCursor = pageInfo.startCursor,
-            endCursor = pageInfo.endCursor,
-        ),
-        totalCount = totalCount?.toInt(),
-    )
-
-    private fun MemberSummaryView.toGql(): GqlMemberSummary = GqlMemberSummary(
-        id = memberId,
-        nickname = nickname,
-        status = GqlMemberStatus.valueOf(status.name),
-        roles = roles,
-        createdAt = createdAt.toString(),
-    )
 
     private companion object {
         const val DEFAULT_PAGE_SIZE = 20

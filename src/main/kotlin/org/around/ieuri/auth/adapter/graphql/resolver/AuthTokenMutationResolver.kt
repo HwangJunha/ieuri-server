@@ -3,13 +3,13 @@ import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsMutation
 import com.netflix.graphql.dgs.InputArgument
 import graphql.schema.DataFetchingEnvironment
+import org.around.ieuri.auth.adapter.graphql.mapper.toPayload
 import org.around.ieuri.auth.adapter.graphql.support.withUserErrors
 import org.around.ieuri.auth.application.token.provided.AuthTokenUseCase
 import org.around.ieuri.auth.application.token.provided.dto.LoginCommand
 import org.around.ieuri.auth.application.token.provided.dto.LoginEmailCommand
 import org.around.ieuri.auth.application.token.provided.dto.LogoutCommand
 import org.around.ieuri.auth.application.token.provided.dto.RefreshTokenCommand
-import org.around.ieuri.auth.application.token.provided.dto.TokenPairResult
 import org.around.ieuri.auth.domain.member.Provider
 import org.around.ieuri.common.graphql.clientIp
 import org.around.ieuri.common.graphql.generated.types.AuthTokenPayload
@@ -77,16 +77,6 @@ class AuthTokenMutationResolver(
         )
         LogoutPayload(success = result.success, userErrors = emptyList())
     }
-
-    private fun TokenPairResult.toPayload(): AuthTokenPayload = AuthTokenPayload(
-        success = true,
-        userErrors = emptyList(),
-        accessToken = accessToken,
-        refreshToken = refreshToken,
-        tokenType = tokenType,
-        accessTokenExpiresIn = accessTokenExpiresInSeconds.toInt(),
-        refreshTokenExpiresIn = refreshTokenExpiresInSeconds.toInt(),
-    )
 
     private fun authTokenErrorPayload(userErrors: List<UserError>): AuthTokenPayload = AuthTokenPayload(
         success = false,

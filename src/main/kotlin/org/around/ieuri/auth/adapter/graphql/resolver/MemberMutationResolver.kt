@@ -3,19 +3,16 @@ import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsMutation
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
+import org.around.ieuri.auth.adapter.graphql.mapper.toCommand
 import org.around.ieuri.auth.adapter.graphql.support.withUserErrors
 import org.around.ieuri.auth.application.member.provided.MemberRegistrationUseCase
 import org.around.ieuri.auth.application.member.provided.PasswordResetUseCase
 import org.around.ieuri.auth.application.member.provided.SnsRegistrationUseCase
-import org.around.ieuri.auth.application.member.provided.dto.AgreementInput
-import org.around.ieuri.auth.application.member.provided.dto.RegisterEmailMemberCommand
-import org.around.ieuri.auth.application.member.provided.dto.RegisterMemberCommand
 import org.around.ieuri.auth.application.member.provided.dto.RequestPasswordResetCommand
 import org.around.ieuri.auth.application.member.provided.dto.ResendVerificationCommand
 import org.around.ieuri.auth.application.member.provided.dto.ResetPasswordCommand
 import org.around.ieuri.auth.application.member.provided.dto.RetargetEmailVerificationCommand
 import org.around.ieuri.auth.application.member.provided.dto.VerifyEmailCommand
-import org.around.ieuri.auth.domain.member.Provider
 import org.around.ieuri.common.graphql.generated.types.RegisterEmailMemberInput
 import org.around.ieuri.common.graphql.generated.types.RegisterEmailMemberPayload
 import org.around.ieuri.common.graphql.generated.types.RegisterSnsMemberInput
@@ -74,19 +71,7 @@ class MemberMutationResolver(
     fun registerSnsMember(@InputArgument input: RegisterSnsMemberInput): RegisterSnsMemberPayload = withUserErrors(
         onError = { RegisterSnsMemberPayload(success = false, userErrors = it, emailVerified = null, verificationId = null) },
     ) {
-        val command = RegisterMemberCommand(
-            // 생성된 GraphQL Provider enum → 도메인 Provider (이름이 일치)
-            provider = Provider.valueOf(input.provider.name),
-            idToken = input.idToken,
-            submittedEmail = input.email,
-            ageVerified = input.ageVerified,
-            // 생성된 TermsCode enum → String (도메인/커맨드는 데이터주도로 String 유지)
-            agreements = input.agreements.map { AgreementInput(it.termsCode.name, it.agreed) },
-            authorizationCode = input.authorizationCode,
-            // 형식 검사를 하지 않는다. 규칙을 벗어나면 서버가 자동 생성으로 대체한다(R30).
-            nickname = input.nickname,
-        )
-        val result = snsRegistrationUseCase.registerBySns(command)
+        val result = snsRegistrationUseCase.registerBySns(input.toCommand())
         RegisterSnsMemberPayload(
             success = true,
             userErrors = emptyList(),
@@ -99,13 +84,7 @@ class MemberMutationResolver(
     fun registerEmailMember(@InputArgument input: RegisterEmailMemberInput): RegisterEmailMemberPayload = withUserErrors(
         onError = { RegisterEmailMemberPayload(success = false, userErrors = it, verificationId = null) },
     ) {
-        val command = RegisterEmailMemberCommand(
-            email = input.email,
-            password = input.password,
-            ageVerified = input.ageVerified,
-            agreements = input.agreements.map { AgreementInput(it.termsCode.name, it.agreed) },
-        )
-        val result = memberRegistrationUseCase.registerByEmail(command)
+        val result = memberRegistrationUseCase.registerByEmail(input.toCommand())
         RegisterEmailMemberPayload(
             success = true,
             userErrors = emptyList(),

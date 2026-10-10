@@ -51,12 +51,12 @@ class ConsistencyConventionTest {
             .because("domain은 프레임워크를 모른다")
             .check(classes)
 
-        noClasses().that().resideInAPackage("..adapter.in.graphql..")
+        noClasses().that().resideInAPackage("..adapter.graphql..")
             .should().beAnnotatedWith("org.springframework.transaction.annotation.Transactional")
             .because("트랜잭션 경계는 유스케이스가 정한다. 리졸버에 붙이면 요청 전체로 넓어진다")
             .check(classes)
 
-        noMethods().that().areDeclaredInClassesThat().resideInAPackage("..adapter.in.graphql..")
+        noMethods().that().areDeclaredInClassesThat().resideInAPackage("..adapter.graphql..")
             .should().beAnnotatedWith("org.springframework.transaction.annotation.Transactional")
             .because("트랜잭션 경계는 유스케이스가 정한다. 리졸버에 붙이면 요청 전체로 넓어진다")
             .check(classes)
@@ -72,6 +72,8 @@ class ConsistencyConventionTest {
             .should().haveSimpleNameEndingWith("Repository")
             .andShould().resideInAPackage("..persistence.repository..")
             .because("리포지토리는 한 곳에 모인다 — 어디를 봐야 하는지가 이름과 위치로 정해진다")
+            // Spring Data 리포지토리가 더 없다. JPA를 걷어내는 S16에서 규칙째 지운다.
+            .allowEmptyShould(true)
             .check(classes)
     }
 
@@ -90,6 +92,8 @@ class ConsistencyConventionTest {
             )
             .should().haveSimpleNameEndingWith("Port")
             .because("포트는 이름으로 식별된다 — port/out의 인터페이스 이름을 XxxPort로 바꾼다")
+            // 옛 구조(port/out)가 더 없다. S16에서 새 구조 규칙으로 바꾼다.
+            .allowEmptyShould(true)
             .check(classes)
     }
 

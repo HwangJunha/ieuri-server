@@ -18,7 +18,7 @@ class ErrorCodeContractTest {
     private fun declaredCodes(): Set<String> {
         val classes = ClassFileImporter()
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-            .importPackages("org.around.ieuri.auth.application.member.provided.exception")
+            .importPackages("org.around.ieuri.auth.domain", "org.around.ieuri.auth.application")
 
         return classes
             .filter { it.isAssignableTo(UserFacingException::class.java) && it != classes.get(UserFacingException::class.java) }

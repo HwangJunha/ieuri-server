@@ -1,6 +1,7 @@
 package org.around.ieuri.auth.adapter.graphql.resolver
 import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsQuery
+import org.around.ieuri.auth.adapter.graphql.mapper.toGql
 import org.around.ieuri.auth.adapter.security.RequiresPermission
 import org.around.ieuri.auth.application.member.provided.MemberQueryUseCase
 import org.around.ieuri.auth.domain.member.Permission
@@ -13,7 +14,5 @@ class RoleQueryResolver(
 ) {
     @DgsQuery
     @RequiresPermission(Permission.ROLE_ASSIGN)
-    fun assignableRoles(): List<GqlRoleInfo> = memberQueryUseCase.assignableRoles().map {
-        GqlRoleInfo(code = it.code, name = it.name, description = it.description)
-    }
+    fun assignableRoles(): List<GqlRoleInfo> = memberQueryUseCase.assignableRoles().map { it.toGql() }
 }

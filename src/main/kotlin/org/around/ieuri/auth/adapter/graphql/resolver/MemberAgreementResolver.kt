@@ -3,16 +3,15 @@ import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsMutation
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
+import org.around.ieuri.auth.adapter.graphql.mapper.toGql
 import org.around.ieuri.auth.adapter.graphql.support.withUserErrors
 import org.around.ieuri.auth.application.member.provided.MemberAgreementUseCase
 import org.around.ieuri.auth.application.member.provided.MemberQueryUseCase
 import org.around.ieuri.auth.application.member.provided.dto.AgreeToRequiredTermsCommand
-import org.around.ieuri.auth.application.member.provided.dto.AgreementStatusView
 import org.around.ieuri.auth.application.member.provided.dto.UpdateAgreementCommand
 import org.around.ieuri.common.graphql.generated.types.AgreeToRequiredTermsInput
 import org.around.ieuri.common.graphql.generated.types.AgreeToRequiredTermsPayload
 import org.around.ieuri.common.graphql.generated.types.AgreementStatus
-import org.around.ieuri.common.graphql.generated.types.TermsCode
 import org.around.ieuri.common.graphql.generated.types.UpdateAgreementInput
 import org.around.ieuri.common.graphql.generated.types.UpdateAgreementPayload
 import org.around.ieuri.common.security.CurrentMemberProvider
@@ -65,16 +64,4 @@ class MemberAgreementResolver(
             agreements = statuses.map { it.toGql() },
         )
     }
-
-    /**
-     * read DTO → 응답 타입.
-     * - 시행 중인 약관 코드가 스키마 enum에 없으면 예외가 난다. 건너뛰면 필수 약관 게이트가 풀린다.
-     */
-    private fun AgreementStatusView.toGql() = AgreementStatus(
-        termsCode = TermsCode.valueOf(termsCode),
-        required = required,
-        agreed = agreed,
-        agreedAt = agreedAt?.toString(),
-        version = version,
-    )
 }

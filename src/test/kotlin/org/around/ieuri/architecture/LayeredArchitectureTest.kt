@@ -51,6 +51,8 @@ class LayeredArchitectureTest {
         classes().that().areAnnotatedWith("jakarta.persistence.Entity")
             .should().resideInAPackage("..infrastructure.adapter.out.persistence..")
             .because("@Entity는 영속 어댑터 세부사항이며 도메인 모델이 될 수 없다")
+            // JPA 엔티티가 더 없다. JPA를 걷어내는 S16에서 규칙째 지운다.
+            .allowEmptyShould(true)
             .check(classes)
     }
 

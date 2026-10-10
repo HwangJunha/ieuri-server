@@ -1,5 +1,6 @@
 package org.around.ieuri.auth.domain
 
+import org.around.ieuri.auth.domain.member.InvalidNicknameException
 import org.around.ieuri.auth.domain.member.Nickname
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -26,15 +27,15 @@ class NicknameTest {
 
     @Test
     fun `공백 제거 후 최소 길이 미만이면 거절한다`() {
-        assertFailsWith<IllegalArgumentException> { Nickname("가") }
-        assertFailsWith<IllegalArgumentException> { Nickname("  가  ") }
-        assertFailsWith<IllegalArgumentException> { Nickname("   ") }
-        assertFailsWith<IllegalArgumentException> { Nickname("") }
+        assertFailsWith<InvalidNicknameException> { Nickname("가") }
+        assertFailsWith<InvalidNicknameException> { Nickname("  가  ") }
+        assertFailsWith<InvalidNicknameException> { Nickname("   ") }
+        assertFailsWith<InvalidNicknameException> { Nickname("") }
     }
 
     @Test
     fun `최대 길이를 넘으면 거절한다`() {
-        assertFailsWith<IllegalArgumentException> { Nickname("가".repeat(21)) }
+        assertFailsWith<InvalidNicknameException> { Nickname("가".repeat(21)) }
     }
 
     @Test
