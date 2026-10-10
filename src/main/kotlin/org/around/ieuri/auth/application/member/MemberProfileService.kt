@@ -1,114 +1,46 @@
 package org.around.ieuri.auth.application.member
-import org.around.ieuri.auth.application.member.ProfileImagePolicy
+
 import org.around.ieuri.auth.application.member.provided.MemberProfileUseCase
 import org.around.ieuri.auth.application.member.provided.dto.ChangeNicknameCommand
-import org.around.ieuri.auth.application.member.provided.dto.ConfirmProfileImageUploadCommand
-import org.around.ieuri.auth.application.member.provided.dto.IssueProfileImageUploadUrlCommand
-import org.around.ieuri.auth.application.member.provided.dto.ProfileImageUploadUrlView
-import org.around.ieuri.auth.application.member.provided.dto.RemoveProfileImageCommand
-import org.around.ieuri.auth.application.member.provided.exception.ImageTooLargeException
-import org.around.ieuri.auth.application.member.provided.exception.InvalidNicknameException
-import org.around.ieuri.auth.application.member.provided.exception.ObjectKeyNotFoundException
-import org.around.ieuri.auth.application.member.provided.exception.PhotoNotUploadedException
-import org.around.ieuri.auth.application.member.provided.exception.UnsupportedImageTypeException
-import org.around.ieuri.auth.application.member.required.ProfileImageStoragePort
-import org.around.ieuri.auth.application.port.out.persistence.MemberProfileRepositoryPort
-import org.around.ieuri.auth.domain.member.ImageFormat
+import org.around.ieuri.auth.application.member.provided.exception.MemberNotFoundException
+import org.around.ieuri.auth.application.member.required.MemberRepository
+import org.around.ieuri.auth.domain.member.Member
 import org.around.ieuri.auth.domain.member.Nickname
 import org.around.ieuri.auth.domain.member.ProfileImageObjectKey
+import org.around.ieuri.common.persistence.ExposedConfig
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.time.Clock
-import java.util.UUID
 
-/** 프로필 수정(SPEC-0011 R5·R6): 닉네임과 프로필 이미지(발급 → 클라이언트 직접 PUT → 확인). */
+/** 프로필의 DB 단계(SPEC-0011 R5·R6). 프로필 행이 없는 회원은 없는 회원과 같이 답한다. */
 @Service
+@Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
 class MemberProfileService(
-    private val profileRepository: MemberProfileRepositoryPort,
-    private val storage: ProfileImageStoragePort,
-    private val policy: ProfileImagePolicy,
-    private val clock: Clock,
+    private val memberRepository: MemberRepository,
 ) : MemberProfileUseCase {
 
-    /** 닉네임 변경. 형식만 보고 중복은 보지 않는다(SPEC-0032 R31). */
-    @Transactional
+    /** 형식만 보고 중복은 보지 않는다(SPEC-0032 R31). 형식 오류가 회원 부재보다 먼저다. */
     override fun changeNickname(command: ChangeNicknameCommand): String {
-        val nickname = runCatching { Nickname(command.nickname) }
-            .getOrElse { throw InvalidNicknameException(it.message ?: "닉네임 형식이 올바르지 않습니다.") }
-
-        profileRepository.updateNickname(command.memberId, nickname.value)
+        val nickname = Nickname(command.nickname)
+        load(command.memberId)
+        if (!memberRepository.saveNickname(command.memberId, nickname)) throw notFound()
         return nickname.value
     }
 
-    /** 업로드 URL 발급. 형식·크기가 어긋나면 키를 발급하지 않는다. */
-    override fun issueProfileImageUploadUrl(
-        command: IssueProfileImageUploadUrlCommand,
-    ): ProfileImageUploadUrlView {
-        val contentType = command.contentType.trim().lowercase()
-        if (contentType !in policy.allowedContentTypes) {
-            throw UnsupportedImageTypeException("지원하지 않는 이미지 형식입니다.")
-        }
-        if (command.contentLength <= 0 || command.contentLength > policy.maxUploadBytes) {
-            throw ImageTooLargeException("이미지 크기가 허용 범위를 벗어났습니다.")
-        }
-
-        val expiresAt = clock.instant().plus(policy.uploadUrlTtl)
-        val key = ProfileImageObjectKey.issue(command.memberId, UUID.randomUUID())
-        val uploadUrl = storage.presignPut(
-            objectKey = key.value,
-            contentType = contentType,
-            contentLength = command.contentLength,
-            expiresAt = expiresAt,
-        )
-        return ProfileImageUploadUrlView(uploadUrl = uploadUrl, objectKey = key.value, expiresAt = expiresAt)
+    override fun attachProfileImage(memberId: Long, pendingObjectKey: String): String? {
+        val member = load(memberId)
+        val previousKey = memberRepository.findProfileImageKey(memberId)
+        val confirmed = member.attachProfileImage(ProfileImageObjectKey.pendingOf(pendingObjectKey, memberId))
+        if (!memberRepository.saveProfileImage(memberId, confirmed.value)) throw notFound()
+        return previousKey
     }
 
-    /**
-     * 업로드 확인 후 회원에 반영. 판정 순서는 소유권 → 존재 → 크기 → 매직바이트다.
-     * - 소유권을 먼저 본다. 저장소를 먼저 물으면 타인 키의 존재가 응답 시간으로 샌다.
-     * - 교체 시 이전 오브젝트 정리 실패는 반영을 막지 않는다.
-     */
-    @Transactional
-    override fun confirmProfileImageUpload(command: ConfirmProfileImageUploadCommand): String {
-        val key = ProfileImageObjectKey.parse(command.objectKey)
-            ?: throw ObjectKeyNotFoundException("발급된 적 없는 오브젝트 키입니다.")
-        // 확인 대상은 임시 키뿐이다 — 이미 확정된 키를 다시 확인하면 원본이 없어 실패한다.
-        if (key.confirmed || !key.ownedBy(command.memberId)) {
-            throw ObjectKeyNotFoundException("발급된 적 없는 오브젝트 키입니다.")
-        }
-
-        val size = storage.findSize(key.value)
-            ?: throw PhotoNotUploadedException("업로드가 확인되지 않았습니다.")
-        if (size <= 0 || size > policy.maxUploadBytes) {
-            throw ImageTooLargeException("이미지 크기가 허용 범위를 벗어났습니다.")
-        }
-
-        val prefix = storage.readPrefix(key.value, ImageFormat.MAGIC_BYTES_LENGTH)
-            ?: throw PhotoNotUploadedException("업로드가 확인되지 않았습니다.")
-        if (ImageFormat.detect(prefix) == null) {
-            throw UnsupportedImageTypeException("지원하지 않는 이미지 형식입니다.")
-        }
-
-        val previousKey = profileRepository.findProfileImageKey(command.memberId)
-        val confirmed = key.toConfirmed()
-        storage.move(sourceKey = key.value, targetKey = confirmed.value)
-        profileRepository.updateProfileImage(command.memberId, confirmed.value)
-
-        deleteQuietly(previousKey, confirmed.value)
-        return confirmed.value
+    override fun detachProfileImage(memberId: Long): String? {
+        val previousKey = memberRepository.findProfileImageKey(memberId)
+        if (!memberRepository.saveProfileImage(memberId, objectKey = null)) throw notFound()
+        return previousKey
     }
 
-    /** 이미 없어도 성공한다(멱등). 오브젝트 정리 실패도 성공을 막지 않는다. */
-    @Transactional
-    override fun removeProfileImage(command: RemoveProfileImageCommand) {
-        val previousKey = profileRepository.findProfileImageKey(command.memberId)
-        profileRepository.updateProfileImage(command.memberId, null)
-        deleteQuietly(previousKey, null)
-    }
+    private fun load(memberId: Long): Member = memberRepository.findById(memberId) ?: throw notFound()
 
-    /** 이전 오브젝트 정리. 실패해도 삼킨다 — 남은 오브젝트는 스토리지 lifecycle rule이 걷어 간다. */
-    private fun deleteQuietly(previousKey: String?, newKey: String?) {
-        if (previousKey == null || previousKey == newKey) return
-        runCatching { storage.delete(previousKey) }
-    }
+    private fun notFound() = MemberNotFoundException("회원을 찾을 수 없습니다.")
 }

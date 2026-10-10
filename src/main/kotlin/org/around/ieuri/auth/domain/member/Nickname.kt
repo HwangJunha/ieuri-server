@@ -1,4 +1,5 @@
 package org.around.ieuri.auth.domain.member
+
 /** 표시용 닉네임. 회원 간 고유하지 않다(SPEC-0032 R31). 앞뒤 공백은 제거한다. */
 @JvmInline
 value class Nickname private constructor(val value: String) {
@@ -8,8 +9,8 @@ value class Nickname private constructor(val value: String) {
 
         operator fun invoke(raw: String): Nickname {
             val v = raw.trim()
-            require(v.length >= MIN_LENGTH) { "닉네임은 ${MIN_LENGTH}자 이상이어야 합니다." }
-            require(v.length <= MAX_LENGTH) { "닉네임은 ${MAX_LENGTH}자를 넘을 수 없습니다." }
+            if (v.length < MIN_LENGTH) throw InvalidNicknameException("닉네임은 ${MIN_LENGTH}자 이상이어야 합니다.")
+            if (v.length > MAX_LENGTH) throw InvalidNicknameException("닉네임은 ${MAX_LENGTH}자를 넘을 수 없습니다.")
             return Nickname(v)
         }
     }

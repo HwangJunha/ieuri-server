@@ -1,7 +1,7 @@
 package org.around.ieuri.auth.infrastructure
 
-import org.around.ieuri.auth.infrastructure.adapter.out.security.HmacLoginIdentifierProtector
-import org.around.ieuri.auth.infrastructure.config.EncryptionProperties
+import org.around.ieuri.auth.adapter.config.EncryptionProperties
+import org.around.ieuri.auth.adapter.security.HmacLoginIdentifierProtector
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals

@@ -1,7 +1,7 @@
 package org.around.ieuri.auth.infrastructure.client
 
-import org.around.ieuri.auth.infrastructure.adapter.out.client.MailSendFailure
-import org.around.ieuri.auth.infrastructure.adapter.out.client.classifySendFailure
+import org.around.ieuri.auth.adapter.client.MailSendFailure
+import org.around.ieuri.auth.adapter.client.classifySendFailure
 import org.springframework.mail.MailAuthenticationException
 import org.springframework.mail.MailSendException
 import kotlin.test.Test

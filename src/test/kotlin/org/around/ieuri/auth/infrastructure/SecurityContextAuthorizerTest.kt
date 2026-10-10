@@ -1,6 +1,6 @@
 package org.around.ieuri.auth.infrastructure
 
-import org.around.ieuri.auth.infrastructure.security.SecurityContextAuthorizer
+import org.around.ieuri.auth.adapter.security.SecurityContextAuthorizer
 import org.around.ieuri.common.security.ForbiddenException
 import org.around.ieuri.common.security.UnauthorizedException
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken

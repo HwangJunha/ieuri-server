@@ -4,6 +4,7 @@ import org.around.ieuri.auth.adapter.persistence.mapper.toMeView
 import org.around.ieuri.auth.adapter.persistence.mapper.toMemberDetailView
 import org.around.ieuri.auth.adapter.persistence.mapper.toMemberPublicProfileView
 import org.around.ieuri.auth.adapter.persistence.mapper.toMemberSummaryView
+import org.around.ieuri.auth.adapter.persistence.mapper.toRoleInfoView
 import org.around.ieuri.auth.adapter.persistence.table.MemberProfileTable
 import org.around.ieuri.auth.adapter.persistence.table.MemberRoleTable
 import org.around.ieuri.auth.adapter.persistence.table.MemberTable
@@ -11,10 +12,12 @@ import org.around.ieuri.auth.adapter.persistence.table.PermissionTable
 import org.around.ieuri.auth.adapter.persistence.table.RolePermissionTable
 import org.around.ieuri.auth.adapter.persistence.table.RoleTable
 import org.around.ieuri.auth.application.member.provided.dto.MeView
+import org.around.ieuri.auth.application.member.provided.dto.MemberAuthoritiesView
 import org.around.ieuri.auth.application.member.provided.dto.MemberDetailView
 import org.around.ieuri.auth.application.member.provided.dto.MemberPublicProfileView
 import org.around.ieuri.auth.application.member.provided.dto.MemberSummaryView
 import org.around.ieuri.auth.application.member.provided.dto.MembersQuery
+import org.around.ieuri.auth.application.member.provided.dto.RoleInfoView
 import org.around.ieuri.auth.application.member.required.EmailEncryptorPort
 import org.around.ieuri.auth.application.member.required.MemberQueryPort
 import org.around.ieuri.common.pagination.CursorEdge
@@ -113,6 +116,15 @@ class MemberQueryAdapter(
             totalCount = total,
         )
     }
+
+    override fun findAuthorities(memberId: Long): MemberAuthoritiesView = MemberAuthoritiesView(
+        roles = roleCodesOf(memberId).toSet(),
+        permissions = permissionCodesOf(memberId).toSet(),
+    )
+
+    override fun findAssignableRoles(): List<RoleInfoView> = RoleTable.selectAll()
+        .orderBy(RoleTable.code to SortOrder.ASC)
+        .map { it.toRoleInfoView() }
 
     private fun memberWithProfile(): Query = MemberTable
         .join(MemberProfileTable, JoinType.LEFT, MemberTable.id, MemberProfileTable.memberId)

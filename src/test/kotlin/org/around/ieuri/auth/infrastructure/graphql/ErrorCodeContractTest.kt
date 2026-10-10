@@ -2,8 +2,8 @@ package org.around.ieuri.auth.infrastructure.graphql
 
 import com.tngtech.archunit.core.importer.ClassFileImporter
 import com.tngtech.archunit.core.importer.ImportOption
+import org.around.ieuri.auth.adapter.graphql.support.toUserErrorOrNull
 import org.around.ieuri.auth.domain.shared.UserFacingException
-import org.around.ieuri.auth.infrastructure.adapter.`in`.graphql.toUserErrorOrNull
 import org.around.ieuri.common.graphql.generated.types.ErrorCode
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -60,7 +60,7 @@ class ErrorCodeContractTest {
 
     @Test
     fun `UserFacingException은 code와 codeValue를 함께 채운다`() {
-        val error = assertNotNull(toUserErrorOrNull(org.around.ieuri.auth.application.member.provided.exception.NotEmailMemberException("m")))
+        val error = assertNotNull(toUserErrorOrNull(org.around.ieuri.auth.domain.member.NotEmailMemberException("m")))
 
         assertEquals("NOT_EMAIL_MEMBER", error.code)
         assertEquals(ErrorCode.NOT_EMAIL_MEMBER, error.codeValue)

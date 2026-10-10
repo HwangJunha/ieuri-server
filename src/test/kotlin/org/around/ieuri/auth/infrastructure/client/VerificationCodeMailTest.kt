@@ -1,7 +1,7 @@
 package org.around.ieuri.auth.infrastructure.client
 
-import org.around.ieuri.auth.infrastructure.adapter.out.client.passwordResetCodeMail
-import org.around.ieuri.auth.infrastructure.adapter.out.client.verificationCodeMail
+import org.around.ieuri.auth.adapter.client.passwordResetCodeMail
+import org.around.ieuri.auth.adapter.client.verificationCodeMail
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

@@ -43,6 +43,16 @@ data class ProfileImageObjectKey(
             )
         }
 
+        /**
+         * 클라이언트가 되돌려준 키를 [memberId]의 임시 키로 읽는다. 형식이 어긋나거나 남의 키이거나 이미 확정된 키면 거부한다.
+         * - 저장소를 묻기 전에 판정한다. 먼저 물으면 타인 키의 존재가 응답 시간으로 샌다.
+         */
+        fun pendingOf(raw: String, memberId: Long): ProfileImageObjectKey {
+            val key = parse(raw) ?: throw ObjectKeyNotFoundException()
+            if (key.confirmed || !key.ownedBy(memberId)) throw ObjectKeyNotFoundException()
+            return key
+        }
+
         /** 클라이언트가 되돌려준 키를 파싱한다. 형식이 어긋나면 예외가 아니라 null이며, 호출자는 소유권 실패와 같은 코드로 응답한다. */
         fun parse(raw: String): ProfileImageObjectKey? {
             val segments = raw.split('/')

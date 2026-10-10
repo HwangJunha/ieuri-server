@@ -1,16 +1,16 @@
 package org.around.ieuri.tourism.adapter.graphql.support
 
-import org.around.ieuri.auth.application.member.provided.exception.InactiveMemberException
+import org.around.ieuri.auth.adapter.graphql.support.toUserErrorOrNull
 import org.around.ieuri.auth.application.member.provided.exception.InvalidCredentialsException
 import org.around.ieuri.auth.application.member.provided.exception.MemberAlreadyRegisteredException
 import org.around.ieuri.auth.application.member.provided.exception.MemberNotFoundException
 import org.around.ieuri.auth.application.member.provided.exception.RoleNotFoundException
-import org.around.ieuri.auth.application.member.provided.exception.SelfDemotionException
 import org.around.ieuri.auth.application.member.provided.exception.SnsVerificationFailedException
 import org.around.ieuri.auth.application.member.provided.exception.VerificationNotFoundException
-import org.around.ieuri.auth.application.member.provided.exception.VerificationRateLimitedException
+import org.around.ieuri.auth.domain.member.InactiveMemberException
+import org.around.ieuri.auth.domain.member.SelfDemotionException
+import org.around.ieuri.auth.domain.member.VerificationRateLimitedException
 import org.around.ieuri.auth.domain.shared.UserFacingException
-import org.around.ieuri.auth.infrastructure.adapter.`in`.graphql.toUserErrorOrNull
 import org.around.ieuri.common.security.UnauthorizedException
 import org.around.ieuri.tourism.application.catalog.provided.exception.SpotNotFoundException
 import org.around.ieuri.tourism.domain.catalog.ReactionUserException

@@ -1,8 +1,8 @@
 package org.around.ieuri.auth.infrastructure
 
 import io.jsonwebtoken.Jwts
-import org.around.ieuri.auth.infrastructure.adapter.out.client.AppleClientSecretFactory
-import org.around.ieuri.auth.infrastructure.config.SnsRevokeProperties
+import org.around.ieuri.auth.adapter.client.AppleClientSecretFactory
+import org.around.ieuri.auth.adapter.config.SnsRevokeProperties
 import org.springframework.core.io.ByteArrayResource
 import java.security.KeyPairGenerator
 import java.security.spec.ECGenParameterSpec

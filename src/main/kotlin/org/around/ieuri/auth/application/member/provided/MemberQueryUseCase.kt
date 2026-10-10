@@ -1,9 +1,13 @@
 package org.around.ieuri.auth.application.member.provided
+
+import org.around.ieuri.auth.application.member.provided.dto.AgreementStatusView
 import org.around.ieuri.auth.application.member.provided.dto.MeView
+import org.around.ieuri.auth.application.member.provided.dto.MemberAuthoritiesView
 import org.around.ieuri.auth.application.member.provided.dto.MemberDetailView
 import org.around.ieuri.auth.application.member.provided.dto.MemberPublicProfileView
 import org.around.ieuri.auth.application.member.provided.dto.MemberSummaryView
 import org.around.ieuri.auth.application.member.provided.dto.MembersQuery
+import org.around.ieuri.auth.application.member.provided.dto.RoleInfoView
 import org.around.ieuri.common.pagination.CursorPage
 
 /** 회원 조회 유스케이스. 인가는 리졸버가 판정한다: me는 인증만, member/members는 member:read. */
@@ -28,4 +32,13 @@ interface MemberQueryUseCase {
 
     /** 여러 회원의 표시용 정보를 **한 번에**. 목록을 그리는 호출자용이다. */
     fun memberPublicProfiles(memberIds: List<Long>): Map<Long, MemberPublicProfileView>
+
+    /** 시행 중인 약관 전체에 대한 회원의 동의 상태. 필수·선택을 모두 담는다. */
+    fun agreements(memberId: Long): List<AgreementStatusView>
+
+    /** 부여할 수 있는 역할(role:assign). */
+    fun assignableRoles(): List<RoleInfoView>
+
+    /** 토큰에 실을 역할·권한 코드. */
+    fun authoritiesOf(memberId: Long): MemberAuthoritiesView
 }

@@ -9,8 +9,8 @@ import com.nimbusds.jose.jwk.source.ImmutableJWKSet
 import com.nimbusds.jose.proc.SecurityContext
 import com.nimbusds.jwt.JWTClaimsSet
 import com.nimbusds.jwt.SignedJWT
+import org.around.ieuri.auth.adapter.client.JwksIdTokenVerifier
 import org.around.ieuri.auth.application.member.provided.exception.SnsVerificationFailedException
-import org.around.ieuri.auth.infrastructure.adapter.out.client.JwksIdTokenVerifier
 import java.security.interfaces.RSAPrivateKey
 import java.time.Instant
 import java.util.Date

@@ -4,4 +4,6 @@ package org.around.ieuri.auth.application.member.provided.dto
 data class ChangeEmailCommand(
     val memberId: Long,
     val newEmail: String,
+    /** 접속지 정보(접속기록용). 인바운드 어댑터가 헤더에서 읽어 넘기며, 판정 불가 시 null. */
+    val ipAddress: String? = null,
 )

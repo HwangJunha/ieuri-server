@@ -1,91 +1,52 @@
 package org.around.ieuri.auth.domain.member
-import java.time.Duration
+
 import java.time.Instant
 import java.util.UUID
 
 /**
- * 비밀번호 재설정 챌린지 애그리거트. 보안 규칙은 이메일 검증과 같다(짧은 만료·시도 제한·단회용).
- * - 결과는 [VerificationResult]를 재사용하고, 코드는 해시(codeHash)로만 다룬다.
+ * 비밀번호 재설정 코드 한 건. 회원의 자식이며 [Member]가 만들고 검증한다.
+ * - 규칙은 이메일 인증과 같다(짧은 만료·시도 제한·단회용). 코드는 해시로만 다룬다.
  */
-class PasswordReset private constructor(
+data class PasswordReset(
     val id: Long?,
     val publicId: UUID,
     val memberId: Long,
     val codeHash: String,
     val expiresAt: Instant,
-    attemptsInitial: Int,
+    val attempts: Int,
     val maxAttempts: Int,
-    consumedInitial: Boolean,
-    val createdAt: Instant,
+    val consumed: Boolean,
+    /** 발급 시각. DB가 채우므로 저장 전에는 null이다. */
+    val createdAt: Instant?,
 ) {
-    var attempts: Int = attemptsInitial
-        private set
-    var consumed: Boolean = consumedInitial
-        private set
+    val active: Boolean get() = !consumed
 
-    fun verify(inputCodeHash: String, now: Instant): VerificationResult {
-        if (consumed) {
-            return VerificationResult.Failure(VerificationFailureReason.CONSUMED)
-        }
-        if (now.isAfter(expiresAt)) {
-            return VerificationResult.Failure(VerificationFailureReason.EXPIRED)
-        }
-        if (attempts >= maxAttempts) {
-            consumed = true
-            return VerificationResult.Failure(VerificationFailureReason.MAX_ATTEMPTS_EXCEEDED)
-        }
+    internal fun verify(inputCodeHash: String, now: Instant): Pair<PasswordReset, VerificationResult> {
+        if (consumed) return this to failure(VerificationFailureReason.CONSUMED)
+        if (now.isAfter(expiresAt)) return this to failure(VerificationFailureReason.EXPIRED)
+        if (attempts >= maxAttempts) return copy(consumed = true) to failure(VerificationFailureReason.MAX_ATTEMPTS_EXCEEDED)
         if (inputCodeHash != codeHash) {
-            attempts += 1
-            if (attempts >= maxAttempts) consumed = true
-            return VerificationResult.Failure(VerificationFailureReason.CODE_MISMATCH)
+            val tried = attempts + 1
+            return copy(attempts = tried, consumed = tried >= maxAttempts) to failure(VerificationFailureReason.CODE_MISMATCH)
         }
-        consumed = true
-        return VerificationResult.Success
+        return copy(consumed = true) to VerificationResult.Success
     }
 
-    companion object {
-        const val DEFAULT_MAX_ATTEMPTS: Int = 5
+    internal fun consume(): PasswordReset = copy(consumed = true)
 
-        fun issue(
-            publicId: UUID,
-            memberId: Long,
-            codeHash: String,
-            ttl: Duration,
-            now: Instant,
-            maxAttempts: Int = DEFAULT_MAX_ATTEMPTS,
-        ): PasswordReset = PasswordReset(
+    private fun failure(reason: VerificationFailureReason) = VerificationResult.Failure(reason)
+
+    internal companion object {
+        fun issue(memberId: Long, code: VerificationCode, policy: VerificationPolicy, now: Instant): PasswordReset = PasswordReset(
             id = null,
-            publicId = publicId,
+            publicId = code.publicId,
             memberId = memberId,
-            codeHash = codeHash,
-            expiresAt = now.plus(ttl),
-            attemptsInitial = 0,
-            maxAttempts = maxAttempts,
-            consumedInitial = false,
-            createdAt = now,
-        )
-
-        /** 영속 상태에서 도메인 모델 재구성(매퍼 전용). */
-        fun reconstitute(
-            id: Long?,
-            publicId: UUID,
-            memberId: Long,
-            codeHash: String,
-            expiresAt: Instant,
-            attempts: Int,
-            maxAttempts: Int,
-            consumed: Boolean,
-            createdAt: Instant,
-        ): PasswordReset = PasswordReset(
-            id = id,
-            publicId = publicId,
-            memberId = memberId,
-            codeHash = codeHash,
-            expiresAt = expiresAt,
-            attemptsInitial = attempts,
-            maxAttempts = maxAttempts,
-            consumedInitial = consumed,
-            createdAt = createdAt,
+            codeHash = code.codeHash,
+            expiresAt = now.plus(policy.ttl),
+            attempts = 0,
+            maxAttempts = policy.maxAttempts,
+            consumed = false,
+            createdAt = null,
         )
     }
 }

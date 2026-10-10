@@ -3,10 +3,10 @@ package org.around.ieuri.auth.infrastructure
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import org.around.ieuri.auth.adapter.security.Authorizer
+import org.around.ieuri.auth.adapter.security.RequiresPermission
+import org.around.ieuri.auth.adapter.security.RequiresPermissionAspect
 import org.around.ieuri.auth.domain.member.Permission
-import org.around.ieuri.auth.infrastructure.security.Authorizer
-import org.around.ieuri.auth.infrastructure.security.RequiresPermission
-import org.around.ieuri.auth.infrastructure.security.RequiresPermissionAspect
 import org.around.ieuri.common.security.ForbiddenException
 import org.springframework.aop.aspectj.annotation.AspectJProxyFactory
 import kotlin.test.Test
