@@ -18,10 +18,11 @@ class MemberDeletionCoverageTest {
     private val tableDir = File("src/main/kotlin/org/around/ieuri/auth/adapter/persistence/table")
     private val adapterSource = File("src/main/kotlin/org/around/ieuri/auth/adapter/persistence/MemberPersistenceAdapter.kt")
 
-    /** `table/`의 Exposed 테이블 객체 전부. 파일 하나에 타입 하나라 파일 이름이 곧 객체 이름이다. */
+    /** `table/`의 Exposed 테이블 객체 전부. 파일은 애그리게이트마다 하나라, 파일 안의 `object XxxTable` 선언에서 이름을 읽는다. */
     private fun authTables(): List<Table> = tableDir.listFiles { file -> file.extension == "kt" }
         .orEmpty()
-        .mapNotNull { Class.forName("$tablePackage.${it.nameWithoutExtension}").getField("INSTANCE").get(null) as? Table }
+        .flatMap { file -> Regex("""^object (\w+) : Table\(""", RegexOption.MULTILINE).findAll(file.readText()).map { it.groupValues[1] } }
+        .mapNotNull { Class.forName("$tablePackage.$it").getField("INSTANCE").get(null) as? Table }
 
     /** `member`로 향하는 FK를 가진 테이블의 객체 이름. */
     private fun tablesReferencingMember(): Set<String> = authTables()

@@ -15,7 +15,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /** 기기 토큰 수명주기(SPEC-0028 R1~R4·R20). */
-class DeviceTokenCommandServiceTest {
+class DeviceTokenModifyServiceTest {
 
     private val repository = mockk<DeviceTokenRepository>(relaxed = true)
 

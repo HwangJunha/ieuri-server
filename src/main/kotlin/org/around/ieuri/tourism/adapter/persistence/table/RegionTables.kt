@@ -1,13 +1,43 @@
 package org.around.ieuri.tourism.adapter.persistence.table
 
 import org.around.ieuri.common.persistence.geography
-import org.around.ieuri.common.persistence.vector
 import org.jetbrains.exposed.v1.core.ReferenceOption
 import org.jetbrains.exposed.v1.core.Table
+import org.jetbrains.exposed.v1.core.isNotNull
 import org.jetbrains.exposed.v1.javatime.date
 import org.jetbrains.exposed.v1.javatime.timestampWithTimeZone
 
-// 지역 지표(KTO 빅데이터)·혼잡 영역·장소 임베딩. 원본은 마이그레이션이다 — 이름을 마이그레이션과 같게 둔다.
+object AreaTable : Table("tour.area") {
+    val areaCd = varchar("area_cd", 2)
+    val nameKo = varchar("name_ko", 128)
+    val nameEn = varchar("name_en", 128)
+    val nameJa = varchar("name_ja", 128).nullable()
+    val nameZh = varchar("name_zh", 128).nullable()
+    override val primaryKey = PrimaryKey(areaCd)
+}
+
+/** 경계·중심은 적재 데이터다. 대표 위치는 배치가 쓴다. */
+object DistrictTable : Table("tour.district") {
+    val code = varchar("code", 5)
+    val areaCd = varchar("area_cd", 2)
+        .references(AreaTable.areaCd, ReferenceOption.NO_ACTION, ReferenceOption.NO_ACTION, "fk_district_area")
+        .index("idx_district_area_cd")
+    val nameKo = varchar("name_ko", 128)
+    val nameEn = varchar("name_en", 128)
+    val nameJa = varchar("name_ja", 128).nullable()
+    val nameZh = varchar("name_zh", 128).nullable()
+    val boundary = geography("boundary").databaseGenerated()
+    val center = geography("center").databaseGenerated()
+    val representativeLocation = geography("representative_location").nullable()
+    val representativeSpotCount = integer("representative_spot_count").nullable()
+    val representativeUpdatedAt = timestampWithTimeZone("representative_updated_at").nullable()
+    override val primaryKey = PrimaryKey(code)
+
+    init {
+        index("idx_district_boundary", false, boundary)
+        index("idx_district_representative_location", false, representativeLocation, filterCondition = { representativeLocation.isNotNull() })
+    }
+}
 
 object KtoVisitorCountTable : Table("tour.kto_visitor_count") {
     val id = long("id").autoIncrement()
@@ -67,30 +97,4 @@ object KtoSpendingIntensityTable : Table("tour.kto_spending_intensity") {
     init {
         uniqueIndex("uk_kto_spending_intensity_natural", districtCode, baseMonth, indicatorCode)
     }
-}
-
-object CongestionAreaTable : Table("tour.congestion_area") {
-    val areaCd = varchar("area_cd", 16)
-    val category = varchar("category", 32)
-    val nameKo = varchar("name_ko", 128)
-    val nameEn = varchar("name_en", 128)
-    val nameJa = varchar("name_ja", 128).nullable()
-    val nameZh = varchar("name_zh", 128).nullable()
-    val boundary = geography("boundary").databaseGenerated()
-    override val primaryKey = PrimaryKey(areaCd)
-
-    init {
-        index("idx_congestion_area_boundary", false, boundary)
-    }
-}
-
-/** 번역 행 하나의 임베딩. [textHash]는 임베딩한 텍스트의 md5라, 텍스트가 바뀌면 다시 대상이 된다. */
-object SpotEmbeddingTable : Table("tour.spot_embedding") {
-    val translationId = long("translation_id")
-        .references(SpotCatalogTranslationTable.id, ReferenceOption.CASCADE, ReferenceOption.NO_ACTION, "spot_embedding_translation_id_fkey")
-    val model = varchar("model", 50)
-    val textHash = char("text_hash", 32)
-    val embedding = vector("embedding")
-    val updatedAt = timestampWithTimeZone("updated_at").databaseGenerated()
-    override val primaryKey = PrimaryKey(translationId)
 }
