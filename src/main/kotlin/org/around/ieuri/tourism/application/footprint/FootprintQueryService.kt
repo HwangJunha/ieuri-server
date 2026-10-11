@@ -60,6 +60,12 @@ class FootprintQueryService(
         return cellIds.mapNotNull { byId[it] }.map { it.toView(locale, visited) }
     }
 
+    override fun mapCellsOfDistricts(districtCodes: Collection<String>, locale: DomainLocale, memberId: Long?): List<MapCellView> {
+        val cellIds = mapCellDistrictQueryPort.findCellIdsByDistrictCodes(districtCodes)
+        val visited = visitedDistrictCodes(memberId)
+        return MapCellGrouping.fold(mapCellQueryPort.findCellDistrictsIn(cellIds)).map { it.toView(locale, visited) }
+    }
+
     override fun allCellImages(): Map<Long, CellImageView> = cellImageQueryPort.findAllRepresentativeImages()
 
     override fun cellSpots(cellId: Long, first: Int, locale: DomainLocale): List<CellSpotView> = // 상한 초과는 절삭이다(POL-018).
@@ -96,6 +102,8 @@ class FootprintQueryService(
             visitedCount = ownerCells.size,
         )
     }
+
+    override fun findSharerId(token: String): Long? = footprintQueryPort.findSharerId(token)
 
     /** 비인증이면 빈 집합이다 — 모든 칸이 미방문으로 나온다. */
     private fun visitedDistrictCodes(memberId: Long?): Set<String> = memberId?.let { footprintQueryPort.findVisitedDistrictCodes(it) } ?: emptySet()

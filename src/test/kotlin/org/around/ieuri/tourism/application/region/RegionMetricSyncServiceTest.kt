@@ -5,7 +5,6 @@ import io.mockk.mockk
 import io.mockk.verify
 import org.around.ieuri.tourism.application.region.provided.dto.RegionMetricDataset
 import org.around.ieuri.tourism.application.region.provided.dto.RegionMetricTarget
-import org.around.ieuri.tourism.application.region.required.DistrictCodeQueryPort
 import org.around.ieuri.tourism.application.region.required.DistrictRepository
 import org.around.ieuri.tourism.application.region.required.RegionMetricSyncPort
 import org.around.ieuri.tourism.application.region.required.dto.DemandIntensityRecord
@@ -27,9 +26,8 @@ class RegionMetricSyncServiceTest {
 
     private val syncPort = mockk<RegionMetricSyncPort>()
     private val districtRepository = mockk<DistrictRepository>()
-    private val districtCodePort = mockk<DistrictCodeQueryPort>()
     private val policy = RegionMetricSyncPolicy(pageSize = 2, visitorBackfillDays = 3, monthlyLookbackMonths = 3)
-    private val service = RegionMetricSyncService(syncPort, districtRepository, districtCodePort, policy)
+    private val service = RegionMetricSyncService(syncPort, districtRepository, policy)
 
     private val province = RegionMetricTarget(provinceCode = "11", districtCode = null)
 
@@ -46,8 +44,8 @@ class RegionMetricSyncServiceTest {
 
     @Test
     fun `순회 대상은 종마다 다르다 - 방문자수는 전국 1회, 집중률은 시군구, 강도는 시도`() {
-        every { districtCodePort.findAllRegions() } returns listOf(DistrictRegion(code = "11110", provinceCode = "11"))
-        every { districtCodePort.findAllProvinceCodes() } returns listOf("11", "26")
+        every { districtRepository.findAllRegions() } returns listOf(DistrictRegion(code = "11110", provinceCode = "11"))
+        every { districtRepository.findAllProvinceCodes() } returns listOf("11", "26")
 
         assertEquals(listOf(RegionMetricTarget.NATIONWIDE), service.targets(RegionMetricDataset.VISITOR_COUNT))
         assertEquals(listOf(RegionMetricTarget("11", "11110")), service.targets(RegionMetricDataset.CONCENTRATION_RATE))

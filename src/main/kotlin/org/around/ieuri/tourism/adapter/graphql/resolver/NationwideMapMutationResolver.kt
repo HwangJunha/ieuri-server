@@ -11,6 +11,7 @@ import org.around.ieuri.tourism.adapter.graphql.support.RecordVisitsResponse
 import org.around.ieuri.tourism.adapter.graphql.support.RemoveVisitResponse
 import org.around.ieuri.tourism.adapter.graphql.support.domainLocale
 import org.around.ieuri.tourism.application.footprint.provided.FootprintCommandUseCase
+import org.around.ieuri.tourism.application.footprint.provided.FootprintQueryUseCase
 import org.around.ieuri.common.graphql.generated.types.CreateMapShareLinkPayload as GqlCreateMapShareLinkPayload
 import org.around.ieuri.common.graphql.generated.types.RecordVisitsInput as GqlRecordVisitsInput
 import org.around.ieuri.common.graphql.generated.types.RemoveVisitInput as GqlRemoveVisitInput
@@ -26,6 +27,7 @@ import org.around.ieuri.common.graphql.generated.types.UserError as GqlUserError
 @DgsComponent
 class NationwideMapMutationResolver(
     private val footprintCommandUseCase: FootprintCommandUseCase,
+    private val footprintQueryUseCase: FootprintQueryUseCase,
     private val currentMemberProvider: CurrentMemberProvider,
 ) {
 
@@ -35,7 +37,7 @@ class NationwideMapMutationResolver(
         @InputArgument input: GqlRecordVisitsInput,
     ): RecordVisitsResponse {
         val memberId = currentMemberProvider.requireMemberId()
-        val result = footprintCommandUseCase.recordVisits(input.toCommand(), memberId, dfe.domainLocale())
+        val result = footprintCommandUseCase.recordVisits(input.toCommand(), memberId)
 
         // 없는 코드가 섞여 있어도 나머지는 기록된다.
         // 오류는 하나로 묶고 어떤 코드였는지 밝힌다(공개 행정코드라 개인정보가 아니다).
@@ -52,7 +54,7 @@ class NationwideMapMutationResolver(
                     ),
                 )
             },
-            updatedCells = result.updatedCells,
+            updatedCells = footprintQueryUseCase.mapCellsOfDistricts(result.addedDistrictCodes, dfe.domainLocale(), memberId),
         )
     }
 
@@ -62,11 +64,11 @@ class NationwideMapMutationResolver(
         @InputArgument input: GqlRemoveVisitInput,
     ): RemoveVisitResponse {
         val memberId = currentMemberProvider.requireMemberId()
-        val result = footprintCommandUseCase.removeVisit(input.toCommand(), memberId, dfe.domainLocale())
+        val result = footprintCommandUseCase.removeVisit(input.toCommand(), memberId)
 
         return RemoveVisitResponse(
-            success = result.updatedCell != null,
-            userErrors = if (result.updatedCell == null) {
+            success = result.updatedCellId != null,
+            userErrors = if (result.updatedCellId == null) {
                 listOf(
                     GqlUserError(
                         code = "MAP_CELL_NOT_FOUND",
@@ -77,7 +79,7 @@ class NationwideMapMutationResolver(
             } else {
                 emptyList()
             },
-            updatedCell = result.updatedCell,
+            updatedCell = result.updatedCellId?.let { footprintQueryUseCase.mapCell(it, dfe.domainLocale(), memberId) },
         )
     }
 

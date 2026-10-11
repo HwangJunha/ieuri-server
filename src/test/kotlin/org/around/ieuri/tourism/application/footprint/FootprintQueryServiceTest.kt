@@ -62,6 +62,27 @@ class FootprintQueryServiceTest {
         assertEquals(mapOf(1L to true, 2L to false, 3L to false), cells.associate { it.id to it.viewerVisited })
     }
 
+    /** 방문 등록의 응답 순서다 — 칸 id 순이 아니라 시도 코드가 먼저다. */
+    @Test
+    fun `시군구 코드로 읽은 칸은 시도 코드, 칸 id 순이고 방문 여부가 얹힌다`() {
+        every { mapCellDistrictQueryPort.findCellIdsByDistrictCodes(listOf("41111", "11110")) } returns listOf(1L, 2L)
+        every { mapCellQueryPort.findCellDistrictsIn(listOf(1L, 2L)) } returns listOf(row(1L, "41111"), row(2L, "11110"))
+        every { footprintQueryPort.findVisitedDistrictCodes(7L) } returns setOf("41111")
+
+        val cells = service.mapCellsOfDistricts(listOf("41111", "11110"), DomainLocale.KO, memberId = 7L)
+
+        assertEquals(listOf(2L to false, 1L to true), cells.map { it.id to it.viewerVisited })
+    }
+
+    @Test
+    fun `공유 링크의 주인은 조회 포트가 읽은 그대로다`() {
+        every { footprintQueryPort.findSharerId("t") } returns 20L
+        every { footprintQueryPort.findSharerId("gone") } returns null
+
+        assertEquals(20L, service.findSharerId("t"))
+        assertEquals(null, service.findSharerId("gone"))
+    }
+
     @Test
     fun `비인증 조회는 모든 칸이 미방문이고 방문 기록을 읽지 않는다`() {
         every { mapCellQueryPort.findAllCellDistricts() } returns listOf(row(1L, "11110"))

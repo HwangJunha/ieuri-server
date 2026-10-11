@@ -3,9 +3,9 @@ package org.around.ieuri.tourism.application.relation
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import org.around.ieuri.tourism.application.footprint.provided.FootprintQueryUseCase
 import org.around.ieuri.tourism.application.footprint.provided.exception.ShareLinkBlockedException
 import org.around.ieuri.tourism.application.footprint.provided.exception.ShareLinkNotFoundException
-import org.around.ieuri.tourism.application.footprint.required.FootprintQueryPort
 import org.around.ieuri.tourism.application.footprint.required.MapViewerBlockPort
 import org.around.ieuri.tourism.application.relation.required.MapRelationRepository
 import org.around.ieuri.tourism.domain.relation.CannotRelateSelfException
@@ -19,10 +19,10 @@ import kotlin.test.assertTrue
 class MapRelationModifyServiceTest {
 
     private val relationRepository = mockk<MapRelationRepository>(relaxed = true)
-    private val footprintQueryPort = mockk<FootprintQueryPort>()
+    private val footprintQueryUseCase = mockk<FootprintQueryUseCase>()
     private val viewerBlockPort = mockk<MapViewerBlockPort>()
 
-    private val service = MapRelationModifyService(relationRepository, footprintQueryPort, viewerBlockPort)
+    private val service = MapRelationModifyService(relationRepository, footprintQueryUseCase, viewerBlockPort)
 
     @Test
     fun `공유 링크로 관계를 맺으면 상대 id를 돌려주고 나에서 상대 방향으로 저장한다`() {
@@ -42,12 +42,12 @@ class MapRelationModifyServiceTest {
 
         service.createRelation(memberId = 10L, shareUrl = SHARE_URL)
 
-        verify(exactly = 1) { footprintQueryPort.findSharerId(TOKEN) }
+        verify(exactly = 1) { footprintQueryUseCase.findSharerId(TOKEN) }
     }
 
     @Test
     fun `폐기됐거나 없는 링크면 SHARE_LINK_NOT_FOUND다`() {
-        every { footprintQueryPort.findSharerId(any()) } returns null
+        every { footprintQueryUseCase.findSharerId(any()) } returns null
 
         assertThrows<ShareLinkNotFoundException> { service.createRelation(memberId = 10L, shareUrl = SHARE_URL) }
         verify(exactly = 0) { relationRepository.relate(any()) }
@@ -94,7 +94,7 @@ class MapRelationModifyServiceTest {
     }
 
     private fun givenActiveLink(ownerId: Long) {
-        every { footprintQueryPort.findSharerId(any()) } returns ownerId
+        every { footprintQueryUseCase.findSharerId(any()) } returns ownerId
     }
 
     private companion object {

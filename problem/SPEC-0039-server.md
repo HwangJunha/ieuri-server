@@ -192,6 +192,9 @@
 | D-153 | S14 | **auth의 `adapter/security`를 역할 폴더로 나누고 `adapter/token`을 그 안으로 넣는다** — `security/authentication`(필터·WebSocket 인터셉터), `authorization`(권한 판정·`@RequiresPermission`·구독 재확인), `crypto`(암호화·해시·코드 생성), `token`(JWT·refresh token 저장). 다른 context의 인바운드 포트를 부르는 `EmailVerificationStatusAdapter`는 `client`로. 테스트도 옛 `auth/infrastructure`·`auth/domain` 패키지에서 대상과 같은 패키지로 옮겼다 | `adapter/<기술>/<역할>/` 규칙인데 `security` 한 폴더에 인바운드와 아웃바운드가 섞여 있었고 `token`은 기술 이름이 아니었다 | **`token`을 `cache`로**: Valkey를 쓰지만 캐시가 아니라 원본이다 — 지워도 되는 것으로 읽힌다 |
 | D-154 | S14 | **통일 기준 다섯을 센서로 고정한다(`ConsistencyConventionTest`).** `CommandUseCase` 구현은 `ModifyService`, `QueryService`는 저장소를 주입하지 않는다, `UserException` 뿌리는 `domain/shared`, Exposed 테이블은 `table` 패키지의 `…Tables.kt`, `adapter` 바로 아래는 정해진 기술 이름만. 각 규칙을 일부러 틀리게 바꿔 실패하는 것을 확인했다 | context를 옮길 때마다 같은 어긋남이 다시 생겼다 — 문서의 규칙만으로는 막지 못했다 | **문서만**: 지금까지 그렇게 했고 매번 갈렸다. Command에 회원 id를 담지 않는 규칙은 센서로 만들지 않았다 — 정지 대상 id처럼 클라이언트가 지정한 회원 id가 있어 이름으로 가를 수 없다 |
 | D-155 | S14 | **조회 포트는 애그리게이트 루트를 돌려주지 않는다 — 읽기 모델이나 값만.** alarm `NotificationPreferenceQueryPort`가 루트 `NotificationPreference` 목록을 돌려주던 것을 "카테고리 → 켜짐" 맵으로 바꿨다(D-151 보정). auth의 약관 조회는 루트가 아닌 값(`Terms`·`Agreement`)이라 그대로다 | 사용자 지적(2026-10-12): 저장소와 조회 포트가 같은 SQL로 같은 루트를 돌려주면 이름만 다른 저장소다. CQRS에서 조회 쪽은 루트를 싣지 않는다 | **조회 서비스가 저장소를 쓰게 예외 두기(D-144)**: 조회와 쓰기의 문이 다시 섞인다 |
+| D-156 | 정리 | **쓰기 서비스만 쓰던 조회 포트 넷을 그 애그리게이트의 저장소로 합친다.** `SpotCatalogQueryPort` → `SpotCatalogRepository`, `EmbeddingTargetQueryPort` → `SpotEmbeddingRepository`, `DistrictCodeQueryPort`·`RepresentativePointQueryPort` → `DistrictRepository`. 조회 어댑터 본문은 `XxxPersistenceAdapter`로 옮겼고 SQL은 그대로다 | 넷 다 조회 서비스가 쓰지 않는다 — 쓰기 쪽이 판단 재료를 읽는 것이라 저장소의 일이다. 이름만 `QueryPort`여서 "쓰기는 Repository, 조회는 QueryPort" 기준을 흐렸다 | **이름만 바꾸기(`XxxReadPort`)**: 포트 종류가 하나 더 생긴다 |
+| D-157 | 정리 | **발자취 쓰기는 바뀐 것만 돌려주고, 칸 뷰는 리졸버가 조회 유스케이스로 읽는다.** `recordVisits`는 새로 방문이 된 시군구 코드를, `removeVisit`은 칸 id를 돌려준다(언어 인자도 뺀다). 리졸버가 `FootprintQueryUseCase.mapCellsOfDistricts`·`mapCell`로 뷰를 만든다. 쓰기 판단에 필요한 읽기 둘(`filterExistingDistrictCodes`·`findDistrictCodesOfCell`)은 `FootprintRepository`에 둔다 | 쓰기 서비스가 조회 포트 셋으로 응답 뷰를 조립하고 있었다. `mapCellsOfDistricts`는 이전과 같은 정렬(시도 코드 → 칸 id)을 쓴다 — 기존 `mapCellsByIds`는 인자 순이라 응답 순서가 달라진다. api-dev 비교에서 `recordVisits`·`removeVisit` 응답이 같다 | **쓰기 서비스가 조회 유스케이스를 불러 뷰까지 돌려주기**: 쓰기 유스케이스가 읽기 모델과 언어를 계속 안다 |
+| D-158 | 정리 | **관계 맺기는 공유 링크의 주인을 발자취의 조회 유스케이스로 읽는다** — `MapRelationModifyService`가 `FootprintQueryPort` 대신 `FootprintQueryUseCase.findSharerId`를 쓴다. 센서 추가: application에서 `QueryPort`에 의존하는 것은 읽기 전용 서비스뿐이다 | 다른 애그리게이트의 값은 그 애그리게이트의 `provided` 유스케이스로 읽는다는 기존 규칙 | **`MapRelationRepository`에 같은 조회 두기**: 남의 테이블(`map_share_link`)을 읽는 저장소가 된다 |
 
 ## 부족한 정보
 
@@ -336,7 +339,6 @@ grep으로 확인한 수(worktree `82fdd48`):
 - auth의 어댑터가 outbound 포트를 직접 주입하는 넷(`VerificationEmailListener` → `EmailSenderPort`, `TokenBackedSubscriptionAuthorizer` → `RefreshTokenStorePort`, `JwtAuthenticationFilter`·`GraphqlWebSocketAuthInterceptor` → `TokenProviderPort`) — 패키지만 옮겼다. 요청마다 도는 필터를 유스케이스로 돌리는 일은 S14 밖이다
 - auth `domain/token/SubscriptionIdentity`를 `Specification<T>` 구현으로 바꾸기(D-121) — 자리만 옮겼다. community·alarm의 spec 정리와 함께
 - 프로필 이미지 형식·크기 판정(`ProfileImageService`)과 설정값(`ProfileImagePolicy`)을 도메인으로 옮기기, `SuspendMemberCommand`와 `Member.suspend`에 겹친 빈 사유 검사 — 응답 문구가 같아 그대로 두었다
-- **쓰기 서비스가 조회 포트를 쓰는 곳(tourism)** — 이름만 `QueryPort`인 넷(`SpotCatalogCuration`·`SpotEmbeddingStore`·`DistrictRepresentative`·`RegionMetricSync`)과 실제로 조회 쪽을 건너 쓰는 둘(`MapRelationModify` → `FootprintQueryPort.findSharerId`, `FootprintModify`의 응답 뷰 조립). 같은 과제로 둔다
 
 ## 설계
 
@@ -375,6 +377,7 @@ grep으로 확인한 수(worktree `82fdd48`):
 
 | 날짜 | 무엇을 | 왜 |
 |---|---|---|
+| 2026-10-12 | D-155(조회 포트는 루트를 돌려주지 않는다), D-156~D-158(tourism 쓰기 쪽의 조회 포트 정리, 센서 추가) — `feature/SPEC-0039-exposed-cleanup` | 사용자 결정 |
 | 2026-10-12 | D-151(alarm 조회 서비스도 조회 포트로), D-152(`VerificationLimits`), D-153(auth `security` 폴더를 역할로 나눔), D-154(통일 기준 센서 다섯). D-150 보정 — 프로필 이미지 반영의 오류 순서를 되돌림 | 사용자 결정 |
 | 2026-10-12 | D-148(한 줄 조회는 그 자리에, 유스케이스 이름), D-149(조회 서비스는 저장소를 쓰지 않는다 — D-144 변경), D-150(규칙 없는 `Member` 메서드 삭제). 다른 context의 같은 어긋남은 범위 밖에 과제로 적음 | 사용자 지적·결정 |
 | 2026-10-12 | D-145(context 간 통일 넷), D-146(auth 서비스 합치기 — D-137 반전), D-147(페이지 층 분리는 리팩토링이 전부 끝난 뒤). CLAUDE.md Target shape에 같은 기준을 적음 | 사용자 지적·결정 |

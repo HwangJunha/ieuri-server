@@ -4,7 +4,6 @@ import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.region.provided.DistrictRepresentativeUseCase
 import org.around.ieuri.tourism.application.region.provided.dto.DistrictRepresentativeRefreshResult
 import org.around.ieuri.tourism.application.region.required.DistrictRepository
-import org.around.ieuri.tourism.application.region.required.RepresentativePointQueryPort
 import org.around.ieuri.tourism.domain.region.RepresentativeLocation
 import org.around.ieuri.tourism.domain.region.RepresentativeRelocation
 import org.springframework.stereotype.Service
@@ -14,12 +13,11 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 @Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
 class DistrictRepresentativeService(
-    private val pointQueryPort: RepresentativePointQueryPort,
     private val districtRepository: DistrictRepository,
 ) : DistrictRepresentativeUseCase {
 
     override fun refreshRepresentativeLocations(cellSizeDegrees: Double, minSpotCount: Int): DistrictRepresentativeRefreshResult {
-        val chosen = pointQueryPort.findKoreanSpotPoints(cellSizeDegrees).mapNotNull { (code, points) ->
+        val chosen = districtRepository.findKoreanSpotPoints(cellSizeDegrees).mapNotNull { (code, points) ->
             RepresentativeLocation.choose(points, minSpotCount)?.let { code to it }
         }.toMap()
 

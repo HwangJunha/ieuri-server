@@ -218,7 +218,7 @@ skill re-checks them:
 - `ConsistencyConventionTest` — persistence tech out of `application`, `common` out of `domain`,
   `@Transactional` off domain and resolvers, repository/`Port`/`Dto`/test naming; and the
   cross-context shape: `CommandUseCase` implemented by a `ModifyService`, no repository in a
-  `QueryService`, `UserException` roots in `domain/shared`, Exposed tables in `…Tables.kt`, and the
+  `QueryService`, `QueryPort` used only by read-only services, `UserException` roots in `domain/shared`, Exposed tables in `…Tables.kt`, and the
   fixed set of technology folders under `adapter/`.
 - ktlint via kotlinter (`./gradlew lintKotlin`, part of `check`) — code style, rules in `.editorconfig`.
 - `ImportStyleTest` — no wildcard imports (source-level, so Konsist rather than ArchUnit).
@@ -386,6 +386,11 @@ refactor.
     method. When a read needs a domain rule (which terms version is in
     force, what an absent preference row means), the query port returns the stored values and a
     pure domain function decides — the rule is not rewritten in SQL.
+  - **A write service never injects a query port.** What it must read to decide (candidates to
+    assign, the district codes of a cell, whether a code exists) is a method on its own
+    repository; another aggregate's value comes through that aggregate's `provided` query use case
+    (`FootprintQueryUseCase.findSharerId`). A write use case returns what changed (ids, codes), not
+    a read model — the resolver asks the query use case for the view.
   - **A one-line lookup is written where it is used.** `repository.findById(id) ?: throw
     XxxNotFoundException()` stays in the method body; a `private fun findXxx` that hides one line
     only adds a place to read. Extract a private function when it bundles several steps and its

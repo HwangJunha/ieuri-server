@@ -12,6 +12,12 @@ interface FootprintRepository {
     /** 아무것도 남기지 않은 회원도 빈 발자취다(null이 아니다). */
     fun findByMemberId(memberId: Long): Footprint
 
+    /** 존재하는 시군구 코드만 남긴다. */
+    fun filterExistingDistrictCodes(districtCodes: Collection<String>): Set<String>
+
+    /** 칸에 속한 시군구 코드(오름차순). 없는 칸이면 빈 목록이다. */
+    fun findDistrictCodesOfCell(cellId: Long): List<String>
+
     /** 방문을 넣는다. 이미 있는 코드는 무시된다. 존재하는 시군구 코드여야 한다. */
     fun addVisits(memberId: Long, districtCodes: Collection<String>)
 

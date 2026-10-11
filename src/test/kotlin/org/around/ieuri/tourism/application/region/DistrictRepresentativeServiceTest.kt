@@ -4,7 +4,6 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import org.around.ieuri.tourism.application.region.required.DistrictRepository
-import org.around.ieuri.tourism.application.region.required.RepresentativePointQueryPort
 import org.around.ieuri.tourism.domain.region.District
 import org.around.ieuri.tourism.domain.region.RepresentativeLocation
 import org.around.ieuri.tourism.domain.region.RepresentativeLocation.Point
@@ -14,14 +13,13 @@ import org.junit.jupiter.api.Test
 
 class DistrictRepresentativeServiceTest {
 
-    private val pointQueryPort = mockk<RepresentativePointQueryPort>()
     private val districtRepository = mockk<DistrictRepository>(relaxed = true)
-    private val service = DistrictRepresentativeService(pointQueryPort, districtRepository)
+    private val service = DistrictRepresentativeService(districtRepository)
 
     @Test
     @DisplayName("선정된 시군구만 쓰고, 대표 위치가 있던 나머지만 비운다")
     fun `saves the chosen districts and clears the rest`() {
-        every { pointQueryPort.findKoreanSpotPoints(0.01) } returns mapOf(
+        every { districtRepository.findKoreanSpotPoints(0.01) } returns mapOf(
             "11110" to listOf(Point(1, 127.0, 37.0, cellRank = 1), Point(2, 127.0001, 37.0, cellRank = 1)),
             "26110" to listOf(Point(3, 129.0, 35.0, cellRank = 1)),
         )

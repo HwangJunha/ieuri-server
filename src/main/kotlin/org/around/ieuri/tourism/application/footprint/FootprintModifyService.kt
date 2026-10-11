@@ -7,52 +7,40 @@ import org.around.ieuri.tourism.application.footprint.provided.dto.RecordVisitsC
 import org.around.ieuri.tourism.application.footprint.provided.dto.RecordVisitsResult
 import org.around.ieuri.tourism.application.footprint.provided.dto.RemoveVisitCommand
 import org.around.ieuri.tourism.application.footprint.provided.dto.RemoveVisitResult
-import org.around.ieuri.tourism.application.footprint.required.FootprintQueryPort
 import org.around.ieuri.tourism.application.footprint.required.FootprintRepository
-import org.around.ieuri.tourism.application.footprint.required.MapCellDistrictQueryPort
-import org.around.ieuri.tourism.application.footprint.required.MapCellQueryPort
-import org.around.ieuri.tourism.domain.footprint.MapCellGrouping
 import org.around.ieuri.tourism.domain.footprint.ShareToken
-import org.around.ieuri.tourism.domain.shared.DomainLocale
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 
-/** 발자취 쓰기(SPEC-0030). 무엇을 남기고 지울지는 발자취가 정하고, 서비스는 바뀐 것만 쓴 뒤 칸으로 보여 준다. */
+/** 발자취 쓰기(SPEC-0030). 무엇을 남기고 지울지는 발자취가 정하고, 서비스는 바뀐 것만 쓴다. 칸으로 보여 주는 것은 조회 쪽이다. */
 @Service
 @Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
 class FootprintModifyService(
     private val footprintRepository: FootprintRepository,
-    private val footprintQueryPort: FootprintQueryPort,
-    private val mapCellQueryPort: MapCellQueryPort,
-    private val mapCellDistrictQueryPort: MapCellDistrictQueryPort,
     private val policy: FootprintPolicy,
 ) : FootprintCommandUseCase {
 
-    /** 없는 코드는 버리지 않고 DISTRICT_NOT_FOUND의 근거로 돌려준다. 이번 요청으로 방문이 된 칸만 돌려준다. */
-    override fun recordVisits(command: RecordVisitsCommand, memberId: Long, locale: DomainLocale): RecordVisitsResult {
+    /** 없는 코드는 버리지 않고 DISTRICT_NOT_FOUND의 근거로 돌려준다. */
+    override fun recordVisits(command: RecordVisitsCommand, memberId: Long): RecordVisitsResult {
         val footprint = footprintRepository.findByMemberId(memberId)
 
-        val visit = footprint.visit(command.districtCodes, footprintQueryPort.filterExistingDistrictCodes(command.districtCodes))
+        val visit = footprint.visit(command.districtCodes, footprintRepository.filterExistingDistrictCodes(command.districtCodes))
 
         footprintRepository.addVisits(memberId, visit.addedDistrictCodes)
-
-        val updatedCellIds = mapCellDistrictQueryPort.findCellIdsByDistrictCodes(visit.addedDistrictCodes)
-        val updatedCells = MapCellGrouping.fold(mapCellQueryPort.findCellDistrictsIn(updatedCellIds))
-            .map { it.toView(locale, visit.footprint.visitedDistrictCodes) }
-        return RecordVisitsResult(updatedCells = updatedCells, unknownDistrictCodes = visit.unknownDistrictCodes)
+        return RecordVisitsResult(addedDistrictCodes = visit.addedDistrictCodes.toList(), unknownDistrictCodes = visit.unknownDistrictCodes)
     }
 
     /** 칸에 속한 시군구 전부를 해제한다(R4). 없는 칸이면 갱신된 칸이 null이다. */
-    override fun removeVisit(command: RemoveVisitCommand, memberId: Long, locale: DomainLocale): RemoveVisitResult {
-        val rows = mapCellQueryPort.findCellDistricts(command.cellId)
-        if (rows.isEmpty()) return RemoveVisitResult(updatedCell = null)
+    override fun removeVisit(command: RemoveVisitCommand, memberId: Long): RemoveVisitResult {
+        val districtCodes = footprintRepository.findDistrictCodesOfCell(command.cellId)
+        if (districtCodes.isEmpty()) return RemoveVisitResult(updatedCellId = null)
         val footprint = footprintRepository.findByMemberId(memberId)
 
-        val unvisit = footprint.unvisit(rows.map { it.districtCode })
+        val unvisit = footprint.unvisit(districtCodes)
 
         footprintRepository.removeVisits(memberId, unvisit.removedDistrictCodes)
-        return RemoveVisitResult(updatedCell = MapCellGrouping.fold(rows).single().toView(locale, unvisit.footprint.visitedDistrictCodes))
+        return RemoveVisitResult(updatedCellId = command.cellId)
     }
 
     /** 토큰을 설정된 앞부분에 붙여 완성한다 — 클라이언트는 조립하지 않는다. */

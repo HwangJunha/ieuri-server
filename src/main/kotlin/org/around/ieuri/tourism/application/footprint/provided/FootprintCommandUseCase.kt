@@ -5,19 +5,18 @@ import org.around.ieuri.tourism.application.footprint.provided.dto.RecordVisitsC
 import org.around.ieuri.tourism.application.footprint.provided.dto.RecordVisitsResult
 import org.around.ieuri.tourism.application.footprint.provided.dto.RemoveVisitCommand
 import org.around.ieuri.tourism.application.footprint.provided.dto.RemoveVisitResult
-import org.around.ieuri.tourism.domain.shared.DomainLocale
 
 /** 발자취 쓰기 — 방문 기록과 공유 링크(SPEC-0030 R3·R4·R12·R14). */
 interface FootprintCommandUseCase {
 
     /**
-     * 시군구를 방문으로 기록하고 갱신된 칸을 돌려준다(R3).
+     * 시군구를 방문으로 기록하고 새로 방문이 된 코드를 돌려준다(R3).
      * - 이미 기록된 코드는 중복되지 않으며 오류도 아니다.
      */
-    fun recordVisits(command: RecordVisitsCommand, memberId: Long, locale: DomainLocale): RecordVisitsResult
+    fun recordVisits(command: RecordVisitsCommand, memberId: Long): RecordVisitsResult
 
     /** 칸의 방문을 해제한다(R4). 그 칸에 속한 시군구 기록이 전부 지워진다. */
-    fun removeVisit(command: RemoveVisitCommand, memberId: Long, locale: DomainLocale): RemoveVisitResult
+    fun removeVisit(command: RemoveVisitCommand, memberId: Long): RemoveVisitResult
 
     /** 공유 링크를 발급한다(R12). 이미 유효한 링크가 있으면 **같은 토큰**을 돌려준다. */
     fun createShareLink(memberId: Long): MapShareLinkView

@@ -1,12 +1,10 @@
 package org.around.ieuri.tourism.adapter.persistence.query
 
-import org.around.ieuri.tourism.adapter.persistence.table.DistrictTable
 import org.around.ieuri.tourism.adapter.persistence.table.MapShareLinkTable
 import org.around.ieuri.tourism.adapter.persistence.table.MemberDistrictVisitTable
 import org.around.ieuri.tourism.application.footprint.required.FootprintQueryPort
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
-import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.core.isNull
 import org.jetbrains.exposed.v1.jdbc.select
 import org.springframework.stereotype.Component
@@ -19,14 +17,6 @@ class FootprintQueryAdapter : FootprintQueryPort {
     override fun findVisitedDistrictCodes(memberId: Long): Set<String> = MemberDistrictVisitTable.select(MemberDistrictVisitTable.districtCode)
         .where { MemberDistrictVisitTable.memberId eq memberId }
         .mapTo(mutableSetOf()) { it[MemberDistrictVisitTable.districtCode] }
-
-    override fun filterExistingDistrictCodes(districtCodes: Collection<String>): Set<String> {
-        if (districtCodes.isEmpty()) return emptySet()
-
-        return DistrictTable.select(DistrictTable.code)
-            .where { DistrictTable.code inList districtCodes }
-            .mapTo(mutableSetOf()) { it[DistrictTable.code] }
-    }
 
     override fun findSharerId(token: String): Long? = MapShareLinkTable.select(MapShareLinkTable.memberId)
         .where { (MapShareLinkTable.token eq token) and MapShareLinkTable.revokedAt.isNull() }

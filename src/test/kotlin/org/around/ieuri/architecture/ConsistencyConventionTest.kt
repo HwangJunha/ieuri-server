@@ -144,6 +144,16 @@ class ConsistencyConventionTest {
             .check(classes)
     }
 
+    /** 쓰기 쪽이 읽을 것은 자기 저장소에 있고, 다른 애그리게이트의 것은 그 유스케이스로 읽는다. */
+    @Test
+    fun `QueryPort는 읽기 전용 서비스만 쓴다`() {
+        noClasses().that().resideInAPackage("..application..")
+            .and(DescribedPredicate.describe("읽기 전용 트랜잭션 서비스가 아닌") { !it.isReadOnlyService() })
+            .should().dependOnClassesThat().haveSimpleNameEndingWith("QueryPort")
+            .because("쓰기 서비스는 조회 포트를 쓰지 않는다 — 판단에 필요한 읽기는 그 애그리게이트의 Repository에 두고, 다른 애그리게이트의 값은 그쪽 QueryUseCase로 읽는다")
+            .check(classes)
+    }
+
     /** 사용자 오류(`userErrors`)의 뿌리는 context마다 하나이고 `domain/shared`에 있다. */
     @Test
     fun `UserException 뿌리는 domain shared에 있다`() {
@@ -172,6 +182,12 @@ class ConsistencyConventionTest {
             .because("adapter 아래는 기술 이름(${ADAPTER_TECHNOLOGIES.joinToString()})으로 나눈다 — 새 폴더를 만들기 전에 이 중 어디에 속하는지 본다")
             .check(classes)
     }
+
+    /** 클래스에 `@Transactional(readOnly = true)`가 붙었거나, 포트 인터페이스 자신(Kotlin의 `DefaultImpls` 포함)이다. */
+    private fun JavaClass.isReadOnlyService(): Boolean = isInterface || name.contains("QueryPort$") ||
+        tryGetAnnotationOfType("org.springframework.transaction.annotation.Transactional")
+            .map { it.get("readOnly").orElse(false) == true }
+            .orElse(false)
 
     private fun beDeclaredInFileEndingWith(suffix: String) = object : ArchCondition<JavaClass>("be declared in a file ending with $suffix") {
         override fun check(item: JavaClass, events: ConditionEvents) {
