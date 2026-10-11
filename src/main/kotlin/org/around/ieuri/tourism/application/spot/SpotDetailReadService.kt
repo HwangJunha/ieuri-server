@@ -14,7 +14,7 @@ import org.around.ieuri.tourism.application.spot.provided.exception.SpotNotFound
 import org.around.ieuri.tourism.application.spot.required.SpotDetailQueryPort
 import org.around.ieuri.tourism.domain.category.SpotCategory
 import org.around.ieuri.tourism.domain.shared.DomainLocale
-import org.around.ieuri.tourism.domain.shared.SpotQueryException
+import org.around.ieuri.tourism.domain.shared.TourismQueryException
 import org.around.ieuri.tourism.domain.spot.SpotDetail
 import org.around.ieuri.tourism.domain.spot.SpotImage
 import org.around.ieuri.tourism.domain.spot.SpotInfoItem
@@ -56,7 +56,7 @@ class SpotDetailReadService(
     }
 
     /** 해소 실패 예외. 카탈로그가 있으면 "이 언어에 없음", 없으면 "그런 장소 없음". */
-    private fun absenceOf(catalogId: Long): SpotQueryException = if (spotQueryPort.existsCatalog(catalogId)) {
+    private fun absenceOf(catalogId: Long): TourismQueryException = if (spotQueryPort.existsCatalog(catalogId)) {
         SpotNotFoundInLocaleQueryException()
     } else {
         SpotDetailNotFoundException()

@@ -3,7 +3,7 @@ package org.around.ieuri.auth.infrastructure.graphql
 import com.tngtech.archunit.core.importer.ClassFileImporter
 import com.tngtech.archunit.core.importer.ImportOption
 import org.around.ieuri.auth.adapter.graphql.support.toUserErrorOrNull
-import org.around.ieuri.auth.domain.shared.UserFacingException
+import org.around.ieuri.auth.domain.shared.AuthUserException
 import org.around.ieuri.common.graphql.generated.types.ErrorCode
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -14,26 +14,26 @@ import kotlin.test.assertTrue
 /** `userErrors[].code`로 나갈 수 있는 값과 스키마 `ErrorCode` enum이 어긋나지 않는지 고정한다(클라이언트는 스키마만 본다). */
 class ErrorCodeContractTest {
 
-    /** 프로덕션 클래스패스의 모든 `UserFacingException` 구현이 내는 코드. */
+    /** 프로덕션 클래스패스의 모든 `AuthUserException` 구현이 내는 코드. */
     private fun declaredCodes(): Set<String> {
         val classes = ClassFileImporter()
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
             .importPackages("org.around.ieuri.auth.domain", "org.around.ieuri.auth.application")
 
         return classes
-            .filter { it.isAssignableTo(UserFacingException::class.java) && it != classes.get(UserFacingException::class.java) }
+            .filter { it.isAssignableTo(AuthUserException::class.java) && it != classes.get(AuthUserException::class.java) }
             .map { javaClass ->
                 // 코드는 생성자에서 상위로 넘기므로, 인스턴스를 만들어 읽는 것이 가장 정확하다.
                 val instance = Class.forName(javaClass.name)
                     .getDeclaredConstructor(String::class.java)
-                    .newInstance("test") as UserFacingException
+                    .newInstance("test") as AuthUserException
                 instance.code
             }
             .toSet()
     }
 
     @Test
-    fun `모든 UserFacingException 코드가 스키마 ErrorCode에 있다`() {
+    fun `모든 AuthUserException 코드가 스키마 ErrorCode에 있다`() {
         val schemaCodes = ErrorCode.entries.map { it.name }.toSet()
         val missing = declaredCodes() - schemaCodes
 
@@ -59,7 +59,7 @@ class ErrorCodeContractTest {
     }
 
     @Test
-    fun `UserFacingException은 code와 codeValue를 함께 채운다`() {
+    fun `AuthUserException은 code와 codeValue를 함께 채운다`() {
         val error = assertNotNull(toUserErrorOrNull(org.around.ieuri.auth.domain.member.NotEmailMemberException("m")))
 
         assertEquals("NOT_EMAIL_MEMBER", error.code)

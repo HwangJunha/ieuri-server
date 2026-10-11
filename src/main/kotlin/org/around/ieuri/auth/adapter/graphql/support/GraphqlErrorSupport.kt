@@ -1,5 +1,5 @@
 package org.around.ieuri.auth.adapter.graphql.support
-import org.around.ieuri.auth.domain.shared.UserFacingException
+import org.around.ieuri.auth.domain.shared.AuthUserException
 import org.around.ieuri.common.graphql.generated.types.ErrorCode
 import org.around.ieuri.common.graphql.generated.types.UserError
 
@@ -7,7 +7,7 @@ import org.around.ieuri.common.graphql.generated.types.UserError
 
 /** 예외를 UserError로 매핑한다. userErrors 대상이 아니면 null(→ 상위에서 재던짐). */
 fun toUserErrorOrNull(e: Throwable): UserError? = when (e) {
-    is UserFacingException -> userError(e.code, e.message ?: e.code, FIELD_BY_CODE[e.code])
+    is AuthUserException -> userError(e.code, e.message ?: e.code, FIELD_BY_CODE[e.code])
 
     // Command 생성/도메인 require 위반 등 입력 형식·불변식 오류.
     is IllegalArgumentException -> userError(INVALID_INPUT, e.message ?: "잘못된 입력입니다.")

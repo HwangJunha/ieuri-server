@@ -10,10 +10,10 @@ import org.around.ieuri.auth.domain.member.InactiveMemberException
 import org.around.ieuri.auth.domain.member.SelfDemotionException
 import org.around.ieuri.auth.domain.member.VerificationNotFoundException
 import org.around.ieuri.auth.domain.member.VerificationRateLimitedException
-import org.around.ieuri.auth.domain.shared.UserFacingException
+import org.around.ieuri.auth.domain.shared.AuthUserException
 import org.around.ieuri.common.security.UnauthorizedException
 import org.around.ieuri.tourism.application.catalog.provided.exception.SpotNotFoundException
-import org.around.ieuri.tourism.domain.catalog.ReactionUserException
+import org.around.ieuri.tourism.domain.shared.TourismUserException
 import kotlin.test.Test
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -27,13 +27,13 @@ class UserErrorTaxonomyTest {
     /** userErrors[]에 실리면 안 되는 세션 상태 code. */
     private val sessionStateCodes = setOf("UNAUTHENTICATED", "UNAUTHORIZED", "TOKEN_EXPIRED")
 
-    /** tourism의 userErrors 대상 예외 전체(ReactionUserException 하위). */
-    private val reactionUserExceptions: List<ReactionUserException> = listOf(
+    /** tourism의 userErrors 대상 예외 전체(TourismUserException 하위). */
+    private val tourismUserExceptions: List<TourismUserException> = listOf(
         SpotNotFoundException(),
     )
 
-    /** auth의 userErrors 대상 예외 전체(UserFacingException 하위). */
-    private val userFacingExceptions: List<UserFacingException> = listOf(
+    /** auth의 userErrors 대상 예외 전체(AuthUserException 하위). */
+    private val userFacingExceptions: List<AuthUserException> = listOf(
         MemberAlreadyRegisteredException("m"),
         VerificationNotFoundException("m"),
         VerificationRateLimitedException("m"),
@@ -47,8 +47,8 @@ class UserErrorTaxonomyTest {
 
     @Test
     fun `reactToSpot의 userErrors에는 인증 실패 code가 없다`() {
-        reactionUserExceptions.forEach { e ->
-            val code = toReactionUserErrorOrNull(e)?.code
+        tourismUserExceptions.forEach { e ->
+            val code = toTourismUserErrorOrNull(e)?.code
             assertTrue(
                 code !in sessionStateCodes,
                 "${e::class.simpleName}이 userErrors로 세션 상태 code($code)를 노출한다 — 인증 실패는 최상위 errors[]로 가야 한다",
@@ -71,7 +71,7 @@ class UserErrorTaxonomyTest {
     @Test
     fun `UnauthorizedException은 어느 경로에서도 UserError로 변환되지 않는다`() {
         val e = UnauthorizedException("인증이 필요합니다.")
-        assertNull(toReactionUserErrorOrNull(e), "인증 실패가 reactToSpot의 userErrors로 변환됐다")
+        assertNull(toTourismUserErrorOrNull(e), "인증 실패가 reactToSpot의 userErrors로 변환됐다")
         assertNull(toUserErrorOrNull(e), "인증 실패가 auth 뮤테이션의 userErrors로 변환됐다")
     }
 }

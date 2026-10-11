@@ -4,7 +4,7 @@ package org.around.ieuri.tourism.domain.shared
  * 쿼리의 도메인 실패. [logicalCode]는 클라이언트 분기 기준 문자열, [classification]은 DGS ErrorType 이름이다.
  * - 어댑터가 graphql.ErrorType으로 매핑한다.
  */
-abstract class SpotQueryException(
+abstract class TourismQueryException(
     val logicalCode: String,
     val classification: Classification,
     message: String,
