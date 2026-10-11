@@ -30,7 +30,7 @@ class NotificationPreferenceServicesTest {
     /** AC19.1 — 설정을 바꾼 적 없는 회원도 두 항목이 켜짐으로 온다. */
     @Test
     fun `저장된 행이 없으면 두 카테고리가 모두 켜짐이다`() {
-        every { queryPort.findByMemberId(memberId) } returns emptyList()
+        every { queryPort.findEnabledByCategory(memberId) } returns emptyMap()
 
         val result = query.findByMemberId(memberId)
 
@@ -41,7 +41,7 @@ class NotificationPreferenceServicesTest {
     /** AC19.2 — 하나만 끈 회원. */
     @Test
     fun `끈 카테고리만 거짓으로 온다`() {
-        every { queryPort.findByMemberId(memberId) } returns listOf(preference(NotificationCategory.MESSAGE, false))
+        every { queryPort.findEnabledByCategory(memberId) } returns mapOf(NotificationCategory.MESSAGE to false)
 
         val result = query.findByMemberId(memberId)
 

@@ -24,9 +24,6 @@ data class NotificationPreference(
         }
 
         /** 모든 카테고리의 실제 값. 저장된 행이 없는 카테고리는 [DEFAULT_ENABLED], 순서는 [NotificationCategory] 선언 순이다. */
-        fun effective(stored: List<NotificationPreference>): List<Pair<NotificationCategory, Boolean>> {
-            val byCategory = stored.associateBy { it.category }
-            return NotificationCategory.entries.map { it to (byCategory[it]?.enabled ?: DEFAULT_ENABLED) }
-        }
+        fun effective(stored: Map<NotificationCategory, Boolean>): List<Pair<NotificationCategory, Boolean>> = NotificationCategory.entries.map { it to (stored[it] ?: DEFAULT_ENABLED) }
     }
 }

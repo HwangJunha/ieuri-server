@@ -380,7 +380,10 @@ refactor.
     arguments, and a Command never carries `memberId`. A value the client did send stays in the
     Command even if it looks like context (a device's `language` in `RegisterDeviceTokenCommand`).
   - **A query service reads through a query port, never a repository.** The repository is the
-    write side's door to its root. When a read needs a domain rule (which terms version is in
+    write side's door to its root. **A query port never returns an aggregate root** — a read model
+    (`XxxView`) or plain values (`Map<NotificationCategory, Boolean>`, a list of `Terms`). The same
+    table being read by a repository and a query port is expected; the two sides do not share a
+    method. When a read needs a domain rule (which terms version is in
     force, what an absent preference row means), the query port returns the stored values and a
     pure domain function decides — the rule is not rewritten in SQL.
   - **A one-line lookup is written where it is used.** `repository.findById(id) ?: throw

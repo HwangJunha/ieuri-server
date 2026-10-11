@@ -26,7 +26,7 @@ class NotificationPreferenceModifyService(
     ): List<NotificationPreferenceView> {
         val existing = repository.findByMemberIdAndCategory(memberId, command.category)
         repository.save(existing?.change(command.enabled) ?: NotificationPreference.create(memberId, command.category, command.enabled))
-        return NotificationPreference.effective(repository.findByMemberId(memberId)).map { (category, enabled) -> NotificationPreferenceView(category, enabled) }
+        return NotificationPreference.effective(repository.findByMemberId(memberId).associate { it.category to it.enabled }).map { (category, enabled) -> NotificationPreferenceView(category, enabled) }
     }
 
     /** `AFTER_COMMIT` 리스너가 부르므로 REQUIRES_NEW여야 한다 — REQUIRED면 삭제가 조용히 사라진다. */

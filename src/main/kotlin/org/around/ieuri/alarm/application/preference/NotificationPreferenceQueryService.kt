@@ -17,7 +17,7 @@ class NotificationPreferenceQueryService(
     private val preferenceQueryPort: NotificationPreferenceQueryPort,
 ) : NotificationPreferenceQueryUseCase {
 
-    override fun findByMemberId(memberId: Long): List<NotificationPreferenceView> = NotificationPreference.effective(preferenceQueryPort.findByMemberId(memberId))
+    override fun findByMemberId(memberId: Long): List<NotificationPreferenceView> = NotificationPreference.effective(preferenceQueryPort.findEnabledByCategory(memberId))
         .map { (category, enabled) -> NotificationPreferenceView(category, enabled) }
 
     /** 발송 경로(`@Async`·`AFTER_COMMIT`)에서 불려 REQUIRES_NEW다. */
