@@ -2,7 +2,7 @@ package org.around.ieuri.community.application.catalog
 
 import org.around.ieuri.community.application.catalog.provided.SpotCatalogSyncUseCase
 import org.around.ieuri.community.application.catalog.required.SpotCatalogLanguageRepository
-import org.around.ieuri.community.application.post.required.PostRepository
+import org.around.ieuri.community.application.post.provided.PostCommandUseCase
 import org.around.ieuri.community.domain.catalog.CatalogLanguage
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -16,14 +16,14 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 @Transactional(propagation = Propagation.REQUIRES_NEW)
 class SpotCatalogSyncService(
-    private val postRepository: PostRepository,
+    private val postCommandUseCase: PostCommandUseCase,
     private val catalogLanguageRepository: SpotCatalogLanguageRepository,
 ) : SpotCatalogSyncUseCase {
 
     override fun cleanupDeletedCatalogs(catalogIds: List<Long>) {
         if (catalogIds.isEmpty()) return
 
-        val detached = postRepository.detachSpotsOfCatalogs(catalogIds)
+        val detached = postCommandUseCase.detachSpotsOfCatalogs(catalogIds)
         log.info("community post-spot links cleaned for {} deleted catalogs: links={}", catalogIds.size, detached)
     }
 

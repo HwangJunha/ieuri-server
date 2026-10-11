@@ -3,7 +3,9 @@ package org.around.ieuri.community.application.conversation
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.security.ForbiddenException
 import org.around.ieuri.community.application.conversation.provided.ConversationQueryUseCase
+import org.around.ieuri.community.application.conversation.provided.dto.ConversationParticipantsView
 import org.around.ieuri.community.application.conversation.provided.dto.ConversationView
+import org.around.ieuri.community.application.conversation.provided.dto.MessageOwnerView
 import org.around.ieuri.community.application.conversation.provided.dto.MessageView
 import org.around.ieuri.community.application.conversation.provided.dto.TypingEventView
 import org.around.ieuri.community.application.conversation.required.ConversationEventPort
@@ -85,4 +87,8 @@ class ConversationQueryService(
         const val DEFAULT_CONVERSATIONS_PAGE_SIZE = 20
         const val DEFAULT_MESSAGES_PAGE_SIZE = 30
     }
+
+    override fun messageOwners(messageIds: List<Long>): List<MessageOwnerView> = conversationQueryPort.findMessageOwners(messageIds)
+
+    override fun participantsOf(conversationId: Long): ConversationParticipantsView? = conversationQueryPort.findParticipants(conversationId)
 }

@@ -1,7 +1,6 @@
 package org.around.ieuri.community.domain.messagereport
 
-import org.around.ieuri.community.domain.conversation.Conversation
-import org.around.ieuri.community.domain.conversation.Message
+import org.around.ieuri.community.domain.conversation.NotConversationParticipantException
 import org.around.ieuri.community.domain.shared.InvalidInputException
 import org.around.ieuri.community.domain.shared.ReportDetailRequiredException
 import org.around.ieuri.community.domain.shared.ReportReason
@@ -35,8 +34,8 @@ data class MessageReport(
         fun file(
             reporterId: Long,
             messageIds: List<Long>,
-            messages: List<Message>,
-            conversation: Conversation?,
+            messages: List<ReportedMessage>,
+            conversation: ReportedConversation?,
             reason: ReportReason,
             detail: String?,
         ): MessageReport {
@@ -44,14 +43,14 @@ data class MessageReport(
             val ids = messageIds.distinct()
             if (ids.isEmpty()) throw InvalidInputException("신고할 메시지를 선택해 주세요.")
             if (messages.size != ids.size) throw InvalidInputException("신고할 수 없는 메시지가 포함되어 있습니다.")
-            if (messages.any { it.sentBy(reporterId) }) throw InvalidInputException("본인이 보낸 메시지는 신고할 수 없습니다.")
+            if (messages.any { it.senderId == reporterId }) throw InvalidInputException("본인이 보낸 메시지는 신고할 수 없습니다.")
             if (messages.map { it.conversationId }.distinct().size != 1) throw InvalidInputException("한 번에 한 대화의 메시지만 신고할 수 있습니다.")
             if (conversation == null) throw InvalidInputException("신고할 수 없는 메시지가 포함되어 있습니다.")
-            conversation.requireParticipant(reporterId)
+            if (reporterId !in conversation.participantIds) throw NotConversationParticipantException()
             return MessageReport(
                 id = null,
                 reporterId = reporterId,
-                conversationId = requireNotNull(conversation.id),
+                conversationId = conversation.id,
                 messageIds = ids,
                 reason = reason,
                 detail = trimmed,

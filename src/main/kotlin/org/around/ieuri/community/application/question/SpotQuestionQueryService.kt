@@ -5,6 +5,7 @@ import org.around.ieuri.common.pagination.cursorPageOf
 import org.around.ieuri.community.application.block.provided.BlockQueryUseCase
 import org.around.ieuri.community.application.lookup.provided.SpotLookupUseCase
 import org.around.ieuri.community.application.question.provided.SpotQuestionQueryUseCase
+import org.around.ieuri.community.application.question.provided.dto.SpotAnswerOriginView
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswerReplyView
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswerView
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswersQuery
@@ -103,4 +104,12 @@ class SpotQuestionQueryService(
     )
 
     private fun <T> emptyPage(): CursorPage<T> = cursorPageOf(edges = emptyList(), hasNextPage = false, hasPreviousPage = false)
+
+    override fun questionExists(questionId: Long): Boolean = spotQaQueryPort.questionExists(questionId)
+
+    override fun answerExists(answerId: Long): Boolean = spotQaQueryPort.answerExists(answerId)
+
+    override fun replyExists(replyId: Long): Boolean = spotQaQueryPort.replyExists(replyId)
+
+    override fun answerOrigin(answerId: Long): SpotAnswerOriginView? = spotQaQueryPort.findAnswerOrigin(answerId)
 }

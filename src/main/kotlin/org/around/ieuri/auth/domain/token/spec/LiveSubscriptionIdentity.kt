@@ -3,7 +3,6 @@ package org.around.ieuri.auth.domain.token.spec
 import org.around.ieuri.auth.domain.shared.Specification
 import org.around.ieuri.auth.domain.token.SocketIdentity
 import java.time.Duration
-import java.time.Instant
 
 /**
  * 소켓 신원이 새 구독을 열 자격이 있는지(SPEC-0032 R7, POL-048). 토큰이 살아 있고 연결 수명이 [accessTtl]을 넘지 않아야 한다.
@@ -12,7 +11,6 @@ import java.time.Instant
  */
 class LiveSubscriptionIdentity(
     private val accessTtl: Duration,
-    private val now: Instant,
 ) : Specification<SocketIdentity> {
-    override fun isSatisfiedBy(candidate: SocketIdentity): Boolean = candidate.hasActiveToken && !now.isAfter(candidate.connectedAt.plus(accessTtl))
+    override fun isSatisfiedBy(candidate: SocketIdentity): Boolean = candidate.hasActiveToken && !candidate.checkedAt.isAfter(candidate.connectedAt.plus(accessTtl))
 }

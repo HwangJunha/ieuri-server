@@ -1,5 +1,6 @@
-package org.around.ieuri.tourism.adapter.batch
-
+package org.around.ieuri.tourism.adapter.config
+import org.around.ieuri.tourism.adapter.batch.BATCH_PROFILE
+import org.around.ieuri.tourism.adapter.batch.SpotDetailPrefetchProperties
 import org.around.ieuri.tourism.application.spot.SpotDetailPrefetchPolicy
 import org.around.ieuri.tourism.application.spot.SpotDetailPrefetchService
 import org.around.ieuri.tourism.application.spot.provided.SpotCommandUseCase

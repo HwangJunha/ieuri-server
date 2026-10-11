@@ -105,4 +105,6 @@ class PostQueryService(
         blockedMemberIds = blockQueryUseCase.blockedMemberIds(memberId),
         hiddenPostIds = postQueryPort.findHiddenPostIds(memberId),
     )
+
+    override fun exists(postId: Long): Boolean = postQueryPort.exists(postId)
 }

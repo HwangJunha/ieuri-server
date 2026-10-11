@@ -2,8 +2,8 @@ package org.around.ieuri.auth.adapter.security.authentication
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import org.around.ieuri.auth.application.token.provided.AuthTokenQueryUseCase
 import org.around.ieuri.auth.application.token.provided.exception.InvalidTokenException
-import org.around.ieuri.auth.application.token.required.TokenProviderPort
 import org.around.ieuri.common.security.TOKEN_PRESENTATION_ATTRIBUTE
 import org.around.ieuri.common.security.TokenPresentation
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
@@ -18,7 +18,7 @@ import org.springframework.web.filter.OncePerRequestFilter
  */
 @Component
 class JwtAuthenticationFilter(
-    private val tokenProvider: TokenProviderPort,
+    private val authTokenQueryUseCase: AuthTokenQueryUseCase,
 ) : OncePerRequestFilter() {
 
     override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, filterChain: FilterChain) {
@@ -33,7 +33,7 @@ class JwtAuthenticationFilter(
     }
 
     private fun authenticate(token: String): TokenPresentation = try {
-        val claims = tokenProvider.parseAccessToken(token)
+        val claims = authTokenQueryUseCase.authenticate(token)
         // 권한(perms)을 authority로 세팅 → Authorizer가 권한 코드로 인가를 판정한다.
         val authorities = claims.permissions.map { SimpleGrantedAuthority(it) }
         val authentication = UsernamePasswordAuthenticationToken(claims.memberId, null, authorities)

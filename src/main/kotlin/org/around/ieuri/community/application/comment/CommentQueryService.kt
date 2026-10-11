@@ -40,4 +40,6 @@ class CommentQueryService(
 
     /** 조회자의 양방향 차단 회원. 개인 숨김(hiddenPostIds)은 글 전용이라 읽지 않는다. */
     private fun viewerContext(memberId: Long): ViewerContext = ViewerContext(memberId = memberId, blockedMemberIds = blockQueryUseCase.blockedMemberIds(memberId))
+
+    override fun exists(commentId: Long): Boolean = commentQueryPort.exists(commentId)
 }

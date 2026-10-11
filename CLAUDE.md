@@ -152,7 +152,7 @@ Uses the Gradle wrapper (`./gradlew`); Gradle 9.5.1, Java toolchain 25.
 
   `TourApiClient`/`TourApiSyncClient` resolve a category into TourAPI's `contentTypeId` *while building the request*; they do it through the `CategoryQueryUseCase` inbound port, not the outbound one — the service cannot sequence it without learning TourAPI's wire format.
 
-  **An inbound adapter calls use cases, not outbound ports.** Five places still inject one directly — auth's `VerificationEmailListener`, `JwtAuthenticationFilter`, `GraphqlWebSocketAuthInterceptor`, `TokenBackedSubscriptionAuthorizer`, and community's `NewMessageBroadcastListener`. They are one-line bridges with no decision in between; a forwarding use case would add a class that says nothing. Recorded, not a precedent — a new inbound adapter with any logic goes through a use case.
+  **An inbound adapter calls use cases, never outbound ports.** Resolvers, event listeners, batch tasklets, and the authentication filters depend on `provided/` only. When one needs a port, the use case that uses that port goes in `application/` — even when it only forwards (`VerificationMailService`, `MessageBroadcastService`). A forwarding service costs one small class; a direct port costs the rule.
 
 - **Security is on the request path.** `spring-boot-starter-security` locks endpoints down by default; `auth/adapter/config/SecurityConfig.kt` opens GraphQL, and introspection is toggled per profile (`local` only). Per-field authorization is still ours to write.
 
@@ -199,8 +199,9 @@ skill re-checks them:
 
 - `LayeredArchitectureTest` — dependency direction, domain purity, DGS isolation, generated
   GraphQL types and table declarations out of `application`/`domain`, cross-context slices, a
-  repository used only by its own aggregate's services, `copy` on a domain model only inside
-  `domain/`, bean-name collisions, `AFTER_COMMIT`/`REQUIRES_NEW`.
+  repository used only by its own aggregate's services, inbound adapters depending on no
+  `required` port, `copy` on a domain model only inside `domain/`, no cycle between domain
+  aggregates, bean-name collisions, `AFTER_COMMIT`/`REQUIRES_NEW`.
 - `ConsistencyConventionTest` — persistence tech out of `application`, `common` out of `domain`,
   `@Transactional` off domain and resolvers, `Repository`/`Port`/`UseCase`/`Dto`/test naming; and the
   cross-context shape: `CommandUseCase` implemented by a `ModifyService`, no repository in a
@@ -214,9 +215,10 @@ skill re-checks them:
 table assigns it. **Nothing checks a declaration against the real database** — a drift surfaces on
 the first query that touches it, so `persistence-review` reads declarations against migrations.
 
-One sensor carries a known-exceptions list: eight places in community's write path where a service
-uses another aggregate's repository (`KNOWN_FOREIGN_REPOSITORY_USES`, SPEC-0039 D-161). The list
-may only shrink.
+**A sensor has no exception list.** The moment one is added it stops being a sensor — the rule
+becomes advice and the next slice copies the exception. When a sensor fires on existing code, fix
+the code. The only exception that may exist is a compatibility shim kept *during* a refactor, and it
+leaves with the refactor (SPEC-0039 D-165).
 
 **A sensor's failure message says what to do, not just what is wrong** — name the rule it enforces,
 so the reader can tell a real violation from a rule that is wrong for this slice:
@@ -287,7 +289,7 @@ it is not.
 ## Structure
 
 Persistence is **Exposed DSL**, and every bounded context has the same shape (SPEC-0039; decisions
-D-32~D-161 in `problem/SPEC-0039-server.md`).
+D-32~D-166 in `problem/SPEC-0039-server.md`).
 
 **A refactor changes neither the GraphQL schema nor the DB schema — nor any response.** The deployed
 dev server (`api-dev.ieuri.co.kr`) is the answer key: every query, error and subscription returns
@@ -399,7 +401,9 @@ external; `application` depends only on `domain`; `adapter` implements `applicat
   - **A write service never injects a query port.** What it must read to decide (candidates to
     assign, the district codes of a cell, whether a code exists) is a method on its own
     repository; another aggregate's value comes through that aggregate's `provided` query use case
-    (`FootprintQueryUseCase.findSharerId`). A write use case returns what changed (ids, codes), not
+    (`FootprintQueryUseCase.findSharerId`), and a change to another aggregate through its command
+    use case, called in the same transaction (`PostCommandUseCase.decreaseCommentCount`) — never
+    its repository. A write use case returns what changed (ids, codes), not
     a read model — the resolver asks the query use case for the view.
   - **A one-line lookup is written where it is used.** `repository.findById(id) ?: throw
     XxxNotFoundException()` stays in the method body; a `private fun findXxx` that hides one line

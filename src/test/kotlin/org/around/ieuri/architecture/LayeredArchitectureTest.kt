@@ -95,13 +95,10 @@ class LayeredArchitectureTest {
             .check(classes)
     }
 
-    /**
-     * 저장소는 루트마다 하나이고 그 애그리게이트의 서비스만 쓴다. 다른 애그리게이트의 값은 그쪽 `provided` 유스케이스로 읽고, 변경은 이벤트로 넘긴다.
-     * - [KNOWN_FOREIGN_REPOSITORY_USES]는 이 규칙보다 먼저 있던 것이다(SPEC-0039 D-161). 줄이는 것만 허용한다.
-     */
+    /** 저장소는 루트마다 하나이고 그 애그리게이트의 서비스만 쓴다. */
     @Test
     fun `저장소는 자기 애그리게이트의 서비스만 쓴다`() {
-        val uses = classes
+        val offenders = classes
             .filter { APPLICATION_AGGREGATE.matches(it.packageName) }
             .flatMap { origin ->
                 val (context, aggregate) = requireNotNull(APPLICATION_AGGREGATE.matchEntire(origin.packageName)).destructured
@@ -113,15 +110,25 @@ class LayeredArchitectureTest {
             }
             .toSet()
 
-        val added = uses - KNOWN_FOREIGN_REPOSITORY_USES
-        check(added.isEmpty()) {
-            "다른 애그리게이트의 저장소를 직접 쓴다 — 읽기는 그 애그리게이트의 QueryUseCase로, 변경은 그쪽 CommandUseCase나 도메인 이벤트로 한다:\n" +
-                added.joinToString("\n") { "  $it" }
+        check(offenders.isEmpty()) {
+            "다른 애그리게이트의 저장소를 직접 쓴다 — 읽기는 그 애그리게이트의 QueryUseCase로, 변경은 그쪽 CommandUseCase로 한다:\n" +
+                offenders.joinToString("\n") { "  $it" }
         }
-        val resolved = KNOWN_FOREIGN_REPOSITORY_USES - uses
-        check(resolved.isEmpty()) {
-            "이미 없어진 예외가 목록에 남아 있다 — KNOWN_FOREIGN_REPOSITORY_USES에서 지운다:\n" + resolved.joinToString("\n") { "  $it" }
-        }
+    }
+
+    /** 인바운드 어댑터는 유스케이스(`provided`)만 부른다. outbound 포트를 직접 잡으면 application을 건너뛴다. */
+    @Test
+    fun `인바운드 어댑터는 required 포트에 의존하지 않는다`() {
+        noClasses().that().resideInAnyPackage(
+            "..adapter.graphql..",
+            "..adapter.event.listener..",
+            "..adapter.batch..",
+            "..adapter.security.authentication..",
+            "..adapter.security.authorization..",
+        )
+            .should().dependOnClassesThat().resideInAPackage("..application..required..")
+            .because("리졸버·리스너·배치·인증 필터는 provided의 유스케이스를 부른다 — 포트가 필요하면 그 포트를 쓰는 유스케이스를 application에 둔다")
+            .check(classes)
     }
 
     private fun aggregateOf(type: JavaClass): String = APPLICATION_AGGREGATE.matchEntire(type.packageName)?.groupValues?.get(2).orEmpty()
@@ -227,18 +234,6 @@ class LayeredArchitectureTest {
     }
 
     private companion object {
-        /** community의 쓰기 경로에 남은 것. 신고의 대상 숨김은 D-54의 결정이고, 나머지는 기기 테스트 뒤 얼려 둔 코드다. */
-        val KNOWN_FOREIGN_REPOSITORY_USES = setOf(
-            "CommentModifyService → PostRepository",
-            "ReportModifyService → PostRepository",
-            "ReportModifyService → CommentRepository",
-            "ReportModifyService → SpotQuestionRepository",
-            "MessageReportModifyService → ConversationRepository",
-            "SpotCatalogSyncService → PostRepository",
-            "ConversationModifyService → SpotQuestionRepository",
-            "ConversationModifyService → BlockRepository",
-        )
-
         /** `org.around.ieuri.<context>.application.<aggregate>` 아래. */
         val APPLICATION_AGGREGATE = Regex("""org\.around\.ieuri\.(\w+)\.application\.(\w+)(?:\..*)?""")
     }

@@ -2,6 +2,7 @@ package org.around.ieuri.community.adapter.persistence.query
 
 import org.around.ieuri.common.pagination.CursorEdge
 import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.community.adapter.persistence.mapper.toSpotAnswerOriginView
 import org.around.ieuri.community.adapter.persistence.mapper.toSpotAnswerReplyView
 import org.around.ieuri.community.adapter.persistence.mapper.toSpotAnswerView
 import org.around.ieuri.community.adapter.persistence.mapper.toSpotQuestionView
@@ -11,6 +12,7 @@ import org.around.ieuri.community.adapter.persistence.table.SpotAnswerTable
 import org.around.ieuri.community.adapter.persistence.table.SpotCatalogLanguageTable
 import org.around.ieuri.community.adapter.persistence.table.SpotQaPhotoTable
 import org.around.ieuri.community.adapter.persistence.table.SpotQuestionTable
+import org.around.ieuri.community.application.question.provided.dto.SpotAnswerOriginView
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswerReplyView
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswerView
 import org.around.ieuri.community.application.question.provided.dto.SpotQuestionView
@@ -19,6 +21,7 @@ import org.around.ieuri.community.application.question.required.dto.SpotAnswersS
 import org.around.ieuri.community.application.question.required.dto.SpotQuestionsSearch
 import org.around.ieuri.community.application.shared.required.dto.ViewerContext
 import org.around.ieuri.community.domain.question.SpotQaKind
+import org.jetbrains.exposed.v1.core.JoinType
 import org.jetbrains.exposed.v1.core.Op
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
@@ -141,4 +144,19 @@ class SpotQaQueryAdapter : SpotQaQueryPort {
         val withinGroup = (SpotQuestionTable.createdAt less at) or ((SpotQuestionTable.createdAt eq at) and (SpotQuestionTable.id less cursor.id))
         return laterGroup or ((SpotQuestionTable.resolved eq cursor.resolved) and withinGroup)
     }
+
+    override fun questionExists(questionId: Long): Boolean = SpotQuestionTable.select(SpotQuestionTable.id)
+        .where { (SpotQuestionTable.id eq questionId) and SpotQuestionTable.deletedAt.isNull() }.limit(1).any()
+
+    override fun answerExists(answerId: Long): Boolean = SpotAnswerTable.select(SpotAnswerTable.id)
+        .where { (SpotAnswerTable.id eq answerId) and SpotAnswerTable.deletedAt.isNull() }.limit(1).any()
+
+    override fun replyExists(replyId: Long): Boolean = SpotAnswerReplyTable.select(SpotAnswerReplyTable.id)
+        .where { (SpotAnswerReplyTable.id eq replyId) and SpotAnswerReplyTable.deletedAt.isNull() }.limit(1).any()
+
+    override fun findAnswerOrigin(answerId: Long): SpotAnswerOriginView? = SpotAnswerTable
+        .join(SpotQuestionTable, JoinType.INNER, SpotAnswerTable.questionId, SpotQuestionTable.id)
+        .select(SpotAnswerTable.id, SpotAnswerTable.authorId, SpotAnswerTable.body, SpotAnswerTable.catalogId, SpotQuestionTable.id, SpotQuestionTable.body)
+        .where { (SpotAnswerTable.id eq answerId) and SpotAnswerTable.deletedAt.isNull() and SpotQuestionTable.deletedAt.isNull() }
+        .singleOrNull()?.toSpotAnswerOriginView()
 }

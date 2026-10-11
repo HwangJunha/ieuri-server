@@ -44,4 +44,7 @@ interface PostQueryPort {
 
     /** [memberId]가 좋아요한 글의 id만. 차단은 이 판정에 영향을 주지 않는다. */
     fun findLikedPostIds(memberId: Long, postIds: List<Long>): Set<Long>
+
+    /** 지워지지 않은 글이 있는가. 모더레이션 필터를 거치지 않는다. */
+    fun exists(postId: Long): Boolean
 }

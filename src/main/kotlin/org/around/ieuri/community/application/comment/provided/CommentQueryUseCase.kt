@@ -14,4 +14,7 @@ interface CommentQueryUseCase {
 
     /** 여러 최상위 댓글의 대댓글. 오래된 순이며 페이지네이션이 없다. */
     fun commentReplies(parentCommentIds: List<Long>, memberId: Long): Map<Long, List<CommentView>>
+
+    /** 지워지지 않은 댓글이 있는가. 차단·숨김은 보지 않는다. */
+    fun exists(commentId: Long): Boolean
 }

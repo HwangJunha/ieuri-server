@@ -211,4 +211,6 @@ class PostQueryAdapter : PostQueryPort {
     private fun categoryCondition(categories: Set<TargetCategory>): Op<Boolean> = PostTable.id inSubQuery PostChipTable.select(PostChipTable.postId).where { PostChipTable.category inList categories.map { it.name } }
 
     private fun tagCondition(normalizedTag: String): Op<Boolean> = PostTable.id inSubQuery PostTagTable.select(PostTagTable.postId).where { PostTagTable.normalized eq normalizedTag }
+
+    override fun exists(postId: Long): Boolean = PostTable.select(PostTable.id).where { (PostTable.id eq postId) and PostTable.deletedAt.isNull() }.limit(1).any()
 }

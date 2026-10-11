@@ -1,14 +1,17 @@
 package org.around.ieuri.community.application.report
 
+import org.around.ieuri.community.application.comment.provided.CommentCommandUseCase
+import org.around.ieuri.community.application.comment.provided.CommentQueryUseCase
 import org.around.ieuri.community.application.comment.provided.exception.CommentNotFoundException
-import org.around.ieuri.community.application.comment.required.CommentRepository
 import org.around.ieuri.community.application.lookup.provided.MemberLookupUseCase
+import org.around.ieuri.community.application.post.provided.PostCommandUseCase
+import org.around.ieuri.community.application.post.provided.PostQueryUseCase
 import org.around.ieuri.community.application.post.provided.exception.PostNotFoundException
-import org.around.ieuri.community.application.post.required.PostRepository
+import org.around.ieuri.community.application.question.provided.SpotQuestionCommandUseCase
+import org.around.ieuri.community.application.question.provided.SpotQuestionQueryUseCase
 import org.around.ieuri.community.application.question.provided.exception.AnswerNotFoundException
 import org.around.ieuri.community.application.question.provided.exception.QuestionNotFoundException
 import org.around.ieuri.community.application.question.provided.exception.ReplyNotFoundException
-import org.around.ieuri.community.application.question.required.SpotQuestionRepository
 import org.around.ieuri.community.application.report.provided.ReportAutoHideUseCase
 import org.around.ieuri.community.application.report.provided.ReportCommandUseCase
 import org.around.ieuri.community.application.report.provided.dto.ReportContentCommand
@@ -31,9 +34,12 @@ import org.springframework.transaction.annotation.Transactional
 @Transactional
 class ReportModifyService(
     private val reportRepository: ReportRepository,
-    private val postRepository: PostRepository,
-    private val commentRepository: CommentRepository,
-    private val questionRepository: SpotQuestionRepository,
+    private val postCommandUseCase: PostCommandUseCase,
+    private val postQueryUseCase: PostQueryUseCase,
+    private val commentCommandUseCase: CommentCommandUseCase,
+    private val commentQueryUseCase: CommentQueryUseCase,
+    private val questionCommandUseCase: SpotQuestionCommandUseCase,
+    private val questionQueryUseCase: SpotQuestionQueryUseCase,
     private val memberLookup: MemberLookupUseCase,
     private val eventPublisherPort: ReportEventPublisherPort,
 ) : ReportCommandUseCase,
@@ -49,7 +55,7 @@ class ReportModifyService(
     }
 
     /**
-     * 숨겨진 댓글·답변은 수에서 빠진다 — 이번 호출로 숨겨졌을 때만 부모의 수를 내린다. 답글은 어떤 수에도 잡히지 않는다.
+     * 숨기는 것은 대상 애그리게이트가 한다 — 숨겨진 댓글·답변이 수에서 빠지는 것도 거기서 정한다.
      * - 커밋 뒤 리스너가 부르므로 새 트랜잭션이다.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -58,23 +64,23 @@ class ReportModifyService(
         if (!Report.reachesAutoHideThreshold(targetType, reporters)) return
 
         when (targetType) {
-            ReportTargetType.POST -> postRepository.hideIfVisible(targetId)
-            ReportTargetType.COMMENT -> commentRepository.hideIfVisible(targetId)?.let(postRepository::decreaseCommentCount)
-            ReportTargetType.SPOT_QUESTION -> questionRepository.hideIfVisible(targetId)
-            ReportTargetType.SPOT_ANSWER -> questionRepository.hideAnswerIfVisible(targetId)?.let(questionRepository::decreaseAnswerCount)
-            ReportTargetType.SPOT_ANSWER_REPLY -> questionRepository.hideReplyIfVisible(targetId)
+            ReportTargetType.POST -> postCommandUseCase.hideReported(targetId)
+            ReportTargetType.COMMENT -> commentCommandUseCase.hideReported(targetId)
+            ReportTargetType.SPOT_QUESTION -> questionCommandUseCase.hideReportedQuestion(targetId)
+            ReportTargetType.SPOT_ANSWER -> questionCommandUseCase.hideReportedAnswer(targetId)
+            ReportTargetType.SPOT_ANSWER_REPLY -> questionCommandUseCase.hideReportedReply(targetId)
             ReportTargetType.MEMBER -> Unit
         }
     }
 
     private fun requireTargetExists(targetType: ReportTargetType, targetId: Long) {
         val exists = when (targetType) {
-            ReportTargetType.POST -> postRepository.exists(targetId)
-            ReportTargetType.COMMENT -> commentRepository.findById(targetId) != null
+            ReportTargetType.POST -> postQueryUseCase.exists(targetId)
+            ReportTargetType.COMMENT -> commentQueryUseCase.exists(targetId)
             ReportTargetType.MEMBER -> memberLookup.member(targetId) != null
-            ReportTargetType.SPOT_QUESTION -> questionRepository.exists(targetId)
-            ReportTargetType.SPOT_ANSWER -> questionRepository.answerExists(targetId)
-            ReportTargetType.SPOT_ANSWER_REPLY -> questionRepository.replyExists(targetId)
+            ReportTargetType.SPOT_QUESTION -> questionQueryUseCase.questionExists(targetId)
+            ReportTargetType.SPOT_ANSWER -> questionQueryUseCase.answerExists(targetId)
+            ReportTargetType.SPOT_ANSWER_REPLY -> questionQueryUseCase.replyExists(targetId)
         }
         if (exists) return
         throw when (targetType) {

@@ -2,6 +2,7 @@ package org.around.ieuri.auth.adapter.config
 import org.around.ieuri.auth.application.member.ProfileImagePolicy
 import org.around.ieuri.auth.domain.member.NicknameGenerator
 import org.around.ieuri.auth.domain.member.VerificationLimits
+import org.around.ieuri.auth.domain.token.spec.LiveSubscriptionIdentity
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -50,4 +51,8 @@ class AuthConfig {
         maxAttempts = properties.maxAttempts,
         resendCooldown = Duration.ofSeconds(properties.resendCooldownSeconds),
     )
+
+    /** 구독 신원의 수명은 액세스 토큰 TTL과 같다(SPEC-0032 R7). */
+    @Bean
+    fun liveSubscriptionIdentity(properties: JwtProperties): LiveSubscriptionIdentity = LiveSubscriptionIdentity(properties.accessTtl)
 }

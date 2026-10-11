@@ -2,8 +2,6 @@ package org.around.ieuri.community.adapter.persistence
 
 import org.around.ieuri.common.security.AesGcmCipher
 import org.around.ieuri.community.adapter.persistence.mapper.toConversation
-import org.around.ieuri.community.adapter.persistence.mapper.toMessage
-import org.around.ieuri.community.adapter.persistence.mapper.toSpotQaOrigin
 import org.around.ieuri.community.adapter.persistence.mapper.toTimestamptz
 import org.around.ieuri.community.adapter.persistence.mapper.writeQuoteTo
 import org.around.ieuri.community.adapter.persistence.mapper.writeTo
@@ -66,21 +64,6 @@ class ConversationPersistenceAdapter(
             spotQaOrigin = message.spotQaOrigin,
             createdAt = row[MessageTable.createdAt].toInstant(),
         )
-    }
-
-    override fun findMessages(messageIds: List<Long>): List<Message> {
-        if (messageIds.isEmpty()) return emptyList()
-        val origins = MessageQuoteTable.selectAll().where { MessageQuoteTable.messageId inList messageIds }
-            .associate { quote ->
-                quote[MessageQuoteTable.messageId] to quote.toSpotQaOrigin(
-                    decryptedQuestionExcerpt = cipher.decrypt(quote[MessageQuoteTable.primaryExcerptEncrypted]),
-                    decryptedAnswerExcerpt = quote[MessageQuoteTable.secondaryExcerptEncrypted]?.let(cipher::decrypt).orEmpty(),
-                )
-            }
-        return MessageTable.selectAll()
-            .where { (MessageTable.id inList messageIds) and MessageTable.deletedAt.isNull() }
-            // 본문이 빈 과거 메시지는 복호화를 건너뛴다 — 빈 값은 base64 디코딩에서 터진다.
-            .map { it.toMessage(it[MessageTable.bodyEncrypted].takeIf(String::isNotEmpty)?.let(cipher::decrypt).orEmpty(), origins[it[MessageTable.id]]) }
     }
 
     /** 읽음 지점을 지워진 메시지로 밀지 않는다 — 세는 쪽과 같은 집합을 본다. */

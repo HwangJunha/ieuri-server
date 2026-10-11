@@ -130,4 +130,12 @@ class PostModifyService(
         likedPostIds.forEach(postRepository::decreaseLikeCount)
         return posts + likedPostIds.size + postRepository.removeHidesByMember(memberId)
     }
+
+    override fun increaseCommentCount(postId: Long) = postRepository.increaseCommentCount(postId)
+
+    override fun decreaseCommentCount(postId: Long) = postRepository.decreaseCommentCount(postId)
+
+    override fun hideReported(postId: Long): Boolean = postRepository.hideIfVisible(postId)
+
+    override fun detachSpotsOfCatalogs(catalogIds: List<Long>): Int = postRepository.detachSpotsOfCatalogs(catalogIds)
 }

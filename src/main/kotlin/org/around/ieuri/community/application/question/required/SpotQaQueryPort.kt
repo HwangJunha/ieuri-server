@@ -1,6 +1,7 @@
 package org.around.ieuri.community.application.question.required
 
 import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.community.application.question.provided.dto.SpotAnswerOriginView
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswerReplyView
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswerView
 import org.around.ieuri.community.application.question.provided.dto.SpotQuestionView
@@ -47,4 +48,14 @@ interface SpotQaQueryPort {
     fun findAnswerPhotoKeys(answerIds: List<Long>): Map<Long, List<String>>
 
     fun findReplyPhotoKeys(replyIds: List<Long>): Map<Long, List<String>>
+
+    /** 지워지지 않은 질문·답변·답글이 있는가. 모더레이션 필터를 거치지 않는다. */
+    fun questionExists(questionId: Long): Boolean
+
+    fun answerExists(answerId: Long): Boolean
+
+    fun replyExists(replyId: Long): Boolean
+
+    /** 답변과 질문의 원문. 둘 중 하나라도 지워졌으면 null이다. */
+    fun findAnswerOrigin(answerId: Long): SpotAnswerOriginView?
 }

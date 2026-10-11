@@ -21,7 +21,7 @@ Exposed**.
 Exposed and JDBC out of `application`/`domain` · tables declared in `adapter/persistence/table/…Tables.kt`
 · `required/` interfaces named `Repository` or `Port` · no repository in a `QueryService` ·
 `QueryPort` used only by read-only services · a repository used only by its own aggregate's
-services · `copy` on a domain model called only inside `domain/`.
+services · inbound adapters depending on no `required` port · `copy` on a domain model called only inside `domain/`.
 
 ## 1. Repository and query port
 

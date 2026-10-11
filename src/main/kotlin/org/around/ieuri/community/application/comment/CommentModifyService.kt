@@ -4,8 +4,9 @@ import org.around.ieuri.community.application.comment.provided.CommentCommandUse
 import org.around.ieuri.community.application.comment.provided.dto.CreateCommentCommand
 import org.around.ieuri.community.application.comment.provided.exception.CommentNotFoundException
 import org.around.ieuri.community.application.comment.required.CommentRepository
+import org.around.ieuri.community.application.post.provided.PostCommandUseCase
+import org.around.ieuri.community.application.post.provided.PostQueryUseCase
 import org.around.ieuri.community.application.post.provided.exception.PostNotFoundException
-import org.around.ieuri.community.application.post.required.PostRepository
 import org.around.ieuri.community.domain.comment.Comment
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
@@ -18,12 +19,13 @@ import java.time.Instant
 @Transactional
 class CommentModifyService(
     private val commentRepository: CommentRepository,
-    private val postRepository: PostRepository,
+    private val postCommandUseCase: PostCommandUseCase,
+    private val postQueryUseCase: PostQueryUseCase,
     private val clock: Clock,
 ) : CommentCommandUseCase {
 
     override fun createComment(command: CreateCommentCommand, memberId: Long): Long {
-        if (!postRepository.exists(command.postId)) throw PostNotFoundException()
+        if (!postQueryUseCase.exists(command.postId)) throw PostNotFoundException()
 
         // 다른 글의 댓글을 부모로 지정하면 없는 댓글로 본다.
         val parent = command.parentCommentId?.let { parentId ->
@@ -33,7 +35,7 @@ class CommentModifyService(
         val comment = Comment.write(command.postId, memberId, command.body, parent)
 
         val commentId = commentRepository.insert(comment)
-        postRepository.increaseCommentCount(command.postId)
+        postCommandUseCase.increaseCommentCount(command.postId)
         return commentId
     }
 
@@ -44,7 +46,7 @@ class CommentModifyService(
         val deleted = comment.delete(memberId, Instant.now(clock))
 
         if (commentRepository.markDeletedWasCounted(commentId, requireNotNull(deleted.deletedAt))) {
-            postRepository.decreaseCommentCount(comment.postId)
+            postCommandUseCase.decreaseCommentCount(comment.postId)
         }
     }
 
@@ -56,9 +58,13 @@ class CommentModifyService(
             val comment = commentRepository.findById(commentId) ?: return@forEach
             val deleted = comment.delete(memberId, deletedAt)
             if (commentRepository.markDeletedWasCounted(commentId, requireNotNull(deleted.deletedAt))) {
-                postRepository.decreaseCommentCount(comment.postId)
+                postCommandUseCase.decreaseCommentCount(comment.postId)
             }
         }
         return commentIds.size
+    }
+
+    override fun hideReported(commentId: Long) {
+        commentRepository.hideIfVisible(commentId)?.let(postCommandUseCase::decreaseCommentCount)
     }
 }

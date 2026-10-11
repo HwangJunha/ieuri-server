@@ -162,4 +162,16 @@ class SpotQuestionModifyService(
         }
         return erased
     }
+
+    override fun hideReportedQuestion(questionId: Long) {
+        questionRepository.hideIfVisible(questionId)
+    }
+
+    override fun hideReportedAnswer(answerId: Long) {
+        questionRepository.hideAnswerIfVisible(answerId)?.let(questionRepository::decreaseAnswerCount)
+    }
+
+    override fun hideReportedReply(replyId: Long) {
+        questionRepository.hideReplyIfVisible(replyId)
+    }
 }
