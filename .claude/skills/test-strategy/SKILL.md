@@ -1,6 +1,6 @@
 ---
 name: test-strategy
-description: Write the tests for a finished slice, right before the PR. Pure JUnit5 for domain and application logic, ArchUnit for boundaries, field-by-field tests for every conversion (GraphQL, JPA, external response) — and nothing else in infrastructure. Use when work is done and the PR is next, or when reviewing existing tests for the wrong shape.
+description: Write the tests for a finished slice, right before the PR. Pure JUnit5 for domain and application logic, ArchUnit for boundaries, field-by-field tests for every conversion (GraphQL, Exposed row, external response) — and nothing else in adapters. Use when work is done and the PR is next, or when reviewing existing tests for the wrong shape.
 license: MIT
 metadata:
   author: junha
