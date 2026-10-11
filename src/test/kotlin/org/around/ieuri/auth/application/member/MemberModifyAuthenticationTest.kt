@@ -10,7 +10,6 @@ import org.around.ieuri.auth.domain.member.InactiveMemberException
 import org.around.ieuri.auth.domain.member.Member
 import org.around.ieuri.auth.domain.member.MemberStatus
 import org.around.ieuri.auth.domain.member.Provider
-import org.around.ieuri.auth.domain.member.ProviderRefreshToken
 import org.around.ieuri.auth.domain.member.ProviderUserId
 import java.time.Clock
 import java.time.Instant
@@ -47,7 +46,7 @@ class MemberModifyAuthenticationTest {
     fun `활성 회원은 상태를 쓰지 않고 회원 id를 돌려준다`() {
         givenSnsMember(snsMember())
 
-        assertEquals(100L, service.admitSns(Provider.GOOGLE, "google-sub-1"))
+        assertEquals(100L, service.loginSnsMember(Provider.GOOGLE, "google-sub-1"))
 
         verify(exactly = 0) { memberRepository.saveStatus(any()) }
     }
@@ -56,7 +55,7 @@ class MemberModifyAuthenticationTest {
     fun `미가입 신원은 회원가입을 안내하는 메시지로 거부한다`() {
         givenSnsMember(null)
 
-        val ex = assertFailsWith<MemberNotFoundException> { service.admitSns(Provider.GOOGLE, "google-sub-1") }
+        val ex = assertFailsWith<MemberNotFoundException> { service.loginSnsMember(Provider.GOOGLE, "google-sub-1") }
 
         assertEquals("가입되지 않은 계정입니다. 회원가입이 필요합니다.", ex.message)
     }
@@ -65,7 +64,7 @@ class MemberModifyAuthenticationTest {
     fun `무기한 정지 회원은 사유를 붙여 거부하고 상태를 쓰지 않는다`() {
         givenSnsMember(snsMember(status = MemberStatus.SUSPENDED, until = null, reason = "약관 위반"))
 
-        val ex = assertFailsWith<InactiveMemberException> { service.admitSns(Provider.GOOGLE, "google-sub-1") }
+        val ex = assertFailsWith<InactiveMemberException> { service.loginSnsMember(Provider.GOOGLE, "google-sub-1") }
 
         assertEquals("ACCOUNT_INACTIVE", ex.code)
         assertEquals("정지된 계정입니다. 사유: 약관 위반", ex.message)
@@ -76,7 +75,7 @@ class MemberModifyAuthenticationTest {
     fun `만료일이 아직 지나지 않은 정지 회원은 거부한다`() {
         givenSnsMember(snsMember(status = MemberStatus.SUSPENDED, until = now.plusSeconds(1), reason = "약관 위반"))
 
-        assertFailsWith<InactiveMemberException> { service.admitSns(Provider.GOOGLE, "google-sub-1") }
+        assertFailsWith<InactiveMemberException> { service.loginSnsMember(Provider.GOOGLE, "google-sub-1") }
 
         verify(exactly = 0) { memberRepository.saveStatus(any()) }
     }
@@ -86,7 +85,7 @@ class MemberModifyAuthenticationTest {
     fun `만료일에 도달한 기간제 정지 회원은 복구된 상태를 저장하고 로그인시킨다`() {
         givenSnsMember(snsMember(status = MemberStatus.SUSPENDED, until = now, reason = "약관 위반"))
 
-        assertEquals(100L, service.admitSns(Provider.GOOGLE, "google-sub-1"))
+        assertEquals(100L, service.loginSnsMember(Provider.GOOGLE, "google-sub-1"))
 
         verify(exactly = 1) { memberRepository.saveStatus(snsMember(status = MemberStatus.ACTIVE)) }
     }
@@ -119,10 +118,10 @@ class MemberModifyAuthenticationTest {
             memberFixture(id = 3L, status = MemberStatus.SUSPENDED, suspendedAt = now.minusSeconds(10), suspendedUntil = now.minusSeconds(1), suspensionReason = "사유")
         every { memberRepository.findById(4L) } returns null
 
-        service.admit(1L)
-        val suspended = assertFailsWith<InactiveMemberException> { service.admit(2L) }
-        service.admit(3L)
-        val missing = assertFailsWith<MemberNotFoundException> { service.admit(4L) }
+        service.loginMember(1L)
+        val suspended = assertFailsWith<InactiveMemberException> { service.loginMember(2L) }
+        service.loginMember(3L)
+        val missing = assertFailsWith<MemberNotFoundException> { service.loginMember(4L) }
 
         // 사유가 없으면 붙이지 않는다.
         assertEquals("정지된 계정입니다.", suspended.message)
@@ -134,23 +133,9 @@ class MemberModifyAuthenticationTest {
     // --- provider 토큰 보관 ---
 
     @Test
-    fun `SNS 회원의 provider 토큰은 회원 id와 함께 저장한다`() {
-        every { memberRepository.findById(100L) } returns snsMember()
+    fun `provider 토큰은 회원 id와 함께 저장소에 넘긴다`() {
+        service.saveProviderRefreshToken(100L, "provider-refresh-1")
 
-        service.keepProviderRefreshToken(100L, "provider-refresh-1")
-
-        verify(exactly = 1) { memberRepository.saveProviderRefreshToken(ProviderRefreshToken(100L, "provider-refresh-1")) }
-    }
-
-    /** 자체(EMAIL) 회원은 대상이 아니고(SPEC-0012 R5), 그 사이 탈퇴한 회원도 조용히 넘어간다. */
-    @Test
-    fun `자체 회원과 없는 회원의 provider 토큰은 저장하지 않는다`() {
-        every { memberRepository.findById(100L) } returns memberFixture(provider = Provider.EMAIL)
-        every { memberRepository.findById(404L) } returns null
-
-        service.keepProviderRefreshToken(100L, "provider-refresh-1")
-        service.keepProviderRefreshToken(404L, "provider-refresh-1")
-
-        verify(exactly = 0) { memberRepository.saveProviderRefreshToken(any()) }
+        verify(exactly = 1) { memberRepository.saveProviderRefreshToken(100L, "provider-refresh-1") }
     }
 }

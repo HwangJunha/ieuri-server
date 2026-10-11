@@ -8,7 +8,6 @@ import org.around.ieuri.auth.domain.member.Nickname
 import org.around.ieuri.auth.domain.member.PasswordReset
 import org.around.ieuri.auth.domain.member.Profile
 import org.around.ieuri.auth.domain.member.Provider
-import org.around.ieuri.auth.domain.member.ProviderRefreshToken
 import org.around.ieuri.auth.domain.member.ProviderUserId
 import org.around.ieuri.auth.domain.member.Role
 import org.around.ieuri.auth.domain.member.Terms
@@ -45,7 +44,8 @@ interface MemberRepository {
     /** 상태와 정지 시각·기간·사유를 쓴다. */
     fun saveStatus(member: Member)
 
-    fun saveProviderRefreshToken(token: ProviderRefreshToken)
+    /** 회원이 없으면 아무것도 하지 않는다. */
+    fun saveProviderRefreshToken(memberId: Long, token: String)
 
     fun findProviderRefreshToken(memberId: Long): String?
 

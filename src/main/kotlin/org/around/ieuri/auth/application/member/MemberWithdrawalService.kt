@@ -35,7 +35,7 @@ class MemberWithdrawalService(
             ),
         )
         sessions.revokeAll(memberId)
-        members.erase(memberId, target.provider, (revokeResult as? SnsRevokeResult.Failed)?.reason)
+        members.deleteMember(memberId, target.provider, (revokeResult as? SnsRevokeResult.Failed)?.reason)
         // 접속기록(기준 제8조). 계정·개인정보 삭제라 남겨야 하는 수행업무다.
         eventPublisher.publish(MemberAccessed(memberId, AccessType.WITHDRAW, ipAddress))
         return LifecycleResult(success = true)

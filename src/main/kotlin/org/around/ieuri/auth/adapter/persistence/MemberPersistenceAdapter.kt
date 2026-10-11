@@ -33,7 +33,6 @@ import org.around.ieuri.auth.domain.member.Nickname
 import org.around.ieuri.auth.domain.member.PasswordReset
 import org.around.ieuri.auth.domain.member.Profile
 import org.around.ieuri.auth.domain.member.Provider
-import org.around.ieuri.auth.domain.member.ProviderRefreshToken
 import org.around.ieuri.auth.domain.member.ProviderUserId
 import org.around.ieuri.auth.domain.member.Role
 import org.around.ieuri.auth.domain.member.Terms
@@ -119,9 +118,9 @@ class MemberPersistenceAdapter(
         updateMember(member) { member.writeStatusTo(it) }
     }
 
-    override fun saveProviderRefreshToken(token: ProviderRefreshToken) {
-        MemberTable.update({ MemberTable.id eq token.memberId }) {
-            it[MemberTable.providerRefreshTokenEncrypted] = encryptor.encrypt(token.value)
+    override fun saveProviderRefreshToken(memberId: Long, token: String) {
+        MemberTable.update({ MemberTable.id eq memberId }) {
+            it[MemberTable.providerRefreshTokenEncrypted] = encryptor.encrypt(token)
             it[MemberTable.updatedAt] = CurrentTimestampWithTimeZone
         }
     }

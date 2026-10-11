@@ -11,7 +11,6 @@ import org.around.ieuri.auth.application.member.provided.dto.MembersQuery
 import org.around.ieuri.auth.application.member.provided.dto.RoleInfoView
 import org.around.ieuri.auth.application.member.provided.exception.MemberNotFoundException
 import org.around.ieuri.auth.application.member.required.MemberQueryPort
-import org.around.ieuri.auth.application.member.required.MemberRepository
 import org.around.ieuri.auth.domain.member.ActiveTerms
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.persistence.ExposedConfig
@@ -24,7 +23,6 @@ import java.time.Clock
 @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, readOnly = true)
 class MemberQueryService(
     private val memberQueryPort: MemberQueryPort,
-    private val memberRepository: MemberRepository,
     private val clock: Clock,
 ) : MemberQueryUseCase {
 
@@ -44,9 +42,9 @@ class MemberQueryService(
 
     override fun memberPublicProfiles(memberIds: List<Long>): Map<Long, MemberPublicProfileView> = memberQueryPort.findPublicProfilesIn(memberIds)
 
-    /** 시행 중인 약관의 판정(코드별 최신 버전)은 도메인 규칙이라 저장소로 읽어 도메인에 맡긴다. */
-    override fun agreements(memberId: Long): List<AgreementStatusView> = ActiveTerms.of(memberRepository.findEffectiveTerms(clock.instant()))
-        .statusOf(memberRepository.findAgreements(memberId))
+    /** 어느 버전이 시행 중인지, 그 버전에 동의했는지는 도메인([ActiveTerms])이 판정한다. 조회 포트는 값만 읽어 온다. */
+    override fun agreements(memberId: Long): List<AgreementStatusView> = ActiveTerms.of(memberQueryPort.findEffectiveTerms(clock.instant()))
+        .statusOf(memberQueryPort.findAgreements(memberId))
         .map(AgreementStatusView::of)
 
     override fun assignableRoles(): List<RoleInfoView> = memberQueryPort.findAssignableRoles()

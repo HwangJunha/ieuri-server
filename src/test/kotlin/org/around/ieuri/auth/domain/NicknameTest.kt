@@ -5,6 +5,7 @@ import org.around.ieuri.auth.domain.member.Nickname
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 
 /** 닉네임 값 객체(SPEC-0011 R5). 길이·공백 규칙을 판정하며 고유성은 판정하지 않는다. */
 class NicknameTest {
@@ -52,5 +53,22 @@ class NicknameTest {
     @Test
     fun `공백을 제거하면 길이 안에 드는 값은 받아들인다`() {
         assertEquals(20, Nickname("  " + "가".repeat(20) + "  ").value.length)
+    }
+
+    @Test
+    fun `후보 중 처음으로 형식에 맞는 닉네임을 고른다`() {
+        assertEquals("여행하는곰", Nickname.firstValid("여행하는곰", "산책하는새")?.value)
+        assertEquals("산책하는새", Nickname.firstValid(null, "산책하는새")?.value)
+    }
+
+    @Test
+    fun `형식을 벗어난 후보는 잘라내지 않고 건너뛴다`() {
+        assertEquals("산책하는새", Nickname.firstValid("가", "가".repeat(21), "  산책하는새 ")?.value)
+    }
+
+    @Test
+    fun `맞는 후보가 없으면 null이다`() {
+        assertNull(Nickname.firstValid())
+        assertNull(Nickname.firstValid(null, "가", "   "))
     }
 }

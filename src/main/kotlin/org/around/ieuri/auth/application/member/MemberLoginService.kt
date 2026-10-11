@@ -25,7 +25,7 @@ class MemberLoginService(
 
     override fun loginBySns(provider: Provider, idToken: String, authorizationCode: String?): Long {
         val identity = snsVerifier.verify(provider, idToken)
-        val memberId = members.admitSns(provider, identity.providerUserId)
+        val memberId = members.loginSnsMember(provider, identity.providerUserId)
         // 탈퇴용 토큰 보충. 실패해도 로그인은 성공한다(R7).
         providerTokenCollector.collect(memberId, provider, authorizationCode)
         return memberId
@@ -38,7 +38,7 @@ class MemberLoginService(
         val passwordHash = credential.passwordHash ?: throw invalidCredentials()
         if (!passwordEncoder.matches(password, passwordHash)) throw invalidCredentials()
 
-        members.admit(credential.memberId)
+        members.loginMember(credential.memberId)
         return credential.memberId
     }
 

@@ -4,7 +4,6 @@ import org.around.ieuri.auth.domain.member.MemberFixtures.ACTIVE_TERMS
 import org.around.ieuri.auth.domain.member.MemberFixtures.NOW
 import org.around.ieuri.auth.domain.member.MemberFixtures.member
 import java.time.Instant
-import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -156,62 +155,16 @@ class MemberRegistrationTest {
     @Test
     fun `저장하면 id만 얹힌다`() {
         val before = registerEmail()
-        val saved = before.saved(42L)
+        val saved = before.withId(42L)
 
         assertEquals(42L, saved.id)
         assertEquals(before, saved.copy(id = null))
     }
 
     @Test
-    fun `프로필은 닉네임과 이미지를 그대로 담는다`() {
-        val profile = member().createProfile(Nickname("여행하는곰"), "images/profile/7/a")
-        val bare = member().createProfile(Nickname("산책하는새"), null)
-
-        assertEquals("여행하는곰", profile.nickname.value)
-        assertEquals("images/profile/7/a", profile.profileImageUrl)
-        assertEquals("산책하는새", bare.nickname.value)
-        assertNull(bare.profileImageUrl)
-    }
-
-    @Test
-    fun `자기에게 발급된 임시 키는 확정 키가 된다`() {
-        val uuid = UUID.fromString("11111111-2222-3333-4444-555555555555")
-
-        val confirmed = member(id = 7L).attachProfileImage(ProfileImageObjectKey.issue(7L, uuid))
-
-        assertEquals("images/profile/7/$uuid", confirmed.value)
-        assertEquals(7L, confirmed.memberId)
-        assertTrue(confirmed.confirmed)
-    }
-
-    @Test
-    fun `남에게 발급된 키는 붙이지 못한다`() {
-        val key = ProfileImageObjectKey.issue(8L, UUID.fromString("11111111-2222-3333-4444-555555555555"))
-
-        val e = assertFailsWith<ObjectKeyNotFoundException> { member(id = 7L).attachProfileImage(key) }
-
-        assertEquals("발급된 적 없는 오브젝트 키입니다.", e.message)
-        assertEquals("OBJECT_KEY_NOT_FOUND", e.code)
-    }
-
-    @Test
-    fun `SNS 회원은 provider 토큰을 회원 id와 함께 보관한다`() {
-        val token = member(id = 7L, provider = Provider.APPLE, passwordHash = null).keepProviderRefreshToken("apple-refresh")
-
-        assertEquals(7L, token?.memberId)
-        assertEquals("apple-refresh", token?.value)
-    }
-
-    @Test
-    fun `자체 회원은 provider 토큰을 보관하지 않는다`() {
-        assertNull(member(provider = Provider.EMAIL).keepProviderRefreshToken("아무-토큰"))
-    }
-
-    @Test
     fun `저장되지 않은 회원으로는 자식을 만들지 못한다`() {
         val unsaved = member(id = null, provider = Provider.KAKAO)
 
-        assertFailsWith<IllegalStateException> { unsaved.keepProviderRefreshToken("t") }
         assertFailsWith<IllegalStateException> { unsaved.issueEmailVerification(MemberFixtures.CODE, MemberFixtures.POLICY, Instant.EPOCH) }
     }
 }

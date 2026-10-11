@@ -25,7 +25,7 @@ class ProviderTokenCollectorTest {
 
         collector.collect(memberId = 100L, provider = Provider.APPLE, authorizationCode = "code-1")
 
-        verify(exactly = 1) { members.keepProviderRefreshToken(100L, "apple-refresh-1") }
+        verify(exactly = 1) { members.saveProviderRefreshToken(100L, "apple-refresh-1") }
     }
 
     @Test
@@ -33,7 +33,7 @@ class ProviderTokenCollectorTest {
         collector.collect(memberId = 100L, provider = Provider.EMAIL, authorizationCode = "code-1")
 
         verify(exactly = 0) { tokenExchanger.exchangeForRefreshToken(any(), any()) }
-        verify(exactly = 0) { members.keepProviderRefreshToken(any(), any()) }
+        verify(exactly = 0) { members.saveProviderRefreshToken(any(), any()) }
     }
 
     @Test
@@ -42,7 +42,7 @@ class ProviderTokenCollectorTest {
         collector.collect(memberId = 100L, provider = Provider.GOOGLE, authorizationCode = "   ")
 
         verify(exactly = 0) { tokenExchanger.exchangeForRefreshToken(any(), any()) }
-        verify(exactly = 0) { members.keepProviderRefreshToken(any(), any()) }
+        verify(exactly = 0) { members.saveProviderRefreshToken(any(), any()) }
     }
 
     /** 카카오는 어드민 키로 해제하므로 교환기가 null을 준다. */
@@ -52,7 +52,7 @@ class ProviderTokenCollectorTest {
 
         collector.collect(memberId = 100L, provider = Provider.KAKAO, authorizationCode = "code-1")
 
-        verify(exactly = 0) { members.keepProviderRefreshToken(any(), any()) }
+        verify(exactly = 0) { members.saveProviderRefreshToken(any(), any()) }
     }
 
     @Test
@@ -61,16 +61,16 @@ class ProviderTokenCollectorTest {
 
         collector.collect(memberId = 100L, provider = Provider.GOOGLE, authorizationCode = "code-1")
 
-        verify(exactly = 0) { members.keepProviderRefreshToken(any(), any()) }
+        verify(exactly = 0) { members.saveProviderRefreshToken(any(), any()) }
     }
 
     @Test
     fun `보관이 실패해도 밖으로 내보내지 않는다`() {
         every { tokenExchanger.exchangeForRefreshToken(any(), any()) } returns "google-refresh-1"
-        every { members.keepProviderRefreshToken(any(), any()) } throws IllegalStateException("저장 실패")
+        every { members.saveProviderRefreshToken(any(), any()) } throws IllegalStateException("저장 실패")
 
         collector.collect(memberId = 100L, provider = Provider.GOOGLE, authorizationCode = "code-1")
 
-        verify(exactly = 1) { members.keepProviderRefreshToken(100L, "google-refresh-1") }
+        verify(exactly = 1) { members.saveProviderRefreshToken(100L, "google-refresh-1") }
     }
 }

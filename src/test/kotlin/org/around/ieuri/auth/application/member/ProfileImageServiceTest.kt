@@ -109,7 +109,7 @@ class ProfileImageServiceTest {
     @Test
     fun `확인은 크기 → 매직바이트 → 이동 → 회원 반영 → 이전 오브젝트 정리 순으로 한다`() {
         givenUploaded()
-        every { members.attachProfileImage(memberId, pendingKey) } returns previousKey
+        every { members.changeProfileImage(memberId, pendingKey) } returns previousKey
 
         val result = service.confirmProfileImageUpload(confirm, memberId)
 
@@ -118,7 +118,7 @@ class ProfileImageServiceTest {
             storage.findSize(pendingKey)
             storage.readPrefix(pendingKey, 12)
             storage.move(sourceKey = pendingKey, targetKey = confirmedKey)
-            members.attachProfileImage(memberId, pendingKey)
+            members.changeProfileImage(memberId, pendingKey)
             storage.delete(previousKey)
         }
     }
@@ -141,7 +141,7 @@ class ProfileImageServiceTest {
         verify(exactly = 0) { storage.readPrefix(any(), any()) }
         verify(exactly = 0) { storage.move(any(), any()) }
         verify(exactly = 0) { storage.delete(any()) }
-        verify(exactly = 0) { members.attachProfileImage(any(), any()) }
+        verify(exactly = 0) { members.changeProfileImage(any(), any()) }
     }
 
     @Test
@@ -153,7 +153,7 @@ class ProfileImageServiceTest {
         assertEquals("업로드가 확인되지 않았습니다.", ex.message)
         verify(exactly = 0) { storage.readPrefix(any(), any()) }
         verify(exactly = 0) { storage.move(any(), any()) }
-        verify(exactly = 0) { members.attachProfileImage(any(), any()) }
+        verify(exactly = 0) { members.changeProfileImage(any(), any()) }
     }
 
     /** 크기 판정이 매직바이트보다 먼저다 — 넘치는 오브젝트는 읽지도 않는다. */
@@ -176,7 +176,7 @@ class ProfileImageServiceTest {
 
         assertEquals("지원하지 않는 이미지 형식입니다.", ex.message)
         verify(exactly = 0) { storage.move(any(), any()) }
-        verify(exactly = 0) { members.attachProfileImage(any(), any()) }
+        verify(exactly = 0) { members.changeProfileImage(any(), any()) }
     }
 
     @Test
@@ -192,7 +192,7 @@ class ProfileImageServiceTest {
     @Test
     fun `이전 이미지가 없었거나 같은 키면 아무것도 지우지 않는다`() {
         givenUploaded()
-        every { members.attachProfileImage(memberId, pendingKey) } returnsMany listOf(null, confirmedKey)
+        every { members.changeProfileImage(memberId, pendingKey) } returnsMany listOf(null, confirmedKey)
 
         service.confirmProfileImageUpload(confirm, memberId)
         service.confirmProfileImageUpload(confirm, memberId)
@@ -204,7 +204,7 @@ class ProfileImageServiceTest {
     @Test
     fun `이전 오브젝트 정리가 실패해도 확인은 성공한다`() {
         givenUploaded()
-        every { members.attachProfileImage(memberId, pendingKey) } returns previousKey
+        every { members.changeProfileImage(memberId, pendingKey) } returns previousKey
         every { storage.delete(previousKey) } throws IllegalStateException("storage down")
 
         val result = service.confirmProfileImageUpload(confirm, memberId)
@@ -216,7 +216,7 @@ class ProfileImageServiceTest {
     @Test
     fun `회원 반영이 실패하면 이전 오브젝트를 지우지 않는다`() {
         givenUploaded()
-        every { members.attachProfileImage(memberId, pendingKey) } throws MemberNotFoundException("회원을 찾을 수 없습니다.")
+        every { members.changeProfileImage(memberId, pendingKey) } throws MemberNotFoundException("회원을 찾을 수 없습니다.")
 
         assertFailsWith<MemberNotFoundException> { service.confirmProfileImageUpload(confirm, memberId) }
 
@@ -227,19 +227,19 @@ class ProfileImageServiceTest {
 
     @Test
     fun `제거는 회원에서 뗀 뒤 이전 오브젝트를 지운다`() {
-        every { members.detachProfileImage(memberId) } returns previousKey
+        every { members.removeProfileImage(memberId) } returns previousKey
 
         service.removeProfileImage(memberId)
 
         verifyOrder {
-            members.detachProfileImage(memberId)
+            members.removeProfileImage(memberId)
             storage.delete(previousKey)
         }
     }
 
     @Test
     fun `이미지가 없던 회원의 제거는 스토리지를 부르지 않는다`() {
-        every { members.detachProfileImage(memberId) } returns null
+        every { members.removeProfileImage(memberId) } returns null
 
         service.removeProfileImage(memberId)
 
@@ -248,7 +248,7 @@ class ProfileImageServiceTest {
 
     @Test
     fun `제거 중 오브젝트 삭제가 실패해도 예외를 내보내지 않는다`() {
-        every { members.detachProfileImage(memberId) } returns previousKey
+        every { members.removeProfileImage(memberId) } returns previousKey
         every { storage.delete(previousKey) } throws IllegalStateException("storage down")
 
         service.removeProfileImage(memberId)

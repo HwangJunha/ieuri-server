@@ -29,7 +29,7 @@ class ProviderTokenCollector(
                 log.info("provider 토큰 교환 대상 아님/미발급(provider={}, memberId={})", provider, memberId)
                 return
             }
-            members.keepProviderRefreshToken(memberId, refreshToken)
+            members.saveProviderRefreshToken(memberId, refreshToken)
         } catch (ex: Exception) {
             log.warn("provider 토큰 교환 실패(provider={}, memberId={}): {}", provider, memberId, ex.javaClass.simpleName)
         }

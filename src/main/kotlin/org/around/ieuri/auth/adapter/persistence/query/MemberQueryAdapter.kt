@@ -1,16 +1,21 @@
 package org.around.ieuri.auth.adapter.persistence.query
 
+import org.around.ieuri.auth.adapter.persistence.mapper.toAgreement
 import org.around.ieuri.auth.adapter.persistence.mapper.toMeView
 import org.around.ieuri.auth.adapter.persistence.mapper.toMemberDetailView
 import org.around.ieuri.auth.adapter.persistence.mapper.toMemberPublicProfileView
 import org.around.ieuri.auth.adapter.persistence.mapper.toMemberSummaryView
 import org.around.ieuri.auth.adapter.persistence.mapper.toRoleInfoView
+import org.around.ieuri.auth.adapter.persistence.mapper.toTerms
+import org.around.ieuri.auth.adapter.persistence.mapper.toTimestamptz
 import org.around.ieuri.auth.adapter.persistence.table.MemberProfileTable
 import org.around.ieuri.auth.adapter.persistence.table.MemberRoleTable
 import org.around.ieuri.auth.adapter.persistence.table.MemberTable
+import org.around.ieuri.auth.adapter.persistence.table.MemberTermsAgreementTable
 import org.around.ieuri.auth.adapter.persistence.table.PermissionTable
 import org.around.ieuri.auth.adapter.persistence.table.RolePermissionTable
 import org.around.ieuri.auth.adapter.persistence.table.RoleTable
+import org.around.ieuri.auth.adapter.persistence.table.TermsTable
 import org.around.ieuri.auth.application.member.provided.dto.MeView
 import org.around.ieuri.auth.application.member.provided.dto.MemberAuthoritiesView
 import org.around.ieuri.auth.application.member.provided.dto.MemberDetailView
@@ -20,6 +25,8 @@ import org.around.ieuri.auth.application.member.provided.dto.MembersQuery
 import org.around.ieuri.auth.application.member.provided.dto.RoleInfoView
 import org.around.ieuri.auth.application.member.required.EmailEncryptorPort
 import org.around.ieuri.auth.application.member.required.MemberQueryPort
+import org.around.ieuri.auth.domain.member.Agreement
+import org.around.ieuri.auth.domain.member.Terms
 import org.around.ieuri.common.pagination.CursorEdge
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.CursorPageInfo
@@ -31,10 +38,12 @@ import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.exists
 import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.core.less
+import org.jetbrains.exposed.v1.core.lessEq
 import org.jetbrains.exposed.v1.jdbc.Query
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.springframework.stereotype.Component
+import java.time.Instant
 
 /**
  * 회원 읽기 포트 구현. 트랜잭션은 조회 서비스가 연다.
@@ -121,6 +130,14 @@ class MemberQueryAdapter(
         roles = roleCodesOf(memberId).toSet(),
         permissions = permissionCodesOf(memberId).toSet(),
     )
+
+    override fun findEffectiveTerms(now: Instant): List<Terms> = TermsTable.selectAll()
+        .where { TermsTable.effectiveAt lessEq now.toTimestamptz() }
+        .map { it.toTerms() }
+
+    override fun findAgreements(memberId: Long): List<Agreement> = MemberTermsAgreementTable.selectAll()
+        .where { MemberTermsAgreementTable.memberId eq memberId }
+        .map { it.toAgreement() }
 
     override fun findAssignableRoles(): List<RoleInfoView> = RoleTable.selectAll()
         .orderBy(RoleTable.code to SortOrder.ASC)

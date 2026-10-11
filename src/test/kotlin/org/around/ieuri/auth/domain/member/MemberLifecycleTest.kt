@@ -113,12 +113,12 @@ class MemberLifecycleTest {
     fun `활성 회원은 그대로 통과한다`() {
         val member = member(status = MemberStatus.ACTIVE)
 
-        assertSame(member, member.admit(NOW))
+        assertSame(member, member.login(NOW))
     }
 
     @Test
     fun `유효한 정지는 사유를 붙여 거부한다`() {
-        val e = assertFailsWith<InactiveMemberException> { suspended(until, reason = "약관 위반").admit(until.minusMillis(1)) }
+        val e = assertFailsWith<InactiveMemberException> { suspended(until, reason = "약관 위반").login(until.minusMillis(1)) }
 
         assertEquals("정지된 계정입니다. 사유: 약관 위반", e.message)
         assertEquals("ACCOUNT_INACTIVE", e.code)
@@ -126,15 +126,15 @@ class MemberLifecycleTest {
 
     @Test
     fun `사유가 없는 정지는 사유 없이 거부한다`() {
-        val e = assertFailsWith<InactiveMemberException> { suspended(until = null, reason = null).admit(NOW) }
+        val e = assertFailsWith<InactiveMemberException> { suspended(until = null, reason = null).login(NOW) }
 
         assertEquals("정지된 계정입니다.", e.message)
     }
 
     @Test
     fun `기간제 정지는 만료 정각부터 복구된 회원으로 통과한다`() {
-        val atUntil = suspended(until).admit(until)
-        val after = suspended(until).admit(until.plusSeconds(1))
+        val atUntil = suspended(until).login(until)
+        val after = suspended(until).login(until.plusSeconds(1))
 
         assertEquals(MemberStatus.ACTIVE, atUntil.status)
         assertNull(atUntil.suspendedAt)
@@ -145,7 +145,7 @@ class MemberLifecycleTest {
 
     @Test
     fun `무기한 정지는 아무리 지나도 만료되지 않는다`() {
-        val e = assertFailsWith<InactiveMemberException> { suspended(until = null, reason = "영구 정지").admit(NOW.plusSeconds(10L * 365 * 86_400)) }
+        val e = assertFailsWith<InactiveMemberException> { suspended(until = null, reason = "영구 정지").login(NOW.plusSeconds(10L * 365 * 86_400)) }
 
         assertEquals("정지된 계정입니다. 사유: 영구 정지", e.message)
     }

@@ -189,14 +189,13 @@ class MemberModifyEmailChangeTest {
 
     /** 메시지에 상대 회원의 정보를 담지 않는다(POL-013). */
     @Test
-    fun `다른 회원이 쓰는 주소면 코드를 만들지 않고 거부한다`() {
+    fun `다른 회원이 쓰는 주소면 코드를 저장하지도 보내지도 않고 거부한다`() {
         givenMember(member())
         every { memberRepository.existsByEmailIdentifier(Provider.EMAIL, "protected:$newEmail", memberId) } returns true
 
         val ex = assertFailsWith<EmailAlreadyInUseException> { service.changeEmail(ChangeEmailCommand(newEmail), memberId, ipAddress = null) }
 
         assertEquals("이미 사용 중인 이메일입니다.", ex.message)
-        verify(exactly = 0) { codeGenerator.generate() }
         verify(exactly = 0) { memberRepository.insertEmailVerification(any()) }
         assertTrue(events.isEmpty())
     }

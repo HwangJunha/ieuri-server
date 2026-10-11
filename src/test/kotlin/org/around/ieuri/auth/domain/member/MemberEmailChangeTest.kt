@@ -72,7 +72,6 @@ class MemberEmailChangeTest {
 
             assertEquals("SNS 계정은 이메일을 변경할 수 없습니다.", e.message)
             assertEquals("NOT_EMAIL_MEMBER", e.code)
-            assertFailsWith<NotEmailMemberException> { sns.ensureCanChangeEmail(next) }
         }
     }
 
@@ -84,15 +83,13 @@ class MemberEmailChangeTest {
 
         assertEquals("현재 사용 중인 이메일과 같습니다.", e.message)
         assertEquals("SAME_AS_CURRENT_EMAIL", e.code)
-        assertFailsWith<SameAsCurrentEmailException> { member.ensureCanChangeEmail(Email("current@example.com")) }
-        member.ensureCanChangeEmail(next)
     }
 
     @Test
     fun `SNS 회원이 같은 주소를 넣으면 회원 유형이 먼저 걸린다`() {
         val sns = member(provider = Provider.KAKAO, email = "current@example.com", passwordHash = null)
 
-        assertFailsWith<NotEmailMemberException> { sns.ensureCanChangeEmail(Email("current@example.com")) }
+        assertFailsWith<NotEmailMemberException> { sns.requestEmailChange(Email("current@example.com"), emptyList(), CODE, POLICY, NOW) }
     }
 
     @Test

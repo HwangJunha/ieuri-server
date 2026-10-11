@@ -61,7 +61,7 @@ class MemberWithdrawalServiceTest {
             members.withdrawalTarget(100L)
             snsTokenRevoker.revoke(RevokeSnsConnectionCommand(Provider.APPLE, "apple-sub-1", "apple-refresh-1"))
             sessions.revokeAll(100L)
-            members.erase(100L, Provider.APPLE, unlinkFailureReason = null)
+            members.deleteMember(100L, Provider.APPLE, unlinkFailureReason = null)
             eventPublisher.publish(MemberAccessed(100L, AccessType.WITHDRAW, "203.0.113.7"))
         }
         verify(exactly = 1) { snsTokenRevoker.revoke(any()) }
@@ -86,7 +86,7 @@ class MemberWithdrawalServiceTest {
         service.withdraw(100L, "203.0.113.7")
 
         verify { snsTokenRevoker.revoke(RevokeSnsConnectionCommand(Provider.KAKAO, "kakao-9911", null)) }
-        verify { members.erase(100L, Provider.KAKAO, unlinkFailureReason = null) }
+        verify { members.deleteMember(100L, Provider.KAKAO, unlinkFailureReason = null) }
     }
 
     /** R11. 해제 실패는 탈퇴를 막지 않고, 사유만 삭제 단계로 넘긴다. */
@@ -99,7 +99,7 @@ class MemberWithdrawalServiceTest {
         assertTrue(result.success)
         verifyOrder {
             sessions.revokeAll(100L)
-            members.erase(100L, Provider.APPLE, unlinkFailureReason = "HTTP 400 invalid_grant")
+            members.deleteMember(100L, Provider.APPLE, unlinkFailureReason = "HTTP 400 invalid_grant")
         }
         assertEquals(listOf<Any>(MemberAccessed(100L, AccessType.WITHDRAW, "203.0.113.7")), events)
     }
@@ -112,7 +112,7 @@ class MemberWithdrawalServiceTest {
         val result = service.withdraw(100L, "203.0.113.7")
 
         assertTrue(result.success)
-        verify(exactly = 1) { members.erase(100L, Provider.EMAIL, unlinkFailureReason = null) }
+        verify(exactly = 1) { members.deleteMember(100L, Provider.EMAIL, unlinkFailureReason = null) }
     }
 
     /** 세션이 살아 있는 채로 회원만 지워지면 안 된다. */
@@ -123,7 +123,7 @@ class MemberWithdrawalServiceTest {
 
         assertFailsWith<IllegalStateException> { service.withdraw(100L, "203.0.113.7") }
 
-        verify(exactly = 0) { members.erase(any(), any(), any()) }
+        verify(exactly = 0) { members.deleteMember(any(), any(), any()) }
         assertTrue(events.isEmpty())
     }
 
@@ -136,14 +136,14 @@ class MemberWithdrawalServiceTest {
         assertEquals("회원을 찾을 수 없습니다.", ex.message)
         verify(exactly = 0) { snsTokenRevoker.revoke(any()) }
         verify(exactly = 0) { sessions.revokeAll(any()) }
-        verify(exactly = 0) { members.erase(any(), any(), any()) }
+        verify(exactly = 0) { members.deleteMember(any(), any(), any()) }
         assertTrue(events.isEmpty())
     }
 
     @Test
     fun `삭제가 실패하면 접속기록을 남기지 않는다`() {
         givenTarget()
-        every { members.erase(any(), any(), any()) } throws IllegalStateException("삭제 실패")
+        every { members.deleteMember(any(), any(), any()) } throws IllegalStateException("삭제 실패")
 
         assertFailsWith<IllegalStateException> { service.withdraw(100L, "203.0.113.7") }
 

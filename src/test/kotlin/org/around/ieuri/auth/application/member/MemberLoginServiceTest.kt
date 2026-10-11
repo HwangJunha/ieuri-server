@@ -38,14 +38,14 @@ class MemberLoginServiceTest {
     @Test
     fun `SNS 로그인은 검증 → 회원 인증 → provider 토큰 보충 순으로 하고 회원 id를 돌려준다`() {
         every { snsVerifier.verify(Provider.GOOGLE, "id-token") } returns identity
-        every { members.admitSns(Provider.GOOGLE, "google-sub-1") } returns 100L
+        every { members.loginSnsMember(Provider.GOOGLE, "google-sub-1") } returns 100L
 
         val memberId = service.loginBySns(Provider.GOOGLE, "id-token", "auth-code-1")
 
         assertEquals(100L, memberId)
         verifyOrder {
             snsVerifier.verify(Provider.GOOGLE, "id-token")
-            members.admitSns(Provider.GOOGLE, "google-sub-1")
+            members.loginSnsMember(Provider.GOOGLE, "google-sub-1")
             providerTokenCollector.collect(100L, Provider.GOOGLE, "auth-code-1")
         }
     }
@@ -56,14 +56,14 @@ class MemberLoginServiceTest {
 
         assertFailsWith<SnsVerificationFailedException> { service.loginBySns(Provider.GOOGLE, "id-token", "auth-code-1") }
 
-        verify(exactly = 0) { members.admitSns(any(), any()) }
+        verify(exactly = 0) { members.loginSnsMember(any(), any()) }
         verify(exactly = 0) { providerTokenCollector.collect(any(), any(), any()) }
     }
 
     @Test
     fun `미가입이거나 정지된 회원이면 provider 토큰을 보충하지 않는다`() {
         every { snsVerifier.verify(any(), any()) } returns identity
-        every { members.admitSns(any(), any()) } throws MemberNotFoundException("가입되지 않은 계정입니다. 회원가입이 필요합니다.")
+        every { members.loginSnsMember(any(), any()) } throws MemberNotFoundException("가입되지 않은 계정입니다. 회원가입이 필요합니다.")
 
         val ex = assertFailsWith<MemberNotFoundException> { service.loginBySns(Provider.GOOGLE, "id-token", "auth-code-1") }
 
@@ -87,7 +87,7 @@ class MemberLoginServiceTest {
         verifyOrder {
             members.findEmailCredential("protected:user@example.com")
             passwordEncoder.matches("Passw0rd!", "hashed-pw")
-            members.admit(300L)
+            members.loginMember(300L)
         }
     }
 
@@ -99,7 +99,7 @@ class MemberLoginServiceTest {
 
         assertEquals(invalidCredentials, ex.message)
         verify(exactly = 0) { passwordEncoder.matches(any(), any()) }
-        verify(exactly = 0) { members.admit(any()) }
+        verify(exactly = 0) { members.loginMember(any()) }
     }
 
     /** 해시가 없으면 이메일 로그인이 안 되는 계정이다 — 그 사실도 드러내지 않는다. */
@@ -111,7 +111,7 @@ class MemberLoginServiceTest {
 
         assertEquals(invalidCredentials, ex.message)
         verify(exactly = 0) { passwordEncoder.matches(any(), any()) }
-        verify(exactly = 0) { members.admit(any()) }
+        verify(exactly = 0) { members.loginMember(any()) }
     }
 
     @Test
@@ -123,7 +123,7 @@ class MemberLoginServiceTest {
 
         assertEquals("INVALID_CREDENTIALS", ex.code)
         assertEquals(invalidCredentials, ex.message)
-        verify(exactly = 0) { members.admit(any()) }
+        verify(exactly = 0) { members.loginMember(any()) }
     }
 
     /** 비밀번호가 맞은 뒤의 정지 판정은 그대로 나간다. */
@@ -131,7 +131,7 @@ class MemberLoginServiceTest {
     fun `비밀번호가 맞아도 정지된 회원이면 정지 오류가 나간다`() {
         every { members.findEmailCredential(any()) } returns EmailCredentialView(300L, "hashed-pw")
         every { passwordEncoder.matches(any(), any()) } returns true
-        every { members.admit(300L) } throws InactiveMemberException("정지된 계정입니다.")
+        every { members.loginMember(300L) } throws InactiveMemberException("정지된 계정입니다.")
 
         val ex = assertFailsWith<InactiveMemberException> { service.loginByEmail("user@example.com", "Passw0rd!") }
 

@@ -68,13 +68,13 @@ class ProfileImageService(
 
         val confirmed = key.toConfirmed()
         storage.move(sourceKey = key.value, targetKey = confirmed.value)
-        val previousKey = members.attachProfileImage(memberId, key.value)
+        val previousKey = members.changeProfileImage(memberId, key.value)
         deleteQuietly(previousKey, confirmed.value)
         return confirmed.value
     }
 
     override fun removeProfileImage(memberId: Long) {
-        deleteQuietly(members.detachProfileImage(memberId), newKey = null)
+        deleteQuietly(members.removeProfileImage(memberId), newKey = null)
     }
 
     /** 이전 오브젝트 정리. 실패해도 삼킨다 — 남은 오브젝트는 스토리지 lifecycle rule이 걷어 간다. */

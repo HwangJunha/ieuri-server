@@ -22,18 +22,7 @@ data class Member(
     val passwordHash: PasswordHash?,
 ) {
     /** 저장 직후 DB가 준 id를 얹는다. */
-    fun saved(id: Long): Member = copy(id = id)
-
-    // ── 프로필 ──
-
-    /** 가입 때 만드는 프로필. */
-    fun createProfile(nickname: Nickname, profileImageUrl: String?): Profile = Profile(nickname, profileImageUrl)
-
-    /** 확인이 끝난 프로필 이미지 키. 이 회원에게 발급된 키만 받는다. */
-    fun attachProfileImage(key: ProfileImageObjectKey): ProfileImageObjectKey {
-        if (!key.ownedBy(savedId())) throw ObjectKeyNotFoundException()
-        return key.toConfirmed()
-    }
+    fun withId(id: Long): Member = copy(id = id)
 
     // ── 가입 이메일 인증 ──
 
@@ -53,10 +42,7 @@ data class Member(
     ): EmailVerificationIssue {
         ensureOwn(previous, VerificationPurpose.REGISTRATION)
         if (!policy.cooldownPassed(lastIssuedAt(existing), now)) throw VerificationRateLimitedException()
-        return EmailVerificationIssue(
-            consumed = existing.filter { it.active }.map { it.consume() },
-            issued = EmailVerification.issue(savedId(), code, policy, now, VerificationPurpose.REGISTRATION, previous.targetEmail),
-        )
+        return replaceCodes(existing, VerificationPurpose.REGISTRATION, previous.targetEmail, code, policy, now)
     }
 
     /** 인증 대기 주소를 정정할 수 있는 회원인지(SPEC-0024 R7-2). 인증을 마쳤으면 거부한다. */
@@ -77,10 +63,7 @@ data class Member(
     ): EmailVerificationIssue {
         ensureEmailUnverified()
         if (!policy.cooldownPassed(lastIssuedAt(existing), now)) throw ResendCooldownActiveException()
-        return EmailVerificationIssue(
-            consumed = existing.filter { it.active }.map { it.consume() },
-            issued = EmailVerification.issue(savedId(), code, policy, now, VerificationPurpose.REGISTRATION, newEmail),
-        )
+        return replaceCodes(existing, VerificationPurpose.REGISTRATION, newEmail, code, policy, now)
     }
 
     /**
@@ -103,14 +86,9 @@ data class Member(
         policy: VerificationPolicy,
         now: Instant,
     ): EmailVerificationIssue {
-        ensureCanChangeEmail(newEmail)
-        return emailChangeIssue(newEmail, existing, code, policy, now)
-    }
-
-    /** 변경 가능 여부만 본다 — 중복 확인(저장소)보다 먼저 판정해야 할 때 쓴다. */
-    fun ensureCanChangeEmail(newEmail: Email) {
         if (provider != Provider.EMAIL) throw NotEmailMemberException("SNS 계정은 이메일을 변경할 수 없습니다.")
         if (email == newEmail) throw SameAsCurrentEmailException()
+        return replaceCodes(existing, VerificationPurpose.EMAIL_CHANGE, newEmail, code, policy, now)
     }
 
     /** 이메일 변경 코드 재발송. 대상 주소는 이전 코드에서 이어받고, 쿨다운은 변경 용도로만 센다. */
@@ -123,8 +101,7 @@ data class Member(
     ): EmailVerificationIssue {
         ensureOwn(previous, VerificationPurpose.EMAIL_CHANGE)
         if (!policy.cooldownPassed(lastIssuedAt(existing), now)) throw ResendCooldownActiveException()
-        val target = requireNotNull(previous.targetEmail) { "이메일 변경 챌린지에 대상 주소가 없습니다." }
-        return emailChangeIssue(target, existing, code, policy, now)
+        return replaceCodes(existing, VerificationPurpose.EMAIL_CHANGE, previous.targetEmail, code, policy, now)
     }
 
     /** 이메일 변경 코드 확인. 이 회원의 이메일 변경 코드만 받는다. 통과해도 회원은 그대로다 — 주소는 [replaceEmail]이 바꾼다. */
@@ -143,15 +120,17 @@ data class Member(
         providerUserId = if (provider == Provider.EMAIL) loginIdentifier else providerUserId,
     )
 
-    private fun emailChangeIssue(
-        target: Email,
+    /** 아직 쓸 수 있는 이전 코드를 폐기하고 새 코드를 낸다. 둘이 살아 있으면 어느 주소가 확정될지 정해지지 않는다. */
+    private fun replaceCodes(
         existing: List<EmailVerification>,
+        purpose: VerificationPurpose,
+        targetEmail: Email?,
         code: VerificationCode,
         policy: VerificationPolicy,
         now: Instant,
     ) = EmailVerificationIssue(
         consumed = existing.filter { it.active }.map { it.consume() },
-        issued = EmailVerification.issue(savedId(), code, policy, now, VerificationPurpose.EMAIL_CHANGE, target),
+        issued = EmailVerification.issue(savedId(), code, policy, now, purpose, targetEmail),
     )
 
     // ── 비밀번호 재설정 ──
@@ -220,11 +199,6 @@ data class Member(
         return if (held.any { it.code == role.code }) MemberRoleChange.Revoked(savedId(), role) else MemberRoleChange.Unchanged
     }
 
-    // ── SNS 연결 ──
-
-    /** 탈퇴 때 연결을 끊을 provider 토큰. 자체(EMAIL) 회원은 대상이 아니라 null이다(SPEC-0012 R5). */
-    fun keepProviderRefreshToken(token: String): ProviderRefreshToken? = if (provider == Provider.EMAIL) null else ProviderRefreshToken(savedId(), token)
-
     // ── 정지·복구·로그인 ──
 
     /** 관리자 정지. 이미 정지 상태면 사유·기간을 갱신한다. */
@@ -241,10 +215,10 @@ data class Member(
     }
 
     /**
-     * 로그인 허용 판정. 기간제 정지가 만료됐으면 복구된 회원을 돌려주고, 유효한 정지면 거부한다.
+     * 로그인. 기간제 정지가 만료됐으면 복구된 회원을 돌려주고, 유효한 정지면 거부한다.
      * - 무기한 정지(until = null)는 만료되지 않는다. 바뀐 것이 없으면 같은 회원이다.
      */
-    fun admit(now: Instant): Member {
+    fun login(now: Instant): Member {
         if (status == MemberStatus.ACTIVE) return this
         val until = suspendedUntil
         if (until != null && !now.isBefore(until)) return reactivate()

@@ -7,7 +7,6 @@ import org.around.ieuri.auth.application.member.provided.dto.MemberSummaryView
 import org.around.ieuri.auth.application.member.provided.dto.MembersQuery
 import org.around.ieuri.auth.application.member.provided.exception.MemberNotFoundException
 import org.around.ieuri.auth.application.member.required.MemberQueryPort
-import org.around.ieuri.auth.application.member.required.MemberRepository
 import org.around.ieuri.auth.domain.member.Agreement
 import org.around.ieuri.auth.domain.member.MemberStatus
 import org.around.ieuri.auth.domain.member.Terms
@@ -30,18 +29,17 @@ class MemberQueryServiceTest {
     private val agreedAt = Instant.parse("2026-08-01T00:00:00Z")
 
     private val memberQueryPort = mockk<MemberQueryPort>()
-    private val memberRepository = mockk<MemberRepository>()
-    private val service = MemberQueryService(memberQueryPort, memberRepository, Clock.fixed(now, ZoneOffset.UTC))
+    private val service = MemberQueryService(memberQueryPort, Clock.fixed(now, ZoneOffset.UTC))
 
     private val serviceTerms = Terms(id = 1, code = "SERVICE", version = "1.0", required = true)
     private val marketingTerms = Terms(id = 4, code = "MARKETING", version = "1.3", required = false)
 
     private fun givenTerms(vararg terms: Terms) {
-        every { memberRepository.findEffectiveTerms(now) } returns terms.toList()
+        every { memberQueryPort.findEffectiveTerms(now) } returns terms.toList()
     }
 
     private fun givenAgreements(vararg agreements: Agreement) {
-        every { memberRepository.findAgreements(memberId) } returns agreements.toList()
+        every { memberQueryPort.findAgreements(memberId) } returns agreements.toList()
     }
 
     @Test

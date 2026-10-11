@@ -2,7 +2,6 @@ package org.around.ieuri.auth.application.member
 
 import org.around.ieuri.auth.application.member.provided.MemberCommandUseCase
 import org.around.ieuri.auth.application.member.provided.dto.AgreeToRequiredTermsCommand
-import org.around.ieuri.auth.application.member.provided.dto.AgreementInput
 import org.around.ieuri.auth.application.member.provided.dto.AgreementStatusView
 import org.around.ieuri.auth.application.member.provided.dto.AssignRoleCommand
 import org.around.ieuri.auth.application.member.provided.dto.ChangeEmailCommand
@@ -114,10 +113,10 @@ class MemberModifyService(
 
         val submittedEmail = Email(request.submittedEmail)
         val providerEmail = command.email?.let { Email(it) }
-        // 클라이언트가 넘긴 값이 클레임보다 앞선다(SPEC-0032 R29).
-        val nickname = nicknameFrom(request.nickname, command.nickname)
-        val active = activeTerms(now)
-        val agreements = agreementsOf(request.agreements, active, now)
+        // 클라이언트가 넘긴 값이 클레임보다 앞선다(SPEC-0032 R29). 둘 다 형식에 안 맞으면 자동 생성한다.
+        val nickname = Nickname.firstValid(request.nickname, command.nickname) ?: nicknameGenerator.generate()
+        val activeTerms = ActiveTerms.of(memberRepository.findEffectiveTerms(now))
+        val agreements = Member.agreementsAtRegistration(request.agreements.associate { it.termsCode to it.agreed }, activeTerms, now)
 
         val member = Member.register(
             provider = request.provider,
@@ -126,10 +125,10 @@ class MemberModifyService(
             fallbackEmail = submittedEmail,
             ageVerified = request.ageVerified,
             agreements = agreements,
-            requiredTermsCodes = active.requiredCodes,
+            requiredTermsCodes = activeTerms.requiredCodes,
         )
         // 저장될 이메일로 판정한다(R5). 제출값으로 보면 다른 주소를 검사하게 된다.
-        ensureEmailAvailable(request.provider, member.email)
+        ensureEmailNotTaken(request.provider, member.email)
 
         // 클라이언트가 R1(읽기 전용 표시)을 어긴 흔적. 저장값은 provider 값이므로 가입은 막지 않는다(R12).
         if (providerEmail != null && providerEmail != submittedEmail) {
@@ -141,9 +140,9 @@ class MemberModifyService(
             )
         }
 
-        val saved = insert(member, member.createProfile(nickname, command.profileImageUrl), agreements, now)
+        val saved = saveNewMember(member, Profile(nickname, command.profileImageUrl), agreements, now)
         // 제출값이 아니라 저장된 주소로 보낸다(R12).
-        val verification = if (saved.emailVerified) null else issueFirstVerification(saved, now)
+        val verification = if (saved.emailVerified) null else sendFirstVerificationCode(saved, now)
 
         val memberId = requireNotNull(saved.id)
         eventPublisher.publish(MemberRegistered(memberId, saved.provider, saved.emailVerified, verification?.publicId, now))
@@ -160,22 +159,22 @@ class MemberModifyService(
         if (memberRepository.existsByProviderUserId(Provider.EMAIL, providerUserId)) {
             throw MemberAlreadyRegisteredException("이미 가입된 이메일입니다.")
         }
-        ensureEmailAvailable(Provider.EMAIL, email)
+        ensureEmailNotTaken(Provider.EMAIL, email)
 
-        val active = activeTerms(now)
-        val agreements = agreementsOf(command.agreements, active, now)
+        val activeTerms = ActiveTerms.of(memberRepository.findEffectiveTerms(now))
+        val agreements = Member.agreementsAtRegistration(command.agreements.associate { it.termsCode to it.agreed }, activeTerms, now)
         val member = Member.registerByEmail(
             email = email,
             providerUserId = providerUserId,
             passwordHash = passwordHash,
             ageVerified = command.ageVerified,
             agreements = agreements,
-            requiredTermsCodes = active.requiredCodes,
+            requiredTermsCodes = activeTerms.requiredCodes,
         )
 
         // 닉네임에 이메일 로컬파트를 쓰지 않는다(R20) — 주소 일부가 표시명으로 새어 나간다.
-        val saved = insert(member, member.createProfile(nicknameGenerator.generate(), profileImageUrl = null), agreements, now)
-        val verification = issueFirstVerification(saved, now)
+        val saved = saveNewMember(member, Profile(nicknameGenerator.generate(), profileImageUrl = null), agreements, now)
+        val verification = sendFirstVerificationCode(saved, now)
 
         eventPublisher.publish(MemberRegistered(requireNotNull(saved.id), Provider.EMAIL, emailVerified = false, verification.publicId, now))
         return RegisterMemberResult(emailVerified = false, verificationPublicId = verification.publicId)
@@ -185,8 +184,8 @@ class MemberModifyService(
 
     override fun verifyEmail(command: VerifyEmailCommand): VerifyEmailResult {
         val now = clock.instant()
-        val verification = findChallenge(command.verificationPublicId, forUpdate = true)
-        val member = findMember(verification.memberId)
+        val verification = memberRepository.findEmailVerification(command.verificationPublicId, forUpdate = true) ?: throw VerificationNotFoundException()
+        val member = memberRepository.findById(verification.memberId) ?: throw MemberNotFoundException()
 
         val attempt = member.verifyRegistrationEmail(verification, codeGenerator.hash(command.code), now)
 
@@ -195,8 +194,13 @@ class MemberModifyService(
         val result = attempt.result
         if (result is VerificationResult.Failure) return VerifyEmailResult(verified = false, failureReason = result.reason.name)
 
-        // 주소를 정정한 코드면 소유가 증명된 지금 회원의 이메일을 확정한다(R7-5).
-        val verified = verification.targetEmail?.let { confirmRetargetedEmail(attempt.member, it) } ?: attempt.member
+        var verified = attempt.member
+        // 주소를 정정한 코드면 소유가 증명된 지금 회원의 이메일을 확정한다(R7-5). 그 사이 다른 회원이 가져갔을 수 있어 다시 본다.
+        verification.targetEmail?.let { newEmail ->
+            ensureEmailNotTaken(member.provider, newEmail, exceptMemberId = member.id)
+            verified = verified.replaceEmail(newEmail, ProviderUserId(identifierProtector.protect(newEmail.value)))
+            memberRepository.saveEmail(verified)
+        }
         memberRepository.saveEmailVerified(verified)
         eventPublisher.publish(EmailVerified(verification.memberId, verification.publicId, now))
         return VerifyEmailResult(verified = true, failureReason = null)
@@ -204,42 +208,31 @@ class MemberModifyService(
 
     override fun resendVerification(command: ResendVerificationCommand): ResendVerificationResult {
         val now = clock.instant()
-        val previous = findChallenge(command.verificationPublicId)
-        val member = memberRepository.findById(previous.memberId)
-            ?: throw VerificationNotFoundException("회원 정보를 찾을 수 없습니다.")
-
+        val previous = memberRepository.findEmailVerification(command.verificationPublicId) ?: throw VerificationNotFoundException()
+        val member = memberRepository.findById(previous.memberId) ?: throw VerificationNotFoundException("회원 정보를 찾을 수 없습니다.")
+        val existing = memberRepository.findEmailVerifications(previous.memberId, VerificationPurpose.REGISTRATION)
         val plainCode = codeGenerator.generate()
-        val issue = member.reissueEmailVerification(
-            previous = previous,
-            existing = memberRepository.findEmailVerifications(previous.memberId, VerificationPurpose.REGISTRATION),
-            code = newCode(plainCode),
-            policy = verificationPolicy,
-            now = now,
-        )
 
-        store(issue)
+        val issue = member.reissueEmailVerification(previous, existing, VerificationCode(UUID.randomUUID(), codeGenerator.hash(plainCode)), verificationPolicy, now)
+
+        saveVerificationCodes(issue)
         eventPublisher.publish(VerificationEmailRequested((issue.issued.targetEmail ?: member.email).value, plainCode))
         return ResendVerificationResult(issue.issued.publicId, issue.issued.expiresAt)
     }
 
+    /** 인증 완료 → 중복 → 쿨다운 순으로 본다. 순서가 곧 오류 코드의 우선순위다. */
     override fun retargetEmailVerification(command: RetargetEmailVerificationCommand, memberId: Long): RetargetEmailVerificationResult {
         val now = clock.instant()
         val newEmail = Email(command.newEmail)
-        val member = findMember(memberId)
-
-        // 인증 완료 → 중복 → 쿨다운 순으로 본다. 순서가 곧 오류 코드의 우선순위다.
+        val member = memberRepository.findById(memberId) ?: throw MemberNotFoundException()
         member.ensureEmailUnverified()
-        ensureEmailAvailable(member.provider, newEmail, excludingMemberId = memberId)
+        ensureEmailNotTaken(member.provider, newEmail, exceptMemberId = memberId)
+        val existing = memberRepository.findEmailVerifications(memberId, VerificationPurpose.REGISTRATION)
         val plainCode = codeGenerator.generate()
-        val issue = member.retargetEmailVerification(
-            newEmail = newEmail,
-            existing = memberRepository.findEmailVerifications(memberId, VerificationPurpose.REGISTRATION),
-            code = newCode(plainCode),
-            policy = verificationPolicy,
-            now = now,
-        )
 
-        store(issue)
+        val issue = member.retargetEmailVerification(newEmail, existing, VerificationCode(UUID.randomUUID(), codeGenerator.hash(plainCode)), verificationPolicy, now)
+
+        saveVerificationCodes(issue)
         eventPublisher.publish(VerificationEmailRequested(newEmail.value, plainCode))
         eventPublisher.publish(EmailVerificationRetargeted(memberId, member.provider))
         return RetargetEmailVerificationResult(issue.issued.publicId, issue.issued.expiresAt)
@@ -251,12 +244,18 @@ class MemberModifyService(
     override fun requestPasswordReset(command: RequestPasswordResetCommand) {
         val now = clock.instant()
         val email = Email(command.email).value
-        val member = findEmailMember(email) ?: throw MemberNotFoundException("가입되지 않은 이메일입니다.")
+        val member = memberRepository.findByProviderUserId(Provider.EMAIL, ProviderUserId(identifierProtector.protect(email)))
+            ?: throw MemberNotFoundException("가입되지 않은 이메일입니다.")
         val memberId = requireNotNull(member.id)
-
         val plainCode = codeGenerator.generate()
+
         // 쿨다운이 없으면 주소를 아는 제3자가 특정인의 메일함에 코드를 무제한 보낼 수 있다.
-        val issue = member.requestPasswordReset(memberRepository.findPasswordResets(memberId), newCode(plainCode), verificationPolicy, now)
+        val issue = member.requestPasswordReset(
+            existing = memberRepository.findPasswordResets(memberId),
+            code = VerificationCode(UUID.randomUUID(), codeGenerator.hash(plainCode)),
+            policy = verificationPolicy,
+            now = now,
+        )
 
         issue.consumed.forEach(memberRepository::consumePasswordReset)
         memberRepository.insertPasswordReset(issue.issued)
@@ -269,9 +268,12 @@ class MemberModifyService(
      */
     override fun resetPassword(command: ResetPasswordCommand): ResetPasswordResult {
         val now = clock.instant()
-        val member = findEmailMember(Email(command.email).value)?.takeIf { it.hasPassword } ?: return codeMismatch()
+        val mismatch = ResetPasswordResult(success = false, failureReason = "CODE_MISMATCH")
+        val email = Email(command.email).value
+        val member = memberRepository.findByProviderUserId(Provider.EMAIL, ProviderUserId(identifierProtector.protect(email))) ?: return mismatch
+        if (!member.hasPassword) return mismatch
         val memberId = requireNotNull(member.id)
-        val reset = member.activePasswordReset(memberRepository.findPasswordResets(memberId, forUpdate = true)) ?: return codeMismatch()
+        val reset = member.activePasswordReset(memberRepository.findPasswordResets(memberId, forUpdate = true)) ?: return mismatch
 
         val attempt = member.verifyPasswordReset(reset, codeGenerator.hash(command.code), now)
 
@@ -291,23 +293,25 @@ class MemberModifyService(
     /** 형식 → 변경 가능 → 동일 주소 → 중복 순으로 본다. 회원의 이메일은 확인을 통과해야 바뀐다. */
     override fun changeEmail(command: ChangeEmailCommand, memberId: Long, ipAddress: String?): EmailChangeRequested {
         val newEmail = runCatching { Email(command.newEmail) }.getOrElse { throw InvalidEmailFormatException() }
-        val member = findMember(memberId)
-
-        member.ensureCanChangeEmail(newEmail)
-        ensureEmailAvailable(member.provider, newEmail, excludingMemberId = memberId)
+        val member = memberRepository.findById(memberId) ?: throw MemberNotFoundException()
+        val existing = memberRepository.findEmailVerifications(memberId, VerificationPurpose.EMAIL_CHANGE)
         val plainCode = codeGenerator.generate()
+
         // 같은 용도의 이전 코드만 폐기한다 — 가입 인증이 진행 중이면 그건 그대로 둔다.
-        val issue = member.requestEmailChange(newEmail, emailChangeChallenges(memberId), newCode(plainCode), verificationPolicy, clock.instant())
+        val issue = member.requestEmailChange(newEmail, existing, VerificationCode(UUID.randomUUID(), codeGenerator.hash(plainCode)), verificationPolicy, clock.instant())
+        ensureEmailNotTaken(member.provider, newEmail, exceptMemberId = memberId)
 
         // 접속기록(기준 제8조). 개인정보(이메일) 변경이라 남겨야 하는 수행업무다.
         eventPublisher.publish(MemberAccessed(memberId, AccessType.EMAIL_CHANGE, ipAddress))
-        return sendEmailChangeCode(issue, newEmail, plainCode)
+        saveVerificationCodes(issue)
+        eventPublisher.publish(VerificationEmailRequested(newEmail.value, plainCode))
+        return EmailChangeRequested(issue.issued.publicId, issue.issued.expiresAt)
     }
 
     /** 남의 핸들이면 없는 것과 같은 오류로 답한다. 성패와 무관하게 시도 횟수·소진을 남긴다. */
     override fun confirmEmailChange(command: ConfirmEmailChangeCommand, memberId: Long): ConfirmEmailChangeResult {
-        val verification = findChallenge(command.verificationPublicId, forUpdate = true)
-        val member = findMember(memberId)
+        val verification = memberRepository.findEmailVerification(command.verificationPublicId, forUpdate = true) ?: throw VerificationNotFoundException()
+        val member = memberRepository.findById(memberId) ?: throw MemberNotFoundException()
 
         val attempt = member.confirmEmailChange(verification, codeGenerator.hash(command.code), clock.instant())
 
@@ -319,7 +323,7 @@ class MemberModifyService(
 
         val newEmail = requireNotNull(verification.targetEmail) { "이메일 변경 챌린지에 대상 주소가 없습니다." }
         // 확인 시점에 다시 본다 — 요청 후 확인 사이에 다른 회원이 그 주소로 가입했을 수 있다.
-        ensureEmailAvailable(member.provider, newEmail, excludingMemberId = memberId)
+        ensureEmailNotTaken(member.provider, newEmail, exceptMemberId = memberId)
         memberRepository.saveEmail(member.replaceEmail(newEmail, ProviderUserId(identifierProtector.protect(newEmail.value))))
         eventPublisher.publish(EmailChanged(memberId, member.provider, loginIdentifierUpdated = member.provider == Provider.EMAIL))
         return ConfirmEmailChangeResult(changed = true, email = newEmail.value, failureReason = null)
@@ -327,13 +331,16 @@ class MemberModifyService(
 
     /** 쿨다운은 이메일 변경 용도로만 센다. 대상 주소는 이전 코드에서 이어받는다. */
     override fun resendEmailChange(command: ResendEmailChangeCommand, memberId: Long): EmailChangeRequested {
-        val previous = findChallenge(command.verificationPublicId)
-        val member = findMember(memberId)
-
+        val previous = memberRepository.findEmailVerification(command.verificationPublicId) ?: throw VerificationNotFoundException()
+        val member = memberRepository.findById(memberId) ?: throw MemberNotFoundException()
+        val existing = memberRepository.findEmailVerifications(memberId, VerificationPurpose.EMAIL_CHANGE)
         val plainCode = codeGenerator.generate()
-        val issue = member.reissueEmailChange(previous, emailChangeChallenges(memberId), newCode(plainCode), verificationPolicy, clock.instant())
 
-        return sendEmailChangeCode(issue, requireNotNull(issue.issued.targetEmail), plainCode)
+        val issue = member.reissueEmailChange(previous, existing, VerificationCode(UUID.randomUUID(), codeGenerator.hash(plainCode)), verificationPolicy, clock.instant())
+
+        saveVerificationCodes(issue)
+        eventPublisher.publish(VerificationEmailRequested(requireNotNull(issue.issued.targetEmail).value, plainCode))
+        return EmailChangeRequested(issue.issued.publicId, issue.issued.expiresAt)
     }
 
     // ── 정지·복구·탈퇴 ──
@@ -344,7 +351,7 @@ class MemberModifyService(
      */
     override fun suspend(command: SuspendMemberCommand): LifecycleResult {
         val now = clock.instant()
-        val member = findMember(command.memberId)
+        val member = memberRepository.findById(command.memberId) ?: throw MemberNotFoundException()
 
         val suspended = member.suspend(command.reason, command.suspendedUntil, now)
 
@@ -355,7 +362,7 @@ class MemberModifyService(
     }
 
     override fun reactivate(command: ReactivateMemberCommand): LifecycleResult {
-        val member = findMember(command.memberId)
+        val member = memberRepository.findById(command.memberId) ?: throw MemberNotFoundException()
 
         val reactivated = member.reactivate()
 
@@ -365,7 +372,7 @@ class MemberModifyService(
     }
 
     override fun withdrawalTarget(memberId: Long): WithdrawalTargetView {
-        val member = findMember(memberId)
+        val member = memberRepository.findById(memberId) ?: throw MemberNotFoundException()
         return WithdrawalTargetView(
             provider = member.provider,
             providerUserId = member.providerUserId.value,
@@ -374,7 +381,7 @@ class MemberModifyService(
     }
 
     /** 행 삭제(hard delete). [MemberWithdrawn]은 커밋 뒤 다른 context로 나간다(SPEC-0011 R17). */
-    override fun erase(memberId: Long, provider: Provider, unlinkFailureReason: String?) {
+    override fun deleteMember(memberId: Long, provider: Provider, unlinkFailureReason: String?) {
         memberRepository.delete(memberId)
         // 해제 실패는 provider와 사유만 남긴다. 토큰·이메일은 남기지 않는다(R11).
         unlinkFailureReason?.let { eventPublisher.publish(SnsUnlinkFailed(memberId, provider, it)) }
@@ -386,23 +393,21 @@ class MemberModifyService(
     /** 형식만 보고 중복은 보지 않는다(SPEC-0032 R31). 형식 오류가 회원 부재보다 먼저다. 프로필 행이 없으면 없는 회원과 같이 답한다. */
     override fun changeNickname(command: ChangeNicknameCommand, memberId: Long): String {
         val nickname = Nickname(command.nickname)
-        findMember(memberId)
 
         if (!memberRepository.saveNickname(memberId, nickname)) throw MemberNotFoundException()
         return nickname.value
     }
 
-    override fun attachProfileImage(memberId: Long, pendingObjectKey: String): String? {
-        val member = findMember(memberId)
+    /** 이 회원에게 발급된 임시 키만 받는다. 저장은 확정 위치의 키로 한다. */
+    override fun changeProfileImage(memberId: Long, pendingObjectKey: String): String? {
+        val confirmedKey = ProfileImageObjectKey.pendingOf(pendingObjectKey, memberId).toConfirmed()
         val previousKey = memberRepository.findProfileImageKey(memberId)
 
-        val confirmed = member.attachProfileImage(ProfileImageObjectKey.pendingOf(pendingObjectKey, memberId))
-
-        if (!memberRepository.saveProfileImage(memberId, confirmed.value)) throw MemberNotFoundException()
+        if (!memberRepository.saveProfileImage(memberId, confirmedKey.value)) throw MemberNotFoundException()
         return previousKey
     }
 
-    override fun detachProfileImage(memberId: Long): String? {
+    override fun removeProfileImage(memberId: Long): String? {
         val previousKey = memberRepository.findProfileImageKey(memberId)
 
         if (!memberRepository.saveProfileImage(memberId, objectKey = null)) throw MemberNotFoundException()
@@ -414,33 +419,37 @@ class MemberModifyService(
     /** 철회해도 다른 오퍼레이션을 거절하지 않는다. 이용 제한은 클라이언트가 `required=true, agreed=false`를 보고 건다(R11). */
     override fun updateAgreement(command: UpdateAgreementCommand, memberId: Long): AgreementStatusView {
         val now = clock.instant()
-        val active = activeTerms(now)
-        val member = findMember(memberId)
+        val activeTerms = ActiveTerms.of(memberRepository.findEffectiveTerms(now))
+        val member = memberRepository.findById(memberId) ?: throw MemberNotFoundException()
 
-        val agreement = member.decideAgreement(command.termsCode, command.agreed, active, now)
+        val agreement = member.decideAgreement(command.termsCode, command.agreed, activeTerms, now)
 
-        saveAgreements(memberId, listOf(agreement), active, command.agreed)
-        return agreementStatuses(memberId, active).first { it.termsCode == command.termsCode }
+        memberRepository.saveAgreements(memberId, listOf(agreement))
+        eventPublisher.publish(TermsAgreementChanged(memberId, listOfNotNull(activeTerms.find(agreement.termsCode)), command.agreed))
+        return activeTerms.statusOf(memberRepository.findAgreements(memberId)).map(AgreementStatusView::of).first { it.termsCode == command.termsCode }
     }
 
-    /** 동의만 받는다. 이미 동의한 코드를 다시 내도 오류가 아니다. */
+    /** 동의만 받는다. 이미 동의한 코드를 다시 내도 오류가 아니다. 낸 코드가 없으면 아무것도 쓰지 않는다. */
     override fun agreeToRequiredTerms(command: AgreeToRequiredTermsCommand, memberId: Long): List<AgreementStatusView> {
         val now = clock.instant()
-        val active = activeTerms(now)
-        val member = findMember(memberId)
+        val activeTerms = ActiveTerms.of(memberRepository.findEffectiveTerms(now))
+        val member = memberRepository.findById(memberId) ?: throw MemberNotFoundException()
 
-        val agreements = member.agreeToRequiredTerms(command.termsCodes, active, now)
+        val agreements = member.agreeToRequiredTerms(command.termsCodes, activeTerms, now)
 
-        saveAgreements(memberId, agreements, active, agreed = true)
-        return agreementStatuses(memberId, active)
+        if (agreements.isNotEmpty()) {
+            memberRepository.saveAgreements(memberId, agreements)
+            eventPublisher.publish(TermsAgreementChanged(memberId, agreements.mapNotNull { activeTerms.find(it.termsCode) }, agreed = true))
+        }
+        return activeTerms.statusOf(memberRepository.findAgreements(memberId)).map(AgreementStatusView::of)
     }
 
     // ── 역할 ──
 
     /** 멱등이다. 대상의 accessToken에는 다음 재발급(최대 access TTL) 뒤에 반영된다. */
     override fun assignRole(command: AssignRoleCommand, actorMemberId: Long): RoleChangeResult {
-        val member = findMember(command.targetMemberId)
-        val role = findRole(command.roleCode)
+        val member = memberRepository.findById(command.targetMemberId) ?: throw MemberNotFoundException()
+        val role = memberRepository.findRole(command.roleCode) ?: throw RoleNotFoundException("존재하지 않는 역할입니다: ${command.roleCode}")
 
         val change = member.grantRole(role, memberRepository.findRolesOf(command.targetMemberId))
 
@@ -448,13 +457,13 @@ class MemberModifyService(
             memberRepository.addRole(change, clock.instant())
             eventPublisher.publish(MemberRoleGranted(command.targetMemberId, command.roleCode, actorMemberId))
         }
-        return RoleChangeResult(success = true, changed = change !is MemberRoleChange.Unchanged)
+        return RoleChangeResult(success = true, changed = change is MemberRoleChange.Granted)
     }
 
     /** 멱등이다. 자기 강등 검사와 회수 사이의 경합(동시 회수 두 건이 모두 통과)은 받아들인 잔여 위험이다. */
     override fun revokeRole(command: RevokeRoleCommand, actorMemberId: Long): RoleChangeResult {
-        val member = findMember(command.targetMemberId)
-        val role = findRole(command.roleCode)
+        val member = memberRepository.findById(command.targetMemberId) ?: throw MemberNotFoundException()
+        val role = memberRepository.findRole(command.roleCode) ?: throw RoleNotFoundException("존재하지 않는 역할입니다: ${command.roleCode}")
 
         val change = member.revokeRole(role, memberRepository.findRolesOf(command.targetMemberId), actorMemberId)
 
@@ -462,125 +471,75 @@ class MemberModifyService(
             memberRepository.removeRole(change)
             eventPublisher.publish(MemberRoleRevoked(command.targetMemberId, command.roleCode, actorMemberId))
         }
-        return RoleChangeResult(success = true, changed = change !is MemberRoleChange.Unchanged)
+        return RoleChangeResult(success = true, changed = change is MemberRoleChange.Revoked)
     }
 
     // ── 로그인 ──
 
-    override fun admitSns(provider: Provider, providerUserId: String): Long {
+    /** 기간제 정지가 만료돼 복구됐을 때만 상태를 쓴다. */
+    override fun loginSnsMember(provider: Provider, providerUserId: String): Long {
         val member = memberRepository.findByProviderUserId(provider, ProviderUserId(providerUserId))
             ?: throw MemberNotFoundException("가입되지 않은 계정입니다. 회원가입이 필요합니다.")
-        return admit(member)
+
+        val loggedIn = member.login(clock.instant())
+
+        if (loggedIn != member) memberRepository.saveStatus(loggedIn)
+        return requireNotNull(member.id)
     }
 
     override fun findEmailCredential(loginIdentifier: String): EmailCredentialView? = memberRepository.findByProviderUserId(Provider.EMAIL, ProviderUserId(loginIdentifier))
         ?.let { EmailCredentialView(memberId = requireNotNull(it.id), passwordHash = it.passwordHash?.value) }
 
-    override fun admit(memberId: Long) {
-        admit(findMember(memberId))
+    override fun loginMember(memberId: Long) {
+        val member = memberRepository.findById(memberId) ?: throw MemberNotFoundException()
+
+        val loggedIn = member.login(clock.instant())
+
+        if (loggedIn != member) memberRepository.saveStatus(loggedIn)
     }
 
-    override fun keepProviderRefreshToken(memberId: Long, token: String) {
-        memberRepository.findById(memberId)?.keepProviderRefreshToken(token)?.let(memberRepository::saveProviderRefreshToken)
+    override fun saveProviderRefreshToken(memberId: Long, token: String) {
+        memberRepository.saveProviderRefreshToken(memberId, token)
     }
 
-    // ── 공통 ──
-
-    private fun findMember(memberId: Long): Member = memberRepository.findById(memberId) ?: throw MemberNotFoundException()
-
-    private fun findEmailMember(email: String): Member? = memberRepository.findByProviderUserId(Provider.EMAIL, ProviderUserId(identifierProtector.protect(email)))
-
-    private fun findRole(code: String): Role = memberRepository.findRole(code) ?: throw RoleNotFoundException("존재하지 않는 역할입니다: $code")
-
-    /** 핸들로 코드를 읽는다. 이 회원·이 용도의 코드가 맞는지는 루트가 판정한다. */
-    private fun findChallenge(publicId: UUID, forUpdate: Boolean = false): EmailVerification = memberRepository.findEmailVerification(publicId, forUpdate)
-        ?: throw VerificationNotFoundException()
-
-    private fun emailChangeChallenges(memberId: Long): List<EmailVerification> = memberRepository.findEmailVerifications(memberId, VerificationPurpose.EMAIL_CHANGE)
+    // ── 여러 메서드가 함께 쓰는 것 ──
 
     /**
-     * `(provider, email)` 유니크 판정(SPEC-0024 R5). 다른 provider의 같은 주소는 충돌이 아니다(POL-002).
-     * - 판정 키는 정규화된 주소의 결정론적 HMAC이다(암호문은 IV가 달라 등호 조회가 안 된다).
-     * - 예외에 상대 회원의 정보를 담지 않는다(POL-013). [excludingMemberId]는 본인 제외 기준이다.
+     * 같은 provider에 그 이메일을 쓰는 다른 회원이 있으면 거부한다(SPEC-0024 R5). 다른 provider의 같은 주소는 충돌이 아니다(POL-002).
+     * - 판정 키는 정규화된 주소의 결정론적 HMAC이다(암호문은 IV가 달라 등호 조회가 안 된다). 예외에 상대 회원의 정보를 담지 않는다(POL-013).
      */
-    private fun ensureEmailAvailable(provider: Provider, email: Email, excludingMemberId: Long? = null) {
-        if (memberRepository.existsByEmailIdentifier(provider, identifierProtector.protect(email.value), excludingMemberId)) {
+    private fun ensureEmailNotTaken(provider: Provider, email: Email, exceptMemberId: Long? = null) {
+        if (memberRepository.existsByEmailIdentifier(provider, identifierProtector.protect(email.value), exceptMemberId)) {
             throw EmailAlreadyInUseException()
         }
     }
 
     /** 회원·프로필·동의를 넣고 기본 역할(USER)을 준다. 관리 역할은 역할 부여로만 얻는다. */
-    private fun insert(member: Member, profile: Profile, agreements: List<Agreement>, now: Instant): Member {
-        val saved = member.saved(memberRepository.insert(member, profile, agreements))
-        memberRepository.findRole(Role.USER)?.let { role ->
-            val change = saved.grantRole(role, held = emptyList())
+    private fun saveNewMember(member: Member, profile: Profile, agreements: List<Agreement>, now: Instant): Member {
+        val saved = member.withId(memberRepository.insert(member, profile, agreements))
+        memberRepository.findRole(Role.USER)?.let { userRole ->
+            val change = saved.grantRole(userRole, held = emptyList())
             if (change is MemberRoleChange.Granted) memberRepository.addRole(change, now)
         }
         return saved
     }
 
-    private fun issueFirstVerification(member: Member, now: Instant): EmailVerification {
+    /** 가입 직후의 첫 인증 코드를 저장하고 회원의 이메일로 보낸다. */
+    private fun sendFirstVerificationCode(member: Member, now: Instant): EmailVerification {
         val plainCode = codeGenerator.generate()
-        val verification = member.issueEmailVerification(newCode(plainCode), verificationPolicy, now)
+        val verification = member.issueEmailVerification(VerificationCode(UUID.randomUUID(), codeGenerator.hash(plainCode)), verificationPolicy, now)
         memberRepository.insertEmailVerification(verification)
         eventPublisher.publish(VerificationEmailRequested(member.email.value, plainCode))
         return verification
     }
 
-    /** 발급 후 확정 사이에 다른 회원이 그 주소를 가져갔을 수 있어 다시 본다. */
-    private fun confirmRetargetedEmail(member: Member, newEmail: Email): Member {
-        ensureEmailAvailable(member.provider, newEmail, excludingMemberId = member.id)
-        val changed = member.replaceEmail(newEmail, ProviderUserId(identifierProtector.protect(newEmail.value)))
-        memberRepository.saveEmail(changed)
-        return changed
-    }
-
-    private fun sendEmailChangeCode(issue: EmailVerificationIssue, toEmail: Email, plainCode: String): EmailChangeRequested {
-        store(issue)
-        eventPublisher.publish(VerificationEmailRequested(toEmail.value, plainCode))
-        return EmailChangeRequested(issue.issued.publicId, issue.issued.expiresAt)
-    }
-
-    private fun store(issue: EmailVerificationIssue) {
+    /** 폐기할 이전 코드에는 소진만 표시하고 새 코드를 넣는다. */
+    private fun saveVerificationCodes(issue: EmailVerificationIssue) {
         issue.consumed.forEach(memberRepository::consumeEmailVerification)
         memberRepository.insertEmailVerification(issue.issued)
     }
 
-    private fun newCode(plainCode: String) = VerificationCode(UUID.randomUUID(), codeGenerator.hash(plainCode))
-
-    private fun activeTerms(now: Instant): ActiveTerms = ActiveTerms.of(memberRepository.findEffectiveTerms(now))
-
-    private fun agreementsOf(inputs: List<AgreementInput>, active: ActiveTerms, now: Instant): List<Agreement> = Member.agreementsAtRegistration(inputs.associate { it.termsCode to it.agreed }, active, now)
-
-    private fun saveAgreements(memberId: Long, agreements: List<Agreement>, active: ActiveTerms, agreed: Boolean) {
-        if (agreements.isEmpty()) return
-        memberRepository.saveAgreements(memberId, agreements)
-        eventPublisher.publish(TermsAgreementChanged(memberId, agreements.mapNotNull { active.find(it.termsCode) }, agreed))
-    }
-
-    private fun agreementStatuses(memberId: Long, active: ActiveTerms): List<AgreementStatusView> = active.statusOf(memberRepository.findAgreements(memberId)).map(AgreementStatusView::of)
-
-    /**
-     * 후보 중 처음으로 형식에 맞는 닉네임을 쓰고, 없으면 자동 생성한다(SPEC-0032 R29·R30).
-     * - 잘라내지 않는다. 길이 규칙을 벗어나면 통째로 다음 후보로 넘어간다. 중복은 허용이라 저장소를 묻지 않는다(R31).
-     */
-    private fun nicknameFrom(vararg candidates: String?): Nickname = candidates.asSequence()
-        .filterNotNull()
-        .mapNotNull { runCatching { Nickname(it) }.getOrNull() }
-        .firstOrNull()
-        ?: nicknameGenerator.generate()
-
-    /** 기간제 정지가 만료돼 복구됐을 때만 상태를 쓴다. */
-    private fun admit(member: Member): Long {
-        val admitted = member.admit(clock.instant())
-        if (admitted != member) memberRepository.saveStatus(admitted)
-        return requireNotNull(member.id)
-    }
-
-    private fun codeMismatch() = ResetPasswordResult(success = false, failureReason = CODE_MISMATCH)
-
     private companion object {
-        const val CODE_MISMATCH = "CODE_MISMATCH"
         val log = LoggerFactory.getLogger(MemberModifyService::class.java)
     }
 }

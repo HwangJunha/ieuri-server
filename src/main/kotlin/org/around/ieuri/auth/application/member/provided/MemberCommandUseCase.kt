@@ -84,7 +84,7 @@ interface MemberCommandUseCase {
     fun withdrawalTarget(memberId: Long): WithdrawalTargetView
 
     /** 회원과 소유 데이터를 지운다. provider 연결 해제가 실패했으면 [unlinkFailureReason]을 함께 남긴다(탈퇴는 그대로 진행한다). */
-    fun erase(memberId: Long, provider: Provider, unlinkFailureReason: String?)
+    fun deleteMember(memberId: Long, provider: Provider, unlinkFailureReason: String?)
 
     // ── 프로필(SPEC-0011 R5·R6) ──
 
@@ -92,10 +92,10 @@ interface MemberCommandUseCase {
     fun changeNickname(command: ChangeNicknameCommand, memberId: Long): String
 
     /** 확인이 끝난 임시 키를 회원의 프로필 이미지로 삼고, 이전 키를 돌려준다(없었으면 null). */
-    fun attachProfileImage(memberId: Long, pendingObjectKey: String): String?
+    fun changeProfileImage(memberId: Long, pendingObjectKey: String): String?
 
     /** 프로필 이미지를 떼고 이전 키를 돌려준다. 이미 없어도 성공한다. */
-    fun detachProfileImage(memberId: Long): String?
+    fun removeProfileImage(memberId: Long): String?
 
     // ── 약관 동의(SPEC-0011 R10·R12) ──
 
@@ -116,14 +116,14 @@ interface MemberCommandUseCase {
     // ── 로그인의 DB 단계. 비밀번호 해시를 내보내므로 리졸버가 부르지 않는다 — [MemberLoginUseCase]만 쓴다 ──
 
     /** SNS 신원의 회원을 로그인시킨다. 미가입은 MEMBER_NOT_FOUND, 유효한 정지는 ACCOUNT_INACTIVE다. 기간제 정지가 만료됐으면 복구하고 허용한다. */
-    fun admitSns(provider: Provider, providerUserId: String): Long
+    fun loginSnsMember(provider: Provider, providerUserId: String): Long
 
     /** [loginIdentifier]는 정규화한 이메일의 보호 변환값이다. 없는 계정이면 null. */
     fun findEmailCredential(loginIdentifier: String): EmailCredentialView?
 
-    /** 비밀번호 대조를 마친 회원을 로그인시킨다. 정지 판정은 [admitSns]와 같다. */
-    fun admit(memberId: Long)
+    /** 비밀번호 대조를 마친 회원을 로그인시킨다. 정지 판정은 [loginSnsMember]와 같다. */
+    fun loginMember(memberId: Long)
 
-    /** 탈퇴 때 쓸 provider 토큰을 보관한다. 회원이 없거나 자체(EMAIL) 회원이면 아무것도 하지 않는다. */
-    fun keepProviderRefreshToken(memberId: Long, token: String)
+    /** 탈퇴 때 연결을 끊는 데 쓸 provider 토큰을 저장한다. 회원이 없으면 아무것도 하지 않는다. */
+    fun saveProviderRefreshToken(memberId: Long, token: String)
 }

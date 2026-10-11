@@ -182,7 +182,7 @@ class MemberModifyLifecycleTest {
 
     @Test
     fun `삭제는 회원을 지운 뒤 탈퇴 사실을 provider와 함께 알린다`() {
-        service.erase(100L, Provider.GOOGLE, unlinkFailureReason = null)
+        service.deleteMember(100L, Provider.GOOGLE, unlinkFailureReason = null)
 
         verifyOrder {
             memberRepository.delete(100L)
@@ -195,7 +195,7 @@ class MemberModifyLifecycleTest {
     /** 해제 실패는 provider와 사유만 남긴다(R11). */
     @Test
     fun `해제 실패 사유가 있으면 해제 실패와 탈퇴를 차례로 알린다`() {
-        service.erase(100L, Provider.APPLE, unlinkFailureReason = "HTTP 400 invalid_grant")
+        service.deleteMember(100L, Provider.APPLE, unlinkFailureReason = "HTTP 400 invalid_grant")
 
         verify(exactly = 1) { memberRepository.delete(100L) }
         assertEquals(
