@@ -6,9 +6,6 @@ import org.around.ieuri.alarm.domain.device.DeviceToken
 interface DeviceTokenRepository {
     fun findByDeviceId(deviceId: String): DeviceToken?
 
-    /** 회원의 기기 전부(AC5.3). 토큰이 없으면 빈 목록이다. */
-    fun findByMemberId(memberId: Long): List<DeviceToken>
-
     /** id가 없으면 넣는다. 있으면 값이 바뀐 경우에만 고친다(`updated_at` 포함). */
     fun save(deviceToken: DeviceToken)
 

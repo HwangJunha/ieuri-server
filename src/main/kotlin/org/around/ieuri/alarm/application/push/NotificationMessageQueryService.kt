@@ -1,7 +1,7 @@
 package org.around.ieuri.alarm.application.push
 
 import org.around.ieuri.alarm.application.push.provided.NotificationMessageQueryUseCase
-import org.around.ieuri.alarm.application.push.required.NotificationMessageRepository
+import org.around.ieuri.alarm.application.push.required.NotificationMessageQueryPort
 import org.around.ieuri.alarm.domain.device.AlarmLocale
 import org.around.ieuri.alarm.domain.push.NotificationMessage
 import org.around.ieuri.alarm.domain.push.NotificationType
@@ -14,9 +14,9 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, readOnly = true)
 class NotificationMessageQueryService(
-    private val repository: NotificationMessageRepository,
+    private val messageQueryPort: NotificationMessageQueryPort,
 ) : NotificationMessageQueryUseCase {
 
     @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, propagation = Propagation.REQUIRES_NEW, readOnly = true)
-    override fun messagesOf(type: NotificationType): Map<AlarmLocale, NotificationMessage> = repository.findByType(type).associateBy { it.locale }
+    override fun messagesOf(type: NotificationType): Map<AlarmLocale, NotificationMessage> = messageQueryPort.findByType(type).associateBy { it.locale }
 }

@@ -25,10 +25,6 @@ class DeviceTokenPersistenceAdapter : DeviceTokenRepository {
         .singleOrNull()
         ?.toDeviceToken()
 
-    override fun findByMemberId(memberId: Long): List<DeviceToken> = DeviceTokenTable.selectAll()
-        .where { DeviceTokenTable.memberId eq memberId }
-        .map { it.toDeviceToken() }
-
     /** 값이 같으면 행을 고치지 않는다 — `updated_at`이 "바뀐 시각"으로 남는다. */
     override fun save(deviceToken: DeviceToken) {
         val id = deviceToken.id

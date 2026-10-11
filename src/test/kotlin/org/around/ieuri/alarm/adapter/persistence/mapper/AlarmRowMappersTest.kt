@@ -1,5 +1,6 @@
 package org.around.ieuri.alarm.adapter.persistence.mapper
 
+import org.around.ieuri.alarm.adapter.persistence.mapper.toDeviceTokenView
 import org.around.ieuri.alarm.adapter.persistence.table.DeviceTokenTable
 import org.around.ieuri.alarm.adapter.persistence.table.NotificationMessageTable
 import org.around.ieuri.alarm.adapter.persistence.table.NotificationPreferenceTable
@@ -42,6 +43,23 @@ class AlarmRowMappersTest {
         assertEquals("fcm-값", token.fcmToken)
         assertEquals(AlarmLocale.JA, token.language)
         assertEquals(DevicePlatform.IOS, token.platform)
+    }
+
+    @Test
+    fun `기기 토큰 행이 발송 대상 읽기 모델로 옮겨진다`() {
+        val view = ResultRow.createAndFillValues(
+            mapOf(
+                DeviceTokenTable.deviceId to "device-값",
+                DeviceTokenTable.fcmToken to "fcm-값",
+                DeviceTokenTable.language to "ZH",
+                DeviceTokenTable.platform to "ANDROID",
+            ),
+        ).toDeviceTokenView()
+
+        assertEquals("device-값", view.deviceId)
+        assertEquals("fcm-값", view.fcmToken)
+        assertEquals(AlarmLocale.ZH, view.language)
+        assertEquals(DevicePlatform.ANDROID, view.platform)
     }
 
     @Test
