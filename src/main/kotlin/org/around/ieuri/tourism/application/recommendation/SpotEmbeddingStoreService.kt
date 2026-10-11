@@ -1,6 +1,5 @@
 package org.around.ieuri.tourism.application.recommendation
 
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.category.provided.CategoryQueryUseCase
 import org.around.ieuri.tourism.application.recommendation.provided.SpotEmbeddingStoreUseCase
 import org.around.ieuri.tourism.application.recommendation.provided.dto.EmbeddingInput
@@ -12,7 +11,7 @@ import org.springframework.transaction.annotation.Transactional
 
 /** 임베딩 대상 읽기와 벡터 저장. 텍스트의 카테고리 라벨은 카테고리 조회를 재사용해 행의 언어로, 언어별로 한 번씩만 조회한다. */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
+@Transactional
 class SpotEmbeddingStoreService(
     private val embeddingRepository: SpotEmbeddingRepository,
     private val categoryQuery: CategoryQueryUseCase,

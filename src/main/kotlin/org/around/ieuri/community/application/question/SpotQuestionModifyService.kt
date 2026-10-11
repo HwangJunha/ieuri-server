@@ -1,6 +1,5 @@
 package org.around.ieuri.community.application.question
 
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.community.application.lookup.provided.SpotLookupUseCase
 import org.around.ieuri.community.application.photo.provided.UploadedPhotoUseCase
 import org.around.ieuri.community.application.question.provided.SpotQuestionCommandUseCase
@@ -26,7 +25,7 @@ import java.time.Instant
 
 /** 질문·답변·답글 쓰기. 답변·답글은 루트(질문)를 통해 만들고 지운다. 외부 호출(장소 조회·R2)은 첫 쿼리 전에 한다. */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
+@Transactional
 class SpotQuestionModifyService(
     private val questionRepository: SpotQuestionRepository,
     private val spotLookup: SpotLookupUseCase,
@@ -138,7 +137,7 @@ class SpotQuestionModifyService(
      * 답글 → 답변 → 질문 순으로 하나씩, 루트(질문)의 탈퇴 메서드를 거쳐 삭제 표시한다. 수에 잡혀 있던 답변만 답변 수를 내린다.
      * - 순서 주의: 자식은 루트를 읽어 판정하므로 질문보다 먼저 처리한다. 루트가 이미 없으면 자식은 읽기에서 걸러지므로 건너뛴다.
      */
-    @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     override fun eraseMemberContent(memberId: Long, deletedAt: Instant): Int {
         var erased = 0
         questionRepository.findReplyIdsByAuthor(memberId).forEach { replyId ->

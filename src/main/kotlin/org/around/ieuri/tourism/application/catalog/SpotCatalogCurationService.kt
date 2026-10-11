@@ -1,6 +1,5 @@
 package org.around.ieuri.tourism.application.catalog
 
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.catalog.provided.SpotCatalogCurationUseCase
 import org.around.ieuri.tourism.application.catalog.provided.dto.CatalogAssignmentResult
 import org.around.ieuri.tourism.application.catalog.provided.dto.CatalogSplitResult
@@ -25,7 +24,7 @@ import org.springframework.transaction.annotation.Transactional
  * - KO에 짝이 없는 외국어 원본은 자기 언어만 가진 카탈로그가 된다(한국어명을 지어내지 않는다).
  */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
+@Transactional
 class SpotCatalogCurationService(
     private val catalogRepository: SpotCatalogRepository,
     private val eventPublisher: CatalogEventPublisherPort,

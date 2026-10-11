@@ -1,6 +1,5 @@
 package org.around.ieuri.tourism.application.region
 
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.region.provided.DistrictRepresentativeUseCase
 import org.around.ieuri.tourism.application.region.provided.dto.DistrictRepresentativeRefreshResult
 import org.around.ieuri.tourism.application.region.required.DistrictRepository
@@ -11,7 +10,7 @@ import org.springframework.transaction.annotation.Transactional
 
 /** 선정과 비우기는 한 트랜잭션이다 — 사이에서 실패하면 문턱 미달 시군구에 낡은 대표 위치가 남는다. */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
+@Transactional
 class DistrictRepresentativeService(
     private val districtRepository: DistrictRepository,
 ) : DistrictRepresentativeUseCase {

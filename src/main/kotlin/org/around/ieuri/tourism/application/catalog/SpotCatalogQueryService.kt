@@ -3,7 +3,6 @@ package org.around.ieuri.tourism.application.catalog
 import org.around.ieuri.common.event.LocationAccessed
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.OffsetPage
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.catalog.provided.SpotCatalogQueryUseCase
 import org.around.ieuri.tourism.application.catalog.provided.dto.LikedSpotView
 import org.around.ieuri.tourism.application.catalog.provided.dto.LikedSpotsQuery
@@ -36,7 +35,7 @@ import org.springframework.transaction.annotation.Transactional
  * - 뷰포트의 문화행사는 혼잡도 캐시에 있는 값만 쓴다.
  */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX, readOnly = true)
+@Transactional(readOnly = true)
 class SpotCatalogQueryService(
     private val spotQueryPort: SpotQueryPort,
     private val spotSpatialQueryPort: SpotSpatialQueryPort,

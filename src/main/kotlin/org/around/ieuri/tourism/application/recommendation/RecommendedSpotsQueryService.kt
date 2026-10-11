@@ -1,7 +1,6 @@
 package org.around.ieuri.tourism.application.recommendation
 
 import org.around.ieuri.common.event.LocationAccessed
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.catalog.SpotQueryPolicy
 import org.around.ieuri.tourism.application.catalog.coordinatesOf
 import org.around.ieuri.tourism.application.catalog.provided.dto.SpotView
@@ -27,7 +26,7 @@ import org.springframework.transaction.annotation.Transactional
  * - 유사도 조회 실패는 오류가 아니라 취향 없음이다.
  */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX, readOnly = true)
+@Transactional(readOnly = true)
 class RecommendedSpotsQueryService(
     private val spotQueryPort: SpotQueryPort,
     private val spotSpatialQueryPort: SpotSpatialQueryPort,

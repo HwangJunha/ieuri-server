@@ -1,7 +1,6 @@
 package org.around.ieuri.community.application.conversation
 
 import org.around.ieuri.common.pagination.CursorPage
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.common.security.ForbiddenException
 import org.around.ieuri.community.application.conversation.provided.ConversationQueryUseCase
 import org.around.ieuri.community.application.conversation.provided.dto.ConversationView
@@ -21,7 +20,7 @@ import reactor.core.publisher.Flux
  * - 없거나 참여자가 아닌 대화는 모두 [ForbiddenException](최상위 errors[])이다 — 뮤테이션의 userErrors[]와 다르다.
  */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX, readOnly = true)
+@Transactional(readOnly = true)
 class ConversationQueryService(
     private val conversationQueryPort: ConversationQueryPort,
     private val conversationEventPort: ConversationEventPort,

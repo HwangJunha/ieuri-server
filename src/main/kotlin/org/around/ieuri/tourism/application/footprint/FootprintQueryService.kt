@@ -1,6 +1,5 @@
 package org.around.ieuri.tourism.application.footprint
 
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.footprint.provided.FootprintQueryUseCase
 import org.around.ieuri.tourism.application.footprint.provided.dto.CellImageView
 import org.around.ieuri.tourism.application.footprint.provided.dto.CellSpotView
@@ -22,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional
 
 /** 전국 지도 조회 유스케이스 구현(SPEC-0030). 좌표를 받지 않고 시군구 코드만 다룬다(POL-045). */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX, readOnly = true)
+@Transactional(readOnly = true)
 class FootprintQueryService(
     private val mapCellQueryPort: MapCellQueryPort,
     private val mapCellDistrictQueryPort: MapCellDistrictQueryPort,

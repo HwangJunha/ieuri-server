@@ -13,14 +13,13 @@ import org.around.ieuri.auth.application.member.provided.exception.MemberNotFoun
 import org.around.ieuri.auth.application.member.required.MemberQueryPort
 import org.around.ieuri.auth.domain.member.ActiveTerms
 import org.around.ieuri.common.pagination.CursorPage
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 
 /** 회원 조회. 읽기 포트의 read DTO를 그대로 반환하며 인가는 리졸버가 판정한다. */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX, readOnly = true)
+@Transactional(readOnly = true)
 class MemberQueryService(
     private val memberQueryPort: MemberQueryPort,
     private val clock: Clock,

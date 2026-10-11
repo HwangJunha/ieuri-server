@@ -7,9 +7,6 @@ spring:
       # 쓰기·읽기 두 풀 각각에 적용된다. DB max_connections와 파드 수를 함께 보고 정한다.
       # 올릴 때는 DB(max_connections) 매니페스트를 먼저 머지한다 — 순서가 뒤집히면 커넥션이 거절된다.
       maximum-pool-size: 60
-  jpa:
-    # 질의 로그를 남기지 않는다. 파라미터에 개인정보가 실릴 수 있다.
-    show-sql: false
   graphql:
     schema:
       introspection:

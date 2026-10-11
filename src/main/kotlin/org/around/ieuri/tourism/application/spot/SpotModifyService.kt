@@ -1,6 +1,5 @@
 package org.around.ieuri.tourism.application.spot
 
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.spot.provided.SpotCommandUseCase
 import org.around.ieuri.tourism.application.spot.provided.exception.SpotOriginNotFoundException
 import org.around.ieuri.tourism.application.spot.required.SpotRepository
@@ -19,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional
  * - 단, 빈 갤러리·빈 이용안내는 원본이 없어도 조용히 끝난다 — 쓸 행이 없어 예전에도 실패하지 않았다(D-123).
  */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
+@Transactional
 class SpotModifyService(
     private val spotRepository: SpotRepository,
 ) : SpotCommandUseCase {

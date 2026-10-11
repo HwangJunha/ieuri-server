@@ -1,6 +1,5 @@
 package org.around.ieuri.community.application.conversation
 
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.community.application.block.required.BlockRepository
 import org.around.ieuri.community.application.conversation.provided.ConversationCommandUseCase
 import org.around.ieuri.community.application.conversation.provided.ExpiredMessageDeleteUseCase
@@ -39,7 +38,7 @@ import java.time.Instant
  * - 외부 호출(회원 조회·R2)은 첫 쿼리 전에 한다. 없는 대화와 참여자가 아닌 대화는 다른 코드다.
  */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
+@Transactional
 class ConversationModifyService(
     private val conversationRepository: ConversationRepository,
     private val blockRepository: BlockRepository,
@@ -150,7 +149,7 @@ class ConversationModifyService(
     }
 
     /** 대화마다 루트가 참여자를 확인한 뒤 그 대화의 보낸 메시지를 삭제 표시한다. 대화는 남긴다. 메시지 한 건 단위의 규칙은 없다. */
-    @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     override fun eraseMemberContent(memberId: Long, deletedAt: Instant): Int = conversationRepository.findIdsByParticipant(memberId).sumOf { conversationId ->
         val conversation = conversationRepository.findById(conversationId) ?: return@sumOf 0
         conversation.requireParticipant(memberId)

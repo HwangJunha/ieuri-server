@@ -1,6 +1,5 @@
 package org.around.ieuri.community.application.comment
 
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.community.application.comment.provided.CommentCommandUseCase
 import org.around.ieuri.community.application.comment.provided.dto.CreateCommentCommand
 import org.around.ieuri.community.application.comment.provided.exception.CommentNotFoundException
@@ -16,7 +15,7 @@ import java.time.Instant
 
 /** 댓글 생성·삭제. 대댓글도 글의 댓글 수에 포함된다. */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
+@Transactional
 class CommentModifyService(
     private val commentRepository: CommentRepository,
     private val postRepository: PostRepository,
@@ -50,7 +49,7 @@ class CommentModifyService(
     }
 
     /** 작성 댓글을 사용자 삭제와 같은 경로(도메인 판정 → 수에 잡혀 있던 것만 글의 댓글 수를 내림)로 하나씩 지운다. */
-    @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     override fun eraseMemberContent(memberId: Long, deletedAt: Instant): Int {
         val commentIds = commentRepository.findIdsByAuthor(memberId)
         commentIds.forEach { commentId ->

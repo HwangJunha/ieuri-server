@@ -3,9 +3,6 @@ plugins {
     kotlin("plugin.spring") version "2.3.21"
     id("org.springframework.boot") version "4.1.1"
     id("io.spring.dependency-management") version "1.1.7"
-    kotlin("plugin.jpa") version "2.3.21"
-    // QueryDSL Q클래스 생성을 위한 애노테이션 프로세싱(kapt).
-    kotlin("kapt") version "2.3.21"
     // 스키마 우선: schema/*.graphqls로부터 GraphQL input/output/enum 타입을 생성한다.
     id("com.netflix.dgs.codegen") version "8.7.0"
     // 스타일 센서(ktlint). `check`에 lintKotlin이 붙는다 — 규칙은 .editorconfig.
@@ -32,9 +29,10 @@ extra["json-path.version"] = "3.0.0"
 extra["exposedVersion"] = "1.5.0"
 
 dependencies {
-    implementation("org.springframework.boot:spring-boot-starter-data-jpa")
-    // 영속성 이전 대상(SPEC-0039 D-32). DSL만 쓴다 — DAO 모듈은 넣지 않는다.
-    // 스타터가 아니라 트랜잭션 모듈만 쓴다: 스타터의 자동구성이 트랜잭션 매니저를 만들면 JPA 매니저 자동구성이 물러난다.
+    // DataSource·JdbcTemplate(배치 메타 테이블·검색 노드)과 트랜잭션 인프라.
+    implementation("org.springframework.boot:spring-boot-starter-jdbc")
+    // 영속성은 Exposed DSL이다(SPEC-0039 D-32). DAO 모듈은 넣지 않는다.
+    // 스타터가 아니라 트랜잭션 모듈만 쓴다 — 매니저는 common/persistence/ExposedConfig가 메인 DataSource로 직접 만든다.
     implementation("org.jetbrains.exposed:exposed-core:${property("exposedVersion")}")
     implementation("org.jetbrains.exposed:exposed-jdbc:${property("exposedVersion")}")
     implementation("org.jetbrains.exposed:exposed-java-time:${property("exposedVersion")}")
@@ -69,11 +67,6 @@ dependencies {
     implementation("org.apache.httpcomponents.client5:httpclient5")
     // TourAPI 초당 호출 제한(SPEC-0037). 세마포어(동시 실행 수)로는 초당 호출 수를 묶을 수 없다.
     implementation("io.github.resilience4j:resilience4j-ratelimiter:2.3.0")
-    // 읽기(CQRS) 프로젝션: QueryDSL. Hibernate 7과 호환되는 OpenFeign 포크(jakarta).
-    implementation("io.github.openfeign.querydsl:querydsl-jpa:6.11")
-    kapt("io.github.openfeign.querydsl:querydsl-apt:6.11:jakarta")
-    kapt("jakarta.persistence:jakarta.persistence-api")
-    kapt("jakarta.annotation:jakarta.annotation-api")
     // 관광지 동기화 등 배치 잡(SPEC-0004). 메타 테이블(BATCH_*)은 Flyway가 소유한다.
     implementation("org.springframework.boot:spring-boot-starter-batch")
     implementation("org.flywaydb:flyway-core")
@@ -92,7 +85,6 @@ dependencies {
     // 애플 revoke용 .p8(PEM) 개인키 파싱. nimbus의 PEM 파서는 공개키를 함께 요구해 쓸 수 없다.
     implementation("org.bouncycastle:bcpkix-jdk18on:1.80")
     runtimeOnly("org.postgresql:postgresql")
-    testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")
     testImplementation("io.mockk:mockk:1.13.13")
     // 패키지 의존성 방향(infrastructure → application → domain) 검증
     testImplementation("com.tngtech.archunit:archunit-junit5:1.4.1")
@@ -118,12 +110,6 @@ kotlin {
     compilerOptions {
         freeCompilerArgs.addAll("-Xjsr305=strict", "-Xannotation-default-target=param-property")
     }
-}
-
-allOpen {
-    annotation("jakarta.persistence.Entity")
-    annotation("jakarta.persistence.MappedSuperclass")
-    annotation("jakarta.persistence.Embeddable")
 }
 
 tasks.withType<Test> {

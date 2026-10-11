@@ -1,6 +1,5 @@
 package org.around.ieuri.tourism.application.relation
 
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.footprint.provided.FootprintQueryUseCase
 import org.around.ieuri.tourism.application.footprint.provided.exception.ShareLinkBlockedException
 import org.around.ieuri.tourism.application.footprint.provided.exception.ShareLinkNotFoundException
@@ -15,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional
 
 /** 지도 관계 맺기·끊기(SPEC-0030 확장). 공유 링크 위에 양방향 관계를 얹는다. */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
+@Transactional
 class MapRelationModifyService(
     private val relationRepository: MapRelationRepository,
     private val footprintQueryUseCase: FootprintQueryUseCase,
@@ -35,6 +34,6 @@ class MapRelationModifyService(
 
     override fun removeRelation(memberId: Long, counterpartId: Long): Boolean = relationRepository.removeFromMyList(memberId, counterpartId)
 
-    @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     override fun eraseMemberContent(memberId: Long): Int = relationRepository.deleteAllInvolving(memberId)
 }

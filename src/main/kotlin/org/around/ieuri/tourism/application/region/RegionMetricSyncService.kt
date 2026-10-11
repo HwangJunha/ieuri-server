@@ -1,7 +1,6 @@
 package org.around.ieuri.tourism.application.region
 
 import org.around.ieuri.common.pagination.OffsetPage
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.region.provided.RegionMetricSyncUseCase
 import org.around.ieuri.tourism.application.region.provided.dto.RegionMetricDataset
 import org.around.ieuri.tourism.application.region.provided.dto.RegionMetricPageResult
@@ -19,7 +18,7 @@ import java.time.YearMonth
 
 /** KTO 빅데이터 동기화. 상류 호출은 첫 쿼리 전에 한다 — 연결을 잡은 채 기다리지 않는다. */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
+@Transactional
 class RegionMetricSyncService(
     private val syncPort: RegionMetricSyncPort,
     private val districtRepository: DistrictRepository,

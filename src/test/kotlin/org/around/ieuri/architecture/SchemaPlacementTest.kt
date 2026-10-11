@@ -1,19 +1,16 @@
 package org.around.ieuri.architecture
 
-import com.tngtech.archunit.core.domain.JavaClass
-import jakarta.persistence.Entity
-import jakarta.persistence.Table
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import org.jetbrains.exposed.v1.core.Table as ExposedTable
 
 /**
- * 스키마 분할의 배치표 검증(SPEC-0023). 실제 DB 배치는 부팅 시 `ddl-auto: validate`가 잡는다.
+ * 스키마 분할의 배치표 검증(SPEC-0023). 선언과 실제 DB의 어긋남은 기동 때 검사하지 않는다 — 그 테이블을 처음 읽는 쿼리에서 드러난다.
  */
 class SchemaPlacementTest {
 
-    /** 스펙 §4 배치표. 테이블 → 소유 스키마. 배치 메타 6개는 JPA 엔티티가 없어 제외한다. */
+    /** 스펙 §4 배치표. 테이블 → 소유 스키마. 배치 메타 6개는 테이블 선언이 없어 제외한다. */
     private val placement: Map<String, String> = buildMap {
         listOf(
             "member", "member_profile", "member_terms_agreement", "terms", "email_verification",
@@ -43,7 +40,7 @@ class SchemaPlacementTest {
             "spot_embedding",
             "congestion_area", "district", "kto_visitor_count", "kto_concentration_rate",
             "kto_stay_intensity", "kto_spending_intensity",
-            // 전국 지도(SPEC-0030). map_cell은 JPA 엔티티가 없다(생 SQL 어댑터 전용).
+            // 전국 지도(SPEC-0030)
             "member_district_visit", "map_share_link", "map_cell_image",
             "area", "map_cell", "map_cell_district", "map_relation",
         ).forEach { put(it, "tour") }
@@ -56,16 +53,13 @@ class SchemaPlacementTest {
             .forEach { put(it, "alarm") }
     }
 
-    /** JPA 엔티티도 Exposed 테이블 선언도 없는 테이블 — raw SQL로만 접근하거나, 쓰는 코드가 없다. */
-    private val tablesWithoutEntity = setOf(
+    /** Exposed 테이블 선언이 없는 테이블 — 쓰는 코드가 없다. */
+    private val tablesWithoutDeclaration = setOf(
         // 고아 사진 판정을 지우며 테이블만 남겼다(SPEC-0039 D-45). 쓰는 코드가 없다.
         "community_orphan_photo_object",
     )
 
-    private val entities: List<JavaClass> = ArchitectureClasses.main
-        .filter { it.isAnnotatedWith(Entity::class.java) }
-
-    /** Exposed로 옮긴 context의 `Table` 선언(object). 이름은 `스키마.테이블`이다. */
+    /** `Table` 선언(object). 이름은 `스키마.테이블`이다. */
     private val exposedTables: Map<String, String> = ArchitectureClasses.main
         .filter { it.isAssignableTo(ExposedTable::class.java) && it.name.endsWith("Table") }
         .mapNotNull { Class.forName(it.name).kotlin.objectInstance as? ExposedTable }
@@ -78,37 +72,11 @@ class SchemaPlacementTest {
         assertEquals(
             setOf("auth", "community", "tour", "category", "alarm"),
             placement.values.toSet(),
-            "배치 대상 스키마는 5개다 — batch는 JPA 엔티티가 없어 이 표에 없다",
+            "배치 대상 스키마는 5개다 — batch는 테이블 선언이 없어 이 표에 없다",
         )
     }
 
-    /** AC-1 — 모든 엔티티가 비어 있지 않은, 허용된 스키마 이름을 갖는다. */
-    @Test
-    fun `모든 JPA 엔티티가 스키마를 명시한다`() {
-        val allowed = setOf("auth", "community", "tour", "category", "alarm")
-
-        val missing = entities.filter { schemaOf(it).isBlank() }.map { it.simpleName }
-        assertTrue(missing.isEmpty(), "스키마를 명시하지 않은 엔티티: $missing")
-
-        val unknown = entities.filterNot { schemaOf(it) in allowed }.map { "${it.simpleName}=${schemaOf(it)}" }
-        assertTrue(unknown.isEmpty(), "허용되지 않은 스키마를 쓰는 엔티티: $unknown")
-    }
-
-    /** AC-2 — 각 엔티티의 (스키마, 테이블) 쌍이 배치표와 일치하고, 배치표에 없는 테이블에 매핑된 엔티티가 없다. */
-    @Test
-    fun `엔티티의 스키마와 테이블 쌍이 배치표와 일치한다`() {
-        val mismatched = entities.mapNotNull { entity ->
-            val table = tableOf(entity)
-            val expected = placement[table]
-                ?: return@mapNotNull "${entity.simpleName}: 배치표에 없는 테이블 '$table'"
-            val actual = schemaOf(entity)
-            if (actual == expected) null else "${entity.simpleName}($table): 기대 '$expected', 실제 '$actual'"
-        }
-
-        assertTrue(mismatched.isEmpty(), "배치표와 어긋나는 엔티티:\n${mismatched.joinToString("\n")}")
-    }
-
-    /** Exposed 테이블 선언도 스키마를 명시하고, 그 (스키마, 테이블) 쌍이 배치표와 일치한다. */
+    /** AC-1·AC-2 — 테이블 선언이 스키마를 명시하고, 그 (스키마, 테이블) 쌍이 배치표와 일치한다. */
     @Test
     fun `Exposed 테이블 선언의 스키마와 테이블 쌍이 배치표와 일치한다`() {
         assertTrue(exposedTables.isNotEmpty(), "Exposed 테이블 선언을 찾지 못했다 — 탐색 조건이 틀렸다")
@@ -122,18 +90,11 @@ class SchemaPlacementTest {
 
     /** 매핑 없는 테이블을 명시 목록으로 고정한다 — 위 테스트들은 존재하는 선언만 보므로 매핑 누락을 못 잡는다. */
     @Test
-    fun `엔티티 없는 테이블은 raw SQL 전용뿐이다`() {
-        val mappedTables = entities.map { tableOf(it) }.toSet() + exposedTables.keys
-        val actuallyMissing = placement.keys - mappedTables
-
+    fun `선언 없는 테이블은 목록에 적힌 것뿐이다`() {
         assertEquals(
-            tablesWithoutEntity,
-            actuallyMissing,
-            "엔티티가 없는 테이블 목록이 달라졌다 — 새 엔티티를 추가했거나 매핑이 빠졌다",
+            tablesWithoutDeclaration,
+            placement.keys - exposedTables.keys,
+            "테이블 선언이 없는 테이블 목록이 달라졌다 — 선언을 추가했거나 빠뜨렸다",
         )
     }
-
-    private fun tableOf(entity: JavaClass): String = entity.tryGetAnnotationOfType(Table::class.java).map { it.name }.orElse("")
-
-    private fun schemaOf(entity: JavaClass): String = entity.tryGetAnnotationOfType(Table::class.java).map { it.schema }.orElse("")
 }

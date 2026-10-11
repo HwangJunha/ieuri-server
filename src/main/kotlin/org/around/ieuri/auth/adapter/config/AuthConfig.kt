@@ -15,7 +15,6 @@ import java.time.Duration
     EncryptionProperties::class,
     VerificationProperties::class,
     JwtProperties::class,
-    RbacProperties::class,
     PasswordProperties::class,
     SnsProperties::class,
     ProfileImageProperties::class,

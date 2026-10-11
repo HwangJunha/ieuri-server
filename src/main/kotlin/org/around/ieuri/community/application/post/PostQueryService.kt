@@ -3,7 +3,6 @@ package org.around.ieuri.community.application.post
 import org.around.ieuri.common.context.AppKey
 import org.around.ieuri.common.event.LocationAccessed
 import org.around.ieuri.common.pagination.CursorPage
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.community.application.block.provided.BlockQueryUseCase
 import org.around.ieuri.community.application.post.provided.PostQueryUseCase
 import org.around.ieuri.community.application.post.provided.dto.CommunityChipView
@@ -27,7 +26,7 @@ import org.springframework.transaction.annotation.Transactional
 
 /** 글 조회. 애그리게이트를 거치지 않고 read DTO를 받는다. 피드·단건은 조회자의 차단·숨김을 조건으로 건다. */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX, readOnly = true)
+@Transactional(readOnly = true)
 class PostQueryService(
     private val postQueryPort: PostQueryPort,
     private val categoryConfigPort: CategoryConfigPort,

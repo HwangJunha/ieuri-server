@@ -1,6 +1,5 @@
 package org.around.ieuri.community.application.post
 
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.community.application.lookup.provided.SpotLookupUseCase
 import org.around.ieuri.community.application.photo.provided.UploadedPhotoUseCase
 import org.around.ieuri.community.application.post.provided.PostCommandUseCase
@@ -30,7 +29,7 @@ import java.time.Instant
  * - 사진 확인 실패는 모두 PHOTO_NOT_UPLOADED다.
  */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
+@Transactional
 class PostModifyService(
     private val postRepository: PostRepository,
     private val spotLookup: SpotLookupUseCase,
@@ -119,7 +118,7 @@ class PostModifyService(
     }
 
     /** 작성 글은 사용자 삭제와 같은 도메인 판정으로 하나씩 지운다. 좋아요·숨김은 저장소 연산이라 한 번에 지우고 좋아요 수를 내린다. */
-    @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     override fun eraseMemberContent(memberId: Long, deletedAt: Instant): Int {
         var posts = 0
         postRepository.findIdsByAuthor(memberId).forEach { postId ->

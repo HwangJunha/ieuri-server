@@ -2,10 +2,8 @@ package org.around.ieuri.common.persistence
 
 import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.migration.JavaMigration
-import org.springframework.beans.factory.BeanFactoryUtils
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Qualifier
-import org.springframework.beans.factory.config.BeanFactoryPostProcessor
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.jdbc.autoconfigure.DataSourceProperties
@@ -14,12 +12,11 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Primary
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.datasource.LazyConnectionDataSourceProxy
-import org.springframework.orm.jpa.AbstractEntityManagerFactoryBean
 import javax.sql.DataSource
 
 /**
  * 메인 DataSource·JdbcTemplate·Flyway. 검색 노드 빈이 있어 Boot 자동구성이 물러나므로 전부 명시한다.
- * - [dataSource]에만 `@Primary`가 필요하다 — JPA·배치 자동구성이 타입으로 받는다. 떼면 entityManagerFactory가 만들어지지 않는다.
+ * - [dataSource]에만 `@Primary`가 필요하다 — 트랜잭션 매니저와 배치가 타입으로 받는다.
  * - 검색 노드로 가는 어댑터는 `searchJdbcTemplate`을 이름으로 지목한다.
  */
 @Configuration
@@ -48,7 +45,7 @@ class DataSourceConfig {
     }
 
     /**
-     * JPA·배치가 타입으로 주입받는 기본 DataSource.
+     * 트랜잭션 매니저와 배치가 타입으로 주입받는 기본 DataSource.
      * - replica가 있으면 라우팅을 [LazyConnectionDataSourceProxy]로 감싼다. 감싸지 않으면 조용히 전부 primary로 간다.
      */
     @Bean
@@ -63,7 +60,7 @@ class DataSourceConfig {
     }
 
     /**
-     * 메인 JdbcTemplate. `searchJdbcTemplate`이 있어 자동구성이 물러나므로 여기서 명시한다.
+     * 메인 JdbcTemplate. 배치 JobRepository가 이 이름으로 쓴다. `searchJdbcTemplate`이 있어 자동구성이 물러나므로 여기서 명시한다.
      * - `@Primary`를 붙이지 않는다 — 주입 파라미터 이름으로 해소되며, 검색 노드 쪽이 이름을 빠뜨리면 기동이 깨지게 둔다.
      */
     @Bean
@@ -74,7 +71,7 @@ class DataSourceConfig {
      * 빠지면 메인 마이그레이션이 오류 없이 조용히 실행되지 않는다.
      * - `spring.flyway.*`를 읽어 자동구성과 동작을 맞춘다.
      * - [javaMigrations]를 넘겨야 한다. 빠뜨리면 빈으로 등록된 Java 마이그레이션이 해석되지 않아 검증이 깨진다.
-     * - JPA보다 먼저 돈다([entityManagerFactoryDependsOnFlyway]).
+     * - 트랜잭션 매니저보다 먼저 돈다([ExposedConfig.transactionManager]의 `@DependsOn`).
      * - Hikari 풀이 아니라 접속 정보를 직접 넘긴다(풀을 넘기면 정리 단계에서 닫힌 커넥션 스택트레이스가 찍힌다).
      */
     @Bean(initMethod = "migrate")
@@ -98,24 +95,6 @@ class DataSourceConfig {
         .ignoreMigrationPatterns(*properties.ignoreMigrationPatterns.toTypedArray())
         .javaMigrations(*javaMigrations.orderedStream().toList().toTypedArray())
         .load()
-
-    /**
-     * `entityManagerFactory`가 [flyway] 뒤에 만들어지도록 강제한다.
-     * - 자동구성이 물러나 Boot가 이 순서를 엮어 주지 않는다. 없으면 validate가 마이그레이션 전 스키마를 본다.
-     */
-    companion object {
-        /** `@JvmStatic`이어야 한다 — 인스턴스 메서드면 이 @Configuration이 너무 일찍 초기화된다. */
-        @Bean
-        @JvmStatic
-        fun entityManagerFactoryDependsOnFlyway(): BeanFactoryPostProcessor = BeanFactoryPostProcessor { beanFactory ->
-            for (name in beanFactory.getBeanNamesForType(AbstractEntityManagerFactoryBean::class.java, true, false)) {
-                // FactoryBean 조회는 `&`가 붙은 이름을 주는데 빈 정의는 그 접두사 없이 등록돼 있다.
-                val definitionName = BeanFactoryUtils.transformedBeanName(name)
-                val definition = beanFactory.getBeanDefinition(definitionName)
-                definition.setDependsOn(*((definition.dependsOn ?: emptyArray()) + "flyway"))
-            }
-        }
-    }
 }
 
 /** `spring.flyway.*` 중 이 앱이 쓰는 값만. 자동구성이 물러나 Boot의 FlywayProperties가 등록되지 않는다. */

@@ -1,6 +1,5 @@
 package org.around.ieuri.tourism.application.spot
 
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.catalog.required.SpotQueryPort
 import org.around.ieuri.tourism.application.catalog.required.dto.SpotIdentity
 import org.around.ieuri.tourism.application.category.provided.exception.UnknownCategoryException
@@ -24,7 +23,7 @@ import java.time.Instant
 
 /** 상세 조회의 DB 단계 구현. 캐시·업스트림은 모른다. */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX, readOnly = true)
+@Transactional(readOnly = true)
 class SpotDetailReadService(
     private val spotQueryPort: SpotQueryPort,
     private val detailQueryPort: SpotDetailQueryPort,

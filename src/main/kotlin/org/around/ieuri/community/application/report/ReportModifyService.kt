@@ -1,6 +1,5 @@
 package org.around.ieuri.community.application.report
 
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.community.application.comment.provided.exception.CommentNotFoundException
 import org.around.ieuri.community.application.comment.required.CommentRepository
 import org.around.ieuri.community.application.lookup.provided.MemberLookupUseCase
@@ -29,7 +28,7 @@ import org.springframework.transaction.annotation.Transactional
  * - 회원 신고는 기록만 한다(POL-041). 회원 존재 확인(auth)은 첫 쿼리 전에 한다.
  */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
+@Transactional
 class ReportModifyService(
     private val reportRepository: ReportRepository,
     private val postRepository: PostRepository,
@@ -53,7 +52,7 @@ class ReportModifyService(
      * 숨겨진 댓글·답변은 수에서 빠진다 — 이번 호출로 숨겨졌을 때만 부모의 수를 내린다. 답글은 어떤 수에도 잡히지 않는다.
      * - 커밋 뒤 리스너가 부르므로 새 트랜잭션이다.
      */
-    @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     override fun applyAutoHide(targetType: ReportTargetType, targetId: Long) {
         val reporters = reportRepository.countDistinctReporters(targetType, targetId)
         if (!Report.reachesAutoHideThreshold(targetType, reporters)) return

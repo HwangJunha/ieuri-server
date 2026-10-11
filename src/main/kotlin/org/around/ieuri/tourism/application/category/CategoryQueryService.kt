@@ -1,7 +1,6 @@
 package org.around.ieuri.tourism.application.category
 
 import org.around.ieuri.common.context.AppKey
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.category.provided.CategoryMappingQueryUseCase
 import org.around.ieuri.tourism.application.category.provided.CategoryQueryUseCase
 import org.around.ieuri.tourism.application.category.provided.dto.AppCategoryCode
@@ -15,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional
 
 /** 카테고리 조회 구현 — 앱별 구성·표시 정보와 외부 제공자 코드 매핑. */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX, readOnly = true)
+@Transactional(readOnly = true)
 class CategoryQueryService(
     private val appCategoryQueryPort: AppCategoryQueryPort,
     private val mappingPort: CategoryExternalMappingPort,

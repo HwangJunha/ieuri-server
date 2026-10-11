@@ -1,6 +1,5 @@
 package org.around.ieuri.tourism.application.footprint
 
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.footprint.provided.FootprintCommandUseCase
 import org.around.ieuri.tourism.application.footprint.provided.dto.MapShareLinkView
 import org.around.ieuri.tourism.application.footprint.provided.dto.RecordVisitsCommand
@@ -15,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional
 
 /** 발자취 쓰기(SPEC-0030). 무엇을 남기고 지울지는 발자취가 정하고, 서비스는 바뀐 것만 쓴다. 칸으로 보여 주는 것은 조회 쪽이다. */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
+@Transactional
 class FootprintModifyService(
     private val footprintRepository: FootprintRepository,
     private val policy: FootprintPolicy,
@@ -61,6 +60,6 @@ class FootprintModifyService(
         return footprintRepository.revokeShareLink(memberId, revoked)
     }
 
-    @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     override fun eraseMemberContent(memberId: Long): Int = footprintRepository.deleteAll(memberId)
 }

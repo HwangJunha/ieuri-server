@@ -1,6 +1,5 @@
 package org.around.ieuri.tourism.application.congestion
 
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.congestion.provided.CongestionAreaReadUseCase
 import org.around.ieuri.tourism.application.congestion.provided.dto.CongestionAreaBoundaryView
 import org.around.ieuri.tourism.application.congestion.provided.exception.AreaFilterRequiredException
@@ -15,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional
 
 /** 혼잡도 구역의 DB 조회 구현. 캐시·업스트림은 모른다. */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX, readOnly = true)
+@Transactional(readOnly = true)
 class CongestionAreaReadService(
     private val congestionAreaQueryPort: CongestionAreaQueryPort,
     private val openDataPolicy: SeoulOpenDataPolicy,

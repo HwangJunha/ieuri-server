@@ -2,7 +2,6 @@ package org.around.ieuri.community.application.question
 
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.cursorPageOf
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.community.application.block.provided.BlockQueryUseCase
 import org.around.ieuri.community.application.lookup.provided.SpotLookupUseCase
 import org.around.ieuri.community.application.question.provided.SpotQuestionQueryUseCase
@@ -28,7 +27,7 @@ import org.springframework.transaction.annotation.Transactional
  * - 개인 숨김(hiddenPostIds)은 글 전용이라 읽지 않는다.
  */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX, readOnly = true)
+@Transactional(readOnly = true)
 class SpotQuestionQueryService(
     private val spotQaQueryPort: SpotQaQueryPort,
     private val blockQueryUseCase: BlockQueryUseCase,
