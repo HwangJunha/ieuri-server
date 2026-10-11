@@ -216,7 +216,10 @@ skill re-checks them:
   isolation, generated GraphQL types and JPA entities out of `application`/`domain`, cross-domain
   slices, bean-name collisions, `AFTER_COMMIT`/`REQUIRES_NEW`.
 - `ConsistencyConventionTest` — persistence tech out of `application`, `common` out of `domain`,
-  `@Transactional` off domain and resolvers, repository/`Port`/`Dto`/test naming.
+  `@Transactional` off domain and resolvers, repository/`Port`/`Dto`/test naming; and the
+  cross-context shape: `CommandUseCase` implemented by a `ModifyService`, no repository in a
+  `QueryService`, `UserException` roots in `domain/shared`, Exposed tables in `…Tables.kt`, and the
+  fixed set of technology folders under `adapter/`.
 - ktlint via kotlinter (`./gradlew lintKotlin`, part of `check`) — code style, rules in `.editorconfig`.
 - `ImportStyleTest` — no wildcard imports (source-level, so Konsist rather than ArchUnit).
 - `CommentLengthTest` — no comment block (KDoc, block, or a run of `//`) of 15 lines or more (Konsist).
@@ -312,7 +315,9 @@ refactor.
   Predicates sit apart in the aggregate's `spec/`, and only as implementations of the context's
   `Specification<T>` (`isSatisfiedBy` plus `and`/`or`/`not`, in `domain/shared`): `ProvinceEligibility`,
   `SpotExclusionRule`. A value that carries settings and computes with them (weights, decay, a
-  scoring model) is a VO at the aggregate root, not a policy. There is no `policy/` until a decision
+  scoring model) is a VO at the aggregate root, named in domain words (`SpotRanking`,
+  `VerificationLimits`) — `XxxPolicy` is for plain setting values in `application/`
+  (`PostPolicy`, `ProfileImagePolicy`). There is no `policy/` until a decision
   has two real implementations behind one interface (Strategy), and no domain `service/` package —
   the word stays with application services (SPEC-0039 D-121).
   `application/<aggregate>/provided/` (inbound ports, `dto/`, `exception/`) and `required/`
@@ -340,7 +345,9 @@ refactor.
     directions: `event/listener` (inbound) and `event/publisher` (Spring events out); `messaging`
     (Valkey pub/sub — it publishes *and* subscribes, so it is not a publisher); `graphql/resolver`,
     `dataloader`, `connection`, `support`, `mapper`; `persistence` (write adapters), `query`,
-    `mapper`, `table`; `client`, `storage`, `config`, `batch`.
+    `mapper`, `table`; `security/authentication` (filters, interceptors — inbound),
+    `authorization`, `crypto`, `token`; `client`, `cache`, `storage`, `config`, `batch`. These ten
+    technology names are the whole set — a new folder under `adapter/` is a finding.
 - **Domain model is an immutable `data class`.** Every field `val`, collections read-only `List`.
   A state change validates and returns `copy(...)`. The persistence mapper rebuilds it through the
   public constructor — there is no `restore`. **Only code inside `domain/` may call an aggregate's
@@ -372,6 +379,14 @@ refactor.
     case method — `createPost(command, memberId, language)`. So `Input.toCommand()` takes no
     arguments, and a Command never carries `memberId`. A value the client did send stays in the
     Command even if it looks like context (a device's `language` in `RegisterDeviceTokenCommand`).
+  - **A query service reads through a query port, never a repository.** The repository is the
+    write side's door to its root. When a read needs a domain rule (which terms version is in
+    force, what an absent preference row means), the query port returns the stored values and a
+    pure domain function decides — the rule is not rewritten in SQL.
+  - **A one-line lookup is written where it is used.** `repository.findById(id) ?: throw
+    XxxNotFoundException()` stays in the method body; a `private fun findXxx` that hides one line
+    only adds a place to read. Extract a private function when it bundles several steps and its
+    name says more than the body does.
   - **Page size is capped in the application** (`PagePolicy.clamp`, or the query service's own
     limit), never in an adapter — an adapter receives a `first` that is already capped.
 - **Every persisted domain datum belongs to an aggregate, and every write goes through its root.**

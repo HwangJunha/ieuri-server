@@ -1,6 +1,10 @@
 package org.around.ieuri.architecture
 
 import com.tngtech.archunit.base.DescribedPredicate
+import com.tngtech.archunit.core.domain.JavaClass
+import com.tngtech.archunit.lang.ArchCondition
+import com.tngtech.archunit.lang.ConditionEvents
+import com.tngtech.archunit.lang.SimpleConditionEvent
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods
@@ -118,5 +122,67 @@ class ConsistencyConventionTest {
             .should().haveSimpleNameEndingWith("Test")
             .because("테스트는 이름으로 식별된다 — Tests·Spec·IT이 섞이면 실행 대상 지정이 흔들린다")
             .check(testClasses)
+    }
+
+    // ── context 간 통일(SPEC-0039 D-145·D-149·D-151·D-152) ─────────────────────
+
+    /** 쓰기 유스케이스의 구현은 애그리게이트마다 `XxxModifyService` 하나다. */
+    @Test
+    fun `CommandUseCase를 구현하는 서비스는 ModifyService로 끝난다`() {
+        classes().that().implement(JavaClass.Predicates.simpleNameEndingWith("CommandUseCase"))
+            .should().haveSimpleNameEndingWith("ModifyService")
+            .because("쓰기 서비스 이름은 XxxModifyService로 통일했다 — XxxCommandService나 유스케이스 묶음별 서비스로 나누지 말고 그 애그리게이트의 ModifyService에 넣는다")
+            .check(classes)
+    }
+
+    /** 조회 쪽은 조회 포트로만 읽는다 — 저장소는 쓰기 쪽이 루트를 싣는 문이다. */
+    @Test
+    fun `QueryService는 저장소를 주입하지 않는다`() {
+        noClasses().that().haveSimpleNameEndingWith("QueryService")
+            .should().dependOnClassesThat().haveSimpleNameEndingWith("Repository")
+            .because("조회 서비스는 XxxQueryPort로 읽는다. 판정할 규칙이 있으면 조회 포트가 값을 읽어 오고 도메인 함수가 판정한다")
+            .check(classes)
+    }
+
+    /** 사용자 오류(`userErrors`)의 뿌리는 context마다 하나이고 `domain/shared`에 있다. */
+    @Test
+    fun `UserException 뿌리는 domain shared에 있다`() {
+        classes().that().haveSimpleNameEndingWith("UserException")
+            .should().resideInAPackage("..domain.shared..")
+            .because("userErrors로 나가는 예외의 뿌리는 <Context>UserException 하나다 — 애그리게이트 패키지에 새 뿌리를 만들지 말고 그것을 상속한다")
+            .check(classes)
+    }
+
+    /** Exposed 테이블은 애그리게이트마다 `<애그리게이트>Tables.kt` 한 파일에 모은다. */
+    @Test
+    fun `Exposed 테이블은 table 패키지의 Tables 파일에 선언한다`() {
+        classes().that().areAssignableTo("org.jetbrains.exposed.v1.core.Table")
+            .and().resideInAPackage("org.around.ieuri..")
+            .should().resideInAPackage("..adapter.persistence.table..")
+            .andShould(beDeclaredInFileEndingWith("Tables.kt"))
+            .because("테이블 선언은 그 테이블을 쓰는 애그리게이트의 <애그리게이트>Tables.kt에 넣는다 — 테이블마다 파일을 만들지 않는다")
+            .check(classes)
+    }
+
+    /** `adapter/<기술>/<역할>/` — 기술 폴더 이름은 context마다 같은 말을 쓴다. */
+    @Test
+    fun `adapter 바로 아래 폴더는 정해진 기술 이름만 쓴다`() {
+        classes().that().resideInAPackage("org.around.ieuri.*.adapter..")
+            .should().resideInAnyPackage(*ADAPTER_TECHNOLOGIES.map { "org.around.ieuri.*.adapter.$it.." }.toTypedArray())
+            .because("adapter 아래는 기술 이름(${ADAPTER_TECHNOLOGIES.joinToString()})으로 나눈다 — 새 폴더를 만들기 전에 이 중 어디에 속하는지 본다")
+            .check(classes)
+    }
+
+    private fun beDeclaredInFileEndingWith(suffix: String) = object : ArchCondition<JavaClass>("be declared in a file ending with $suffix") {
+        override fun check(item: JavaClass, events: ConditionEvents) {
+            val fileName = item.source.flatMap { it.fileName }.orElse("")
+            if (!fileName.endsWith(suffix)) {
+                events.add(SimpleConditionEvent.violated(item, "${item.name} is declared in $fileName"))
+            }
+        }
+    }
+
+    private companion object {
+        val ADAPTER_TECHNOLOGIES = listOf("batch", "cache", "client", "config", "event", "graphql", "messaging", "persistence", "security", "storage")
     }
 }
