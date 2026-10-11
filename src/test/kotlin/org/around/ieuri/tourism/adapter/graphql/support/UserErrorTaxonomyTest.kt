@@ -1,6 +1,6 @@
 package org.around.ieuri.tourism.adapter.graphql.support
 
-import org.around.ieuri.auth.adapter.graphql.support.toUserErrorOrNull
+import org.around.ieuri.auth.adapter.graphql.support.toAuthUserErrorOrNull
 import org.around.ieuri.auth.application.member.provided.exception.InvalidCredentialsException
 import org.around.ieuri.auth.application.member.provided.exception.MemberAlreadyRegisteredException
 import org.around.ieuri.auth.application.member.provided.exception.MemberNotFoundException
@@ -59,7 +59,7 @@ class UserErrorTaxonomyTest {
     @Test
     fun `auth 뮤테이션의 userErrors에는 인증 실패 code가 없다`() {
         userFacingExceptions.forEach { e ->
-            val code = toUserErrorOrNull(e)?.code
+            val code = toAuthUserErrorOrNull(e)?.code
             assertTrue(
                 code !in sessionStateCodes,
                 "${e::class.simpleName}이 userErrors로 세션 상태 code($code)를 노출한다 — 인증 실패는 최상위 errors[]로 가야 한다",
@@ -72,6 +72,6 @@ class UserErrorTaxonomyTest {
     fun `UnauthorizedException은 어느 경로에서도 UserError로 변환되지 않는다`() {
         val e = UnauthorizedException("인증이 필요합니다.")
         assertNull(toTourismUserErrorOrNull(e), "인증 실패가 reactToSpot의 userErrors로 변환됐다")
-        assertNull(toUserErrorOrNull(e), "인증 실패가 auth 뮤테이션의 userErrors로 변환됐다")
+        assertNull(toAuthUserErrorOrNull(e), "인증 실패가 auth 뮤테이션의 userErrors로 변환됐다")
     }
 }

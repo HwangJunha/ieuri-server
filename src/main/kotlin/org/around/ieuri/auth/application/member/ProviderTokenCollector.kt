@@ -1,6 +1,6 @@
 package org.around.ieuri.auth.application.member
 
-import org.around.ieuri.auth.application.member.provided.MemberAuthenticationUseCase
+import org.around.ieuri.auth.application.member.provided.MemberCommandUseCase
 import org.around.ieuri.auth.application.member.required.SnsTokenExchangerPort
 import org.around.ieuri.auth.domain.member.Provider
 import org.slf4j.LoggerFactory
@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component
 @Component
 class ProviderTokenCollector(
     private val tokenExchanger: SnsTokenExchangerPort,
-    private val authentication: MemberAuthenticationUseCase,
+    private val members: MemberCommandUseCase,
 ) {
     private val log = LoggerFactory.getLogger(ProviderTokenCollector::class.java)
 
@@ -29,7 +29,7 @@ class ProviderTokenCollector(
                 log.info("provider 토큰 교환 대상 아님/미발급(provider={}, memberId={})", provider, memberId)
                 return
             }
-            authentication.keepProviderRefreshToken(memberId, refreshToken)
+            members.keepProviderRefreshToken(memberId, refreshToken)
         } catch (ex: Exception) {
             log.warn("provider 토큰 교환 실패(provider={}, memberId={}): {}", provider, memberId, ex.javaClass.simpleName)
         }

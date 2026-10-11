@@ -15,7 +15,6 @@ import org.around.ieuri.auth.application.member.provided.exception.InvalidEmailF
 import org.around.ieuri.auth.application.member.provided.exception.MemberNotFoundException
 import org.around.ieuri.auth.application.member.required.MemberEventPublisherPort
 import org.around.ieuri.auth.application.member.required.MemberRepository
-import org.around.ieuri.auth.application.member.required.VerificationCodeGeneratorPort
 import org.around.ieuri.auth.domain.member.Email
 import org.around.ieuri.auth.domain.member.EmailVerification
 import org.around.ieuri.auth.domain.member.Member
@@ -24,13 +23,11 @@ import org.around.ieuri.auth.domain.member.Provider
 import org.around.ieuri.auth.domain.member.ResendCooldownActiveException
 import org.around.ieuri.auth.domain.member.SameAsCurrentEmailException
 import org.around.ieuri.auth.domain.member.VerificationNotFoundException
-import org.around.ieuri.auth.domain.member.VerificationPolicy
 import org.around.ieuri.auth.domain.member.VerificationPurpose
 import org.around.ieuri.auth.domain.member.event.EmailChanged
 import org.around.ieuri.common.event.AccessType
 import org.around.ieuri.common.event.MemberAccessed
 import java.time.Clock
-import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
 import java.util.UUID
@@ -46,32 +43,25 @@ import kotlin.test.assertTrue
  * - 확인을 통과하기 전까지 이메일은 바뀌지 않고, 코드 실패는 오류가 아니라 `failureReason`이다.
  * - 자체(EMAIL) 회원은 로그인 식별자가 함께 바뀐다(R8).
  */
-class EmailChangeServiceTest {
+class MemberModifyEmailChangeTest {
 
     private val memberId = 14L
     private val now = Instant.parse("2026-08-09T00:00:00Z")
     private val currentEmail = "old@example.com"
     private val newEmail = "new@example.com"
     private val publicId = UUID.fromString("33333333-3333-3333-3333-333333333333")
-    private val policy = VerificationPolicy(Duration.ofMinutes(10), 5, Duration.ofSeconds(60))
+    private val policy = testVerificationPolicy
 
     private val memberRepository = mockk<MemberRepository>(relaxUnitFun = true)
-    private val codeGenerator = mockk<VerificationCodeGeneratorPort> {
-        every { generate() } returns "123456"
-        every { hash(any()) } answers { "hashed:${firstArg<String>()}" }
-    }
+    private val codeGenerator = fixedCodeGenerator()
     private val eventPublisher = mockk<MemberEventPublisherPort>()
     private val events = mutableListOf<Any>()
-    private val identifierProtector = prefixingIdentifierProtector()
 
-    private val service = EmailChangeService(
+    private val service = memberModifyService(
         memberRepository,
-        codeGenerator,
-        identifierProtector,
-        ProviderEmailUniqueness(memberRepository, identifierProtector),
-        policy,
-        eventPublisher,
-        Clock.fixed(now, ZoneOffset.UTC),
+        clock = Clock.fixed(now, ZoneOffset.UTC),
+        eventPublisher = eventPublisher,
+        codeGenerator = codeGenerator,
     )
 
     private val issued = slot<EmailVerification>()
@@ -115,7 +105,7 @@ class EmailChangeServiceTest {
         givenMember(member())
         every { memberRepository.findEmailVerifications(memberId, VerificationPurpose.EMAIL_CHANGE) } returns listOf(previous)
 
-        val result = service.changeEmail(ChangeEmailCommand(memberId, " New@Example.com ", ipAddress = "203.0.113.7"))
+        val result = service.changeEmail(ChangeEmailCommand(" New@Example.com "), memberId, ipAddress = "203.0.113.7")
 
         assertEquals(issued.captured.publicId, result.verificationPublicId)
         assertEquals(now.plus(policy.ttl), result.expiresAt)
@@ -142,12 +132,22 @@ class EmailChangeServiceTest {
         )
     }
 
+    /** 접속지는 Command가 아니라 인자로 받는다 — 알 수 없으면 null 그대로 남긴다. */
+    @Test
+    fun `접속지를 알 수 없는 변경 요청은 접속기록에 null을 남긴다`() {
+        givenMember(member())
+
+        service.changeEmail(ChangeEmailCommand(newEmail), memberId, ipAddress = null)
+
+        assertEquals(MemberAccessed(memberId, AccessType.EMAIL_CHANGE, null), events.first())
+    }
+
     /** 형식 → 회원 → 변경 가능 → 동일 주소 → 중복 순. 형식 오류는 회원을 읽기도 전에 나간다. */
     @Test
     fun `형식이 틀린 주소는 회원을 읽기 전에 거부한다`() {
         givenMember(null)
 
-        val ex = assertFailsWith<InvalidEmailFormatException> { service.changeEmail(ChangeEmailCommand(memberId, "not-an-email")) }
+        val ex = assertFailsWith<InvalidEmailFormatException> { service.changeEmail(ChangeEmailCommand("not-an-email"), memberId, ipAddress = null) }
 
         assertEquals("이메일 형식이 올바르지 않습니다.", ex.message)
         verify(exactly = 0) { memberRepository.findById(any()) }
@@ -157,7 +157,7 @@ class EmailChangeServiceTest {
     fun `변경 요청 회원이 없으면 회원 없음으로 답한다`() {
         givenMember(null)
 
-        val ex = assertFailsWith<MemberNotFoundException> { service.changeEmail(ChangeEmailCommand(memberId, newEmail)) }
+        val ex = assertFailsWith<MemberNotFoundException> { service.changeEmail(ChangeEmailCommand(newEmail), memberId, ipAddress = null) }
 
         assertEquals("회원을 찾을 수 없습니다.", ex.message)
         assertTrue(events.isEmpty())
@@ -168,7 +168,7 @@ class EmailChangeServiceTest {
         givenMember(member(provider = Provider.KAKAO, providerUserId = "kakao-9911"))
         every { memberRepository.existsByEmailIdentifier(any(), any(), any()) } returns true
 
-        val ex = assertFailsWith<NotEmailMemberException> { service.changeEmail(ChangeEmailCommand(memberId, currentEmail)) }
+        val ex = assertFailsWith<NotEmailMemberException> { service.changeEmail(ChangeEmailCommand(currentEmail), memberId, ipAddress = null) }
 
         assertEquals("SNS 계정은 이메일을 변경할 수 없습니다.", ex.message)
         verify(exactly = 0) { memberRepository.existsByEmailIdentifier(any(), any(), any()) }
@@ -180,7 +180,7 @@ class EmailChangeServiceTest {
         givenMember(member())
         every { memberRepository.existsByEmailIdentifier(any(), any(), any()) } returns true
 
-        val ex = assertFailsWith<SameAsCurrentEmailException> { service.changeEmail(ChangeEmailCommand(memberId, "OLD@example.com")) }
+        val ex = assertFailsWith<SameAsCurrentEmailException> { service.changeEmail(ChangeEmailCommand("OLD@example.com"), memberId, ipAddress = null) }
 
         assertEquals("현재 사용 중인 이메일과 같습니다.", ex.message)
         verify(exactly = 0) { memberRepository.existsByEmailIdentifier(any(), any(), any()) }
@@ -193,7 +193,7 @@ class EmailChangeServiceTest {
         givenMember(member())
         every { memberRepository.existsByEmailIdentifier(Provider.EMAIL, "protected:$newEmail", memberId) } returns true
 
-        val ex = assertFailsWith<EmailAlreadyInUseException> { service.changeEmail(ChangeEmailCommand(memberId, newEmail)) }
+        val ex = assertFailsWith<EmailAlreadyInUseException> { service.changeEmail(ChangeEmailCommand(newEmail), memberId, ipAddress = null) }
 
         assertEquals("이미 사용 중인 이메일입니다.", ex.message)
         verify(exactly = 0) { codeGenerator.generate() }
@@ -203,7 +203,7 @@ class EmailChangeServiceTest {
 
     // --- 확인 ---
 
-    private val confirm = ConfirmEmailChangeCommand(memberId, publicId, "123456")
+    private val confirm = ConfirmEmailChangeCommand(publicId, "123456")
 
     private fun givenChallenge(challenge: EmailVerification?, forUpdate: Boolean = true) {
         every { memberRepository.findEmailVerification(publicId, forUpdate) } returns challenge
@@ -215,7 +215,7 @@ class EmailChangeServiceTest {
         givenChallenge(challenge())
         givenMember(member())
 
-        val result = service.confirmEmailChange(confirm)
+        val result = service.confirmEmailChange(confirm, memberId)
 
         assertTrue(result.changed)
         assertEquals(newEmail, result.email)
@@ -234,7 +234,7 @@ class EmailChangeServiceTest {
         givenChallenge(challenge())
         givenMember(member(provider = Provider.KAKAO, providerUserId = "kakao-9911"))
 
-        service.confirmEmailChange(confirm)
+        service.confirmEmailChange(confirm, memberId)
 
         verify { memberRepository.saveEmail(memberFixture(id = memberId, provider = Provider.KAKAO, providerUserId = "kakao-9911", email = newEmail)) }
         assertEquals(listOf<Any>(EmailChanged(memberId, Provider.KAKAO, loginIdentifierUpdated = false)), events)
@@ -245,7 +245,7 @@ class EmailChangeServiceTest {
         givenChallenge(challenge())
         givenMember(member())
 
-        val result = service.confirmEmailChange(ConfirmEmailChangeCommand(memberId, publicId, "999999"))
+        val result = service.confirmEmailChange(ConfirmEmailChangeCommand(publicId, "999999"), memberId)
 
         assertFalse(result.changed)
         assertNull(result.email)
@@ -259,9 +259,9 @@ class EmailChangeServiceTest {
     fun `만료됐거나 이미 쓴 코드는 사유를 돌려주고 이메일을 바꾸지 않는다`() {
         givenMember(member())
         givenChallenge(challenge(expiresAt = now.minusSeconds(1)))
-        val expired = service.confirmEmailChange(confirm)
+        val expired = service.confirmEmailChange(confirm, memberId)
         givenChallenge(challenge(consumed = true))
-        val consumed = service.confirmEmailChange(confirm)
+        val consumed = service.confirmEmailChange(confirm, memberId)
 
         assertEquals("EXPIRED", expired.failureReason)
         assertEquals("CONSUMED", consumed.failureReason)
@@ -281,7 +281,7 @@ class EmailChangeServiceTest {
 
         handles.forEach { handle ->
             givenChallenge(handle)
-            val ex = assertFailsWith<VerificationNotFoundException> { service.confirmEmailChange(confirm) }
+            val ex = assertFailsWith<VerificationNotFoundException> { service.confirmEmailChange(confirm, memberId) }
             assertEquals("유효하지 않은 검증 요청입니다.", ex.message)
             assertEquals("VERIFICATION_NOT_FOUND", ex.code)
         }
@@ -298,7 +298,7 @@ class EmailChangeServiceTest {
         givenMember(member())
         givenChallenge(challenge(owner = 99L))
 
-        assertFailsWith<VerificationNotFoundException> { service.confirmEmailChange(ConfirmEmailChangeCommand(memberId, publicId, "999999")) }
+        assertFailsWith<VerificationNotFoundException> { service.confirmEmailChange(ConfirmEmailChangeCommand(publicId, "999999"), memberId) }
 
         verify(exactly = 0) { memberRepository.saveEmailVerification(any()) }
         assertTrue(events.isEmpty())
@@ -311,7 +311,7 @@ class EmailChangeServiceTest {
         givenMember(member())
         every { memberRepository.existsByEmailIdentifier(Provider.EMAIL, "protected:$newEmail", memberId) } returns true
 
-        val ex = assertFailsWith<EmailAlreadyInUseException> { service.confirmEmailChange(confirm) }
+        val ex = assertFailsWith<EmailAlreadyInUseException> { service.confirmEmailChange(confirm, memberId) }
 
         assertEquals("이미 사용 중인 이메일입니다.", ex.message)
         verify(exactly = 0) { memberRepository.saveEmail(any()) }
@@ -328,7 +328,7 @@ class EmailChangeServiceTest {
         givenMember(member())
         every { memberRepository.findEmailVerifications(memberId, VerificationPurpose.EMAIL_CHANGE) } returns listOf(previous)
 
-        val result = service.resendEmailChange(ResendEmailChangeCommand(memberId, publicId))
+        val result = service.resendEmailChange(ResendEmailChangeCommand(publicId), memberId)
 
         assertEquals(issued.captured.publicId, result.verificationPublicId)
         assertEquals(now.plus(policy.ttl), result.expiresAt)
@@ -351,7 +351,7 @@ class EmailChangeServiceTest {
         givenMember(member())
         every { memberRepository.findEmailVerifications(memberId, VerificationPurpose.EMAIL_CHANGE) } returns listOf(previous)
 
-        val ex = assertFailsWith<ResendCooldownActiveException> { service.resendEmailChange(ResendEmailChangeCommand(memberId, publicId)) }
+        val ex = assertFailsWith<ResendCooldownActiveException> { service.resendEmailChange(ResendEmailChangeCommand(publicId), memberId) }
 
         assertEquals("잠시 후 다시 시도해 주세요.", ex.message)
         verify(exactly = 0) { memberRepository.consumeEmailVerification(any()) }
@@ -372,7 +372,7 @@ class EmailChangeServiceTest {
 
         handles.forEach { handle ->
             givenChallenge(handle, forUpdate = false)
-            val ex = assertFailsWith<VerificationNotFoundException> { service.resendEmailChange(ResendEmailChangeCommand(memberId, publicId)) }
+            val ex = assertFailsWith<VerificationNotFoundException> { service.resendEmailChange(ResendEmailChangeCommand(publicId), memberId) }
             assertEquals("유효하지 않은 검증 요청입니다.", ex.message)
         }
         verify(exactly = 0) { memberRepository.consumeEmailVerification(any()) }

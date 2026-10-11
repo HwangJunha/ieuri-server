@@ -1,7 +1,6 @@
 package org.around.ieuri.auth.application.audit
 
-import org.around.ieuri.auth.application.audit.provided.AuditLogUseCase
-import org.around.ieuri.auth.application.audit.provided.AuditRetentionUseCase
+import org.around.ieuri.auth.application.audit.provided.AuditLogCommandUseCase
 import org.around.ieuri.auth.application.audit.required.AuditLogRepository
 import org.around.ieuri.auth.domain.audit.LocationAccessLog
 import org.around.ieuri.auth.domain.audit.MemberAccessLog
@@ -19,11 +18,10 @@ import java.time.Clock
  */
 @Service
 @Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
-class AuditLogService(
+class AuditLogModifyService(
     private val repository: AuditLogRepository,
     private val clock: Clock,
-) : AuditLogUseCase,
-    AuditRetentionUseCase {
+) : AuditLogCommandUseCase {
 
     @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, propagation = Propagation.REQUIRES_NEW)
     override fun recordMemberAudit(memberId: Long, eventType: String, payload: Map<String, Any?>) {

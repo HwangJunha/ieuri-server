@@ -6,7 +6,7 @@ import io.mockk.mockk
 import io.mockk.runs
 import io.mockk.slot
 import io.mockk.verify
-import org.around.ieuri.auth.application.audit.provided.AuditLogUseCase
+import org.around.ieuri.auth.application.audit.provided.AuditLogCommandUseCase
 import org.around.ieuri.common.event.LocationAccessed
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
 class LocationAccessAuditListenerTest {
 
     private val memberId = 7L
-    private val auditLog = mockk<AuditLogUseCase>()
+    private val auditLog = mockk<AuditLogCommandUseCase>()
     private val listener = LocationAccessAuditListener(auditLog)
 
     private val payload = slot<Map<String, Any?>>()

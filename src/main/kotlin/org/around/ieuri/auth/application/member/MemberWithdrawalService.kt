@@ -1,10 +1,8 @@
 package org.around.ieuri.auth.application.member
 
-import org.around.ieuri.auth.application.member.provided.MemberLifecycleUseCase
+import org.around.ieuri.auth.application.member.provided.MemberCommandUseCase
 import org.around.ieuri.auth.application.member.provided.MemberWithdrawalUseCase
-import org.around.ieuri.auth.application.member.provided.dto.EraseMemberCommand
 import org.around.ieuri.auth.application.member.provided.dto.LifecycleResult
-import org.around.ieuri.auth.application.member.provided.dto.WithdrawMemberCommand
 import org.around.ieuri.auth.application.member.required.MemberEventPublisherPort
 import org.around.ieuri.auth.application.member.required.MemberSessionPort
 import org.around.ieuri.auth.application.member.required.SnsTokenRevokerPort
@@ -21,14 +19,14 @@ import org.springframework.stereotype.Service
  */
 @Service
 class MemberWithdrawalService(
-    private val lifecycle: MemberLifecycleUseCase,
+    private val members: MemberCommandUseCase,
     private val snsTokenRevoker: SnsTokenRevokerPort,
     private val sessions: MemberSessionPort,
     private val eventPublisher: MemberEventPublisherPort,
 ) : MemberWithdrawalUseCase {
 
-    override fun withdraw(command: WithdrawMemberCommand): LifecycleResult {
-        val target = lifecycle.withdrawalTarget(command.memberId)
+    override fun withdraw(memberId: Long, ipAddress: String?): LifecycleResult {
+        val target = members.withdrawalTarget(memberId)
         val revokeResult = snsTokenRevoker.revoke(
             RevokeSnsConnectionCommand(
                 provider = target.provider,
@@ -36,10 +34,10 @@ class MemberWithdrawalService(
                 providerRefreshToken = target.providerRefreshToken,
             ),
         )
-        sessions.revokeAll(command.memberId)
-        lifecycle.erase(EraseMemberCommand(command.memberId, target.provider, (revokeResult as? SnsRevokeResult.Failed)?.reason))
+        sessions.revokeAll(memberId)
+        members.erase(memberId, target.provider, (revokeResult as? SnsRevokeResult.Failed)?.reason)
         // 접속기록(기준 제8조). 계정·개인정보 삭제라 남겨야 하는 수행업무다.
-        eventPublisher.publish(MemberAccessed(command.memberId, AccessType.WITHDRAW, command.ipAddress))
+        eventPublisher.publish(MemberAccessed(memberId, AccessType.WITHDRAW, ipAddress))
         return LifecycleResult(success = true)
     }
 }

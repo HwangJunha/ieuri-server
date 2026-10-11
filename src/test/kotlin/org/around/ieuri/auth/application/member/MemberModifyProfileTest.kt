@@ -17,13 +17,13 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
 /** 프로필의 DB 단계(SPEC-0011 R5·R6). 프로필 행이 없는 회원은 없는 회원과 같이 답한다. */
-class MemberProfileServiceTest {
+class MemberModifyProfileTest {
 
     private val memberId = 7L
     private val otherMemberId = 99L
 
     private val memberRepository = mockk<MemberRepository>(relaxUnitFun = true)
-    private val service = MemberProfileService(memberRepository)
+    private val service = memberModifyService(memberRepository)
 
     private val pendingKey = "pending/profile/$memberId/${UUID.fromString("44444444-4444-4444-4444-444444444444")}"
     private val confirmedKey = pendingKey.replaceFirst("pending/", "images/")
@@ -41,7 +41,7 @@ class MemberProfileServiceTest {
         givenMember()
         every { memberRepository.saveNickname(memberId, Nickname("여행하는곰")) } returns true
 
-        val result = service.changeNickname(ChangeNicknameCommand(memberId, "  여행하는곰  "))
+        val result = service.changeNickname(ChangeNicknameCommand("  여행하는곰  "), memberId)
 
         assertEquals("여행하는곰", result)
         verify(exactly = 1) { memberRepository.saveNickname(memberId, Nickname("여행하는곰")) }
@@ -52,8 +52,8 @@ class MemberProfileServiceTest {
     fun `길이 규칙을 벗어난 닉네임은 회원을 읽기 전에 거부한다`() {
         givenMember(exists = false)
 
-        val tooShort = assertFailsWith<InvalidNicknameException> { service.changeNickname(ChangeNicknameCommand(memberId, " 가 ")) }
-        val tooLong = assertFailsWith<InvalidNicknameException> { service.changeNickname(ChangeNicknameCommand(memberId, "가".repeat(21))) }
+        val tooShort = assertFailsWith<InvalidNicknameException> { service.changeNickname(ChangeNicknameCommand(" 가 "), memberId) }
+        val tooLong = assertFailsWith<InvalidNicknameException> { service.changeNickname(ChangeNicknameCommand("가".repeat(21)), memberId) }
 
         assertEquals("닉네임은 2자 이상이어야 합니다.", tooShort.message)
         assertEquals("닉네임은 20자를 넘을 수 없습니다.", tooLong.message)
@@ -65,7 +65,7 @@ class MemberProfileServiceTest {
     fun `없는 회원의 닉네임 변경은 저장하지 않고 회원 없음으로 답한다`() {
         givenMember(exists = false)
 
-        val ex = assertFailsWith<MemberNotFoundException> { service.changeNickname(ChangeNicknameCommand(memberId, "여행하는곰")) }
+        val ex = assertFailsWith<MemberNotFoundException> { service.changeNickname(ChangeNicknameCommand("여행하는곰"), memberId) }
 
         assertEquals("회원을 찾을 수 없습니다.", ex.message)
         verify(exactly = 0) { memberRepository.saveNickname(any(), any()) }
@@ -76,7 +76,7 @@ class MemberProfileServiceTest {
         givenMember()
         every { memberRepository.saveNickname(memberId, any()) } returns false
 
-        val ex = assertFailsWith<MemberNotFoundException> { service.changeNickname(ChangeNicknameCommand(memberId, "여행하는곰")) }
+        val ex = assertFailsWith<MemberNotFoundException> { service.changeNickname(ChangeNicknameCommand("여행하는곰"), memberId) }
 
         assertEquals("회원을 찾을 수 없습니다.", ex.message)
     }

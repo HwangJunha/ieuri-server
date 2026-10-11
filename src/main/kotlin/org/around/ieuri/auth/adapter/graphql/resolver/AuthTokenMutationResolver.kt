@@ -5,10 +5,8 @@ import com.netflix.graphql.dgs.InputArgument
 import graphql.schema.DataFetchingEnvironment
 import org.around.ieuri.auth.adapter.graphql.mapper.toCommand
 import org.around.ieuri.auth.adapter.graphql.mapper.toPayload
-import org.around.ieuri.auth.adapter.graphql.support.withUserErrors
+import org.around.ieuri.auth.adapter.graphql.support.withAuthUserErrors
 import org.around.ieuri.auth.application.token.provided.AuthTokenUseCase
-import org.around.ieuri.auth.application.token.provided.dto.LogoutCommand
-import org.around.ieuri.auth.application.token.provided.dto.RefreshTokenCommand
 import org.around.ieuri.common.graphql.clientIp
 import org.around.ieuri.common.graphql.generated.types.AuthTokenPayload
 import org.around.ieuri.common.graphql.generated.types.LoginEmailInput
@@ -27,39 +25,37 @@ class AuthTokenMutationResolver(
     fun loginSns(
         @InputArgument input: LoginSnsInput,
         dfe: DataFetchingEnvironment,
-    ): AuthTokenPayload = withUserErrors(
+    ): AuthTokenPayload = withAuthUserErrors(
         onError = { authTokenErrorPayload(it) },
     ) {
-        authTokenUseCase.loginBySns(input.toCommand(dfe.clientIp())).toPayload()
+        authTokenUseCase.loginBySns(input.toCommand(), dfe.clientIp()).toPayload()
     }
 
     @DgsMutation
     fun loginEmail(
         @InputArgument input: LoginEmailInput,
         dfe: DataFetchingEnvironment,
-    ): AuthTokenPayload = withUserErrors(
+    ): AuthTokenPayload = withAuthUserErrors(
         onError = { authTokenErrorPayload(it) },
     ) {
-        authTokenUseCase.loginByEmail(input.toCommand(dfe.clientIp())).toPayload()
+        authTokenUseCase.loginByEmail(input.toCommand(), dfe.clientIp()).toPayload()
     }
 
     @DgsMutation
-    fun refreshToken(@InputArgument input: RefreshTokenInput): AuthTokenPayload = withUserErrors(
+    fun refreshToken(@InputArgument input: RefreshTokenInput): AuthTokenPayload = withAuthUserErrors(
         onError = { authTokenErrorPayload(it) },
     ) {
-        authTokenUseCase.refresh(RefreshTokenCommand(input.refreshToken)).toPayload()
+        authTokenUseCase.refresh(input.toCommand()).toPayload()
     }
 
     @DgsMutation
     fun logout(
         @InputArgument input: LogoutInput,
         dfe: DataFetchingEnvironment,
-    ): LogoutPayload = withUserErrors(
+    ): LogoutPayload = withAuthUserErrors(
         onError = { LogoutPayload(success = false, userErrors = it) },
     ) {
-        val result = authTokenUseCase.logout(
-            LogoutCommand(refreshToken = input.refreshToken, ipAddress = dfe.clientIp()),
-        )
+        val result = authTokenUseCase.logout(input.toCommand(), dfe.clientIp())
         LogoutPayload(success = result.success, userErrors = emptyList())
     }
 

@@ -6,7 +6,6 @@ import io.mockk.mockk
 import io.mockk.runs
 import io.mockk.verify
 import io.mockk.verifyOrder
-import org.around.ieuri.auth.application.member.provided.dto.EraseMemberCommand
 import org.around.ieuri.auth.application.member.provided.dto.ReactivateMemberCommand
 import org.around.ieuri.auth.application.member.provided.dto.SuspendMemberCommand
 import org.around.ieuri.auth.application.member.provided.dto.WithdrawalTargetView
@@ -31,7 +30,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 /** 정지·복구와 탈퇴의 DB 단계. 상태 전이는 도메인이 판정하고, 서비스는 저장 → 세션 폐기 → 이벤트 순서를 지킨다. */
-class MemberLifecycleServiceTest {
+class MemberModifyLifecycleTest {
 
     private val now = Instant.parse("2026-07-17T00:00:00Z")
 
@@ -40,7 +39,7 @@ class MemberLifecycleServiceTest {
     private val eventPublisher = mockk<MemberEventPublisherPort>()
     private val events = mutableListOf<Any>()
 
-    private val service = MemberLifecycleService(memberRepository, sessions, eventPublisher, Clock.fixed(now, ZoneOffset.UTC))
+    private val service = memberModifyService(memberRepository, clock = Clock.fixed(now, ZoneOffset.UTC), eventPublisher = eventPublisher, sessions = sessions)
 
     init {
         every { eventPublisher.publish(capture(events)) } just runs
@@ -183,7 +182,7 @@ class MemberLifecycleServiceTest {
 
     @Test
     fun `삭제는 회원을 지운 뒤 탈퇴 사실을 provider와 함께 알린다`() {
-        service.erase(EraseMemberCommand(100L, Provider.GOOGLE, unlinkFailureReason = null))
+        service.erase(100L, Provider.GOOGLE, unlinkFailureReason = null)
 
         verifyOrder {
             memberRepository.delete(100L)
@@ -196,7 +195,7 @@ class MemberLifecycleServiceTest {
     /** 해제 실패는 provider와 사유만 남긴다(R11). */
     @Test
     fun `해제 실패 사유가 있으면 해제 실패와 탈퇴를 차례로 알린다`() {
-        service.erase(EraseMemberCommand(100L, Provider.APPLE, unlinkFailureReason = "HTTP 400 invalid_grant"))
+        service.erase(100L, Provider.APPLE, unlinkFailureReason = "HTTP 400 invalid_grant")
 
         verify(exactly = 1) { memberRepository.delete(100L) }
         assertEquals(

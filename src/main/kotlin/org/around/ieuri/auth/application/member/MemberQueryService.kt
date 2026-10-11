@@ -29,14 +29,15 @@ class MemberQueryService(
 ) : MemberQueryUseCase {
 
     override fun me(memberId: Long): MeView = memberQueryPort.findMe(memberId)
-        ?: throw MemberNotFoundException("회원을 찾을 수 없습니다.")
+        ?: throw MemberNotFoundException()
 
     override fun isEmailVerified(memberId: Long): Boolean = memberQueryPort.isEmailVerified(memberId)
 
     override fun member(memberId: Long): MemberDetailView = memberQueryPort.findMemberDetail(memberId)
-        ?: throw MemberNotFoundException("회원을 찾을 수 없습니다.")
+        ?: throw MemberNotFoundException()
 
-    override fun members(query: MembersQuery): CursorPage<MemberSummaryView> = memberQueryPort.findMembers(query)
+    /** `first`는 1~[MAX_PAGE_SIZE]로 맞춘다(넘으면 오류가 아니라 잘라낸다). */
+    override fun members(query: MembersQuery): CursorPage<MemberSummaryView> = memberQueryPort.findMembers(query.copy(first = query.first.coerceIn(1, MAX_PAGE_SIZE)))
 
     /** 부재는 예외가 아니라 null이다 — 호출자가 존재 확인 용도로도 쓴다. */
     override fun memberPublicProfile(memberId: Long): MemberPublicProfileView? = memberQueryPort.findPublicProfile(memberId)
@@ -51,4 +52,8 @@ class MemberQueryService(
     override fun assignableRoles(): List<RoleInfoView> = memberQueryPort.findAssignableRoles()
 
     override fun authoritiesOf(memberId: Long): MemberAuthoritiesView = memberQueryPort.findAuthorities(memberId)
+
+    private companion object {
+        const val MAX_PAGE_SIZE = 100
+    }
 }

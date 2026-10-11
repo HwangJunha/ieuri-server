@@ -4,7 +4,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import io.mockk.verifyOrder
-import org.around.ieuri.auth.application.member.provided.MemberRegistrationUseCase
+import org.around.ieuri.auth.application.member.provided.MemberCommandUseCase
 import org.around.ieuri.auth.application.member.provided.dto.AgreementInput
 import org.around.ieuri.auth.application.member.provided.dto.RegisterMemberCommand
 import org.around.ieuri.auth.application.member.provided.dto.RegisterMemberResult
@@ -24,10 +24,10 @@ import kotlin.test.assertFailsWith
 class SnsRegistrationServiceTest {
 
     private val snsVerifier = mockk<SnsIdentityVerifierPort>()
-    private val registration = mockk<MemberRegistrationUseCase>()
+    private val members = mockk<MemberCommandUseCase>()
     private val providerTokenCollector = mockk<ProviderTokenCollector>(relaxUnitFun = true)
 
-    private val service = SnsRegistrationService(snsVerifier, registration, providerTokenCollector)
+    private val service = SnsRegistrationService(snsVerifier, members, providerTokenCollector)
 
     private val command = RegisterMemberCommand(
         provider = Provider.APPLE,
@@ -49,14 +49,14 @@ class SnsRegistrationServiceTest {
     @Test
     fun `검증한 신원으로 가입한 뒤에 provider 토큰을 확보하고 가입 결과를 그대로 돌려준다`() {
         every { snsVerifier.verify(Provider.APPLE, "id-token") } returns identity
-        every { registration.registerBySnsIdentity(any()) } returns SnsRegistrationResult(100L, registered)
+        every { members.registerBySnsIdentity(any()) } returns SnsRegistrationResult(100L, registered)
 
         val result = service.registerBySns(command)
 
         assertEquals(registered, result)
         verifyOrder {
             snsVerifier.verify(Provider.APPLE, "id-token")
-            registration.registerBySnsIdentity(
+            members.registerBySnsIdentity(
                 RegisterSnsIdentityCommand(
                     request = command,
                     providerUserId = "apple-sub-1",
@@ -76,14 +76,14 @@ class SnsRegistrationServiceTest {
         val ex = assertFailsWith<SnsVerificationFailedException> { service.registerBySns(command) }
 
         assertEquals("SNS 인증에 실패했습니다.", ex.message)
-        verify(exactly = 0) { registration.registerBySnsIdentity(any()) }
+        verify(exactly = 0) { members.registerBySnsIdentity(any()) }
         verify(exactly = 0) { providerTokenCollector.collect(any(), any(), any()) }
     }
 
     @Test
     fun `가입이 거부되면 provider 토큰을 확보하지 않는다`() {
         every { snsVerifier.verify(any(), any()) } returns identity
-        every { registration.registerBySnsIdentity(any()) } throws MemberAlreadyRegisteredException("이미 가입된 계정입니다.")
+        every { members.registerBySnsIdentity(any()) } throws MemberAlreadyRegisteredException("이미 가입된 계정입니다.")
 
         assertFailsWith<MemberAlreadyRegisteredException> { service.registerBySns(command) }
 

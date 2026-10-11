@@ -1,7 +1,7 @@
 package org.around.ieuri.auth.adapter.event.listener
 
 import org.around.ieuri.auth.adapter.event.mapper.toAuditPayload
-import org.around.ieuri.auth.application.audit.provided.AuditLogUseCase
+import org.around.ieuri.auth.application.audit.provided.AuditLogCommandUseCase
 import org.around.ieuri.auth.application.member.PasswordResetRequested
 import org.around.ieuri.auth.domain.member.event.EmailChanged
 import org.around.ieuri.auth.domain.member.event.EmailVerificationRetargeted
@@ -26,7 +26,7 @@ import org.springframework.transaction.event.TransactionalEventListener
  */
 @Component
 class MemberAuditListener(
-    private val auditLog: AuditLogUseCase,
+    private val auditLog: AuditLogCommandUseCase,
 ) {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     fun on(event: MemberRegistered) = record(event.memberId, "MEMBER_REGISTERED", event.toAuditPayload())

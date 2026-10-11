@@ -1,6 +1,7 @@
 package org.around.ieuri.auth.application.token
 
 import org.around.ieuri.auth.application.member.provided.MemberLoginUseCase
+import org.around.ieuri.auth.application.member.provided.MemberQueryUseCase
 import org.around.ieuri.auth.application.token.provided.AuthTokenUseCase
 import org.around.ieuri.auth.application.token.provided.dto.LoginCommand
 import org.around.ieuri.auth.application.token.provided.dto.LoginEmailCommand
@@ -16,6 +17,8 @@ import org.around.ieuri.auth.application.token.required.TokenProviderPort
 import org.around.ieuri.common.event.AccessType
 import org.around.ieuri.common.event.MemberAccessed
 import org.springframework.stereotype.Service
+import java.time.Clock
+import java.time.Duration
 
 /**
  * 로그인·refresh 회전·로그아웃. 트랜잭션을 갖지 않는다 — 회원 인증이 커밋된 뒤 토큰을 발급한다.
@@ -24,23 +27,24 @@ import org.springframework.stereotype.Service
 @Service
 class AuthTokenService(
     private val memberLogin: MemberLoginUseCase,
+    private val memberQuery: MemberQueryUseCase,
     private val tokenProvider: TokenProviderPort,
     private val refreshTokenStore: RefreshTokenStorePort,
-    private val tokenIssuer: TokenIssuer,
     private val eventPublisher: TokenEventPublisherPort,
+    private val clock: Clock,
 ) : AuthTokenUseCase {
 
     /** 미가입·정지는 거부하되, 기간제 정지가 만료됐으면 복구 후 허용한다. */
-    override fun loginBySns(command: LoginCommand): TokenPairResult {
+    override fun loginBySns(command: LoginCommand, ipAddress: String?): TokenPairResult {
         val memberId = memberLogin.loginBySns(command.provider, command.idToken, command.authorizationCode)
-        publishAccess(memberId, AccessType.LOGIN, command.ipAddress)
-        return tokenIssuer.issueFor(memberId)
+        publishAccess(memberId, AccessType.LOGIN, ipAddress)
+        return issueFor(memberId)
     }
 
-    override fun loginByEmail(command: LoginEmailCommand): TokenPairResult {
+    override fun loginByEmail(command: LoginEmailCommand, ipAddress: String?): TokenPairResult {
         val memberId = memberLogin.loginByEmail(command.email, command.password)
-        publishAccess(memberId, AccessType.LOGIN, command.ipAddress)
-        return tokenIssuer.issueFor(memberId)
+        publishAccess(memberId, AccessType.LOGIN, ipAddress)
+        return issueFor(memberId)
     }
 
     /**
@@ -54,16 +58,16 @@ class AuthTokenService(
 
         if (!refreshTokenStore.existsActive(claims.jti)) {
             refreshTokenStore.revokeAllByMember(claims.memberId)
-            throw TokenReuseDetectedException("재사용된 리프레시 토큰입니다. 다시 로그인해 주세요.")
+            throw TokenReuseDetectedException()
         }
 
-        val issued = tokenIssuer.issueFor(claims.memberId)
+        val issued = issueFor(claims.memberId)
         refreshTokenStore.revoke(claims.jti)
         return issued
     }
 
     /** 제출된 refresh를 폐기한다. 이미 무효·만료된 토큰이어도 성공한다(멱등). */
-    override fun logout(command: LogoutCommand): LogoutResult {
+    override fun logout(command: LogoutCommand, ipAddress: String?): LogoutResult {
         val claims = try {
             tokenProvider.parseRefreshToken(command.refreshToken)
         } catch (ex: InvalidTokenException) {
@@ -71,8 +75,26 @@ class AuthTokenService(
         }
         refreshTokenStore.revoke(claims.jti)
 
-        publishAccess(claims.memberId, AccessType.LOGOUT, command.ipAddress)
+        publishAccess(claims.memberId, AccessType.LOGOUT, ipAddress)
         return LogoutResult(success = true)
+    }
+
+    /** access/refresh 쌍을 발급하고 refresh jti를 저장소에 등록한다. 발급마다 유효 권한을 다시 읽는다. */
+    private fun issueFor(memberId: Long): TokenPairResult {
+        val authorities = memberQuery.authoritiesOf(memberId)
+
+        val access = tokenProvider.issueAccessToken(memberId, authorities.permissions, authorities.roles)
+        val refresh = tokenProvider.issueRefreshToken(memberId)
+        refreshTokenStore.save(refresh.jti, memberId, refresh.expiresAt)
+
+        val now = clock.instant()
+        return TokenPairResult(
+            accessToken = access.token,
+            refreshToken = refresh.token,
+            tokenType = "Bearer",
+            accessTokenExpiresInSeconds = Duration.between(now, access.expiresAt).seconds,
+            refreshTokenExpiresInSeconds = Duration.between(now, refresh.expiresAt).seconds,
+        )
     }
 
     /** 접속기록(안전성 확보조치 기준 제8조). 성공한 접속만 남기며 저장은 리스너가 비동기로 한다. */

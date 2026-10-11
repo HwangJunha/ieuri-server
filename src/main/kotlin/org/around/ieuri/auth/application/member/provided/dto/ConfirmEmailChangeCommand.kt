@@ -3,7 +3,6 @@ import java.util.UUID
 
 /** 이메일 변경 코드 확인(R7). 통과하면 회원의 이메일이 교체된다. */
 data class ConfirmEmailChangeCommand(
-    val memberId: Long,
     val verificationPublicId: UUID,
     val code: String,
 ) {

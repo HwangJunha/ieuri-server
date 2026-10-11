@@ -3,7 +3,7 @@ package org.around.ieuri.auth.adapter.event.listener
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import org.around.ieuri.auth.application.audit.provided.AuditLogUseCase
+import org.around.ieuri.auth.application.audit.provided.AuditLogCommandUseCase
 import org.around.ieuri.common.event.AccessType
 import org.around.ieuri.common.event.MemberAccessed
 import kotlin.test.Test
@@ -12,7 +12,7 @@ import kotlin.test.Test
 class MemberAccessAuditListenerTest {
 
     private val memberId = 7L
-    private val auditLog = mockk<AuditLogUseCase>(relaxUnitFun = true)
+    private val auditLog = mockk<AuditLogCommandUseCase>(relaxUnitFun = true)
     private val listener = MemberAccessAuditListener(auditLog)
 
     @Test

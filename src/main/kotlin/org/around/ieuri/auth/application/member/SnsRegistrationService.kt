@@ -1,6 +1,6 @@
 package org.around.ieuri.auth.application.member
 
-import org.around.ieuri.auth.application.member.provided.MemberRegistrationUseCase
+import org.around.ieuri.auth.application.member.provided.MemberCommandUseCase
 import org.around.ieuri.auth.application.member.provided.SnsRegistrationUseCase
 import org.around.ieuri.auth.application.member.provided.dto.RegisterMemberCommand
 import org.around.ieuri.auth.application.member.provided.dto.RegisterMemberResult
@@ -15,13 +15,13 @@ import org.springframework.stereotype.Service
 @Service
 class SnsRegistrationService(
     private val snsVerifier: SnsIdentityVerifierPort,
-    private val registration: MemberRegistrationUseCase,
+    private val members: MemberCommandUseCase,
     private val providerTokenCollector: ProviderTokenCollector,
 ) : SnsRegistrationUseCase {
 
     override fun registerBySns(command: RegisterMemberCommand): RegisterMemberResult {
         val identity = snsVerifier.verify(command.provider, command.idToken)
-        val registered = registration.registerBySnsIdentity(
+        val registered = members.registerBySnsIdentity(
             RegisterSnsIdentityCommand(
                 request = command,
                 providerUserId = identity.providerUserId,

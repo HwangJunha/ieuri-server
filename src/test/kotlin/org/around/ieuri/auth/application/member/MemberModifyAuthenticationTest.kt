@@ -21,12 +21,12 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
 /** 로그인의 DB 단계. 정지 판정은 도메인이 하고, 서비스는 기간제 정지가 만료돼 복구됐을 때만 상태를 쓴다. */
-class MemberAuthenticationServiceTest {
+class MemberModifyAuthenticationTest {
 
     private val now = Instant.parse("2026-07-17T00:00:00Z")
 
     private val memberRepository = mockk<MemberRepository>(relaxUnitFun = true)
-    private val service = MemberAuthenticationService(memberRepository, Clock.fixed(now, ZoneOffset.UTC))
+    private val service = memberModifyService(memberRepository, clock = Clock.fixed(now, ZoneOffset.UTC))
 
     private fun snsMember(status: MemberStatus = MemberStatus.ACTIVE, until: Instant? = null, reason: String? = null) = memberFixture(
         provider = Provider.GOOGLE,

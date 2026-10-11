@@ -1,6 +1,6 @@
 package org.around.ieuri.auth.application.member
 
-import org.around.ieuri.auth.application.member.provided.MemberAuthenticationUseCase
+import org.around.ieuri.auth.application.member.provided.MemberCommandUseCase
 import org.around.ieuri.auth.application.member.provided.MemberLoginUseCase
 import org.around.ieuri.auth.application.member.provided.exception.InvalidCredentialsException
 import org.around.ieuri.auth.application.member.required.LoginIdentifierProtectorPort
@@ -17,7 +17,7 @@ import org.springframework.stereotype.Service
 @Service
 class MemberLoginService(
     private val snsVerifier: SnsIdentityVerifierPort,
-    private val authentication: MemberAuthenticationUseCase,
+    private val members: MemberCommandUseCase,
     private val providerTokenCollector: ProviderTokenCollector,
     private val passwordEncoder: PasswordEncoderPort,
     private val identifierProtector: LoginIdentifierProtectorPort,
@@ -25,22 +25,22 @@ class MemberLoginService(
 
     override fun loginBySns(provider: Provider, idToken: String, authorizationCode: String?): Long {
         val identity = snsVerifier.verify(provider, idToken)
-        val memberId = authentication.admitSns(provider, identity.providerUserId)
+        val memberId = members.admitSns(provider, identity.providerUserId)
         // 탈퇴용 토큰 보충. 실패해도 로그인은 성공한다(R7).
         providerTokenCollector.collect(memberId, provider, authorizationCode)
         return memberId
     }
 
     override fun loginByEmail(email: String, password: String): Long {
-        val credential = authentication.findEmailCredential(identifierProtector.protect(Email(email).value))
+        val credential = members.findEmailCredential(identifierProtector.protect(Email(email).value))
             ?: throw invalidCredentials()
         // 해시가 없으면 SNS 계정이다 — 이메일 로그인은 안 되고, 존재 여부도 드러내지 않는다.
         val passwordHash = credential.passwordHash ?: throw invalidCredentials()
         if (!passwordEncoder.matches(password, passwordHash)) throw invalidCredentials()
 
-        authentication.admit(credential.memberId)
+        members.admit(credential.memberId)
         return credential.memberId
     }
 
-    private fun invalidCredentials() = InvalidCredentialsException("이메일 또는 비밀번호가 올바르지 않습니다.")
+    private fun invalidCredentials() = InvalidCredentialsException()
 }

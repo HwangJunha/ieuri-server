@@ -7,17 +7,37 @@ import org.around.ieuri.auth.application.member.provided.dto.RoleInfoView
 import org.around.ieuri.auth.application.token.provided.dto.TokenPairResult
 import org.around.ieuri.auth.domain.member.MemberStatus
 import org.around.ieuri.auth.domain.member.Provider
+import org.around.ieuri.common.graphql.generated.types.AgreeToRequiredTermsInput
 import org.around.ieuri.common.graphql.generated.types.AgreementInput
+import org.around.ieuri.common.graphql.generated.types.AssignRoleInput
+import org.around.ieuri.common.graphql.generated.types.ChangeEmailInput
+import org.around.ieuri.common.graphql.generated.types.ChangeNicknameInput
+import org.around.ieuri.common.graphql.generated.types.ConfirmEmailChangeInput
+import org.around.ieuri.common.graphql.generated.types.ConfirmProfileImageUploadInput
+import org.around.ieuri.common.graphql.generated.types.CreateProfileImageUploadUrlInput
 import org.around.ieuri.common.graphql.generated.types.LoginEmailInput
 import org.around.ieuri.common.graphql.generated.types.LoginSnsInput
+import org.around.ieuri.common.graphql.generated.types.LogoutInput
+import org.around.ieuri.common.graphql.generated.types.ReactivateMemberInput
+import org.around.ieuri.common.graphql.generated.types.RefreshTokenInput
 import org.around.ieuri.common.graphql.generated.types.RegisterEmailMemberInput
 import org.around.ieuri.common.graphql.generated.types.RegisterSnsMemberInput
+import org.around.ieuri.common.graphql.generated.types.RequestPasswordResetInput
+import org.around.ieuri.common.graphql.generated.types.ResendEmailChangeInput
+import org.around.ieuri.common.graphql.generated.types.ResendVerificationInput
 import org.around.ieuri.common.graphql.generated.types.ResetPasswordInput
+import org.around.ieuri.common.graphql.generated.types.RetargetEmailVerificationInput
+import org.around.ieuri.common.graphql.generated.types.RevokeRoleInput
+import org.around.ieuri.common.graphql.generated.types.SuspendMemberInput
 import org.around.ieuri.common.graphql.generated.types.TermsCode
+import org.around.ieuri.common.graphql.generated.types.UpdateAgreementInput
+import org.around.ieuri.common.graphql.generated.types.VerifyEmailInput
 import org.around.ieuri.common.pagination.CursorEdge
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.CursorPageInfo
 import java.time.Instant
+import java.time.format.DateTimeParseException
+import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -99,53 +119,196 @@ class AuthGraphqlMappersTest {
         assertEquals(listOf(true, false), command.agreements.map { it.agreed })
     }
 
+    /** 접속지는 Command에 담지 않는다 — 리졸버가 유스케이스에 따로 넘긴다. */
     @Test
-    fun `SNS 로그인 입력이 Command로 옮겨진다 - 토큰과 인가 코드와 접속지가 섞이지 않는다`() {
+    fun `SNS 로그인 입력이 Command로 옮겨진다 - 토큰과 인가 코드가 섞이지 않는다`() {
         val command = LoginSnsInput(
             provider = GqlProvider.GOOGLE,
             idToken = "id-token-값",
             authorizationCode = "auth-code-값",
-        ).toCommand(ipAddress = "203.0.113.7")
+        ).toCommand()
 
         assertEquals(Provider.GOOGLE, command.provider)
         assertEquals("id-token-값", command.idToken)
         assertEquals("auth-code-값", command.authorizationCode)
-        assertEquals("203.0.113.7", command.ipAddress)
     }
 
     @Test
-    fun `SNS 로그인 입력의 인가 코드와 접속지가 없으면 null로 옮겨진다`() {
-        val command = LoginSnsInput(provider = GqlProvider.APPLE, idToken = "id-token-값", authorizationCode = null).toCommand(ipAddress = null)
+    fun `SNS 로그인 입력의 인가 코드가 없으면 null로 옮겨진다`() {
+        val command = LoginSnsInput(provider = GqlProvider.APPLE, idToken = "id-token-값", authorizationCode = null).toCommand()
 
         assertEquals(Provider.APPLE, command.provider)
         assertEquals("id-token-값", command.idToken)
         assertNull(command.authorizationCode)
-        assertNull(command.ipAddress)
     }
 
     @Test
     fun `SNS 로그인의 provider는 네 값 모두 같은 이름으로 옮겨진다`() {
         GqlProvider.entries.forEach { provider ->
-            assertEquals(provider.name, LoginSnsInput(provider = provider, idToken = "t").toCommand(ipAddress = null).provider.name)
+            assertEquals(provider.name, LoginSnsInput(provider = provider, idToken = "t").toCommand().provider.name)
         }
     }
 
     @Test
-    fun `자체 로그인 입력이 Command로 옮겨진다 - 이메일과 비밀번호와 접속지가 섞이지 않는다`() {
-        val command = LoginEmailInput(email = "login@example.com", password = "비밀번호-값").toCommand(ipAddress = "198.51.100.9")
+    fun `자체 로그인 입력이 Command로 옮겨진다 - 이메일과 비밀번호가 섞이지 않는다`() {
+        val command = LoginEmailInput(email = "login@example.com", password = "비밀번호-값").toCommand()
 
         assertEquals("login@example.com", command.email)
         assertEquals("비밀번호-값", command.password)
-        assertEquals("198.51.100.9", command.ipAddress)
     }
 
     @Test
-    fun `자체 로그인 입력의 접속지가 없으면 null로 옮겨진다`() {
-        val command = LoginEmailInput(email = "login@example.com", password = "비밀번호-값").toCommand(ipAddress = null)
+    fun `재발급과 로그아웃 입력의 refresh 토큰이 Command로 옮겨진다`() {
+        assertEquals("refresh-재발급-값", RefreshTokenInput(refreshToken = "refresh-재발급-값").toCommand().refreshToken)
+        assertEquals("refresh-로그아웃-값", LogoutInput(refreshToken = "refresh-로그아웃-값").toCommand().refreshToken)
+    }
 
-        assertEquals("login@example.com", command.email)
-        assertEquals("비밀번호-값", command.password)
-        assertNull(command.ipAddress)
+    // ── 이메일 인증·변경 ──
+
+    @Test
+    fun `이메일 인증 입력이 Command로 옮겨진다 - 핸들은 UUID로 읽고 코드와 섞이지 않는다`() {
+        val command = VerifyEmailInput(verificationId = "11111111-2222-3333-4444-555555555555", code = "481516").toCommand()
+
+        assertEquals(UUID.fromString("11111111-2222-3333-4444-555555555555"), command.verificationPublicId)
+        assertEquals("481516", command.code)
+    }
+
+    @Test
+    fun `인증 코드 재발송 입력의 핸들이 UUID로 옮겨진다`() {
+        val command = ResendVerificationInput(verificationId = "22222222-3333-4444-5555-666666666666").toCommand()
+
+        assertEquals(UUID.fromString("22222222-3333-4444-5555-666666666666"), command.verificationPublicId)
+    }
+
+    @Test
+    fun `인증 주소 정정과 이메일 변경 입력의 새 주소가 다듬지 않은 채 Command로 옮겨진다`() {
+        // 정규화는 도메인(Email)이 한다 — 변환은 값을 건드리지 않는다.
+        assertEquals(" Retarget@Example.com ", RetargetEmailVerificationInput(newEmail = " Retarget@Example.com ").toCommand().newEmail)
+        assertEquals(" Change@Example.com ", ChangeEmailInput(newEmail = " Change@Example.com ").toCommand().newEmail)
+    }
+
+    @Test
+    fun `이메일 변경 확인 입력이 Command로 옮겨진다 - 핸들은 UUID로 읽고 코드와 섞이지 않는다`() {
+        val command = ConfirmEmailChangeInput(verificationId = "33333333-4444-5555-6666-777777777777", code = "162342").toCommand()
+
+        assertEquals(UUID.fromString("33333333-4444-5555-6666-777777777777"), command.verificationPublicId)
+        assertEquals("162342", command.code)
+    }
+
+    @Test
+    fun `이메일 변경 재발송 입력의 핸들이 UUID로 옮겨진다`() {
+        val command = ResendEmailChangeInput(verificationId = "44444444-5555-6666-7777-888888888888").toCommand()
+
+        assertEquals(UUID.fromString("44444444-5555-6666-7777-888888888888"), command.verificationPublicId)
+    }
+
+    @Test
+    fun `UUID가 아닌 핸들은 네 입력 모두 예외다`() {
+        assertFailsWith<IllegalArgumentException> { VerifyEmailInput(verificationId = "not-a-uuid", code = "481516").toCommand() }
+        assertFailsWith<IllegalArgumentException> { ResendVerificationInput(verificationId = "not-a-uuid").toCommand() }
+        assertFailsWith<IllegalArgumentException> { ConfirmEmailChangeInput(verificationId = "not-a-uuid", code = "481516").toCommand() }
+        assertFailsWith<IllegalArgumentException> { ResendEmailChangeInput(verificationId = "not-a-uuid").toCommand() }
+    }
+
+    @Test
+    fun `비밀번호 재설정 요청 입력의 이메일이 Command로 옮겨진다`() {
+        assertEquals("forgot@example.com", RequestPasswordResetInput(email = "forgot@example.com").toCommand().email)
+    }
+
+    // ── 프로필 ──
+
+    @Test
+    fun `닉네임 변경 입력이 다듬지 않은 채 Command로 옮겨진다`() {
+        assertEquals("  여행하는곰  ", ChangeNicknameInput(nickname = "  여행하는곰  ").toCommand().nickname)
+    }
+
+    @Test
+    fun `프로필 이미지 업로드 URL 입력이 Command로 옮겨진다 - 크기는 Long으로 넓힌다`() {
+        val command = CreateProfileImageUploadUrlInput(contentType = "image/webp", contentLength = 2_147_483_647).toCommand()
+
+        assertEquals("image/webp", command.contentType)
+        assertEquals(2_147_483_647L, command.contentLength)
+    }
+
+    @Test
+    fun `프로필 이미지 업로드 확인 입력의 오브젝트 키가 Command로 옮겨진다`() {
+        assertEquals("pending/profile/7/키-값", ConfirmProfileImageUploadInput(objectKey = "pending/profile/7/키-값").toCommand().objectKey)
+    }
+
+    // ── 약관 동의 ──
+
+    @Test
+    fun `약관 토글 입력이 Command로 옮겨진다 - 코드는 enum 이름이다`() {
+        val on = UpdateAgreementInput(termsCode = TermsCode.MARKETING, agreed = true).toCommand()
+        val off = UpdateAgreementInput(termsCode = TermsCode.LOCATION, agreed = false).toCommand()
+
+        assertEquals("MARKETING", on.termsCode)
+        assertEquals(true, on.agreed)
+        assertEquals("LOCATION", off.termsCode)
+        assertEquals(false, off.agreed)
+    }
+
+    @Test
+    fun `약관 코드는 모든 값이 같은 이름으로 옮겨진다`() {
+        TermsCode.entries.forEach { code ->
+            assertEquals(code.name, UpdateAgreementInput(termsCode = code, agreed = true).toCommand().termsCode)
+        }
+    }
+
+    @Test
+    fun `필수 약관 동의 입력의 코드가 순서대로 이름으로 옮겨진다`() {
+        val command = AgreeToRequiredTermsInput(termsCodes = listOf(TermsCode.PRIVACY, TermsCode.SERVICE, TermsCode.PRIVACY)).toCommand()
+        val empty = AgreeToRequiredTermsInput(termsCodes = emptyList()).toCommand()
+
+        // 중복 제거는 도메인이 한다 — 변환은 받은 대로 옮긴다.
+        assertEquals(listOf("PRIVACY", "SERVICE", "PRIVACY"), command.termsCodes)
+        assertEquals(emptyList(), empty.termsCodes)
+    }
+
+    // ── 정지·복구·역할(관리자) ──
+
+    @Test
+    fun `정지 입력이 Command로 옮겨진다 - 만료 시각은 ISO 문자열을 Instant로 읽는다`() {
+        val command = SuspendMemberInput(memberId = 41L, reason = "사유-값", suspendedUntil = "2026-11-12T13:14:15Z").toCommand()
+
+        assertEquals(41L, command.memberId)
+        assertEquals("사유-값", command.reason)
+        assertEquals(Instant.parse("2026-11-12T13:14:15Z"), command.suspendedUntil)
+    }
+
+    @Test
+    fun `정지 입력의 만료 시각이 없으면 null이다 - 무기한 정지`() {
+        val command = SuspendMemberInput(memberId = 42L, reason = "사유-값", suspendedUntil = null).toCommand()
+
+        assertEquals(42L, command.memberId)
+        assertNull(command.suspendedUntil)
+    }
+
+    @Test
+    fun `ISO-8601이 아닌 만료 시각은 예외다`() {
+        assertFailsWith<DateTimeParseException> { SuspendMemberInput(memberId = 43L, reason = "사유-값", suspendedUntil = "2026-11-12").toCommand() }
+    }
+
+    @Test
+    fun `복구 입력의 회원 id가 Command로 옮겨진다`() {
+        assertEquals(44L, ReactivateMemberInput(memberId = 44L).toCommand().memberId)
+    }
+
+    /** 수행자는 Command에 없다 — 리졸버가 인증 컨텍스트에서 읽어 따로 넘긴다. */
+    @Test
+    fun `역할 부여 입력의 memberId는 대상 회원으로 옮겨진다`() {
+        val command = AssignRoleInput(memberId = 51L, roleCode = "ADMIN").toCommand()
+
+        assertEquals(51L, command.targetMemberId)
+        assertEquals("ADMIN", command.roleCode)
+    }
+
+    @Test
+    fun `역할 회수 입력의 memberId는 대상 회원으로 옮겨진다`() {
+        val command = RevokeRoleInput(memberId = 52L, roleCode = "SUPER_ADMIN").toCommand()
+
+        assertEquals(52L, command.targetMemberId)
+        assertEquals("SUPER_ADMIN", command.roleCode)
     }
 
     @Test

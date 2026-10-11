@@ -17,13 +17,13 @@ import kotlin.test.assertEquals
  * 감사 기록 쓰기와 보관 기간 집행(SPEC-0032 R22, POL-014).
  * - 기록 종류마다 보관 기간이 다르다: 회원 감사 365일, 접속기록 1년, 위치 조회 6개월.
  */
-class AuditLogServiceTest {
+class AuditLogModifyServiceTest {
 
     // 윤일(2028-02-29)을 낀 시각이라 365일과 1년, 6개월이 서로 다른 기준 시각을 낸다.
     private val now = Instant.parse("2028-08-31T00:00:00Z")
 
     private val repository = mockk<AuditLogRepository>(relaxUnitFun = true)
-    private val service = AuditLogService(repository, Clock.fixed(now, ZoneOffset.UTC))
+    private val service = AuditLogModifyService(repository, Clock.fixed(now, ZoneOffset.UTC))
 
     // --- 기록 ---
 

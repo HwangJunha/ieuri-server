@@ -1,6 +1,6 @@
 package org.around.ieuri.auth.adapter.batch
 import org.around.ieuri.auth.adapter.config.AuditRetentionProperties
-import org.around.ieuri.auth.application.audit.provided.AuditRetentionUseCase
+import org.around.ieuri.auth.application.audit.provided.AuditLogCommandUseCase
 import org.slf4j.LoggerFactory
 import org.springframework.batch.core.job.Job
 import org.springframework.batch.core.job.builder.JobBuilder
@@ -21,7 +21,7 @@ import org.springframework.context.annotation.Profile
 @Profile("batch")
 class AuditRetentionJobConfig(
     private val jobRepository: JobRepository,
-    private val retentionUseCase: AuditRetentionUseCase,
+    private val retentionUseCase: AuditLogCommandUseCase,
     private val properties: AuditRetentionProperties,
 ) {
 

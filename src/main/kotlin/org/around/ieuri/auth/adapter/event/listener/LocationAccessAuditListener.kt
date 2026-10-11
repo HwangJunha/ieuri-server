@@ -1,7 +1,7 @@
 package org.around.ieuri.auth.adapter.event.listener
 
 import org.around.ieuri.auth.adapter.config.AuthAsyncConfig
-import org.around.ieuri.auth.application.audit.provided.AuditLogUseCase
+import org.around.ieuri.auth.application.audit.provided.AuditLogCommandUseCase
 import org.around.ieuri.common.event.LocationAccessed
 import org.slf4j.LoggerFactory
 import org.springframework.context.event.EventListener
@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component
  */
 @Component
 class LocationAccessAuditListener(
-    private val auditLog: AuditLogUseCase,
+    private val auditLog: AuditLogCommandUseCase,
 ) {
 
     @Async(AuthAsyncConfig.ACCESS_LOG_EXECUTOR)

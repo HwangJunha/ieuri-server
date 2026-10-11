@@ -1,7 +1,7 @@
 package org.around.ieuri.architecture
 
 import com.tngtech.archunit.core.domain.JavaModifier
-import org.around.ieuri.auth.adapter.graphql.support.toUserErrorOrNull
+import org.around.ieuri.auth.adapter.graphql.support.toAuthUserErrorOrNull
 import org.around.ieuri.auth.application.token.provided.exception.AuthStoreUnavailableException
 import org.around.ieuri.auth.application.token.provided.exception.InvalidTokenException
 import org.around.ieuri.auth.application.token.provided.exception.TokenReuseDetectedException
@@ -53,7 +53,7 @@ class AuthErrorSurfaceContractTest {
     fun `인증 계열 예외는 userErrors로 변환되지 않는다`() {
         topLevelOnlyExceptions().forEach { e ->
             assertNull(
-                toUserErrorOrNull(e),
+                toAuthUserErrorOrNull(e),
                 "${e::class.simpleName}이 userErrors로 새고 있다 — 인증 실패는 최상위 errors[]로 가야 " +
                     "클라이언트의 토큰 갱신이 발동한다(POL-016).",
             )

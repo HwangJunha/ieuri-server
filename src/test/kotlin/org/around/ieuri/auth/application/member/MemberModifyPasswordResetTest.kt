@@ -13,18 +13,14 @@ import org.around.ieuri.auth.application.member.provided.exception.MemberNotFoun
 import org.around.ieuri.auth.application.member.required.MemberEventPublisherPort
 import org.around.ieuri.auth.application.member.required.MemberRepository
 import org.around.ieuri.auth.application.member.required.MemberSessionPort
-import org.around.ieuri.auth.application.member.required.PasswordEncoderPort
-import org.around.ieuri.auth.application.member.required.VerificationCodeGeneratorPort
 import org.around.ieuri.auth.domain.member.Member
 import org.around.ieuri.auth.domain.member.NotEmailMemberException
 import org.around.ieuri.auth.domain.member.PasswordReset
 import org.around.ieuri.auth.domain.member.Provider
 import org.around.ieuri.auth.domain.member.ProviderUserId
 import org.around.ieuri.auth.domain.member.ResendCooldownActiveException
-import org.around.ieuri.auth.domain.member.VerificationPolicy
 import org.around.ieuri.auth.domain.member.event.PasswordResetCompleted
 import java.time.Clock
-import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
 import kotlin.test.Test
@@ -39,32 +35,23 @@ import kotlin.test.assertTrue
  * - 실행 단계의 실패 사유는 `CODE_MISMATCH` 하나로 모은다 — 갈리면 인증 없이 계정을 열거할 수 있다.
  * - 코드 확인 → 비밀번호 저장 → 세션 폐기 순서를 고정한다.
  */
-class PasswordResetServiceTest {
+class MemberModifyPasswordResetTest {
 
     private val now = Instant.parse("2026-07-16T00:00:00Z")
-    private val policy = VerificationPolicy(Duration.ofMinutes(10), 5, Duration.ofSeconds(60))
+    private val policy = testVerificationPolicy
 
     private val memberRepository = mockk<MemberRepository>(relaxUnitFun = true)
     private val sessions = mockk<MemberSessionPort>(relaxUnitFun = true)
-    private val codeGenerator = mockk<VerificationCodeGeneratorPort> {
-        every { generate() } returns "123456"
-        every { hash(any()) } answers { "hashed:${firstArg<String>()}" }
-    }
-    private val passwordEncoder = mockk<PasswordEncoderPort> {
-        every { encode(any()) } answers { "encoded:${firstArg<String>()}" }
-    }
+    private val passwordEncoder = prefixingPasswordEncoder()
     private val eventPublisher = mockk<MemberEventPublisherPort>()
     private val events = mutableListOf<Any>()
 
-    private val service = PasswordResetService(
+    private val service = memberModifyService(
         memberRepository,
-        sessions,
-        codeGenerator,
-        passwordEncoder,
-        prefixingIdentifierProtector(),
-        eventPublisher,
-        policy,
-        Clock.fixed(now, ZoneOffset.UTC),
+        clock = Clock.fixed(now, ZoneOffset.UTC),
+        eventPublisher = eventPublisher,
+        sessions = sessions,
+        passwordEncoder = passwordEncoder,
     )
 
     private val loginIdentifier = ProviderUserId("protected:user@example.com")

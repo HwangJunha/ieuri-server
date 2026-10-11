@@ -81,9 +81,9 @@ class MemberQueryAdapter(
             .associate { it[MemberTable.id] to it.toMemberPublicProfileView() }
     }
 
-    /** id 내림차순 keyset. 커서는 회원 id 문자열이고, `first`는 1~100으로 맞춘다. */
+    /** id 내림차순 keyset. 커서는 회원 id 문자열이다. `first`는 상한이 적용된 값을 받는다. */
     override fun findMembers(query: MembersQuery): CursorPage<MemberSummaryView> {
-        val first = query.first.coerceIn(1, MAX_PAGE_SIZE)
+        val first = query.first
         val afterId = query.after?.let {
             it.toLongOrNull() ?: throw IllegalArgumentException("유효하지 않은 커서입니다.")
         }
@@ -172,8 +172,4 @@ class MemberQueryAdapter(
         .where { MemberRoleTable.memberId eq memberId }
         .orderBy(PermissionTable.code to SortOrder.ASC)
         .map { it[PermissionTable.code] }
-
-    private companion object {
-        const val MAX_PAGE_SIZE = 100
-    }
 }

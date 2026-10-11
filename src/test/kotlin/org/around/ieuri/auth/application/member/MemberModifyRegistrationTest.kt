@@ -20,8 +20,6 @@ import org.around.ieuri.auth.application.member.provided.exception.MemberNotFoun
 import org.around.ieuri.auth.application.member.provided.exception.PasswordPolicyViolationException
 import org.around.ieuri.auth.application.member.required.MemberEventPublisherPort
 import org.around.ieuri.auth.application.member.required.MemberRepository
-import org.around.ieuri.auth.application.member.required.PasswordEncoderPort
-import org.around.ieuri.auth.application.member.required.VerificationCodeGeneratorPort
 import org.around.ieuri.auth.domain.member.Agreement
 import org.around.ieuri.auth.domain.member.AlreadyVerifiedException
 import org.around.ieuri.auth.domain.member.Email
@@ -39,14 +37,12 @@ import org.around.ieuri.auth.domain.member.Role
 import org.around.ieuri.auth.domain.member.Terms
 import org.around.ieuri.auth.domain.member.UnderageRegistrationException
 import org.around.ieuri.auth.domain.member.VerificationNotFoundException
-import org.around.ieuri.auth.domain.member.VerificationPolicy
 import org.around.ieuri.auth.domain.member.VerificationPurpose
 import org.around.ieuri.auth.domain.member.VerificationRateLimitedException
 import org.around.ieuri.auth.domain.member.event.EmailVerificationRetargeted
 import org.around.ieuri.auth.domain.member.event.EmailVerified
 import org.around.ieuri.auth.domain.member.event.MemberRegistered
 import java.time.Clock
-import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
 import java.util.UUID
@@ -63,37 +59,23 @@ import kotlin.test.assertTrue
  * - 판정 순서가 곧 오류 코드의 우선순위라 순서를 고정한다.
  * - 평문 코드는 이벤트로만 나가고, 저장되는 것은 해시다.
  */
-class MemberRegistrationServiceTest {
+class MemberModifyRegistrationTest {
 
     private val now = Instant.parse("2026-07-16T00:00:00Z")
-    private val policy = VerificationPolicy(Duration.ofMinutes(10), 5, Duration.ofSeconds(60))
+    private val policy = testVerificationPolicy
     private val nicknameSeed = 20260807
 
     private val memberRepository = mockk<MemberRepository>(relaxUnitFun = true)
-    private val codeGenerator = mockk<VerificationCodeGeneratorPort> {
-        every { generate() } returns "123456"
-        every { hash(any()) } answers { "hashed:${firstArg<String>()}" }
-    }
-    private val passwordEncoder = mockk<PasswordEncoderPort> {
-        every { encode(any()) } answers { "encoded:${firstArg<String>()}" }
-    }
+    private val codeGenerator = fixedCodeGenerator()
     private val eventPublisher = mockk<MemberEventPublisherPort>()
     private val events = mutableListOf<Any>()
-    private val identifierProtector = prefixingIdentifierProtector()
 
-    // 중복 판정은 실제 인스턴스다 — 어느 주소·provider로 묻는지까지 함께 고정된다.
-    private val emailUniqueness = ProviderEmailUniqueness(memberRepository, identifierProtector)
-
-    private val service = MemberRegistrationService(
+    private val service = memberModifyService(
         memberRepository,
-        codeGenerator,
-        eventPublisher,
-        policy,
-        passwordEncoder,
-        NicknameGenerator(Random(nicknameSeed)),
-        identifierProtector,
-        emailUniqueness,
-        Clock.fixed(now, ZoneOffset.UTC),
+        clock = Clock.fixed(now, ZoneOffset.UTC),
+        eventPublisher = eventPublisher,
+        codeGenerator = codeGenerator,
+        nicknameGenerator = NicknameGenerator(Random(nicknameSeed)),
     )
 
     private val serviceTerms = Terms(id = 1, code = "SERVICE", version = "1.0", required = true)
@@ -227,9 +209,24 @@ class MemberRegistrationServiceTest {
 
         val ex = assertFailsWith<EmailAlreadyInUseException> { service.registerBySnsIdentity(snsCommand()) }
 
+        assertEquals("EMAIL_ALREADY_IN_USE", ex.code)
         assertEquals("이미 사용 중인 이메일입니다.", ex.message)
+        assertFalse(ex.message.orEmpty().contains("@"))
         verify(exactly = 0) { memberRepository.insert(any(), any(), any()) }
         assertTrue(events.isEmpty())
+    }
+
+    /** POL-002. 판정은 `(provider, email)`이다 — 다른 provider의 같은 주소는 충돌이 아니다. */
+    @Test
+    fun `다른 provider에 같은 이메일이 있어도 SNS 가입은 통과한다`() {
+        every { memberRepository.existsByEmailIdentifier(Provider.KAKAO, "protected:user@example.com", any()) } returns true
+
+        val result = service.registerBySnsIdentity(snsCommand())
+
+        assertEquals(100L, result.memberId)
+        // 가입하는 provider로만, 평문이 아닌 보호 변환값으로, 제외 기준 없이 묻는다.
+        verify(exactly = 1) { memberRepository.existsByEmailIdentifier(any(), any(), any()) }
+        verify(exactly = 1) { memberRepository.existsByEmailIdentifier(Provider.GOOGLE, "protected:user@example.com", null) }
     }
 
     /** SNS 가입은 가입 자격(만 14세·필수 약관)을 이메일 중복보다 먼저 본다. */
@@ -334,6 +331,8 @@ class MemberRegistrationServiceTest {
         assertEquals("user@example.com", member.email.value)
         assertFalse(member.emailVerified)
         assertEquals("encoded:Passw0rd!", member.passwordHash?.value)
+        // 중복은 정규화한 주소의 보호 변환값으로, 제외 기준 없이 묻는다.
+        verify(exactly = 1) { memberRepository.existsByEmailIdentifier(Provider.EMAIL, "protected:user@example.com", null) }
         // 닉네임에 이메일 로컬파트를 쓰지 않는다(R20).
         assertEquals(generatedNickname(), insertedProfile.captured.nickname.value)
         assertNull(insertedProfile.captured.profileImageUrl)
@@ -656,7 +655,7 @@ class MemberRegistrationServiceTest {
 
     // --- 인증 주소 정정 (SPEC-0024 R7) ---
 
-    private val retarget = RetargetEmailVerificationCommand(100L, " Right@Example.com ")
+    private val retarget = RetargetEmailVerificationCommand(" Right@Example.com ")
 
     /** R7-1. 회원의 이메일은 아직 바꾸지 않는다 — 새 주소는 코드가 들고 있다가 통과하면 확정된다. */
     @Test
@@ -665,7 +664,7 @@ class MemberRegistrationServiceTest {
         givenMember(memberFixture(provider = Provider.KAKAO, email = "wrong@example.com", emailVerified = false))
         every { memberRepository.findEmailVerifications(100L, VerificationPurpose.REGISTRATION) } returns listOf(previous)
 
-        val result = service.retargetEmailVerification(retarget)
+        val result = service.retargetEmailVerification(retarget, 100L)
 
         val issued = insertedVerification.captured
         assertEquals(issued.publicId, result.verificationPublicId)
@@ -697,7 +696,7 @@ class MemberRegistrationServiceTest {
         every { memberRepository.existsByEmailIdentifier(any(), any(), any()) } returns true
         every { memberRepository.findEmailVerifications(100L, VerificationPurpose.REGISTRATION) } returns listOf(challenge().copy(createdAt = now))
 
-        val ex = assertFailsWith<AlreadyVerifiedException> { service.retargetEmailVerification(retarget) }
+        val ex = assertFailsWith<AlreadyVerifiedException> { service.retargetEmailVerification(retarget, 100L) }
 
         assertEquals("ALREADY_VERIFIED", ex.code)
         assertEquals("이미 이메일 인증을 마쳤습니다.", ex.message)
@@ -711,11 +710,24 @@ class MemberRegistrationServiceTest {
         every { memberRepository.existsByEmailIdentifier(Provider.EMAIL, "protected:right@example.com", 100L) } returns true
         every { memberRepository.findEmailVerifications(100L, VerificationPurpose.REGISTRATION) } returns listOf(challenge().copy(createdAt = now))
 
-        val ex = assertFailsWith<EmailAlreadyInUseException> { service.retargetEmailVerification(retarget) }
+        val ex = assertFailsWith<EmailAlreadyInUseException> { service.retargetEmailVerification(retarget, 100L) }
 
         assertEquals("이미 사용 중인 이메일입니다.", ex.message)
         verify(exactly = 0) { codeGenerator.generate() }
         verify(exactly = 0) { memberRepository.insertEmailVerification(any()) }
+    }
+
+    /** 제외 기준이 빠지면 자기 주소를 다시 넣은 회원이 자기 자신과 충돌한다. */
+    @Test
+    fun `주소 정정의 중복 판정은 본인을 빼고 본다`() {
+        givenMember(memberFixture(provider = Provider.KAKAO, email = "wrong@example.com", emailVerified = false))
+        every { memberRepository.existsByEmailIdentifier(Provider.KAKAO, "protected:right@example.com", null) } returns true
+        every { memberRepository.existsByEmailIdentifier(Provider.KAKAO, "protected:right@example.com", 100L) } returns false
+
+        val result = service.retargetEmailVerification(retarget, 100L)
+
+        assertEquals(insertedVerification.captured.publicId, result.verificationPublicId)
+        verify(exactly = 0) { memberRepository.existsByEmailIdentifier(any(), any(), null) }
     }
 
     /** R7-3. 창은 재발송과 함께 세지만 코드는 RESEND_COOLDOWN_ACTIVE다. */
@@ -724,7 +736,7 @@ class MemberRegistrationServiceTest {
         givenMember(memberFixture(emailVerified = false))
         every { memberRepository.findEmailVerifications(100L, VerificationPurpose.REGISTRATION) } returns listOf(challenge().copy(createdAt = now.minusSeconds(59)))
 
-        val ex = assertFailsWith<ResendCooldownActiveException> { service.retargetEmailVerification(retarget) }
+        val ex = assertFailsWith<ResendCooldownActiveException> { service.retargetEmailVerification(retarget, 100L) }
 
         assertEquals("RESEND_COOLDOWN_ACTIVE", ex.code)
         assertEquals("잠시 후 다시 시도해 주세요.", ex.message)
@@ -738,7 +750,7 @@ class MemberRegistrationServiceTest {
     fun `주소 정정 대상 회원이 없으면 회원 없음으로 답한다`() {
         givenMember(null)
 
-        val ex = assertFailsWith<MemberNotFoundException> { service.retargetEmailVerification(retarget) }
+        val ex = assertFailsWith<MemberNotFoundException> { service.retargetEmailVerification(retarget, 100L) }
 
         assertEquals("회원을 찾을 수 없습니다.", ex.message)
     }

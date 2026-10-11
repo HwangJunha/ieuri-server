@@ -321,9 +321,11 @@ refactor.
     returns goes in that side's `dto/` — never declared next to the interface
     (SpotSearchPort's `SpotSearchQuery` lives in `required/dto/`) (SPEC-0039 D-100).
   - **One top-level type per file, named after it** — interfaces, DTOs, events, policies alike, in every
-    layer. The only files that keep several are sets bound by a `private` member they share (Exposed
-    `Table` groups sharing a constant, keyset cursors sharing the codec, deserializers sharing
-    `readItems`) and a `private` type only its file uses.
+    layer. The only files that keep several are sets bound by a `private` member they share (keyset
+    cursors sharing the codec, deserializers sharing `readItems`), a `private` type only its file
+    uses, and **Exposed tables: one `<Aggregate>Tables.kt` per aggregate** holding every table that
+    aggregate owns (`MemberTables.kt`, `PostTables.kt`) — the owner is the aggregate whose repository
+    writes the table, or whose port reads it when nothing writes it.
     A file named `XxxReadModels.kt` holding ten views is the shape to avoid.
   - **`application/` and `domain/` list the same packages, one to one.** Each name is an aggregate
     (see the persisted-data bullet below — a package that writes has a root). A capability several aggregates use but
@@ -346,10 +348,32 @@ refactor.
 - **Rules are judged in the domain only.** The domain throws a typed exception per violation; the
   application neither pre-validates nor interprets a `Boolean` result. Exception → error code happens
   in the adapter's error handler, keeping the existing codes (POL-016).
-- **Services read as a procedure: find → domain method → save.** One `XxxModifyService` and one
-  `XxxQueryService` per aggregate. An update still calls `save` — Exposed has no dirty-checking.
-  Query services are per aggregate too; the outbound **read** port may be shared between them
-  (reads skip the aggregate, so splitting the port only scatters one moderation filter).
+  - **One root per error channel, named for the context.** Failures that go to a payload's
+    `userErrors` extend `<Context>UserException(code, message)` in `domain/shared`
+    (`CommunityUserException`, `TourismUserException`, `AuthUserException`); the adapter helper is
+    `with<Context>UserErrors`. Failures that go to top-level `errors[]` have their own root
+    (`TourismQueryException`). **The message is the exception class's default** —
+    `throw PostNotFoundException()`; pass a message only when one exception has a second wording.
+    The code and message strings are the client contract: renaming a class never changes them.
+- **Services read as a procedure: find → domain method → save.** One `XxxModifyService`
+  (implementing `XxxCommandUseCase`) and one `XxxQueryService` (`XxxQueryUseCase`) per aggregate —
+  never `XxxCommandService`, and never one write service per use-case group. An update still calls
+  `save` — Exposed has no dirty-checking. Query services are per aggregate too; the outbound **read**
+  port may be shared between them (reads skip the aggregate, so splitting the port only scatters one
+  moderation filter).
+  - **A further service exists only for a different role, and is named for it** — a batch sync
+    (`SpotSyncService`), or a flow that wraps external calls around DB steps (`MemberWithdrawalService`,
+    `PostImageUploadService`). A flow service has no transaction; it calls the Modify service's use
+    case for each DB step, because a `@Transactional` method called from its own class is not
+    transactional. Its use case is a plain `XxxUseCase`.
+  - **A Command holds what the client specified; what the server learned from the request is a
+    separate argument.** Target ids and payload go in the Command (in REST terms: the path and the
+    body). The caller's member id, the request language and the client IP are parameters of the use
+    case method — `createPost(command, memberId, language)`. So `Input.toCommand()` takes no
+    arguments, and a Command never carries `memberId`. A value the client did send stays in the
+    Command even if it looks like context (a device's `language` in `RegisterDeviceTokenCommand`).
+  - **Page size is capped in the application** (`PagePolicy.clamp`, or the query service's own
+    limit), never in an adapter — an adapter receives a `first` that is already capped.
 - **Every persisted domain datum belongs to an aggregate, and every write goes through its root.**
   Load the root → a root method decides → save. This holds for batch-synced and derived data too
   (KTO metrics, embeddings, a district's representative location) — a thin root is still a root.
