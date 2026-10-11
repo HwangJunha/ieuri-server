@@ -1,10 +1,10 @@
 package org.around.ieuri.auth.domain.member
 
 import org.around.ieuri.auth.domain.member.MemberFixtures.CODE
+import org.around.ieuri.auth.domain.member.MemberFixtures.LIMITS
 import org.around.ieuri.auth.domain.member.MemberFixtures.MEMBER_ID
 import org.around.ieuri.auth.domain.member.MemberFixtures.NOW
 import org.around.ieuri.auth.domain.member.MemberFixtures.OTHER_MEMBER_ID
-import org.around.ieuri.auth.domain.member.MemberFixtures.POLICY
 import org.around.ieuri.auth.domain.member.MemberFixtures.member
 import org.around.ieuri.auth.domain.member.MemberFixtures.verification
 import java.time.Instant
@@ -40,7 +40,7 @@ class MemberEmailChangeTest {
 
     @Test
     fun `변경 요청은 새 주소를 실은 변경 용도 코드를 낸다`() {
-        val issue = member(provider = Provider.EMAIL).requestEmailChange(next, emptyList(), CODE, POLICY, NOW)
+        val issue = member(provider = Provider.EMAIL).requestEmailChange(next, emptyList(), CODE, LIMITS, NOW)
 
         assertNull(issue.issued.id)
         assertEquals(CODE.publicId, issue.issued.publicId)
@@ -58,7 +58,7 @@ class MemberEmailChangeTest {
         val active = change(n = 1)
         val consumed = change(n = 2, consumed = true)
 
-        val issue = member().requestEmailChange(next, listOf(active, consumed), CODE, POLICY, NOW)
+        val issue = member().requestEmailChange(next, listOf(active, consumed), CODE, LIMITS, NOW)
 
         assertEquals(listOf(active.copy(consumed = true)), issue.consumed)
     }
@@ -68,7 +68,7 @@ class MemberEmailChangeTest {
         listOf(Provider.APPLE, Provider.GOOGLE, Provider.KAKAO).forEach { provider ->
             val sns = member(provider = provider, passwordHash = null)
 
-            val e = assertFailsWith<NotEmailMemberException> { sns.requestEmailChange(next, emptyList(), CODE, POLICY, NOW) }
+            val e = assertFailsWith<NotEmailMemberException> { sns.requestEmailChange(next, emptyList(), CODE, LIMITS, NOW) }
 
             assertEquals("SNS 계정은 이메일을 변경할 수 없습니다.", e.message)
             assertEquals("NOT_EMAIL_MEMBER", e.code)
@@ -79,7 +79,7 @@ class MemberEmailChangeTest {
     fun `지금과 같은 주소로는 바꿀 수 없다 - 대소문자와 공백은 같은 주소다`() {
         val member = member(email = "current@example.com")
 
-        val e = assertFailsWith<SameAsCurrentEmailException> { member.requestEmailChange(Email("  Current@Example.com "), emptyList(), CODE, POLICY, NOW) }
+        val e = assertFailsWith<SameAsCurrentEmailException> { member.requestEmailChange(Email("  Current@Example.com "), emptyList(), CODE, LIMITS, NOW) }
 
         assertEquals("현재 사용 중인 이메일과 같습니다.", e.message)
         assertEquals("SAME_AS_CURRENT_EMAIL", e.code)
@@ -89,7 +89,7 @@ class MemberEmailChangeTest {
     fun `SNS 회원이 같은 주소를 넣으면 회원 유형이 먼저 걸린다`() {
         val sns = member(provider = Provider.KAKAO, email = "current@example.com", passwordHash = null)
 
-        assertFailsWith<NotEmailMemberException> { sns.requestEmailChange(Email("current@example.com"), emptyList(), CODE, POLICY, NOW) }
+        assertFailsWith<NotEmailMemberException> { sns.requestEmailChange(Email("current@example.com"), emptyList(), CODE, LIMITS, NOW) }
     }
 
     @Test
@@ -97,7 +97,7 @@ class MemberEmailChangeTest {
         val previous = change(n = 1, target = Email("carried@example.com"))
         val consumed = change(n = 2, consumed = true)
 
-        val issue = member().reissueEmailChange(previous, listOf(previous, consumed), CODE, POLICY, NOW)
+        val issue = member().reissueEmailChange(previous, listOf(previous, consumed), CODE, LIMITS, NOW)
 
         assertEquals("carried@example.com", issue.issued.targetEmail?.value)
         assertEquals(VerificationPurpose.EMAIL_CHANGE, issue.issued.purpose)
@@ -111,11 +111,11 @@ class MemberEmailChangeTest {
         val justBefore = change(createdAt = NOW.minusSeconds(59))
         val exactly = change(createdAt = NOW.minusSeconds(60))
 
-        val e = assertFailsWith<ResendCooldownActiveException> { member().reissueEmailChange(justBefore, listOf(justBefore), CODE, POLICY, NOW) }
+        val e = assertFailsWith<ResendCooldownActiveException> { member().reissueEmailChange(justBefore, listOf(justBefore), CODE, LIMITS, NOW) }
 
         assertEquals("잠시 후 다시 시도해 주세요.", e.message)
         assertEquals("RESEND_COOLDOWN_ACTIVE", e.code)
-        assertEquals(CODE.publicId, member().reissueEmailChange(exactly, listOf(exactly), CODE, POLICY, NOW).issued.publicId)
+        assertEquals(CODE.publicId, member().reissueEmailChange(exactly, listOf(exactly), CODE, LIMITS, NOW).issued.publicId)
     }
 
     /** 대상 주소가 없는 코드는 가입 인증 코드뿐이고, 그것은 용도 판정에서 먼저 걸린다. */
@@ -124,11 +124,11 @@ class MemberEmailChangeTest {
         val registration = verification(n = 1, purpose = VerificationPurpose.REGISTRATION, targetEmail = null)
         val retargeted = verification(n = 2, purpose = VerificationPurpose.REGISTRATION, targetEmail = Email("fixed@example.com"))
 
-        val e = assertFailsWith<VerificationNotFoundException> { member().reissueEmailChange(registration, listOf(registration), CODE, POLICY, NOW) }
+        val e = assertFailsWith<VerificationNotFoundException> { member().reissueEmailChange(registration, listOf(registration), CODE, LIMITS, NOW) }
 
         assertEquals("유효하지 않은 검증 요청입니다.", e.message)
         assertEquals("VERIFICATION_NOT_FOUND", e.code)
-        assertFailsWith<VerificationNotFoundException> { member().reissueEmailChange(retargeted, emptyList(), CODE, POLICY, NOW) }
+        assertFailsWith<VerificationNotFoundException> { member().reissueEmailChange(retargeted, emptyList(), CODE, LIMITS, NOW) }
     }
 
     /** 쿨다운도 함께 걸린 상태에서 없는 요청이 이긴다 — 쿨다운으로 답하면 남의 핸들이 있다는 것이 드러난다. */
@@ -138,13 +138,13 @@ class MemberEmailChangeTest {
         val registration = verification(n = 2, purpose = VerificationPurpose.REGISTRATION, targetEmail = Email("fixed@example.com"))
         val justIssued = change(n = 3, createdAt = NOW.minusSeconds(10))
 
-        val e = assertFailsWith<VerificationNotFoundException> { member().reissueEmailChange(foreign, listOf(justIssued), CODE, POLICY, NOW) }
+        val e = assertFailsWith<VerificationNotFoundException> { member().reissueEmailChange(foreign, listOf(justIssued), CODE, LIMITS, NOW) }
 
         assertEquals("유효하지 않은 검증 요청입니다.", e.message)
         assertEquals("VERIFICATION_NOT_FOUND", e.code)
-        assertFailsWith<VerificationNotFoundException> { member().reissueEmailChange(registration, listOf(justIssued), CODE, POLICY, NOW) }
+        assertFailsWith<VerificationNotFoundException> { member().reissueEmailChange(registration, listOf(justIssued), CODE, LIMITS, NOW) }
         // 같은 상태에서 자기 변경 코드면 쿨다운에 걸린다 — 위 판정이 쿨다운보다 먼저였다는 뜻이다.
-        assertFailsWith<ResendCooldownActiveException> { member().reissueEmailChange(justIssued, listOf(justIssued), CODE, POLICY, NOW) }
+        assertFailsWith<ResendCooldownActiveException> { member().reissueEmailChange(justIssued, listOf(justIssued), CODE, LIMITS, NOW) }
     }
 
     // ── 확인 ──

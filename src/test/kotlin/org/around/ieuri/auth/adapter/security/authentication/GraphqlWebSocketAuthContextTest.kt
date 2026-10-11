@@ -1,7 +1,6 @@
-package org.around.ieuri.auth
+package org.around.ieuri.auth.adapter.security.authentication
 
 import io.mockk.mockk
-import org.around.ieuri.auth.adapter.security.GraphqlWebSocketAuthInterceptor
 import org.around.ieuri.auth.application.token.required.TokenProviderPort
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
@@ -25,7 +24,7 @@ import kotlin.test.assertNull
  * - 리졸버가 실행되는 구독 시점에 신원이 보여야 하고, 끝나면 반드시 지워져야 한다.
  * - `chain.next()`가 콜드 Mono라 try/finally면 앞의 것이, defer만 하면 뒤의 것이 깨진다.
  */
-class GraphqlWebSocketAuthInterceptorTest {
+class GraphqlWebSocketAuthContextTest {
 
     private val interceptor = GraphqlWebSocketAuthInterceptor(
         mockk<TokenProviderPort>(relaxed = true),

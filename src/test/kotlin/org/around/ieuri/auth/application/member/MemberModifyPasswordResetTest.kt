@@ -38,7 +38,7 @@ import kotlin.test.assertTrue
 class MemberModifyPasswordResetTest {
 
     private val now = Instant.parse("2026-07-16T00:00:00Z")
-    private val policy = testVerificationPolicy
+    private val limits = testVerificationLimits
 
     private val memberRepository = mockk<MemberRepository>(relaxUnitFun = true)
     private val sessions = mockk<MemberSessionPort>(relaxUnitFun = true)
@@ -99,8 +99,8 @@ class MemberModifyPasswordResetTest {
         assertNull(issued.captured.id)
         assertEquals(300L, issued.captured.memberId)
         assertEquals("hashed:123456", issued.captured.codeHash)
-        assertEquals(now.plus(policy.ttl), issued.captured.expiresAt)
-        assertEquals(policy.maxAttempts, issued.captured.maxAttempts)
+        assertEquals(now.plus(limits.ttl), issued.captured.expiresAt)
+        assertEquals(limits.maxAttempts, issued.captured.maxAttempts)
         assertFalse(issued.captured.consumed)
         assertEquals(listOf<Any>(PasswordResetRequested(memberId = 300L, toEmail = "user@example.com", code = "123456")), events)
     }

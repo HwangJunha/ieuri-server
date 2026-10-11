@@ -66,9 +66,14 @@ class MemberModifyProfileTest {
 
     // --- 프로필 이미지 반영 ---
 
+    private fun givenMember() {
+        every { memberRepository.findById(memberId) } returns memberFixture(id = memberId)
+    }
+
     /** 이전 키는 덮어쓰기 전에 읽어야 호출자가 정리할 수 있다. */
     @Test
     fun `이미지 반영은 이전 키를 읽은 뒤 확정 키를 저장하고 이전 키를 돌려준다`() {
+        givenMember()
         every { memberRepository.findProfileImageKey(memberId) } returns previousKey
         every { memberRepository.saveProfileImage(memberId, confirmedKey) } returns true
 
@@ -83,6 +88,7 @@ class MemberModifyProfileTest {
 
     @Test
     fun `이전 이미지가 없던 회원은 null을 돌려준다`() {
+        givenMember()
         every { memberRepository.findProfileImageKey(memberId) } returns null
         every { memberRepository.saveProfileImage(memberId, confirmedKey) } returns true
 
@@ -91,6 +97,7 @@ class MemberModifyProfileTest {
 
     @Test
     fun `남의 키와 이미 확정된 키는 저장하지 않고 거부한다`() {
+        givenMember()
         every { memberRepository.findProfileImageKey(memberId) } returns null
         val othersKey = "pending/profile/$otherMemberId/${UUID.fromString("66666666-6666-6666-6666-666666666666")}"
 
@@ -101,8 +108,21 @@ class MemberModifyProfileTest {
         verify(exactly = 0) { memberRepository.saveProfileImage(any(), any()) }
     }
 
+    /** 없는 회원이 잘못된 키를 내도 회원 없음이 먼저다. */
+    @Test
+    fun `없는 회원의 이미지 반영은 키를 보기 전에 회원 없음으로 답한다`() {
+        every { memberRepository.findById(memberId) } returns null
+
+        listOf(pendingKey, "not-a-key").forEach { raw ->
+            val ex = assertFailsWith<MemberNotFoundException> { service.changeProfileImage(memberId, raw) }
+            assertEquals("회원을 찾을 수 없습니다.", ex.message)
+        }
+        verify(exactly = 0) { memberRepository.saveProfileImage(any(), any()) }
+    }
+
     @Test
     fun `바뀐 행이 없는 이미지 반영은 회원 없음으로 답한다`() {
+        givenMember()
         every { memberRepository.findProfileImageKey(memberId) } returns null
         every { memberRepository.saveProfileImage(memberId, confirmedKey) } returns false
 

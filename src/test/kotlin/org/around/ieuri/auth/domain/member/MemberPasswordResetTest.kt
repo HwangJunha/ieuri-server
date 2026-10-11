@@ -1,9 +1,9 @@
 package org.around.ieuri.auth.domain.member
 
 import org.around.ieuri.auth.domain.member.MemberFixtures.CODE
+import org.around.ieuri.auth.domain.member.MemberFixtures.LIMITS
 import org.around.ieuri.auth.domain.member.MemberFixtures.MEMBER_ID
 import org.around.ieuri.auth.domain.member.MemberFixtures.NOW
-import org.around.ieuri.auth.domain.member.MemberFixtures.POLICY
 import org.around.ieuri.auth.domain.member.MemberFixtures.member
 import org.around.ieuri.auth.domain.member.MemberFixtures.reset
 import kotlin.test.Test
@@ -23,7 +23,7 @@ class MemberPasswordResetTest {
         val active = reset(n = 1)
         val consumed = reset(n = 2, consumed = true)
 
-        val issue = member().requestPasswordReset(listOf(active, consumed), CODE, POLICY, NOW)
+        val issue = member().requestPasswordReset(listOf(active, consumed), CODE, LIMITS, NOW)
 
         assertNull(issue.issued.id)
         assertEquals(CODE.publicId, issue.issued.publicId)
@@ -41,7 +41,7 @@ class MemberPasswordResetTest {
     fun `비밀번호가 없는 SNS 회원은 쿨다운과 무관하게 재설정을 요청할 수 없다`() {
         val sns = member(provider = Provider.KAKAO, passwordHash = null)
 
-        val e = assertFailsWith<NotEmailMemberException> { sns.requestPasswordReset(listOf(reset(createdAt = NOW)), CODE, POLICY, NOW) }
+        val e = assertFailsWith<NotEmailMemberException> { sns.requestPasswordReset(listOf(reset(createdAt = NOW)), CODE, LIMITS, NOW) }
 
         assertEquals("SNS로 가입한 계정입니다. 해당 SNS로 로그인해 주세요.", e.message)
         assertEquals("NOT_EMAIL_MEMBER", e.code)
@@ -52,12 +52,12 @@ class MemberPasswordResetTest {
         val justBefore = reset(n = 1, consumed = true, createdAt = NOW.minusSeconds(59))
         val exactly = reset(n = 2, createdAt = NOW.minusSeconds(60))
 
-        val e = assertFailsWith<ResendCooldownActiveException> { member().requestPasswordReset(listOf(exactly, justBefore), CODE, POLICY, NOW) }
+        val e = assertFailsWith<ResendCooldownActiveException> { member().requestPasswordReset(listOf(exactly, justBefore), CODE, LIMITS, NOW) }
 
         assertEquals("잠시 후 다시 시도해 주세요.", e.message)
         assertEquals("RESEND_COOLDOWN_ACTIVE", e.code)
-        assertEquals(CODE.publicId, member().requestPasswordReset(listOf(exactly), CODE, POLICY, NOW).issued.publicId)
-        assertEquals(CODE.publicId, member().requestPasswordReset(emptyList(), CODE, POLICY, NOW).issued.publicId)
+        assertEquals(CODE.publicId, member().requestPasswordReset(listOf(exactly), CODE, LIMITS, NOW).issued.publicId)
+        assertEquals(CODE.publicId, member().requestPasswordReset(emptyList(), CODE, LIMITS, NOW).issued.publicId)
     }
 
     @Test

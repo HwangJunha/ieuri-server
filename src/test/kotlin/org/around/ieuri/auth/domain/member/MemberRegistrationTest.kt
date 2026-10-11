@@ -165,6 +165,6 @@ class MemberRegistrationTest {
     fun `저장되지 않은 회원으로는 자식을 만들지 못한다`() {
         val unsaved = member(id = null, provider = Provider.KAKAO)
 
-        assertFailsWith<IllegalStateException> { unsaved.issueEmailVerification(MemberFixtures.CODE, MemberFixtures.POLICY, Instant.EPOCH) }
+        assertFailsWith<IllegalStateException> { unsaved.issueEmailVerification(MemberFixtures.CODE, MemberFixtures.LIMITS, Instant.EPOCH) }
     }
 }

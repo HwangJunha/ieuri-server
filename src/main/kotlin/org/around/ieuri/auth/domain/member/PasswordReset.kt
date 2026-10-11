@@ -37,14 +37,14 @@ data class PasswordReset(
     private fun failure(reason: VerificationFailureReason) = VerificationResult.Failure(reason)
 
     internal companion object {
-        fun issue(memberId: Long, code: VerificationCode, policy: VerificationPolicy, now: Instant): PasswordReset = PasswordReset(
+        fun issue(memberId: Long, code: VerificationCode, limits: VerificationLimits, now: Instant): PasswordReset = PasswordReset(
             id = null,
             publicId = code.publicId,
             memberId = memberId,
             codeHash = code.codeHash,
-            expiresAt = now.plus(policy.ttl),
+            expiresAt = now.plus(limits.ttl),
             attempts = 0,
-            maxAttempts = policy.maxAttempts,
+            maxAttempts = limits.maxAttempts,
             consumed = false,
             createdAt = null,
         )

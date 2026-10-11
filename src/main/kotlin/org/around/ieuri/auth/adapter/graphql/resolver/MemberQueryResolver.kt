@@ -5,7 +5,7 @@ import com.netflix.graphql.dgs.DgsDataFetchingEnvironment
 import com.netflix.graphql.dgs.DgsQuery
 import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.auth.adapter.graphql.mapper.toGql
-import org.around.ieuri.auth.adapter.security.RequiresPermission
+import org.around.ieuri.auth.adapter.security.authorization.RequiresPermission
 import org.around.ieuri.auth.application.member.provided.MemberQueryUseCase
 import org.around.ieuri.auth.application.member.provided.dto.MeView
 import org.around.ieuri.auth.application.member.provided.dto.MembersQuery

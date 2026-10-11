@@ -15,7 +15,7 @@ internal object MemberFixtures {
     val NOW: Instant = Instant.parse("2026-10-05T03:00:00Z")
 
     /** 만료 10분, 시도 3회, 재발송 쿨다운 60초. */
-    val POLICY = VerificationPolicy(ttl = Duration.ofMinutes(10), maxAttempts = 3, resendCooldown = Duration.ofSeconds(60))
+    val LIMITS = VerificationLimits(ttl = Duration.ofMinutes(10), maxAttempts = 3, resendCooldown = Duration.ofSeconds(60))
 
     val CODE = VerificationCode(publicId = UUID.fromString("aaaaaaaa-0000-0000-0000-000000000001"), codeHash = "새-코드-해시")
 

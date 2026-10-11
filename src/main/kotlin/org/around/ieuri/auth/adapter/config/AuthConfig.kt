@@ -1,7 +1,7 @@
 package org.around.ieuri.auth.adapter.config
 import org.around.ieuri.auth.application.member.ProfileImagePolicy
 import org.around.ieuri.auth.domain.member.NicknameGenerator
-import org.around.ieuri.auth.domain.member.VerificationPolicy
+import org.around.ieuri.auth.domain.member.VerificationLimits
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -46,7 +46,7 @@ class AuthConfig {
     fun nicknameGenerator(): NicknameGenerator = NicknameGenerator()
 
     @Bean
-    fun verificationPolicy(properties: VerificationProperties): VerificationPolicy = VerificationPolicy(
+    fun verificationLimits(properties: VerificationProperties): VerificationLimits = VerificationLimits(
         ttl = Duration.ofMinutes(properties.ttlMinutes),
         maxAttempts = properties.maxAttempts,
         resendCooldown = Duration.ofSeconds(properties.resendCooldownSeconds),

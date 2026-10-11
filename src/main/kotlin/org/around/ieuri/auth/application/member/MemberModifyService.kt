@@ -58,8 +58,8 @@ import org.around.ieuri.auth.domain.member.Provider
 import org.around.ieuri.auth.domain.member.ProviderUserId
 import org.around.ieuri.auth.domain.member.Role
 import org.around.ieuri.auth.domain.member.VerificationCode
+import org.around.ieuri.auth.domain.member.VerificationLimits
 import org.around.ieuri.auth.domain.member.VerificationNotFoundException
-import org.around.ieuri.auth.domain.member.VerificationPolicy
 import org.around.ieuri.auth.domain.member.VerificationPurpose
 import org.around.ieuri.auth.domain.member.VerificationResult
 import org.around.ieuri.auth.domain.member.event.EmailChanged
@@ -98,7 +98,7 @@ class MemberModifyService(
     private val passwordEncoder: PasswordEncoderPort,
     private val identifierProtector: LoginIdentifierProtectorPort,
     private val eventPublisher: MemberEventPublisherPort,
-    private val verificationPolicy: VerificationPolicy,
+    private val verificationLimits: VerificationLimits,
     private val nicknameGenerator: NicknameGenerator,
     private val clock: Clock,
 ) : MemberCommandUseCase {
@@ -213,7 +213,7 @@ class MemberModifyService(
         val existing = memberRepository.findEmailVerifications(previous.memberId, VerificationPurpose.REGISTRATION)
         val plainCode = codeGenerator.generate()
 
-        val issue = member.reissueEmailVerification(previous, existing, VerificationCode(UUID.randomUUID(), codeGenerator.hash(plainCode)), verificationPolicy, now)
+        val issue = member.reissueEmailVerification(previous, existing, VerificationCode(UUID.randomUUID(), codeGenerator.hash(plainCode)), verificationLimits, now)
 
         saveVerificationCodes(issue)
         eventPublisher.publish(VerificationEmailRequested((issue.issued.targetEmail ?: member.email).value, plainCode))
@@ -230,7 +230,7 @@ class MemberModifyService(
         val existing = memberRepository.findEmailVerifications(memberId, VerificationPurpose.REGISTRATION)
         val plainCode = codeGenerator.generate()
 
-        val issue = member.retargetEmailVerification(newEmail, existing, VerificationCode(UUID.randomUUID(), codeGenerator.hash(plainCode)), verificationPolicy, now)
+        val issue = member.retargetEmailVerification(newEmail, existing, VerificationCode(UUID.randomUUID(), codeGenerator.hash(plainCode)), verificationLimits, now)
 
         saveVerificationCodes(issue)
         eventPublisher.publish(VerificationEmailRequested(newEmail.value, plainCode))
@@ -253,7 +253,7 @@ class MemberModifyService(
         val issue = member.requestPasswordReset(
             existing = memberRepository.findPasswordResets(memberId),
             code = VerificationCode(UUID.randomUUID(), codeGenerator.hash(plainCode)),
-            policy = verificationPolicy,
+            limits = verificationLimits,
             now = now,
         )
 
@@ -298,7 +298,7 @@ class MemberModifyService(
         val plainCode = codeGenerator.generate()
 
         // 같은 용도의 이전 코드만 폐기한다 — 가입 인증이 진행 중이면 그건 그대로 둔다.
-        val issue = member.requestEmailChange(newEmail, existing, VerificationCode(UUID.randomUUID(), codeGenerator.hash(plainCode)), verificationPolicy, clock.instant())
+        val issue = member.requestEmailChange(newEmail, existing, VerificationCode(UUID.randomUUID(), codeGenerator.hash(plainCode)), verificationLimits, clock.instant())
         ensureEmailNotTaken(member.provider, newEmail, exceptMemberId = memberId)
 
         // 접속기록(기준 제8조). 개인정보(이메일) 변경이라 남겨야 하는 수행업무다.
@@ -336,7 +336,7 @@ class MemberModifyService(
         val existing = memberRepository.findEmailVerifications(memberId, VerificationPurpose.EMAIL_CHANGE)
         val plainCode = codeGenerator.generate()
 
-        val issue = member.reissueEmailChange(previous, existing, VerificationCode(UUID.randomUUID(), codeGenerator.hash(plainCode)), verificationPolicy, clock.instant())
+        val issue = member.reissueEmailChange(previous, existing, VerificationCode(UUID.randomUUID(), codeGenerator.hash(plainCode)), verificationLimits, clock.instant())
 
         saveVerificationCodes(issue)
         eventPublisher.publish(VerificationEmailRequested(requireNotNull(issue.issued.targetEmail).value, plainCode))
@@ -398,8 +398,9 @@ class MemberModifyService(
         return nickname.value
     }
 
-    /** 이 회원에게 발급된 임시 키만 받는다. 저장은 확정 위치의 키로 한다. */
+    /** 이 회원에게 발급된 임시 키만 받는다. 저장은 확정 위치의 키로 한다. 회원 부재가 키 오류보다 먼저다. */
     override fun changeProfileImage(memberId: Long, pendingObjectKey: String): String? {
+        if (memberRepository.findById(memberId) == null) throw MemberNotFoundException()
         val confirmedKey = ProfileImageObjectKey.pendingOf(pendingObjectKey, memberId).toConfirmed()
         val previousKey = memberRepository.findProfileImageKey(memberId)
 
@@ -527,7 +528,7 @@ class MemberModifyService(
     /** 가입 직후의 첫 인증 코드를 저장하고 회원의 이메일로 보낸다. */
     private fun sendFirstVerificationCode(member: Member, now: Instant): EmailVerification {
         val plainCode = codeGenerator.generate()
-        val verification = member.issueEmailVerification(VerificationCode(UUID.randomUUID(), codeGenerator.hash(plainCode)), verificationPolicy, now)
+        val verification = member.issueEmailVerification(VerificationCode(UUID.randomUUID(), codeGenerator.hash(plainCode)), verificationLimits, now)
         memberRepository.insertEmailVerification(verification)
         eventPublisher.publish(VerificationEmailRequested(member.email.value, plainCode))
         return verification

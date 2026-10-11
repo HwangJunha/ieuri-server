@@ -27,7 +27,7 @@ data class Member(
     // ── 가입 이메일 인증 ──
 
     /** 가입 직후의 첫 인증 코드. */
-    fun issueEmailVerification(code: VerificationCode, policy: VerificationPolicy, now: Instant): EmailVerification = EmailVerification.issue(savedId(), code, policy, now, VerificationPurpose.REGISTRATION, targetEmail = null)
+    fun issueEmailVerification(code: VerificationCode, limits: VerificationLimits, now: Instant): EmailVerification = EmailVerification.issue(savedId(), code, limits, now, VerificationPurpose.REGISTRATION, targetEmail = null)
 
     /**
      * 가입 인증 코드 재발송. 정정한 대기 주소는 이어받는다 — 회원의 이메일로 되돌리면 정정이 조용히 취소된다.
@@ -37,12 +37,12 @@ data class Member(
         previous: EmailVerification,
         existing: List<EmailVerification>,
         code: VerificationCode,
-        policy: VerificationPolicy,
+        limits: VerificationLimits,
         now: Instant,
     ): EmailVerificationIssue {
         ensureOwn(previous, VerificationPurpose.REGISTRATION)
-        if (!policy.cooldownPassed(lastIssuedAt(existing), now)) throw VerificationRateLimitedException()
-        return replaceCodes(existing, VerificationPurpose.REGISTRATION, previous.targetEmail, code, policy, now)
+        if (!limits.cooldownPassed(lastIssuedAt(existing), now)) throw VerificationRateLimitedException()
+        return replaceCodes(existing, VerificationPurpose.REGISTRATION, previous.targetEmail, code, limits, now)
     }
 
     /** 인증 대기 주소를 정정할 수 있는 회원인지(SPEC-0024 R7-2). 인증을 마쳤으면 거부한다. */
@@ -58,12 +58,12 @@ data class Member(
         newEmail: Email,
         existing: List<EmailVerification>,
         code: VerificationCode,
-        policy: VerificationPolicy,
+        limits: VerificationLimits,
         now: Instant,
     ): EmailVerificationIssue {
         ensureEmailUnverified()
-        if (!policy.cooldownPassed(lastIssuedAt(existing), now)) throw ResendCooldownActiveException()
-        return replaceCodes(existing, VerificationPurpose.REGISTRATION, newEmail, code, policy, now)
+        if (!limits.cooldownPassed(lastIssuedAt(existing), now)) throw ResendCooldownActiveException()
+        return replaceCodes(existing, VerificationPurpose.REGISTRATION, newEmail, code, limits, now)
     }
 
     /**
@@ -83,12 +83,12 @@ data class Member(
         newEmail: Email,
         existing: List<EmailVerification>,
         code: VerificationCode,
-        policy: VerificationPolicy,
+        limits: VerificationLimits,
         now: Instant,
     ): EmailVerificationIssue {
         if (provider != Provider.EMAIL) throw NotEmailMemberException("SNS 계정은 이메일을 변경할 수 없습니다.")
         if (email == newEmail) throw SameAsCurrentEmailException()
-        return replaceCodes(existing, VerificationPurpose.EMAIL_CHANGE, newEmail, code, policy, now)
+        return replaceCodes(existing, VerificationPurpose.EMAIL_CHANGE, newEmail, code, limits, now)
     }
 
     /** 이메일 변경 코드 재발송. 대상 주소는 이전 코드에서 이어받고, 쿨다운은 변경 용도로만 센다. */
@@ -96,12 +96,12 @@ data class Member(
         previous: EmailVerification,
         existing: List<EmailVerification>,
         code: VerificationCode,
-        policy: VerificationPolicy,
+        limits: VerificationLimits,
         now: Instant,
     ): EmailVerificationIssue {
         ensureOwn(previous, VerificationPurpose.EMAIL_CHANGE)
-        if (!policy.cooldownPassed(lastIssuedAt(existing), now)) throw ResendCooldownActiveException()
-        return replaceCodes(existing, VerificationPurpose.EMAIL_CHANGE, previous.targetEmail, code, policy, now)
+        if (!limits.cooldownPassed(lastIssuedAt(existing), now)) throw ResendCooldownActiveException()
+        return replaceCodes(existing, VerificationPurpose.EMAIL_CHANGE, previous.targetEmail, code, limits, now)
     }
 
     /** 이메일 변경 코드 확인. 이 회원의 이메일 변경 코드만 받는다. 통과해도 회원은 그대로다 — 주소는 [replaceEmail]이 바꾼다. */
@@ -126,11 +126,11 @@ data class Member(
         purpose: VerificationPurpose,
         targetEmail: Email?,
         code: VerificationCode,
-        policy: VerificationPolicy,
+        limits: VerificationLimits,
         now: Instant,
     ) = EmailVerificationIssue(
         consumed = existing.filter { it.active }.map { it.consume() },
-        issued = EmailVerification.issue(savedId(), code, policy, now, purpose, targetEmail),
+        issued = EmailVerification.issue(savedId(), code, limits, now, purpose, targetEmail),
     )
 
     // ── 비밀번호 재설정 ──
@@ -142,14 +142,14 @@ data class Member(
     fun requestPasswordReset(
         existing: List<PasswordReset>,
         code: VerificationCode,
-        policy: VerificationPolicy,
+        limits: VerificationLimits,
         now: Instant,
     ): PasswordResetIssue {
         if (!hasPassword) throw NotEmailMemberException("SNS로 가입한 계정입니다. 해당 SNS로 로그인해 주세요.")
-        if (!policy.cooldownPassed(existing.mapNotNull { it.createdAt }.maxOrNull(), now)) throw ResendCooldownActiveException()
+        if (!limits.cooldownPassed(existing.mapNotNull { it.createdAt }.maxOrNull(), now)) throw ResendCooldownActiveException()
         return PasswordResetIssue(
             consumed = existing.filter { it.active }.map { it.consume() },
-            issued = PasswordReset.issue(savedId(), code, policy, now),
+            issued = PasswordReset.issue(savedId(), code, limits, now),
         )
     }
 

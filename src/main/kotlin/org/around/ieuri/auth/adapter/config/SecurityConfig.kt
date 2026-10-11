@@ -1,5 +1,5 @@
 package org.around.ieuri.auth.adapter.config
-import org.around.ieuri.auth.adapter.security.JwtAuthenticationFilter
+import org.around.ieuri.auth.adapter.security.authentication.JwtAuthenticationFilter
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.security.config.annotation.web.builders.HttpSecurity

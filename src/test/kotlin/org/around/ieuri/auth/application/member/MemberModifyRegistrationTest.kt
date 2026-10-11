@@ -62,7 +62,7 @@ import kotlin.test.assertTrue
 class MemberModifyRegistrationTest {
 
     private val now = Instant.parse("2026-07-16T00:00:00Z")
-    private val policy = testVerificationPolicy
+    private val limits = testVerificationLimits
     private val nicknameSeed = 20260807
 
     private val memberRepository = mockk<MemberRepository>(relaxUnitFun = true)
@@ -178,8 +178,8 @@ class MemberModifyRegistrationTest {
         assertEquals(issued.publicId, result.result.verificationPublicId)
         assertEquals(100L, issued.memberId)
         assertEquals("hashed:123456", issued.codeHash)
-        assertEquals(now.plus(policy.ttl), issued.expiresAt)
-        assertEquals(policy.maxAttempts, issued.maxAttempts)
+        assertEquals(now.plus(limits.ttl), issued.expiresAt)
+        assertEquals(limits.maxAttempts, issued.maxAttempts)
         assertEquals(VerificationPurpose.REGISTRATION, issued.purpose)
         assertNull(issued.targetEmail)
         assertEquals(
@@ -402,7 +402,7 @@ class MemberModifyRegistrationTest {
     private fun challenge(
         purpose: VerificationPurpose = VerificationPurpose.REGISTRATION,
         targetEmail: String? = null,
-        expiresAt: Instant = now.plus(policy.ttl),
+        expiresAt: Instant = now.plus(limits.ttl),
     ) = emailVerificationFixture(publicId = publicId, expiresAt = expiresAt, purpose = purpose, targetEmail = targetEmail)
 
     private fun givenChallenge(challenge: EmailVerification?) {
@@ -580,7 +580,7 @@ class MemberModifyRegistrationTest {
 
         val issued = insertedVerification.captured
         assertEquals(issued.publicId, result.verificationPublicId)
-        assertEquals(now.plus(policy.ttl), result.expiresAt)
+        assertEquals(now.plus(limits.ttl), result.expiresAt)
         assertEquals("hashed:123456", issued.codeHash)
         assertEquals(VerificationPurpose.REGISTRATION, issued.purpose)
         assertNull(issued.targetEmail)
@@ -668,7 +668,7 @@ class MemberModifyRegistrationTest {
 
         val issued = insertedVerification.captured
         assertEquals(issued.publicId, result.verificationPublicId)
-        assertEquals(now.plus(policy.ttl), result.expiresAt)
+        assertEquals(now.plus(limits.ttl), result.expiresAt)
         assertEquals(Email("right@example.com"), issued.targetEmail)
         assertEquals(VerificationPurpose.REGISTRATION, issued.purpose)
         assertEquals("hashed:123456", issued.codeHash)

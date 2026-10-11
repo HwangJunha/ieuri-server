@@ -17,7 +17,7 @@ import org.around.ieuri.auth.domain.member.PasswordHash
 import org.around.ieuri.auth.domain.member.PasswordReset
 import org.around.ieuri.auth.domain.member.Provider
 import org.around.ieuri.auth.domain.member.ProviderUserId
-import org.around.ieuri.auth.domain.member.VerificationPolicy
+import org.around.ieuri.auth.domain.member.VerificationLimits
 import org.around.ieuri.auth.domain.member.VerificationPurpose
 import java.time.Clock
 import java.time.Duration
@@ -27,7 +27,7 @@ import java.util.UUID
 import kotlin.random.Random
 
 /** 테스트가 함께 쓰는 인증 코드 정책: 10분 유효, 5회 시도, 재발송 쿨다운 60초. */
-internal val testVerificationPolicy = VerificationPolicy(Duration.ofMinutes(10), 5, Duration.ofSeconds(60))
+internal val testVerificationLimits = VerificationLimits(Duration.ofMinutes(10), 5, Duration.ofSeconds(60))
 
 /**
  * 회원 쓰기 서비스 조립. 주제별 테스트가 자기가 보는 협력자만 넘기고 나머지는 기본값을 쓴다.
@@ -41,7 +41,7 @@ internal fun memberModifyService(
     codeGenerator: VerificationCodeGeneratorPort = fixedCodeGenerator(),
     passwordEncoder: PasswordEncoderPort = prefixingPasswordEncoder(),
     identifierProtector: LoginIdentifierProtectorPort = prefixingIdentifierProtector(),
-    verificationPolicy: VerificationPolicy = testVerificationPolicy,
+    verificationLimits: VerificationLimits = testVerificationLimits,
     nicknameGenerator: NicknameGenerator = NicknameGenerator(Random(0)),
 ): MemberModifyService = MemberModifyService(
     memberRepository = memberRepository,
@@ -50,7 +50,7 @@ internal fun memberModifyService(
     passwordEncoder = passwordEncoder,
     identifierProtector = identifierProtector,
     eventPublisher = eventPublisher,
-    verificationPolicy = verificationPolicy,
+    verificationLimits = verificationLimits,
     nicknameGenerator = nicknameGenerator,
     clock = clock,
 )

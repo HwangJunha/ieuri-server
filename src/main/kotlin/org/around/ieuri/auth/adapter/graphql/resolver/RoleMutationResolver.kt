@@ -4,7 +4,7 @@ import com.netflix.graphql.dgs.DgsMutation
 import com.netflix.graphql.dgs.InputArgument
 import org.around.ieuri.auth.adapter.graphql.mapper.toCommand
 import org.around.ieuri.auth.adapter.graphql.support.withAuthUserErrors
-import org.around.ieuri.auth.adapter.security.RequiresPermission
+import org.around.ieuri.auth.adapter.security.authorization.RequiresPermission
 import org.around.ieuri.auth.application.member.provided.MemberCommandUseCase
 import org.around.ieuri.auth.domain.member.Permission
 import org.around.ieuri.common.graphql.generated.types.AssignRoleInput

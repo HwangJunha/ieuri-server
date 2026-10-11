@@ -2,7 +2,7 @@ package org.around.ieuri.auth.adapter.graphql.resolver
 import com.netflix.graphql.dgs.DgsComponent
 import com.netflix.graphql.dgs.DgsQuery
 import org.around.ieuri.auth.adapter.graphql.mapper.toGql
-import org.around.ieuri.auth.adapter.security.RequiresPermission
+import org.around.ieuri.auth.adapter.security.authorization.RequiresPermission
 import org.around.ieuri.auth.application.member.provided.MemberQueryUseCase
 import org.around.ieuri.auth.domain.member.Permission
 import org.around.ieuri.common.graphql.generated.types.RoleInfo as GqlRoleInfo

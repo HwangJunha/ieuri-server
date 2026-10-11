@@ -1,10 +1,10 @@
 package org.around.ieuri.auth.domain.member
 
 import org.around.ieuri.auth.domain.member.MemberFixtures.CODE
+import org.around.ieuri.auth.domain.member.MemberFixtures.LIMITS
 import org.around.ieuri.auth.domain.member.MemberFixtures.MEMBER_ID
 import org.around.ieuri.auth.domain.member.MemberFixtures.NOW
 import org.around.ieuri.auth.domain.member.MemberFixtures.OTHER_MEMBER_ID
-import org.around.ieuri.auth.domain.member.MemberFixtures.POLICY
 import org.around.ieuri.auth.domain.member.MemberFixtures.member
 import org.around.ieuri.auth.domain.member.MemberFixtures.verification
 import kotlin.test.Test
@@ -24,7 +24,7 @@ class MemberEmailVerificationTest {
 
     @Test
     fun `첫 인증 코드는 정책값으로 만들어진다`() {
-        val issued = member().issueEmailVerification(CODE, POLICY, NOW)
+        val issued = member().issueEmailVerification(CODE, LIMITS, NOW)
 
         assertNull(issued.id)
         assertEquals(CODE.publicId, issued.publicId)
@@ -49,7 +49,7 @@ class MemberEmailVerificationTest {
         val consumed = verification(n = 2, consumed = true)
         val verified = verification(n = 3, verifiedAt = NOW.minusSeconds(100))
 
-        val issue = member().reissueEmailVerification(active, listOf(active, consumed, verified), CODE, POLICY, NOW)
+        val issue = member().reissueEmailVerification(active, listOf(active, consumed, verified), CODE, LIMITS, NOW)
 
         assertEquals(listOf(active.publicId), issue.consumed.map { it.publicId })
         assertTrue(issue.consumed.single().consumed)
@@ -66,8 +66,8 @@ class MemberEmailVerificationTest {
         val retargeted = verification(targetEmail = Email("fixed@example.com"))
         val plain = verification(n = 2)
 
-        assertEquals("fixed@example.com", member().reissueEmailVerification(retargeted, listOf(retargeted), CODE, POLICY, NOW).issued.targetEmail?.value)
-        assertNull(member().reissueEmailVerification(plain, listOf(plain), CODE, POLICY, NOW).issued.targetEmail)
+        assertEquals("fixed@example.com", member().reissueEmailVerification(retargeted, listOf(retargeted), CODE, LIMITS, NOW).issued.targetEmail?.value)
+        assertNull(member().reissueEmailVerification(plain, listOf(plain), CODE, LIMITS, NOW).issued.targetEmail)
     }
 
     @Test
@@ -76,11 +76,11 @@ class MemberEmailVerificationTest {
         val exactly = verification(createdAt = NOW.minusSeconds(60))
 
         val e = assertFailsWith<VerificationRateLimitedException> {
-            member().reissueEmailVerification(justBefore, listOf(justBefore), CODE, POLICY, NOW)
+            member().reissueEmailVerification(justBefore, listOf(justBefore), CODE, LIMITS, NOW)
         }
         assertEquals("잠시 후 다시 시도해 주세요.", e.message)
         assertEquals("VERIFICATION_RATE_LIMITED", e.code)
-        assertEquals(CODE.publicId, member().reissueEmailVerification(exactly, listOf(exactly), CODE, POLICY, NOW).issued.publicId)
+        assertEquals(CODE.publicId, member().reissueEmailVerification(exactly, listOf(exactly), CODE, LIMITS, NOW).issued.publicId)
     }
 
     @Test
@@ -89,7 +89,7 @@ class MemberEmailVerificationTest {
         val recentConsumed = verification(n = 2, consumed = true, createdAt = NOW.minusSeconds(10))
 
         assertFailsWith<VerificationRateLimitedException> {
-            member().reissueEmailVerification(old, listOf(old, recentConsumed), CODE, POLICY, NOW)
+            member().reissueEmailVerification(old, listOf(old, recentConsumed), CODE, LIMITS, NOW)
         }
     }
 
@@ -100,14 +100,14 @@ class MemberEmailVerificationTest {
         val justIssued = verification(n = 2, createdAt = NOW.minusSeconds(10))
 
         val e = assertFailsWith<VerificationNotFoundException> {
-            member().reissueEmailVerification(foreign, listOf(justIssued), CODE, POLICY, NOW)
+            member().reissueEmailVerification(foreign, listOf(justIssued), CODE, LIMITS, NOW)
         }
 
         assertEquals("유효하지 않은 검증 요청입니다.", e.message)
         assertEquals("VERIFICATION_NOT_FOUND", e.code)
         // 같은 상태에서 자기 코드면 쿨다운에 걸린다 — 위 판정이 쿨다운보다 먼저였다는 뜻이다.
         assertFailsWith<VerificationRateLimitedException> {
-            member().reissueEmailVerification(justIssued, listOf(justIssued), CODE, POLICY, NOW)
+            member().reissueEmailVerification(justIssued, listOf(justIssued), CODE, LIMITS, NOW)
         }
     }
 
@@ -117,12 +117,12 @@ class MemberEmailVerificationTest {
         val justIssued = verification(n = 2, createdAt = NOW.minusSeconds(10))
 
         val e = assertFailsWith<VerificationNotFoundException> {
-            member().reissueEmailVerification(change, listOf(justIssued), CODE, POLICY, NOW)
+            member().reissueEmailVerification(change, listOf(justIssued), CODE, LIMITS, NOW)
         }
 
         assertEquals("유효하지 않은 검증 요청입니다.", e.message)
         // 쿨다운이 지난 상태에서도 거부한다.
-        assertFailsWith<VerificationNotFoundException> { member().reissueEmailVerification(change, emptyList(), CODE, POLICY, NOW) }
+        assertFailsWith<VerificationNotFoundException> { member().reissueEmailVerification(change, emptyList(), CODE, LIMITS, NOW) }
     }
 
     // ── 주소 정정 ──
@@ -133,7 +133,7 @@ class MemberEmailVerificationTest {
         val consumed = verification(n = 2, consumed = true)
         val member = member(email = "current@example.com")
 
-        val issue = member.retargetEmailVerification(Email("fixed@example.com"), listOf(active, consumed), CODE, POLICY, NOW)
+        val issue = member.retargetEmailVerification(Email("fixed@example.com"), listOf(active, consumed), CODE, LIMITS, NOW)
 
         assertEquals("fixed@example.com", issue.issued.targetEmail?.value)
         assertEquals(VerificationPurpose.REGISTRATION, issue.issued.purpose)
@@ -148,11 +148,11 @@ class MemberEmailVerificationTest {
         val exactly = verification(createdAt = NOW.minusSeconds(60))
 
         val e = assertFailsWith<ResendCooldownActiveException> {
-            member().retargetEmailVerification(Email("fixed@example.com"), listOf(justBefore), CODE, POLICY, NOW)
+            member().retargetEmailVerification(Email("fixed@example.com"), listOf(justBefore), CODE, LIMITS, NOW)
         }
         assertEquals("잠시 후 다시 시도해 주세요.", e.message)
         assertEquals("RESEND_COOLDOWN_ACTIVE", e.code)
-        assertEquals("fixed@example.com", member().retargetEmailVerification(Email("fixed@example.com"), listOf(exactly), CODE, POLICY, NOW).issued.targetEmail?.value)
+        assertEquals("fixed@example.com", member().retargetEmailVerification(Email("fixed@example.com"), listOf(exactly), CODE, LIMITS, NOW).issued.targetEmail?.value)
     }
 
     @Test
@@ -160,7 +160,7 @@ class MemberEmailVerificationTest {
         val verified = member(emailVerified = true)
 
         val e = assertFailsWith<AlreadyVerifiedException> {
-            verified.retargetEmailVerification(Email("fixed@example.com"), listOf(verification(createdAt = NOW)), CODE, POLICY, NOW)
+            verified.retargetEmailVerification(Email("fixed@example.com"), listOf(verification(createdAt = NOW)), CODE, LIMITS, NOW)
         }
         assertEquals("이미 이메일 인증을 마쳤습니다.", e.message)
         assertEquals("ALREADY_VERIFIED", e.code)

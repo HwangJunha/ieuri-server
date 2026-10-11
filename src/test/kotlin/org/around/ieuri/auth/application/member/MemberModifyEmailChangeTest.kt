@@ -50,7 +50,7 @@ class MemberModifyEmailChangeTest {
     private val currentEmail = "old@example.com"
     private val newEmail = "new@example.com"
     private val publicId = UUID.fromString("33333333-3333-3333-3333-333333333333")
-    private val policy = testVerificationPolicy
+    private val limits = testVerificationLimits
 
     private val memberRepository = mockk<MemberRepository>(relaxUnitFun = true)
     private val codeGenerator = fixedCodeGenerator()
@@ -108,7 +108,7 @@ class MemberModifyEmailChangeTest {
         val result = service.changeEmail(ChangeEmailCommand(" New@Example.com "), memberId, ipAddress = "203.0.113.7")
 
         assertEquals(issued.captured.publicId, result.verificationPublicId)
-        assertEquals(now.plus(policy.ttl), result.expiresAt)
+        assertEquals(now.plus(limits.ttl), result.expiresAt)
         assertEquals(memberId, issued.captured.memberId)
         assertEquals(VerificationPurpose.EMAIL_CHANGE, issued.captured.purpose)
         assertEquals(Email(newEmail), issued.captured.targetEmail)
@@ -330,7 +330,7 @@ class MemberModifyEmailChangeTest {
         val result = service.resendEmailChange(ResendEmailChangeCommand(publicId), memberId)
 
         assertEquals(issued.captured.publicId, result.verificationPublicId)
-        assertEquals(now.plus(policy.ttl), result.expiresAt)
+        assertEquals(now.plus(limits.ttl), result.expiresAt)
         assertEquals(Email(newEmail), issued.captured.targetEmail)
         assertEquals(VerificationPurpose.EMAIL_CHANGE, issued.captured.purpose)
         verifyOrder {
