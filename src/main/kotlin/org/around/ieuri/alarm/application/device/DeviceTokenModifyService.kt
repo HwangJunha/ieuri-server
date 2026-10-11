@@ -14,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional
 /** 기기 토큰 등록·해제·파기(SPEC-0028 R1~R4·R20). 로그에 토큰 원문을 남기지 않는다(POL-013). */
 @Service
 @Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
-class DeviceTokenCommandService(
+class DeviceTokenModifyService(
     private val repository: DeviceTokenRepository,
 ) : DeviceTokenCommandUseCase {
 

@@ -19,7 +19,7 @@ class DeviceTokenCommandServiceTest {
 
     private val repository = mockk<DeviceTokenRepository>(relaxed = true)
 
-    private val service = DeviceTokenCommandService(repository)
+    private val service = DeviceTokenModifyService(repository)
 
     private val memberId = 7L
     private val deviceId = "device-1"

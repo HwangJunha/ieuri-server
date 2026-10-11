@@ -14,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional
 /** 카테고리별 수신 설정 변경·파기(SPEC-0028 R3·R19). */
 @Service
 @Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
-class NotificationPreferenceCommandService(
+class NotificationPreferenceModifyService(
     private val repository: NotificationPreferenceRepository,
 ) : NotificationPreferenceCommandUseCase {
 

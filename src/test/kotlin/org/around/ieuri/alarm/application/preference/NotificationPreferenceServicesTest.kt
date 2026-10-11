@@ -19,7 +19,7 @@ class NotificationPreferenceServicesTest {
 
     private val repository = mockk<NotificationPreferenceRepository>(relaxed = true)
     private val query = NotificationPreferenceQueryService(repository)
-    private val command = NotificationPreferenceCommandService(repository)
+    private val command = NotificationPreferenceModifyService(repository)
 
     private val memberId = 7L
 
