@@ -195,6 +195,8 @@
 | D-156 | 정리 | **쓰기 서비스만 쓰던 조회 포트 넷을 그 애그리게이트의 저장소로 합친다.** `SpotCatalogQueryPort` → `SpotCatalogRepository`, `EmbeddingTargetQueryPort` → `SpotEmbeddingRepository`, `DistrictCodeQueryPort`·`RepresentativePointQueryPort` → `DistrictRepository`. 조회 어댑터 본문은 `XxxPersistenceAdapter`로 옮겼고 SQL은 그대로다 | 넷 다 조회 서비스가 쓰지 않는다 — 쓰기 쪽이 판단 재료를 읽는 것이라 저장소의 일이다. 이름만 `QueryPort`여서 "쓰기는 Repository, 조회는 QueryPort" 기준을 흐렸다 | **이름만 바꾸기(`XxxReadPort`)**: 포트 종류가 하나 더 생긴다 |
 | D-157 | 정리 | **발자취 쓰기는 바뀐 것만 돌려주고, 칸 뷰는 리졸버가 조회 유스케이스로 읽는다.** `recordVisits`는 새로 방문이 된 시군구 코드를, `removeVisit`은 칸 id를 돌려준다(언어 인자도 뺀다). 리졸버가 `FootprintQueryUseCase.mapCellsOfDistricts`·`mapCell`로 뷰를 만든다. 쓰기 판단에 필요한 읽기 둘(`filterExistingDistrictCodes`·`findDistrictCodesOfCell`)은 `FootprintRepository`에 둔다 | 쓰기 서비스가 조회 포트 셋으로 응답 뷰를 조립하고 있었다. `mapCellsOfDistricts`는 이전과 같은 정렬(시도 코드 → 칸 id)을 쓴다 — 기존 `mapCellsByIds`는 인자 순이라 응답 순서가 달라진다. api-dev 비교에서 `recordVisits`·`removeVisit` 응답이 같다 | **쓰기 서비스가 조회 유스케이스를 불러 뷰까지 돌려주기**: 쓰기 유스케이스가 읽기 모델과 언어를 계속 안다 |
 | D-158 | 정리 | **관계 맺기는 공유 링크의 주인을 발자취의 조회 유스케이스로 읽는다** — `MapRelationModifyService`가 `FootprintQueryPort` 대신 `FootprintQueryUseCase.findSharerId`를 쓴다. 센서 추가: application에서 `QueryPort`에 의존하는 것은 읽기 전용 서비스뿐이다 | 다른 애그리게이트의 값은 그 애그리게이트의 `provided` 유스케이스로 읽는다는 기존 규칙 | **`MapRelationRepository`에 같은 조회 두기**: 남의 테이블(`map_share_link`)을 읽는 저장소가 된다 |
+| D-159 | 정리 | **community의 남은 raw SQL 둘을 DSL로 옮긴다 — 메인 DB에서 `JdbcTemplate`을 쓰는 곳이 없어진다.** (1) 거리순 글 조회는 `PostQueryAdapter.findPostsByDistance`로 합쳐 최신순과 같은 모더레이션·숨김·카테고리·태그 조건 함수를 쓴다. `PostSpatialQueryPort`·어댑터는 지운다. (2) 카탈로그-언어 사본은 임시 테이블 대신 지금 있는 행을 읽어 차집합만 지우고 넣는다 | PostGIS 식이 `common/persistence`에 생겨 DSL로 쓸 수 있고, 거리순만 조건을 SQL 문자열로 한 번 더 쓰고 있었다. api-dev 비교: 검증용 글 다섯(같은 거리 셋 포함)으로 중심 셋·반경 둘·필터 넷·`first` 1·2·5 조합 78건의 페이지 넘김이 전부 같다. 사본 동기화는 배치 이벤트로만 돌아 실측하지 않았다 | **그대로 두기**: `exposedJdbcTemplate` 빈과 "DSL로 못 쓴다"는 예외가 남는다. **사본을 `unnest` 배열로 한 문장에**: 공용 식을 새로 만들어야 한다. 차집합은 보통 작고, 지울 id는 문장당 1만 개로 나눈다(PostgreSQL 파라미터 한도 32,767) |
+| D-160 | 정리 | **auth의 구독 신원 판정을 `Specification` 구현으로 바꾼다** — `domain/token/spec/LiveSubscriptionIdentity`가 `SocketIdentity`를 판정한다. `object SubscriptionIdentity`는 지운다. auth `domain/shared`에 `Specification<T>`를 둔다 | D-121: 따로 떨어진 판정은 `spec/`의 `Specification` 구현이다. community·alarm 도메인을 훑었으나 따로 떨어진 판정이나 Policy가 없어 옮길 것이 없었다 | **그대로 두기**: 판정 object가 auth에만 남는다 |
 
 ## 부족한 정보
 
@@ -238,18 +240,19 @@ grep으로 확인한 수(worktree `82fdd48`):
 | S3~S7 | — | — | **S12~S15에 흡수(2026-09-30)** — 규칙 이동·설정 한도·변환 이동·개명을 context 이전과 함께 한다(D-36~D-41) | 폐기 |
 | S10 | B2 | QR-001 · FR-001 | Boot 4.1.1·DGS 12.1.0·codegen 8.7.0·Kotlin 2.3.21, BOM 순서 수정(D-34). 동작 불변 | 완료. 해석 결과 reactor-core 3.8.7·context-propagation 1.2.1·json-path 3.0.0·Flyway 12.4.0. 18888 기동 5.9초, 조회 비교 53/54 동일(차이 1건은 `post.viewCount` 조회 부수 효과 — 이전과 같음) |
 | S11 | B2 | FR-017 | Exposed 기반: 별도 DataSource·트랜잭션 매니저(D-33), 기동 시 스키마 검증(D-35), raw SQL 도구 실측(D-42) | 완료. 실측 코드는 커밋하지 않음. 로컬에 읽기 복제본이 없어 **읽기 전용 라우팅은 dev 배포 후 확인**. 실측 insert는 롤백 확인(잔여 0건) |
-| S12 | B2 | FR-005~FR-009 · FR-019 · AC-001~AC-007 | community: 경계 합의 → 패키지(D-36) → 도메인 모델(D-37·D-38) → 서비스(D-39) → Exposed(D-40·D-42) → mapper(D-41) → 결함(D-43) | — 진행 중. ① 테이블 선언(`d7fa8b2`) ⑤ 탈퇴 정리(D-61)·장소 참조 정리·사본 동기화(D-62)·조회 Exposed 이전·조회 서비스 분할·패키지 정리(D-63), community JPA 엔티티 삭제: 조회 루트 53/54(조회수 부수 효과), 조회 분기 전부 동일, 오류 경로 38/39·쓰기 경로 43/46 dev 동일(이전과 같은 차이), Q&A 실측 통과. 탈퇴·보관 파기 배치·사본 동기화·자동 숨김은 실측하지 않음. ④ 대화·메시지·메시지 신고 쓰기 이전(D-59): 오류 경로 38/39·쓰기 경로 43/46 dev 동일(이전과 같은 차이), DM 실측 통과. 보관 파기 배치는 실측하지 않음. ③ 장소 Q&A 쓰기 이전(D-55): 오류 경로 38/39·쓰기 경로 43/46 dev 동일(이전과 같은 차이), Q&A 실측 통과. ② 글·댓글·좋아요·숨김·차단·신고 쓰기 이전(`1b14081`): 오류 경로 38/39 dev 동일(차이 1건 = 태그 6개 코드, 확정), 쓰기 단계 43/46 동일(차이 3건 = 하네스 닉네임 표기·지난 검증 잔여 데이터), 글·댓글·좋아요 수·숨김·차단 상태 검증 전부 통과 |
+| S12 | B2 | FR-005~FR-009 · FR-019 · AC-001~AC-007 | community: 경계 합의 → 패키지(D-36) → 도메인 모델(D-37·D-38) → 서비스(D-39) → Exposed(D-40·D-42) → mapper(D-41) → 결함(D-43) | 완료(남은 raw SQL 둘은 D-159에서 DSL로 옮겼다). ① 테이블 선언(`d7fa8b2`) ⑤ 탈퇴 정리(D-61)·장소 참조 정리·사본 동기화(D-62)·조회 Exposed 이전·조회 서비스 분할·패키지 정리(D-63), community JPA 엔티티 삭제: 조회 루트 53/54(조회수 부수 효과), 조회 분기 전부 동일, 오류 경로 38/39·쓰기 경로 43/46 dev 동일(이전과 같은 차이), Q&A 실측 통과. 탈퇴·보관 파기 배치·사본 동기화·자동 숨김은 실측하지 않음. ④ 대화·메시지·메시지 신고 쓰기 이전(D-59): 오류 경로 38/39·쓰기 경로 43/46 dev 동일(이전과 같은 차이), DM 실측 통과. 보관 파기 배치는 실측하지 않음. ③ 장소 Q&A 쓰기 이전(D-55): 오류 경로 38/39·쓰기 경로 43/46 dev 동일(이전과 같은 차이), Q&A 실측 통과. ② 글·댓글·좋아요·숨김·차단·신고 쓰기 이전(`1b14081`): 오류 경로 38/39 dev 동일(차이 1건 = 태그 6개 코드, 확정), 쓰기 단계 43/46 동일(차이 3건 = 하네스 닉네임 표기·지난 검증 잔여 데이터), 글·댓글·좋아요 수·숨김·차단 상태 검증 전부 통과 |
 | S13 | B2 | 같음 | tourism (배치 트랜잭션 매니저 포함) | 완료(`feature/SPEC-0039-tourism`). A: 테이블 22개 선언, JPA·QueryDSL → Exposed, 배치 스텝 Exposed 매니저(D-71~D-73). 결함: 업무 예외 코드·`spotDetail.category`(D-43). B: 애그리게이트 패키지·불변 루트·저장소 통합·서비스 트랜잭션(D-74~D-78). 조회 46/54·오류 38/39·쓰기 45/46 dev와 같음 — 차이는 의도한 결함 수정 8건과 이전과 같은 조회수·닉네임. 배치는 실측하지 않음(D-76) |
 | S12b | B2 | 같음 | community `shared` 정리(S12 후속, tourism 브랜치에서): 포트·읽기 모델을 주인에게, `photo`·`lookup` 패키지, 정책·시계·이벤트 포트, 리졸버의 포트 호출 제거(D-105~D-111) | 완료. 커밋 메시지의 "S14"는 이 행이다(슬라이스 표의 S14는 auth). GraphQL 계약·오류 코드·커서 바이트 불변 |
-| S14 | B2 | 같음 | auth (트랜잭션 안 외부 I/O 분리) | 구현(D-128~D-142, `feature/SPEC-0039-auth`). Exposed 테이블 13개, JPA 엔티티·리포지토리·`QuerydslConfig` 삭제 — JPA를 쓰는 context가 더 없다. 패키지 member·audit·token. api-dev 비교(2026-10-11): 조회 76/77(조회수 부수 효과 1)·오류 39/39·쓰기 46/46·원상복구 2/2. 감사 기록은 커밋 뒤 이벤트로 남고 payload가 전과 같다(약관 동의로 확인), 접속·위치 기록도 남는다. **가입·이메일 인증 완료·비밀번호 재설정 완료·탈퇴·정지·역할 부여의 성공 경로는 실측하지 않았다**(일회용 계정이 필요하다) |
+| S14 | B2 | 같음 | auth (트랜잭션 안 외부 I/O 분리) | 구현(D-128~D-155, `feature/SPEC-0039-auth`, PR #174). 통일 작업 뒤 api-dev 재비교(2026-10-12): 조회 76/77·오류 39/39·쓰기 46/46·원상복구 2/2·구독 5/5. Exposed 테이블 13개, JPA 엔티티·리포지토리·`QuerydslConfig` 삭제 — JPA를 쓰는 context가 더 없다. 패키지 member·audit·token. api-dev 비교(2026-10-11): 조회 76/77(조회수 부수 효과 1)·오류 39/39·쓰기 46/46·원상복구 2/2. 감사 기록은 커밋 뒤 이벤트로 남고 payload가 전과 같다(약관 동의로 확인), 접속·위치 기록도 남는다. **가입·이메일 인증 완료·비밀번호 재설정 완료·탈퇴·정지·역할 부여의 성공 경로는 실측하지 않았다** — 가입·탈퇴는 사용자가 직접 확인한다 |
 | S15 | B2 | 같음 | alarm — `feature/SPEC-0039-alarm`(tourism 브랜치에서 땀) | 구현(D-115~D-119). Exposed 테이블 3개, JPA 엔티티·리포지토리 삭제. api-dev 비교(2026-10-09): 조회 76/77(조회수 부수 효과 1)·오류 39/39·쓰기 46/46·원상복구 2/2, 뮤테이션 뒤 상태 검증 40/40. 발송 경로는 비동기 스레드에서 설정→차단→기기→문구 판정까지 돌고 문구가 없어 끝난다(dev DB에 `notification_message` 행이 0 — 양쪽 같음). FCM 실제 도착은 기기 테스트 몫 |
+| 정리 | B5 | 같음 | 통일 뒤 정리 — tourism 쓰기 쪽의 조회 포트(D-156~D-158), community raw SQL(D-159), auth 판정(D-160) | 구현(`feature/SPEC-0039-exposed-cleanup`, auth 브랜치 위). api-dev 비교(2026-10-12): 조회 76/77·오류 39/39·쓰기 46/46·원상복구 2/2·구독 5/5, 거리순 78/78 |
 | S16 | B2 | FR-010 · FR-011 | JPA·QueryDSL·kapt 제거, `@Transactional(transactionManager = EXPOSED_TX)`의 매니저 지정 제거(D-54), JPA 전제 센서·CLAUDE.md 규칙 정리, 새 구조 센서(애그리거트 순환·교차 호출·`copy` 제한) | |
 | C1 | B1.5 | D-30 | 주석 정리(컨텍스트별), 주석 제외 토큰 비교 | 완료. Kotlin 주석 16,248 → 7,376줄, 15줄 이상 블록 67 → 0. 771파일 주석 외 차이 0건, 마이그레이션·스키마 변경 0 |
 | C2 | B1.5 | D-31 · FR-010 | 주석 길이 센서 | 완료. 16줄 탐침으로 실패·제거 후 통과 확인, 문자열 안 주석 기호 오탐 없음 |
 | S8 | B4 | FR-013 · VC-004(한도) | detekt 2.0.0-alpha.6, 60/600/14(D-23), outlier 분할 | |
 | S9 | (머지 후 dev) | VC-001 ~ VC-007 · QR-001 | A/B 실행, 스키마 diff, 테스트 대응표, 센서별 위반 삽입·제거 확인, 시간 측정. 결과를 spec 변경 이력에 | |
 
-브랜치: B1 = `feature/SPEC-0039-hexagonal-sensors`, B1.5 = `feature/SPEC-0039-comment-trim`, B2 = `feature/SPEC-0039-domain-rules`, B3 = `feature/SPEC-0039-boundary-naming`, B4 = `feature/SPEC-0039-complexity-limit`.
+브랜치: B1 = `feature/SPEC-0039-hexagonal-sensors`, B1.5 = `feature/SPEC-0039-comment-trim`, B2 = `feature/SPEC-0039-domain-rules`, B3 = `feature/SPEC-0039-boundary-naming`, B4 = `feature/SPEC-0039-complexity-limit`, B5 = `feature/SPEC-0039-exposed-cleanup`.
 
 ### S12에서 지운 테스트 (PR 전에 새 구조로 다시 쓴다 — VC-007 대응표의 입력)
 
@@ -280,7 +283,7 @@ grep으로 확인한 수(worktree `82fdd48`):
 
 옛 구조(JPA 엔티티, `MemberRepositoryPort` 등 옛 포트, `var` 도메인)에 묶여 컴파일되지 않는 것을 지웠다: `auth/application/service/`의 서비스 테스트 8개(`AuthTokenServiceTest`·`EmailChangeServiceTest`·`MemberAgreementServiceTest`·`MemberLifecycleServiceTest`·`MemberProfileServiceTest`·`MemberRegistrationServiceTest`·`ProviderTokenCollectorTest`·`RoleServiceTest`), `auth/domain/`의 `AuditRetentionTest`·`EmailVerificationTest`·`MemberLifecycleTest`·`MemberTest`·`RoleTest`, `auth/infrastructure/mapper/`의 엔티티 변환 테스트 4개, 리스너 테스트 2개(`LocationAccessAuditListenerTest`·`MemberAccessAuditListenerTest`), `MemberDeletionCoverageTest`(JPA 리포지토리 이름을 소스 문자열로 대조하던 테스트).
 
-**재작성(2026-10-11)** — 도메인은 루트 메서드 단위(`domain/member/Member*Test`·`ActiveTermsTest`·`VerificationPolicyTest`, `domain/audit/AuditLogRetentionTest`), 서비스는 나뉜 서비스마다(`application/member/*ServiceTest` 15개, `application/token` 2개, `application/audit` 1개) 다시 썼다. 감사 기록 단언은 발행 이벤트 단언으로, 엔티티 변환 테스트는 행 변환(`adapter/persistence/mapper/*RowMappersTest`)·GraphQL 변환·감사 payload 변환 테스트로 바뀌었다. 리스너 테스트 둘(위치 조회 기록에 좌표 키가 없다 — POL-045의 집행 장치)과 `MemberDeletionCoverageTest`(회원을 참조하는 FK 자식이 전부 삭제 목록에 있다)는 리뷰 뒤 Exposed 기준으로 되살렸다.
+**재작성(2026-10-11)** — 도메인은 루트 메서드 단위(`domain/member/Member*Test`·`ActiveTermsTest`·`VerificationLimitsTest`, `domain/audit/AuditLogRetentionTest`), 서비스는 나뉜 서비스마다(`application/member/*Test`, `application/token` 2개, `application/audit` 1개) 다시 썼다. 감사 기록 단언은 발행 이벤트 단언으로, 엔티티 변환 테스트는 행 변환(`adapter/persistence/mapper/*RowMappersTest`)·GraphQL 변환·감사 payload 변환 테스트로 바뀌었다. 리스너 테스트 둘(위치 조회 기록에 좌표 키가 없다 — POL-045의 집행 장치)과 `MemberDeletionCoverageTest`(회원을 참조하는 FK 자식이 전부 삭제 목록에 있다)는 리뷰 뒤 Exposed 기준으로 되살렸다.
 
 ### S12에서 생긴 응답 차이 (VC-001에 의도한 차이로 기록)
 
@@ -325,7 +328,6 @@ grep으로 확인한 수(worktree `82fdd48`):
 - `LongParameterList` 류의 파라미터 수 한도(FR-013이 요구하지 않음)
 - SPEC-0038 추천 조회 성능 재측정(spec이 요구하지 않음)
 - ktlint 커스텀 룰
-- community의 남은 raw SQL(`SpotCatalogLanguagePersistenceAdapter` 임시 테이블, `PostSpatialQueryAdapter`) — 실기기 테스트가 끝난 context라 테스트 외 코드를 고치지 않는다(사용자 규칙). `exposedJdbcTemplate` 빈은 그래서 남는다
 - 잡 빈 이름의 `tourStats*` — 매니페스트 CronJob이 참조한다
 - 상세 갤러리·이용안내가 빈 결과면 행을 남기지 않아 매일 다시 확보하는 결함(기존 동작)
 - tourism 검색 노드(`searchJdbcTemplate`) 어댑터 — 메인 DB가 아니라 Exposed 이전 대상이 아니다
@@ -333,11 +335,9 @@ grep으로 확인한 수(worktree `82fdd48`):
 - 어댑터의 `NationwideMap*` 이름(리졸버·GraphQL 매퍼·설정) — 스키마 루트 `nationwideMap`을 따른다. 응용 계층은 `Footprint*`로 바꿨다(D-99)
 - `ConsistencyConventionTest`에 `org.springframework.data..` 금지 추가 — 하지 않기로 했다(사용자 결정 2026-10-07)
 - community `spotAnswers(없는 질문)`의 `INTERNAL_ERROR` — community 조회 예외라 S13 범위 밖
-- community·alarm 도메인의 spec/policy 정리(`CatalogIndex` 쪼개기는 D-121에서 했다)
 - 메일 발송 `@Async` 전환, `accessLogExecutor` 거부 정책 — 동작이 바뀌는 수정이라 리팩토링 밖(S14 합의)
 - JPA 자체 제거와 쓰는 곳 없는 `RbacProperties` 삭제 — auth 뒤 정리 브랜치(S16)에서
 - auth의 어댑터가 outbound 포트를 직접 주입하는 넷(`VerificationEmailListener` → `EmailSenderPort`, `TokenBackedSubscriptionAuthorizer` → `RefreshTokenStorePort`, `JwtAuthenticationFilter`·`GraphqlWebSocketAuthInterceptor` → `TokenProviderPort`) — 패키지만 옮겼다. 요청마다 도는 필터를 유스케이스로 돌리는 일은 S14 밖이다
-- auth `domain/token/SubscriptionIdentity`를 `Specification<T>` 구현으로 바꾸기(D-121) — 자리만 옮겼다. community·alarm의 spec 정리와 함께
 - 프로필 이미지 형식·크기 판정(`ProfileImageService`)과 설정값(`ProfileImagePolicy`)을 도메인으로 옮기기, `SuspendMemberCommand`와 `Member.suspend`에 겹친 빈 사유 검사 — 응답 문구가 같아 그대로 두었다
 
 ## 설계

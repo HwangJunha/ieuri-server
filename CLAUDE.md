@@ -473,10 +473,8 @@ refactor.
   write no wrapper for what it already does (SPEC-0039 D-114). A CTE is written as a
   subquery (`Query.alias`) or a scalar subquery (`wrapAsExpression`). When the DSL cannot express a
   statement, change its shape (read the parent id, then upsert; insert-ignore, then re-read) before
-  reaching for `exec()`. Migrated contexts do not use `JdbcTemplate` on the main DB; the search node
-  (paradedb) stays raw SQL through `searchJdbcTemplate` (SPEC-0039 D-82). Two community adapters
-  (`SpotCatalogLanguagePersistenceAdapter`, `PostSpatialQueryAdapter`) still use `exposedJdbcTemplate` —
-  community is frozen after device testing, so they are a recorded follow-up, not a precedent. Declaring a table: identity id → `autoIncrement()`, read the generated
+  reaching for `exec()`. Nothing uses `JdbcTemplate` on the main DB; the search node
+  (paradedb) stays raw SQL through `searchJdbcTemplate` (SPEC-0039 D-82). Declaring a table: identity id → `autoIncrement()`, read the generated
   value with `insertReturning`; `DEFAULT now()` → `databaseGenerated()`; `timestamptz` →
   `timestampWithTimeZone`; FKs → `onUpdate = NO_ACTION` and the DB's constraint name; CHECK, index and
   UNIQUE names exactly as in the migration.
