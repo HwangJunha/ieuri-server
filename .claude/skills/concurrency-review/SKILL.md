@@ -39,10 +39,10 @@ that quietly went missing.
 - **Read-modify-write on shared columns.** Counters are atomic `± 1`; values that only move forward
   (read points, last activity) are conditional updates (`WHERE col IS NULL OR col < :v`); "did this
   call change it?" comes from `UPDATE … RETURNING`, not from a read before the write.
-- A raw-SQL `JdbcTemplate` that is not `exposedJdbcTemplate` runs on the JPA pool, outside the
-  Exposed transaction — it cannot see that transaction's uncommitted writes.
-- A JPA-backed query port called from an Exposed write service reads on another connection and
-  misses the service's own uncommitted changes.
+- There is one transaction manager (Exposed) on the main DataSource. `searchJdbcTemplate` is a
+  different database — it never joins a transaction and cannot see uncommitted writes.
+- **A batch step gets no transaction manager.** `StepBuilder.tasklet(tasklet, transactionManager)`
+  wraps the whole tasklet in one transaction and every use-case call inside joins it.
 
 ## 2. Events as the domain seam
 

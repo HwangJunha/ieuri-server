@@ -1,11 +1,11 @@
 ---
 name: reviewer
-description: Reviews a finished slice against the ieuri principles before the PR. Reads the decision record and the diff against dev, applies the architecture, JPA, GraphQL, security, concurrency, and simplicity skills, and reports what the implementer missed. Read-only — it never edits code. Delegate when work is done, or when the user asks for a review.
+description: Reviews a finished slice against the ieuri principles before the PR. Reads the decision record and the diff against dev, applies the architecture, persistence, GraphQL, security, concurrency, and simplicity skills, and reports what the implementer missed. Read-only — it never edits code. Delegate when work is done, or when the user asks for a review.
 tools: Read, Grep, Glob, Bash
 model: opus
 skills:
   - architecture-review
-  - jpa-review
+  - persistence-review
   - graphql-review
   - security-review
   - concurrency-review
@@ -72,8 +72,8 @@ Load each and check the diff against it:
 
 - **`architecture-review`** — CQRS rails, mapper placement and purity, framework leaking below
   infrastructure, domain independence, `common/` bloat, required values weakened to nullable.
-- **`jpa-review`** — relations, dirty-checking on update, raw-SQL containment, query choice,
-  migrations; for a context already moved to Exposed, its Exposed section instead of the JPA one.
+- **`persistence-review`** — repository vs query port, minimal write loads, Exposed DSL
+  discipline, table declarations against the migration, migrations.
 - **`graphql-review`** — a new root where a field belonged, field-selection laziness, N+1,
   schema description bloat.
 - **`security-review`** — authorization on every mutation and member-scoped query, personal data in
@@ -83,7 +83,7 @@ Load each and check the diff against it:
 - **`simplify-review`** — forced-fit implementations, over-abstraction, dead code, stale comments.
 
 Skip a skill when the diff does not touch its area, and say so in one line. A diff with no
-persistence changes needs no JPA findings.
+persistence changes needs no persistence findings.
 
 Two of these deserve a pass even when the diff looks unrelated to them: **`security-review`**
 whenever a resolver, a member id, or anything reaching personal data is touched, and
@@ -96,8 +96,9 @@ Three test classes under `src/test/kotlin/org/around/ieuri/architecture/` alread
 mechanical rules. If one broke, the build is red. Your value is in what compiles, passes, and is
 still wrong.
 
-- `LayeredArchitectureTest` — dependency direction, domain purity, `@Entity` confinement, no DGS in
-  `application`, cross-domain imports, bean-name collisions, `AFTER_COMMIT`/`REQUIRES_NEW`.
+- `LayeredArchitectureTest` — dependency direction, domain purity, no DGS in `application`,
+  cross-context imports, repository ownership, `copy` confined to the domain, bean-name collisions,
+  `AFTER_COMMIT`/`REQUIRES_NEW`.
 - `ConsistencyConventionTest` — persistence tech out of `application`, `common` out of `domain`,
   `@Transactional` off domain and resolvers, repository/`Dto`/test naming.
 - `ImportStyleTest` — no wildcard imports.
@@ -128,9 +129,8 @@ These have no automated check, and several fail silently. Look for them specific
 2. **A required value accepted as nullable** — schema, `Command`, and DB column all three.
 3. **A forced-fit implementation** — machinery faking a capability the upstream doesn't have
    (a cursor over an offset-only API, repeated calls to fill values the source won't give).
-4. **A relation across aggregates** where an id reference belonged; in a JPA context any
-   `@OneToMany`, in an Exposed context a child collection on a root that is unbounded or that no
-   rule reads whole.
+4. **A relation across aggregates** where an id reference belonged, or a child collection on a
+   root that is unbounded or that no rule reads whole.
 5. **A mutation or member-scoped query with no authorization**, or one trusting a `memberId`
    argument instead of the authenticated identity.
 6. **`@Transactional` or `@Async` self-invoked** from the same class — the proxy is bypassed and the

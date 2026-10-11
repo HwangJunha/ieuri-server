@@ -17,7 +17,7 @@ and still has the wrong shape.
 
 ## Never flag these — they are deliberate
 
-Domain ↔ persistence separation (JPA entity or Exposed row) and its mappers. Port/adapter
+Domain ↔ persistence separation (Exposed row vs domain model) and its mappers. Port/adapter
 indirection. The CQRS split. Per-item loops through a domain method in place of one bulk statement —
 that is the bulk-change rule in CLAUDE.md, not an inefficiency to collapse.
 Cross-domain isolation via ports/events. Never recommend collapsing them.

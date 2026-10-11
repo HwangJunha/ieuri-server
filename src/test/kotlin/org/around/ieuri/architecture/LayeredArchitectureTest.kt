@@ -126,6 +126,15 @@ class LayeredArchitectureTest {
 
     private fun aggregateOf(type: JavaClass): String = APPLICATION_AGGREGATE.matchEntire(type.packageName)?.groupValues?.get(2).orEmpty()
 
+    /** 애그리게이트끼리 서로를 알면 경계가 없는 것이다. 둘이 함께 쓰는 값은 `domain/shared`로 내린다. */
+    @Test
+    fun `도메인의 애그리게이트 패키지는 서로 순환하지 않는다`() {
+        slices().matching("org.around.ieuri.(*).domain.(*)..")
+            .should().beFreeOfCycles()
+            .because("순환하는 두 애그리게이트는 하나이거나, 공유하는 값을 domain/shared로 내려야 한다")
+            .check(classes)
+    }
+
     /** 불변식은 도메인 메서드를 거쳐야만 바뀐다 — `copy`로 필드를 바꾸면 검증을 건너뛴다. */
     @Test
     fun `도메인 모델의 copy는 domain 안에서만 부른다`() {
