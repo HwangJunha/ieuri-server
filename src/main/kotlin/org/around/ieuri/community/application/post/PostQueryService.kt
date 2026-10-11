@@ -13,7 +13,6 @@ import org.around.ieuri.community.application.post.provided.dto.PostsQuery
 import org.around.ieuri.community.application.post.required.CategoryConfigPort
 import org.around.ieuri.community.application.post.required.PostEventPublisherPort
 import org.around.ieuri.community.application.post.required.PostQueryPort
-import org.around.ieuri.community.application.post.required.PostSpatialQueryPort
 import org.around.ieuri.community.application.post.required.dto.MyPostsSearch
 import org.around.ieuri.community.application.post.required.dto.PostsArea
 import org.around.ieuri.community.application.post.required.dto.PostsSearch
@@ -31,7 +30,6 @@ import org.springframework.transaction.annotation.Transactional
 @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, readOnly = true)
 class PostQueryService(
     private val postQueryPort: PostQueryPort,
-    private val postSpatialQueryPort: PostSpatialQueryPort,
     private val categoryConfigPort: CategoryConfigPort,
     private val blockQueryUseCase: BlockQueryUseCase,
     private val eventPublisher: PostEventPublisherPort,
@@ -58,7 +56,7 @@ class PostQueryService(
         )
         return when (search.sort) {
             PostSortOrder.LATEST -> postQueryPort.findPosts(search)
-            PostSortOrder.DISTANCE -> postSpatialQueryPort.findPostsByDistance(search)
+            PostSortOrder.DISTANCE -> postQueryPort.findPostsByDistance(search)
         }
     }
 
