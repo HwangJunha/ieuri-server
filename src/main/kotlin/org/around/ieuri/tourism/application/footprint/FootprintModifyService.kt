@@ -30,12 +30,12 @@ class FootprintModifyService(
 ) : FootprintCommandUseCase {
 
     /** 없는 코드는 버리지 않고 DISTRICT_NOT_FOUND의 근거로 돌려준다. 이번 요청으로 방문이 된 칸만 돌려준다. */
-    override fun recordVisits(command: RecordVisitsCommand, locale: DomainLocale): RecordVisitsResult {
-        val footprint = footprintRepository.findByMemberId(command.memberId)
+    override fun recordVisits(command: RecordVisitsCommand, memberId: Long, locale: DomainLocale): RecordVisitsResult {
+        val footprint = footprintRepository.findByMemberId(memberId)
 
         val visit = footprint.visit(command.districtCodes, footprintQueryPort.filterExistingDistrictCodes(command.districtCodes))
 
-        footprintRepository.addVisits(command.memberId, visit.addedDistrictCodes)
+        footprintRepository.addVisits(memberId, visit.addedDistrictCodes)
 
         val updatedCellIds = mapCellDistrictQueryPort.findCellIdsByDistrictCodes(visit.addedDistrictCodes)
         val updatedCells = MapCellGrouping.fold(mapCellQueryPort.findCellDistrictsIn(updatedCellIds))
@@ -44,14 +44,14 @@ class FootprintModifyService(
     }
 
     /** 칸에 속한 시군구 전부를 해제한다(R4). 없는 칸이면 갱신된 칸이 null이다. */
-    override fun removeVisit(command: RemoveVisitCommand, locale: DomainLocale): RemoveVisitResult {
+    override fun removeVisit(command: RemoveVisitCommand, memberId: Long, locale: DomainLocale): RemoveVisitResult {
         val rows = mapCellQueryPort.findCellDistricts(command.cellId)
         if (rows.isEmpty()) return RemoveVisitResult(updatedCell = null)
-        val footprint = footprintRepository.findByMemberId(command.memberId)
+        val footprint = footprintRepository.findByMemberId(memberId)
 
         val unvisit = footprint.unvisit(rows.map { it.districtCode })
 
-        footprintRepository.removeVisits(command.memberId, unvisit.removedDistrictCodes)
+        footprintRepository.removeVisits(memberId, unvisit.removedDistrictCodes)
         return RemoveVisitResult(updatedCell = MapCellGrouping.fold(rows).single().toView(locale, unvisit.footprint.visitedDistrictCodes))
     }
 

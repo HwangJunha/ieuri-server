@@ -14,10 +14,10 @@ interface FootprintCommandUseCase {
      * 시군구를 방문으로 기록하고 갱신된 칸을 돌려준다(R3).
      * - 이미 기록된 코드는 중복되지 않으며 오류도 아니다.
      */
-    fun recordVisits(command: RecordVisitsCommand, locale: DomainLocale): RecordVisitsResult
+    fun recordVisits(command: RecordVisitsCommand, memberId: Long, locale: DomainLocale): RecordVisitsResult
 
     /** 칸의 방문을 해제한다(R4). 그 칸에 속한 시군구 기록이 전부 지워진다. */
-    fun removeVisit(command: RemoveVisitCommand, locale: DomainLocale): RemoveVisitResult
+    fun removeVisit(command: RemoveVisitCommand, memberId: Long, locale: DomainLocale): RemoveVisitResult
 
     /** 공유 링크를 발급한다(R12). 이미 유효한 링크가 있으면 **같은 토큰**을 돌려준다. */
     fun createShareLink(memberId: Long): MapShareLinkView

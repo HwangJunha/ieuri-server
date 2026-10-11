@@ -47,7 +47,7 @@ class FootprintModifyServiceTest {
         every { mapCellDistrictQueryPort.findCellIdsByDistrictCodes(listOf("41111")) } returns listOf(2L)
         every { mapCellQueryPort.findCellDistrictsIn(listOf(2L)) } returns listOf(row(2, "41111"))
 
-        val result = service.recordVisits(RecordVisitsCommand(7, listOf("11110", "41111", "99999")), DomainLocale.KO)
+        val result = service.recordVisits(RecordVisitsCommand(listOf("11110", "41111", "99999")), 7, DomainLocale.KO)
 
         verify { repository.addVisits(7, listOf("41111")) }
         assertEquals(listOf(2L), result.updatedCells.map { it.id })
@@ -61,7 +61,7 @@ class FootprintModifyServiceTest {
         every { mapCellQueryPort.findCellDistricts(2) } returns listOf(row(2, "41111"), row(2, "41113"))
         every { repository.findByMemberId(7) } returns Footprint(7, setOf("41111", "11110"), null)
 
-        val result = service.removeVisit(RemoveVisitCommand(7, 2), DomainLocale.KO)
+        val result = service.removeVisit(RemoveVisitCommand(2), 7, DomainLocale.KO)
 
         verify { repository.removeVisits(7, setOf("41111")) }
         assertEquals(2L, result.updatedCell?.id)
@@ -73,7 +73,7 @@ class FootprintModifyServiceTest {
     fun `removing a missing cell returns null`() {
         every { mapCellQueryPort.findCellDistricts(999) } returns emptyList()
 
-        assertNull(service.removeVisit(RemoveVisitCommand(7, 999), DomainLocale.KO).updatedCell)
+        assertNull(service.removeVisit(RemoveVisitCommand(999), 7, DomainLocale.KO).updatedCell)
         verify(exactly = 0) { repository.removeVisits(any(), any()) }
     }
 
