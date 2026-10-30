@@ -1,6 +1,6 @@
 package org.around.ieuri.community.adapter.client
 
-import org.around.ieuri.auth.application.port.`in`.query.MemberQueryUseCase
+import org.around.ieuri.auth.application.member.provided.MemberQueryUseCase
 import org.around.ieuri.community.adapter.client.mapper.toMemberSummary
 import org.around.ieuri.community.application.lookup.required.MemberLookupPort
 import org.around.ieuri.community.domain.lookup.MemberSummary

@@ -23,18 +23,12 @@ import org.around.ieuri.common.graphql.generated.types.SpotCategory as GqlSpotCa
 
 /**
  * 전국 지도 GraphQL 경계 변환(POL-033).
- * - 회원 id는 입력이 아니라 인자로 받는다 — 인증 컨텍스트가 정한다.
+ * - Command에는 입력만 담는다. 회원 id는 리졸버가 인증 컨텍스트에서 꺼내 유스케이스에 따로 넘긴다.
  */
 
-fun GqlRecordVisitsInput.toCommand(memberId: Long): RecordVisitsCommand = RecordVisitsCommand(
-    memberId = memberId,
-    districtCodes = districtCodes,
-)
+fun GqlRecordVisitsInput.toCommand(): RecordVisitsCommand = RecordVisitsCommand(districtCodes = districtCodes)
 
-fun GqlRemoveVisitInput.toCommand(memberId: Long): RemoveVisitCommand = RemoveVisitCommand(
-    memberId = memberId,
-    cellId = cellId,
-)
+fun GqlRemoveVisitInput.toCommand(): RemoveVisitCommand = RemoveVisitCommand(cellId = cellId)
 
 /** 칸에 속한 장소 → 응답 타입. `label`은 코드이며 `CategoryDisplayResolver`가 요청 시 표시명으로 덮는다. */
 fun CellSpotView.toGql(): GqlCellSpot = GqlCellSpot(

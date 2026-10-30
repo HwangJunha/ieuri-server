@@ -9,12 +9,12 @@ class NotificationPreferenceTest {
 
     @Test
     fun `저장된 행이 없으면 모든 카테고리가 켜짐이고 순서는 선언 순이다`() {
-        assertEquals(listOf(NotificationCategory.MESSAGE to true, NotificationCategory.SPOT_QA to true), NotificationPreference.effective(emptyList()))
+        assertEquals(listOf(NotificationCategory.MESSAGE to true, NotificationCategory.SPOT_QA to true), NotificationPreference.effective(emptyMap()))
     }
 
     @Test
     fun `저장된 카테고리만 그 값이고 나머지는 켜짐이다`() {
-        val stored = listOf(NotificationPreference(id = 3, memberId = 7, category = NotificationCategory.SPOT_QA, enabled = false))
+        val stored = mapOf(NotificationCategory.SPOT_QA to false)
 
         assertEquals(listOf(NotificationCategory.MESSAGE to true, NotificationCategory.SPOT_QA to false), NotificationPreference.effective(stored))
     }

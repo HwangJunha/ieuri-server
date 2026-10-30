@@ -9,7 +9,7 @@ import org.around.ieuri.common.graphql.generated.types.ReactToSpotPayload
 import org.around.ieuri.common.graphql.generated.types.UserError
 import org.around.ieuri.common.security.CurrentMemberProvider
 import org.around.ieuri.tourism.adapter.graphql.support.domainLocale
-import org.around.ieuri.tourism.adapter.graphql.support.withReactionUserErrors
+import org.around.ieuri.tourism.adapter.graphql.support.withTourismUserErrors
 import org.around.ieuri.tourism.application.catalog.provided.SpotCatalogCommandUseCase
 import org.around.ieuri.tourism.application.catalog.provided.dto.ReactToSpotCommand
 import org.around.ieuri.tourism.domain.catalog.ReactionType
@@ -28,7 +28,7 @@ class ReactToSpotResolver(
     fun reactToSpot(
         dfe: DgsDataFetchingEnvironment,
         @InputArgument input: ReactToSpotInput,
-    ): ReactToSpotPayload = withReactionUserErrors(
+    ): ReactToSpotPayload = withTourismUserErrors(
         onError = { failure(it) },
     ) {
         // 비로그인 → UnauthorizedException → 최상위 errors[].

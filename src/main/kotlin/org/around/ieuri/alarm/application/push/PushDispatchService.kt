@@ -2,6 +2,7 @@ package org.around.ieuri.alarm.application.push
 
 import org.around.ieuri.alarm.application.device.provided.DeviceTokenCommandUseCase
 import org.around.ieuri.alarm.application.device.provided.DeviceTokenQueryUseCase
+import org.around.ieuri.alarm.application.device.provided.dto.DeviceTokenView
 import org.around.ieuri.alarm.application.preference.provided.NotificationPreferenceQueryUseCase
 import org.around.ieuri.alarm.application.push.provided.NotificationMessageQueryUseCase
 import org.around.ieuri.alarm.application.push.provided.PushDispatchUseCase
@@ -10,7 +11,6 @@ import org.around.ieuri.alarm.application.push.required.BlockLookupPort
 import org.around.ieuri.alarm.application.push.required.PushSenderPort
 import org.around.ieuri.alarm.application.push.required.dto.PushTarget
 import org.around.ieuri.alarm.domain.device.AlarmLocale
-import org.around.ieuri.alarm.domain.device.DeviceToken
 import org.around.ieuri.alarm.domain.push.NotificationMessage
 import org.around.ieuri.alarm.domain.push.PushNotification
 import org.slf4j.LoggerFactory
@@ -82,7 +82,7 @@ class PushDispatchService(
     /** 한 언어권 기기들로 보낸다. 돌려주는 것은 FCM이 무효로 판정한 기기(R4). */
     private fun sendTo(
         language: AlarmLocale,
-        tokens: List<DeviceToken>,
+        tokens: List<DeviceTokenView>,
         request: PushDispatchRequest,
         messages: Map<AlarmLocale, NotificationMessage>,
     ): List<String> {

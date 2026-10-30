@@ -3,6 +3,7 @@ package org.around.ieuri.alarm.adapter.persistence.mapper
 import org.around.ieuri.alarm.adapter.persistence.table.DeviceTokenTable
 import org.around.ieuri.alarm.adapter.persistence.table.NotificationMessageTable
 import org.around.ieuri.alarm.adapter.persistence.table.NotificationPreferenceTable
+import org.around.ieuri.alarm.application.device.provided.dto.DeviceTokenView
 import org.around.ieuri.alarm.domain.device.AlarmLocale
 import org.around.ieuri.alarm.domain.device.DevicePlatform
 import org.around.ieuri.alarm.domain.device.DeviceToken
@@ -18,6 +19,14 @@ fun ResultRow.toDeviceToken(): DeviceToken = DeviceToken(
     id = this[DeviceTokenTable.id],
     deviceId = this[DeviceTokenTable.deviceId],
     memberId = this[DeviceTokenTable.memberId],
+    fcmToken = this[DeviceTokenTable.fcmToken],
+    language = AlarmLocale.valueOf(this[DeviceTokenTable.language]),
+    platform = DevicePlatform.valueOf(this[DeviceTokenTable.platform]),
+)
+
+/** 기기 토큰 행 → 발송 대상 읽기 모델. */
+fun ResultRow.toDeviceTokenView(): DeviceTokenView = DeviceTokenView(
+    deviceId = this[DeviceTokenTable.deviceId],
     fcmToken = this[DeviceTokenTable.fcmToken],
     language = AlarmLocale.valueOf(this[DeviceTokenTable.language]),
     platform = DevicePlatform.valueOf(this[DeviceTokenTable.platform]),

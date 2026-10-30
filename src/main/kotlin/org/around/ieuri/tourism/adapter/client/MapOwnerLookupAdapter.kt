@@ -1,6 +1,6 @@
 package org.around.ieuri.tourism.adapter.client
 
-import org.around.ieuri.auth.application.port.`in`.query.MemberQueryUseCase
+import org.around.ieuri.auth.application.member.provided.MemberQueryUseCase
 import org.around.ieuri.tourism.application.footprint.required.MapOwnerLookupPort
 import org.springframework.stereotype.Component
 

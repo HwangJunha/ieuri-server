@@ -1,7 +1,8 @@
 package org.around.ieuri.auth.application.query
 
-import org.around.ieuri.auth.domain.vo.MemberStatus
-import org.around.ieuri.auth.domain.vo.Provider
+import org.around.ieuri.auth.application.member.provided.dto.MeView
+import org.around.ieuri.auth.domain.member.MemberStatus
+import org.around.ieuri.auth.domain.member.Provider
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertFalse

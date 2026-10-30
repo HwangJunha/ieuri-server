@@ -5,6 +5,7 @@ import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
 import org.around.ieuri.alarm.application.preference.provided.dto.UpdateNotificationPreferenceCommand
+import org.around.ieuri.alarm.application.preference.required.NotificationPreferenceQueryPort
 import org.around.ieuri.alarm.application.preference.required.NotificationPreferenceRepository
 import org.around.ieuri.alarm.domain.preference.NotificationCategory
 import org.around.ieuri.alarm.domain.preference.NotificationPreference
@@ -18,8 +19,9 @@ import kotlin.test.assertTrue
 class NotificationPreferenceServicesTest {
 
     private val repository = mockk<NotificationPreferenceRepository>(relaxed = true)
-    private val query = NotificationPreferenceQueryService(repository)
-    private val command = NotificationPreferenceCommandService(repository)
+    private val queryPort = mockk<NotificationPreferenceQueryPort>()
+    private val query = NotificationPreferenceQueryService(queryPort)
+    private val command = NotificationPreferenceModifyService(repository)
 
     private val memberId = 7L
 
@@ -28,7 +30,7 @@ class NotificationPreferenceServicesTest {
     /** AC19.1 — 설정을 바꾼 적 없는 회원도 두 항목이 켜짐으로 온다. */
     @Test
     fun `저장된 행이 없으면 두 카테고리가 모두 켜짐이다`() {
-        every { repository.findByMemberId(memberId) } returns emptyList()
+        every { queryPort.findEnabledByCategory(memberId) } returns emptyMap()
 
         val result = query.findByMemberId(memberId)
 
@@ -39,7 +41,7 @@ class NotificationPreferenceServicesTest {
     /** AC19.2 — 하나만 끈 회원. */
     @Test
     fun `끈 카테고리만 거짓으로 온다`() {
-        every { repository.findByMemberId(memberId) } returns listOf(preference(NotificationCategory.MESSAGE, false))
+        every { queryPort.findEnabledByCategory(memberId) } returns mapOf(NotificationCategory.MESSAGE to false)
 
         val result = query.findByMemberId(memberId)
 
@@ -50,10 +52,10 @@ class NotificationPreferenceServicesTest {
     /** AC10.3 — 설정을 바꾼 적 없는 회원은 켜짐이다. */
     @Test
     fun `발송 판정은 설정 행이 없으면 켜짐, 있으면 그 값이다`() {
-        every { repository.findByMemberIdAndCategory(memberId, NotificationCategory.MESSAGE) } returns null
+        every { queryPort.findEnabled(memberId, NotificationCategory.MESSAGE) } returns null
         assertTrue(query.isEnabled(memberId, NotificationCategory.MESSAGE))
 
-        every { repository.findByMemberIdAndCategory(memberId, NotificationCategory.MESSAGE) } returns preference(NotificationCategory.MESSAGE, false)
+        every { queryPort.findEnabled(memberId, NotificationCategory.MESSAGE) } returns false
         assertFalse(query.isEnabled(memberId, NotificationCategory.MESSAGE))
     }
 

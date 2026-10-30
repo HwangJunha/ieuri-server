@@ -39,25 +39,22 @@ class NationwideMapGqlMapperTest {
     }
 
     @Test
-    fun `방문 등록 입력은 회원 id를 인자에서 받는다`() {
-        // 입력에 회원 id가 없다 — 인증 컨텍스트가 정한다.
-        val command = RecordVisitsInput(districtCodes = listOf("11110", "41111")).toCommand(memberId = 7L)
+    fun `방문 등록 입력은 시군구 코드를 그대로 옮긴다`() {
+        val command = RecordVisitsInput(districtCodes = listOf("11110", "41111")).toCommand()
 
-        assertEquals(7L, command.memberId)
         assertEquals(listOf("11110", "41111"), command.districtCodes)
     }
 
     @Test
     fun `방문 해제 입력은 칸 id를 그대로 옮긴다`() {
-        val command = RemoveVisitInput(cellId = 2L).toCommand(memberId = 9L)
+        val command = RemoveVisitInput(cellId = 2L).toCommand()
 
-        assertEquals(9L, command.memberId)
         assertEquals(2L, command.cellId)
     }
 
     @Test
     fun `빈 코드 목록도 변환된다`() {
-        val command = RecordVisitsInput(districtCodes = emptyList()).toCommand(memberId = 1L)
+        val command = RecordVisitsInput(districtCodes = emptyList()).toCommand()
 
         assertEquals(emptyList(), command.districtCodes)
     }

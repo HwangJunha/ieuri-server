@@ -8,8 +8,6 @@ import org.jetbrains.exposed.v1.core.regexp
 import org.jetbrains.exposed.v1.core.trim
 import org.jetbrains.exposed.v1.javatime.timestampWithTimeZone
 
-// category 스키마. 원본은 마이그레이션이다 — 컬럼·제약·인덱스 이름을 마이그레이션과 같게 둔다.
-
 object CategoryTable : Table("category.category") {
     val code = varchar("code", 30)
     val iconUrl = varchar("icon_url", 500).nullable()

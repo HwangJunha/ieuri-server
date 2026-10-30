@@ -2,7 +2,7 @@ package org.around.ieuri.alarm.adapter.event.listener
 
 import org.around.ieuri.alarm.application.device.provided.DeviceTokenCommandUseCase
 import org.around.ieuri.alarm.application.preference.provided.NotificationPreferenceCommandUseCase
-import org.around.ieuri.auth.domain.event.MemberWithdrawn
+import org.around.ieuri.auth.domain.member.event.MemberWithdrawn
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import org.springframework.transaction.event.TransactionPhase

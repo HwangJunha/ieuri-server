@@ -35,7 +35,7 @@ class NationwideMapMutationResolver(
         @InputArgument input: GqlRecordVisitsInput,
     ): RecordVisitsResponse {
         val memberId = currentMemberProvider.requireMemberId()
-        val result = footprintCommandUseCase.recordVisits(input.toCommand(memberId), dfe.domainLocale())
+        val result = footprintCommandUseCase.recordVisits(input.toCommand(), memberId, dfe.domainLocale())
 
         // 없는 코드가 섞여 있어도 나머지는 기록된다.
         // 오류는 하나로 묶고 어떤 코드였는지 밝힌다(공개 행정코드라 개인정보가 아니다).
@@ -62,7 +62,7 @@ class NationwideMapMutationResolver(
         @InputArgument input: GqlRemoveVisitInput,
     ): RemoveVisitResponse {
         val memberId = currentMemberProvider.requireMemberId()
-        val result = footprintCommandUseCase.removeVisit(input.toCommand(memberId), dfe.domainLocale())
+        val result = footprintCommandUseCase.removeVisit(input.toCommand(), memberId, dfe.domainLocale())
 
         return RemoveVisitResponse(
             success = result.updatedCell != null,

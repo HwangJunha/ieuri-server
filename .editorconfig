@@ -7,3 +7,7 @@ ktlint_code_style = intellij_idea
 ktlint_standard_package-name = disabled
 # ktlint 1.7부터 기본 꺼짐 — 쓰지 않는 import가 패키지 간 의존을 잘못 보이게 해서 켠다(SPEC-0039 D-97)
 ktlint_standard_no-unused-imports = enabled
+
+[**/adapter/persistence/table/*.kt]
+# 테이블 선언은 애그리게이트마다 `<애그리게이트>Tables.kt` 하나로 묶는다. 테이블이 하나뿐인 애그리게이트도 같은 이름을 쓴다
+ktlint_standard_filename = disabled

@@ -216,7 +216,10 @@ skill re-checks them:
   isolation, generated GraphQL types and JPA entities out of `application`/`domain`, cross-domain
   slices, bean-name collisions, `AFTER_COMMIT`/`REQUIRES_NEW`.
 - `ConsistencyConventionTest` — persistence tech out of `application`, `common` out of `domain`,
-  `@Transactional` off domain and resolvers, repository/`Port`/`Dto`/test naming.
+  `@Transactional` off domain and resolvers, repository/`Port`/`Dto`/test naming; and the
+  cross-context shape: `CommandUseCase` implemented by a `ModifyService`, no repository in a
+  `QueryService`, `UserException` roots in `domain/shared`, Exposed tables in `…Tables.kt`, and the
+  fixed set of technology folders under `adapter/`.
 - ktlint via kotlinter (`./gradlew lintKotlin`, part of `check`) — code style, rules in `.editorconfig`.
 - `ImportStyleTest` — no wildcard imports (source-level, so Konsist rather than ArchUnit).
 - `CommentLengthTest` — no comment block (KDoc, block, or a run of `//`) of 15 lines or more (Konsist).
@@ -312,7 +315,9 @@ refactor.
   Predicates sit apart in the aggregate's `spec/`, and only as implementations of the context's
   `Specification<T>` (`isSatisfiedBy` plus `and`/`or`/`not`, in `domain/shared`): `ProvinceEligibility`,
   `SpotExclusionRule`. A value that carries settings and computes with them (weights, decay, a
-  scoring model) is a VO at the aggregate root, not a policy. There is no `policy/` until a decision
+  scoring model) is a VO at the aggregate root, named in domain words (`SpotRanking`,
+  `VerificationLimits`) — `XxxPolicy` is for plain setting values in `application/`
+  (`PostPolicy`, `ProfileImagePolicy`). There is no `policy/` until a decision
   has two real implementations behind one interface (Strategy), and no domain `service/` package —
   the word stays with application services (SPEC-0039 D-121).
   `application/<aggregate>/provided/` (inbound ports, `dto/`, `exception/`) and `required/`
@@ -321,9 +326,11 @@ refactor.
     returns goes in that side's `dto/` — never declared next to the interface
     (SpotSearchPort's `SpotSearchQuery` lives in `required/dto/`) (SPEC-0039 D-100).
   - **One top-level type per file, named after it** — interfaces, DTOs, events, policies alike, in every
-    layer. The only files that keep several are sets bound by a `private` member they share (Exposed
-    `Table` groups sharing a constant, keyset cursors sharing the codec, deserializers sharing
-    `readItems`) and a `private` type only its file uses.
+    layer. The only files that keep several are sets bound by a `private` member they share (keyset
+    cursors sharing the codec, deserializers sharing `readItems`), a `private` type only its file
+    uses, and **Exposed tables: one `<Aggregate>Tables.kt` per aggregate** holding every table that
+    aggregate owns (`MemberTables.kt`, `PostTables.kt`) — the owner is the aggregate whose repository
+    writes the table, or whose port reads it when nothing writes it.
     A file named `XxxReadModels.kt` holding ten views is the shape to avoid.
   - **`application/` and `domain/` list the same packages, one to one.** Each name is an aggregate
     (see the persisted-data bullet below — a package that writes has a root). A capability several aggregates use but
@@ -338,7 +345,9 @@ refactor.
     directions: `event/listener` (inbound) and `event/publisher` (Spring events out); `messaging`
     (Valkey pub/sub — it publishes *and* subscribes, so it is not a publisher); `graphql/resolver`,
     `dataloader`, `connection`, `support`, `mapper`; `persistence` (write adapters), `query`,
-    `mapper`, `table`; `client`, `storage`, `config`, `batch`.
+    `mapper`, `table`; `security/authentication` (filters, interceptors — inbound),
+    `authorization`, `crypto`, `token`; `client`, `cache`, `storage`, `config`, `batch`. These ten
+    technology names are the whole set — a new folder under `adapter/` is a finding.
 - **Domain model is an immutable `data class`.** Every field `val`, collections read-only `List`.
   A state change validates and returns `copy(...)`. The persistence mapper rebuilds it through the
   public constructor — there is no `restore`. **Only code inside `domain/` may call an aggregate's
@@ -346,10 +355,43 @@ refactor.
 - **Rules are judged in the domain only.** The domain throws a typed exception per violation; the
   application neither pre-validates nor interprets a `Boolean` result. Exception → error code happens
   in the adapter's error handler, keeping the existing codes (POL-016).
-- **Services read as a procedure: find → domain method → save.** One `XxxModifyService` and one
-  `XxxQueryService` per aggregate. An update still calls `save` — Exposed has no dirty-checking.
-  Query services are per aggregate too; the outbound **read** port may be shared between them
-  (reads skip the aggregate, so splitting the port only scatters one moderation filter).
+  - **One root per error channel, named for the context.** Failures that go to a payload's
+    `userErrors` extend `<Context>UserException(code, message)` in `domain/shared`
+    (`CommunityUserException`, `TourismUserException`, `AuthUserException`); the adapter helper is
+    `with<Context>UserErrors`. Failures that go to top-level `errors[]` have their own root
+    (`TourismQueryException`). **The message is the exception class's default** —
+    `throw PostNotFoundException()`; pass a message only when one exception has a second wording.
+    The code and message strings are the client contract: renaming a class never changes them.
+- **Services read as a procedure: find → domain method → save.** One `XxxModifyService`
+  (implementing `XxxCommandUseCase`) and one `XxxQueryService` (`XxxQueryUseCase`) per aggregate —
+  never `XxxCommandService`, and never one write service per use-case group. An update still calls
+  `save` — Exposed has no dirty-checking. Query services are per aggregate too; the outbound **read**
+  port may be shared between them (reads skip the aggregate, so splitting the port only scatters one
+  moderation filter).
+  - **A further service exists only for a different role, and is named for it** — a batch sync
+    (`SpotSyncService`), or a flow that wraps external calls around DB steps (`MemberWithdrawalService`,
+    `PostImageUploadService`). A flow service has no transaction; it calls the Modify service's use
+    case for each DB step, because a `@Transactional` method called from its own class is not
+    transactional. Its use case is a plain `XxxUseCase`.
+  - **A Command holds what the client specified; what the server learned from the request is a
+    separate argument.** Target ids and payload go in the Command (in REST terms: the path and the
+    body). The caller's member id, the request language and the client IP are parameters of the use
+    case method — `createPost(command, memberId, language)`. So `Input.toCommand()` takes no
+    arguments, and a Command never carries `memberId`. A value the client did send stays in the
+    Command even if it looks like context (a device's `language` in `RegisterDeviceTokenCommand`).
+  - **A query service reads through a query port, never a repository.** The repository is the
+    write side's door to its root. **A query port never returns an aggregate root** — a read model
+    (`XxxView`) or plain values (`Map<NotificationCategory, Boolean>`, a list of `Terms`). The same
+    table being read by a repository and a query port is expected; the two sides do not share a
+    method. When a read needs a domain rule (which terms version is in
+    force, what an absent preference row means), the query port returns the stored values and a
+    pure domain function decides — the rule is not rewritten in SQL.
+  - **A one-line lookup is written where it is used.** `repository.findById(id) ?: throw
+    XxxNotFoundException()` stays in the method body; a `private fun findXxx` that hides one line
+    only adds a place to read. Extract a private function when it bundles several steps and its
+    name says more than the body does.
+  - **Page size is capped in the application** (`PagePolicy.clamp`, or the query service's own
+    limit), never in an adapter — an adapter receives a `first` that is already capped.
 - **Every persisted domain datum belongs to an aggregate, and every write goes through its root.**
   Load the root → a root method decides → save. This holds for batch-synced and derived data too
   (KTO metrics, embeddings, a district's representative location) — a thin root is still a root.

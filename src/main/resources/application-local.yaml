@@ -32,7 +32,7 @@ logging:
     # connection_init / subscribe / complete 프레임과 구독 생명주기.
     org.springframework.graphql: DEBUG
     # 우리 인터셉터의 판정 로그.
-    org.around.ieuri.auth.infrastructure.security: DEBUG
+    org.around.ieuri.auth.adapter.security: DEBUG
     # 푸시 발송 경로. 로컬 전용이다 — 조용히 걸러지는 정상 분기(수신 거부·차단·기기 없음)가 어디서 멈췄는지 본다.
     org.around.ieuri.alarm: DEBUG
 

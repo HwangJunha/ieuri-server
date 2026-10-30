@@ -6,6 +6,7 @@ import io.mockk.slot
 import io.mockk.verify
 import org.around.ieuri.alarm.application.device.provided.DeviceTokenCommandUseCase
 import org.around.ieuri.alarm.application.device.provided.DeviceTokenQueryUseCase
+import org.around.ieuri.alarm.application.device.provided.dto.DeviceTokenView
 import org.around.ieuri.alarm.application.preference.provided.NotificationPreferenceQueryUseCase
 import org.around.ieuri.alarm.application.push.provided.NotificationMessageQueryUseCase
 import org.around.ieuri.alarm.application.push.provided.dto.PushDispatchRequest
@@ -15,7 +16,6 @@ import org.around.ieuri.alarm.application.push.required.dto.PushSendResult
 import org.around.ieuri.alarm.application.push.required.dto.PushTarget
 import org.around.ieuri.alarm.domain.device.AlarmLocale
 import org.around.ieuri.alarm.domain.device.DevicePlatform
-import org.around.ieuri.alarm.domain.device.DeviceToken
 import org.around.ieuri.alarm.domain.preference.NotificationCategory
 import org.around.ieuri.alarm.domain.push.NotificationMessage
 import org.around.ieuri.alarm.domain.push.NotificationType
@@ -62,10 +62,8 @@ class PushDispatchServiceTest {
         deviceId: String,
         fcmToken: String = "token-$deviceId",
         language: AlarmLocale = AlarmLocale.KO,
-    ) = DeviceToken(
-        id = 1L,
+    ) = DeviceTokenView(
         deviceId = deviceId,
-        memberId = recipientId,
         fcmToken = fcmToken,
         language = language,
         platform = DevicePlatform.ANDROID,
@@ -77,7 +75,7 @@ class PushDispatchServiceTest {
         destination: PushDestination = PushDestination.Dm(50L),
     ) = PushDispatchRequest(recipient, actor, destination)
 
-    private fun givenTokens(vararg tokens: DeviceToken) {
+    private fun givenTokens(vararg tokens: DeviceTokenView) {
         every { tokenQuery.tokensOf(recipientId) } returns tokens.toList()
     }
 

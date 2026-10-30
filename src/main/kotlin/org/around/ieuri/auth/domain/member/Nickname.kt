@@ -1,0 +1,23 @@
+package org.around.ieuri.auth.domain.member
+
+/** 표시용 닉네임. 회원 간 고유하지 않다(SPEC-0032 R31). 앞뒤 공백은 제거한다. */
+@JvmInline
+value class Nickname private constructor(val value: String) {
+    companion object {
+        const val MIN_LENGTH = 2
+        const val MAX_LENGTH = 20
+
+        operator fun invoke(raw: String): Nickname {
+            val v = raw.trim()
+            if (v.length < MIN_LENGTH) throw InvalidNicknameException("닉네임은 ${MIN_LENGTH}자 이상이어야 합니다.")
+            if (v.length > MAX_LENGTH) throw InvalidNicknameException("닉네임은 ${MAX_LENGTH}자를 넘을 수 없습니다.")
+            return Nickname(v)
+        }
+
+        /** 후보 중 처음으로 형식에 맞는 것. 잘라내지 않고, 규칙을 벗어나면 통째로 다음 후보로 넘어간다(SPEC-0032 R30). 없으면 null. */
+        fun firstValid(vararg candidates: String?): Nickname? = candidates.asSequence()
+            .filterNotNull()
+            .mapNotNull { runCatching { invoke(it) }.getOrNull() }
+            .firstOrNull()
+    }
+}

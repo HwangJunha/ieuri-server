@@ -2,7 +2,7 @@ package org.around.ieuri.alarm.application.push
 
 import io.mockk.every
 import io.mockk.mockk
-import org.around.ieuri.alarm.application.push.required.NotificationMessageRepository
+import org.around.ieuri.alarm.application.push.required.NotificationMessageQueryPort
 import org.around.ieuri.alarm.domain.device.AlarmLocale
 import org.around.ieuri.alarm.domain.push.NotificationMessage
 import org.around.ieuri.alarm.domain.push.NotificationType
@@ -12,7 +12,7 @@ import kotlin.test.assertEquals
 /** 알림 문구 조회(SPEC-0028 R13). */
 class NotificationMessageQueryServiceTest {
 
-    private val repository = mockk<NotificationMessageRepository>()
+    private val repository = mockk<NotificationMessageQueryPort>()
     private val service = NotificationMessageQueryService(repository)
 
     /** 문구를 언어 키 맵으로 접는다. */
