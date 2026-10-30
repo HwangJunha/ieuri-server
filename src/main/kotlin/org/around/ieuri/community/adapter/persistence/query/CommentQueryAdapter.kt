@@ -9,9 +9,11 @@ import org.around.ieuri.community.application.comment.required.CommentQueryPort
 import org.around.ieuri.community.application.comment.required.dto.PostCommentsSearch
 import org.around.ieuri.community.application.shared.required.dto.ViewerContext
 import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.core.isNull
+import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.springframework.stereotype.Component
 
@@ -81,4 +83,6 @@ class CommentQueryAdapter : CommentQueryPort {
             .orderBy(CommentTable.createdAt to SortOrder.ASC, CommentTable.id to SortOrder.ASC)
             .groupBy({ requireNotNull(it[CommentTable.parentCommentId]) }, { it.toCommentView(viewer.memberId) })
     }
+
+    override fun exists(commentId: Long): Boolean = CommentTable.select(CommentTable.id).where { (CommentTable.id eq commentId) and CommentTable.deletedAt.isNull() }.limit(1).any()
 }

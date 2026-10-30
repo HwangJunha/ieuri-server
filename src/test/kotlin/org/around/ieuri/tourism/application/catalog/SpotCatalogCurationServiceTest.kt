@@ -6,7 +6,6 @@ import io.mockk.slot
 import io.mockk.verify
 import io.mockk.verifyOrder
 import org.around.ieuri.tourism.application.catalog.required.CatalogEventPublisherPort
-import org.around.ieuri.tourism.application.catalog.required.SpotCatalogQueryPort
 import org.around.ieuri.tourism.application.catalog.required.SpotCatalogRepository
 import org.around.ieuri.tourism.application.catalog.required.dto.CatalogLanguage
 import org.around.ieuri.tourism.application.catalog.required.dto.VisibilityRefreshResult
@@ -34,9 +33,8 @@ import java.time.LocalDate
 class SpotCatalogCurationServiceTest {
 
     private val repository = mockk<SpotCatalogRepository>(relaxed = true)
-    private val queryPort = mockk<SpotCatalogQueryPort>()
     private val events = mockk<CatalogEventPublisherPort>(relaxed = true)
-    private val service = SpotCatalogCurationService(repository, queryPort, events)
+    private val service = SpotCatalogCurationService(repository, events)
 
     private fun origin(spotId: Long, language: DomainLocale, title: String, mapX: Double = 129.1, mapY: Double = 35.1) = CatalogOrigin(
         spotId = spotId,
@@ -59,9 +57,9 @@ class SpotCatalogCurationServiceTest {
     @Test
     @DisplayName("기존 카탈로그에 붙을 때는 번역을 쓰고 원본을 배정한다")
     fun `join writes the new translation and assigns the origin`() {
-        every { queryPort.findUnassigned(DomainLocale.EN, 0, any()) } returns listOf(origin(11, DomainLocale.EN, "Marine City (마린시티)"))
-        every { queryPort.loadKoreanTitleIndex() } returns mapOf("마린시티" to listOf(CatalogCandidate(900, 127.0, 37.0, "x")))
-        every { queryPort.loadKoreanThumbnailIndex() } returns emptyMap()
+        every { repository.findUnassigned(DomainLocale.EN, 0, any()) } returns listOf(origin(11, DomainLocale.EN, "Marine City (마린시티)"))
+        every { repository.loadKoreanTitleIndex() } returns mapOf("마린시티" to listOf(CatalogCandidate(900, 127.0, 37.0, "x")))
+        every { repository.loadKoreanThumbnailIndex() } returns emptyMap()
         every { repository.findById(900) } returns koreanCatalog
 
         val result = service.assignCatalogs(DomainLocale.EN, afterSpotId = 0)
@@ -76,8 +74,8 @@ class SpotCatalogCurationServiceTest {
     @Test
     @DisplayName("이미 있는 언어로 붙으면 번역을 쓰지 않고 배정만 한다")
     fun `join in an existing language only assigns`() {
-        every { queryPort.findUnassigned(DomainLocale.KO, 0, any()) } returns listOf(origin(12, DomainLocale.KO, "마린시티"))
-        every { queryPort.loadKoreanTitleIndex() } returns mapOf("마린시티" to listOf(CatalogCandidate(900, 129.1, 35.1, "https://img/12.jpg")))
+        every { repository.findUnassigned(DomainLocale.KO, 0, any()) } returns listOf(origin(12, DomainLocale.KO, "마린시티"))
+        every { repository.loadKoreanTitleIndex() } returns mapOf("마린시티" to listOf(CatalogCandidate(900, 129.1, 35.1, "https://img/12.jpg")))
         every { repository.findById(900) } returns koreanCatalog
 
         service.assignCatalogs(DomainLocale.KO, afterSpotId = 0)
@@ -90,8 +88,8 @@ class SpotCatalogCurationServiceTest {
     @DisplayName("새 카탈로그는 저장 → 원본 이동 → 축제 기간 순으로 쓴다")
     fun `found inserts, moves the origin, then sets the festival period`() {
         val period = FestivalPeriod(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 3))
-        every { queryPort.findUnassigned(DomainLocale.KO, 5, any()) } returns listOf(origin(12, DomainLocale.KO, "부산불꽃축제"))
-        every { queryPort.loadKoreanTitleIndex() } returns emptyMap()
+        every { repository.findUnassigned(DomainLocale.KO, 5, any()) } returns listOf(origin(12, DomainLocale.KO, "부산불꽃축제"))
+        every { repository.loadKoreanTitleIndex() } returns emptyMap()
         every { repository.insert(any()) } returns 500
         every { repository.findById(500) } returns koreanCatalog.copy(id = 500)
         every { repository.findOriginFestivalPeriods(500) } returns listOf(OriginFestivalPeriod(12, DomainLocale.KO, period))
@@ -110,10 +108,10 @@ class SpotCatalogCurationServiceTest {
     @Test
     @DisplayName("건너뛴 원본도 커서를 전진시키고, 대상이 없으면 커서를 그대로 둔다")
     fun `skipped origins advance the cursor`() {
-        every { queryPort.findUnassigned(DomainLocale.EN, 0, any()) } returns listOf(origin(21, DomainLocale.EN, "마린시티"))
-        every { queryPort.loadKoreanTitleIndex() } returns emptyMap()
-        every { queryPort.loadKoreanThumbnailIndex() } returns emptyMap()
-        every { queryPort.findUnassigned(DomainLocale.EN, 21, any()) } returns emptyList()
+        every { repository.findUnassigned(DomainLocale.EN, 0, any()) } returns listOf(origin(21, DomainLocale.EN, "마린시티"))
+        every { repository.loadKoreanTitleIndex() } returns emptyMap()
+        every { repository.loadKoreanThumbnailIndex() } returns emptyMap()
+        every { repository.findUnassigned(DomainLocale.EN, 21, any()) } returns emptyList()
 
         val first = service.assignCatalogs(DomainLocale.EN, afterSpotId = 0)
         val second = service.assignCatalogs(DomainLocale.EN, afterSpotId = 21)
@@ -127,15 +125,15 @@ class SpotCatalogCurationServiceTest {
     @Test
     @DisplayName("KO 배정에는 썸네일 색인을 읽지 않는다")
     fun `korean assignment does not load the thumbnail index`() {
-        every { queryPort.findUnassigned(DomainLocale.KO, 0, any()) } returns listOf(origin(12, DomainLocale.KO, "부산타워"))
-        every { queryPort.loadKoreanTitleIndex() } returns emptyMap()
+        every { repository.findUnassigned(DomainLocale.KO, 0, any()) } returns listOf(origin(12, DomainLocale.KO, "부산타워"))
+        every { repository.loadKoreanTitleIndex() } returns emptyMap()
         every { repository.insert(any()) } returns 500
         every { repository.findById(500) } returns koreanCatalog.copy(id = 500)
         every { repository.findOriginFestivalPeriods(500) } returns emptyList()
 
         service.assignCatalogs(DomainLocale.KO, afterSpotId = 0)
 
-        verify(exactly = 0) { queryPort.loadKoreanThumbnailIndex() }
+        verify(exactly = 0) { repository.loadKoreanThumbnailIndex() }
         verify { repository.saveFestival(CatalogFestival(500, null)) }
     }
 
@@ -144,9 +142,9 @@ class SpotCatalogCurationServiceTest {
     fun `split founds departures and removes departed languages`() {
         val near = 129.1
         val far = 128.0
-        every { queryPort.findSplitCandidates(CatalogSplit.MIN_ORIGIN_COUNT, CatalogSplit.MIN_DISTANCE_METERS) } returns listOf(900)
+        every { repository.findSplitCandidates(CatalogSplit.MIN_ORIGIN_COUNT, CatalogSplit.MIN_DISTANCE_METERS) } returns listOf(900)
         every { repository.findById(900) } returns koreanCatalog
-        every { queryPort.findOrigins(900) } returns listOf(
+        every { repository.findOrigins(900) } returns listOf(
             origin(1, DomainLocale.KO, "마린시티", mapX = near),
             origin(2, DomainLocale.EN, "Marine City", mapX = near),
             origin(3, DomainLocale.JA, "マリンシティ", mapX = far),
@@ -167,9 +165,9 @@ class SpotCatalogCurationServiceTest {
     @Test
     @DisplayName("한 군집이면 아무것도 쓰지 않는다")
     fun `split of one cluster writes nothing`() {
-        every { queryPort.findSplitCandidates(any(), any()) } returns listOf(900)
+        every { repository.findSplitCandidates(any(), any()) } returns listOf(900)
         every { repository.findById(900) } returns koreanCatalog
-        every { queryPort.findOrigins(900) } returns listOf(origin(1, DomainLocale.KO, "마린시티"), origin(2, DomainLocale.EN, "Marine City"))
+        every { repository.findOrigins(900) } returns listOf(origin(1, DomainLocale.KO, "마린시티"), origin(2, DomainLocale.EN, "Marine City"))
 
         val result = service.splitMismatchedCatalogs()
 

@@ -21,9 +21,15 @@ interface FootprintQueryUseCase {
     /** 칸 여러 개를 한 번에 읽는다. 없는 id는 오류 없이 빠지며, 순서는 인자 순서를 따른다. */
     fun mapCellsByIds(cellIds: Collection<Long>, locale: DomainLocale, memberId: Long?): List<MapCellView>
 
+    /** 이 시군구들이 속한 칸. 시도 코드 → 칸 id 오름차순이다. 없는 코드는 오류 없이 빠진다. */
+    fun mapCellsOfDistricts(districtCodes: Collection<String>, locale: DomainLocale, memberId: Long?): List<MapCellView>
+
     /** 칸에 속한 장소. 좋아요 수 내림차순, 같은 수는 id 오름차순이며 [first]는 상한으로 절삭한다(POL-018). */
     fun cellSpots(cellId: Long, first: Int, locale: DomainLocale): List<CellSpotView>
 
     /** 공유 토큰으로 다른 회원의 지도를 본다. [viewerMemberId]가 있으면 겹치는 칸이 함께 오며, 차단 관계면 SHARE_LINK_BLOCKED다. */
     fun sharedMap(token: String, viewerMemberId: Long?): SharedMapView
+
+    /** 유효한 공유 링크 [token]의 주인. 폐기됐거나 없으면 null이다(둘을 구분하지 않는다). */
+    fun findSharerId(token: String): Long?
 }

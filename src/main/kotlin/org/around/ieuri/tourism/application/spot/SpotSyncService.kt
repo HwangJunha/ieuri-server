@@ -1,7 +1,6 @@
 package org.around.ieuri.tourism.application.spot
 
 import org.around.ieuri.common.pagination.OffsetPage
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.spot.provided.SpotSyncUseCase
 import org.around.ieuri.tourism.application.spot.provided.dto.FestivalSweepResult
 import org.around.ieuri.tourism.application.spot.provided.dto.SpotSyncPageResult
@@ -18,7 +17,7 @@ import java.time.LocalDate
 
 /** 원본 관광지·축제 동기화. TourAPI 호출은 첫 쿼리 전에 한다 — 연결을 잡은 채 기다리지 않는다. */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
+@Transactional
 class SpotSyncService(
     private val spotSyncPort: SpotSyncPort,
     private val festivalSyncPort: FestivalSyncPort,

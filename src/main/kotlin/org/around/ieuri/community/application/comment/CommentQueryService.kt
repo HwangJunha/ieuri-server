@@ -2,7 +2,6 @@ package org.around.ieuri.community.application.comment
 
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.cursorPageOf
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.community.application.block.provided.BlockQueryUseCase
 import org.around.ieuri.community.application.comment.provided.CommentQueryUseCase
 import org.around.ieuri.community.application.comment.provided.dto.CommentView
@@ -17,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional
 
 /** 댓글 조회. 조회자의 차단·숨김을 조건으로 건다. */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX, readOnly = true)
+@Transactional(readOnly = true)
 class CommentQueryService(
     private val commentQueryPort: CommentQueryPort,
     private val postQueryUseCase: PostQueryUseCase,
@@ -41,4 +40,6 @@ class CommentQueryService(
 
     /** 조회자의 양방향 차단 회원. 개인 숨김(hiddenPostIds)은 글 전용이라 읽지 않는다. */
     private fun viewerContext(memberId: Long): ViewerContext = ViewerContext(memberId = memberId, blockedMemberIds = blockQueryUseCase.blockedMemberIds(memberId))
+
+    override fun exists(commentId: Long): Boolean = commentQueryPort.exists(commentId)
 }

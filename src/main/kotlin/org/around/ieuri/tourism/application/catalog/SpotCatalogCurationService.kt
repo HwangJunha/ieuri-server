@@ -1,12 +1,10 @@
 package org.around.ieuri.tourism.application.catalog
 
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.catalog.provided.SpotCatalogCurationUseCase
 import org.around.ieuri.tourism.application.catalog.provided.dto.CatalogAssignmentResult
 import org.around.ieuri.tourism.application.catalog.provided.dto.CatalogSplitResult
 import org.around.ieuri.tourism.application.catalog.provided.dto.DistrictAssignmentResult
 import org.around.ieuri.tourism.application.catalog.required.CatalogEventPublisherPort
-import org.around.ieuri.tourism.application.catalog.required.SpotCatalogQueryPort
 import org.around.ieuri.tourism.application.catalog.required.SpotCatalogRepository
 import org.around.ieuri.tourism.domain.catalog.CatalogAssignment
 import org.around.ieuri.tourism.domain.catalog.CatalogCandidates
@@ -26,23 +24,22 @@ import org.springframework.transaction.annotation.Transactional
  * - KO에 짝이 없는 외국어 원본은 자기 언어만 가진 카탈로그가 된다(한국어명을 지어내지 않는다).
  */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
+@Transactional
 class SpotCatalogCurationService(
     private val catalogRepository: SpotCatalogRepository,
-    private val catalogQueryPort: SpotCatalogQueryPort,
     private val eventPublisher: CatalogEventPublisherPort,
 ) : SpotCatalogCurationUseCase {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
     override fun assignCatalogs(language: DomainLocale, afterSpotId: Long): CatalogAssignmentResult {
-        val origins = catalogQueryPort.findUnassigned(language, afterSpotId, ASSIGNMENT_BATCH_SIZE)
+        val origins = catalogRepository.findUnassigned(language, afterSpotId, ASSIGNMENT_BATCH_SIZE)
         if (origins.isEmpty()) return CatalogAssignmentResult(joined = 0, catalogsCreated = 0, lastSpotId = afterSpotId)
 
         // 썸네일 폴백은 비한국어 전용이다.
         var candidates = CatalogCandidates(
-            titleCandidates = catalogQueryPort.loadKoreanTitleIndex(),
-            thumbnailCatalogIds = if (language.isKorean) emptyMap() else catalogQueryPort.loadKoreanThumbnailIndex(),
+            titleCandidates = catalogRepository.loadKoreanTitleIndex(),
+            thumbnailCatalogIds = if (language.isKorean) emptyMap() else catalogRepository.loadKoreanThumbnailIndex(),
         )
 
         var joined = 0
@@ -72,10 +69,10 @@ class SpotCatalogCurationService(
         var split = 0
         var created = 0
         var moved = 0
-        catalogQueryPort.findSplitCandidates(CatalogSplit.MIN_ORIGIN_COUNT, CatalogSplit.MIN_DISTANCE_METERS).forEach { catalogId ->
+        catalogRepository.findSplitCandidates(CatalogSplit.MIN_ORIGIN_COUNT, CatalogSplit.MIN_DISTANCE_METERS).forEach { catalogId ->
             val catalog = catalogRepository.findById(catalogId) ?: return@forEach
 
-            val result = catalog.split(catalogQueryPort.findOrigins(catalogId)) ?: return@forEach
+            val result = catalog.split(catalogRepository.findOrigins(catalogId)) ?: return@forEach
 
             result.departures.forEach { departure -> found(departure.catalog) { saved -> saved.admitAll(departure.spotIds) } }
             catalogRepository.deleteTranslations(catalogId, result.removedLanguages)

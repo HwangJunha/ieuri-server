@@ -1,6 +1,7 @@
 package org.around.ieuri.community.adapter.persistence.mapper
 
 import org.around.ieuri.community.adapter.persistence.table.CommentTable
+import org.around.ieuri.community.adapter.persistence.table.ConversationTable
 import org.around.ieuri.community.adapter.persistence.table.MessageQuoteTable
 import org.around.ieuri.community.adapter.persistence.table.MessageTable
 import org.around.ieuri.community.adapter.persistence.table.PostTable
@@ -8,9 +9,12 @@ import org.around.ieuri.community.adapter.persistence.table.SpotAnswerReplyTable
 import org.around.ieuri.community.adapter.persistence.table.SpotAnswerTable
 import org.around.ieuri.community.adapter.persistence.table.SpotQuestionTable
 import org.around.ieuri.community.application.comment.provided.dto.CommentView
+import org.around.ieuri.community.application.conversation.provided.dto.ConversationParticipantsView
 import org.around.ieuri.community.application.conversation.provided.dto.ConversationSpotQaOriginView
+import org.around.ieuri.community.application.conversation.provided.dto.MessageOwnerView
 import org.around.ieuri.community.application.conversation.provided.dto.MessageView
 import org.around.ieuri.community.application.post.provided.dto.PostView
+import org.around.ieuri.community.application.question.provided.dto.SpotAnswerOriginView
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswerReplyView
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswerView
 import org.around.ieuri.community.application.question.provided.dto.SpotQuestionView
@@ -96,4 +100,28 @@ fun ResultRow.toSpotQaOriginView(decryptedQuestionExcerpt: String, decryptedAnsw
     questionBodySnapshot = decryptedQuestionExcerpt,
     answerId = this[MessageQuoteTable.targetId],
     answerBodySnapshot = decryptedAnswerExcerpt,
+)
+
+/** 답변-질문 조인 행 → 인용 원문 읽기 모델. */
+fun ResultRow.toSpotAnswerOriginView(): SpotAnswerOriginView = SpotAnswerOriginView(
+    answerId = this[SpotAnswerTable.id],
+    answerAuthorId = this[SpotAnswerTable.authorId],
+    answerBody = this[SpotAnswerTable.body],
+    questionId = this[SpotQuestionTable.id],
+    questionBody = this[SpotQuestionTable.body],
+    catalogId = this[SpotAnswerTable.catalogId],
+)
+
+/** 메시지 행 → 신고 판정에 쓰는 소유 정보. */
+fun ResultRow.toMessageOwnerView(): MessageOwnerView = MessageOwnerView(
+    messageId = this[MessageTable.id],
+    conversationId = this[MessageTable.conversationId],
+    senderId = this[MessageTable.senderId],
+)
+
+/** 대화 행 → 참여자. */
+fun ResultRow.toConversationParticipantsView(): ConversationParticipantsView = ConversationParticipantsView(
+    conversationId = this[ConversationTable.id],
+    memberLow = this[ConversationTable.memberLow],
+    memberHigh = this[ConversationTable.memberHigh],
 )

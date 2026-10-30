@@ -1,7 +1,6 @@
 package org.around.ieuri.community.application.conversation
 
-import org.around.ieuri.common.persistence.ExposedConfig
-import org.around.ieuri.community.application.block.required.BlockRepository
+import org.around.ieuri.community.application.block.provided.BlockQueryUseCase
 import org.around.ieuri.community.application.conversation.provided.ConversationCommandUseCase
 import org.around.ieuri.community.application.conversation.provided.ExpiredMessageDeleteUseCase
 import org.around.ieuri.community.application.conversation.provided.dto.ExpiredMessages
@@ -19,7 +18,7 @@ import org.around.ieuri.community.application.conversation.required.Conversation
 import org.around.ieuri.community.application.lookup.provided.MemberLookupUseCase
 import org.around.ieuri.community.application.lookup.provided.SpotLookupUseCase
 import org.around.ieuri.community.application.photo.provided.UploadedPhotoUseCase
-import org.around.ieuri.community.application.question.required.SpotQuestionRepository
+import org.around.ieuri.community.application.question.provided.SpotQuestionQueryUseCase
 import org.around.ieuri.community.application.shared.exception.MemberNotFoundException
 import org.around.ieuri.community.domain.conversation.Conversation
 import org.around.ieuri.community.domain.conversation.Message
@@ -39,11 +38,11 @@ import java.time.Instant
  * - 외부 호출(회원 조회·R2)은 첫 쿼리 전에 한다. 없는 대화와 참여자가 아닌 대화는 다른 코드다.
  */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
+@Transactional
 class ConversationModifyService(
     private val conversationRepository: ConversationRepository,
-    private val blockRepository: BlockRepository,
-    private val questionRepository: SpotQuestionRepository,
+    private val blockQueryUseCase: BlockQueryUseCase,
+    private val questionQueryUseCase: SpotQuestionQueryUseCase,
     private val memberLookup: MemberLookupUseCase,
     private val spotLookup: SpotLookupUseCase,
     private val uploadedPhotos: UploadedPhotoUseCase,
@@ -121,7 +120,7 @@ class ConversationModifyService(
     private fun requireConversation(conversationId: Long): Conversation = conversationRepository.findById(conversationId) ?: throw ConversationNotFoundException()
 
     private fun requireNotBlocked(memberId: Long, counterpartId: Long) {
-        if (blockRepository.existsBetween(memberId, counterpartId)) throw BlockedException()
+        if (blockQueryUseCase.isBlockedBetween(memberId, counterpartId)) throw BlockedException()
     }
 
     /** 형식·소유·확정·실제 존재를 본다. 모든 실패는 PHOTO_NOT_CONFIRMED 하나다 — 남의 키 존재 여부를 드러내지 않는다. */
@@ -134,23 +133,22 @@ class ConversationModifyService(
 
     /** 만들지 못하면 null이며 오류가 아니다: 답변·질문이 사라졌거나, 답변 작성자가 상대가 아니거나, 장소가 [language]로 해소되지 않을 때. */
     private fun resolveSpotQaOrigin(answerId: Long, counterpartId: Long, language: ContentLanguage): SpotQaOrigin? {
-        val answer = questionRepository.findAnswer(answerId) ?: return null
-        if (answer.authorId != counterpartId) return null
-        val question = questionRepository.findById(answer.questionId) ?: return null
-        val spot = spotLookup.spot(answer.catalogId, language) ?: return null
+        val origin = questionQueryUseCase.answerOrigin(answerId) ?: return null
+        if (origin.answerAuthorId != counterpartId) return null
+        val spot = spotLookup.spot(origin.catalogId, language) ?: return null
 
         return SpotQaOrigin(
-            catalogId = answer.catalogId,
+            catalogId = origin.catalogId,
             spotTitle = spot.title,
-            questionId = answer.questionId,
-            questionExcerpt = SpotQaOrigin.excerpt(question.body),
+            questionId = origin.questionId,
+            questionExcerpt = SpotQaOrigin.excerpt(origin.questionBody),
             answerId = answerId,
-            answerExcerpt = SpotQaOrigin.excerpt(answer.body),
+            answerExcerpt = SpotQaOrigin.excerpt(origin.answerBody),
         )
     }
 
     /** 대화마다 루트가 참여자를 확인한 뒤 그 대화의 보낸 메시지를 삭제 표시한다. 대화는 남긴다. 메시지 한 건 단위의 규칙은 없다. */
-    @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     override fun eraseMemberContent(memberId: Long, deletedAt: Instant): Int = conversationRepository.findIdsByParticipant(memberId).sumOf { conversationId ->
         val conversation = conversationRepository.findById(conversationId) ?: return@sumOf 0
         conversation.requireParticipant(memberId)

@@ -42,7 +42,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-`ieuri` is a Spring Boot 4 application written in Kotlin, exposing a GraphQL API via Netflix DGS backed by PostgreSQL through Spring Data JPA (with QueryDSL for reads), and Spring Security on the request path. Four bounded contexts are implemented — `auth` (members, tokens, RBAC), `tourism` (spots, details, reactions, festival sync), `community`, and `alarm` — plus a Spring Batch job that syncs TourAPI data.
+`ieuri` is a Spring Boot 4 application written in Kotlin, exposing a GraphQL API via Netflix DGS backed by PostgreSQL through Exposed DSL, and Spring Security on the request path. Four bounded contexts are implemented — `auth` (members, tokens, RBAC), `tourism` (spots, details, reactions, festival sync), `community`, and `alarm` — plus Spring Batch jobs (TourAPI sync, retention, statistics).
 
 `ieuri` runs as a single server, and its design is centered on Domain-Driven Design (DDD) and hexagonal architecture. Every domain currently lives inside this one application, but because the application may need to be split as it grows in scale, the design deliberately leads with domain boundaries — so that individual domains can later be extracted into their own separate applications naturally, with minimal friction.
 
@@ -83,11 +83,11 @@ Uses the Gradle wrapper (`./gradlew`); Gradle 9.5.1, Java toolchain 25.
 
 - **Test the domain, not the framework.** Write only:
     - **Unit tests for domain and business logic** — pure JUnit5, no Spring context. Aggregates, value objects, specifications, and use-case services (with mocked ports).
-    - **Architecture tests with ArchUnit** — dependency direction, domain purity, `@Entity` confinement, cross-domain isolation.
+    - **Architecture tests with ArchUnit** — dependency direction, domain purity, cross-domain isolation, and the service and port shapes.
 
   **Do not write infrastructure tests.** No tests that boot a Spring context to prove wiring, no tests that hit a real database or Valkey, no tests that assert thread names, executor behavior, shutdown timing, or queue saturation. Those verify the framework rather than our logic, they are slow, and they drag in external dependencies. If an infrastructure concern seems to need pinning, that is a signal to use a well-trodden Spring idiom (see the rule above) whose behavior does not need re-proving. Verify infrastructure by running it, not by encoding it in the suite.
 
-  **The one exception is conversion, and there it is mandatory — every conversion, both directions.** GraphQL input/response ↔ domain model or `Command`; domain model ↔ JPA entity; external API response ↔ domain model. A conversion is a pure function with no external dependency, so it is cheap to test, and it hides a bug the compiler cannot see: a **swapped mapping between two same-typed fields** (`mapy → longitude`). Assert **field by field with a distinct value per field** — a single whole-object `assertEquals` cannot say which field is wrong, and shared fixture values let a swap pass. Include an all-nulls case.
+  **The one exception is conversion, and there it is mandatory — every conversion, both directions.** GraphQL input/response ↔ `Command` or read model; Exposed row ↔ domain model or read model; external API response ↔ domain model. A conversion is a pure function with no external dependency, so it is cheap to test, and it hides a bug the compiler cannot see: a **swapped mapping between two same-typed fields** (`mapy → longitude`). Assert **field by field with a distinct value per field** — a single whole-object `assertEquals` cannot say which field is wrong, and shared fixture values let a swap pass. Include an all-nulls case.
 
   A conversion written inline inside a resolver method cannot be called on its own, so it cannot be tested without standing up the resolver. When a slice adds one with enough fields to swap, **extract it as an extension function on the source type** and test that. Conversions predating this rule are untested; that is the accepted current state, and the rule binds what a slice adds or changes.
 
@@ -109,13 +109,13 @@ Uses the Gradle wrapper (`./gradlew`); Gradle 9.5.1, Java toolchain 25.
 
 - **Design by domain, for future extraction.** Keep domain logic at the core and independent of delivery/persistence adapters, following hexagonal ports-and-adapters. All domains share this one application today, so structure each domain so it can be lifted out into its own application later without rewriting the core.
 
-- **The domain model is never a JPA entity — always kept separate. This is a project-wide rule with no exceptions.** Every `domain/` type is pure Kotlin with no persistence concerns. JPA `@Entity` classes live only under `infrastructure/adapter/out/persistence`, with mappers converting between the domain model and the persistence model. This applies to *every* domain, including simple CRUD-heavy ones — not just rich domains. The rationale is domain purity and, above all, **code consistency**: one predictable shape across every domain makes the codebase far easier to read and reason about, and removes the per-domain "is this one separated or merged?" judgment. The accepted cost is mapping boilerplate; do not try to eliminate it by reusing JPA entities as domain models.
+- **The domain model is never a persistence model — always kept separate. This is a project-wide rule with no exceptions.** Every `domain/` type is pure Kotlin with no persistence concerns. Exposed `Table` objects live only under `adapter/persistence/table`, with mappers converting between rows and the domain model. This applies to *every* domain, including simple CRUD-heavy ones — not just rich domains. The rationale is domain purity and, above all, **code consistency**: one predictable shape across every domain makes the codebase far easier to read and reason about, and removes the per-domain "is this one separated or merged?" judgment. The accepted cost is mapping boilerplate; do not try to eliminate it with Exposed DAO entities — DAO is Active Record, the persistence model becoming the domain model.
 
-- **Conversion lives in a `mapper` package, as extension functions on the source type (POL-033).** Do not scatter `private fun toDomain(...)` members across adapters and clients — a conversion buried in the class that uses it grows with that class and cannot be unit-tested on its own. Each bounded context gets `infrastructure/adapter/out/persistence/mapper/` for entity↔domain, and external-response conversion goes in a *separate* package (`.../out/tourapi/mapper/`) so one package doesn't swell again. Rules:
-    - Declare as an extension on the **source** type and return the **domain model**: `fun SpotEntity.toDomain(): Spot`, `fun TourApiDetailCommonResponse.Item.toSpotDetail(...): SpotDetail`. Never return a JPA entity or a codegen type across the boundary.
-    - **Keep side-effecting concerns out.** Encryption, category-code resolution, and anything needing config are passed *in* as parameters (`fun MemberEntity.toDomain(profile, decryptedEmail: String)`) — the mapper stays a pure function.
+- **Conversion lives in a `mapper` package, as extension functions on the source type (POL-033).** Do not scatter `private fun toDomain(...)` members across adapters and clients — a conversion buried in the class that uses it grows with that class and cannot be unit-tested on its own. Each adapter technology has its own: `adapter/persistence/mapper/` for row↔domain, `adapter/graphql/mapper/` for input→`Command` and read model→response, `adapter/client/**/mapper/` for external responses. Rules:
+    - Declare as an extension on the **source** type and return the **domain model** or read model: `fun ResultRow.toSpot(): Spot`, `fun TourApiDetailCommonResponse.Item.toSpotDetail(...): SpotDetail`. Never return a `ResultRow` or a codegen type across the boundary.
+    - **Keep side-effecting concerns out.** Encryption, category-code resolution, and anything needing config are passed *in* as parameters (`fun ResultRow.toMember(decryptedEmail: String)`) — the mapper stays a pure function.
     - Mappers translate shape only. No business logic, no I/O.
-    - Every conversion gets a pure unit test asserting **field by field**, with a distinct value per field so a swapped mapping fails. A single whole-object `assertEquals` does not satisfy this — it cannot tell you *which* field is wrong. Include a case where all nullable fields are null. This covers the GraphQL boundary too: a resolver's input → `Command` conversion is extracted as an extension function (`fun CreatePostInput.toCommand(...)`) when it has enough fields to swap, so that it is callable — and therefore testable — without the resolver.
+    - Every conversion gets a pure unit test asserting **field by field**, with a distinct value per field so a swapped mapping fails. A single whole-object `assertEquals` does not satisfy this — it cannot tell you *which* field is wrong. Include a case where all nullable fields are null. This covers the GraphQL boundary too: a resolver's input → `Command` conversion is extracted as an extension function (`fun CreatePostInput.toCommand()`) when it has enough fields to swap, so that it is callable — and therefore testable — without the resolver.
 
 - **Comments summarize what a thing does; rationale lives in the spec (POL-033).** Design rationale, policy justification, rejected alternatives, and SPEC history do not belong in code — link the spec instead. **KDoc blocks stay under 15 lines.** Two things must survive the trimming, though: (1) *operational warnings* a maintainer needs at the call site — "an empty surviving set deletes everything", "`ST_MakePoint` takes (lon, lat)", step ordering that a FK depends on; and (2) *behavioral facts that exist only in the comment* — clamp-vs-error at a limit, null vs empty-array meaning, empty-string normalization, sort guarantees. Those are contract, not rationale. Compress them to one line; do not delete them. The same rule governs GraphQL schema descriptions — see the schema bullet below.
 
@@ -142,34 +142,19 @@ Uses the Gradle wrapper (`./gradlew`); Gradle 9.5.1, Java toolchain 25.
     - **Generated types are output shape, not the resolution carrier.** DGS codegen makes non-null fields required constructor args, so a generated type can't be built with lazy fields left empty. Return the read DTO from the root and let field resolvers read it via `getSource`.
     - Lazy resolution is a *runtime* property — compilation proves nothing. Pin it at the **service level**: assert with mocked ports that selecting only the body triggers no gallery/intro/info calls. That is business logic (which I/O a use case performs) and belongs in a unit test; do not boot a DGS/Spring context to prove it. Worked example: SPEC-0003 `spotDetail` — `{ id title overview }` costs 1 upstream call; selecting `gallery`/`intro`/`infoItems`/`likeCount` adds one each.
 
-- **JPA relations follow the textbook — no `@OneToMany`; a child-side `@ManyToOne` only, when one is needed at all.** Unless a service requirement genuinely demands otherwise, follow the well-proven default. `@OneToMany` fires a query the moment a mapper touches the collection — even when reading a single row — and its size cannot be bounded. A unidirectional child→parent `@ManyToOne` is better on both performance and longevity. Reads are the job of the repositories and QueryDSL projections.
-
-  But **across aggregates, not even `@ManyToOne`** — references between aggregates are id columns (see "Reference across aggregates by id" under Persistence & migrations). A relation is only ever a candidate *within* one aggregate. That is why the codebase currently has no relations at all, only id references, and that is correct.
-
-- **JPA entities need the Kotlin all-open treatment, which is already configured.** The `kotlin("plugin.jpa")` and `allOpen` block in `build.gradle.kts` automatically open classes annotated with `@Entity`, `@MappedSuperclass`, and `@Embeddable` (JPA/Hibernate require non-final classes). Do not manually mark entities `open`. These constraints are exactly why entities stay out of `domain/`.
-
-- **Compiler strictness.** `-Xjsr305=strict` makes Spring's nullability annotations enforce Kotlin null-safety at the boundary, and `-Xannotation-default-target=param-property` controls annotation targeting on constructor properties — keep JPA/validation annotations on `val`/`var` constructor params working as expected.
+- **Compiler strictness.** `-Xjsr305=strict` makes Spring's nullability annotations enforce Kotlin null-safety at the boundary, and `-Xannotation-default-target=param-property` controls annotation targeting on constructor properties — it keeps `@ConfigurationProperties`/validation annotations on `val` constructor params working as expected.
 
 - **Persistence.** PostgreSQL is the only JDBC driver on the classpath (`runtimeOnly`), configured via `spring.datasource.*` in `application.yaml` (the local password comes from `IEURI_DB_PASSWORD`).
 
-- **Queries are QueryDSL or derived queries — raw SQL is the exception, and exceptions get their own adapter.** The whole point of JPA + QueryDSL is not being pinned to one database; a `JdbcTemplate` string throws that away silently. Order of preference: Spring Data **derived query** → **QueryDSL** → raw SQL. Do not use `@Query` at all — an annotation string splits the query definition across two places and is neither type-checked nor refactorable.
-    - Only two things justify raw SQL today: **PostGIS spatial functions** (`ST_DWithin`, `ST_Distance` — QueryDSL cannot express them) and **`INSERT ... ON CONFLICT` upsert** (JPA has no portable upsert; `merge` semantics would introduce a select-then-insert race).
-    - When you need one, **isolate it in a dedicated adapter** whose name says so (`SpotSpatialQueryAdapter`, `SpotUpsertJdbcAdapter`). The invariant to preserve: `JdbcTemplate` appears *only* in those adapters. Give that adapter its **own outbound port** so the application depends on the port, not on another adapter — `infrastructure → infrastructure` injection hides the split in the wrong layer.
-    - **A column whose type JPA cannot express (PostGIS `geography`, …) is not mapped on the entity at all.** Mapping it — even as `String` to sneak it past the compiler — fails `ddl-auto: validate` at startup. An unmapped column is also invisible to HQL, so **any query touching it belongs in the raw-SQL adapter above.** Deriving the value from mapped columns instead (`ST_MakePoint(map_x, map_y)`) compiles but skips the index; measure before choosing it.
-    - **JPQL has no row-value constructor.** Keyset paging written as `(a, b) < (?, ?)` in SQL becomes `a < ? OR (a = ? AND b < ?)` in QueryDSL. Equivalent result and ordering; verify the index is still used if the table is large.
-    - Bulk `update()`/`delete()` bypass the persistence context. That is fine when nothing re-reads those entities in the same transaction — **check the callers before converting**, and note that DB-level `ON DELETE CASCADE` still fires (it is not a JPA cascade).
-    - Never self-invoke a `@Transactional` method from another method of the same class — the proxy is bypassed and the annotation silently does nothing. Extract the shared body into a private helper and have both call it.
+- **An outbound adapter never injects another adapter — including through a port whose only implementation is one.** The wrapper reads as "the application doesn't need to know about the split", but that is exactly the cost: in what order two stores are touched stops being visible where that decision is made. **The application service injects both ports** and sequences them itself. A one-line `override` that forwards to another adapter is the tell.
 
-- **An outbound adapter never injects another adapter — including through a port whose only implementation is one.** The wrapper reads as "the application doesn't need to know about the split", but that is exactly the cost: which writes take raw SQL, and in what order two stores are touched, stop being visible where those decisions are made. **The application service injects both ports** and sequences them itself. A one-line `override` that forwards to another adapter is the tell.
+  Two things this is *not*. Injecting the other context's `provided` use case from an `adapter/client` adapter is the sanctioned cross-context path (`SpotLookupAdapter` → `SpotCatalogQueryUseCase`). And a port whose implementation is a thin shim over a `common/` utility is fine — `EmailEncryptorPort` resolves to three lines wrapping `common/security/AesGcmCipher`, and the encryption happens *inside* row↔domain mapping, so hoisting it would push storage format up into the service.
 
-  Two things this is *not*. Injecting the other domain's inbound `port/in` from an `out/client` adapter is the sanctioned cross-domain path (`SpotLookupAdapter` → `SpotCatalogQueryUseCase`). And a port whose implementation is a thin shim over a `common/` utility is fine — `EmailEncryptorPort` resolves to three lines wrapping `common/security/AesGcmCipher`, and the encryption happens *inside* entity↔domain mapping, so hoisting it would push storage format up into the service.
+  `TourApiClient`/`TourApiSyncClient` resolve a category into TourAPI's `contentTypeId` *while building the request*; they do it through the `CategoryQueryUseCase` inbound port, not the outbound one — the service cannot sequence it without learning TourAPI's wire format.
 
-  `TourApiClient`/`TourApiSyncClient` resolve a category into TourAPI's `contentTypeId` *while building the request*; they do it through the `CategoryMappingQueryUseCase` inbound port, not the outbound one — the service cannot sequence it without learning TourAPI's wire format.
+  **An inbound adapter calls use cases, never outbound ports.** Resolvers, event listeners, batch tasklets, and the authentication filters depend on `provided/` only. When one needs a port, the use case that uses that port goes in `application/` — even when it only forwards (`VerificationMailService`, `MessageBroadcastService`). A forwarding service costs one small class; a direct port costs the rule.
 
-  One exception stands today, because hoisting makes it worse:
-    - **`out/event` listeners injecting an outbound port** (`VerificationEmailListener`, `NewMessageBroadcastListener`, `PostViewCountListener`). These are one-line event→port bridges with no service between them. The honest fix is to move them to `adapter/in/event/` — where the other domains' listeners already live — not to invent a forwarding use case. Left as a structural decision, not a wiring one.
-
-- **Security is on the request path.** `spring-boot-starter-security` locks endpoints down by default; `auth/infrastructure/config/SecurityConfig.kt` opens GraphQL, and introspection is toggled per profile (`local` only). Per-field authorization is still ours to write.
+- **Security is on the request path.** `spring-boot-starter-security` locks endpoints down by default; `auth/adapter/config/SecurityConfig.kt` opens GraphQL, and introspection is toggled per profile (`local` only). Per-field authorization is still ours to write.
 
 - **`ZH` is always Traditional Chinese (번체/正體) — never Simplified.** This applies everywhere `ZH` appears: DB name columns, seed data, GraphQL responses, and any content we author or generate.
 
@@ -212,21 +197,28 @@ cannot catch** — code that compiles, passes the suite, and is still designed w
 classes under `src/test/kotlin/org/around/ieuri/architecture/` hold the mechanical checks, so no
 skill re-checks them:
 
-- `LayeredArchitectureTest` — dependency direction, domain purity, `@Entity` confinement, DGS
-  isolation, generated GraphQL types and JPA entities out of `application`/`domain`, cross-domain
-  slices, bean-name collisions, `AFTER_COMMIT`/`REQUIRES_NEW`.
+- `LayeredArchitectureTest` — dependency direction, domain purity, DGS isolation, generated
+  GraphQL types and table declarations out of `application`/`domain`, cross-context slices, a
+  repository used only by its own aggregate's services, inbound adapters depending on no
+  `required` port, `copy` on a domain model only inside `domain/`, no cycle between domain
+  aggregates, bean-name collisions, `AFTER_COMMIT`/`REQUIRES_NEW`.
 - `ConsistencyConventionTest` — persistence tech out of `application`, `common` out of `domain`,
-  `@Transactional` off domain and resolvers, repository/`Port`/`Dto`/test naming; and the
+  `@Transactional` off domain and resolvers, `Repository`/`Port`/`UseCase`/`Dto`/test naming; and the
   cross-context shape: `CommandUseCase` implemented by a `ModifyService`, no repository in a
-  `QueryService`, `UserException` roots in `domain/shared`, Exposed tables in `…Tables.kt`, and the
+  `QueryService`, `QueryPort` used only by read-only services, `UserException` roots in `domain/shared`, Exposed tables in `…Tables.kt`, and the
   fixed set of technology folders under `adapter/`.
 - ktlint via kotlinter (`./gradlew lintKotlin`, part of `check`) — code style, rules in `.editorconfig`.
 - `ImportStyleTest` — no wildcard imports (source-level, so Konsist rather than ArchUnit).
 - `CommentLengthTest` — no comment block (KDoc, block, or a run of `//`) of 15 lines or more (Konsist).
 
-`ConsistencyConventionTest` and `ImportStyleTest` fix **what is already consistent**, chosen because
-a full survey found zero violations — not because the convention has been settled. They are
-revisited in the refactoring; `problem/HARNESS-server-sensors.md` lists what is up for review.
+`SchemaPlacementTest` checks that every Exposed table declaration names the schema the placement
+table assigns it. **Nothing checks a declaration against the real database** — a drift surfaces on
+the first query that touches it, so `persistence-review` reads declarations against migrations.
+
+**A sensor has no exception list.** The moment one is added it stops being a sensor — the rule
+becomes advice and the next slice copies the exception. When a sensor fires on existing code, fix
+the code. The only exception that may exist is a compatibility shim kept *during* a refactor, and it
+leaves with the refactor (SPEC-0039 D-165).
 
 **A sensor's failure message says what to do, not just what is wrong** — name the rule it enforces,
 so the reader can tell a real violation from a rule that is wrong for this slice:
@@ -245,8 +237,8 @@ violated`) — so write in `because` what to do, not why the rule exists.
 
 - `architecture-review` — CQRS rails, mapper placement and purity, framework leaking below
   infrastructure, domain independence, `common/` bloat, required values weakened to nullable.
-- `jpa-review` — relations (no `@OneToMany`), dirty-checking, raw-SQL containment, query choice,
-  migrations.
+- `persistence-review` — repository vs query port, minimal write loads, Exposed DSL discipline,
+  table declarations against the migration, migrations.
 - `graphql-review` — a new root where a field belonged, per-field resolution, N+1, description bloat.
 - `security-review` — authorization on every mutation and member-scoped query, personal data in
   logs and errors, credential handling.
@@ -294,14 +286,12 @@ This pass is **not another review**, and it is bounded so it cannot loop:
 A finding you deliberately did not fix is fine — say so in the PR with the reason. Silently leaving
 it is not.
 
-## Target shape — Exposed migration (SPEC-0039, in progress)
+## Structure
 
-Persistence is moving from JPA to **Exposed DSL**, one bounded context at a time: community →
-tourism → auth → alarm (decisions D-32~D-67 in `problem/SPEC-0039-server.md`). **A context that has
-been moved follows this section; one that has not still follows Layout and the JPA rules below.**
-Those rules are deleted in the final slice, not piecemeal.
+Persistence is **Exposed DSL**, and every bounded context has the same shape (SPEC-0039; decisions
+D-32~D-166 in `problem/SPEC-0039-server.md`).
 
-**A migration changes neither the GraphQL schema nor the DB schema — nor any response.** The deployed
+**A refactor changes neither the GraphQL schema nor the DB schema — nor any response.** The deployed
 dev server (`api-dev.ieuri.co.kr`) is the answer key: every query, error and subscription returns
 exactly what dev returns, **defects included**. A changed response is a production incident for the
 client, not a fix. A defect that shows in a response is recorded and left alone; fixing it is a
@@ -309,6 +299,28 @@ separate SPEC agreed with the client (SPEC-0039 D-112). Mutations may differ onl
 values (ids, times, tokens); what a query reads back after them must match. Anything that needs a
 migration or a schema field is a separate SPEC (D-56). Work that follows from a refactor is still a
 refactor.
+
+```
+org/around/ieuri/
+  <context>/                         # auth, tourism, community, alarm
+    domain/
+      <aggregate>/                   # root, its entities, VOs, exceptions; event/, spec/
+      shared/                        # VOs and exception roots several aggregates use
+    application/
+      <aggregate>/                   # XxxModifyService, XxxQueryService, plain setting values
+        provided/                    # inbound ports (UseCase); dto/, exception/
+        required/                    # outbound ports (Repository, QueryPort, other Port); dto/
+      shared/
+    adapter/
+      graphql/                       # resolver, dataloader, connection, support, mapper
+      event/                         # listener (inbound), publisher, mapper
+      persistence/                   # write adapters; query/, mapper/, table/
+      client/  cache/  messaging/  storage/  security/  batch/  config/
+  common/                            # thin shared kernel
+```
+
+Dependencies point inward only: `adapter → application → domain`. `domain` imports nothing
+external; `application` depends only on `domain`; `adapter` implements `application` ports.
 
 - **Packages: context → layer → aggregate.** `domain/<aggregate>/` holds the root with its own
   entities, VOs, exceptions and events; `domain/shared/` holds VOs several aggregates use.
@@ -321,7 +333,7 @@ refactor.
   has two real implementations behind one interface (Strategy), and no domain `service/` package —
   the word stays with application services (SPEC-0039 D-121).
   `application/<aggregate>/provided/` (inbound ports, `dto/`, `exception/`) and `required/`
-  (outbound ports, `dto/`). No `infrastructure/adapter/in|out`.
+  (outbound ports, `dto/`).
   - **`provided/` and `required/` hold port interfaces only.** Every data type a port takes or
     returns goes in that side's `dto/` — never declared next to the interface
     (SpotSearchPort's `SpotSearchQuery` lives in `required/dto/`) (SPEC-0039 D-100).
@@ -386,6 +398,13 @@ refactor.
     method. When a read needs a domain rule (which terms version is in
     force, what an absent preference row means), the query port returns the stored values and a
     pure domain function decides — the rule is not rewritten in SQL.
+  - **A write service never injects a query port.** What it must read to decide (candidates to
+    assign, the district codes of a cell, whether a code exists) is a method on its own
+    repository; another aggregate's value comes through that aggregate's `provided` query use case
+    (`FootprintQueryUseCase.findSharerId`), and a change to another aggregate through its command
+    use case, called in the same transaction (`PostCommandUseCase.decreaseCommentCount`) — never
+    its repository. A write use case returns what changed (ids, codes), not
+    a read model — the resolver asks the query use case for the view.
   - **A one-line lookup is written where it is used.** `repository.findById(id) ?: throw
     XxxNotFoundException()` stays in the method body; a `private fun findXxx` that hides one line
     only adds a place to read. Extract a private function when it bundles several steps and its
@@ -435,8 +454,7 @@ refactor.
   Read-side children are field resolvers keyed by the parent id. Port implementations are
   `XxxPersistenceAdapter`.
 - **A root may hold its own children as a collection — only when the set is small and bounded.**
-  The JPA ban on `@OneToMany` existed for lazy-loading surprises and N+1; Exposed loads nothing
-  implicitly, so the remaining risk is size. An unbounded child set (messages, answers) is never held:
+  Exposed loads nothing implicitly, so the risk is size. An unbounded child set (messages, answers) is never held:
   the child carries the root's id and is created only by a root factory method
   (`conversation.send(...)`, `question.answer(...)` — Vernon's `planBacklogItem`). Never across
   aggregates.
@@ -445,18 +463,19 @@ refactor.
   can be changed concurrently carries a `version` column. External I/O (HTTP, Valkey, R2) runs
   outside the transaction. Reads skip the aggregate and project straight into read DTOs.
 - **Batch tasklets are inbound adapters: they call use cases, never ports or repositories.** A step
-  gets no transaction manager (`StepBuilder.tasklet(tasklet)`); one use-case call is one
+  gets no transaction manager (`StepBuilder.tasklet(tasklet)`) — passing one wraps the whole
+  tasklet in a single transaction that every use-case call joins. One use-case call is one
   transaction, so a sync commits per page and the sweep commits on its own. A service whose work
   wraps upstream calls between DB steps (prefetch, embedding) has no transaction of its own and calls
   transactional use cases for each DB step (SPEC-0039 D-81·D-83).
-- **Exposed: DSL only, never DAO** (DAO is Active Record — the JPA-as-domain problem again).
+- **Exposed: DSL only, never DAO** (DAO is Active Record — the persistence model as the domain model).
   `Table` objects live in `adapter/persistence/table/` and mirror the migration — nothing checks this
   at startup (no library offers it), so a drift surfaces on the first query that touches it. Transactions use Spring
-  `@Transactional` on the Exposed transaction manager, never Exposed's `transaction {}` block nor
-  `TransactionTemplate`. **Declare it once on the service class**; a method overrides it only for
+  `@Transactional`, never Exposed's `transaction {}` block nor `TransactionTemplate`. There is one
+  pool and one transaction manager (`common/persistence`): the Exposed manager on the main
+  DataSource, which the batch JobRepository uses too. **Declare it once on the service class**; a method overrides it only for
   `propagation = REQUIRES_NEW` — every method an `AFTER_COMMIT` listener calls needs that, because
-  `REQUIRED` there joins the already-committed transaction of the same manager and silently writes
-  nothing. Query services are `readOnly = true` at class level. External calls (R2, another context)
+  `REQUIRED` there joins the already-committed transaction and silently writes nothing. Query services are `readOnly = true` at class level. External calls (R2, another context)
   go at the top of the method, before the first query — Exposed opens the connection on the first
   query, so nothing is held while they run. Concurrent writes use conditional, column-scoped updates
   (`WHERE col IS NULL OR col < :v` for values that only move forward, atomic `+ 1`/`- 1` for
@@ -468,10 +487,8 @@ refactor.
   write no wrapper for what it already does (SPEC-0039 D-114). A CTE is written as a
   subquery (`Query.alias`) or a scalar subquery (`wrapAsExpression`). When the DSL cannot express a
   statement, change its shape (read the parent id, then upsert; insert-ignore, then re-read) before
-  reaching for `exec()`. Migrated contexts do not use `JdbcTemplate` on the main DB; the search node
-  (paradedb) stays raw SQL through `searchJdbcTemplate` (SPEC-0039 D-82). Two community adapters
-  (`SpotCatalogLanguagePersistenceAdapter`, `PostSpatialQueryAdapter`) still use `exposedJdbcTemplate` —
-  community is frozen after device testing, so they are a recorded follow-up, not a precedent. Declaring a table: identity id → `autoIncrement()`, read the generated
+  reaching for `exec()`. Nothing uses `JdbcTemplate` on the main DB; the search node
+  (paradedb) stays raw SQL through `searchJdbcTemplate` (SPEC-0039 D-82). Declaring a table: identity id → `autoIncrement()`, read the generated
   value with `insertReturning`; `DEFAULT now()` → `databaseGenerated()`; `timestamptz` →
   `timestampWithTimeZone`; FKs → `onUpdate = NO_ACTION` and the DB's constraint name; CHECK, index and
   UNIQUE names exactly as in the migration.
@@ -480,80 +497,18 @@ refactor.
   `adapter/messaging/mapper`. Resolvers and repositories contain no conversion code. The
   field-by-field test rule is unchanged.
 
-## Layout
-
-Package root: `org.around.ieuri`. Organized **by domain first, then hexagonal layer**, with a **CQRS split** in the application layer. Dependencies point inward only: `infrastructure → application → domain`. `domain` imports nothing external (no Spring/JPA/DGS); `application` depends only on `domain`; `infrastructure` implements `application` ports.
-
-```
-org/around/ieuri/
-  <domain>/                          # auth, tourism, community, alarm
-    domain/                          # pure Kotlin — no framework/JPA/DGS imports
-      aggregate/                     # aggregate roots (entry point to invariants)
-      entity/                        # entities owned by an aggregate
-      vo/                            # value objects
-      event/                         # domain events
-      specification/                 # Specification-pattern rules
-      strategy/                      # Strategy-pattern policies
-    application/
-      port/
-        in/
-          command/                   # write use-case interfaces (XxxCommandUseCase)
-          query/                     # read use-case interfaces (XxxQueryUseCase)
-        out/                         # one subpackage per outbound concern; add one when a new
-          persistence/               #   concern appears rather than widening an existing name.
-          query/                     #   Today: persistence, query, client, event, cache, token,
-          client/                    #   push, security.
-      command/                       # Command input objects (write inputs only)
-      query/                         # read-model DTOs + query inputs (read models only)
-      service/                       # use-case implementations (XxxService, impl of port/in command & query)
-      policy/                        # configurable policy values a use case reads
-      validation/                    # domain validation failure → error-code translation
-      event/                         # application-level event types
-      exception/                     # use-case exceptions
-    infrastructure/
-      adapter/
-        in/
-          graphql/                   # DGS resolvers + schema-mapped response types
-            mapper/                  # GraphQL input -> Command, read DTO -> response (POL-033)
-          event/                     # listeners for other domains' published events
-          messaging/                 # Kafka consumers
-        out/
-          persistence/               # port impl + JPA @Entity + repositories
-            entity/                  # @Entity only — confined here
-            repository/              # Spring Data interfaces (XxxRepository)
-            mapper/                  # domain<->entity extension functions (POL-033)
-          query/                     # QueryDSL projections → read-model DTOs
-          client/                    # HTTP/gRPC clients
-            mapper/                  # external response -> domain, kept apart from entity mappers
-          event/                     # this domain's event publishing
-          storage/                   # object storage (R2/S3)
-      batch/                         # Spring Batch jobs, tasklets
-      config/                        # per-domain @Configuration
-      security/                      # per-domain security wiring
-  common/                            # thin shared kernel: base VO, error types, authzService.can()
-  IeuriApplication.kt
-```
-
-The tree is the shape a domain grows into, not a checklist — a domain has only the packages it
-needs. When a new outbound concern appears, add a subpackage for it rather than widening an
-existing name; `port/out/` currently has eight for that reason.
-
-There is no per-domain `utils` package. Domain-specific helpers become domain services, value objects, or specifications; genuinely generic helpers go in `common/`.
-
 ### CQRS & data flow (enforce this)
 
-- **Command (write):** GraphQL input → `Command` object (application) → `domain` aggregate (invariants enforced here) → JPA `@Entity` via the persistence adapter's mapper. The domain model is the source of truth; JPA entities are a persistence detail and never leak into `application`/`domain`.
-    - **On update:** inside the transaction, load the *managed* JPA entity, apply the domain's changes onto that managed entity, and let Hibernate dirty-checking emit the `UPDATE`. Do **not** build a fresh detached entity and `save()` it — that defeats dirty-checking.
-    - **On create:** map the domain aggregate to a new entity and persist it.
-- **Query (read):** GraphQL args → query service (`application/service/`) → outbound `query` port → **QueryDSL projects directly into a read-model DTO**, bypassing the domain aggregate entirely. The **resolver** maps that read DTO into the GraphQL response type — `application` must not import DGS/response types.
+- **Command (write):** GraphQL input → `Command` → the aggregate (invariants enforced here) → the repository saves what changed. The domain model is the source of truth; rows are a persistence detail and never leak into `application`/`domain`.
+- **Query (read):** GraphQL args → query service → `XxxQueryPort` → **the query adapter projects directly into a read model (`XxxView`)**, bypassing the aggregate entirely. The **resolver's mapper** turns that read model into the GraphQL response type — `application` must not import DGS/response types.
 - **One use-case method per independently-resolvable field.** A composite response is not one query. If `gallery` and `likeCount` cost separate I/O, the inbound port exposes `spotGallery(...)`/`spotLikeCount(...)` alongside the body method, and a `@DgsData` resolver calls each only when selected. Don't build a fat method that eagerly assembles everything — that forces the resolver to fetch fields nobody asked for.
-- Write ports and read ports stay physically separate; never route reads through aggregates or the CQRS benefit is lost. The read `port/out/query` may return read DTOs directly — do not force domain-port symmetry on the read side.
-- Start with a **per-query QueryDSL projection**. Introduce a DGS `DataLoader` only where nested associations actually cause N+1 — do not add DataLoaders preemptively. (Lazy field resolvers avoid over-fetching *per request*; DataLoaders solve N+1 *within* a request. Different problems — don't substitute one for the other.)
+- Write ports and read ports stay physically separate; never route reads through aggregates or the CQRS benefit is lost.
+- Start with a **per-query projection**. Introduce a DGS `DataLoader` only where nested associations actually cause N+1 — do not add DataLoaders preemptively. (Lazy field resolvers avoid over-fetching *per request*; DataLoaders solve N+1 *within* a request. Different problems — don't substitute one for the other.)
 
 ### Naming
 
-- Write input is a `Command`, not a "DTO". Reserve "DTO" for the read side (QueryDSL projection results and read models). This keeps command input, domain model, JPA entity, read DTO, and GraphQL response from collapsing into one overloaded word.
-- **Use-case implementations are `XxxService`, not `XxxHandler`, and live in `application/service/`.** Group related use cases into one cohesive service with **meaningful method names** (e.g. `MemberRegistrationService.registerBySns/verifyEmail`, `AuthTokenService.loginBySns/refresh/logout`) instead of a generic `handle()` per single-method class. The matching inbound port groups the same use cases (`MemberRegistrationUseCase`, `AuthTokenUseCase`, …).
+- Write input is a `Command`; a read model is a `View`. The suffix `Dto` is not used — it swallows every layer's types and cannot tell them apart. This keeps command input, domain model, row, read model, and GraphQL response from collapsing into one overloaded word.
+- There is no per-context `utils` package. Domain-specific helpers become value objects or specifications; genuinely generic helpers go in `common/`.
 
 ### Validation
 
@@ -568,13 +523,13 @@ There is no per-domain `utils` package. Domain-specific helpers become domain se
 
 ### Cross-domain rules (keeps extraction cheap)
 
-- A domain never imports another domain's `domain`/`application` internals. Cross-domain interaction goes through the other domain's `port/in` or via published domain events.
+- A domain never imports another domain's `domain`/`application` internals. Cross-domain interaction goes through the other domain's `provided` use case (called from `adapter/client`) or via published domain events (received in `adapter/event/listener`).
 - Anything genuinely shared goes in `common/`, kept deliberately thin — domain logic must not leak into it. A fat `common` is the real reason monoliths refuse to split later.
+
 ## Persistence & migrations
 
-Schema is owned by **Flyway migrations**, never by Hibernate. The domain-model ≠ JPA-entity separation means entities are not the source of schema truth — migrations are.
+Schema is owned by **Flyway migrations**. Exposed table declarations mirror it and never create or alter anything.
 
-- **`ddl-auto: validate` only.** Set `spring.jpa.hibernate.ddl-auto=validate` so Hibernate checks entities against the real schema but never creates or alters it. Never use `update`, `create`, or `create-drop` (they let Hibernate mutate schema behind Flyway's back and can drop data).
 - **All schema changes are Flyway migrations** under `src/main/resources/db/migration/`, using Flyway's default naming `V{n}__{snake_case_description}.sql` (e.g. `V1__create_community_post.sql`). Flyway runs `migrate` automatically on app startup.
 - **Migrations from a finished slice are immutable — including comments. The ones you wrote in *this* slice are still yours to edit.** Flyway hashes the whole file, so changing a single comment line breaks the checksum and blocks startup. What that costs depends on who else has the file:
 

@@ -3,7 +3,6 @@ package org.around.ieuri.tourism.application.catalog
 import org.around.ieuri.common.event.LocationAccessed
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.OffsetPage
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.catalog.provided.SpotDiscoveryUseCase
 import org.around.ieuri.tourism.application.catalog.provided.dto.FestivalView
 import org.around.ieuri.tourism.application.catalog.provided.dto.OngoingFestivalsQuery
@@ -34,7 +33,7 @@ import java.time.ZoneId
  * - 정렬 키에 spot id를 tie-breaker로 붙인다(R7).
  */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX, readOnly = true)
+@Transactional(readOnly = true)
 class SpotDiscoveryService(
     private val spotSearchPort: SpotSearchPort,
     private val festivalQueryPort: FestivalQueryPort,

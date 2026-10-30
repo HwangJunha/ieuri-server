@@ -12,7 +12,6 @@ import org.around.ieuri.community.application.post.provided.dto.PostsQuery
 import org.around.ieuri.community.application.post.required.CategoryConfigPort
 import org.around.ieuri.community.application.post.required.PostEventPublisherPort
 import org.around.ieuri.community.application.post.required.PostQueryPort
-import org.around.ieuri.community.application.post.required.PostSpatialQueryPort
 import org.around.ieuri.community.application.post.required.dto.PostsSearch
 import org.around.ieuri.community.application.shared.PagePolicy
 import org.around.ieuri.community.application.shared.required.dto.ViewerContext
@@ -34,11 +33,10 @@ class PostQueryServiceTest {
     private val blocks = mockk<BlockQueryUseCase> {
         every { blockedMemberIds(memberId) } returns setOf(9L)
     }
-    private val spatial = mockk<PostSpatialQueryPort>()
     private val events = mockk<PostEventPublisherPort>(relaxUnitFun = true)
     private val pagePolicy = PagePolicy(maxPageSize = 50)
     private val policy = PostPolicy(maxRadiusMeters = 100_000)
-    private val service = PostQueryService(queries, spatial, mockk<CategoryConfigPort>(), blocks, events, pagePolicy, policy)
+    private val service = PostQueryService(queries, mockk<CategoryConfigPort>(), blocks, events, pagePolicy, policy)
 
     private val view = PostView(1, "제목", "본문", authorId = 8, likeCount = 0, commentCount = 0, viewCount = 0, ownedByViewer = false, hidden = false, edited = false, createdAt = Instant.EPOCH)
 
@@ -63,13 +61,13 @@ class PostQueryServiceTest {
 
         service.posts(query(PostSortOrder.DISTANCE), memberId, ContentLanguage.KO)
 
-        verify(exactly = 0) { spatial.findPostsByDistance(any()) }
+        verify(exactly = 0) { queries.findPostsByDistance(any()) }
     }
 
     @Test
     fun `좌표가 있는 거리순은 공간 포트로 가며 경도·위도를 그대로 넘기고 반경 상한을 절삭한다`() {
         val search = slot<PostsSearch>()
-        every { spatial.findPostsByDistance(capture(search)) } returns cursorPageOf(emptyList(), false, false)
+        every { queries.findPostsByDistance(capture(search)) } returns cursorPageOf(emptyList(), false, false)
 
         service.posts(query(PostSortOrder.DISTANCE, latitude = 37.5, longitude = 127.0, radius = 999_999), memberId, ContentLanguage.KO)
 
@@ -93,7 +91,7 @@ class PostQueryServiceTest {
     @Test
     fun `좌표를 보낸 피드 조회만 위치 조회로 남긴다`() {
         every { queries.findPosts(any()) } returns cursorPageOf(emptyList(), false, false)
-        every { spatial.findPostsByDistance(any()) } returns cursorPageOf(emptyList(), false, false)
+        every { queries.findPostsByDistance(any()) } returns cursorPageOf(emptyList(), false, false)
 
         service.posts(query(PostSortOrder.LATEST), memberId, ContentLanguage.KO)
         service.posts(query(PostSortOrder.LATEST, latitude = 37.5), memberId, ContentLanguage.KO)

@@ -2,7 +2,6 @@ package org.around.ieuri.tourism.application.relation
 
 import org.around.ieuri.common.pagination.CursorEdge
 import org.around.ieuri.common.pagination.CursorPage
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.footprint.required.MapOwnerLookupPort
 import org.around.ieuri.tourism.application.relation.provided.MapRelationQueryUseCase
 import org.around.ieuri.tourism.application.relation.provided.dto.MapRelationView
@@ -13,7 +12,7 @@ import org.springframework.transaction.annotation.Transactional
 
 /** 지도 관계 목록(SPEC-0030 확장). 겹침은 조회 시점에 다시 계산한다. */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX, readOnly = true)
+@Transactional(readOnly = true)
 class MapRelationQueryService(
     private val mapRelationQueryPort: MapRelationQueryPort,
     private val mapOwnerLookupPort: MapOwnerLookupPort,

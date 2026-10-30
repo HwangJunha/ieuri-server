@@ -1,11 +1,14 @@
 package org.around.ieuri.tourism.adapter.persistence
 
 import org.around.ieuri.tourism.adapter.persistence.mapper.toShareLink
+import org.around.ieuri.tourism.adapter.persistence.table.DistrictTable
+import org.around.ieuri.tourism.adapter.persistence.table.MapCellDistrictTable
 import org.around.ieuri.tourism.adapter.persistence.table.MapShareLinkTable
 import org.around.ieuri.tourism.adapter.persistence.table.MemberDistrictVisitTable
 import org.around.ieuri.tourism.application.footprint.required.FootprintRepository
 import org.around.ieuri.tourism.domain.footprint.Footprint
 import org.around.ieuri.tourism.domain.footprint.ShareLink
+import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.inList
@@ -30,6 +33,18 @@ class FootprintPersistenceAdapter : FootprintRepository {
             .mapTo(mutableSetOf()) { it[MemberDistrictVisitTable.districtCode] },
         shareLink = activeLink(memberId),
     )
+
+    override fun filterExistingDistrictCodes(districtCodes: Collection<String>): Set<String> {
+        if (districtCodes.isEmpty()) return emptySet()
+        return DistrictTable.select(DistrictTable.code)
+            .where { DistrictTable.code inList districtCodes }
+            .mapTo(mutableSetOf()) { it[DistrictTable.code] }
+    }
+
+    override fun findDistrictCodesOfCell(cellId: Long): List<String> = MapCellDistrictTable.select(MapCellDistrictTable.districtCode)
+        .where { MapCellDistrictTable.cellId eq cellId }
+        .orderBy(MapCellDistrictTable.districtCode, SortOrder.ASC)
+        .map { it[MapCellDistrictTable.districtCode] }
 
     /** 동시 요청이 같은 코드를 넣어도 유일 제약에 걸리지 않는다(`ON CONFLICT DO NOTHING`). */
     override fun addVisits(memberId: Long, districtCodes: Collection<String>) {

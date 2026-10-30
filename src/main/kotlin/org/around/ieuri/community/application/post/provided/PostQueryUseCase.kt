@@ -38,4 +38,7 @@ interface PostQueryUseCase {
 
     /** 글을 볼 수 있는가. 피드·단건과 같은 차단·숨김 필터를 거치며 조회수는 오르지 않는다. */
     fun isVisible(postId: Long, memberId: Long): Boolean
+
+    /** 지워지지 않은 글이 있는가. 차단·숨김은 보지 않는다 — 볼 수 있는지는 [isVisible]이다. */
+    fun exists(postId: Long): Boolean
 }

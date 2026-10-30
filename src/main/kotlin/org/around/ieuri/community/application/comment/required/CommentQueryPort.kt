@@ -27,4 +27,7 @@ interface CommentQueryPort {
         parentCommentIds: List<Long>,
         viewer: ViewerContext,
     ): Map<Long, List<CommentView>>
+
+    /** 지워지지 않은 댓글이 있는가. 모더레이션 필터를 거치지 않는다. */
+    fun exists(commentId: Long): Boolean
 }

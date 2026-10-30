@@ -1,7 +1,9 @@
 package org.around.ieuri.community.application.conversation.required
 
 import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.community.application.conversation.provided.dto.ConversationParticipantsView
 import org.around.ieuri.community.application.conversation.provided.dto.ConversationView
+import org.around.ieuri.community.application.conversation.provided.dto.MessageOwnerView
 import org.around.ieuri.community.application.conversation.provided.dto.MessageView
 import org.around.ieuri.community.application.conversation.required.dto.ConversationMessagesSearch
 import org.around.ieuri.community.application.conversation.required.dto.ConversationsSearch
@@ -23,4 +25,9 @@ interface ConversationQueryPort {
      * - [memberId]는 ownedByViewer 판정용이다. 참여자 검사는 구독 시작 시점에 끝났다.
      */
     fun findMessage(conversationId: Long, messageId: Long, memberId: Long): MessageView?
+
+    /** 지워지지 않은 메시지만. 없는 id는 결과에 없다. */
+    fun findMessageOwners(messageIds: List<Long>): List<MessageOwnerView>
+
+    fun findParticipants(conversationId: Long): ConversationParticipantsView?
 }

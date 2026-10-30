@@ -5,7 +5,6 @@ import org.around.ieuri.alarm.application.preference.provided.dto.NotificationPr
 import org.around.ieuri.alarm.application.preference.provided.dto.UpdateNotificationPreferenceCommand
 import org.around.ieuri.alarm.application.preference.required.NotificationPreferenceRepository
 import org.around.ieuri.alarm.domain.preference.NotificationPreference
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
@@ -13,7 +12,7 @@ import org.springframework.transaction.annotation.Transactional
 
 /** 카테고리별 수신 설정 변경·파기(SPEC-0028 R3·R19). */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
+@Transactional
 class NotificationPreferenceModifyService(
     private val repository: NotificationPreferenceRepository,
 ) : NotificationPreferenceCommandUseCase {
@@ -30,7 +29,7 @@ class NotificationPreferenceModifyService(
     }
 
     /** `AFTER_COMMIT` 리스너가 부르므로 REQUIRES_NEW여야 한다 — REQUIRED면 삭제가 조용히 사라진다. */
-    @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     override fun eraseMemberPreferences(memberId: Long) {
         val preferences = repository.deleteByMemberId(memberId)
         log.info("alarm preferences erased for withdrawn member {}: preferences={}", memberId, preferences)

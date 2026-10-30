@@ -1,5 +1,5 @@
 package org.around.ieuri.auth.application.token.required
-import org.around.ieuri.auth.application.token.required.dto.AccessTokenClaims
+import org.around.ieuri.auth.application.token.provided.dto.AccessTokenClaims
 import org.around.ieuri.auth.application.token.required.dto.IssuedRefreshToken
 import org.around.ieuri.auth.application.token.required.dto.IssuedToken
 import org.around.ieuri.auth.application.token.required.dto.RefreshTokenClaims

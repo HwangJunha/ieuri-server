@@ -1,6 +1,5 @@
 package org.around.ieuri.tourism.application.catalog
 
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.catalog.provided.SpotCatalogCommandUseCase
 import org.around.ieuri.tourism.application.catalog.provided.dto.ReactToSpotCommand
 import org.around.ieuri.tourism.application.catalog.provided.exception.SpotNotFoundException
@@ -12,7 +11,7 @@ import org.springframework.transaction.annotation.Transactional
 
 /** 카탈로그의 회원 쓰기. 반응은 카탈로그가 만든다 — 그 언어에서 볼 수 있는 장소인지 루트가 판정한다. */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
+@Transactional
 class SpotCatalogModifyService(
     private val catalogRepository: SpotCatalogRepository,
 ) : SpotCatalogCommandUseCase {
@@ -25,6 +24,6 @@ class SpotCatalogModifyService(
         catalogRepository.saveReaction(reaction)
     }
 
-    @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     override fun eraseMemberContent(memberId: Long): Int = catalogRepository.deleteReactionsByMember(memberId)
 }

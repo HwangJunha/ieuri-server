@@ -7,10 +7,16 @@ import org.around.ieuri.community.application.post.required.dto.PostsSearch
 import org.around.ieuri.community.application.shared.required.dto.ViewerContext
 import org.around.ieuri.community.domain.post.TargetCategory
 
-/** 글 읽기 포트(CQRS 읽기). 애그리게이트를 우회해 필요한 값만 프로젝션한다. 거리순은 [PostSpatialQueryPort]가 맡는다. */
+/** 글 읽기 포트(CQRS 읽기). 애그리게이트를 우회해 필요한 값만 프로젝션한다.. */
 interface PostQueryPort {
-    /** 최신순 피드. 거리순은 [PostSpatialQueryPort]가 담당한다. */
+    /** 최신순 피드. */
     fun findPosts(search: PostsSearch): CursorPage<PostView>
+
+    /**
+     * 반경 안의 글을 가까운 순으로 한 페이지. 같은 거리면 최신순이다. 좌표([PostsSearch.area])가 있어야 한다.
+     * - 모더레이션·카테고리·태그 필터를 이 조회가 함께 걸어, 요청 개수가 곧 페이지 크기다.
+     */
+    fun findPostsByDistance(search: PostsSearch): CursorPage<PostView>
 
     /** 글 단건. 피드와 같은 모더레이션 필터를 거치며, 걸러지면 null이다. */
     fun findPost(postId: Long, viewer: ViewerContext): PostView?
@@ -38,4 +44,7 @@ interface PostQueryPort {
 
     /** [memberId]가 좋아요한 글의 id만. 차단은 이 판정에 영향을 주지 않는다. */
     fun findLikedPostIds(memberId: Long, postIds: List<Long>): Set<Long>
+
+    /** 지워지지 않은 글이 있는가. 모더레이션 필터를 거치지 않는다. */
+    fun exists(postId: Long): Boolean
 }

@@ -1,21 +1,16 @@
 package org.around.ieuri.auth.adapter.security.authorization
 import graphql.schema.DataFetchingEnvironment
-import org.around.ieuri.auth.adapter.config.JwtProperties
 import org.around.ieuri.auth.adapter.security.authentication.GraphqlWebSocketAuthInterceptor
-import org.around.ieuri.auth.application.token.required.RefreshTokenStorePort
-import org.around.ieuri.auth.domain.token.SubscriptionIdentity
+import org.around.ieuri.auth.application.token.provided.AuthTokenQueryUseCase
 import org.around.ieuri.common.security.SubscriptionAuthorizer
 import org.around.ieuri.common.security.SubscriptionUnauthenticatedException
 import org.springframework.stereotype.Component
-import java.time.Clock
 import java.time.Instant
 
-/** 구독 인가의 auth 쪽 구현(SPEC-0032 R7). 연결 시각과 토큰 폐기 여부를 모아 [SubscriptionIdentity]에 넘긴다. */
+/** 구독 인가의 auth 쪽 구현(SPEC-0032 R7). 소켓의 연결 시각을 꺼내 유스케이스에 판정을 맡긴다. */
 @Component
 class TokenBackedSubscriptionAuthorizer(
-    private val refreshTokenStore: RefreshTokenStorePort,
-    private val jwtProperties: JwtProperties,
-    private val clock: Clock,
+    private val authTokenQueryUseCase: AuthTokenQueryUseCase,
 ) : SubscriptionAuthorizer {
 
     override fun requireLiveIdentity(dfe: DataFetchingEnvironment, memberId: Long) {
@@ -25,14 +20,7 @@ class TokenBackedSubscriptionAuthorizer(
             null,
         ) ?: return
 
-        val allowed = SubscriptionIdentity.canSubscribe(
-            connectedAt = connectedAt,
-            now = clock.instant(),
-            accessTtl = jwtProperties.accessTtl,
-            hasActiveToken = refreshTokenStore.hasActiveToken(memberId),
-        )
-
-        if (!allowed) {
+        if (!authTokenQueryUseCase.canOpenSubscription(memberId, connectedAt)) {
             throw SubscriptionUnauthenticatedException(
                 "구독 신원이 만료되었습니다. 토큰을 갱신하고 다시 연결해 주세요.",
             )

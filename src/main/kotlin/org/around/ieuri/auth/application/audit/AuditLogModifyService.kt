@@ -5,7 +5,6 @@ import org.around.ieuri.auth.application.audit.required.AuditLogRepository
 import org.around.ieuri.auth.domain.audit.LocationAccessLog
 import org.around.ieuri.auth.domain.audit.MemberAccessLog
 import org.around.ieuri.auth.domain.audit.MemberAuditLog
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
@@ -17,23 +16,23 @@ import java.time.Clock
  * - 파기는 호출 한 번이 한 회차이고 회차마다 커밋한다.
  */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
+@Transactional
 class AuditLogModifyService(
     private val repository: AuditLogRepository,
     private val clock: Clock,
 ) : AuditLogCommandUseCase {
 
-    @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     override fun recordMemberAudit(memberId: Long, eventType: String, payload: Map<String, Any?>) {
         repository.insert(MemberAuditLog(memberId, eventType, payload))
     }
 
-    @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     override fun recordAccess(memberId: Long, operation: String, ipAddress: String?) {
         repository.insert(MemberAccessLog(memberId, operation, ipAddress))
     }
 
-    @Transactional(transactionManager = ExposedConfig.EXPOSED_TX, propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     override fun recordLocationAccess(memberId: Long, payload: Map<String, Any?>) {
         repository.insert(LocationAccessLog(memberId, payload))
     }

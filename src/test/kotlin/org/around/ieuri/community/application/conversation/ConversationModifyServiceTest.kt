@@ -4,7 +4,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
-import org.around.ieuri.community.application.block.required.BlockRepository
+import org.around.ieuri.community.application.block.provided.BlockQueryUseCase
 import org.around.ieuri.community.application.conversation.provided.dto.MarkConversationReadCommand
 import org.around.ieuri.community.application.conversation.provided.dto.SendMessageCommand
 import org.around.ieuri.community.application.conversation.provided.dto.StartConversationCommand
@@ -18,7 +18,8 @@ import org.around.ieuri.community.application.lookup.provided.MemberLookupUseCas
 import org.around.ieuri.community.application.lookup.provided.SpotLookupUseCase
 import org.around.ieuri.community.application.photo.UploadedPhotoService
 import org.around.ieuri.community.application.photo.required.ObjectStoragePort
-import org.around.ieuri.community.application.question.required.SpotQuestionRepository
+import org.around.ieuri.community.application.question.provided.SpotQuestionQueryUseCase
+import org.around.ieuri.community.application.question.provided.dto.SpotAnswerOriginView
 import org.around.ieuri.community.application.shared.exception.MemberNotFoundException
 import org.around.ieuri.community.domain.conversation.Conversation
 import org.around.ieuri.community.domain.conversation.Message
@@ -28,8 +29,6 @@ import org.around.ieuri.community.domain.conversation.event.MessageSent
 import org.around.ieuri.community.domain.lookup.MemberSummary
 import org.around.ieuri.community.domain.lookup.SpotSummary
 import org.around.ieuri.community.domain.photo.PhotoObjectKey
-import org.around.ieuri.community.domain.question.SpotAnswer
-import org.around.ieuri.community.domain.question.SpotQuestion
 import org.around.ieuri.community.domain.shared.ContentLanguage
 import java.time.Clock
 import java.time.Instant
@@ -44,8 +43,8 @@ class ConversationModifyServiceTest {
 
     private val now = Instant.parse("2026-10-05T00:00:00Z")
     private val conversations = mockk<ConversationRepository>(relaxUnitFun = true)
-    private val blocks = mockk<BlockRepository>()
-    private val questions = mockk<SpotQuestionRepository>()
+    private val blocks = mockk<BlockQueryUseCase>()
+    private val questions = mockk<SpotQuestionQueryUseCase>()
     private val members = mockk<MemberLookupUseCase>()
     private val spots = mockk<SpotLookupUseCase>()
     private val storage = mockk<ObjectStoragePort>()
@@ -70,7 +69,7 @@ class ConversationModifyServiceTest {
         assertFailsWith<MemberNotFoundException> { service.startConversation(StartConversationCommand(9), 7) }
 
         every { members.member(9) } returns MemberSummary(9, "상대", null)
-        every { blocks.existsBetween(7, 9) } returns true
+        every { blocks.isBlockedBetween(7, 9) } returns true
         assertFailsWith<BlockedException> { service.startConversation(StartConversationCommand(9), 7) }
 
         verify(exactly = 0) { conversations.insertIfAbsent(any()) }
@@ -79,7 +78,7 @@ class ConversationModifyServiceTest {
     @Test
     fun `대화 시작은 정렬된 쌍으로 저장하고 기존 대화면 그 id다`() {
         every { members.member(7) } returns MemberSummary(7, "나", null)
-        every { blocks.existsBetween(9, 7) } returns false
+        every { blocks.isBlockedBetween(9, 7) } returns false
         val pair = slot<Conversation>()
         every { conversations.insertIfAbsent(capture(pair)) } returns 5
 
@@ -91,7 +90,7 @@ class ConversationModifyServiceTest {
     @Test
     fun `전송은 최근 활동 시각을 메시지 시각으로 올리고 알림·브로드캐스트 이벤트를 낸다`() {
         every { conversations.findById(5) } returns conversation
-        every { blocks.existsBetween(7, 9) } returns false
+        every { blocks.isBlockedBetween(7, 9) } returns false
         every { conversations.insertMessage(any()) } answers { stored(firstArg()) }
 
         assertEquals(201L, service.sendMessage(SendMessageCommand(5, "안녕"), memberId = 7, language = ContentLanguage.KO))
@@ -109,7 +108,7 @@ class ConversationModifyServiceTest {
         every { conversations.findById(5) } returns conversation
         assertFailsWith<NotConversationParticipantException> { service.sendMessage(SendMessageCommand(5, "x"), 8, ContentLanguage.KO) }
 
-        every { blocks.existsBetween(7, 9) } returns true
+        every { blocks.isBlockedBetween(7, 9) } returns true
         assertFailsWith<BlockedException> { service.sendMessage(SendMessageCommand(5, "x"), 7, ContentLanguage.KO) }
 
         verify(exactly = 0) { conversations.insertMessage(any()) }
@@ -128,10 +127,9 @@ class ConversationModifyServiceTest {
     @Test
     fun `인용은 상대가 쓴 답변일 때만 붙고 아니면 인용 없이 보낸다`() {
         every { conversations.findById(5) } returns conversation
-        every { blocks.existsBetween(7, 9) } returns false
-        every { questions.findAnswer(20) } returns SpotAnswer(20, 1, 343259, authorId = 9, body = "답변", hidden = false, deletedAt = null)
-        every { questions.findAnswer(21) } returns SpotAnswer(21, 1, 343259, authorId = 8, body = "남의 답변", hidden = false, deletedAt = null)
-        every { questions.findById(1) } returns SpotQuestion(1, 343259, 7, "질문", false, false, null)
+        every { blocks.isBlockedBetween(7, 9) } returns false
+        every { questions.answerOrigin(20) } returns SpotAnswerOriginView(answerId = 20, answerAuthorId = 9, answerBody = "답변", questionId = 1, questionBody = "질문", catalogId = 343259)
+        every { questions.answerOrigin(21) } returns SpotAnswerOriginView(answerId = 21, answerAuthorId = 8, answerBody = "남의 답변", questionId = 1, questionBody = "질문", catalogId = 343259)
         every { spots.spot(343259, ContentLanguage.KO) } returns SpotSummary(343259, "남산", "", null, 127.0, 37.5)
         val sent = mutableListOf<Message>()
         every { conversations.insertMessage(capture(sent)) } answers { stored(firstArg()) }
@@ -177,5 +175,19 @@ class ConversationModifyServiceTest {
 
         assertEquals(4, service.eraseMemberContent(7, now))
         verify(exactly = 0) { conversations.markMessagesDeletedBySender(6, any(), any()) }
+    }
+
+    @Test
+    fun `인용할 답변이나 질문이 사라졌으면 인용 없이 보낸다`() {
+        every { conversations.findById(5) } returns conversation
+        every { blocks.isBlockedBetween(7, 9) } returns false
+        every { questions.answerOrigin(22) } returns null
+        val sent = slot<Message>()
+        every { conversations.insertMessage(capture(sent)) } answers { stored(firstArg()) }
+
+        service.sendMessage(SendMessageCommand(5, "이거요", sourceAnswerId = 22), 7, ContentLanguage.KO)
+
+        assertNull(sent.captured.spotQaOrigin)
+        verify(exactly = 0) { spots.spot(any(), any()) }
     }
 }

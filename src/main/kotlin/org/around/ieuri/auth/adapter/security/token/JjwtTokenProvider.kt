@@ -3,9 +3,9 @@ import io.jsonwebtoken.JwtException
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.security.Keys
 import org.around.ieuri.auth.adapter.config.JwtProperties
+import org.around.ieuri.auth.application.token.provided.dto.AccessTokenClaims
 import org.around.ieuri.auth.application.token.provided.exception.InvalidTokenException
 import org.around.ieuri.auth.application.token.required.TokenProviderPort
-import org.around.ieuri.auth.application.token.required.dto.AccessTokenClaims
 import org.around.ieuri.auth.application.token.required.dto.IssuedRefreshToken
 import org.around.ieuri.auth.application.token.required.dto.IssuedToken
 import org.around.ieuri.auth.application.token.required.dto.RefreshTokenClaims

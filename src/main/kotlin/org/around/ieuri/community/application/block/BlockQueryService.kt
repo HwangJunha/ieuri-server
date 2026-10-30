@@ -1,7 +1,6 @@
 package org.around.ieuri.community.application.block
 
 import org.around.ieuri.common.pagination.CursorPage
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.community.application.block.provided.BlockQueryUseCase
 import org.around.ieuri.community.application.block.provided.dto.BlockedUserView
 import org.around.ieuri.community.application.block.provided.dto.BlockedUsersQuery
@@ -12,7 +11,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX, readOnly = true)
+@Transactional(readOnly = true)
 class BlockQueryService(
     private val blockQueryPort: BlockQueryPort,
     private val pagePolicy: PagePolicy,

@@ -1,6 +1,6 @@
 package org.around.ieuri.auth.adapter.security.authentication
+import org.around.ieuri.auth.application.token.provided.AuthTokenQueryUseCase
 import org.around.ieuri.auth.application.token.provided.exception.InvalidTokenException
-import org.around.ieuri.auth.application.token.required.TokenProviderPort
 import org.around.ieuri.common.security.UnauthorizedException
 import org.springframework.graphql.server.WebGraphQlInterceptor
 import org.springframework.graphql.server.WebGraphQlRequest
@@ -23,7 +23,7 @@ import java.time.Instant
  */
 @Component
 class GraphqlWebSocketAuthInterceptor(
-    private val tokenProvider: TokenProviderPort,
+    private val authTokenQueryUseCase: AuthTokenQueryUseCase,
     private val clock: Clock,
 ) : WebSocketGraphQlInterceptor {
 
@@ -56,7 +56,7 @@ class GraphqlWebSocketAuthInterceptor(
         }
 
         return try {
-            val claims = tokenProvider.parseAccessToken(raw)
+            val claims = authTokenQueryUseCase.authenticate(raw)
             sessionInfo.attributes[MEMBER_ID] = claims.memberId
             sessionInfo.attributes[PERMISSIONS] = claims.permissions.toList()
             // 구독 인가가 이 시각으로부터 액세스 TTL 초과를 판정한다(SPEC-0032 R7).

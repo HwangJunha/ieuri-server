@@ -2,9 +2,9 @@ package org.around.ieuri.auth.adapter.security.authentication
 import io.mockk.every
 import io.mockk.mockk
 import org.around.ieuri.auth.adapter.security.authentication.GraphqlWebSocketAuthInterceptor
+import org.around.ieuri.auth.application.token.provided.AuthTokenQueryUseCase
+import org.around.ieuri.auth.application.token.provided.dto.AccessTokenClaims
 import org.around.ieuri.auth.application.token.provided.exception.InvalidTokenException
-import org.around.ieuri.auth.application.token.required.TokenProviderPort
-import org.around.ieuri.auth.application.token.required.dto.AccessTokenClaims
 import org.around.ieuri.common.security.UnauthorizedException
 import org.springframework.graphql.server.WebSocketSessionInfo
 import org.springframework.http.HttpHeaders
@@ -25,7 +25,7 @@ import kotlin.test.assertNull
 class GraphqlWebSocketAuthInterceptorTest {
 
     private val memberId = 7L
-    private val tokenProvider = mockk<TokenProviderPort>()
+    private val tokenProvider = mockk<AuthTokenQueryUseCase>()
     private val interceptor = GraphqlWebSocketAuthInterceptor(
         tokenProvider,
         Clock.fixed(Instant.parse("2026-08-25T00:00:00Z"), ZoneOffset.UTC),
@@ -47,7 +47,7 @@ class GraphqlWebSocketAuthInterceptorTest {
     private fun headersWith(authorization: String) = HttpHeaders().apply { set("Authorization", authorization) }
 
     private fun givenValidToken() {
-        every { tokenProvider.parseAccessToken("valid") } returns
+        every { tokenProvider.authenticate("valid") } returns
             AccessTokenClaims(
                 memberId = memberId,
                 permissions = setOf("POST_WRITE"),
@@ -94,7 +94,7 @@ class GraphqlWebSocketAuthInterceptorTest {
     @Test
     fun `페이로드와 헤더가 모두 있으면 페이로드를 쓴다`() {
         givenValidToken()
-        every { tokenProvider.parseAccessToken("other") } throws InvalidTokenException("무효")
+        every { tokenProvider.authenticate("other") } throws InvalidTokenException("무효")
         val attributes = mutableMapOf<String, Any>()
 
         interceptor.handleConnectionInitialization(
@@ -142,7 +142,7 @@ class GraphqlWebSocketAuthInterceptorTest {
 
     @Test
     fun `무효한 토큰이면 연결이 거부된다`() {
-        every { tokenProvider.parseAccessToken("bad") } throws InvalidTokenException("무효")
+        every { tokenProvider.authenticate("bad") } throws InvalidTokenException("무효")
 
         assertFailsWith<UnauthorizedException> {
             interceptor.handleConnectionInitialization(

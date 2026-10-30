@@ -18,7 +18,7 @@ import javax.sql.DataSource
 class SearchDataSourceConfig {
 
     /**
-     * 검색 노드 DataSource. `@Primary`가 아니다 — 붙이면 JPA·배치가 전부 검색 노드를 본다.
+     * 검색 노드 DataSource. `@Primary`가 아니다 — 붙이면 트랜잭션 매니저와 배치가 전부 검색 노드를 본다.
      * - 이 빈이 있으면 Boot의 DataSource 자동구성이 물러나므로 메인은 `common/persistence/DataSourceConfig`가 선언한다.
      */
     @Bean

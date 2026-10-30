@@ -2,6 +2,9 @@ package org.around.ieuri.community.adapter.persistence.query
 
 import org.around.ieuri.common.pagination.CursorEdge
 import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.common.persistence.geographyPoint
+import org.around.ieuri.common.persistence.stDWithin
+import org.around.ieuri.common.persistence.stDistance
 import org.around.ieuri.community.adapter.persistence.mapper.toPostView
 import org.around.ieuri.community.adapter.persistence.table.PostChipTable
 import org.around.ieuri.community.adapter.persistence.table.PostHideTable
@@ -23,6 +26,7 @@ import org.jetbrains.exposed.v1.core.Op
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.greater
 import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.core.inSubQuery
 import org.jetbrains.exposed.v1.core.isNull
@@ -35,12 +39,12 @@ import org.springframework.stereotype.Component
 
 /**
  * 글 읽기 어댑터. read DTO로 직접 프로젝션한다. 트랜잭션은 호출하는 조회 서비스가 연다.
- * - 모더레이션 필터는 [visibleToViewer] 하나를 모든 글 조회 경로가 공유한다.
+ * - 모더레이션 필터는 [visibleToViewer] 하나를 모든 글 조회 경로가 공유한다. 뒤에서 거르면 페이지 크기가 깨진다.
  */
 @Component
 class PostQueryAdapter : PostQueryPort {
 
-    /** 최신순 피드. 반경 조건을 걸지 않는다(장소 없는 글 포함). 거리순은 [PostSpatialQueryAdapter]. */
+    /** 최신순 피드. 반경 조건을 걸지 않는다(장소 없는 글 포함). */
     override fun findPosts(search: PostsSearch): CursorPage<PostView> = postPage(
         viewer = search.viewer,
         first = search.first,
@@ -53,6 +57,38 @@ class PostQueryAdapter : PostQueryPort {
             hideCondition(search),
         ),
     )
+
+    /**
+     * 거리순 피드. 정렬은 (거리 ASC, created_at DESC, id DESC)이고 커서 비교도 그 순서다.
+     * - 장소 없는 글은 오지 않는다(`community_post_spot` INNER JOIN). 장소 필터는 카탈로그로 건다.
+     */
+    override fun findPostsByDistance(search: PostsSearch): CursorPage<PostView> {
+        val area = requireNotNull(search.area) { "거리순은 좌표를 준 경우에만 온다." }
+        val cursor = search.after?.let(::decodeDistanceCursor)
+        // `geographyPoint`는 (경도, 위도) 순서다 — 뒤집으면 조용히 틀린다.
+        val center = geographyPoint(area.longitude, area.latitude)
+        val distance = stDistance(PostSpotTable.location, center)
+        val rows = PostTable.join(PostSpotTable, JoinType.INNER, PostTable.id, PostSpotTable.postId)
+            .select(PostTable.columns + distance)
+            .where {
+                allOf(
+                    stDWithin(PostSpotTable.location, center, area.radiusMeters.toDouble()),
+                    visibleToViewer(search.viewer),
+                    hideCondition(search),
+                    search.catalogId?.let { PostSpotTable.catalogId eq it },
+                    PostSpotTable.catalogId inSubQuery SpotCatalogLanguageTable.select(SpotCatalogLanguageTable.catalogId).where { SpotCatalogLanguageTable.language eq search.language.name },
+                    search.categories.takeIf { it.isNotEmpty() }?.let(::categoryCondition),
+                    search.normalizedTag?.let(::tagCondition),
+                    cursor?.let { (distance greater it.distanceMeters) or ((distance eq it.distanceMeters) and keysetBefore(PostTable.createdAt, PostTable.id, CommunityCursor(it.createdAt, it.id))) },
+                )
+            }
+            .orderBy(distance to SortOrder.ASC, PostTable.createdAt to SortOrder.DESC, PostTable.id to SortOrder.DESC)
+            .limit(search.first + 1)
+            .toList()
+        return page(rows, search.first, cursor != null) { row ->
+            CursorEdge(encodeDistanceCursor(row[distance], row[PostTable.createdAt].toInstant(), row[PostTable.id]), row.toPostView(search.viewer.memberId))
+        }
+    }
 
     /** 단건. 피드와 같은 [visibleToViewer]를 거친다 — 빼면 딥링크로 차단·숨김이 우회된다. */
     override fun findPost(postId: Long, viewer: ViewerContext): PostView? = PostTable.selectAll()
@@ -175,4 +211,6 @@ class PostQueryAdapter : PostQueryPort {
     private fun categoryCondition(categories: Set<TargetCategory>): Op<Boolean> = PostTable.id inSubQuery PostChipTable.select(PostChipTable.postId).where { PostChipTable.category inList categories.map { it.name } }
 
     private fun tagCondition(normalizedTag: String): Op<Boolean> = PostTable.id inSubQuery PostTagTable.select(PostTagTable.postId).where { PostTagTable.normalized eq normalizedTag }
+
+    override fun exists(postId: Long): Boolean = PostTable.select(PostTable.id).where { (PostTable.id eq postId) and PostTable.deletedAt.isNull() }.limit(1).any()
 }

@@ -77,7 +77,6 @@ import org.around.ieuri.auth.domain.member.event.TermsAgreementChanged
 import org.around.ieuri.common.event.AccessType
 import org.around.ieuri.common.event.MemberAccessed
 import org.around.ieuri.common.logging.maskEmail
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -90,7 +89,7 @@ import java.util.UUID
  * - 외부 호출이 끼는 흐름(SNS 가입·로그인·탈퇴·프로필 이미지)은 트랜잭션 없는 흐름 서비스가 이 서비스의 메서드를 단계로 부른다.
  */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX)
+@Transactional
 class MemberModifyService(
     private val memberRepository: MemberRepository,
     private val sessions: MemberSessionPort,

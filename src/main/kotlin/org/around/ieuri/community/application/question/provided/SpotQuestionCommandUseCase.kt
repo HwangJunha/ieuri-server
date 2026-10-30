@@ -30,4 +30,13 @@ interface SpotQuestionCommandUseCase {
 
     /** 탈퇴 정리. 탈퇴 커밋 뒤 리스너가 부르며 새 트랜잭션이다. 한 번의 탈퇴는 모든 애그리게이트에 같은 [deletedAt]을 남긴다. 바뀐 행 수(로그용). */
     fun eraseMemberContent(memberId: Long, deletedAt: Instant): Int
+
+    /** 신고 누적 숨김. */
+    fun hideReportedQuestion(questionId: Long)
+
+    /** 신고 누적 숨김. 이번 호출로 숨겨졌을 때만 질문의 답변 수를 내린다. */
+    fun hideReportedAnswer(answerId: Long)
+
+    /** 신고 누적 숨김. 답글은 어떤 수에도 잡히지 않는다. */
+    fun hideReportedReply(replyId: Long)
 }

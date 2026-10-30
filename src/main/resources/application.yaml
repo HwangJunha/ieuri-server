@@ -33,11 +33,6 @@ spring:
       # 커넥션 수명 10분. 터널 재시작·CNPG 장애 조치로 끊긴 커넥션의 유일한 방어선이다 —
       # keepalive는 유휴 커넥션에만 동작하고, Postgres 쪽 타임아웃은 전부 0이다.
       max-lifetime: 600000
-  jpa:
-    hibernate:
-      # 스키마 소유권은 Flyway. Hibernate는 엔티티↔스키마 검증만 한다.
-      ddl-auto: validate
-    open-in-view: false
   batch:
     job:
       # 부팅 시 잡을 자동 실행하지 않는다 — 기본값 true라 끄지 않으면 재배포마다 전량 동기화가 돈다.

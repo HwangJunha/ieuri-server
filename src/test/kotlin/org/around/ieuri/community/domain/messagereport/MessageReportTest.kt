@@ -1,7 +1,5 @@
 package org.around.ieuri.community.domain.messagereport
 
-import org.around.ieuri.community.domain.conversation.Conversation
-import org.around.ieuri.community.domain.conversation.Message
 import org.around.ieuri.community.domain.conversation.NotConversationParticipantException
 import org.around.ieuri.community.domain.shared.InvalidInputException
 import org.around.ieuri.community.domain.shared.ReportDetailRequiredException
@@ -12,9 +10,9 @@ import kotlin.test.assertFailsWith
 
 class MessageReportTest {
 
-    private val conversation = Conversation(5, memberLow = 7, memberHigh = 9, lastMessageAt = null, lastReadMessageIdLow = null, lastReadMessageIdHigh = null)
+    private val conversation = ReportedConversation(5, participantIds = setOf(7, 9))
 
-    private fun message(id: Long, senderId: Long = 9, conversationId: Long = 5) = Message(id, conversationId, senderId, "본문", null, null, null)
+    private fun message(id: Long, senderId: Long = 9, conversationId: Long = 5) = ReportedMessage(id, conversationId, senderId)
 
     @Test
     fun `상대의 메시지를 한 신고로 접수하고 중복 id는 하나로 본다`() {
@@ -47,7 +45,7 @@ class MessageReportTest {
                 MessageReport.file(7, listOf(1, 2), listOf(message(1), message(2, conversationId = 6)), null, ReportReason.SPAM, null)
             }.message,
         )
-        val stranger = conversation.copy(memberLow = 8)
+        val stranger = conversation.copy(participantIds = setOf(8, 9))
         assertFailsWith<NotConversationParticipantException> { MessageReport.file(7, listOf(1), listOf(message(1)), stranger, ReportReason.SPAM, null) }
     }
 }

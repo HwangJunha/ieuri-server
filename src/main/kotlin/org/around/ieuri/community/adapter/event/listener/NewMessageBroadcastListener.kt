@@ -1,7 +1,7 @@
 package org.around.ieuri.community.adapter.event.listener
 
 import org.around.ieuri.community.application.conversation.NewMessageStored
-import org.around.ieuri.community.application.conversation.required.ConversationEventPort
+import org.around.ieuri.community.application.conversation.provided.MessageBroadcastUseCase
 import org.springframework.stereotype.Component
 import org.springframework.transaction.event.TransactionPhase
 import org.springframework.transaction.event.TransactionalEventListener
@@ -12,10 +12,10 @@ import org.springframework.transaction.event.TransactionalEventListener
  */
 @Component
 class NewMessageBroadcastListener(
-    private val conversationEventPort: ConversationEventPort,
+    private val messageBroadcastUseCase: MessageBroadcastUseCase,
 ) {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     fun on(event: NewMessageStored) {
-        conversationEventPort.publishNewMessage(event.conversationId, event.messageId)
+        messageBroadcastUseCase.broadcastNewMessage(event.conversationId, event.messageId)
     }
 }

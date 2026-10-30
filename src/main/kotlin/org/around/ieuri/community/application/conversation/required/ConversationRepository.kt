@@ -15,9 +15,6 @@ interface ConversationRepository {
     /** 저장된 메시지(id·생성 시각 포함). 인용이 있으면 함께 저장한다. */
     fun insertMessage(message: Message): Message
 
-    /** 지워지지 않은 메시지만. 없는 id는 결과에 없다. */
-    fun findMessages(messageIds: List<Long>): List<Message>
-
     /** 지워지지 않은 마지막 메시지 id. 메시지가 없으면 null. */
     fun lastMessageId(conversationId: Long): Long?
 

@@ -16,18 +16,20 @@ Read `CLAUDE.md` first — it is the contract; this mechanizes the parts a test 
 
 ## Do not re-check these — `LayeredArchitectureTest` already proves them
 
-Dependency direction · domain purity (no JPA/DGS/Spring/QueryDSL under `domain/`) · `@Entity`
-confined to persistence adapters · no DGS types in `application` · cross-domain internal imports ·
-duplicate bean simple-names · `AFTER_COMMIT` listeners calling `REQUIRES_NEW`.
+Dependency direction · domain purity (no Spring/DGS/Exposed/JDBC under `domain/`) · no DGS types,
+generated types or table declarations in `application` · cross-context internal imports ·
+duplicate bean simple-names · `AFTER_COMMIT` listeners calling `REQUIRES_NEW` · the service and
+port shapes in `ConsistencyConventionTest` (`ModifyService`, no repository in a `QueryService`,
+`QueryPort` only in read-only services, repositories used by their own aggregate).
 
 If one of these is broken the build is red. Reporting it again adds nothing — spend the pass on
 what follows.
 
 ## 1. CQRS rails
 
-- Query service that **loads an aggregate** to read — should project via QueryDSL into a read DTO.
+- Query service that **loads an aggregate** to read — the query adapter projects straight into a read model.
 - Query returning a domain aggregate; command returning a read DTO. Both mix the sides.
-- Read path importing `port/out/persistence`, or write path importing `port/out/query`.
+- A write use case that returns a read model, or takes the request language to build one.
 - Command mutating state directly instead of through an aggregate method (anemic aggregate).
 - Read-DTO → GraphQL response mapping done in `application` instead of the resolver.
 - One fat read method assembling parts with separate cost — one use-case method per
@@ -44,19 +46,19 @@ what follows.
 
 ## 3. Framework confinement
 
-Frameworks change; domains outlive them. Spring/JPA/DGS annotations and imports belong in
-`infrastructure`. ArchUnit blocks them under `domain/`, but **not** everywhere they don't belong:
+Frameworks change; domains outlive them. Spring/Exposed/DGS annotations and imports belong in
+`adapter/`. ArchUnit blocks them under `domain/`, but **not** everywhere they don't belong:
 
 - Framework imports in `application/` beyond what a use case genuinely needs. `@Transactional` and
-  DI annotations are accepted there; DGS, JPA, and HTTP types are not.
-- A port signature typed in framework terms (`ResponseEntity`, `Page`, an entity, a codegen type).
+  DI annotations are accepted there; DGS, Exposed, and HTTP types are not.
+- A port signature typed in framework terms (`ResponseEntity`, `Page`, a `ResultRow`, a codegen type).
   A port speaks domain models and read DTOs — that is what makes the adapter replaceable.
 
 ## 4. Domain independence
 
 Each domain (`auth`, `tourism`, `community`, `alarm`) must be liftable into its own application.
 
-- Cross-domain calls go through the other domain's `port/in` or a **published domain event** —
+- Cross-domain calls go through the other domain's `provided` use case or a **published domain event** —
   never its internals (ArchUnit catches the import; it does not catch a *design* that assumes
   the other domain is in-process).
 - An event listener that assumes synchronous execution or a shared transaction with the publisher.

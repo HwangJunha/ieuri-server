@@ -1,6 +1,5 @@
 package org.around.ieuri.tourism.application.recommendation
 
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.catalog.provided.dto.MapSpotView
 import org.around.ieuri.tourism.application.catalog.provided.exception.BboxTooLargeException
 import org.around.ieuri.tourism.application.catalog.provided.exception.InvalidBboxException
@@ -28,7 +27,7 @@ import org.springframework.transaction.annotation.Transactional
  * - 같은 좌표는 점수가 가장 높은 1건으로 접는다(D-14).
  */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX, readOnly = true)
+@Transactional(readOnly = true)
 class MapRecommendationService(
     private val mapQueryPort: MapQueryPort,
     private val spotQueryPort: SpotQueryPort,

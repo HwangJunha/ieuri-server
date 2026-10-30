@@ -1,6 +1,7 @@
 package org.around.ieuri.community.application.question.provided
 
 import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.community.application.question.provided.dto.SpotAnswerOriginView
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswerReplyView
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswerView
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswersQuery
@@ -39,4 +40,14 @@ interface SpotQuestionQueryUseCase {
     fun answerPhotoKeys(answerIds: List<Long>): Map<Long, List<String>>
 
     fun replyPhotoKeys(replyIds: List<Long>): Map<Long, List<String>>
+
+    /** 지워지지 않은 질문·답변·답글이 있는가. 차단·숨김은 보지 않는다. */
+    fun questionExists(questionId: Long): Boolean
+
+    fun answerExists(answerId: Long): Boolean
+
+    fun replyExists(replyId: Long): Boolean
+
+    /** 답변과 질문의 원문. 답변이나 질문이 지워졌으면 null이다. */
+    fun answerOrigin(answerId: Long): SpotAnswerOriginView?
 }

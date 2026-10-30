@@ -1,7 +1,7 @@
 package org.around.ieuri.auth.adapter.security.authentication
 
 import io.mockk.mockk
-import org.around.ieuri.auth.application.token.required.TokenProviderPort
+import org.around.ieuri.auth.application.token.provided.AuthTokenQueryUseCase
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.springframework.graphql.server.WebGraphQlInterceptor
@@ -27,7 +27,7 @@ import kotlin.test.assertNull
 class GraphqlWebSocketAuthContextTest {
 
     private val interceptor = GraphqlWebSocketAuthInterceptor(
-        mockk<TokenProviderPort>(relaxed = true),
+        mockk<AuthTokenQueryUseCase>(relaxed = true),
         Clock.fixed(Instant.parse("2026-08-25T00:00:00Z"), ZoneOffset.UTC),
     )
 

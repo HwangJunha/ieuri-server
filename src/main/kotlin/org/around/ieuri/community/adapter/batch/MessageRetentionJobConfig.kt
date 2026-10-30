@@ -12,17 +12,15 @@ import org.springframework.batch.infrastructure.repeat.RepeatStatus
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Profile
-import org.springframework.transaction.PlatformTransactionManager
 
 /**
  * DM 메시지 보관 기간 만료 삭제 잡(SPEC-0017 R16, POL-050). 실행 시점은 k8s CronJob이 정한다.
- * - 트랜잭션은 회차마다 유스케이스가 연다. 태스클릿 전체를 한 트랜잭션으로 묶지 않는다.
+ * - 트랜잭션은 회차마다 유스케이스가 연다. 스텝에 매니저를 넘기지 않는다 — 넘기면 태스클릿 전체가 한 트랜잭션으로 묶인다.
  */
 @Configuration
 @Profile("batch")
 class MessageRetentionJobConfig(
     private val jobRepository: JobRepository,
-    private val transactionManager: PlatformTransactionManager,
     private val retentionUseCase: MessageRetentionUseCase,
     private val properties: MessageRetentionProperties,
 ) {
@@ -30,7 +28,7 @@ class MessageRetentionJobConfig(
     @Bean
     fun messageRetentionJob(): Job {
         val step = StepBuilder("${JOB_NAME}Step", jobRepository)
-            .tasklet(purgeTasklet(), transactionManager)
+            .tasklet(purgeTasklet())
             .build()
         return JobBuilder(JOB_NAME, jobRepository).start(step).build()
     }

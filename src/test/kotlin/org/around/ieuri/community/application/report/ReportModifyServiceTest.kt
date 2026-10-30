@@ -3,11 +3,15 @@ package org.around.ieuri.community.application.report
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import org.around.ieuri.community.application.comment.required.CommentRepository
+import org.around.ieuri.community.application.comment.provided.CommentCommandUseCase
+import org.around.ieuri.community.application.comment.provided.CommentQueryUseCase
+import org.around.ieuri.community.application.comment.provided.exception.CommentNotFoundException
 import org.around.ieuri.community.application.lookup.provided.MemberLookupUseCase
+import org.around.ieuri.community.application.post.provided.PostCommandUseCase
+import org.around.ieuri.community.application.post.provided.PostQueryUseCase
 import org.around.ieuri.community.application.post.provided.exception.PostNotFoundException
-import org.around.ieuri.community.application.post.required.PostRepository
-import org.around.ieuri.community.application.question.required.SpotQuestionRepository
+import org.around.ieuri.community.application.question.provided.SpotQuestionCommandUseCase
+import org.around.ieuri.community.application.question.provided.SpotQuestionQueryUseCase
 import org.around.ieuri.community.application.report.provided.dto.ReportContentCommand
 import org.around.ieuri.community.application.report.required.ReportEventPublisherPort
 import org.around.ieuri.community.application.report.required.ReportRepository
@@ -22,16 +26,19 @@ import kotlin.test.assertFailsWith
 class ReportModifyServiceTest {
 
     private val reportRepository = mockk<ReportRepository>()
-    private val postRepository = mockk<PostRepository>(relaxed = true)
-    private val commentRepository = mockk<CommentRepository>()
-    private val questionRepository = mockk<SpotQuestionRepository>(relaxed = true)
+    private val postCommand = mockk<PostCommandUseCase>(relaxed = true)
+    private val postQuery = mockk<PostQueryUseCase>()
+    private val commentCommand = mockk<CommentCommandUseCase>(relaxed = true)
+    private val commentQuery = mockk<CommentQueryUseCase>()
+    private val questionCommand = mockk<SpotQuestionCommandUseCase>(relaxed = true)
+    private val questionQuery = mockk<SpotQuestionQueryUseCase>()
     private val memberLookup = mockk<MemberLookupUseCase>()
     private val eventPublisher = mockk<ReportEventPublisherPort>(relaxUnitFun = true)
-    private val service = ReportModifyService(reportRepository, postRepository, commentRepository, questionRepository, memberLookup, eventPublisher)
+    private val service = ReportModifyService(reportRepository, postCommand, postQuery, commentCommand, commentQuery, questionCommand, questionQuery, memberLookup, eventPublisher)
 
     @Test
     fun `자동 숨김 대상 신고는 기록 뒤 이벤트를 낸다`() {
-        every { postRepository.exists(1) } returns true
+        every { postQuery.exists(1) } returns true
         every { reportRepository.add(any()) } returns true
 
         service.report(ReportContentCommand(ReportTargetType.POST, 1, ReportReason.SPAM, null), memberId = 7)
@@ -41,14 +48,31 @@ class ReportModifyServiceTest {
 
     @Test
     fun `없는 대상과 중복 신고는 거부하고 이벤트를 내지 않는다`() {
-        every { postRepository.exists(1) } returns false
+        every { postQuery.exists(1) } returns false
         assertFailsWith<PostNotFoundException> { service.report(ReportContentCommand(ReportTargetType.POST, 1, ReportReason.SPAM, null), 7) }
 
-        every { postRepository.exists(2) } returns true
+        every { postQuery.exists(2) } returns true
         every { reportRepository.add(any()) } returns false
         assertFailsWith<AlreadyReportedException> { service.report(ReportContentCommand(ReportTargetType.POST, 2, ReportReason.SPAM, null), 7) }
 
         verify(exactly = 0) { eventPublisher.publish(any()) }
+    }
+
+    /** 대상 종류마다 그 애그리게이트의 조회 유스케이스로 존재를 본다. */
+    @Test
+    fun `댓글·질문·답변·답글의 존재는 각 애그리게이트에 묻는다`() {
+        every { commentQuery.exists(3) } returns false
+        every { questionQuery.questionExists(4) } returns true
+        every { questionQuery.answerExists(5) } returns true
+        every { questionQuery.replyExists(6) } returns true
+        every { reportRepository.add(any()) } returns true
+
+        assertFailsWith<CommentNotFoundException> { service.report(ReportContentCommand(ReportTargetType.COMMENT, 3, ReportReason.SPAM, null), 7) }
+        service.report(ReportContentCommand(ReportTargetType.SPOT_QUESTION, 4, ReportReason.SPAM, null), 7)
+        service.report(ReportContentCommand(ReportTargetType.SPOT_ANSWER, 5, ReportReason.SPAM, null), 7)
+        service.report(ReportContentCommand(ReportTargetType.SPOT_ANSWER_REPLY, 6, ReportReason.SPAM, null), 7)
+
+        verify(exactly = 3) { reportRepository.add(any()) }
     }
 
     @Test
@@ -57,33 +81,24 @@ class ReportModifyServiceTest {
 
         service.applyAutoHide(ReportTargetType.POST, 1)
 
-        verify(exactly = 0) { postRepository.hideIfVisible(any()) }
+        verify(exactly = 0) { postCommand.hideReported(any()) }
     }
 
+    /** 숨기는 것과 부모의 수를 내리는 것은 대상 애그리게이트가 한다. */
     @Test
-    fun `댓글·답변은 이번에 숨겨졌을 때만 부모의 수를 내린다`() {
+    fun `임계값에 이르면 대상 애그리게이트에 숨김을 맡긴다`() {
         every { reportRepository.countDistinctReporters(any(), any()) } returns Report.AUTO_HIDE_THRESHOLD
-        every { commentRepository.hideIfVisible(10) } returns 1
-        every { commentRepository.hideIfVisible(11) } returns null
-        every { questionRepository.hideAnswerIfVisible(20) } returns 2
 
+        service.applyAutoHide(ReportTargetType.POST, 1)
         service.applyAutoHide(ReportTargetType.COMMENT, 10)
-        service.applyAutoHide(ReportTargetType.COMMENT, 11)
-        service.applyAutoHide(ReportTargetType.SPOT_ANSWER, 20)
-
-        verify(exactly = 1) { postRepository.decreaseCommentCount(1) }
-        verify(exactly = 1) { questionRepository.decreaseAnswerCount(2) }
-    }
-
-    @Test
-    fun `질문·답글은 숨기기만 한다`() {
-        every { reportRepository.countDistinctReporters(any(), any()) } returns Report.AUTO_HIDE_THRESHOLD
-
         service.applyAutoHide(ReportTargetType.SPOT_QUESTION, 5)
+        service.applyAutoHide(ReportTargetType.SPOT_ANSWER, 20)
         service.applyAutoHide(ReportTargetType.SPOT_ANSWER_REPLY, 6)
 
-        verify { questionRepository.hideIfVisible(5) }
-        verify { questionRepository.hideReplyIfVisible(6) }
-        verify(exactly = 0) { questionRepository.decreaseAnswerCount(any()) }
+        verify(exactly = 1) { postCommand.hideReported(1) }
+        verify(exactly = 1) { commentCommand.hideReported(10) }
+        verify(exactly = 1) { questionCommand.hideReportedQuestion(5) }
+        verify(exactly = 1) { questionCommand.hideReportedAnswer(20) }
+        verify(exactly = 1) { questionCommand.hideReportedReply(6) }
     }
 }

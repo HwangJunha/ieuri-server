@@ -3,13 +3,17 @@ package org.around.ieuri.community.adapter.persistence.query
 import org.around.ieuri.common.pagination.CursorEdge
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.security.AesGcmCipher
+import org.around.ieuri.community.adapter.persistence.mapper.toConversationParticipantsView
+import org.around.ieuri.community.adapter.persistence.mapper.toMessageOwnerView
 import org.around.ieuri.community.adapter.persistence.mapper.toMessageView
 import org.around.ieuri.community.adapter.persistence.mapper.toSpotQaOriginView
 import org.around.ieuri.community.adapter.persistence.table.ConversationTable
 import org.around.ieuri.community.adapter.persistence.table.MessageQuoteTable
 import org.around.ieuri.community.adapter.persistence.table.MessageTable
+import org.around.ieuri.community.application.conversation.provided.dto.ConversationParticipantsView
 import org.around.ieuri.community.application.conversation.provided.dto.ConversationSpotQaOriginView
 import org.around.ieuri.community.application.conversation.provided.dto.ConversationView
+import org.around.ieuri.community.application.conversation.provided.dto.MessageOwnerView
 import org.around.ieuri.community.application.conversation.provided.dto.MessageView
 import org.around.ieuri.community.application.conversation.required.ConversationQueryPort
 import org.around.ieuri.community.application.conversation.required.dto.ConversationMessagesSearch
@@ -178,4 +182,16 @@ class ConversationQueryAdapter(
         val encrypted = this[MessageTable.bodyEncrypted]
         return toMessageView(memberId, if (encrypted.isEmpty()) "" else cipher.decrypt(encrypted), origin)
     }
+
+    override fun findMessageOwners(messageIds: List<Long>): List<MessageOwnerView> {
+        if (messageIds.isEmpty()) return emptyList()
+        return MessageTable.select(MessageTable.id, MessageTable.conversationId, MessageTable.senderId)
+            .where { (MessageTable.id inList messageIds) and MessageTable.deletedAt.isNull() }
+            .map { it.toMessageOwnerView() }
+    }
+
+    override fun findParticipants(conversationId: Long): ConversationParticipantsView? = ConversationTable
+        .select(ConversationTable.id, ConversationTable.memberLow, ConversationTable.memberHigh)
+        .where { ConversationTable.id eq conversationId }
+        .singleOrNull()?.toConversationParticipantsView()
 }

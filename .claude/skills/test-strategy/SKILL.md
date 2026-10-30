@@ -1,6 +1,6 @@
 ---
 name: test-strategy
-description: Write the tests for a finished slice, right before the PR. Pure JUnit5 for domain and application logic, ArchUnit for boundaries, field-by-field tests for every conversion (GraphQL, JPA, external response) — and nothing else in infrastructure. Use when work is done and the PR is next, or when reviewing existing tests for the wrong shape.
+description: Write the tests for a finished slice, right before the PR. Pure JUnit5 for domain and application logic, ArchUnit for boundaries, field-by-field tests for every conversion (GraphQL, Exposed row, external response) — and nothing else in adapters. Use when work is done and the PR is next, or when reviewing existing tests for the wrong shape.
 license: MIT
 metadata:
   author: junha
@@ -39,7 +39,7 @@ use a well-trodden Spring idiom instead. **Verify infrastructure by running it, 
   This is also where **field-level laziness** is pinned — which I/O a use case performs is business
   logic: `verify(exactly = 0) { tourInfoPort.findGallery(any()) }`. Never boot DGS to prove it.
 
-- **`infrastructure/` adapters** → **no tests.** They are slow to run and heavy on external
+- **`adapter/`** → **no tests.** They are slow to run and heavy on external
   dependencies — a database, an HTTP upstream, a Spring context — and what they would prove is
   Spring's behaviour, not ours. SQL is verified against a real database by hand.
 
@@ -54,9 +54,9 @@ All three boundaries count, in both directions:
 
 | Boundary | Where it lives |
 |---|---|
-| GraphQL input/response ↔ domain model or `Command` | `adapter/in/graphql` |
-| domain model ↔ JPA entity | `adapter/out/persistence/mapper/` |
-| external API response ↔ domain model | `adapter/out/client/**/mapper/` |
+| GraphQL input/response ↔ `Command` or read model | `adapter/graphql/mapper/` |
+| Exposed row ↔ domain model or read model | `adapter/persistence/mapper/` |
+| external API response ↔ domain model | `adapter/client/**/mapper/` |
 
 **Required shape** — the same for all three:
 
@@ -82,8 +82,9 @@ changes**.
 
 ## Architecture (ArchUnit)
 
-Dependency direction, domain purity, `@Entity` confinement, no DGS types in `application`,
-cross-domain isolation, `AFTER_COMMIT`/`REQUIRES_NEW`. These live in `LayeredArchitectureTest` and
+Dependency direction, domain purity, no DGS types in `application`, cross-context isolation,
+repository ownership, `copy` confined to the domain, `AFTER_COMMIT`/`REQUIRES_NEW`
+(`LayeredArchitectureTest`), and the service and port shapes (`ConsistencyConventionTest`). These
 are what actually *proves* the architecture holds — keep them green.
 
 ## At PR time
@@ -102,7 +103,7 @@ are what actually *proves* the architecture holds — keep them green.
 - **Conversion tests using one whole-object `assertEquals`**, or a fixture where several fields
   share a value (a swap between them passes silently).
 - A conversion added by this slice with **no test at all** — including GraphQL input → `Command`.
-- Assertions on JPA entities instead of the domain model in write tests.
+- Assertions on rows or table columns instead of the domain model in write tests.
 - Missing failure-path coverage for aggregate invariants.
 - Non-deterministic fixtures — if a test can pass or fail on the same input, fix the fixture rather
   than deleting the coverage.

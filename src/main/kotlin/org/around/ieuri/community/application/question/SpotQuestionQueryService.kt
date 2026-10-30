@@ -2,10 +2,10 @@ package org.around.ieuri.community.application.question
 
 import org.around.ieuri.common.pagination.CursorPage
 import org.around.ieuri.common.pagination.cursorPageOf
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.community.application.block.provided.BlockQueryUseCase
 import org.around.ieuri.community.application.lookup.provided.SpotLookupUseCase
 import org.around.ieuri.community.application.question.provided.SpotQuestionQueryUseCase
+import org.around.ieuri.community.application.question.provided.dto.SpotAnswerOriginView
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswerReplyView
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswerView
 import org.around.ieuri.community.application.question.provided.dto.SpotAnswersQuery
@@ -28,7 +28,7 @@ import org.springframework.transaction.annotation.Transactional
  * - 개인 숨김(hiddenPostIds)은 글 전용이라 읽지 않는다.
  */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX, readOnly = true)
+@Transactional(readOnly = true)
 class SpotQuestionQueryService(
     private val spotQaQueryPort: SpotQaQueryPort,
     private val blockQueryUseCase: BlockQueryUseCase,
@@ -104,4 +104,12 @@ class SpotQuestionQueryService(
     )
 
     private fun <T> emptyPage(): CursorPage<T> = cursorPageOf(edges = emptyList(), hasNextPage = false, hasPreviousPage = false)
+
+    override fun questionExists(questionId: Long): Boolean = spotQaQueryPort.questionExists(questionId)
+
+    override fun answerExists(answerId: Long): Boolean = spotQaQueryPort.answerExists(answerId)
+
+    override fun replyExists(replyId: Long): Boolean = spotQaQueryPort.replyExists(replyId)
+
+    override fun answerOrigin(answerId: Long): SpotAnswerOriginView? = spotQaQueryPort.findAnswerOrigin(answerId)
 }

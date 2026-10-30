@@ -4,19 +4,19 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import org.around.ieuri.community.application.catalog.required.SpotCatalogLanguageRepository
-import org.around.ieuri.community.application.post.required.PostRepository
+import org.around.ieuri.community.application.post.provided.PostCommandUseCase
 import org.around.ieuri.community.domain.catalog.CatalogLanguage
 import org.around.ieuri.community.domain.shared.ContentLanguage
 import kotlin.test.Test
 
 class SpotCatalogSyncServiceTest {
 
-    private val posts = mockk<PostRepository>()
+    private val posts = mockk<PostCommandUseCase>()
     private val languages = mockk<SpotCatalogLanguageRepository>()
     private val service = SpotCatalogSyncService(posts, languages)
 
     @Test
-    fun `사라진 카탈로그가 없으면 저장소를 부르지 않는다`() {
+    fun `사라진 카탈로그가 없으면 글 쪽을 부르지 않는다`() {
         service.cleanupDeletedCatalogs(emptyList())
 
         verify(exactly = 0) { posts.detachSpotsOfCatalogs(any()) }

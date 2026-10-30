@@ -11,8 +11,7 @@ import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods
 import kotlin.test.Test
 
 /**
- * 전수 조사에서 위반 0건이던 일관성을 고정한다 — import·트랜잭션 위치·네이밍.
- * 확정된 컨벤션이 아니라 임시다. 재검토 대상은 `problem/HARNESS-server-sensors.md`.
+ * context마다 같아야 하는 모양을 고정한다 — 의존·트랜잭션 위치·네이밍·서비스와 포트의 역할(SPEC-0039 D-145~D-158).
  */
 class ConsistencyConventionTest {
 
@@ -22,17 +21,17 @@ class ConsistencyConventionTest {
 
     // ── 의존·import ────────────────────────────────────────────────────────────
 
-    /** `application`은 영속 기술을 모른다 — 읽기 포트가 QueryDSL 타입을 돌려주면 read DTO 경계가 사라진다. */
+    /** `application`은 영속 기술을 모른다 — 포트가 Exposed 타입을 주고받으면 read DTO 경계가 사라진다. */
     @Test
-    fun `application은 JPA Hibernate QueryDSL에 의존하지 않는다`() {
+    fun `application은 Exposed와 JDBC에 의존하지 않는다`() {
         noClasses().that().resideInAPackage("..application..")
             .should().dependOnClassesThat().resideInAnyPackage(
-                "jakarta.persistence..",
-                "javax.persistence..",
-                "org.hibernate..",
-                "com.querydsl..",
+                "org.jetbrains.exposed..",
+                "java.sql..",
+                "javax.sql..",
+                "org.springframework.jdbc..",
             )
-            .because("영속 기술은 infrastructure의 세부사항이다. application은 포트와 read DTO만 안다")
+            .because("영속 기술은 adapter/persistence의 세부사항이다. application은 포트와 도메인 모델·read DTO만 안다")
             .check(classes)
     }
 
@@ -68,36 +67,24 @@ class ConsistencyConventionTest {
 
     // ── 네이밍 ────────────────────────────────────────────────────────────────
 
-    /** Spring Data 인터페이스는 `Repository`로 끝나고 `persistence/repository/` 안에 있다. */
+    /** `required/`의 인터페이스는 쓰기용 저장소(`Repository`)이거나 그 밖의 아웃바운드 포트(`Port`)다. */
     @Test
-    fun `Spring Data 리포지토리는 Repository로 끝나고 repository 패키지에 있다`() {
-        classes().that().areAssignableTo("org.springframework.data.repository.Repository")
+    fun `required의 인터페이스는 Repository나 Port로 끝난다`() {
+        classes().that().resideInAPackage("..application..required")
             .and().areInterfaces()
             .should().haveSimpleNameEndingWith("Repository")
-            .andShould().resideInAPackage("..persistence.repository..")
-            .because("리포지토리는 한 곳에 모인다 — 어디를 봐야 하는지가 이름과 위치로 정해진다")
-            // Spring Data 리포지토리가 더 없다. JPA를 걷어내는 S16에서 규칙째 지운다.
-            .allowEmptyShould(true)
+            .orShould().haveSimpleNameEndingWith("Port")
+            .because("아웃바운드 포트는 이름으로 역할이 갈린다 — 루트를 싣고 저장하면 XxxRepository, 그 밖은 XxxPort(조회는 XxxQueryPort)")
             .check(classes)
     }
 
-    /**
-     * 아웃바운드 포트 인터페이스는 `Port`로 끝난다(SPEC-0039 D-17).
-     * - infrastructure가 구현하는 인터페이스만 대상이다(결과 타입 `sealed interface`는 제외).
-     */
+    /** `provided/`의 인터페이스는 유스케이스다. */
     @Test
-    fun `아웃바운드 포트 인터페이스는 Port로 끝난다`() {
-        classes().that().resideInAPackage("..application.port.out..")
+    fun `provided의 인터페이스는 UseCase로 끝난다`() {
+        classes().that().resideInAPackage("..application..provided")
             .and().areInterfaces()
-            .and(
-                DescribedPredicate.describe("infrastructure가 구현하는") { port ->
-                    port.allSubclasses.any { it.packageName.contains(".infrastructure.") }
-                },
-            )
-            .should().haveSimpleNameEndingWith("Port")
-            .because("포트는 이름으로 식별된다 — port/out의 인터페이스 이름을 XxxPort로 바꾼다")
-            // 옛 구조(port/out)가 더 없다. S16에서 새 구조 규칙으로 바꾼다.
-            .allowEmptyShould(true)
+            .should().haveSimpleNameEndingWith("UseCase")
+            .because("인바운드 포트는 XxxCommandUseCase·XxxQueryUseCase이고, 역할이 다른 흐름은 XxxUseCase다")
             .check(classes)
     }
 
@@ -144,6 +131,16 @@ class ConsistencyConventionTest {
             .check(classes)
     }
 
+    /** 쓰기 쪽이 읽을 것은 자기 저장소에 있고, 다른 애그리게이트의 것은 그 유스케이스로 읽는다. */
+    @Test
+    fun `QueryPort는 읽기 전용 서비스만 쓴다`() {
+        noClasses().that().resideInAPackage("..application..")
+            .and(DescribedPredicate.describe("읽기 전용 트랜잭션 서비스가 아닌") { !it.isReadOnlyService() })
+            .should().dependOnClassesThat().haveSimpleNameEndingWith("QueryPort")
+            .because("쓰기 서비스는 조회 포트를 쓰지 않는다 — 판단에 필요한 읽기는 그 애그리게이트의 Repository에 두고, 다른 애그리게이트의 값은 그쪽 QueryUseCase로 읽는다")
+            .check(classes)
+    }
+
     /** 사용자 오류(`userErrors`)의 뿌리는 context마다 하나이고 `domain/shared`에 있다. */
     @Test
     fun `UserException 뿌리는 domain shared에 있다`() {
@@ -172,6 +169,12 @@ class ConsistencyConventionTest {
             .because("adapter 아래는 기술 이름(${ADAPTER_TECHNOLOGIES.joinToString()})으로 나눈다 — 새 폴더를 만들기 전에 이 중 어디에 속하는지 본다")
             .check(classes)
     }
+
+    /** 클래스에 `@Transactional(readOnly = true)`가 붙었거나, 포트 인터페이스 자신(Kotlin의 `DefaultImpls` 포함)이다. */
+    private fun JavaClass.isReadOnlyService(): Boolean = isInterface || name.contains("QueryPort$") ||
+        tryGetAnnotationOfType("org.springframework.transaction.annotation.Transactional")
+            .map { it.get("readOnly").orElse(false) == true }
+            .orElse(false)
 
     private fun beDeclaredInFileEndingWith(suffix: String) = object : ArchCondition<JavaClass>("be declared in a file ending with $suffix") {
         override fun check(item: JavaClass, events: ConditionEvents) {

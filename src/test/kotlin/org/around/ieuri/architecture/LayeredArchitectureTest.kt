@@ -9,50 +9,39 @@ import com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices
 import kotlin.test.Test
 
 /**
- * 헥사고날 + 도메인 경계 규칙: 의존성 방향, domain 순수성, @Entity 위치, application의 DGS 격리,
- * 크로스도메인 내부 격리, 빈 이름 충돌, AFTER_COMMIT 전파.
+ * 헥사고날 + 도메인 경계 규칙: 의존성 방향, domain 순수성, application의 DGS 격리,
+ * 크로스도메인 내부 격리, 애그리게이트 간 호출, `copy` 제한, 빈 이름 충돌, AFTER_COMMIT 전파.
  */
 class LayeredArchitectureTest {
 
     private val classes = ArchitectureClasses.main
 
     @Test
-    fun `의존성은 infrastructure → application → domain 방향만 허용한다`() {
+    fun `의존성은 adapter → application → domain 방향만 허용한다`() {
         layeredArchitecture()
             .consideringOnlyDependenciesInLayers()
             .layer("Domain").definedBy("..domain..")
             .layer("Application").definedBy("..application..")
-            // `..adapter..`: Exposed로 옮긴 context의 새 구조(SPEC-0039 D-47). 옛 구조가 사라지면 `..infrastructure..`를 뺀다.
-            .layer("Infrastructure").definedBy("..infrastructure..", "..adapter..")
-            .whereLayer("Infrastructure").mayNotBeAccessedByAnyLayer()
-            .whereLayer("Application").mayOnlyBeAccessedByLayers("Infrastructure")
-            .whereLayer("Domain").mayOnlyBeAccessedByLayers("Application", "Infrastructure")
+            .layer("Adapter").definedBy("..adapter..")
+            .whereLayer("Adapter").mayNotBeAccessedByAnyLayer()
+            .whereLayer("Application").mayOnlyBeAccessedByLayers("Adapter")
+            .whereLayer("Domain").mayOnlyBeAccessedByLayers("Application", "Adapter")
             .check(classes)
     }
 
     @Test
-    fun `domain은 순수 Kotlin이어야 한다 - JPA DGS Spring QueryDSL 의존 금지`() {
+    fun `domain은 순수 Kotlin이어야 한다 - Spring DGS Exposed JDBC 의존 금지`() {
         noClasses().that().resideInAPackage("..domain..")
             .should().dependOnClassesThat().resideInAnyPackage(
-                "jakarta.persistence..",
-                "javax.persistence..",
                 "org.springframework..",
                 "com.netflix.graphql..",
                 "com.netflix.dgs..",
                 "graphql..",
-                "com.querydsl..",
+                "org.jetbrains.exposed..",
+                "java.sql..",
+                "javax.sql..",
             )
             .because("domain/은 프레임워크에 의존하지 않는 순수 Kotlin이어야 한다")
-            .check(classes)
-    }
-
-    @Test
-    fun `JPA 엔티티는 persistence 어댑터 안에만 존재한다`() {
-        classes().that().areAnnotatedWith("jakarta.persistence.Entity")
-            .should().resideInAPackage("..infrastructure.adapter.out.persistence..")
-            .because("@Entity는 영속 어댑터 세부사항이며 도메인 모델이 될 수 없다")
-            // JPA 엔티티가 더 없다. JPA를 걷어내는 S16에서 규칙째 지운다.
-            .allowEmptyShould(true)
             .check(classes)
     }
 
@@ -64,63 +53,105 @@ class LayeredArchitectureTest {
                 "com.netflix.dgs..",
                 "graphql..",
             )
-            .because("read DTO → 응답 타입 매핑은 graphql 리졸버(adapter/in)의 책임이다")
+            .because("read DTO → 응답 타입 매핑은 adapter/graphql/mapper가 한다")
             .check(classes)
     }
 
-    /** 경계 타입은 infrastructure에서 멈춘다(POL-033). 생성 타입은 `common.graphql.generated`라 위 규칙에 걸리지 않는다. */
+    /** 경계 타입은 adapter에서 멈춘다(POL-033). 생성 타입은 `common.graphql.generated`라 위 규칙에 걸리지 않는다. */
     @Test
-    fun `application과 domain은 GraphQL 생성 타입과 JPA 엔티티에 의존하지 않는다`() {
+    fun `application과 domain은 GraphQL 생성 타입과 Exposed 테이블 선언에 의존하지 않는다`() {
         noClasses().that().resideInAnyPackage("..application..", "..domain..")
             .should().dependOnClassesThat().resideInAnyPackage(
                 "org.around.ieuri.common.graphql.generated..",
-                "..persistence.entity..",
+                "..adapter.persistence.table..",
             )
-            .orShould().dependOnClassesThat().areAnnotatedWith("jakarta.persistence.Entity")
-            .because("경계 타입 ↔ 도메인 변환은 infrastructure 어댑터의 mapper에서 한다 — application·domain은 원시값·도메인 모델·read DTO만 안다")
+            .because("경계 타입 ↔ 도메인 변환은 각 adapter의 mapper에서 한다 — application·domain은 원시값·도메인 모델·read DTO만 안다")
             .check(classes)
     }
 
     /**
-     * 도메인 간 상호작용은 상대 도메인의 `port/in` 또는 발행된 도메인 이벤트로만 한다.
+     * context 간 상호작용은 상대의 `provided`(유스케이스와 그 DTO) 또는 발행된 도메인 이벤트로만 한다.
      * - `common..`: 공유 커널.
-     * - `..port.in..`·`..application..provided..`·`..application.query..`: 호출하는 쪽은 client 어댑터여야 한다.
-     * - `..domain..event..`(옛 `domain.event`, 새 `domain.<aggregate>.event`): 구독하는 쪽은 이벤트 어댑터여야 한다(POL-028).
+     * - `..application..provided..`: 호출하는 쪽은 `adapter/client`여야 한다.
+     * - `..domain..event..`: 구독하는 쪽은 `adapter/event`여야 한다(POL-028).
      */
     @Test
-    fun `도메인은 다른 도메인의 내부에 의존하지 않는다`() {
+    fun `context는 다른 context의 내부에 의존하지 않는다`() {
         slices().matching("org.around.ieuri.(*)..")
             .should().notDependOnEachOther()
             .ignoreDependency(
                 DescribedPredicate.alwaysTrue<JavaClass>(),
                 JavaClass.Predicates.resideInAPackage("org.around.ieuri.common.."),
             )
-            // 인바운드 포트 호출은 어댑터(infrastructure)에서만 허용한다. 상대가 새 구조로 옮겼으면 그 포트는 `provided`에 있다.
-            .ignoreDependency(
-                JavaClass.Predicates.resideInAPackage("..infrastructure.adapter.out.client.."),
-                JavaClass.Predicates.resideInAnyPackage("..application.port.in..", "..application..provided.."),
-            )
-            // 인바운드 포트가 돌려주는 read DTO. 포트만 허용하고 반환 타입을 막으면 포트를 쓸 수 없다.
-            .ignoreDependency(
-                JavaClass.Predicates.resideInAPackage("..infrastructure.adapter.out.client.."),
-                JavaClass.Predicates.resideInAPackage("..application.query.."),
-            )
-            // 발행된 도메인 이벤트 구독은 인바운드 이벤트 어댑터에서만 허용한다.
-            // 이벤트는 옛 구조면 `domain.event`, 새 구조면 애그리게이트 안의 `domain.<aggregate>.event`에 있다.
-            .ignoreDependency(
-                JavaClass.Predicates.resideInAPackage("..infrastructure.adapter.in.event.."),
-                JavaClass.Predicates.resideInAPackage("..domain..event.."),
-            )
-            // 새 구조(SPEC-0039 D-47): `adapter.client` → 상대의 `provided`(포트·DTO), `adapter.event` → 상대의 이벤트.
             .ignoreDependency(
                 JavaClass.Predicates.resideInAPackage("..adapter.client.."),
-                JavaClass.Predicates.resideInAnyPackage("..application..provided..", "..application.port.in..", "..application.query.."),
+                JavaClass.Predicates.resideInAPackage("..application..provided.."),
             )
             .ignoreDependency(
                 JavaClass.Predicates.resideInAPackage("..adapter.event.."),
                 JavaClass.Predicates.resideInAPackage("..domain..event.."),
             )
-            .because("도메인 간 상호작용은 상대 도메인의 port/in 또는 발행된 도메인 이벤트로만 한다")
+            .because("다른 context의 값은 adapter/client가 그쪽 provided 유스케이스로 읽고, 변화는 adapter/event가 그쪽 도메인 이벤트로 받는다")
+            .check(classes)
+    }
+
+    /** 저장소는 루트마다 하나이고 그 애그리게이트의 서비스만 쓴다. */
+    @Test
+    fun `저장소는 자기 애그리게이트의 서비스만 쓴다`() {
+        val offenders = classes
+            .filter { APPLICATION_AGGREGATE.matches(it.packageName) }
+            .flatMap { origin ->
+                val (context, aggregate) = requireNotNull(APPLICATION_AGGREGATE.matchEntire(origin.packageName)).destructured
+                origin.directDependenciesFromSelf
+                    .map { it.targetClass }
+                    .filter { it.simpleName.endsWith("Repository") && it.packageName == "org.around.ieuri.$context.application.${aggregateOf(it)}.required" }
+                    .filter { aggregateOf(it) != aggregate }
+                    .map { "${origin.simpleName} → ${it.simpleName}" }
+            }
+            .toSet()
+
+        check(offenders.isEmpty()) {
+            "다른 애그리게이트의 저장소를 직접 쓴다 — 읽기는 그 애그리게이트의 QueryUseCase로, 변경은 그쪽 CommandUseCase로 한다:\n" +
+                offenders.joinToString("\n") { "  $it" }
+        }
+    }
+
+    /** 인바운드 어댑터는 유스케이스(`provided`)만 부른다. outbound 포트를 직접 잡으면 application을 건너뛴다. */
+    @Test
+    fun `인바운드 어댑터는 required 포트에 의존하지 않는다`() {
+        noClasses().that().resideInAnyPackage(
+            "..adapter.graphql..",
+            "..adapter.event.listener..",
+            "..adapter.batch..",
+            "..adapter.security.authentication..",
+            "..adapter.security.authorization..",
+        )
+            .should().dependOnClassesThat().resideInAPackage("..application..required..")
+            .because("리졸버·리스너·배치·인증 필터는 provided의 유스케이스를 부른다 — 포트가 필요하면 그 포트를 쓰는 유스케이스를 application에 둔다")
+            .check(classes)
+    }
+
+    private fun aggregateOf(type: JavaClass): String = APPLICATION_AGGREGATE.matchEntire(type.packageName)?.groupValues?.get(2).orEmpty()
+
+    /** 애그리게이트끼리 서로를 알면 경계가 없는 것이다. 둘이 함께 쓰는 값은 `domain/shared`로 내린다. */
+    @Test
+    fun `도메인의 애그리게이트 패키지는 서로 순환하지 않는다`() {
+        slices().matching("org.around.ieuri.(*).domain.(*)..")
+            .should().beFreeOfCycles()
+            .because("순환하는 두 애그리게이트는 하나이거나, 공유하는 값을 domain/shared로 내려야 한다")
+            .check(classes)
+    }
+
+    /** 불변식은 도메인 메서드를 거쳐야만 바뀐다 — `copy`로 필드를 바꾸면 검증을 건너뛴다. */
+    @Test
+    fun `도메인 모델의 copy는 domain 안에서만 부른다`() {
+        noClasses().that().resideOutsideOfPackage("..domain..")
+            .should().callMethodWhere(
+                DescribedPredicate.describe("도메인 모델의 copy") { call ->
+                    call.targetOwner.packageName.contains(".domain.") && call.name.startsWith("copy")
+                },
+            )
+            .because("상태 변경은 도메인 메서드로 한다 — application·adapter에서 copy로 필드를 바꾸지 말고 그 변경을 뜻하는 메서드를 루트에 둔다")
             .check(classes)
     }
 
@@ -200,5 +231,10 @@ class LayeredArchitectureTest {
             "AFTER_COMMIT 리스너가 부르는데 REQUIRES_NEW가 아니다(쓰기가 조용히 사라진다):\n" +
                 offenders.joinToString("\n") { "  $it" }
         }
+    }
+
+    private companion object {
+        /** `org.around.ieuri.<context>.application.<aggregate>` 아래. */
+        val APPLICATION_AGGREGATE = Regex("""org\.around\.ieuri\.(\w+)\.application\.(\w+)(?:\..*)?""")
     }
 }

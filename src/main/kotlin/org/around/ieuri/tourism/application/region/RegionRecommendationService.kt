@@ -1,7 +1,6 @@
 package org.around.ieuri.tourism.application.region
 
 import org.around.ieuri.common.event.LocationAccessed
-import org.around.ieuri.common.persistence.ExposedConfig
 import org.around.ieuri.tourism.application.region.provided.RegionRecommendationUseCase
 import org.around.ieuri.tourism.application.region.provided.dto.RecommendedRegionItemView
 import org.around.ieuri.tourism.application.region.provided.dto.RecommendedRegionQuery
@@ -22,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional
  * - 정규화 구간과 순위는 후보 집합 전체에서 나오므로, 개수 제한은 반드시 마지막에 적용한다.
  */
 @Service
-@Transactional(transactionManager = ExposedConfig.EXPOSED_TX, readOnly = true)
+@Transactional(readOnly = true)
 class RegionRecommendationService(
     private val regionMetricQueryPort: RegionMetricQueryPort,
     private val policy: RegionRecommendationPolicy,

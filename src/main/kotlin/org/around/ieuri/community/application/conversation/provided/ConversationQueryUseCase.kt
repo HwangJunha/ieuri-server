@@ -1,7 +1,9 @@
 package org.around.ieuri.community.application.conversation.provided
 
 import org.around.ieuri.common.pagination.CursorPage
+import org.around.ieuri.community.application.conversation.provided.dto.ConversationParticipantsView
 import org.around.ieuri.community.application.conversation.provided.dto.ConversationView
+import org.around.ieuri.community.application.conversation.provided.dto.MessageOwnerView
 import org.around.ieuri.community.application.conversation.provided.dto.MessageView
 import org.around.ieuri.community.application.conversation.provided.dto.TypingEventView
 import reactor.core.publisher.Flux
@@ -29,4 +31,10 @@ interface ConversationQueryUseCase {
 
     /** 메시지 단건. 대화로도 범위를 좁히며 지워졌으면 null이다. 참여자 검사는 구독 시작 때 끝났다. */
     fun message(conversationId: Long, messageId: Long, memberId: Long): MessageView?
+
+    /** 지워지지 않은 메시지의 대화와 보낸 사람. 없는 id는 결과에 없다. 참여자 검사를 하지 않는다 — 판정은 부르는 쪽이 한다. */
+    fun messageOwners(messageIds: List<Long>): List<MessageOwnerView>
+
+    /** 대화의 참여자. 없는 대화면 null이다. */
+    fun participantsOf(conversationId: Long): ConversationParticipantsView?
 }

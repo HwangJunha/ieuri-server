@@ -7,7 +7,6 @@ import io.mockk.verify
 import org.around.ieuri.tourism.application.category.CategoryQueryService
 import org.around.ieuri.tourism.application.category.provided.dto.CategoryDisplay
 import org.around.ieuri.tourism.application.category.required.AppCategoryQueryPort
-import org.around.ieuri.tourism.application.recommendation.required.EmbeddingTargetQueryPort
 import org.around.ieuri.tourism.application.recommendation.required.SpotEmbeddingRepository
 import org.around.ieuri.tourism.application.recommendation.required.TextEmbeddingPort
 import org.around.ieuri.tourism.application.recommendation.required.dto.EmbeddingTarget
@@ -23,7 +22,6 @@ import kotlin.test.assertEquals
 /** SPEC-0035 S2 — 임베딩 적재: 대상 → 텍스트 → 제공자(재시도) → 저장. 포트는 전부 스텁이고, DB 쪽 절반은 실제 `SpotEmbeddingStoreService`다. */
 class SpotEmbeddingSyncServiceTest {
 
-    private val targetQueryPort = mockk<EmbeddingTargetQueryPort>()
     private val embeddingRepository = mockk<SpotEmbeddingRepository>(relaxed = true)
     private val embeddingPort = mockk<TextEmbeddingPort>()
     private val categoryPort = mockk<AppCategoryQueryPort>()
@@ -33,7 +31,7 @@ class SpotEmbeddingSyncServiceTest {
         tasteThreshold = TasteThreshold(5),
         embedding = EmbeddingSpec(model = "voyage-4", dimension = 3, retryCount = 2, overviewMaxChars = 500),
     )
-    private val service = SpotEmbeddingSyncService(SpotEmbeddingStoreService(targetQueryPort, embeddingRepository, CategoryQueryService(categoryPort, mockk()), policy), embeddingPort, policy)
+    private val service = SpotEmbeddingSyncService(SpotEmbeddingStoreService(embeddingRepository, CategoryQueryService(categoryPort, mockk()), policy), embeddingPort, policy)
 
     private val targets = listOf(
         EmbeddingTarget(11L, "hash-11", DomainLocale.KO, "나이키 가산점", "SHOPPING", "서울 금천구", "스포츠 브랜드 매장이다."),
@@ -42,7 +40,7 @@ class SpotEmbeddingSyncServiceTest {
 
     @Test
     fun `대상이 없으면 소진이다`() {
-        every { targetQueryPort.findTargets(0L, 100, "voyage-4") } returns emptyList()
+        every { embeddingRepository.findTargets(0L, 100, "voyage-4") } returns emptyList()
         val result = service.syncNext(0L, 100)
         assertEquals(0, result.processed)
         assertEquals(0L, result.lastTranslationId)
@@ -50,7 +48,7 @@ class SpotEmbeddingSyncServiceTest {
 
     @Test
     fun `행의 언어로 라벨을 붙인 텍스트를 임베딩해 저장하고 커서를 옮긴다`() {
-        every { targetQueryPort.findTargets(0L, 100, "voyage-4") } returns targets
+        every { embeddingRepository.findTargets(0L, 100, "voyage-4") } returns targets
         every { categoryPort.findDisplays(setOf("SHOPPING", "RESTAURANT"), DomainLocale.KO) } returns
             mapOf("SHOPPING" to CategoryDisplay(SpotCategory("SHOPPING"), "쇼핑", null))
         val texts = slot<List<String>>()
@@ -75,7 +73,7 @@ class SpotEmbeddingSyncServiceTest {
 
     @Test
     fun `제공자가 실패하면 설정 횟수까지 바로 재시도한다`() {
-        every { targetQueryPort.findTargets(any(), any(), any()) } returns targets
+        every { embeddingRepository.findTargets(any(), any(), any()) } returns targets
         every { categoryPort.findDisplays(any(), any()) } returns emptyMap()
         every { embeddingPort.embed(any(), any()) } throws IllegalStateException("429") andThen listOf(floatArrayOf(1f, 0f, 0f), floatArrayOf(0f, 1f, 0f))
 
@@ -87,7 +85,7 @@ class SpotEmbeddingSyncServiceTest {
 
     @Test
     fun `재시도를 다 써도 실패하면 건너뛰고 실패로 세되 커서는 옮긴다`() {
-        every { targetQueryPort.findTargets(any(), any(), any()) } returns targets
+        every { embeddingRepository.findTargets(any(), any(), any()) } returns targets
         every { categoryPort.findDisplays(any(), any()) } returns emptyMap()
         every { embeddingPort.embed(any(), any()) } throws IllegalStateException("down")
 
@@ -103,7 +101,7 @@ class SpotEmbeddingSyncServiceTest {
 
     @Test
     fun `차원이 설정과 다른 벡터는 저장하지 않고 실패로 센다`() {
-        every { targetQueryPort.findTargets(any(), any(), any()) } returns targets
+        every { embeddingRepository.findTargets(any(), any(), any()) } returns targets
         every { categoryPort.findDisplays(any(), any()) } returns emptyMap()
         every { embeddingPort.embed(any(), any()) } returns listOf(floatArrayOf(1f, 0f, 0f), floatArrayOf(0f, 1f))
         val saved = slot<List<SpotEmbedding>>()
