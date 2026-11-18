@@ -8,11 +8,7 @@ import org.springframework.jdbc.datasource.LazyConnectionDataSourceProxy
 import javax.sql.DataSource
 
 /**
- * 읽기 복제본 풀을 **언제 만드는가**. 프레임워크 배선이 아니라 이 설정 클래스의 판단을 고정한다.
- *
- * `ieuri.read-replica.url`의 기본값이 `${IEURI_DB_RO_URL:}`이라 변수가 없어도 속성은 빈
- * 문자열로 **존재한다**. 그래서 "속성이 있는가"로는 로컬(복제본 없음)과 배포(있음)를 가를 수
- * 없고, 빈 URL로 풀을 만들면 `jdbcUrl is required`로 기동이 깨진다.
+ * 읽기 복제본 풀을 언제 만드는가 — url이 빈 문자열이면 만들지 않는다.
  */
 class ReplicaDataSourceWiringTest {
 

@@ -1,8 +1,6 @@
 package org.around.ieuri.architecture
 
 import com.tngtech.archunit.core.domain.JavaClass
-import com.tngtech.archunit.core.importer.ClassFileImporter
-import com.tngtech.archunit.core.importer.ImportOption
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -11,22 +9,12 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
- * `@Enumerated(STRING)` 컬럼이 **가장 긴 열거값을 담을 수 있는지** 검사한다.
- *
- * 열거형에 값을 더할 때 컬럼 길이를 함께 보지 않으면 **INSERT에서만 터진다** — 애플리케이션도
- * 스키마도 CHECK 제약도 전부 통과하고, DB만 `value too long for type character varying(n)`으로
- * 거부한다. 유닛테스트는 저장소를 스텁하므로 잡지 못한다.
- *
- * 실제로 SPEC-0026이 `ReportTargetType`에 `SPOT_ANSWER_REPLY`(17자)를 더하면서
- * `VARCHAR(10)` 컬럼을 그대로 뒀고, 신고 요청이 런타임에 실패했다(V65에서 30으로 넓혔다).
- *
- * 이 테스트는 엔티티 메타데이터와 열거값만 보므로 DB도 Spring도 필요 없다.
+ * `@Enumerated(STRING)` 컬럼이 가장 긴 열거값을 담을 수 있는지 검사한다.
+ * - 넘으면 INSERT에서만 `value too long`으로 터진다 — 유닛테스트는 저장소를 스텁하므로 잡지 못한다.
  */
 class EnumColumnLengthTest {
 
-    private val entities: List<JavaClass> = ClassFileImporter()
-        .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-        .importPackages("org.around.ieuri")
+    private val entities: List<JavaClass> = ArchitectureClasses.main
         .filter { it.isAnnotatedWith(Entity::class.java) }
 
     @Test

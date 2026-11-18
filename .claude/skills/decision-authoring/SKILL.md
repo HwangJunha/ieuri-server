@@ -76,8 +76,8 @@ things are deliberately not settled here:
   column proves the decision is defensible, not that it is theirs to skip. When a choice changes
   what the service does — what a user sees, what is stored about them, what a client must handle —
   put it in the decision table *and* raise it, rather than treating the table as the approval.
-- **Each slice agrees its own design before it is written** (`CLAUDE.md`, "Agree the slice's design
-  before writing it"). This document is written once, before any code, so it cannot answer questions
+- **Each slice agrees its own design before it is written** (`CLAUDE.md`, "Agree the design before
+  writing it"). This document is written once, before any code, so it cannot answer questions
   that only appear once the shape is known. Those are not failures of this document; they are the
   next conversation, and they land in the same decision table as `D-04`, `D-05`, …
 
@@ -115,8 +115,8 @@ records a conflict over is the one that gets reverted after implementation.
 auth, personal data, API contract, i18n, legal/platform, and operations. **They bind this repo
 whether or not anything reminds you of them.**
 
-The planner's `spec.md` used to carry an "적용 정책" section listing which ones applied. It no longer
-does, so **checking them is this document's job now.** Nothing else does it.
+`spec.md` does not list which policies apply, so **checking them is this document's job.** Nothing
+else does it.
 
 Read the sections your slice touches — not all 59. A query with paging touches the API contract
 section (POL-017 cursor, POL-018 page sizes and caps, POL-019 sort guarantees); anything storing

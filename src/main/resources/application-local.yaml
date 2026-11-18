@@ -8,60 +8,37 @@ server:
 ieuri:
   tourapi:
     detail-prefetch:
-      # **로컬에서는 상세 수집을 돌리지 않는다**(SPEC-0037). 한 번 돌면 오퍼레이션당 수만 회를
-      # 쓰는데 그 쿼터는 dev·prod와 같은 계정에서 나간다 — 로컬 실수 한 번이 운영 몫을 태운다.
-      # 0이면 Tasklet이 첫 판정에서 바로 끝내므로 호출이 아예 나가지 않는다.
+      # 로컬에서는 상세 수집을 돌리지 않는다(SPEC-0037) — 쿼터가 dev·prod와 같은 계정에서 나간다.
+      # 0이면 Tasklet이 첫 판정에서 끝나 호출이 나가지 않는다.
       daily-limit: 0
-  # 검색 노드도 로컬에서는 같은 port-forward 터널 위에 있어, 메인과 같은 이유로 SSL을 끈다
-  # (아래 spring.datasource 주석 참조).
+  # 검색 노드도 같은 port-forward 터널 위라 SSL을 끈다(아래 spring.datasource 참조).
   search-datasource:
     url: ${IEURI_SEARCH_DB_URL:jdbc:postgresql://localhost:5433/ieuri?prepareThreshold=0&sslmode=disable}
   mail:
     from: noreply@ieuri.co.kr
 spring:
-  # 로컬은 `kubectl port-forward` 터널로 DB에 붙는데, **그 위에서 SSL 핸드셰이크가 깨진다.**
-  # 서버는 `ssl = on`이라 JDBC가 기본으로 SSL을 시도하고, 터널을 통과하는 순간
-  # `SSL error: Connection reset`으로 실패한다. 그 리셋을 kubectl이 "lost connection to pod"로
-  # 보고 터널을 통째로 내리며, 그때 Flyway가 쓰던 커넥션이 함께 끊겨
-  # `This connection has been closed` 스택트레이스가 기동마다 찍혔다.
-  #
-  # 실측: sslmode=disable로 5회 연결/종료 → 터널 끊김 0회. 기본(SSL) → 즉시 끊김.
-  #
-  # **로컬 전용이다.** 터널 반대편은 localhost이고 트래픽이 기기 밖으로 나가지 않는다.
-  # 운영은 이 프로파일을 쓰지 않으므로 SSL 그대로다.
+  # `kubectl port-forward` 터널 위에서는 SSL 핸드셰이크가 깨져 터널이 내려간다 — 로컬 전용으로 SSL을 끈다.
   datasource:
     url: ${IEURI_DB_URL:jdbc:postgresql://localhost:5432/ieuri?sslmode=disable}
   jpa:
     show-sql: true
 
-# 구독(WebSocket) 디버깅용. **로컬 전용이다.**
-#
-# 연결 수립이 실패하면 리졸버까지 가지 않아 애플리케이션 로그가 한 줄도 안 남는다 —
-# 클라이언트에는 "Unknown GraphQL error"만 뜨고 서버는 조용해서 원인을 좁힐 수 없다.
-# 아래 둘을 켜면 핸드셰이크·connection_init·subscribe가 각각 보인다.
+# 구독(WebSocket) 디버깅용. 로컬 전용이다.
+# 연결 수립이 실패하면 애플리케이션 로그가 남지 않으므로 핸드셰이크·connection_init·subscribe를 켠다.
 logging:
   level:
     # 핸드셰이크가 실제로 도달했는지, 어떤 서브프로토콜로 붙었는지.
     org.springframework.web.socket: DEBUG
     # connection_init / subscribe / complete 프레임과 구독 생명주기.
     org.springframework.graphql: DEBUG
-    # 우리 인터셉터의 판정 로그(INFO면 충분하나 함께 올려 둔다).
-    org.around.ieuri.auth.infrastructure.security: DEBUG
-    # 푸시 발송 경로. **로컬 전용이다.**
-    #
-    # 발송은 조용히 걸러지는 분기가 많고(자기 행위·수신 거부·차단·기기 없음) 전부 정상
-    # 동작이라 INFO로 올릴 수 없다. 그런데 "알림이 안 온다"를 진단하려면 그중 어디서
-    # 멈췄는지가 바로 그 정보다. 로컬에서만 켠다.
+    # 우리 인터셉터의 판정 로그.
+    org.around.ieuri.auth.adapter.security: DEBUG
+    # 푸시 발송 경로. 로컬 전용이다 — 조용히 걸러지는 정상 분기(수신 거부·차단·기기 없음)가 어디서 멈췄는지 본다.
     org.around.ieuri.alarm: DEBUG
 
 management:
   tracing:
     export:
-      # **로컬에는 수집기가 없다.** 보낼 곳이 없으니 전송을 끈다. span 생성 자체는
-      # 살아 있어 로그의 trace ID는 그대로 찍히고, 내보내기만 멈춘다.
-      #
-      # 주소(management.opentelemetry.tracing.export.otlp.endpoint)는 이 파일에 두지
-      # 않는다 — application-{dev,prod}.yaml 만 갖는다. 여기 두면 값이 없어
-      # PlaceholderResolutionException 으로 부팅이 실패하며, 이 속성으로도 막지 못한다
-      # (조건 평가보다 placeholder 해석이 먼저다).
+      # 로컬에는 수집기가 없어 전송을 끈다. span 생성과 로그의 trace ID는 그대로다.
+      # 주소(otlp.endpoint)를 이 파일에 두지 않는다 — 값이 없어 placeholder 해석에서 부팅이 실패한다.
       enabled: false

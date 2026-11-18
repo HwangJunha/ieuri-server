@@ -27,6 +27,23 @@ that quietly went missing.
 - Bulk `update()`/`delete()` bypass the persistence context — check that nothing re-reads those
   entities in the same transaction.
 
+### In a context moved to Exposed
+
+- `@Transactional` is declared **on the service class**. A method-level annotation is a finding
+  unless it only adds `propagation = REQUIRES_NEW` — and every method an `AFTER_COMMIT` listener
+  calls must add exactly that, even when today's caller uses a different transaction manager (the
+  day both sides share a manager, `REQUIRED` joins the committed transaction and writes nothing).
+- **External I/O before the first query.** Exposed opens the connection on the first statement, so
+  an R2/HTTP/other-context call placed after a query holds a pooled connection for its whole
+  latency. Flag any external call that follows a repository call in the same method.
+- **Read-modify-write on shared columns.** Counters are atomic `± 1`; values that only move forward
+  (read points, last activity) are conditional updates (`WHERE col IS NULL OR col < :v`); "did this
+  call change it?" comes from `UPDATE … RETURNING`, not from a read before the write.
+- A raw-SQL `JdbcTemplate` that is not `exposedJdbcTemplate` runs on the JPA pool, outside the
+  Exposed transaction — it cannot see that transaction's uncommitted writes.
+- A JPA-backed query port called from an Exposed write service reads on another connection and
+  misses the service's own uncommitted changes.
+
 ## 2. Events as the domain seam
 
 Domains talk through published events precisely so they can be split apart later. Review each event
@@ -44,6 +61,10 @@ as if the listener already lived in another process.
 - Note what a swallowed failure costs. Mail that fails after commit is simply lost; if the work
   cannot be lost, an event is the wrong mechanism and retry/outbox is a separate spec.
 - Ordering between listeners must never be assumed.
+- **One listener method per aggregate** for an event several aggregates react to (member
+  withdrawal). A single method calling every aggregate in turn lets the first failure skip the rest;
+  each method swallows and logs its own. Shared facts (one timestamp) come from the event payload,
+  not from a coordinator.
 
 ## 3. Async execution
 

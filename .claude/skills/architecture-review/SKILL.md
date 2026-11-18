@@ -1,6 +1,6 @@
 ---
 name: architecture-review
-description: Review ieuri code for architecture violations ArchUnit cannot catch — CQRS rails, mapper placement and purity, framework leaking below infrastructure, cross-domain coupling through events, common/ bloat, and required values weakened to nullable. Use on a diff before a PR. Reports only.
+description: Review ieuri code for architecture violations ArchUnit cannot catch — CQRS rails, mapper placement and purity, framework leaking below infrastructure, cross-domain coupling through events, common/ bloat, required values weakened to nullable, and (in Exposed-migrated contexts) aggregate roots as the only door, rules judged outside the domain, hidden pairing parameters, application/domain package parity, and adapter role packages. Use on a diff before a PR. Reports only.
 license: MIT
 metadata:
   author: junha
@@ -54,7 +54,7 @@ Frameworks change; domains outlive them. Spring/JPA/DGS annotations and imports 
 
 ## 4. Domain independence
 
-The three domains (`auth`, `tourism`, `community`) must each be liftable into their own application.
+Each domain (`auth`, `tourism`, `community`, `alarm`) must be liftable into its own application.
 
 - Cross-domain calls go through the other domain's `port/in` or a **published domain event** —
   never its internals (ArchUnit catches the import; it does not catch a *design* that assumes
@@ -71,6 +71,30 @@ The three domains (`auth`, `tourism`, `community`) must each be liftable into th
 consent, coordinates are required. Opening them to null forces a branch for the missing case, and
 that branch returns *wrong* data rather than no data. Check all three: the `.graphqls` field, the
 `Command`, and the DB column. One of them left open is the path it comes in by.
+
+## 6. Aggregate and package shape (contexts already moved to Exposed)
+
+CLAUDE.md "Target shape" is the contract for a migrated context. Check what compiles but breaks it:
+
+- **A child created or removed outside its root** — a `SpotAnswer.write(...)`, a repository insert
+  the service calls without a root method in between. The root is the only door.
+- **A domain rule judged in the application or in SQL.** A service that pre-validates, interprets a
+  `Boolean`, or a bulk `UPDATE … WHERE` that re-states a rule the domain method already owns (the
+  rule now lives twice). Per-item through the domain is the default; bulk SQL only for rows with no
+  domain rule (likes, hides, blocks).
+- **A hidden pairing** — a parameter the caller must match to another by hand (`owner = ANSWER` with
+  a question id). The pairing belongs on a type; a fixed classification is a body `val` on the
+  entity, not a constructor argument.
+- **`application/` and `domain/` package lists differ.** A package on one side only — an
+  orchestrator like `application/withdrawal`, or `application/photo` with no domain twin — is a
+  finding. Aggregate-less capabilities go in `shared`; a cross-aggregate process is one listener
+  method per aggregate calling that aggregate's use case.
+- **An adapter directory mixing directions or technologies** — listeners beside publishers, Valkey
+  beside Spring events, resolvers beside dataloaders. Technology first, then role.
+- **A domain event named for its consumer** (`XxxNotificationTriggered`) or parked in `shared`
+  instead of the aggregate that emits it. Events are facts: `MessageSent`, `SpotAnswerWritten`.
+- **A child collection on a root** that is unbounded, or that no decision needs. Only small, bounded
+  sets a rule reads as a whole belong on the root.
 
 ## Output
 

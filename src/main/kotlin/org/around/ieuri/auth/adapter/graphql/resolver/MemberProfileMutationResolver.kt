@@ -1,0 +1,80 @@
+package org.around.ieuri.auth.adapter.graphql.resolver
+import com.netflix.graphql.dgs.DgsComponent
+import com.netflix.graphql.dgs.DgsMutation
+import com.netflix.graphql.dgs.InputArgument
+import org.around.ieuri.auth.adapter.graphql.mapper.toCommand
+import org.around.ieuri.auth.adapter.graphql.support.withAuthUserErrors
+import org.around.ieuri.auth.application.member.provided.MemberCommandUseCase
+import org.around.ieuri.auth.application.member.provided.ProfileImageUseCase
+import org.around.ieuri.common.graphql.generated.types.ChangeNicknameInput
+import org.around.ieuri.common.graphql.generated.types.ChangeNicknamePayload
+import org.around.ieuri.common.graphql.generated.types.ConfirmProfileImageUploadInput
+import org.around.ieuri.common.graphql.generated.types.ConfirmProfileImageUploadPayload
+import org.around.ieuri.common.graphql.generated.types.CreateProfileImageUploadUrlInput
+import org.around.ieuri.common.graphql.generated.types.CreateProfileImageUploadUrlPayload
+import org.around.ieuri.common.graphql.generated.types.RemoveProfileImagePayload
+import org.around.ieuri.common.security.CurrentMemberProvider
+
+/** 프로필 수정 뮤테이션 리졸버(SPEC-0011 R5·R6). 본인 대상이며 이미지 바이트는 서버를 거치지 않는다. */
+@DgsComponent
+class MemberProfileMutationResolver(
+    private val memberCommandUseCase: MemberCommandUseCase,
+    private val profileImageUseCase: ProfileImageUseCase,
+    private val currentMemberProvider: CurrentMemberProvider,
+) {
+    @DgsMutation
+    fun changeNickname(@InputArgument input: ChangeNicknameInput): ChangeNicknamePayload = withAuthUserErrors(
+        onError = { ChangeNicknamePayload(success = false, userErrors = it, nickname = null) },
+    ) {
+        val memberId = currentMemberProvider.requireMemberId()
+        val nickname = memberCommandUseCase.changeNickname(input.toCommand(), memberId)
+        ChangeNicknamePayload(success = true, userErrors = emptyList(), nickname = nickname)
+    }
+
+    @DgsMutation
+    fun createProfileImageUploadUrl(
+        @InputArgument input: CreateProfileImageUploadUrlInput,
+    ): CreateProfileImageUploadUrlPayload = withAuthUserErrors(
+        onError = {
+            CreateProfileImageUploadUrlPayload(
+                success = false,
+                userErrors = it,
+                uploadUrl = null,
+                objectKey = null,
+                expiresAt = null,
+            )
+        },
+    ) {
+        val memberId = currentMemberProvider.requireMemberId()
+        val view = profileImageUseCase.issueProfileImageUploadUrl(input.toCommand(), memberId)
+        CreateProfileImageUploadUrlPayload(
+            success = true,
+            userErrors = emptyList(),
+            uploadUrl = view.uploadUrl,
+            objectKey = view.objectKey,
+            expiresAt = view.expiresAt.toString(),
+        )
+    }
+
+    @DgsMutation
+    fun confirmProfileImageUpload(
+        @InputArgument input: ConfirmProfileImageUploadInput,
+    ): ConfirmProfileImageUploadPayload = withAuthUserErrors(
+        onError = {
+            ConfirmProfileImageUploadPayload(success = false, userErrors = it, profileImageKey = null)
+        },
+    ) {
+        val memberId = currentMemberProvider.requireMemberId()
+        val key = profileImageUseCase.confirmProfileImageUpload(input.toCommand(), memberId)
+        ConfirmProfileImageUploadPayload(success = true, userErrors = emptyList(), profileImageKey = key)
+    }
+
+    @DgsMutation
+    fun removeProfileImage(): RemoveProfileImagePayload = withAuthUserErrors(
+        onError = { RemoveProfileImagePayload(success = false, userErrors = it) },
+    ) {
+        val memberId = currentMemberProvider.requireMemberId()
+        profileImageUseCase.removeProfileImage(memberId)
+        RemoveProfileImagePayload(success = true, userErrors = emptyList())
+    }
+}

@@ -11,17 +11,8 @@ import org.slf4j.LoggerFactory
 import java.util.concurrent.CompletableFuture
 
 /**
- * 매핑되지 않은 예외를 **내부 정보 없이** 내보낸다(POL-013).
- *
- * DGS 기본 핸들러는 `"${예외 FQCN}: ${메시지}"`를 그대로 메시지에 싣는다. 그래서 예컨대
- * JPA 제약 위반이 나면 SQL 문·테이블명·제약명·회원 id가 통째로 클라이언트까지 갔다.
- * 예상하지 못한 실패일수록 그 원문에 무엇이 담길지 알 수 없으므로, **화이트리스트 방식으로
- * 고정 메시지만 내보내고** 원인은 서버 로그에만 남긴다.
- *
- * 스택은 로그로 남기므로 디버깅 정보를 잃지 않는다 — 노출 대상만 바뀐다.
- *
- * 핸들러 체인의 **맨 끝**에 둔다. 앞선 핸들러들이 자기 예외에 코드를 실어 처리하고,
- * 여기 도달했다는 것은 우리가 모르는 실패라는 뜻이다.
+ * 매핑되지 않은 예외를 고정 메시지·코드로만 내보낸다(POL-013). 원인은 서버 로그에만 남긴다.
+ * 핸들러 체인의 맨 끝에 둔다.
  */
 class InternalErrorSanitizingHandler : DataFetcherExceptionHandler {
 
@@ -29,7 +20,7 @@ class InternalErrorSanitizingHandler : DataFetcherExceptionHandler {
         parameters: DataFetcherExceptionHandlerParameters,
     ): CompletableFuture<DataFetcherExceptionHandlerResult> {
         val exception = parameters.exception
-        // 원인은 로그에만 남긴다. path가 있어야 어느 필드에서 터졌는지 추적할 수 있다.
+        // path가 있어야 어느 필드에서 터졌는지 추적할 수 있다.
         log.error("처리되지 않은 오류: path={}", parameters.path, exception)
 
         val error = InternalGraphQLError(
