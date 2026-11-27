@@ -53,7 +53,7 @@
 > CLAUDE.md CQRS 규약: GraphQL args → query 핸들러 → `port/out/query` → **QueryDSL이 read DTO로 직접 프로젝션(애그리거트 우회)** → 리졸버가 read DTO를 GraphQL 응답으로 매핑. `application`은 DGS 타입을 모른다. 우선 per-query 프로젝션으로 시작, N+1 실측 시에만 DataLoader.
 
 **조회 기능**
-1. **`me`(본인 정보)** — accessToken 인증 필요(권한 불요, 로그인만). 반환: 닉네임·프로필이미지·상태·emailVerified·**역할 목록**·**유효 권한 목록**·가입일(+본인 이메일). → 클라이언트가 권한으로 **메뉴 렌더**(다나와식 권한 코드 UX)에 사용.
+1. **`me`(본인 정보)** — accessToken 인증 필요(권한 불요, 로그인만). 반환: 닉네임·프로필이미지·상태·emailVerified·**역할 목록**·**유효 권한 목록**·가입일(+본인 이메일). → 클라이언트가 권한으로 **메뉴 렌더**(권한 코드 UX)에 사용.
 2. **관리자 회원 조회** — 권한 `member:read` 필요:
    - `member(id: ID!)` — 단건 상세(프로필·상태·정지정보·역할).
    - `members(status, roleCode, page, size)` — 페이지네이션 목록.

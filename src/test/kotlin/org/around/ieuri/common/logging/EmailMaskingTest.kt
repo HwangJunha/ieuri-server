@@ -9,7 +9,7 @@ class EmailMaskingTest {
 
     @Test
     fun `일반 주소는 앞 2자만 남기고 도메인은 유지한다`() {
-        assertEquals("ta***@gmail.com", maskEmail("tarot1415@gmail.com"))
+        assertEquals("ta***@gmail.com", maskEmail("taxxxx@gmail.com"))
         assertEquals("ab***@ieuri.co.kr", maskEmail("abc@ieuri.co.kr"))
     }
 
