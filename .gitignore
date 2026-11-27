@@ -241,3 +241,9 @@ Temporary Items
 # 위 IntelliJ 규칙(out/)이 소스까지 무시하므로, 소스 트리의 out 패키지는 다시 추적한다(마지막 매치 우선).
 !**/src/main/**/out/
 !**/src/test/**/out/
+
+# local-only (공개 전 추적 해제)
+.env*
+.envrc
+local.properties
+.mcp.json
